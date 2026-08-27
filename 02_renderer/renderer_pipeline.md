@@ -1,0 +1,101 @@
+# Renderer — Pipeline de renderização
+
+> **Estado:** renderer mínimo da Fase 2 implementado e validado; variantes de
+> Worker e materiais industriais preparados/cacheados antes do draw nas Fases 9
+> e 10. Filas completas, culling, transparência, UI e pós-processamento
+> permanecem planejados.
+>
+> **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
+
+## Base documental
+
+- `architecture.md — Renderer/OpenGL`
+- `README(6).md — passe visual`
+
+## Objetivo
+
+Renderizar o estado do jogo sem possuir regras de gameplay.
+
+## Entrada
+
+```cpp
+struct RenderFrame {
+    CameraData camera;
+    std::span<const RenderInstance> opaque;
+    std::span<const RenderInstance> transparent;
+    std::span<const LightData> lights;
+    UiRenderData ui;
+};
+```
+
+## Pipeline
+
+```text
+GAME STATE
+→ visibility/culling
+→ render queue
+→ opaque world
+→ opaque entities
+→ transparent/emissive
+→ post-process opcional
+→ viewmodel
+→ HUD/UI
+→ present
+```
+
+## Implementação da Fase 2
+
+`Renderer` recebe dimensões do alvo e `CameraData` pronto do gameplay e mantém
+shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
+
+```text
+room material variant → fixed room instances → Worker/Guard/Officer variants
+→ framebuffer color+depth → blit → SDL window
+```
+
+O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
+OpenGL encerram o frame com log e recursos GPU são destruídos antes do contexto.
+`prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
+`prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
+`prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e
+`prepareSecurityRoomMaterials()` e `prepareCentralHubRoomMaterials()` geram uma
+chave pelo hash integral do perfil e selecionam a variante. `render()` apenas
+escolhe os canais Wall/Floor/Ceiling já enviados à GPU. A START usa Industrial;
+o teste offscreen alterna pelos outros sete ambientes, confirma mudança de
+pixels entre os oito perfis e repetição exata da mesma variante Industrial.
+`prepareWorkerVisual()`, `prepareGuardVisual()` e `prepareOfficerVisual()` usam
+mapas GPU separados por papel; `EnemyRenderData::role` seleciona mesh/textura
+sem geração durante draw. O teste offscreen posiciona os três no mesmo ponto e
+exige pixels distintos entre cada papel.
+
+## Separação
+
+O renderer recebe `MeshHandle`, `MaterialHandle` e transforms. Ele nunca consulta `EnemyGenerator`, `WorldGenerator` ou RNG.
+
+## Depth e transparência
+
+Mundo/entidades opacas usam depth test. Transparência é exceção e fila separada. UI é passe separado.
+
+## Culling
+
+Primeira versão: frustum culling por AABB. Occlusion culling é opcional futuro.
+
+## Viewmodel
+
+Pode possuir FOV/projeção própria, mas hitscan usa a câmera lógica de gameplay.
+
+## Retro visual
+
+Pode usar resolução interna reduzida, quantização, dithering e gradação, desde que não prejudique leitura.
+
+## Debug
+
+Wireframe, normals, AABB, connector volumes, spawn zones, material IDs, semantic regions e light bounds.
+
+## Falha
+
+Shader/material ausente usa material de erro visível e gera log. Não falhar silenciosamente.
+
+## Testes
+
+Resize, fullscreen/windowed, mesh vazia, material inválido, zero luzes, alto número de objetos e HUD independente do FOV 3D.

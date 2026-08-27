@@ -1,0 +1,12 @@
+{
+  "total_files": 134,
+  "markdown_files": 50,
+  "json_files": 2,
+  "cmake_files": 1,
+  "cpp_source_files": 44,
+  "cpp_header_files": 35,
+  "images": 1,
+  "other_files": 1,
+  "empty_files": [],
+  "excluded_directories": ["build"]
+}
