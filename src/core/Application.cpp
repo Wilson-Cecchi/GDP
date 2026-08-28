@@ -56,6 +56,37 @@ gdp::render::RoomLightingRenderData makeRenderLighting(
     return lighting;
 }
 
+gameplay::ProgressionEvent progressionEventFor(
+    const entities::EnemyArchetype archetype) noexcept
+{
+    switch (archetype) {
+    case entities::EnemyArchetype::Guard:
+        return gameplay::ProgressionEvent::GuardKilled;
+    case entities::EnemyArchetype::Officer:
+        return gameplay::ProgressionEvent::OfficerKilled;
+    case entities::EnemyArchetype::Engineer:
+        return gameplay::ProgressionEvent::EngineerKilled;
+    case entities::EnemyArchetype::IndustrialRobot:
+        return gameplay::ProgressionEvent::IndustrialRobotKilled;
+    case entities::EnemyArchetype::Worker:
+        return gameplay::ProgressionEvent::WorkerKilled;
+    }
+    return gameplay::ProgressionEvent::WorkerKilled;
+}
+
+const char* progressionRewardName(const gameplay::ProgressionReward reward) noexcept
+{
+    switch (reward) {
+    case gameplay::ProgressionReward::Vitality:
+        return "Vitality +15 HP";
+    case gameplay::ProgressionReward::Firepower:
+        return "Firepower +4 damage";
+    case gameplay::ProgressionReward::Capacity:
+        return "Capacity +4 reserve";
+    }
+    return "Unknown";
+}
+
 } // namespace
 
 Application::Application(ApplicationConfig config)
@@ -318,6 +349,24 @@ void Application::fixedUpdate(const double fixedStep)
     weapon_.fixedUpdate(step);
     entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
+    const auto awardProgress = [this](
+        const gameplay::ProgressionEvent event,
+        const std::uint32_t count) {
+        const gameplay::ProgressionUpdate update
+            = progression_.record(event, count, player_, weapon_);
+        if (update.experienceAwarded == 0U) {
+            return;
+        }
+        std::ostringstream message;
+        message << "Progress +" << update.experienceAwarded << " XP | score +"
+                << update.scoreAwarded << " | level " << progression_.state().level;
+        log(LogLevel::Info, message.str());
+        for (const gameplay::ProgressionReward reward : update.rewards) {
+            std::ostringstream rewardMessage;
+            rewardMessage << "Level reward: " << progressionRewardName(reward);
+            log(LogLevel::Info, rewardMessage.str());
+        }
+    };
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
     player_.fixedUpdate(playerCommand_, step, collisionWorld_);
@@ -352,6 +401,8 @@ void Application::fixedUpdate(const double fixedStep)
             audio_->play(gdp::audio::AudioEventKind::Pickup,
                 config_.worldSeed, audioEventCounter_++);
         }
+        awardProgress(gameplay::ProgressionEvent::LootCollected,
+            static_cast<std::uint32_t>(loot.collected));
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
@@ -420,6 +471,15 @@ void Application::fixedUpdate(const double fixedStep)
                 config_.worldSeed, audioEventCounter_++,
                 player_.cameraPosition() + (player_.forwardDirection() * 4.0F),
                 player_.cameraPosition(), player_.forwardDirection());
+        }
+        if (shot.outcome == gameplay::ShotOutcome::Killed && shot.hit) {
+            const entities::EnemyData* killed
+                = entities_.findData<entities::EnemyData>(shot.hit->target);
+            if (killed != nullptr) {
+                awardProgress(progressionEventFor(killed->archetype), 1U);
+            }
+        } else if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
+            awardProgress(gameplay::ProgressionEvent::PropDestroyed, 1U);
         }
         std::ostringstream message;
         if (shot.outcome == gameplay::ShotOutcome::Hit
@@ -545,6 +605,7 @@ void Application::fixedUpdate(const double fixedStep)
                 audio_->play(gdp::audio::AudioEventKind::EventComplete,
                     activeEvent->plan.seed, audioEventCounter_++);
             }
+            awardProgress(gameplay::ProgressionEvent::RoomEventCompleted, 1U);
         }
     }
     if (audio_) {
@@ -650,6 +711,15 @@ void Application::render()
     title << "GDP | HP " << static_cast<int>(player_.state().health)
           << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
     title << " | Keys " << player_.state().keys;
+    const gameplay::ProgressionState& progress = progression_.state();
+    title << " | Lv " << progress.level << " XP " << progress.experienceIntoLevel;
+    const std::uint32_t nextLevelXp = gameplay::experienceForNextLevel(progress.level);
+    if (nextLevelXp > 0U) {
+        title << '/' << nextLevelXp;
+    } else {
+        title << " MAX";
+    }
+    title << " | Score " << progress.score;
     const auto activeEvent = std::find_if(
         roomEvents_.begin(), roomEvents_.end(),
         [playerRoom](const gameplay::RoomEventRuntime& runtime) {
@@ -699,6 +769,7 @@ void Application::shutdown()
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    progression_ = gameplay::ProgressionSystem{};
     audioEventCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();

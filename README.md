@@ -56,9 +56,10 @@ especializados das pastas numeradas.
   Technical Area, Security e Central Hub.
 - **Fase 11 — Elenco:** implementada e validada; Guard, Officer, Engineer e
   IndustrialRobot possuem geração procedural, renderer e combate funcional.
-- **Fase 12 — Procedural avançado:** em andamento; loot, props, eventos de sala,
-  iluminação e áudio procedurais funcionais, integrados e validados.
-- **Próxima atualização:** continuar a Fase 12 com progressão.
+- **Fase 12 — Procedural avançado:** implementada e validada; loot, props,
+  eventos de sala, iluminação, áudio e progressão estão integrados.
+- **Próxima atualização:** iniciar o vertical slice navegável com transições
+  físicas entre salas.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -154,6 +155,13 @@ vozes, cache, ambiente próprio para os sete temas, pan e distância. Falta de
 dispositivo não interrompe o jogo; headless mantém síntese/mixagem silenciosa
 para regressão. Nenhum arquivo WAV externo é necessário.
 
+O sexto incremento conclui a Fase 12 com progressão funcional de sessão.
+Eliminações, props destruídos, loot e eventos concedem XP e score; a curva vai
+do nível 1 ao 10. Cada nível alterna automaticamente `Vitality` (+15 HP máximo
+e cura), `Firepower` (+4 de dano) e `Capacity` (+4 de reserva e munição). Nível,
+XP e score aparecem no título; limpar o encontro inicial e a emboscada da START
+já permite alcançar o primeiro upgrade.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -183,7 +191,7 @@ ctest --preset debug
 
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
-Gameplay, Loot, Props, Events, Lighting, Audio, Combat, Entities e World.
+Gameplay, Loot, Props, Events, Lighting, Audio, Progression, Combat, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 

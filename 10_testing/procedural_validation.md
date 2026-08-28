@@ -40,6 +40,11 @@ clipping, cache, 16 vozes, pan, distância, loop, dispositivo dummy e fallback
 sem device são regressões dedicadas. A substream `Audio` não participa do
 fingerprint estrutural.
 
+O gate de progressão valida a curva 100 + 75 por nível, cap 10, XP restante,
+score, contadores por fonte, eventos inválidos e ciclo fixo de nove upgrades.
+Integração prova que Vitality altera HP/cura, Firepower altera dano e Capacity
+altera reserva/munição nas instâncias reais, mantendo o estado canônico válido.
+
 ## Enemy metrics
 
 Role, BodyProfile, part IDs, fallback count, materials e unique VisualGenomeHash.

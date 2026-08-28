@@ -1,7 +1,8 @@
 # Gameplay — Loot, progressão e modos
 
-> **Estado:** loot procedural e coleta automática implementados no primeiro
-> incremento da Fase 12; Armor, Weapon, Special e progressão permanecem planejados.
+> **Estado:** loot procedural, coleta automática e progressão de sessão até o
+> nível 10 implementados e validados na Fase 12. Armor, Weapon pickup, Special
+> e persistência entre execuções permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -38,6 +39,28 @@ handle da sala e só então faz flush. Jogador morto não coleta.
 
 O renderer usa formas mínimas emissivas verdes, amarelas e ciano para Health,
 Ammo e Key. Assets procedurais específicos permanecem para uma etapa visual posterior.
+
+## Progressão de sessão
+
+`ProgressionSystem` recebe apenas resultados já consolidados. Worker, Guard,
+Officer, Engineer e IndustrialRobot concedem respectivamente 25/40/55/50/200
+XP; prop destruído concede 10, loot coletado 5 e evento concluído 75. Cada fonte
+também possui score e contador próprios. Eventos inválidos ou quantidade zero
+não alteram estado.
+
+O nível começa em 1, exige 100 XP e cada próximo limiar cresce 75, até o máximo
+10. Resto de XP atravessa múltiplos níveis; no cap, XP corrente fica zero e
+total/score continuam acumulando.
+
+```text
+nível 2, 5, 8  → Vitality: +15 HP máximo e +15 cura
+nível 3, 6, 9  → Firepower: +4 dano da pistola
+nível 4, 7, 10 → Capacity: +4 reserva máxima e +4 munição
+```
+
+Os benefícios são aplicados às instâncias reais de `Player` e `Weapon`. O
+título mostra nível, XP atual/limiar e score. O sistema atual dura a sessão; a
+Campanha futura decidirá o que persiste entre andares e execuções.
 
 ## Validação atual
 

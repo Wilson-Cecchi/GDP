@@ -114,6 +114,7 @@ add_library(
     src/gameplay/Enemy.cpp
     src/gameplay/Loot.cpp
     src/gameplay/Player.cpp
+    src/gameplay/Progression.cpp
     src/gameplay/Props.cpp
     src/gameplay/RoomEvents.cpp
     src/gameplay/Weapon.cpp
@@ -239,6 +240,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME gameplay_systems COMMAND gdp_gameplay_tests)
     set_tests_properties(gameplay_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_progression_tests tests/test_progression.cpp)
+    target_link_libraries(gdp_progression_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_progression_tests)
+    gdp_enable_sanitizers(gdp_progression_tests)
+
+    add_test(NAME progression_systems COMMAND gdp_progression_tests)
+    set_tests_properties(progression_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_loot_tests tests/test_loot.cpp)
     target_link_libraries(gdp_loot_tests PRIVATE gdp_gameplay gdp_world)

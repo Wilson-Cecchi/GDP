@@ -1,6 +1,8 @@
 #include "gameplay/Weapon.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace gdp::gameplay {
 
@@ -53,6 +55,29 @@ std::uint32_t Weapon::addReserveAmmo(const std::uint32_t amount) noexcept
     const std::uint32_t accepted = std::min(amount, capacity);
     reserveAmmo_ += accepted;
     return accepted;
+}
+
+bool Weapon::increaseDamage(const float amount) noexcept
+{
+    if (!std::isfinite(amount) || amount <= 0.0F) {
+        return false;
+    }
+    definition_.damage += amount;
+    return true;
+}
+
+bool Weapon::increaseReserveCapacity(
+    const std::uint32_t amount,
+    const std::uint32_t bonusAmmo) noexcept
+{
+    if (amount == 0U
+        || amount > std::numeric_limits<std::uint32_t>::max()
+            - definition_.reserveMaximum) {
+        return false;
+    }
+    definition_.reserveMaximum += amount;
+    (void)addReserveAmmo(bonusAmmo);
+    return true;
 }
 
 const WeaponDefinition& Weapon::definition() const noexcept

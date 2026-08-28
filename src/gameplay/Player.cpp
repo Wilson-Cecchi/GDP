@@ -155,6 +155,20 @@ void Player::addKeys(const std::uint32_t amount) noexcept
     state_.keys += amount;
 }
 
+bool Player::increaseMaximumHealth(
+    const float amount,
+    const float healing) noexcept
+{
+    if (!std::isfinite(amount) || !std::isfinite(healing) || amount <= 0.0F) {
+        return false;
+    }
+    state_.maximumHealth += amount;
+    if (state_.alive && healing > 0.0F) {
+        state_.health = std::min(state_.maximumHealth, state_.health + healing);
+    }
+    return true;
+}
+
 const PlayerState& Player::state() const noexcept
 {
     return state_;

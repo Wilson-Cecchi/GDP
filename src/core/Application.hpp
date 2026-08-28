@@ -7,6 +7,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/Progression.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldGenerator.hpp"
 
@@ -62,6 +63,7 @@ private:
     gameplay::CollisionWorld collisionWorld_;
     gameplay::Player player_;
     gameplay::Weapon weapon_;
+    gameplay::ProgressionSystem progression_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};

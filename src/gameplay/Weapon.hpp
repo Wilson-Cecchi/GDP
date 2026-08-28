@@ -26,6 +26,10 @@ public:
     [[nodiscard]] FireReadiness tryFire() noexcept;
     [[nodiscard]] bool reload() noexcept;
     [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
+    [[nodiscard]] bool increaseDamage(float amount) noexcept;
+    [[nodiscard]] bool increaseReserveCapacity(
+        std::uint32_t amount,
+        std::uint32_t bonusAmmo = 0U) noexcept;
 
     [[nodiscard]] const WeaponDefinition& definition() const noexcept;
     [[nodiscard]] std::uint32_t magazineAmmo() const noexcept;

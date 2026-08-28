@@ -46,7 +46,8 @@ struct WeaponDefinition {
 
 A pistola inicial usa 34 de dano, intervalo de `0,22 s`, alcance de `30 m`,
 pente de 8 e reserva de 32. Botão esquerdo dispara e `R` transfere a quantidade
-necessária da reserva para o pente.
+necessária da reserva para o pente. Progressão pode aumentar dano em blocos de
+4 e reserva máxima em blocos de 4 sem substituir a arma.
 
 ## Dano
 

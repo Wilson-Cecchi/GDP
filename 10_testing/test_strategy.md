@@ -53,6 +53,11 @@ categorias sem samples inválidos ou clipping. Testes do mixer silencioso cobrem
 cache, voice budget, descarte, loop, pan e distância; integrações SDL usam
 driver dummy para saída e driver inexistente para provar fallback não fatal.
 
+O gate de progressão cobre valores por fonte, curva/limite, múltiplos níveis no
+mesmo award, resto de XP, telemetria e entradas inválidas. Também exige os nove
+benefícios reais de Player/Weapon no nível 10 e valida o estado após cada
+sequência representativa.
+
 O gate de assets gera 1.000 recipes visuais, valida pixels e regras materiais,
 exercita reuse do cache e mantém o fingerprint estrutural do World separado. O
 gate do Worker gera outras 1.000 seeds, valida montagem/mesh/albedo/hash e exige

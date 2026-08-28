@@ -2,7 +2,7 @@
 
 > **Estado:** estado lógico, spawn, vida e interação inicial implementados na
 > Fase 3; binding geracional e sincronização com Entity Manager validados na
-> Fase 6; chaves e coleta automática de recursos validadas na Fase 12.
+> Fase 6; chaves, coleta automática e upgrade de HP validados na Fase 12.
 > Armadura e eventos entram nas fases correspondentes.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.

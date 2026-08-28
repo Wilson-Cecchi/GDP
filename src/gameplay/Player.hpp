@@ -52,6 +52,9 @@ public:
     void applyDamage(float amount) noexcept;
     void heal(float amount) noexcept;
     void addKeys(std::uint32_t amount) noexcept;
+    [[nodiscard]] bool increaseMaximumHealth(
+        float amount,
+        float healing = 0.0F) noexcept;
 
     [[nodiscard]] const PlayerState& state() const noexcept;
     [[nodiscard]] gdp::entities::EntityId entity() const noexcept;
