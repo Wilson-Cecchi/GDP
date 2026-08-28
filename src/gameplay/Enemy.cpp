@@ -35,6 +35,7 @@ EnemyUpdateSummary updateWorkers(
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
             || enemy->archetype != EnemyArchetype::Worker
+            || !enemy->active
             || enemy->behavior == EnemyBehaviorState::Dead) {
             continue;
         }
@@ -111,6 +112,7 @@ EnemyUpdateSummary updateGuards(
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
             || enemy->archetype != EnemyArchetype::Guard
+            || !enemy->active
             || enemy->behavior == EnemyBehaviorState::Dead) {
             continue;
         }
@@ -205,6 +207,7 @@ EnemyUpdateSummary updateOfficers(
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
             || enemy->archetype != EnemyArchetype::Officer
+            || !enemy->active
             || enemy->behavior == EnemyBehaviorState::Dead) {
             continue;
         }
@@ -231,6 +234,7 @@ EnemyUpdateSummary updateOfficers(
                 if (allyEntity == nullptr || ally == nullptr || allyEntity->roomId != roomId
                     || (ally->archetype != EnemyArchetype::Worker
                         && ally->archetype != EnemyArchetype::Guard)
+                    || !ally->active
                     || ally->behavior == EnemyBehaviorState::Dead
                     || ally->attackCooldown <= 0.0F) {
                     continue;
@@ -336,6 +340,7 @@ EnemyUpdateSummary updateEngineers(
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
             || enemy->archetype != EnemyArchetype::Engineer
+            || !enemy->active
             || enemy->behavior == EnemyBehaviorState::Dead) {
             continue;
         }
@@ -355,6 +360,7 @@ EnemyUpdateSummary updateEngineers(
                 const Entity* allyEntity = manager.find(allyId);
                 const EnemyData* ally = manager.findData<EnemyData>(allyId);
                 if (allyEntity == nullptr || ally == nullptr || allyEntity->roomId != roomId
+                    || !ally->active
                     || ally->behavior == EnemyBehaviorState::Dead
                     || ally->health >= ally->maximumHealth) {
                     continue;
@@ -536,6 +542,7 @@ EnemyUpdateSummary updateIndustrialRobots(
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
             || enemy->archetype != EnemyArchetype::IndustrialRobot
+            || !enemy->active
             || enemy->behavior == EnemyBehaviorState::Dead) {
             continue;
         }

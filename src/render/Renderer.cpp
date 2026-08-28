@@ -49,7 +49,7 @@ in vec2 vUv;
 
 uniform sampler2D uAlbedo;
 uniform vec3 uTint;
-const int MAX_LIGHTS = 4;
+const int MAX_LIGHTS = 8;
 uniform int uLightCount;
 uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
@@ -715,18 +715,26 @@ bool Renderer::render(
     constexpr std::array positionUniforms{
         "uLightPositions[0]", "uLightPositions[1]",
         "uLightPositions[2]", "uLightPositions[3]",
+        "uLightPositions[4]", "uLightPositions[5]",
+        "uLightPositions[6]", "uLightPositions[7]",
     };
     constexpr std::array colorUniforms{
         "uLightColors[0]", "uLightColors[1]",
         "uLightColors[2]", "uLightColors[3]",
+        "uLightColors[4]", "uLightColors[5]",
+        "uLightColors[6]", "uLightColors[7]",
     };
     constexpr std::array intensityUniforms{
         "uLightIntensities[0]", "uLightIntensities[1]",
         "uLightIntensities[2]", "uLightIntensities[3]",
+        "uLightIntensities[4]", "uLightIntensities[5]",
+        "uLightIntensities[6]", "uLightIntensities[7]",
     };
     constexpr std::array rangeUniforms{
         "uLightRanges[0]", "uLightRanges[1]",
         "uLightRanges[2]", "uLightRanges[3]",
+        "uLightRanges[4]", "uLightRanges[5]",
+        "uLightRanges[6]", "uLightRanges[7]",
     };
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
@@ -1036,12 +1044,16 @@ bool Renderer::render(
             * gdp::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(
-            gl_, "uTint", enemy.alive
+            gl_, "uTint", !enemy.alive
+                ? gdp::core::Vec3{0.30F, 0.24F, 0.20F}
+                : enemy.active
                 ? gdp::core::Vec3{1.0F, 1.0F, 1.0F}
-                : gdp::core::Vec3{0.30F, 0.24F, 0.20F});
+                : gdp::core::Vec3{0.68F, 0.72F, 0.78F});
         shader_.setFloat(gl_, "uUvScale", 4.0F);
         shader_.setFloat(gl_, "uEmissiveStrength",
-            enemy.alive ? visual->second.emissiveStrength : 0.0F);
+            enemy.alive
+                ? visual->second.emissiveStrength * (enemy.active ? 1.0F : 0.25F)
+                : 0.0F);
         visual->second.mesh.draw(gl_);
     }
 

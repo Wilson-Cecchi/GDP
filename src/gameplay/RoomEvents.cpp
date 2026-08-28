@@ -13,6 +13,7 @@ bool enemyIsAlive(
     const gdp::entities::EnemyData* enemy
         = manager.findData<gdp::entities::EnemyData>(id);
     return enemy != nullptr
+        && enemy->active
         && enemy->behavior != gdp::entities::EnemyBehaviorState::Dead;
 }
 
@@ -60,6 +61,36 @@ RoomEventRuntime makeRoomEventRuntime(
         ? RoomEventPhase::Completed : RoomEventPhase::Dormant;
     runtime.plan = std::move(plan);
     return runtime;
+}
+
+std::vector<gdp::entities::EntityId> stageRoomEventFirstWave(
+    RoomEventRuntime& runtime,
+    gdp::entities::EntityManager& manager)
+{
+    using gdp::world::RoomEventTrigger;
+    std::vector<gdp::entities::EntityId> staged;
+    if (runtime.phase != RoomEventPhase::Dormant
+        || runtime.plan.trigger != RoomEventTrigger::RoomEntry
+        || runtime.plan.waveCount == 0U || !runtime.stagedEnemies.empty()) {
+        return staged;
+    }
+
+    for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
+        if (spawn.wave != 0U) {
+            continue;
+        }
+        const gdp::entities::EntityId enemy = manager.createEnemy({
+            .transform = {.position = spawn.position},
+            .roomId = runtime.roomId,
+            .archetype = spawn.archetype,
+            .health = spawn.health,
+            .visualSeed = spawn.visualSeed,
+            .active = false,
+        });
+        runtime.stagedEnemies.push_back(enemy);
+        staged.push_back(enemy);
+    }
+    return staged;
 }
 
 RoomEventUpdateSummary updateRoomEvent(
@@ -115,20 +146,35 @@ RoomEventUpdateSummary updateRoomEvent(
         && liveEventEnemies == 0U && runtime.cooldownRemaining <= 0.0F
         && !lockdownWaitingForInitialClear) {
         const std::uint32_t wave = runtime.nextWave;
-        for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
-            if (spawn.wave != wave) {
-                continue;
+        if (wave == 0U && !runtime.stagedEnemies.empty()) {
+            for (const gdp::entities::EntityId id : runtime.stagedEnemies) {
+                gdp::entities::EnemyData* enemy
+                    = manager.findData<gdp::entities::EnemyData>(id);
+                if (enemy == nullptr
+                    || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
+                    continue;
+                }
+                enemy->active = true;
+                runtime.eventEnemies.push_back(id);
+                summary.spawnedEnemies.push_back(id);
             }
-            const gdp::entities::EntityId enemy = manager.createEnemy({
-                .transform = {.position = spawn.position},
-                .roomId = runtime.roomId,
-                .archetype = spawn.archetype,
-                .health = spawn.health,
-                .visualSeed = spawn.visualSeed,
-            });
-            runtime.eventEnemies.push_back(enemy);
-            summary.spawnedEnemies.push_back(enemy);
-            summary.createdEntities.push_back(enemy);
+            runtime.stagedEnemies.clear();
+        } else {
+            for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
+                if (spawn.wave != wave) {
+                    continue;
+                }
+                const gdp::entities::EntityId enemy = manager.createEnemy({
+                    .transform = {.position = spawn.position},
+                    .roomId = runtime.roomId,
+                    .archetype = spawn.archetype,
+                    .health = spawn.health,
+                    .visualSeed = spawn.visualSeed,
+                });
+                runtime.eventEnemies.push_back(enemy);
+                summary.spawnedEnemies.push_back(enemy);
+                summary.createdEntities.push_back(enemy);
+            }
         }
         ++runtime.nextWave;
         runtime.cooldownRemaining = runtime.plan.interWaveDelay;

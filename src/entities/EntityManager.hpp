@@ -86,6 +86,7 @@ struct EnemyData {
     float attackCooldown{0.0F};
     gdp::core::Seed visualSeed{0};
     float supportCooldown{0.0F};
+    bool active{true};
 };
 
 struct ItemData {
@@ -126,6 +127,7 @@ struct EnemyCreateInfo {
     EnemyArchetype archetype{EnemyArchetype::Worker};
     float health{50.0F};
     gdp::core::Seed visualSeed{0};
+    bool active{true};
 };
 
 struct ItemCreateInfo {

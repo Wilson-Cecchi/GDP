@@ -70,6 +70,37 @@ void testDamageLifecycle()
         "invalid target safely ignores damage");
 }
 
+void testDormantEnemyIgnoresCombat()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld openRoom{{{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    EntityManager manager;
+    const EntityId dormant = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -3.0F}},
+        .roomId = 1,
+        .active = false,
+    });
+    expect(applyDamage(manager, dormant, 500.0F) == DamageOutcome::Ignored,
+        "dormant preview enemy ignores direct damage before event activation");
+    Weapon weapon({.fireInterval = 0.0F, .range = 20.0F});
+    const ShotResult shot = fireHitscan(
+        weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1, openRoom, manager);
+    expect(shot.outcome == ShotOutcome::ImpactWorld && !shot.hit
+            && manager.findData<EnemyData>(dormant)->health == 50.0F,
+        "hitscan passes over dormant event previews without changing their health");
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const gdp::core::Vec3 dormantPosition = manager.find(dormant)->transform.position;
+    const EnemyUpdateSummary update
+        = updateWorkers(manager, player, 1, openRoom, 1.0F);
+    expect(update.idle == 0U && update.chasing == 0U && update.attacking == 0U
+            && manager.find(dormant)->transform.position == dormantPosition,
+        "dormant preview enemy runs no AI and remains fixed before activation");
+}
+
 void testHitscanSelectionAndBlocking()
 {
     using namespace gdp::entities;
@@ -709,6 +740,7 @@ int main()
 {
     testWeaponLifecycle();
     testDamageLifecycle();
+    testDormantEnemyIgnoresCombat();
     testHitscanSelectionAndBlocking();
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testWorkerBehavior();

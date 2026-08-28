@@ -54,6 +54,7 @@ struct EnemyRenderData {
     bool alive{true};
     gdp::core::Seed visualSeed{0};
     EnemyVisualRole role{EnemyVisualRole::Worker};
+    bool active{true};
 };
 
 struct PickupRenderData {
@@ -103,7 +104,7 @@ struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
 };
 
-inline constexpr std::size_t maxRenderedRoomLights = 4U;
+inline constexpr std::size_t maxRenderedRoomLights = 8U;
 
 struct PointLightRenderData {
     gdp::core::Vec3 position{};

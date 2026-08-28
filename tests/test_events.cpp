@@ -230,6 +230,52 @@ void testLockdownAndSupplyRuntime()
         "Hub supply event activates and completes atomically on room entry");
 }
 
+void testAdjacentEventWaveIsStagedDormant()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    using namespace gdp::world;
+
+    EntityManager manager;
+    const EntityId baseline = manager.createEnemy({
+        .roomId = 8,
+        .archetype = EnemyArchetype::Guard,
+    });
+    RoomEventRuntime runtime = makeRoomEventRuntime(generateRoomEventPlan(
+        777, RoomRole::Arena, RoomTheme::Security, 4, eventZones), 8);
+
+    const std::vector<EntityId> staged = stageRoomEventFirstWave(runtime, manager);
+    expect(staged.size() == 1U && runtime.stagedEnemies == staged,
+        "room-entry event materializes its first wave before room activation");
+    const EnemyData* stagedEnemy = staged.empty()
+        ? nullptr : manager.findData<EnemyData>(staged.front());
+    expect(stagedEnemy != nullptr && !stagedEnemy->active
+            && runtime.nextWave == 0U && runtime.phase == RoomEventPhase::Dormant,
+        "materialized event enemy remains dormant without advancing the event");
+    expect(stageRoomEventFirstWave(runtime, manager).empty()
+            && manager.queryRoom(8).size() == 2U,
+        "staging is idempotent and cannot duplicate the previewed wave");
+
+    const RoomEventUpdateSummary entered
+        = updateRoomEvent(runtime, manager, true, false, 0.0F);
+    expect(entered.activated && entered.enemiesSpawned == 0U
+            && runtime.nextWave == 0U,
+        "inactive staged enemies do not bypass Arena baseline-clear pacing");
+    (void)applyDamage(manager, baseline, 1'000.0F);
+    const RoomEventUpdateSummary released
+        = updateRoomEvent(runtime, manager, true, false, 1.0F);
+    stagedEnemy = manager.findData<EnemyData>(staged.front());
+    expect(released.spawnedEnemies == staged && released.createdEntities.empty()
+            && stagedEnemy != nullptr && stagedEnemy->active
+            && runtime.nextWave == 1U,
+        "event releases the already visible enemy instead of creating a pop-in duplicate");
+
+    RoomEventRuntime terminal = makeRoomEventRuntime(generateRoomEventPlan(
+        99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);
+    expect(stageRoomEventFirstWave(terminal, manager).empty(),
+        "terminal ambush remains concealed until explicit terminal interaction");
+}
+
 void testTwoWaveReinforcementRuntime()
 {
     using namespace gdp::gameplay;
@@ -274,6 +320,7 @@ int main()
     testEventPlanBatchAndWorlds();
     testTerminalAmbushRuntime();
     testLockdownAndSupplyRuntime();
+    testAdjacentEventWaveIsStagedDormant();
     testTwoWaveReinforcementRuntime();
     if (failures != 0) {
         std::cerr << failures << " event test(s) failed\n";

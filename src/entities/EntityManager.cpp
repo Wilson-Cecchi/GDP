@@ -40,7 +40,7 @@ EntityId EntityManager::createEnemy(const EnemyCreateInfo& info)
         info.transform,
         info.roomId,
         EnemyData{info.archetype, health, health,
-            EnemyBehaviorState::Idle, 0.0F, info.visualSeed});
+            EnemyBehaviorState::Idle, 0.0F, info.visualSeed, 0.0F, info.active});
 }
 
 EntityId EntityManager::createItem(const ItemCreateInfo& info)

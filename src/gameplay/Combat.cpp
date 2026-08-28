@@ -121,7 +121,9 @@ DamageOutcome applyDamage(
         }
         return DamageOutcome::Ignored;
     }
-    if (enemy->behavior == gdp::entities::EnemyBehaviorState::Dead || amount <= 0.0F) {
+    if (!enemy->active
+        || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead
+        || amount <= 0.0F) {
         return DamageOutcome::Ignored;
     }
     enemy->health = std::max(0.0F, enemy->health - amount);
@@ -162,6 +164,7 @@ ShotResult fireHitscan(
         const gdp::entities::Entity* entity = manager.find(id);
         const gdp::entities::EnemyData* enemy = manager.findData<gdp::entities::EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
+            || !enemy->active
             || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
             continue;
         }

@@ -67,6 +67,10 @@ especializados das pastas numeradas.
 - **Fase 15 — Portas e áudio contínuos:** concluída; `E` anima a abertura sem
   teleporte, portas bloqueiam/seguram/fecham fisicamente e a ambiência faz
   crossfade determinístico durante todo o corredor.
+- **Fase 16 — Continuidade de encontros e luz:** concluída; a primeira onda dos
+  eventos de entrada já existe dormente na sala adjacente, sem IA ou colisão de
+  tiro antes do gatilho, e até oito luzes combinam sala atual e vizinhas sem
+  aparecer somente após a troca lógica.
 - **Próxima atualização:** levar HP, munição, chaves, evento e prompts de
   interação para um HUD funcional dentro do viewport.
 
@@ -81,7 +85,8 @@ O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e
 rotação reais, com cubo indexado reutilizado e materiais procedurais próprios de
 parede/piso/teto derivados da seed da sala, aberturas e molduras ciano nas
 portas, painéis vermelhos durante lockdown, corredores com piso, teto e paredes,
-até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
+até oito luzes pontuais combinadas entre a sala atual e as adjacentes,
+luminárias emissivas, ambiente por tema,
 câmera em perspectiva e retícula. Parede com grandes placas e rodapé
 amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
@@ -217,6 +222,14 @@ fica livre a partir de 90%, não fecha sobre o jogador e volta a bloquear soment
 depois que o corredor está vazio. Os painéis deslizam lateralmente e lockdown
 força fechamento/bloqueio. O áudio mantém dois loops cacheados no corredor e
 aplica crossfade equal-power com o mesmo progresso suavizado da iluminação.
+
+Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
+inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
+permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
+até o evento liberá-los. A ativação reutiliza as mesmas entidades, evitando
+duplicação e aparecimento tardio; emboscadas de terminal continuam ocultas. O
+renderer também seleciona as luzes vizinhas mais próximas e combina até oito
+pontos, mantendo luminárias e iluminação da sala destino visíveis pelo corredor.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com

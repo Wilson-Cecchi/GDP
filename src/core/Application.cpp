@@ -39,7 +39,7 @@ gdp::render::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert)
 {
-    static_assert(gdp::world::maxRoomLights == gdp::render::maxRenderedRoomLights);
+    static_assert(gdp::world::maxRoomLights <= gdp::render::maxRenderedRoomLights);
     gdp::render::RoomLightingRenderData lighting;
     lighting.ambientColor = plan.ambientColor;
     lighting.ambientIntensity = plan.ambientIntensity;
@@ -56,6 +56,85 @@ gdp::render::RoomLightingRenderData makeRenderLighting(
         };
     }
     return lighting;
+}
+
+void appendConnectedRoomLights(
+    gdp::render::RoomLightingRenderData& lighting,
+    const gdp::world::World& world,
+    const std::vector<gdp::world::RoomLightingPlan>& roomLighting,
+    const gdp::world::RoomId currentRoomId,
+    const gdp::core::Vec3 observerPosition)
+{
+    struct Candidate {
+        gdp::render::PointLightRenderData light;
+        float distanceSquared{0.0F};
+        gdp::world::RoomId roomId{0};
+        std::size_t lightIndex{0};
+    };
+
+    std::vector<gdp::world::RoomId> connectedRoomIds;
+    for (const gdp::world::CorridorPath& corridor : world.corridors) {
+        if (corridor.firstRoom == currentRoomId) {
+            connectedRoomIds.push_back(corridor.secondRoom);
+        } else if (corridor.secondRoom == currentRoomId) {
+            connectedRoomIds.push_back(corridor.firstRoom);
+        }
+    }
+    std::sort(connectedRoomIds.begin(), connectedRoomIds.end());
+    connectedRoomIds.erase(
+        std::unique(connectedRoomIds.begin(), connectedRoomIds.end()),
+        connectedRoomIds.end());
+
+    std::vector<Candidate> candidates;
+    for (const gdp::world::RoomId roomId : connectedRoomIds) {
+        const auto room = std::find_if(
+            world.rooms.begin(), world.rooms.end(),
+            [roomId](const gdp::world::RoomInstance& candidate) {
+                return candidate.id == roomId;
+            });
+        if (room == world.rooms.end()) {
+            continue;
+        }
+        const std::size_t roomIndex = static_cast<std::size_t>(
+            std::distance(world.rooms.begin(), room));
+        if (roomIndex >= roomLighting.size()) {
+            continue;
+        }
+        const gdp::world::RoomLightingPlan& plan = roomLighting[roomIndex];
+        for (std::size_t lightIndex = 0; lightIndex < plan.lights.size(); ++lightIndex) {
+            const gdp::world::RoomPointLight& source = plan.lights[lightIndex];
+            const gdp::core::Vec3 offset = source.position - observerPosition;
+            candidates.push_back({
+                {source.position, source.color, source.intensity, source.range},
+                gdp::core::dot(offset, offset),
+                roomId,
+                lightIndex,
+            });
+        }
+    }
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Candidate& left, const Candidate& right) {
+            if (left.distanceSquared < right.distanceSquared) {
+                return true;
+            }
+            if (right.distanceSquared < left.distanceSquared) {
+                return false;
+            }
+            if (left.roomId != right.roomId) {
+                return left.roomId < right.roomId;
+            }
+            return left.lightIndex < right.lightIndex;
+        });
+
+    std::size_t lightCount = std::min<std::size_t>(
+        lighting.lightCount, gdp::render::maxRenderedRoomLights);
+    for (const Candidate& candidate : candidates) {
+        if (lightCount >= gdp::render::maxRenderedRoomLights) {
+            break;
+        }
+        lighting.lights[lightCount++] = candidate.light;
+    }
+    lighting.lightCount = static_cast<std::uint32_t>(lightCount);
 }
 
 gameplay::ProgressionEvent progressionEventFor(
@@ -306,6 +385,21 @@ bool Application::initialize()
             return false;
         }
         roomLighting_.push_back(std::move(lighting));
+    }
+    for (gameplay::RoomEventRuntime& runtime : roomEvents_) {
+        const std::vector<entities::EntityId> staged
+            = gameplay::stageRoomEventFirstWave(runtime, entities_);
+        if (staged.empty()) {
+            continue;
+        }
+        const auto room = std::find_if(
+            world_->rooms.begin(), world_->rooms.end(),
+            [&runtime](const world::RoomInstance& candidate) {
+                return candidate.id == runtime.roomId;
+            });
+        if (room != world_->rooms.end()) {
+            room->entities.insert(room->entities.end(), staged.begin(), staged.end());
+        }
     }
     if (const entities::Entity* playerEntity = entities_.find(player_.entity())) {
         collisionWorld_ = gameplay::collisionWorldWithProps(
@@ -987,6 +1081,7 @@ void Application::render()
                 enemy->behavior != entities::EnemyBehaviorState::Dead,
                 enemy->visualSeed,
                 role,
+                enemy->active,
             });
         }
     }
@@ -1135,6 +1230,8 @@ void Application::render()
                     break;
                 }
             }
+            appendConnectedRoomLights(
+                lighting, *world_, roomLighting_, playerRoom, player_.state().position);
             if (session_.state().phase == gameplay::SessionPhase::Victory) {
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
                 lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);

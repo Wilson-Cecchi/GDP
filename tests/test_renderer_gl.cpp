@@ -65,6 +65,9 @@ int main()
             gdp::render::EnemyRenderData{
                 {0.75F, 0.0F, 1.0F}, true, 666,
                 gdp::render::EnemyVisualRole::IndustrialRobot},
+            gdp::render::EnemyRenderData{
+                {-0.75F, 0.0F, 0.5F}, true, 111,
+                gdp::render::EnemyVisualRole::Worker, false},
         };
         constexpr std::array workerOnly{
             gdp::render::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
@@ -111,7 +114,7 @@ int main()
         gdp::render::RoomLightingRenderData proceduralLighting;
         proceduralLighting.ambientColor = {0.52F, 0.68F, 0.82F};
         proceduralLighting.ambientIntensity = 0.18F;
-        proceduralLighting.lightCount = 3U;
+        proceduralLighting.lightCount = 8U;
         proceduralLighting.fixtureEmissive = 0.84F;
         proceduralLighting.lights[0] = {
             {-2.0F, 3.82F, -2.0F}, {0.48F, 0.74F, 1.0F}, 1.05F, 5.4F};
@@ -119,6 +122,16 @@ int main()
             {2.0F, 3.82F, -2.0F}, {0.60F, 0.82F, 1.0F}, 0.95F, 5.8F};
         proceduralLighting.lights[2] = {
             {0.0F, 3.82F, 2.0F}, {0.42F, 0.68F, 0.94F}, 1.10F, 5.2F};
+        proceduralLighting.lights[3] = {
+            {-3.0F, 3.82F, 2.0F}, {0.72F, 0.80F, 1.0F}, 0.72F, 4.8F};
+        proceduralLighting.lights[4] = {
+            {3.0F, 3.82F, 2.0F}, {0.72F, 0.80F, 1.0F}, 0.72F, 4.8F};
+        proceduralLighting.lights[5] = {
+            {-2.5F, 3.82F, -5.0F}, {0.55F, 0.72F, 0.96F}, 0.82F, 5.1F};
+        proceduralLighting.lights[6] = {
+            {2.5F, 3.82F, -5.0F}, {0.55F, 0.72F, 0.96F}, 0.82F, 5.1F};
+        proceduralLighting.lights[7] = {
+            {0.0F, 3.82F, -7.0F}, {0.48F, 0.66F, 0.92F}, 0.88F, 5.4F};
         if (!renderer.initialize(width, height) || !renderer.render(width, height)) {
             std::cerr << "Renderer failed to produce a frame\n";
         } else {
