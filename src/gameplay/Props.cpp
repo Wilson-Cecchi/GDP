@@ -40,7 +40,8 @@ CollisionWorld collisionWorldWithProps(
         }
         solids.push_back(propCollisionBounds(*entity, *prop));
     }
-    return {base.roomBounds(), std::move(solids)};
+    return CollisionWorld::fromWalkableVolumes(
+        base.walkableVolumes(), std::move(solids));
 }
 
 PropDamageResult damageProp(

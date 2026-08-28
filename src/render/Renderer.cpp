@@ -100,16 +100,6 @@ struct RoomPart {
 };
 
 constexpr std::array roomParts{
-    RoomPart{{0.0F, -0.1F, 0.0F}, {8.0F, 0.2F, 10.0F}, {1.0F, 1.0F, 1.0F},
-        RoomMaterialChannel::Floor, 4.0F},
-    RoomPart{{0.0F, 4.1F, 0.0F}, {8.0F, 0.2F, 10.0F}, {1.0F, 1.0F, 1.0F},
-        RoomMaterialChannel::Ceiling, 4.0F},
-    RoomPart{{0.0F, 2.0F, -5.0F}, {8.0F, 4.0F, 0.2F}, {1.0F, 1.0F, 1.0F},
-        RoomMaterialChannel::Wall, 1.0F},
-    RoomPart{{-4.0F, 2.0F, 0.0F}, {0.2F, 4.0F, 10.0F}, {1.0F, 1.0F, 1.0F},
-        RoomMaterialChannel::Wall, 1.0F},
-    RoomPart{{4.0F, 2.0F, 0.0F}, {0.2F, 4.0F, 10.0F}, {1.0F, 1.0F, 1.0F},
-        RoomMaterialChannel::Wall, 1.0F},
     RoomPart{{-2.8F, 1.0F, -3.8F}, {0.45F, 2.0F, 0.45F}, {0.75F, 0.57F, 0.22F},
         RoomMaterialChannel::Generic, 4.0F},
     RoomPart{{2.8F, 1.0F, -3.8F}, {0.45F, 2.0F, 0.45F}, {0.75F, 0.57F, 0.22F},
@@ -632,7 +622,9 @@ bool Renderer::render(
     const std::span<const PropRenderData> props,
     const RoomLightingRenderData lighting,
     const RoomRenderData room,
-    const std::span<const DoorRenderData> doors)
+    const std::span<const DoorRenderData> doors,
+    const std::span<const CorridorRenderData> corridors,
+    const std::span<const RoomRenderData> connectedRooms)
 {
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
@@ -703,6 +695,161 @@ bool Renderer::render(
         return false;
     }
 
+    const auto drawSurface = [this, &roomMaterials](
+        const gdp::core::Vec3 position,
+        const gdp::core::Vec3 scale,
+        const RoomMaterialChannel material,
+        const float uvScale = 1.0F,
+        const gdp::core::Vec3 tint = {1.0F, 1.0F, 1.0F}) {
+        float emissiveStrength = 0.0F;
+        switch (material) {
+        case RoomMaterialChannel::Wall:
+            roomMaterials->second.textures[static_cast<std::size_t>(
+                gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
+            break;
+        case RoomMaterialChannel::Floor:
+            roomMaterials->second.textures[static_cast<std::size_t>(
+                gdp::procedural::IndustrialSurface::Floor)].bind(gl_);
+            break;
+        case RoomMaterialChannel::Ceiling:
+            roomMaterials->second.textures[static_cast<std::size_t>(
+                gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
+            emissiveStrength = roomMaterials->second.ceilingEmissive;
+            break;
+        case RoomMaterialChannel::Generic:
+            fallbackTexture_.bind(gl_);
+            break;
+        }
+        shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
+                * gdp::core::scaleMatrix(scale));
+        shader_.setVec3(gl_, "uTint", tint);
+        shader_.setFloat(gl_, "uUvScale", uvScale);
+        shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
+        box_.draw(gl_);
+    };
+
+    const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
+        const bool swapsAxes
+            = renderedRoom.rotation == gdp::core::QuarterTurn::Degrees90
+            || renderedRoom.rotation == gdp::core::QuarterTurn::Degrees270;
+        const float roomHalfX = swapsAxes ? 4.85F : 3.85F;
+        const float roomHalfZ = swapsAxes ? 3.85F : 4.85F;
+        constexpr float roomHeight = 4.0F;
+        constexpr float shellThickness = 0.20F;
+        drawSurface(
+            renderedRoom.origin
+                + gdp::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
+            {(roomHalfX * 2.0F) + shellThickness, shellThickness,
+                (roomHalfZ * 2.0F) + shellThickness},
+            RoomMaterialChannel::Floor, 4.0F);
+        drawSurface(
+            renderedRoom.origin
+                + gdp::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
+            {(roomHalfX * 2.0F) + shellThickness, shellThickness,
+                (roomHalfZ * 2.0F) + shellThickness},
+            RoomMaterialChannel::Ceiling, 4.0F);
+
+        const auto drawWall = [&](const gdp::core::Vec3 normal) {
+            const bool facesX = std::abs(normal.x) > 0.5F;
+            const float wallCenter = facesX
+                ? renderedRoom.origin.x + (normal.x * roomHalfX)
+                : renderedRoom.origin.z + (normal.z * roomHalfZ);
+            const float transverseMinimum = facesX
+                ? renderedRoom.origin.z - roomHalfZ
+                : renderedRoom.origin.x - roomHalfX;
+            const float transverseMaximum = facesX
+                ? renderedRoom.origin.z + roomHalfZ
+                : renderedRoom.origin.x + roomHalfX;
+            const auto door = std::find_if(
+                doors.begin(), doors.end(), [&](const DoorRenderData& candidate) {
+                    const float candidatePlane
+                        = facesX ? candidate.position.x : candidate.position.z;
+                    const float candidateTransverse
+                        = facesX ? candidate.position.z : candidate.position.x;
+                    return gdp::core::dot(normal, candidate.outwardNormal) > 0.90F
+                        && std::abs(candidatePlane - wallCenter) < 0.25F
+                        && candidateTransverse >= transverseMinimum - 0.01F
+                        && candidateTransverse <= transverseMaximum + 0.01F;
+                });
+            const auto drawWallSpan = [&](const float minimum, const float maximum,
+                                          const float bottom, const float top) {
+                if (maximum - minimum <= 1.0e-4F || top - bottom <= 1.0e-4F) {
+                    return;
+                }
+                const float transverseCenter = (minimum + maximum) * 0.5F;
+                const gdp::core::Vec3 position = facesX
+                    ? gdp::core::Vec3{wallCenter,
+                        renderedRoom.origin.y + ((bottom + top) * 0.5F),
+                        transverseCenter}
+                    : gdp::core::Vec3{transverseCenter,
+                        renderedRoom.origin.y + ((bottom + top) * 0.5F),
+                        wallCenter};
+                const gdp::core::Vec3 scale = facesX
+                    ? gdp::core::Vec3{
+                        shellThickness, top - bottom, maximum - minimum}
+                    : gdp::core::Vec3{
+                        maximum - minimum, top - bottom, shellThickness};
+                drawSurface(position, scale, RoomMaterialChannel::Wall);
+            };
+            if (door == doors.end()) {
+                drawWallSpan(transverseMinimum, transverseMaximum, 0.0F, roomHeight);
+                return;
+            }
+            const float doorCenter = facesX ? door->position.z : door->position.x;
+            const float openingMinimum = std::clamp(
+                doorCenter - (door->width * 0.5F),
+                transverseMinimum, transverseMaximum);
+            const float openingMaximum = std::clamp(
+                doorCenter + (door->width * 0.5F),
+                transverseMinimum, transverseMaximum);
+            drawWallSpan(transverseMinimum, openingMinimum, 0.0F, roomHeight);
+            drawWallSpan(openingMaximum, transverseMaximum, 0.0F, roomHeight);
+            drawWallSpan(openingMinimum, openingMaximum,
+                std::min(door->height, roomHeight), roomHeight);
+        };
+        drawWall({1.0F, 0.0F, 0.0F});
+        drawWall({-1.0F, 0.0F, 0.0F});
+        drawWall({0.0F, 0.0F, 1.0F});
+        drawWall({0.0F, 0.0F, -1.0F});
+    };
+    drawRoomShell(room);
+    for (const RoomRenderData connectedRoom : connectedRooms) {
+        drawRoomShell(connectedRoom);
+    }
+
+    constexpr float corridorShellThickness = 0.12F;
+    for (const CorridorRenderData& corridor : corridors) {
+        for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+            const gdp::core::Vec3 first = corridor.points[index];
+            const gdp::core::Vec3 second = corridor.points[index + 1U];
+            const bool alongX = gdp::core::nearlyEqual(first.z, second.z);
+            const float length = alongX
+                ? std::abs(second.x - first.x) : std::abs(second.z - first.z);
+            if (length <= 1.0e-4F) {
+                continue;
+            }
+            const gdp::core::Vec3 center = (first + second) * 0.5F;
+            const gdp::core::Vec3 floorScale = alongX
+                ? gdp::core::Vec3{length, corridorShellThickness, corridor.width}
+                : gdp::core::Vec3{corridor.width, corridorShellThickness, length};
+            drawSurface(center + gdp::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
+                floorScale, RoomMaterialChannel::Floor, 2.0F);
+            drawSurface(center + gdp::core::Vec3{
+                    0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
+                floorScale, RoomMaterialChannel::Ceiling, 2.0F);
+            const gdp::core::Vec3 wallScale = alongX
+                ? gdp::core::Vec3{length, corridor.height, corridorShellThickness}
+                : gdp::core::Vec3{corridorShellThickness, corridor.height, length};
+            const gdp::core::Vec3 wallCenter
+                = center + gdp::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
+            const gdp::core::Vec3 sideOffset = alongX
+                ? gdp::core::Vec3{0.0F, 0.0F, corridor.width * 0.5F}
+                : gdp::core::Vec3{corridor.width * 0.5F, 0.0F, 0.0F};
+            drawSurface(wallCenter + sideOffset, wallScale, RoomMaterialChannel::Wall);
+            drawSurface(wallCenter - sideOffset, wallScale, RoomMaterialChannel::Wall);
+        }
+    }
+
     for (const RoomPart& part : roomParts) {
         float emissiveStrength = 0.0F;
         switch (part.material) {
@@ -742,21 +889,52 @@ bool Renderer::render(
     fallbackTexture_.bind(gl_);
     for (const DoorRenderData& door : doors) {
         const bool facesX = std::abs(door.outwardNormal.x) > 0.5F;
-        const gdp::core::Vec3 scale = facesX
-            ? gdp::core::Vec3{0.12F, door.height, door.width}
-            : gdp::core::Vec3{door.width, door.height, 0.12F};
-        const gdp::core::Vec3 position = door.position
-            - (door.outwardNormal * 0.12F)
-            + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(position)
-            * gdp::core::scaleMatrix(scale);
-        shader_.setMat4(gl_, "uModel", model);
-        shader_.setVec3(gl_, "uTint", door.locked
-                ? gdp::core::Vec3{0.90F, 0.10F, 0.05F}
-                : gdp::core::Vec3{0.10F, 0.66F, 0.72F});
-        shader_.setFloat(gl_, "uUvScale", 2.0F);
-        shader_.setFloat(gl_, "uEmissiveStrength", door.locked ? 0.65F : 0.28F);
-        box_.draw(gl_);
+        const gdp::core::Vec3 insetPosition
+            = door.position - (door.outwardNormal * 0.12F);
+        const auto drawDoorPiece = [&](const gdp::core::Vec3 position,
+                                       const gdp::core::Vec3 scale,
+                                       const gdp::core::Vec3 tint,
+                                       const float emissive) {
+            shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
+                    * gdp::core::scaleMatrix(scale));
+            shader_.setVec3(gl_, "uTint", tint);
+            shader_.setFloat(gl_, "uUvScale", 2.0F);
+            shader_.setFloat(gl_, "uEmissiveStrength", emissive);
+            box_.draw(gl_);
+        };
+        if (door.locked) {
+            const gdp::core::Vec3 scale = facesX
+                ? gdp::core::Vec3{0.12F, door.height, door.width}
+                : gdp::core::Vec3{door.width, door.height, 0.12F};
+            drawDoorPiece(
+                insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F},
+                scale, {0.90F, 0.10F, 0.05F}, 0.65F);
+            continue;
+        }
+
+        constexpr float frameThickness = 0.14F;
+        const gdp::core::Vec3 frameColor{0.10F, 0.66F, 0.72F};
+        const gdp::core::Vec3 transverse = facesX
+            ? gdp::core::Vec3{0.0F, 0.0F, 1.0F}
+            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
+        const gdp::core::Vec3 postScale = facesX
+            ? gdp::core::Vec3{0.12F, door.height, frameThickness}
+            : gdp::core::Vec3{frameThickness, door.height, 0.12F};
+        const float postOffset = (door.width + frameThickness) * 0.5F;
+        const gdp::core::Vec3 postCenter
+            = insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
+        drawDoorPiece(postCenter + (transverse * postOffset),
+            postScale, frameColor, 0.28F);
+        drawDoorPiece(postCenter - (transverse * postOffset),
+            postScale, frameColor, 0.28F);
+        const gdp::core::Vec3 lintelScale = facesX
+            ? gdp::core::Vec3{0.12F, frameThickness,
+                door.width + (frameThickness * 2.0F)}
+            : gdp::core::Vec3{door.width + (frameThickness * 2.0F),
+                frameThickness, 0.12F};
+        drawDoorPiece(insetPosition
+                + gdp::core::Vec3{0.0F, door.height + (frameThickness * 0.5F), 0.0F},
+            lintelScale, frameColor, 0.28F);
     }
 
     fallbackTexture_.bind(gl_);

@@ -58,11 +58,11 @@ especializados das pastas numeradas.
   IndustrialRobot possuem geração procedural, renderer e combate funcional.
 - **Fase 12 — Procedural avançado:** implementada e validada; loot, props,
   eventos de sala, iluminação, áudio e progressão estão integrados.
-- **Fase 13 — Vertical slice navegável:** primeiro incremento implementado;
-  portas conectadas permitem entrar nas salas geradas preservando estado,
-  colisão, conteúdo, material, iluminação e ambiência.
-- **Próxima atualização:** transformar as rotas já geradas em corredores
-  renderizados e atravessáveis continuamente.
+- **Fase 13 — Vertical slice navegável:** segundo incremento implementado;
+  portas e corredores Straight/L/Z conectam fisicamente as salas geradas, com
+  caminhada contínua, troca automática de sala e lockdown sólido.
+- **Próxima atualização:** fechar o objetivo de sessão com progressão até a
+  sala Boss, condição de vitória e reinício de uma nova run.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -71,16 +71,18 @@ domínio, geração versionada de seeds e tipos matemáticos básicos. Quando SD
 não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
-O renderer atual desenha a sala ocupada usando sua origem e rotação reais, com
+O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e rotação reais, com
 cubo indexado reutilizado, materiais procedurais de parede/piso/teto derivados
-da seed da sala, portas ciano e portas vermelhas durante lockdown,
+da seed da sala, aberturas e molduras ciano nas portas, painéis vermelhos durante
+lockdown e corredores com piso, teto e paredes,
 até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
 câmera em perspectiva e
 retícula. Parede com grandes placas e rodapé amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
-paredes e props, usa `E` no terminal ou em uma porta próxima, dispara com o botão esquerdo
+paredes e props, caminha pelas portas ou usa `E` como atalho compatível, interage
+com o terminal usando `E`, dispara com o botão esquerdo
 e recarrega com `R`. Pickups próximos são coletados automaticamente; HP,
 munição e chaves aparecem no título da janela. `Esc` encerra a
 aplicação enquanto o sistema de menus ainda não existe.
@@ -93,8 +95,9 @@ isolada da estrutura do mapa. O Worker visível é montado a partir de
 quatro `BodyProfile` e uma biblioteca compatível de 18 peças Box/Cylinder, com
 assimetria, materiais e desgaste próprios; sua mesh e seu albedo são preparados
 e cacheados antes do draw. Ele persegue o jogador, ataca em alcance e pode ser
-morto pela pistola hitscan. Ao atravessar uma porta, o jogador aparece voltado
-para dentro da sala destino; HP, chaves, munição e upgrades são preservados. A
+morto pela pistola hitscan. Ao caminhar por uma porta e pelo corredor, a sala
+destino é assumida automaticamente ao cruzar seus bounds; `E` ainda oferece a
+travessia imediata. HP, chaves, munição e upgrades são preservados. A
 entidade muda de `roomId`, e colisão, conteúdo visível, evento, material,
 iluminação e ambiência passam a usar a nova sala. Lockdown bloqueia a saída até
 o evento terminar.
@@ -169,11 +172,18 @@ e cura), `Firepower` (+4 de dano) e `Capacity` (+4 de reserva e munição). Nív
 XP e score aparecem no título; limpar o encontro inicial e a emboscada da START
 já permite alcançar o primeiro upgrade.
 
-O primeiro incremento da Fase 13 liga o grafo procedural ao fluxo do jogador.
+O primeiro incremento da Fase 13 ligou o grafo procedural ao fluxo do jogador.
 Cada connector consumido por uma edge produz uma porta visível; aproximar-se,
 olhar para ela e pressionar `E` resolve o corredor correspondente nos dois
 sentidos e posiciona o jogador dentro da sala oposta. Salas e conteúdo fixo
 agora respeitam origem e rotação, e a colisão usa os mesmos bounds transformados.
+
+O segundo incremento materializa cada sequência `CorridorPath::points` como
+trechos ortogonais com piso, teto e laterais. A colisão combina volumes da sala,
+do corredor e da sala adjacente com sobreposição suficiente para o collider
+cilíndrico atravessar retas e curvas sem teleporte. Entrar nos bounds da sala
+oposta troca automaticamente `roomId`, conteúdo, materiais, iluminação e
+ambiência; durante lockdown, somente o volume da sala atual permanece navegável.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
@@ -189,8 +199,9 @@ console monitorado, alerta vermelho confinado, piso técnico e teto claro
 regular. Central Hub fecha o conjunto com grandes superfícies neutras,
 sinalização ciano única, rotas contínuas no piso e luminárias alinhadas. O
 renderer cacheia os oito perfis pelo hash completo e seleciona o perfil da sala
-ocupada. O teste OpenGL offscreen também cobre sala transladada/rotacionada e a
-mudança visual de porta normal para lockdown.
+ocupada. O teste OpenGL offscreen também cobre sala transladada/rotacionada, a
+mudança visual de porta normal para lockdown e geometria vista de dentro de um
+corredor conectado.
 
 ## Compilar e testar
 

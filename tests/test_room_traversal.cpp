@@ -5,10 +5,12 @@
 #include "world/RoomModule.hpp"
 #include "world/WorldGenerator.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -44,6 +46,33 @@ const gdp::world::ConnectorInstance* connectorForEdge(
         }
     }
     return nullptr;
+}
+
+bool moveToWaypoint(
+    const gdp::gameplay::CollisionWorld& collision,
+    gdp::core::Vec3& position,
+    const gdp::core::Vec3 target)
+{
+    constexpr float fixedStep = 1.0F / 120.0F;
+    constexpr float speed = 4.5F;
+    constexpr int maximumSteps = 2400;
+    gdp::core::Vec3 velocity{};
+    for (int step = 0; step < maximumSteps; ++step) {
+        gdp::core::Vec3 offset = target - position;
+        offset.y = 0.0F;
+        const float distance = gdp::core::length(offset);
+        if (distance <= 0.06F) {
+            return true;
+        }
+        velocity = offset * (speed / distance);
+        const gdp::gameplay::CharacterMotionResult motion
+            = collision.moveCharacter(position, velocity, fixedStep, {});
+        if (gdp::core::nearlyEqual(position, motion.position, 1.0e-6F)) {
+            return false;
+        }
+        position = motion.position;
+    }
+    return false;
 }
 
 void testEveryGeneratedConnectionTraversesBothWays()
@@ -155,6 +184,80 @@ void testRotatedRoomCollisionMatchesModuleBounds()
     }
 }
 
+void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
+{
+    using namespace gdp;
+    const world::WorldGenerationResult generated
+        = world::generateWorld(0x434F525249444F52ULL);
+    expect(generated.succeeded(), "continuous corridor world generates");
+    if (!generated.world) {
+        return;
+    }
+
+    for (const world::CorridorPath& corridor : generated.world->corridors) {
+        const world::RoomId endpoints[2]{corridor.firstRoom, corridor.secondRoom};
+        for (const world::RoomId sourceId : endpoints) {
+            const world::RoomId destinationId = sourceId == corridor.firstRoom
+                ? corridor.secondRoom : corridor.firstRoom;
+            const world::RoomInstance* source = findRoom(*generated.world, sourceId);
+            const world::RoomInstance* destination
+                = findRoom(*generated.world, destinationId);
+            const world::ConnectorInstance* sourceDoor
+                = source == nullptr ? nullptr : connectorForEdge(*source, corridor.edge);
+            const world::ConnectorInstance* destinationDoor = destination == nullptr
+                ? nullptr : connectorForEdge(*destination, corridor.edge);
+            expect(source != nullptr && destination != nullptr
+                    && sourceDoor != nullptr && destinationDoor != nullptr,
+                "continuous route endpoints and doors exist");
+            if (source == nullptr || destination == nullptr
+                || sourceDoor == nullptr || destinationDoor == nullptr) {
+                continue;
+            }
+
+            const gameplay::CollisionWorld navigation
+                = gameplay::makeRoomNavigationCollision(
+                    *generated.world, sourceId, false);
+            std::vector<core::Vec3> waypoints = corridor.points;
+            if (sourceId == corridor.secondRoom) {
+                std::reverse(waypoints.begin(), waypoints.end());
+            }
+            waypoints.push_back(destinationDoor->worldPosition
+                - (destinationDoor->worldNormal * 0.75F));
+
+            core::Vec3 position = sourceDoor->worldPosition
+                - (sourceDoor->worldNormal * 0.55F);
+            bool completed = true;
+            for (const core::Vec3 waypoint : waypoints) {
+                if (!moveToWaypoint(navigation, position, waypoint)) {
+                    completed = false;
+                    break;
+                }
+            }
+            expect(completed && destination->worldBounds.contains(position),
+                "player walks continuously through each corridor in both directions");
+            expect(gameplay::roomContainingPosition(*generated.world, position)
+                    == std::optional<world::RoomId>{destinationId},
+                "entering a destination room resolves its logical room id");
+
+            const gameplay::CollisionWorld lockedNavigation
+                = gameplay::makeRoomNavigationCollision(
+                    *generated.world, sourceId, true);
+            core::Vec3 lockedPosition = sourceDoor->worldPosition
+                - (sourceDoor->worldNormal * 0.55F);
+            for (int step = 0; step < 120; ++step) {
+                const gameplay::CharacterMotionResult motion
+                    = lockedNavigation.moveCharacter(
+                        lockedPosition, sourceDoor->worldNormal * 4.5F,
+                        1.0F / 120.0F, {});
+                lockedPosition = motion.position;
+            }
+            expect(source->worldBounds.contains(lockedPosition)
+                    && !destination->worldBounds.contains(lockedPosition),
+                "lockdown collision prevents walking out through a corridor");
+        }
+    }
+}
+
 } // namespace
 
 int main()
@@ -162,6 +265,7 @@ int main()
     testEveryGeneratedConnectionTraversesBothWays();
     testRangeInvalidInputAndPlayerRelocation();
     testRotatedRoomCollisionMatchesModuleBounds();
+    testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
 
     if (failures != 0) {
         std::cerr << failures << " room traversal test(s) failed\n";

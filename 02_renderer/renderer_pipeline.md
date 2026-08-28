@@ -3,7 +3,7 @@
 > **Estado:** renderer mínimo da Fase 2 implementado e validado; variantes de
 > Worker e materiais industriais preparados/cacheados antes do draw nas Fases 9
 > e 10; iluminação procedural integrada na Fase 12; transform da sala ativa e
-> portas conectadas integrados na Fase 13. Filas completas,
+> portas, shells adjacentes e corredores conectados integrados na Fase 13. Filas completas,
 > culling, transparência, UI e pós-processamento
 > permanecem planejados.
 >
@@ -51,7 +51,8 @@ GAME STATE
 shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
 
 ```text
-room transform + material variant + lighting plan → room instances + doors/fixtures
+room transforms + corridor paths + material variant + lighting plan
+→ room shells + corridor segments + doors/fixtures
 → enemy variants → pickup markers → props
 → framebuffer color+depth → blit → SDL window
 ```
@@ -83,11 +84,13 @@ plano. O flag `alert` mistura ambiente, pontos e fixtures com vermelho enquanto
 o evento mantém a sala em lockdown; a regressão offscreen exige saídas distintas
 para iluminação padrão, procedural e alerta.
 
-`RoomRenderData` aplica origem e quarter-turn da sala ocupada a toda geometria
-fixa. `DoorRenderData` desenha somente connectors consumidos por edges: ciano
-quando atravessáveis e vermelho durante lockdown. A regressão offscreen coloca
-uma sala fora da origem, gira 90° e exige pixels diferentes entre os dois estados
-da porta.
+`RoomRenderData` aplica origem e quarter-turn à shell da sala ocupada e das
+salas diretamente adjacentes. As paredes são divididas ao redor da abertura de
+cada connector. `DoorRenderData` usa moldura ciano quando atravessável e painel
+vermelho durante lockdown. `CorridorRenderData` referencia os pontos do mundo e
+desenha cada trecho ortogonal com piso, teto e laterais. A regressão offscreen
+coloca uma sala fora da origem, gira 90°, diferencia os dois estados da porta e
+exige mudança de pixels com a câmera dentro de um corredor conectado.
 
 ## Separação
 

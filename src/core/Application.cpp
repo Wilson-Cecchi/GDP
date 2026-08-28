@@ -213,8 +213,8 @@ bool Application::initialize()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
-    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom(
-        startRoom->transform.position, startRoom->rotation);
+    baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
+        *world_, startRoom->id, false);
     roomEvents_.reserve(world_->rooms.size());
     roomLighting_.reserve(world_->rooms.size());
     for (const world::RoomInstance& room : world_->rooms) {
@@ -407,9 +407,60 @@ void Application::fixedUpdate(const double fixedStep)
             log(LogLevel::Info, rewardMessage.str());
         }
     };
+    const auto collisionEvent = std::find_if(
+        roomEvents_.begin(), roomEvents_.end(),
+        [playerRoom](const gameplay::RoomEventRuntime& runtime) {
+            return runtime.roomId == playerRoom;
+        });
+    const bool doorsLocked = collisionEvent != roomEvents_.end()
+        && gameplay::isRoomLocked(*collisionEvent);
+    if (world_ && playerEntity != nullptr) {
+        baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
+            *world_, playerRoom, doorsLocked);
+    }
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
     player_.fixedUpdate(playerCommand_, step, collisionWorld_);
+
+    const auto adoptRoom = [this, &playerEntity, &playerRoom](
+        const world::RoomInstance& destination,
+        const std::string_view transitionKind) {
+        const std::uint32_t sourceRoom = playerRoom;
+        playerRoom = destination.id;
+        playerEntity->roomId = playerRoom;
+        playerEntity->transform.position = player_.state().position;
+        baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
+            *world_, playerRoom, false);
+        collisionWorld_ = gameplay::collisionWorldWithProps(
+            baseCollisionWorld_, entities_, playerRoom);
+        if (renderer_ != nullptr
+            && !prepareRoomMaterials(*renderer_, destination)) {
+            log(LogLevel::Error, "Destination room material preparation failed");
+            running_ = false;
+        }
+        if (audio_) {
+            audio_->setAmbience(destination.seed,
+                static_cast<std::uint64_t>(destination.theme));
+        }
+        std::ostringstream message;
+        message << transitionKind << ' ' << sourceRoom << " -> " << playerRoom;
+        log(LogLevel::Info, message.str());
+    };
+
+    if (playerEntity != nullptr && world_) {
+        const auto enteredRoom = gameplay::roomContainingPosition(
+            *world_, player_.state().position);
+        if (enteredRoom && *enteredRoom != playerRoom) {
+            const auto destination = std::find_if(
+                world_->rooms.begin(), world_->rooms.end(),
+                [&enteredRoom](const world::RoomInstance& room) {
+                    return room.id == *enteredRoom;
+                });
+            if (destination != world_->rooms.end()) {
+                adoptRoom(*destination, "Continuous room transition");
+            }
+        }
+    }
 
     if (playerCommand_.interact && playerEntity != nullptr && world_) {
         const auto transition = gameplay::findRoomTransition(
@@ -435,27 +486,7 @@ void Application::fixedUpdate(const double fixedStep)
                     && player_.relocate(
                         transition->destinationPosition,
                         transition->destinationYawDegrees)) {
-                    playerRoom = destination->id;
-                    playerEntity->roomId = playerRoom;
-                    playerEntity->transform.position = player_.state().position;
-                    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom(
-                        destination->transform.position, destination->rotation);
-                    collisionWorld_ = gameplay::collisionWorldWithProps(
-                        baseCollisionWorld_, entities_, playerRoom);
-                    if (renderer_ != nullptr
-                        && !prepareRoomMaterials(*renderer_, *destination)) {
-                        log(LogLevel::Error, "Destination room material preparation failed");
-                        running_ = false;
-                    }
-                    if (audio_) {
-                        audio_->setAmbience(destination->seed,
-                            static_cast<std::uint64_t>(destination->theme));
-                    }
-                    std::ostringstream message;
-                    message << "Room transition " << transition->sourceRoom << " -> "
-                            << transition->destinationRoom << " through edge "
-                            << transition->edge;
-                    log(LogLevel::Info, message.str());
+                    adoptRoom(*destination, "Interactive room transition");
                 }
             }
             interactionPending_ = false;
@@ -833,6 +864,8 @@ void Application::render()
     gdp::render::RoomLightingRenderData lighting;
     gdp::render::RoomRenderData roomRender;
     std::vector<gdp::render::DoorRenderData> visibleDoors;
+    std::vector<gdp::render::CorridorRenderData> visibleCorridors;
+    std::vector<gdp::render::RoomRenderData> connectedRooms;
     if (world_) {
         const auto currentRoom = std::find_if(
             world_->rooms.begin(), world_->rooms.end(),
@@ -862,13 +895,54 @@ void Application::render()
                     });
                 }
             }
+            for (const world::CorridorPath& corridor : world_->corridors) {
+                world::RoomId connectedRoomId = 0U;
+                if (corridor.firstRoom == playerRoom) {
+                    connectedRoomId = corridor.secondRoom;
+                } else if (corridor.secondRoom == playerRoom) {
+                    connectedRoomId = corridor.firstRoom;
+                } else {
+                    continue;
+                }
+                visibleCorridors.push_back({
+                    std::span<const gdp::core::Vec3>{corridor.points},
+                    corridor.width,
+                    corridor.height,
+                });
+                const auto connectedRoom = std::find_if(
+                    world_->rooms.begin(), world_->rooms.end(),
+                    [connectedRoomId](const world::RoomInstance& candidate) {
+                        return candidate.id == connectedRoomId;
+                    });
+                if (connectedRoom == world_->rooms.end()) {
+                    continue;
+                }
+                connectedRooms.push_back({
+                    connectedRoom->transform.position,
+                    connectedRoom->rotation,
+                });
+                const auto entryDoor = std::find_if(
+                    connectedRoom->connectors.begin(), connectedRoom->connectors.end(),
+                    [&corridor](const world::ConnectorInstance& connector) {
+                        return !connector.sealed && connector.edge == corridor.edge;
+                    });
+                if (entryDoor != connectedRoom->connectors.end()) {
+                    visibleDoors.push_back({
+                        entryDoor->worldPosition,
+                        entryDoor->worldNormal,
+                        entryDoor->width,
+                        entryDoor->height,
+                        false,
+                    });
+                }
+            }
         }
     }
     SDL_SetWindowTitle(window_, title.str().c_str());
     if (renderer_ == nullptr
         || !renderer_->render(
             width, height, camera, visibleEnemies, visiblePickups, visibleProps,
-            lighting, roomRender, visibleDoors)) {
+            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         running_ = false;
         return;

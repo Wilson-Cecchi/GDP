@@ -1,8 +1,8 @@
 # Gameplay — Movimento e câmera
 
 > **Estado:** movimento, mouse look, gravidade e colisão básica implementados na
-> Fase 3; travessia por portas conectadas implementada na Fase 13. Head bob e
-> caminhada contínua pela mesh dos corredores permanecem planejados.
+> Fase 3; portas e corredores contínuos implementados na Fase 13. Head bob
+> permanece planejado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -35,12 +35,14 @@ Capsule/cilindro vertical simplificado é suficiente inicialmente. Portas verifi
 ocupado antes de fechar; nunca empurram o jogador através de parede.
 
 O collider inicial tem raio `0,30 m` e altura `1,80 m`. O solver restringe
-piso/teto e limites internos da sala e resolve X e Z separadamente contra AABBs,
-permitindo deslizamento. Origem e rotação do `RoomModule` transformam bounds e
-sólidos juntos. Próximo a um connector associado a edge, olhar para a porta e
-usar `E` reposiciona o jogador 0,85 m para dentro do destino e zera somente sua
-velocidade; HP, inventário, progressão e arma são preservados. Lockdown consome
-a interação sem permitir saída.
+piso/teto e uma união de volumes navegáveis e resolve X e Z separadamente contra
+AABBs, permitindo deslizamento. Origem e rotação do `RoomModule` transformam
+bounds e sólidos juntos. Em estado normal, essa união contém a sala atual, os
+segmentos dos corredores conectados e suas salas destino. Cruzar os bounds do
+destino troca o `roomId` automaticamente sem zerar velocidade; HP, inventário,
+progressão e arma são preservados. Próximo a uma porta, olhar e usar `E` mantém
+o reposicionamento imediato como fallback. Lockdown remove corredores e salas
+adjacentes da união e consome a interação sem permitir saída.
 
 ## Câmera
 
@@ -50,5 +52,6 @@ projeção. Head bob é cosmético.
 ## Testes
 
 Distância equivalente em diferentes FPS; diagonal normalizada; colisão em canto;
-porta nos dois sentidos para cada corredor; distância/orientação da interação;
-preservação de estado; quatro rotações; pitch clamp; sensibilidade independente do FPS.
+porta nos dois sentidos para cada corredor; caminhada segmentada contínua;
+lockdown físico; distância/orientação da interação; preservação de estado;
+quatro rotações; pitch clamp; sensibilidade independente do FPS.

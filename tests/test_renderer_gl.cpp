@@ -216,6 +216,39 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lockedDoorPixels.data());
 
+            constexpr std::array corridorDoors{
+                gdp::render::DoorRenderData{
+                    {0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F},
+                    1.2F, 2.2F, false},
+                gdp::render::DoorRenderData{
+                    {0.0F, 0.0F, -10.0F}, {0.0F, 0.0F, 1.0F},
+                    1.2F, 2.2F, false},
+            };
+            constexpr gdp::render::CameraData corridorCamera{
+                {0.0F, 1.62F, -7.0F}, {0.0F, 0.0F, -1.0F}, 68.0F};
+            const bool renderedOpenDoor = renderer.render(
+                width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors);
+            std::vector<std::uint8_t> openDoorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                openDoorPixels.data());
+            constexpr std::array corridorPoints{
+                gdp::core::Vec3{0.0F, 0.0F, -4.85F},
+                gdp::core::Vec3{0.0F, 0.0F, -10.0F},
+            };
+            const std::array corridorGeometry{
+                gdp::render::CorridorRenderData{corridorPoints, 1.2F, 2.2F},
+            };
+            constexpr std::array connectedRoomGeometry{
+                gdp::render::RoomRenderData{
+                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0},
+            };
+            const bool renderedCorridor = renderer.render(
+                width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
+                corridorGeometry, connectedRoomGeometry);
+            std::vector<std::uint8_t> corridorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                corridorPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -279,6 +312,7 @@ int main()
             std::size_t lightingChangedChannels = 0;
             std::size_t alertLightingChangedChannels = 0;
             std::size_t doorStateChangedChannels = 0;
+            std::size_t corridorChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -327,6 +361,10 @@ int main()
                         != translatedDoorPixels[index + channel]) {
                         ++doorStateChangedChannels;
                     }
+                    if (corridorPixels[index + channel]
+                        != openDoorPixels[index + channel]) {
+                        ++corridorChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -368,6 +406,8 @@ int main()
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedTranslatedDoor && renderedLockedDoor
                 && doorStateChangedChannels > 100U
+                && renderedOpenDoor && renderedCorridor
+                && corridorChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U
@@ -378,7 +418,11 @@ int main()
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
                 && glGetError() == GL_NO_ERROR;
             if (!passed) {
-                std::cerr << "Framebuffer lacks expected scene or enemy contrast\n";
+                std::cerr << "Framebuffer lacks expected scene or enemy contrast"
+                          << " | corridor rendered=" << renderedCorridor
+                          << " openDoor=" << renderedOpenDoor
+                          << " changed=" << corridorChangedChannels
+                          << " doorState=" << doorStateChangedChannels << '\n';
             }
         }
     }

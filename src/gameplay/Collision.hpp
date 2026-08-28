@@ -21,6 +21,9 @@ struct CharacterMotionResult {
 class CollisionWorld {
 public:
     CollisionWorld(gdp::core::Aabb roomBounds, std::vector<gdp::core::Aabb> solids = {});
+    [[nodiscard]] static CollisionWorld fromWalkableVolumes(
+        std::vector<gdp::core::Aabb> walkableVolumes,
+        std::vector<gdp::core::Aabb> solids = {});
 
     [[nodiscard]] static CollisionWorld fixedRoom(
         gdp::core::Vec3 worldOrigin = {},
@@ -32,14 +35,30 @@ public:
         CharacterCollider collider) const noexcept;
 
     [[nodiscard]] const gdp::core::Aabb& roomBounds() const noexcept;
+    [[nodiscard]] const std::vector<gdp::core::Aabb>& walkableVolumes() const noexcept;
     [[nodiscard]] const std::vector<gdp::core::Aabb>& solids() const noexcept;
+    [[nodiscard]] bool canOccupy(
+        gdp::core::Vec3 feetPosition,
+        CharacterCollider collider = {}) const noexcept;
 
 private:
+    struct WalkableVolumesTag {
+    };
+
+    CollisionWorld(
+        WalkableVolumesTag,
+        std::vector<gdp::core::Aabb> walkableVolumes,
+        std::vector<gdp::core::Aabb> solids);
+
+    [[nodiscard]] bool insideWalkable(
+        gdp::core::Vec3 feetPosition,
+        CharacterCollider collider) const noexcept;
     [[nodiscard]] bool overlapsSolid(
         gdp::core::Vec3 feetPosition,
         CharacterCollider collider) const noexcept;
 
     gdp::core::Aabb roomBounds_;
+    std::vector<gdp::core::Aabb> walkableVolumes_;
     std::vector<gdp::core::Aabb> solids_;
 };
 

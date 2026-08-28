@@ -4,6 +4,8 @@
 #include <cmath>
 #include <limits>
 #include <numbers>
+#include <utility>
+#include <vector>
 
 namespace gdp::gameplay {
 namespace {
@@ -51,6 +53,47 @@ float horizontalDistance(
     const float differenceX = first.x - second.x;
     const float differenceZ = first.z - second.z;
     return std::sqrt((differenceX * differenceX) + (differenceZ * differenceZ));
+}
+
+gdp::core::Aabb corridorSegmentVolume(
+    const gdp::core::Vec3 first,
+    const gdp::core::Vec3 second,
+    const float width,
+    const float height) noexcept
+{
+    // The longitudinal overlap lets a circular character pass continuously
+    // between volumes after each AABB is inset by its collision radius.
+    constexpr float endpointOverlap = 0.65F;
+    const float halfWidth = width * 0.5F;
+    const float floor = std::min(first.y, second.y);
+    const float ceiling = std::max(first.y, second.y) + height;
+    if (gdp::core::nearlyEqual(first.z, second.z)) {
+        return {
+            {std::min(first.x, second.x) - endpointOverlap,
+                floor,
+                first.z - halfWidth},
+            {std::max(first.x, second.x) + endpointOverlap,
+                ceiling,
+                first.z + halfWidth},
+        };
+    }
+    return {
+        {first.x - halfWidth,
+            floor,
+            std::min(first.z, second.z) - endpointOverlap},
+        {first.x + halfWidth,
+            ceiling,
+            std::max(first.z, second.z) + endpointOverlap},
+    };
+}
+
+void appendFixedRoomSolids(
+    const gdp::world::RoomInstance& room,
+    std::vector<gdp::core::Aabb>& solids)
+{
+    const CollisionWorld fixed = CollisionWorld::fixedRoom(
+        room.transform.position, room.rotation);
+    solids.insert(solids.end(), fixed.solids().begin(), fixed.solids().end());
 }
 
 } // namespace
@@ -144,6 +187,62 @@ std::optional<RoomTransition> findRoomTransition(
         destinationPosition,
         yaw,
     };
+}
+
+CollisionWorld makeRoomNavigationCollision(
+    const gdp::world::World& world,
+    const gdp::world::RoomId currentRoom,
+    const bool doorsLocked)
+{
+    const gdp::world::RoomInstance* source = findRoom(world, currentRoom);
+    if (source == nullptr) {
+        return CollisionWorld{{}};
+    }
+
+    std::vector<gdp::core::Aabb> volumes{source->worldBounds};
+    std::vector<gdp::core::Aabb> solids;
+    appendFixedRoomSolids(*source, solids);
+    if (doorsLocked) {
+        return CollisionWorld::fromWalkableVolumes(
+            std::move(volumes), std::move(solids));
+    }
+
+    for (const gdp::world::CorridorPath& corridor : world.corridors) {
+        gdp::world::RoomId destinationId = 0U;
+        if (corridor.firstRoom == currentRoom) {
+            destinationId = corridor.secondRoom;
+        } else if (corridor.secondRoom == currentRoom) {
+            destinationId = corridor.firstRoom;
+        } else {
+            continue;
+        }
+
+        const gdp::world::RoomInstance* destination = findRoom(world, destinationId);
+        if (destination == nullptr || corridor.points.size() < 2U) {
+            continue;
+        }
+        volumes.push_back(destination->worldBounds);
+        appendFixedRoomSolids(*destination, solids);
+        for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+            volumes.push_back(corridorSegmentVolume(
+                corridor.points[index], corridor.points[index + 1U],
+                corridor.width, corridor.height));
+        }
+    }
+    return CollisionWorld::fromWalkableVolumes(
+        std::move(volumes), std::move(solids));
+}
+
+std::optional<gdp::world::RoomId> roomContainingPosition(
+    const gdp::world::World& world,
+    const gdp::core::Vec3 feetPosition) noexcept
+{
+    for (const gdp::world::RoomInstance& room : world.rooms) {
+        if (room.worldBounds.contains(feetPosition)) {
+            return room.id;
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace gdp::gameplay

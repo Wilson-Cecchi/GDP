@@ -140,6 +140,33 @@ void testHitscanSelectionAndBlocking()
         "shot with no target or world impact inside its range reports a miss");
 }
 
+void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld disconnected = CollisionWorld::fromWalkableVolumes({
+        {{-2.0F, 0.0F, -2.0F}, {2.0F, 4.0F, 2.0F}},
+        {{5.0F, 0.0F, -2.0F}, {9.0F, 4.0F, 2.0F}},
+    });
+    EntityManager manager;
+    const EntityId enemy = manager.createEnemy({
+        .transform = {.position = {6.0F, 0.0F, 0.0F}},
+        .roomId = 1,
+        .health = 50.0F,
+    });
+    Weapon weapon({.fireInterval = 0.0F, .range = 20.0F});
+    const ShotResult shot = fireHitscan(
+        weapon, {0.0F, 1.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
+        1, disconnected, manager);
+    expect(shot.outcome == ShotOutcome::ImpactWorld
+            && manager.findData<EnemyData>(enemy)->health == 50.0F,
+        "hitscan stops at the first gap in a walkable-volume union");
+    expect(!hasLineOfSight(
+            {0.0F, 1.0F, 0.0F}, {6.0F, 1.0F, 0.0F}, disconnected),
+        "line of sight cannot cross disconnected navigable volumes");
+}
+
 void testWorkerBehavior()
 {
     using namespace gdp::entities;
@@ -683,6 +710,7 @@ int main()
     testWeaponLifecycle();
     testDamageLifecycle();
     testHitscanSelectionAndBlocking();
+    testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testWorkerBehavior();
     testWorkerLineOfSight();
     testGuardRangedBehavior();

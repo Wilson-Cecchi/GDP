@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace gdp::gameplay {
 namespace {
@@ -73,9 +74,31 @@ float firstWorldDistance(
             nearest = std::min(nearest, interval->nearDistance);
         }
     }
-    if (const auto room = rayAabbInterval(
-            origin, direction, collisionWorld.roomBounds(), maximumDistance)) {
-        nearest = std::min(nearest, room->farDistance);
+
+    std::vector<RayInterval> walkableIntervals;
+    walkableIntervals.reserve(collisionWorld.walkableVolumes().size());
+    for (const gdp::core::Aabb volume : collisionWorld.walkableVolumes()) {
+        if (const auto interval = rayAabbInterval(
+                origin, direction, volume, maximumDistance)) {
+            walkableIntervals.push_back(*interval);
+        }
+    }
+    std::sort(walkableIntervals.begin(), walkableIntervals.end(),
+        [](const RayInterval first, const RayInterval second) {
+            return first.nearDistance < second.nearDistance;
+        });
+    float continuousFar = 0.0F;
+    bool startsInsideWalkable = false;
+    constexpr float intervalEpsilon = 1.0e-4F;
+    for (const RayInterval interval : walkableIntervals) {
+        if (interval.nearDistance > continuousFar + intervalEpsilon) {
+            break;
+        }
+        startsInsideWalkable = true;
+        continuousFar = std::max(continuousFar, interval.farDistance);
+    }
+    if (startsInsideWalkable) {
+        nearest = std::min(nearest, continuousFar);
     }
     return nearest;
 }

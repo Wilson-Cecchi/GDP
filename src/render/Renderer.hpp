@@ -82,6 +82,12 @@ struct DoorRenderData {
     bool locked{false};
 };
 
+struct CorridorRenderData {
+    std::span<const gdp::core::Vec3> points{};
+    float width{1.2F};
+    float height{2.2F};
+};
+
 inline constexpr std::size_t maxRenderedRoomLights = 4U;
 
 struct PointLightRenderData {
@@ -135,7 +141,9 @@ public:
         std::span<const PropRenderData> props = {},
         RoomLightingRenderData lighting = {},
         RoomRenderData room = {},
-        std::span<const DoorRenderData> doors = {});
+        std::span<const DoorRenderData> doors = {},
+        std::span<const CorridorRenderData> corridors = {},
+        std::span<const RoomRenderData> connectedRooms = {});
 
 private:
     struct EnemyGpuVisual {

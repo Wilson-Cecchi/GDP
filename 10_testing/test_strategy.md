@@ -61,8 +61,11 @@ sequência representativa.
 O gate de travessia percorre todos os corredores de um mundo representativo nos
 dois sentidos, exige edge/destino corretos, spawn dentro dos bounds, distância e
 orientação válidas. Também cobre preservação de HP/inventário/upgrades,
-rejeição de coordenadas inválidas e colisão nas quatro rotações. OpenGL desloca
-e gira a sala e diferencia porta atravessável de lockdown por pixels.
+rejeição de coordenadas inválidas e colisão nas quatro rotações. O mesmo gate
+simula movimento por todos os segmentos, sem teleporte, resolve a sala destino
+automaticamente e prova que lockdown impede a saída. OpenGL desloca e gira a
+sala, diferencia porta atravessável de lockdown e detecta a geometria adicional
+com a câmera dentro de um corredor.
 
 O gate de assets gera 1.000 recipes visuais, valida pixels e regras materiais,
 exercita reuse do cache e mantém o fingerprint estrutural do World separado. O

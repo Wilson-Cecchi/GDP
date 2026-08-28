@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Math.hpp"
+#include "gameplay/Collision.hpp"
 #include "world/World.hpp"
 
 #include <optional>
@@ -22,5 +23,14 @@ struct RoomTransition {
     gdp::core::Vec3 playerForward,
     float maximumDistance = 1.35F,
     float destinationInset = 0.85F) noexcept;
+
+[[nodiscard]] CollisionWorld makeRoomNavigationCollision(
+    const gdp::world::World& world,
+    gdp::world::RoomId currentRoom,
+    bool doorsLocked = false);
+
+[[nodiscard]] std::optional<gdp::world::RoomId> roomContainingPosition(
+    const gdp::world::World& world,
+    gdp::core::Vec3 feetPosition) noexcept;
 
 } // namespace gdp::gameplay

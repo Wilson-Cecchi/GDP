@@ -7,6 +7,24 @@
 namespace gdp::gameplay {
 namespace {
 
+gdp::core::Aabb combinedBounds(
+    const std::vector<gdp::core::Aabb>& volumes) noexcept
+{
+    if (volumes.empty()) {
+        return {};
+    }
+    gdp::core::Aabb bounds = volumes.front();
+    for (const gdp::core::Aabb volume : volumes) {
+        bounds.minimum.x = std::min(bounds.minimum.x, volume.minimum.x);
+        bounds.minimum.y = std::min(bounds.minimum.y, volume.minimum.y);
+        bounds.minimum.z = std::min(bounds.minimum.z, volume.minimum.z);
+        bounds.maximum.x = std::max(bounds.maximum.x, volume.maximum.x);
+        bounds.maximum.y = std::max(bounds.maximum.y, volume.maximum.y);
+        bounds.maximum.z = std::max(bounds.maximum.z, volume.maximum.z);
+    }
+    return bounds;
+}
+
 gdp::core::Aabb transformBounds(
     const gdp::core::Aabb localBounds,
     const gdp::core::Vec3 origin,
@@ -44,8 +62,30 @@ CollisionWorld::CollisionWorld(
     const gdp::core::Aabb roomBounds,
     std::vector<gdp::core::Aabb> solids)
     : roomBounds_(roomBounds)
+    , walkableVolumes_{roomBounds}
     , solids_(std::move(solids))
 {
+}
+
+CollisionWorld::CollisionWorld(
+    const WalkableVolumesTag,
+    std::vector<gdp::core::Aabb> walkableVolumes,
+    std::vector<gdp::core::Aabb> solids)
+    : roomBounds_(combinedBounds(walkableVolumes))
+    , walkableVolumes_(std::move(walkableVolumes))
+    , solids_(std::move(solids))
+{
+}
+
+CollisionWorld CollisionWorld::fromWalkableVolumes(
+    std::vector<gdp::core::Aabb> walkableVolumes,
+    std::vector<gdp::core::Aabb> solids)
+{
+    return {
+        WalkableVolumesTag{},
+        std::move(walkableVolumes),
+        std::move(solids),
+    };
 }
 
 CollisionWorld CollisionWorld::fixedRoom(
@@ -92,11 +132,7 @@ CharacterMotionResult CollisionWorld::moveCharacter(
 
     const float originalX = result.position.x;
     result.position.x += result.velocity.x * step;
-    result.position.x = std::clamp(
-        result.position.x,
-        roomBounds_.minimum.x + collider.radius,
-        roomBounds_.maximum.x - collider.radius);
-    if (overlapsSolid(result.position, collider)) {
+    if (!canOccupy(result.position, collider)) {
         result.position.x = originalX;
     }
     if (!gdp::core::nearlyEqual(
@@ -108,11 +144,7 @@ CharacterMotionResult CollisionWorld::moveCharacter(
 
     const float originalZ = result.position.z;
     result.position.z += result.velocity.z * step;
-    result.position.z = std::clamp(
-        result.position.z,
-        roomBounds_.minimum.z + collider.radius,
-        roomBounds_.maximum.z - collider.radius);
-    if (overlapsSolid(result.position, collider)) {
+    if (!canOccupy(result.position, collider)) {
         result.position.z = originalZ;
     }
     if (!gdp::core::nearlyEqual(
@@ -130,9 +162,40 @@ const gdp::core::Aabb& CollisionWorld::roomBounds() const noexcept
     return roomBounds_;
 }
 
+const std::vector<gdp::core::Aabb>& CollisionWorld::walkableVolumes() const noexcept
+{
+    return walkableVolumes_;
+}
+
 const std::vector<gdp::core::Aabb>& CollisionWorld::solids() const noexcept
 {
     return solids_;
+}
+
+bool CollisionWorld::canOccupy(
+    const gdp::core::Vec3 feetPosition,
+    const CharacterCollider collider) const noexcept
+{
+    return insideWalkable(feetPosition, collider)
+        && !overlapsSolid(feetPosition, collider);
+}
+
+bool CollisionWorld::insideWalkable(
+    const gdp::core::Vec3 feetPosition,
+    const CharacterCollider collider) const noexcept
+{
+    const float top = feetPosition.y + collider.height;
+    for (const gdp::core::Aabb volume : walkableVolumes_) {
+        if (feetPosition.x >= volume.minimum.x + collider.radius
+            && feetPosition.x <= volume.maximum.x - collider.radius
+            && feetPosition.z >= volume.minimum.z + collider.radius
+            && feetPosition.z <= volume.maximum.z - collider.radius
+            && feetPosition.y >= volume.minimum.y - 1.0e-4F
+            && top <= volume.maximum.y + 1.0e-4F) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool CollisionWorld::overlapsSolid(

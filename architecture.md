@@ -3434,11 +3434,12 @@ travessia bidirecional ✓
 estado do jogador preservado ✓
 sala ativa: colisão/material/luz/áudio ✓
 lockdown bloqueia saída ✓
-corredor contínuo → próximo
+corredor contínuo: geometria/colisão ✓
+troca automática de sala ✓
 ```
 
-**Próximo marco:** materializar os `CorridorPath::points` em geometria e colisão
-para caminhada contínua entre as salas já conectadas.
+**Próximo marco:** completar o objetivo de sessão até o Boss, com condição de
+vitória e reinício determinístico de uma nova run.
 
 ---
 

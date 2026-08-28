@@ -1,8 +1,8 @@
 # World — Corredores procedurais
 
 > **Estado:** roteamento estrutural Straight/L/Z implementado e validado na Fase
-> 5; as rotas já resolvem a travessia por portas na Fase 13. Occupancy grid
-> detalhado, BFS/A* e geração de mesh atravessável permanecem planejados.
+> 5; a Fase 13 materializa as rotas em geometria e volumes navegáveis contínuos.
+> Occupancy grid detalhado, BFS/A* e mesh otimizada permanecem planejados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -32,8 +32,11 @@ Cada rota é validada antes de aceitar.
 
 `RoomTraversal` usa `edge` e os dois `RoomId` do `CorridorPath` como contrato de
 destino. Assim, nenhuma porta pode enviar o jogador a uma sala não ligada, e o
-mesmo corredor funciona nos dois sentidos. A etapa seguinte materializa os
-pontos da rota como piso, paredes, teto e colisão para caminhada contínua.
+mesmo corredor funciona nos dois sentidos. Cada par de pontos vira um volume
+ortogonal navegável, com sobreposição longitudinal de `0,65 m` para acomodar o
+raio do jogador nas transições de volume e nas curvas. A sala atual, seus
+corredores e as salas diretamente adjacentes formam a união navegável; lockdown
+reduz essa união à sala atual.
 
 ## Stub
 
@@ -55,7 +58,10 @@ Não permitir cruzamento arbitrário no primeiro passe. Se necessário, represen
 
 ## Mesh
 
-`cells → floor/walls/ceiling → MeshData`.
+O renderer atual converte os segmentos diretamente em boxes de piso, duas
+paredes laterais e teto, além de desenhar a shell da sala adjacente. Uma etapa
+posterior pode consolidar `cells → floor/walls/ceiling → MeshData` para reduzir
+draw calls sem alterar o contrato de gameplay.
 
 ## Falha
 
@@ -64,3 +70,5 @@ Todas as rotas falharam → rejeitar placement/candidate. Nunca atravessar geome
 ## Testes
 
 Straight, L, Z, obstáculos, salas próximas, connectors opostos e mapa impossível.
+A regressão funcional percorre todos os corredores de uma seed representativa
+nos dois sentidos, sem teleporte, e verifica o bloqueio físico de lockdown.
