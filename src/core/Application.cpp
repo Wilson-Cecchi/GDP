@@ -20,7 +20,6 @@
 #include <array>
 #include <chrono>
 #include <cmath>
-#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -124,50 +123,40 @@ float yawForDirection(const gdp::core::Vec3 direction) noexcept
     return std::atan2(direction.z, direction.x) * radiansToDegrees;
 }
 
-std::optional<float> corridorProgressAt(
-    const world::CorridorPath& corridor,
+bool edgeTouchesRoom(
+    const world::World& world,
+    const world::EdgeId edge,
+    const world::RoomId roomId) noexcept
+{
+    const auto corridor = std::find_if(
+        world.corridors.begin(), world.corridors.end(),
+        [edge](const world::CorridorPath& candidate) {
+            return candidate.edge == edge;
+        });
+    return corridor != world.corridors.end()
+        && (corridor->firstRoom == roomId || corridor->secondRoom == roomId);
+}
+
+bool playerNearDoor(
+    const world::World& world,
+    const world::EdgeId edge,
     const gdp::core::Vec3 position) noexcept
 {
-    float totalLength = 0.0F;
-    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
-        const gdp::core::Vec3 segment = corridor.points[index + 1U] - corridor.points[index];
-        totalLength += std::sqrt((segment.x * segment.x) + (segment.z * segment.z));
-    }
-    if (totalLength <= 1.0e-4F) {
-        return std::nullopt;
-    }
-
-    float traversed = 0.0F;
-    float closestDistanceSquared = std::numeric_limits<float>::max();
-    float closestProgress = 0.0F;
-    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
-        const gdp::core::Vec3 first = corridor.points[index];
-        const gdp::core::Vec3 segment = corridor.points[index + 1U] - first;
-        const float lengthSquared = (segment.x * segment.x) + (segment.z * segment.z);
-        const float length = std::sqrt(lengthSquared);
-        if (length <= 1.0e-4F) {
-            continue;
+    constexpr float occupancyDistance = 1.05F;
+    for (const world::RoomInstance& room : world.rooms) {
+        for (const world::ConnectorInstance& connector : room.connectors) {
+            if (!connector.edge || *connector.edge != edge) {
+                continue;
+            }
+            const float deltaX = connector.worldPosition.x - position.x;
+            const float deltaZ = connector.worldPosition.z - position.z;
+            if ((deltaX * deltaX) + (deltaZ * deltaZ)
+                <= occupancyDistance * occupancyDistance) {
+                return true;
+            }
         }
-        const gdp::core::Vec3 relative = position - first;
-        const float along = std::clamp(
-            ((relative.x * segment.x) + (relative.z * segment.z)) / lengthSquared,
-            0.0F, 1.0F);
-        const float closestX = first.x + (segment.x * along);
-        const float closestZ = first.z + (segment.z * along);
-        const float deltaX = position.x - closestX;
-        const float deltaZ = position.z - closestZ;
-        const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
-        if (distanceSquared < closestDistanceSquared) {
-            closestDistanceSquared = distanceSquared;
-            closestProgress = (traversed + (length * along)) / totalLength;
-        }
-        traversed += length;
     }
-    const float tolerance = (corridor.width * 0.5F) + 0.20F;
-    if (closestDistanceSquared > tolerance * tolerance) {
-        return std::nullopt;
-    }
-    return std::clamp(closestProgress, 0.0F, 1.0F);
+    return false;
 }
 
 } // namespace
@@ -283,8 +272,16 @@ bool Application::initialize()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
+    doorRuntimes_.clear();
+    std::vector<world::EdgeId> initiallyBlockedEdges;
+    initiallyBlockedEdges.reserve(world_->corridors.size());
+    for (const world::CorridorPath& corridor : world_->corridors) {
+        doorRuntimes_.emplace(
+            corridor.edge, gameplay::makeDoorRuntime(corridor.edge));
+        initiallyBlockedEdges.push_back(corridor.edge);
+    }
     baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
-        *world_, startRoom->id, false);
+        *world_, startRoom->id, false, initiallyBlockedEdges);
     roomEvents_.reserve(world_->rooms.size());
     roomLighting_.reserve(world_->rooms.size());
     for (const world::RoomInstance& room : world_->rooms) {
@@ -506,9 +503,32 @@ void Application::fixedUpdate(const double fixedStep)
         });
     const bool doorsLocked = collisionEvent != roomEvents_.end()
         && gameplay::isRoomLocked(*collisionEvent);
+    std::optional<world::EdgeId> occupiedCorridorEdge;
+    if (world_ && !gameplay::roomContainingPosition(*world_, player_.state().position)) {
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            if (gameplay::corridorProgressAt(corridor, player_.state().position)) {
+                occupiedCorridorEdge = corridor.edge;
+                break;
+            }
+        }
+    }
+    std::vector<world::EdgeId> blockedDoorEdges;
+    blockedDoorEdges.reserve(doorRuntimes_.size());
+    if (world_) {
+        for (auto& [edge, door] : doorRuntimes_) {
+            const bool locked = doorsLocked
+                && edgeTouchesRoom(*world_, edge, playerRoom);
+            const bool occupied = occupiedCorridorEdge == edge
+                || playerNearDoor(*world_, edge, player_.state().position);
+            (void)gameplay::updateDoor(door, step, locked, occupied);
+            if (!gameplay::isDoorPassable(door)) {
+                blockedDoorEdges.push_back(edge);
+            }
+        }
+    }
     if (world_ && playerEntity != nullptr) {
         baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
-            *world_, playerRoom, doorsLocked);
+            *world_, playerRoom, doorsLocked, blockedDoorEdges);
     }
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
@@ -521,14 +541,17 @@ void Application::fixedUpdate(const double fixedStep)
         playerRoom = destination.id;
         playerEntity->roomId = playerRoom;
         playerEntity->transform.position = player_.state().position;
+        std::vector<world::EdgeId> blockedEdges;
+        blockedEdges.reserve(doorRuntimes_.size());
+        for (const auto& [edge, door] : doorRuntimes_) {
+            if (!gameplay::isDoorPassable(door)) {
+                blockedEdges.push_back(edge);
+            }
+        }
         baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
-            *world_, playerRoom, false);
+            *world_, playerRoom, false, blockedEdges);
         collisionWorld_ = gameplay::collisionWorldWithProps(
             baseCollisionWorld_, entities_, playerRoom);
-        if (audio_) {
-            audio_->setAmbience(destination.seed,
-                static_cast<std::uint64_t>(destination.theme));
-        }
         std::ostringstream message;
         message << transitionKind << ' ' << sourceRoom << " -> " << playerRoom;
         log(LogLevel::Info, message.str());
@@ -564,16 +587,12 @@ void Application::fixedUpdate(const double fixedStep)
             if (locked) {
                 log(LogLevel::Info, "Door locked by active room event");
             } else {
-                const auto destination = std::find_if(
-                    world_->rooms.begin(), world_->rooms.end(),
-                    [&transition](const world::RoomInstance& room) {
-                        return room.id == transition->destinationRoom;
-                    });
-                if (destination != world_->rooms.end()
-                    && player_.relocate(
-                        transition->destinationPosition,
-                        transition->destinationYawDegrees)) {
-                    adoptRoom(*destination, "Interactive room transition");
+                const auto door = doorRuntimes_.find(transition->edge);
+                if (door != doorRuntimes_.end()
+                    && gameplay::requestDoorOpen(door->second, false)) {
+                    std::ostringstream message;
+                    message << "Door opening on edge " << transition->edge;
+                    log(LogLevel::Info, message.str());
                 }
             }
             interactionPending_ = false;
@@ -857,6 +876,51 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
     if (audio_) {
+        bool ambienceSelected = false;
+        if (world_ && !gameplay::roomContainingPosition(
+                *world_, player_.state().position)) {
+            for (const world::CorridorPath& corridor : world_->corridors) {
+                const std::optional<float> corridorProgress
+                    = gameplay::corridorProgressAt(
+                        corridor, player_.state().position);
+                if (!corridorProgress) {
+                    continue;
+                }
+                const auto firstRoom = std::find_if(
+                    world_->rooms.begin(), world_->rooms.end(),
+                    [&corridor](const world::RoomInstance& room) {
+                        return room.id == corridor.firstRoom;
+                    });
+                const auto secondRoom = std::find_if(
+                    world_->rooms.begin(), world_->rooms.end(),
+                    [&corridor](const world::RoomInstance& room) {
+                        return room.id == corridor.secondRoom;
+                    });
+                if (firstRoom == world_->rooms.end()
+                    || secondRoom == world_->rooms.end()) {
+                    break;
+                }
+                float blend = *corridorProgress;
+                blend = blend * blend * (3.0F - (2.0F * blend));
+                audio_->setAmbienceBlend(
+                    firstRoom->seed, static_cast<std::uint64_t>(firstRoom->theme),
+                    secondRoom->seed, static_cast<std::uint64_t>(secondRoom->theme),
+                    blend);
+                ambienceSelected = true;
+                break;
+            }
+        }
+        if (world_ && !ambienceSelected) {
+            const auto currentRoom = std::find_if(
+                world_->rooms.begin(), world_->rooms.end(),
+                [playerRoom](const world::RoomInstance& room) {
+                    return room.id == playerRoom;
+                });
+            if (currentRoom != world_->rooms.end()) {
+                audio_->setAmbience(currentRoom->seed,
+                    static_cast<std::uint64_t>(currentRoom->theme));
+            }
+        }
         audio_->update(step);
     }
     ++fixedUpdates_;
@@ -1034,7 +1098,8 @@ void Application::render()
                         && corridor.secondRoom != playerRoom) {
                         continue;
                     }
-                    const std::optional<float> corridorProgress = corridorProgressAt(
+                    const std::optional<float> corridorProgress
+                        = gameplay::corridorProgressAt(
                         corridor, player_.state().position);
                     if (!corridorProgress) {
                         continue;
@@ -1083,12 +1148,14 @@ void Application::render()
                 && gameplay::isRoomLocked(*activeEvent);
             for (const world::ConnectorInstance& connector : currentRoom->connectors) {
                 if (!connector.sealed && connector.edge) {
+                    const auto door = doorRuntimes_.find(*connector.edge);
                     visibleDoors.push_back({
                         connector.worldPosition,
                         connector.worldNormal,
                         connector.width,
                         connector.height,
                         doorsLocked,
+                        door == doorRuntimes_.end() ? 0.0F : door->second.openness,
                     });
                 }
             }
@@ -1128,12 +1195,14 @@ void Application::render()
                         return !connector.sealed && connector.edge == corridor.edge;
                     });
                 if (entryDoor != connectedRoom->connectors.end()) {
+                    const auto door = doorRuntimes_.find(corridor.edge);
                     visibleDoors.push_back({
                         entryDoor->worldPosition,
                         entryDoor->worldNormal,
                         entryDoor->width,
                         entryDoor->height,
                         false,
+                        door == doorRuntimes_.end() ? 0.0F : door->second.openness,
                     });
                 }
             }
@@ -1176,6 +1245,7 @@ void Application::shutdown()
     roomEvents_.clear();
     roomLighting_.clear();
     roomMaterialKeys_.clear();
+    doorRuntimes_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};

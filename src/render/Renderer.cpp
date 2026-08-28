@@ -948,18 +948,10 @@ bool Renderer::render(
             shader_.setFloat(gl_, "uEmissiveStrength", emissive);
             box_.draw(gl_);
         };
-        if (door.locked) {
-            const gdp::core::Vec3 scale = facesX
-                ? gdp::core::Vec3{0.12F, door.height, door.width}
-                : gdp::core::Vec3{door.width, door.height, 0.12F};
-            drawDoorPiece(
-                insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F},
-                scale, {0.90F, 0.10F, 0.05F}, 0.65F);
-            continue;
-        }
-
         constexpr float frameThickness = 0.14F;
-        const gdp::core::Vec3 frameColor{0.10F, 0.66F, 0.72F};
+        const gdp::core::Vec3 frameColor = door.locked
+            ? gdp::core::Vec3{0.90F, 0.10F, 0.05F}
+            : gdp::core::Vec3{0.10F, 0.66F, 0.72F};
         const gdp::core::Vec3 transverse = facesX
             ? gdp::core::Vec3{0.0F, 0.0F, 1.0F}
             : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -981,6 +973,24 @@ bool Renderer::render(
         drawDoorPiece(insetPosition
                 + gdp::core::Vec3{0.0F, door.height + (frameThickness * 0.5F), 0.0F},
             lintelScale, frameColor, 0.28F);
+
+        const float openFraction = std::isfinite(door.openFraction)
+            ? std::clamp(door.openFraction, 0.0F, 1.0F) : 0.0F;
+        const float panelWidth = std::max(0.05F, (door.width * 0.5F) - 0.02F);
+        const float panelOffset = (panelWidth * 0.5F) + (panelWidth * openFraction);
+        const gdp::core::Vec3 panelScale = facesX
+            ? gdp::core::Vec3{0.10F, door.height - 0.10F, panelWidth}
+            : gdp::core::Vec3{panelWidth, door.height - 0.10F, 0.10F};
+        const gdp::core::Vec3 panelCenter
+            = insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
+        const gdp::core::Vec3 panelColor = door.locked
+            ? gdp::core::Vec3{0.72F, 0.08F, 0.04F}
+            : gdp::core::Vec3{0.22F, 0.30F, 0.34F};
+        const float panelEmissive = door.locked ? 0.48F : 0.08F;
+        drawDoorPiece(panelCenter + (transverse * panelOffset),
+            panelScale, panelColor, panelEmissive);
+        drawDoorPiece(panelCenter - (transverse * panelOffset),
+            panelScale, panelColor, panelEmissive);
     }
 
     fallbackTexture_.bind(gl_);

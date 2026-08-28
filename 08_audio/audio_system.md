@@ -1,7 +1,8 @@
 # Audio — Sistema e procedural
 
 > **Estado:** síntese procedural, mixer estéreo, ambiência por tema, integração
-> de gameplay e fallback silencioso implementados na Fase 12.
+> de gameplay e fallback silencioso implementados na Fase 12; crossfade de
+> ambiência por corredor implementado na Fase 15.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -41,8 +42,10 @@ dano recebido e estados de evento usam o centro estéreo.
 ## Ambiência
 
 Os sete `RoomTheme` fornecem fundações distintas de frequência, modulação e
-ruído para um loop ambiente. A START seleciona seu perfil na inicialização e
-cada travessia de porta troca o loop pela seed/tema da sala destino.
+ruído para um loop ambiente. A START seleciona seu perfil na inicialização. No
+corredor, `setAmbienceBlend()` mantém os loops das duas salas sem reiniciar seus
+cursors e usa ganhos `sqrt(1-t)`/`sqrt(t)`; ao entrar, preserva somente o loop da
+sala destino. O peso vem da projeção sobre o `CorridorPath` com `smoothstep`.
 Máquinas locais e eventos ambientes raros permanecem planejados e deverão usar
 budget temporal, nunca chance por frame.
 
@@ -58,5 +61,6 @@ encerrar SDL.
 
 O gate cobre 1.000 receitas/hash únicos, todas as doze categorias, sete perfis
 ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
-cache, limite de vozes, ciclo de one-shot/loop, pan, distância, dispositivo
-dummy e dispositivo ausente. Pause e som dedicado de porta permanecem planejados.
+cache, limite de vozes, ciclo de one-shot/loop, crossfade de duas ambiências,
+pan, distância, dispositivo dummy e dispositivo ausente. Pause e som dedicado
+de porta permanecem planejados.

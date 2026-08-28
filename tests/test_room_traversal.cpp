@@ -1,11 +1,13 @@
 #include "core/Math.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Door.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldGenerator.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -184,6 +186,42 @@ void testRotatedRoomCollisionMatchesModuleBounds()
     }
 }
 
+void testDoorRuntimeOpensHoldsClosesAndLocks()
+{
+    using namespace gdp;
+    gameplay::DoorRuntime door = gameplay::makeDoorRuntime(17U);
+    expect(!gameplay::isDoorPassable(door)
+            && door.state == world::DoorState::Closed,
+        "new corridor door starts closed and blocks traversal");
+    expect(gameplay::requestDoorOpen(door, false)
+            && door.state == world::DoorState::Opening,
+        "door interaction starts physical opening without relocation");
+    (void)gameplay::updateDoor(door, 0.20F, false, true);
+    expect(door.openness > 0.0F && door.openness < 1.0F
+            && !gameplay::isDoorPassable(door),
+        "partially opened door remains a physical blocker");
+    (void)gameplay::updateDoor(door, 0.30F, false, true);
+    expect(door.state == world::DoorState::Open
+            && gameplay::isDoorPassable(door),
+        "fully opened door releases its corridor collision");
+    (void)gameplay::updateDoor(door, 5.0F, false, true);
+    expect(door.state == world::DoorState::Open,
+        "occupied door cannot close on a player in its threshold or corridor");
+    (void)gameplay::updateDoor(door, 2.0F, false, false);
+    expect(door.state == world::DoorState::Closing,
+        "unoccupied door starts closing after its hold interval");
+    expect(gameplay::requestDoorOpen(door, false),
+        "interaction reverses a closing door safely");
+    (void)gameplay::updateDoor(door, 1.0F, false, false);
+    expect(door.state == world::DoorState::Open,
+        "reopened door returns to its fully open state");
+    (void)gameplay::updateDoor(door, 1.0F, true, false);
+    expect(door.state == world::DoorState::Locked
+            && !gameplay::isDoorPassable(door)
+            && !gameplay::requestDoorOpen(door, true),
+        "lockdown closes the door and rejects interaction");
+}
+
 void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
 {
     using namespace gdp;
@@ -238,6 +276,30 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
             expect(gameplay::roomContainingPosition(*generated.world, position)
                     == std::optional<world::RoomId>{destinationId},
                 "entering a destination room resolves its logical room id");
+            const std::optional<float> firstProgress
+                = gameplay::corridorProgressAt(corridor, corridor.points.front());
+            const std::optional<float> lastProgress
+                = gameplay::corridorProgressAt(corridor, corridor.points.back());
+            expect(firstProgress && lastProgress
+                    && *firstProgress <= 1.0e-4F && *lastProgress >= 0.9999F,
+                "corridor projection provides stable first-to-second blend progress");
+
+            const std::array blockedEdge{corridor.edge};
+            const gameplay::CollisionWorld closedDoorNavigation
+                = gameplay::makeRoomNavigationCollision(
+                    *generated.world, sourceId, false, blockedEdge);
+            core::Vec3 closedDoorPosition = sourceDoor->worldPosition
+                - (sourceDoor->worldNormal * 0.55F);
+            for (int step = 0; step < 120; ++step) {
+                const gameplay::CharacterMotionResult motion
+                    = closedDoorNavigation.moveCharacter(
+                        closedDoorPosition, sourceDoor->worldNormal * 4.5F,
+                        1.0F / 120.0F, {});
+                closedDoorPosition = motion.position;
+            }
+            expect(source->worldBounds.contains(closedDoorPosition)
+                    && !destination->worldBounds.contains(closedDoorPosition),
+                "a closed individual door blocks only its corridor route");
 
             const gameplay::CollisionWorld lockedNavigation
                 = gameplay::makeRoomNavigationCollision(
@@ -265,6 +327,7 @@ int main()
     testEveryGeneratedConnectionTraversesBothWays();
     testRangeInvalidInputAndPlayerRelocation();
     testRotatedRoomCollisionMatchesModuleBounds();
+    testDoorRuntimeOpensHoldsClosesAndLocks();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
 
     if (failures != 0) {

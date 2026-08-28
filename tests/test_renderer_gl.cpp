@@ -211,12 +211,21 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 translatedDoorPixels.data());
             translatedDoors.front().locked = true;
+            translatedDoors.front().openFraction = 0.0F;
             const bool renderedLockedDoor = renderer.render(
                 width, height, translatedCamera, {}, {}, {}, translatedLighting,
                 translatedRoom, translatedDoors);
             std::vector<std::uint8_t> lockedDoorPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lockedDoorPixels.data());
+            translatedDoors.front().locked = false;
+            translatedDoors.front().openFraction = 0.45F;
+            const bool renderedMovingDoor = renderer.render(
+                width, height, translatedCamera, {}, {}, {}, translatedLighting,
+                translatedRoom, translatedDoors);
+            std::vector<std::uint8_t> movingDoorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                movingDoorPixels.data());
 
             constexpr std::array corridorDoors{
                 gdp::render::DoorRenderData{
@@ -333,6 +342,7 @@ int main()
             std::size_t lightingChangedChannels = 0;
             std::size_t alertLightingChangedChannels = 0;
             std::size_t doorStateChangedChannels = 0;
+            std::size_t doorMotionChangedChannels = 0;
             std::size_t corridorChangedChannels = 0;
             std::size_t connectedRoomMaterialChangedChannels = 0;
             std::size_t hudChangedChannels = 0;
@@ -383,6 +393,10 @@ int main()
                     if (lockedDoorPixels[index + channel]
                         != translatedDoorPixels[index + channel]) {
                         ++doorStateChangedChannels;
+                    }
+                    if (movingDoorPixels[index + channel]
+                        != translatedDoorPixels[index + channel]) {
+                        ++doorMotionChangedChannels;
                     }
                     if (corridorPixels[index + channel]
                         != openDoorPixels[index + channel]) {
@@ -435,8 +449,9 @@ int main()
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
-                && renderedTranslatedDoor && renderedLockedDoor
+                && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U
+                && doorMotionChangedChannels > 100U
                 && renderedOpenDoor && renderedCorridor
                 && corridorChangedChannels > 100U
                 && renderedConnectedRoomMaterial

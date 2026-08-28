@@ -147,8 +147,20 @@ void testSilentMixerAndSpatialization()
     audio.clearVoices();
     audio.setAmbience(12345U, 2U);
     audio.update(2.2F);
-    expect(audio.activeVoiceCount() == 1U && audio.lastMixPeak() > 0.0F,
+    expect(audio.activeVoiceCount() == 1U && audio.ambientVoiceCount() == 1U
+            && audio.lastMixPeak() > 0.0F,
         "ambient voice loops in silent/headless mixer mode");
+    audio.setAmbienceBlend(12345U, 2U, 67890U, 4U, 0.5F);
+    audio.update(1.0F / 60.0F);
+    expect(audio.activeVoiceCount() == 2U && audio.ambientVoiceCount() == 2U
+            && audio.lastMixPeak() > 0.0F,
+        "corridor crossfade mixes two cached ambient loops without silence");
+    audio.setAmbienceBlend(12345U, 2U, 67890U, 4U, 0.75F);
+    expect(audio.ambientVoiceCount() == 2U,
+        "updating a crossfade reuses both ambient voices instead of restarting them");
+    audio.setAmbience(67890U, 4U);
+    expect(audio.activeVoiceCount() == 1U && audio.ambientVoiceCount() == 1U,
+        "finishing a corridor blend preserves only the destination ambience");
     audio.stopAmbience();
     expect(audio.activeVoiceCount() == 0U,
         "ambient loop can be replaced or stopped without stale voices");

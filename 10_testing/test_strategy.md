@@ -68,8 +68,10 @@ dois sentidos, exige edge/destino corretos, spawn dentro dos bounds, distância 
 orientação válidas. Também cobre preservação de HP/inventário/upgrades,
 rejeição de coordenadas inválidas e colisão nas quatro rotações. O mesmo gate
 simula movimento por todos os segmentos, sem teleporte, resolve a sala destino
-automaticamente e prova que lockdown impede a saída. OpenGL desloca e gira a
-sala, diferencia porta atravessável de lockdown e detecta a geometria adicional
+automaticamente e prova que porta individual fechada e lockdown impedem a saída.
+O runtime cobre abertura parcial bloqueada, limiar passável, ocupação, hold,
+fechamento, reversão e lock. OpenGL desloca e gira a sala, diferencia porta
+aberta, em movimento e lockdown, e detecta a geometria adicional
 com a câmera dentro de um corredor. A regressão multissala mantém duas chaves de
 material preparadas ao mesmo tempo, troca apenas o perfil da sala conectada e
 exige diferença de pixels; o mesmo teste cobre o overlay terminal no viewport.

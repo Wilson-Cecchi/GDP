@@ -40,6 +40,12 @@ public:
         gdp::core::Vec3 listenerPosition,
         gdp::core::Vec3 listenerForward);
     void setAmbience(gdp::core::Seed roomSeed, std::uint64_t profileId);
+    void setAmbienceBlend(
+        gdp::core::Seed firstRoomSeed,
+        std::uint64_t firstProfileId,
+        gdp::core::Seed secondRoomSeed,
+        std::uint64_t secondProfileId,
+        float secondWeight);
     void stopAmbience() noexcept;
     void clearVoices() noexcept;
     void update(float fixedStepSeconds);
@@ -51,6 +57,7 @@ public:
     [[nodiscard]] bool isInitialized() const noexcept;
     [[nodiscard]] bool isOutputActive() const noexcept;
     [[nodiscard]] std::size_t activeVoiceCount() const noexcept;
+    [[nodiscard]] std::size_t ambientVoiceCount() const noexcept;
     [[nodiscard]] std::size_t cachedClipCount() const noexcept;
     [[nodiscard]] float lastMixPeak() const noexcept;
     [[nodiscard]] float lastLeftEnergy() const noexcept;

@@ -4,6 +4,7 @@
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Door.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
 #include "gameplay/Weapon.hpp"
@@ -77,6 +78,7 @@ private:
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
+    std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<gdp::render::Renderer> renderer_;
     SDL_Window* window_{nullptr};

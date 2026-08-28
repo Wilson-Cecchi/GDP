@@ -90,10 +90,12 @@ sala ocupada e das salas diretamente adjacentes. Todos os perfis do mundo são
 preparados antes do primeiro frame; por isso a sala destino mantém shell,
 decoração, inimigos, pickups e props próprios antes da troca de `roomId`, sem
 ativar sua IA antecipadamente. As paredes são divididas ao redor da abertura de
-cada connector. `DoorRenderData` usa moldura ciano quando atravessável e painel
-vermelho durante lockdown. `CorridorRenderData` referencia os pontos do mundo e
+cada connector. `DoorRenderData` usa `openFraction` para deslizar dois painéis
+lateralmente, moldura ciano no fluxo normal e vermelho durante lockdown.
+`CorridorRenderData` referencia os pontos do mundo e
 desenha cada trecho ortogonal com piso, teto e laterais. A regressão offscreen
-coloca uma sala fora da origem, gira 90°, diferencia os dois estados da porta e
+coloca uma sala fora da origem, gira 90°, diferencia porta aberta, em movimento
+e lockdown, e
 exige mudança de pixels com a câmera dentro de um corredor conectado e também
 ao trocar somente a chave de material da sala adjacente.
 

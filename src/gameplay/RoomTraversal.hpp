@@ -5,6 +5,7 @@
 #include "world/World.hpp"
 
 #include <optional>
+#include <span>
 
 namespace gdp::gameplay {
 
@@ -27,10 +28,15 @@ struct RoomTransition {
 [[nodiscard]] CollisionWorld makeRoomNavigationCollision(
     const gdp::world::World& world,
     gdp::world::RoomId currentRoom,
-    bool doorsLocked = false);
+    bool doorsLocked = false,
+    std::span<const gdp::world::EdgeId> blockedEdges = {});
 
 [[nodiscard]] std::optional<gdp::world::RoomId> roomContainingPosition(
     const gdp::world::World& world,
+    gdp::core::Vec3 feetPosition) noexcept;
+
+[[nodiscard]] std::optional<float> corridorProgressAt(
+    const gdp::world::CorridorPath& corridor,
     gdp::core::Vec3 feetPosition) noexcept;
 
 } // namespace gdp::gameplay

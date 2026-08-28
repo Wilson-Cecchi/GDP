@@ -64,8 +64,11 @@ especializados das pastas numeradas.
 - **Fase 14 — Apresentação multissala:** concluída; salas adjacentes preservam
   materiais, decoração e entidades próprias antes da troca lógica, a luz
   ambiente mistura durante o corredor e objetivo/resultado aparecem no viewport.
-- **Próxima atualização:** portas com abertura física e crossfade de ambiência,
-  substituindo o reposicionamento imediato por uma interação totalmente contínua.
+- **Fase 15 — Portas e áudio contínuos:** concluída; `E` anima a abertura sem
+  teleporte, portas bloqueiam/seguram/fecham fisicamente e a ambiência faz
+  crossfade determinístico durante todo o corredor.
+- **Próxima atualização:** levar HP, munição, chaves, evento e prompts de
+  interação para um HUD funcional dentro do viewport.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -84,8 +87,8 @@ amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
-paredes e props, caminha pelas portas ou usa `E` como atalho compatível, interage
-com o terminal usando `E`, dispara com o botão esquerdo
+paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
+terminal, dispara com o botão esquerdo
 e recarrega com `R`. Pickups próximos são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
 mesmos estados permanecem no título como apoio. `Esc` encerra a
@@ -104,9 +107,10 @@ assimetria, materiais e desgaste próprios; sua mesh e seu albedo são preparado
 e cacheados antes do draw. Ele persegue o jogador, ataca em alcance e pode ser
 morto pela pistola hitscan. Ao caminhar por uma porta e pelo corredor, a sala
 destino já permanece visível com decoração, inimigos, pickups, props e materiais
-próprios; sua IA continua inativa até a entrada. A luz ambiente mistura pelo
-trajeto e a sala é assumida automaticamente ao cruzar seus bounds; `E` ainda
-oferece a travessia imediata. HP, chaves, munição e upgrades são preservados. A
+próprios; sua IA continua inativa até a entrada. `E` abre os dois painéis da
+porta sem reposicionar o jogador; a colisão libera o corredor somente após 90%
+de abertura, mantém a porta aberta enquanto o trajeto está ocupado e fecha após
+a entrada. HP, chaves, munição e upgrades são preservados. A
 entidade muda de `roomId`, e colisão, evento e ambiência passam a usar a nova
 sala. Lockdown bloqueia a saída até o evento terminar.
 
@@ -181,9 +185,9 @@ XP e score aparecem no título; limpar o encontro inicial e a emboscada da START
 já permite alcançar o primeiro upgrade.
 
 O primeiro incremento da Fase 13 ligou o grafo procedural ao fluxo do jogador.
-Cada connector consumido por uma edge produz uma porta visível; aproximar-se,
-olhar para ela e pressionar `E` resolve o corredor correspondente nos dois
-sentidos e posiciona o jogador dentro da sala oposta. Salas e conteúdo fixo
+Cada connector consumido por uma edge produz uma porta visível; na primeira
+versão, aproximar-se, olhar e pressionar `E` resolvia o corredor correspondente
+e posicionava o jogador na sala oposta. Salas e conteúdo fixo
 agora respeitam origem e rotação, e a colisão usa os mesmos bounds transformados.
 
 O segundo incremento materializa cada sequência `CorridorPath::points` como
@@ -206,6 +210,13 @@ cada shell e corredor referencia uma chave estável, e conteúdo/decor da sala
 adjacente entra na fila ainda durante a aproximação. No corredor, ambiente e
 emissão misturam com `smoothstep`. Um passe bitmap independente da câmera 3D
 mostra `REACH BOSS`, `DEFEAT BOSS`, `VICTORY` ou `DEFEAT` no viewport.
+
+Na Fase 15, `DoorRuntime` substitui o reposicionamento interativo por estados
+`Closed/Opening/Open/Closing/Locked`. Cada edge começa fechada, abre em 0,45 s,
+fica livre a partir de 90%, não fecha sobre o jogador e volta a bloquear somente
+depois que o corredor está vazio. Os painéis deslizam lateralmente e lockdown
+força fechamento/bloqueio. O áudio mantém dois loops cacheados no corredor e
+aplica crossfade equal-power com o mesmo progresso suavizado da iluminação.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com

@@ -118,10 +118,86 @@ void AudioSystem::setAmbience(
     if (!initialized_) {
         return;
     }
-    stopAmbience();
     const AudioRecipe recipe = generateAudioRecipe(
         roomSeed, AudioEventKind::Ambient, profileId);
-    addVoice(acquireClip(recipe), 1.0F, 1.0F, true, true);
+    const std::shared_ptr<const AudioClip> clip = acquireClip(recipe);
+    if (!clip) {
+        return;
+    }
+    voices_.erase(std::remove_if(voices_.begin(), voices_.end(),
+        [&clip](const Voice& voice) {
+            return voice.ambient && (!voice.clip
+                || voice.clip->recipeHash != clip->recipeHash);
+        }), voices_.end());
+    const auto existing = std::find_if(voices_.begin(), voices_.end(),
+        [&clip](const Voice& voice) {
+            return voice.ambient && voice.clip
+                && voice.clip->recipeHash == clip->recipeHash;
+        });
+    if (existing != voices_.end()) {
+        existing->leftGain = 1.0F;
+        existing->rightGain = 1.0F;
+        return;
+    }
+    addVoice(clip, 1.0F, 1.0F, true, true);
+}
+
+void AudioSystem::setAmbienceBlend(
+    const gdp::core::Seed firstRoomSeed,
+    const std::uint64_t firstProfileId,
+    const gdp::core::Seed secondRoomSeed,
+    const std::uint64_t secondProfileId,
+    const float secondWeight)
+{
+    if (!initialized_ || !std::isfinite(secondWeight)) {
+        return;
+    }
+    const float weight = std::clamp(secondWeight, 0.0F, 1.0F);
+    if (weight <= 1.0e-4F) {
+        setAmbience(firstRoomSeed, firstProfileId);
+        return;
+    }
+    if (weight >= 1.0F - 1.0e-4F) {
+        setAmbience(secondRoomSeed, secondProfileId);
+        return;
+    }
+
+    const AudioRecipe firstRecipe = generateAudioRecipe(
+        firstRoomSeed, AudioEventKind::Ambient, firstProfileId);
+    const AudioRecipe secondRecipe = generateAudioRecipe(
+        secondRoomSeed, AudioEventKind::Ambient, secondProfileId);
+    if (firstRecipe.recipeHash == secondRecipe.recipeHash) {
+        setAmbience(firstRoomSeed, firstProfileId);
+        return;
+    }
+    const std::shared_ptr<const AudioClip> firstClip = acquireClip(firstRecipe);
+    const std::shared_ptr<const AudioClip> secondClip = acquireClip(secondRecipe);
+    if (!firstClip || !secondClip) {
+        return;
+    }
+    voices_.erase(std::remove_if(voices_.begin(), voices_.end(),
+        [&firstClip, &secondClip](const Voice& voice) {
+            return voice.ambient && (!voice.clip
+                || (voice.clip->recipeHash != firstClip->recipeHash
+                    && voice.clip->recipeHash != secondClip->recipeHash));
+        }), voices_.end());
+    const auto ensureAmbient = [this](
+        const std::shared_ptr<const AudioClip>& clip,
+        const float gain) {
+        const auto existing = std::find_if(voices_.begin(), voices_.end(),
+            [&clip](const Voice& voice) {
+                return voice.ambient && voice.clip
+                    && voice.clip->recipeHash == clip->recipeHash;
+            });
+        if (existing != voices_.end()) {
+            existing->leftGain = gain;
+            existing->rightGain = gain;
+        } else {
+            addVoice(clip, gain, gain, true, true);
+        }
+    };
+    ensureAmbient(firstClip, std::sqrt(1.0F - weight));
+    ensureAmbient(secondClip, std::sqrt(weight));
 }
 
 void AudioSystem::stopAmbience() noexcept
@@ -228,6 +304,13 @@ bool AudioSystem::isOutputActive() const noexcept
 std::size_t AudioSystem::activeVoiceCount() const noexcept
 {
     return voices_.size();
+}
+
+std::size_t AudioSystem::ambientVoiceCount() const noexcept
+{
+    return static_cast<std::size_t>(std::count_if(
+        voices_.begin(), voices_.end(),
+        [](const Voice& voice) { return voice.ambient; }));
 }
 
 std::size_t AudioSystem::cachedClipCount() const noexcept

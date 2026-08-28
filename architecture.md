@@ -3453,8 +3453,21 @@ objetivo e resultado dentro do viewport ✓
 regressão OpenGL para material multissala e HUD ✓
 ```
 
-**Próximo marco:** animar abertura/fechamento das portas e aplicar crossfade de
-ambiência, removendo o reposicionamento imediato da interação normal.
+## Fase 15 — Portas e áudio contínuos
+
+```text
+DoorRuntime por edge: Closed/Opening/Open/Closing/Locked ✓
+E solicita abertura sem reposicionar o jogador ✓
+colisão liberada somente após 90% de abertura ✓
+porta segura enquanto vão/corredor estão ocupados ✓
+fechamento temporizado e lockdown físico ✓
+painéis deslizantes guiados por openFraction ✓
+crossfade equal-power entre ambiências das duas salas ✓
+regressões de runtime, colisão, mixer e pixels ✓
+```
+
+**Próximo marco:** mover HP, munição, chaves, eventos e prompts contextuais do
+título para um HUD funcional dentro do viewport.
 
 ---
 

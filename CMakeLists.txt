@@ -111,6 +111,7 @@ add_library(
     STATIC
     src/gameplay/Collision.cpp
     src/gameplay/Combat.cpp
+    src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
     src/gameplay/Loot.cpp
     src/gameplay/Player.cpp

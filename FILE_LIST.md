@@ -75,6 +75,8 @@
 - `src/gameplay/Collision.hpp`
 - `src/gameplay/Combat.cpp`
 - `src/gameplay/Combat.hpp`
+- `src/gameplay/Door.cpp`
+- `src/gameplay/Door.hpp`
 - `src/gameplay/Enemy.cpp`
 - `src/gameplay/Enemy.hpp`
 - `src/gameplay/Player.cpp`

@@ -192,7 +192,8 @@ std::optional<RoomTransition> findRoomTransition(
 CollisionWorld makeRoomNavigationCollision(
     const gdp::world::World& world,
     const gdp::world::RoomId currentRoom,
-    const bool doorsLocked)
+    const bool doorsLocked,
+    const std::span<const gdp::world::EdgeId> blockedEdges)
 {
     const gdp::world::RoomInstance* source = findRoom(world, currentRoom);
     if (source == nullptr) {
@@ -208,6 +209,10 @@ CollisionWorld makeRoomNavigationCollision(
     }
 
     for (const gdp::world::CorridorPath& corridor : world.corridors) {
+        if (std::find(blockedEdges.begin(), blockedEdges.end(), corridor.edge)
+            != blockedEdges.end()) {
+            continue;
+        }
         gdp::world::RoomId destinationId = 0U;
         if (corridor.firstRoom == currentRoom) {
             destinationId = corridor.secondRoom;
@@ -243,6 +248,52 @@ std::optional<gdp::world::RoomId> roomContainingPosition(
         }
     }
     return std::nullopt;
+}
+
+std::optional<float> corridorProgressAt(
+    const gdp::world::CorridorPath& corridor,
+    const gdp::core::Vec3 feetPosition) noexcept
+{
+    float totalLength = 0.0F;
+    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+        const gdp::core::Vec3 segment = corridor.points[index + 1U] - corridor.points[index];
+        totalLength += std::sqrt((segment.x * segment.x) + (segment.z * segment.z));
+    }
+    if (totalLength <= 1.0e-4F) {
+        return std::nullopt;
+    }
+
+    float traversed = 0.0F;
+    float closestDistanceSquared = std::numeric_limits<float>::max();
+    float closestProgress = 0.0F;
+    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+        const gdp::core::Vec3 first = corridor.points[index];
+        const gdp::core::Vec3 segment = corridor.points[index + 1U] - first;
+        const float lengthSquared = (segment.x * segment.x) + (segment.z * segment.z);
+        const float length = std::sqrt(lengthSquared);
+        if (length <= 1.0e-4F) {
+            continue;
+        }
+        const gdp::core::Vec3 relative = feetPosition - first;
+        const float along = std::clamp(
+            ((relative.x * segment.x) + (relative.z * segment.z)) / lengthSquared,
+            0.0F, 1.0F);
+        const float closestX = first.x + (segment.x * along);
+        const float closestZ = first.z + (segment.z * along);
+        const float deltaX = feetPosition.x - closestX;
+        const float deltaZ = feetPosition.z - closestZ;
+        const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
+        if (distanceSquared < closestDistanceSquared) {
+            closestDistanceSquared = distanceSquared;
+            closestProgress = (traversed + (length * along)) / totalLength;
+        }
+        traversed += length;
+    }
+    const float tolerance = (corridor.width * 0.5F) + 0.20F;
+    if (closestDistanceSquared > tolerance * tolerance) {
+        return std::nullopt;
+    }
+    return std::clamp(closestProgress, 0.0F, 1.0F);
 }
 
 } // namespace gdp::gameplay

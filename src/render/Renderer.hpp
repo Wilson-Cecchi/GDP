@@ -81,6 +81,7 @@ struct DoorRenderData {
     float width{1.2F};
     float height{2.2F};
     bool locked{false};
+    float openFraction{1.0F};
 };
 
 struct CorridorRenderData {
