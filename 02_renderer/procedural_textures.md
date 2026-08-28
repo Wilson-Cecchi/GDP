@@ -163,7 +163,7 @@ Falha gera log + textura de erro. Debug pode salvar albedo/roughness/metallic/no
 
 Implementados: mesma recipe gera os mesmos pixels, seed diferente altera pixels,
 ranges válidos, ferrugem nunca em Fabric, imagem opaca válida, hashes dourados,
-1.000 recipes de assets, 1.000 Workers, 1.000 Guards, 1.000 Officers completos e 8.000 conjuntos
+1.000 recipes de assets, 1.000 Workers, 1.000 Guards, 1.000 Officers, 1.000 Engineers completos e 8.000 conjuntos
 de sala
 (1.000 por perfil Industrial, Storage, Combat, Cafeteria, Laboratory, Technical,
 Security e Central Hub) sem falha. Normal sem NaN e mapas emissivos

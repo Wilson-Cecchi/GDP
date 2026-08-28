@@ -6,6 +6,26 @@
 #include <utility>
 
 namespace gdp::entities {
+namespace {
+
+float defaultPropHealth(const PropType type) noexcept
+{
+    switch (type) {
+    case PropType::Crate:
+        return 60.0F;
+    case PropType::Canister:
+        return 35.0F;
+    case PropType::Barricade:
+        return 90.0F;
+    case PropType::Terminal:
+    case PropType::Door:
+    case PropType::Decoration:
+        return 0.0F;
+    }
+    return 0.0F;
+}
+
+} // namespace
 
 EntityId EntityManager::createPlayer(const PlayerCreateInfo& info)
 {
@@ -34,11 +54,21 @@ EntityId EntityManager::createItem(const ItemCreateInfo& info)
 
 EntityId EntityManager::createProp(const PropCreateInfo& info)
 {
+    const float fallbackHealth = defaultPropHealth(info.type);
+    const float requestedMaximum = info.maximumHealth > 0.0F
+        ? info.maximumHealth : fallbackHealth;
+    const float requestedHealth = info.health > 0.0F
+        ? info.health
+        : info.state == PropState::Damaged ? requestedMaximum * 0.5F
+                                           : requestedMaximum;
+    const float health = std::clamp(requestedHealth, 0.0F, requestedMaximum);
+    const float maximumHealth = std::max(requestedMaximum, health);
     return create(
         EntityKind::Prop,
         info.transform,
         info.roomId,
-        PropData{info.type, info.state, info.solid});
+        PropData{info.type, info.state, info.solid, health, maximumHealth,
+            info.dropType, info.dropQuantity, info.visualSeed});
 }
 
 bool EntityManager::destroy(const EntityId id) noexcept

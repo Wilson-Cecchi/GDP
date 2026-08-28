@@ -63,6 +63,8 @@ enum class PropType : std::uint8_t {
     Crate,
     Door,
     Decoration,
+    Canister,
+    Barricade,
 };
 
 enum class PropState : std::uint8_t {
@@ -73,6 +75,7 @@ enum class PropState : std::uint8_t {
 
 struct PlayerData {
     float health{100.0F};
+    std::uint32_t keys{0};
 };
 
 struct EnemyData {
@@ -94,6 +97,11 @@ struct PropData {
     PropType type{PropType::Decoration};
     PropState state{PropState::Intact};
     bool solid{false};
+    float health{0.0F};
+    float maximumHealth{0.0F};
+    ItemType dropType{ItemType::Ammo};
+    std::uint32_t dropQuantity{0};
+    gdp::core::Seed visualSeed{0};
 };
 
 using EntityData = std::variant<PlayerData, EnemyData, ItemData, PropData>;
@@ -133,6 +141,11 @@ struct PropCreateInfo {
     PropType type{PropType::Decoration};
     PropState state{PropState::Intact};
     bool solid{false};
+    float health{0.0F};
+    float maximumHealth{0.0F};
+    ItemType dropType{ItemType::Ammo};
+    std::uint32_t dropQuantity{0};
+    gdp::core::Seed visualSeed{0};
 };
 
 class EntityManager {

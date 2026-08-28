@@ -59,6 +59,30 @@ bool containsError(
     return false;
 }
 
+bool containsError(
+    const gdp::procedural::EngineerVisualValidationResult& result,
+    const gdp::procedural::EngineerVisualValidationError error)
+{
+    for (const auto candidate : result.errors) {
+        if (candidate == error) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool containsError(
+    const gdp::procedural::IndustrialRobotVisualValidationResult& result,
+    const gdp::procedural::IndustrialRobotVisualValidationError error)
+{
+    for (const auto candidate : result.errors) {
+        if (candidate == error) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void testPartLibrary()
 {
     using namespace gdp::procedural;
@@ -496,6 +520,320 @@ void testOfficerSeedBatch()
         "Officer seed batch reaches every command material family");
 }
 
+void testEngineerPartLibrary()
+{
+    using namespace gdp::procedural;
+
+    const auto library = engineerPartLibrary();
+    std::unordered_set<EngineerPartId> ids;
+    std::array<bool, static_cast<std::size_t>(WorkerPartSlot::Count)> slots{};
+    bool definitionsValid = library.size() == 18U;
+    for (const EngineerPartDefinition& part : library) {
+        definitionsValid = definitionsValid && part.id >= 3'100U
+            && ids.insert(part.id).second && part.slot < WorkerPartSlot::Count
+            && part.weight > 0U && part.compatibility != 0U
+            && part.semantic < SemanticRegion::Count && part.material < MaterialSlot::Count;
+        if (part.slot < WorkerPartSlot::Count) {
+            slots[static_cast<std::size_t>(part.slot)] = true;
+        }
+        if (part.slot == WorkerPartSlot::Back) {
+            definitionsValid = definitionsValid
+                && part.semantic == SemanticRegion::MechanicalCore
+                && part.dimensionScale.y > part.dimensionScale.x;
+        } else if (part.slot == WorkerPartSlot::Tool) {
+            definitionsValid = definitionsValid && part.semantic == SemanticRegion::Tool
+                && part.dimensionScale.y > part.dimensionScale.x * 2.0F;
+        }
+    }
+    expect(definitionsValid,
+        "Engineer library has 18 unique diagnostic definitions and repair tools");
+    expect(std::all_of(slots.begin(), slots.end(), [](const bool covered) { return covered; }),
+        "Engineer part library covers every required assembly slot");
+}
+
+void testDeterministicEngineer()
+{
+    using namespace gdp::procedural;
+
+    constexpr gdp::core::Seed seed = 0x454E47494E454531ULL;
+    const EngineerVisual first = generateEngineerVisual(seed);
+    const EngineerVisual repeated = generateEngineerVisual(seed);
+    const EngineerVisual different = generateEngineerVisual(seed + 1U);
+    const WorkerVisual worker = generateWorkerVisual(seed);
+    const GuardVisual guard = generateGuardVisual(seed);
+    const OfficerVisual officer = generateOfficerVisual(seed);
+    expect(validateEngineerVisual(first).isValid(), "representative Engineer visual validates");
+    expect(first.genome.visualHash == repeated.genome.visualHash
+            && first.meshRecipe == repeated.meshRecipe
+            && first.textureRecipe == repeated.textureRecipe,
+        "same Engineer seed reproduces genome and asset recipes exactly");
+    expect(first.genome.visualHash != different.genome.visualHash,
+        "different visual seed changes the Engineer genome hash");
+    expect(first.genome.visualHash != worker.genome.visualHash
+            && first.genome.visualHash != guard.genome.visualHash
+            && first.genome.visualHash != officer.genome.visualHash
+            && first.meshRecipe.seed != worker.meshRecipe.seed
+            && first.meshRecipe.seed != guard.meshRecipe.seed
+            && first.meshRecipe.seed != officer.meshRecipe.seed
+            && first.textureRecipe.seed != worker.textureRecipe.seed
+            && first.textureRecipe.seed != guard.textureRecipe.seed
+            && first.textureRecipe.seed != officer.textureRecipe.seed,
+        "Engineer uses isolated role-specific visual substreams");
+    expect(first.fallbackCount == 0U,
+        "built-in library generates representative Engineer without fallback");
+    const auto mesh = generateMesh(first.meshRecipe);
+    const auto albedo = generateAlbedo(first.textureRecipe);
+    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+        "complete Engineer genome produces renderer-valid mesh data");
+    expect(albedo && gdp::render::validateImageData(*albedo),
+        "complete Engineer genome produces renderer-valid albedo data");
+    constexpr std::uint64_t goldenHash = 0x9E65A4A016966EB0ULL;
+    expect(first.genome.visualHash == goldenHash,
+        "golden Engineer visual hash remains stable across builds");
+
+    EngineerVisual invalid = first;
+    invalid.genome.head = 999'999U;
+    expect(containsError(
+               validateEngineerVisual(invalid), EngineerVisualValidationError::MissingPart),
+        "Engineer assembly rejects missing part ID");
+    invalid = first;
+    invalid.genome.diagnosticPack = first.genome.torso;
+    expect(containsError(validateEngineerVisual(invalid),
+               EngineerVisualValidationError::InvalidDiagnosticPack),
+        "Engineer assembly requires a recognizable diagnostic pack");
+    invalid = first;
+    invalid.genome.repairTool = first.genome.torso;
+    expect(containsError(validateEngineerVisual(invalid),
+               EngineerVisualValidationError::InvalidRepairTool),
+        "Engineer assembly requires a recognizable repair tool");
+    invalid = first;
+    invalid.genome.visualHash ^= 1U;
+    expect(containsError(validateEngineerVisual(invalid),
+               EngineerVisualValidationError::InvalidVisualHash),
+        "Engineer assembly detects genome hash corruption");
+}
+
+void testEngineerSeedBatch()
+{
+    using namespace gdp::procedural;
+
+    std::array<bool, static_cast<std::size_t>(EngineerBodyProfileId::Count)> profiles{};
+    std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
+    std::array<bool, static_cast<std::size_t>(MaterialFamily::Count)> materials{};
+    std::unordered_set<EngineerPartId> selectedParts;
+    std::unordered_set<std::uint64_t> engineerHashes;
+    std::unordered_set<std::uint64_t> crossRoleHashes;
+    bool allValid = true;
+    bool foundAsymmetry = false;
+    std::uint32_t fallbackCount = 0;
+
+    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+        const EngineerVisual visual = generateEngineerVisual(seed);
+        const WorkerVisual worker = generateWorkerVisual(seed);
+        const GuardVisual guard = generateGuardVisual(seed);
+        const OfficerVisual officer = generateOfficerVisual(seed);
+        const auto validation = validateEngineerVisual(visual);
+        const auto mesh = generateMesh(visual.meshRecipe);
+        const auto albedo = generateAlbedo(visual.textureRecipe);
+        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
+            || !albedo || !gdp::render::validateImageData(*albedo)) {
+            allValid = false;
+            std::cerr << "Engineer generation failed at visual seed " << seed << '\n';
+            break;
+        }
+        profiles[static_cast<std::size_t>(visual.genome.bodyProfile)] = true;
+        wearConditions[static_cast<std::size_t>(visual.wear.condition)] = true;
+        materials[static_cast<std::size_t>(visual.materials.family)] = true;
+        selectedParts.insert(visual.genome.torso);
+        selectedParts.insert(visual.genome.head);
+        selectedParts.insert(visual.genome.leftArm);
+        selectedParts.insert(visual.genome.rightArm);
+        selectedParts.insert(visual.genome.leftLeg);
+        selectedParts.insert(visual.genome.rightLeg);
+        selectedParts.insert(visual.genome.diagnosticPack);
+        selectedParts.insert(visual.genome.repairTool);
+        engineerHashes.insert(visual.genome.visualHash);
+        crossRoleHashes.insert(visual.genome.visualHash);
+        crossRoleHashes.insert(worker.genome.visualHash);
+        crossRoleHashes.insert(guard.genome.visualHash);
+        crossRoleHashes.insert(officer.genome.visualHash);
+        foundAsymmetry = foundAsymmetry
+            || visual.genome.leftArm != visual.genome.rightArm
+            || visual.genome.leftLeg != visual.genome.rightLeg;
+        fallbackCount += visual.fallbackCount;
+    }
+    expect(allValid, "1,000 Engineer visual seeds pass assembly and asset gates");
+    expect(fallbackCount == 0U, "built-in Engineer library needs no batch fallback");
+    expect(engineerHashes.size() == 1'000U,
+        "1,000 visual seeds produce unique canonical Engineer hashes");
+    expect(crossRoleHashes.size() == 4'000U,
+        "all four enemy roles keep isolated hashes for equal visual seeds");
+    expect(selectedParts.size() == engineerPartLibrary().size(),
+        "Engineer seed batch reaches every compatible built-in part");
+    expect(foundAsymmetry, "Engineer seed batch exercises allowed limb asymmetry");
+    expect(std::all_of(profiles.begin(), profiles.end(), [](const bool used) { return used; }),
+        "Engineer seed batch reaches Maintenance, Diagnostics and Hazmat profiles");
+    expect(std::all_of(
+               wearConditions.begin(), wearConditions.end(), [](const bool used) { return used; }),
+        "Engineer seed batch reaches every wear condition");
+    expect(materials[static_cast<std::size_t>(MaterialFamily::Aluminum)]
+            && materials[static_cast<std::size_t>(MaterialFamily::Polymer)]
+            && materials[static_cast<std::size_t>(MaterialFamily::PaintedSteel)],
+        "Engineer seed batch reaches every technical material family");
+}
+
+void testIndustrialRobotPartLibrary()
+{
+    using namespace gdp::procedural;
+    const auto library = industrialRobotPartLibrary();
+    std::unordered_set<IndustrialRobotPartId> ids;
+    std::array<bool, static_cast<std::size_t>(WorkerPartSlot::Count)> slots{};
+    bool definitionsValid = library.size() == 18U;
+    for (const IndustrialRobotPartDefinition& part : library) {
+        definitionsValid = definitionsValid && part.id >= 4'100U
+            && ids.insert(part.id).second && part.slot < WorkerPartSlot::Count
+            && part.weight > 0U && part.compatibility != 0U
+            && part.semantic < SemanticRegion::Count && part.material < MaterialSlot::Count;
+        if (part.slot < WorkerPartSlot::Count) {
+            slots[static_cast<std::size_t>(part.slot)] = true;
+        }
+        if (part.slot == WorkerPartSlot::Torso
+            || part.slot == WorkerPartSlot::Back) {
+            definitionsValid = definitionsValid
+                && part.semantic == SemanticRegion::MechanicalCore;
+        } else if (part.slot == WorkerPartSlot::Head) {
+            definitionsValid = definitionsValid && part.semantic == SemanticRegion::Lens;
+        } else if (part.slot == WorkerPartSlot::Arm) {
+            definitionsValid = definitionsValid && part.semantic == SemanticRegion::Piston
+                && part.dimensionScale.x >= 1.2F;
+        } else if (part.slot == WorkerPartSlot::Tool) {
+            definitionsValid = definitionsValid && part.semantic == SemanticRegion::Weapon;
+        }
+    }
+    expect(definitionsValid,
+        "IndustrialRobot library has 18 unique heavy mechanical definitions");
+    expect(std::all_of(slots.begin(), slots.end(), [](const bool covered) { return covered; }),
+        "IndustrialRobot part library covers every required assembly slot");
+}
+
+void testDeterministicIndustrialRobot()
+{
+    using namespace gdp::procedural;
+    constexpr gdp::core::Seed seed = 0x494E44524F424F54ULL;
+    const IndustrialRobotVisual first = generateIndustrialRobotVisual(seed);
+    const IndustrialRobotVisual repeated = generateIndustrialRobotVisual(seed);
+    const IndustrialRobotVisual different = generateIndustrialRobotVisual(seed + 1U);
+    expect(validateIndustrialRobotVisual(first).isValid(),
+        "representative IndustrialRobot visual validates");
+    expect(first.genome.visualHash == repeated.genome.visualHash
+            && first.meshRecipe == repeated.meshRecipe
+            && first.textureRecipe == repeated.textureRecipe,
+        "same IndustrialRobot seed reproduces genome and asset recipes exactly");
+    expect(first.genome.visualHash != different.genome.visualHash,
+        "different visual seed changes the IndustrialRobot genome hash");
+    expect(first.fallbackCount == 0U,
+        "built-in library generates representative IndustrialRobot without fallback");
+    const auto mesh = generateMesh(first.meshRecipe);
+    const auto albedo = generateAlbedo(first.textureRecipe);
+    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+        "complete IndustrialRobot genome produces renderer-valid mesh data");
+    expect(albedo && gdp::render::validateImageData(*albedo),
+        "complete IndustrialRobot genome produces renderer-valid albedo data");
+    constexpr std::uint64_t goldenHash = 0x5D654A79E5B31648ULL;
+    expect(first.genome.visualHash == goldenHash,
+        "golden IndustrialRobot visual hash remains stable across builds");
+
+    IndustrialRobotVisual invalid = first;
+    invalid.genome.torsoCore = invalid.genome.sensorHead;
+    expect(containsError(validateIndustrialRobotVisual(invalid),
+               IndustrialRobotVisualValidationError::InvalidTorsoCore),
+        "IndustrialRobot assembly requires a mechanical torso core");
+    invalid = first;
+    invalid.genome.leftReactor = invalid.genome.leftArm;
+    expect(containsError(validateIndustrialRobotVisual(invalid),
+               IndustrialRobotVisualValidationError::InvalidReactorModules),
+        "IndustrialRobot assembly requires two reactor modules");
+    invalid = first;
+    invalid.textureRecipe.emissiveAmount = 0.0F;
+    expect(containsError(validateIndustrialRobotVisual(invalid),
+               IndustrialRobotVisualValidationError::InvalidEmissiveCore),
+        "IndustrialRobot assembly requires a readable emissive core");
+    invalid = first;
+    invalid.genome.visualHash ^= 1U;
+    expect(containsError(validateIndustrialRobotVisual(invalid),
+               IndustrialRobotVisualValidationError::InvalidVisualHash),
+        "IndustrialRobot assembly detects genome hash corruption");
+}
+
+void testIndustrialRobotSeedBatch()
+{
+    using namespace gdp::procedural;
+    std::array<bool, static_cast<std::size_t>(IndustrialRobotBodyProfileId::Count)> profiles{};
+    std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
+    std::array<bool, static_cast<std::size_t>(MaterialFamily::Count)> materials{};
+    std::unordered_set<IndustrialRobotPartId> selectedParts;
+    std::unordered_set<std::uint64_t> robotHashes;
+    std::unordered_set<std::uint64_t> crossRoleHashes;
+    bool allValid = true;
+    bool foundAsymmetry = false;
+    std::uint32_t fallbackCount = 0;
+    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+        const IndustrialRobotVisual visual = generateIndustrialRobotVisual(seed);
+        const auto validation = validateIndustrialRobotVisual(visual);
+        const auto mesh = generateMesh(visual.meshRecipe);
+        const auto albedo = generateAlbedo(visual.textureRecipe);
+        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
+            || !albedo || !gdp::render::validateImageData(*albedo)) {
+            allValid = false;
+            std::cerr << "IndustrialRobot generation failed at visual seed " << seed << '\n';
+            break;
+        }
+        profiles[static_cast<std::size_t>(visual.genome.bodyProfile)] = true;
+        wearConditions[static_cast<std::size_t>(visual.wear.condition)] = true;
+        materials[static_cast<std::size_t>(visual.materials.family)] = true;
+        selectedParts.insert(visual.genome.torsoCore);
+        selectedParts.insert(visual.genome.sensorHead);
+        selectedParts.insert(visual.genome.leftArm);
+        selectedParts.insert(visual.genome.rightArm);
+        selectedParts.insert(visual.genome.leftLeg);
+        selectedParts.insert(visual.genome.rightLeg);
+        selectedParts.insert(visual.genome.leftReactor);
+        selectedParts.insert(visual.genome.rightReactor);
+        selectedParts.insert(visual.genome.heavyWeapon);
+        robotHashes.insert(visual.genome.visualHash);
+        crossRoleHashes.insert(visual.genome.visualHash);
+        crossRoleHashes.insert(generateWorkerVisual(seed).genome.visualHash);
+        crossRoleHashes.insert(generateGuardVisual(seed).genome.visualHash);
+        crossRoleHashes.insert(generateOfficerVisual(seed).genome.visualHash);
+        crossRoleHashes.insert(generateEngineerVisual(seed).genome.visualHash);
+        foundAsymmetry = foundAsymmetry
+            || visual.genome.leftArm != visual.genome.rightArm
+            || visual.genome.leftLeg != visual.genome.rightLeg
+            || visual.genome.leftReactor != visual.genome.rightReactor;
+        fallbackCount += visual.fallbackCount;
+    }
+    expect(allValid, "1,000 IndustrialRobot visual seeds pass assembly and asset gates");
+    expect(fallbackCount == 0U,
+        "built-in IndustrialRobot library needs no batch fallback");
+    expect(robotHashes.size() == 1'000U,
+        "1,000 visual seeds produce unique canonical IndustrialRobot hashes");
+    expect(crossRoleHashes.size() == 5'000U,
+        "all five enemy roles keep isolated hashes for equal visual seeds");
+    expect(selectedParts.size() == industrialRobotPartLibrary().size(),
+        "IndustrialRobot seed batch reaches every compatible built-in part");
+    expect(foundAsymmetry,
+        "IndustrialRobot seed batch exercises limbs and dual-reactor asymmetry");
+    expect(std::all_of(profiles.begin(), profiles.end(), [](const bool used) { return used; }),
+        "IndustrialRobot seed batch reaches Sentry, Foundry and Siege profiles");
+    expect(std::all_of(
+               wearConditions.begin(), wearConditions.end(), [](const bool used) { return used; }),
+        "IndustrialRobot seed batch reaches every wear condition");
+    expect(materials[static_cast<std::size_t>(MaterialFamily::BareSteel)]
+            && materials[static_cast<std::size_t>(MaterialFamily::PaintedSteel)]
+            && materials[static_cast<std::size_t>(MaterialFamily::Aluminum)],
+        "IndustrialRobot seed batch reaches every heavy material family");
+}
+
 } // namespace
 
 int main()
@@ -509,6 +847,12 @@ int main()
     testOfficerPartLibrary();
     testDeterministicOfficer();
     testOfficerSeedBatch();
+    testEngineerPartLibrary();
+    testDeterministicEngineer();
+    testEngineerSeedBatch();
+    testIndustrialRobotPartLibrary();
+    testDeterministicIndustrialRobot();
+    testIndustrialRobotSeedBatch();
 
     if (failures != 0) {
         std::cerr << failures << " enemy generation test(s) failed\n";

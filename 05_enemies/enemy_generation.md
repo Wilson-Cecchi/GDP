@@ -1,7 +1,7 @@
 # Enemies — Geração procedural
 
-> **Estado:** Worker completo por partes implementado na Fase 9; Guard e Officer
-> completos na Fase 11 sobre a fundação de receita/hash/cache da Fase 8.
+> **Estado:** Worker completo por partes implementado na Fase 9; Guard, Officer,
+> Engineer e IndustrialRobot completos na Fase 11 sobre receita/hash/cache da Fase 8.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -11,6 +11,8 @@
 WorkerVisual generateWorkerVisual(Seed visualSeed);
 GuardVisual generateGuardVisual(Seed visualSeed);
 OfficerVisual generateOfficerVisual(Seed visualSeed);
+EngineerVisual generateEngineerVisual(Seed visualSeed);
+IndustrialRobotVisual generateIndustrialRobotVisual(Seed visualSeed);
 ```
 
 `EnemyGenerationRequest` com role e tema continua sendo a expansão prevista
@@ -61,14 +63,16 @@ Se um slot ficar sem candidato, usa fallback local seguro e incrementa
 `fallbackCount`; nunca regenera o mundo. As bibliotecas atuais apresentaram zero
 fallbacks nos gates de 1.000 seeds por papel. O Guard usa IDs 1100–1602 e
 substreams locais 100–107; o Officer usa IDs 2100–2602 e substreams 200–207,
-separados dos IDs 100–602 do Worker.
+e o Engineer usa IDs 3100–3602 e substreams 300–307, todos separados dos IDs
+100–602 do Worker. O IndustrialRobot usa IDs 4100–4602, slots 400–408 e
+duas escolhas traseiras independentes; receitas usam substreams 499/401.
 
 ## Unicidade
 
 O hash canônico inclui seed, perfil, oito IDs de peças, família material,
 desgaste e hashes das receitas. A biblioteca não promete unicidade matemática,
-mas as primeiras 1.000 seeds de cada papel produziram 3.000 hashes distintos
-entre Worker, Guard e Officer.
+mas as primeiras 1.000 seeds de cada papel produziram 5.000 hashes distintos
+entre Worker, Guard, Officer, Engineer e IndustrialRobot.
 
 ## Validação
 
@@ -91,3 +95,15 @@ O terceiro gate gera 1.000 Officers, cobre `Field/Command/Veteran`, quatro
 estados de desgaste, `Fabric/Polymer/PaintedSteel`, todas as 18 peças, sidearm e
 módulo de comando obrigatórios, assimetria e zero fallbacks. Seu hash dourado é
 `0x6C70CF22F1AE4F61`; o lote conjunto exige 3.000 hashes sem colisão.
+
+O quarto gate gera 1.000 Engineers, cobre
+`Maintenance/Diagnostics/Hazmat`, quatro estados de desgaste,
+`Aluminum/Polymer/PaintedSteel`, todas as 18 peças, ferramenta de reparo e
+mochila diagnóstica obrigatórias, assimetria e zero fallbacks. Seu hash dourado
+é `0x9E65A4A016966EB0`; o lote conjunto exige 4.000 hashes sem colisão.
+
+O quinto gate gera 1.000 IndustrialRobots, cobre `Sentry/Foundry/Siege`, quatro
+estados de desgaste, `BareSteel/PaintedSteel/Aluminum`, todas as 18 peças,
+torso/núcleo, sensor, braços pesados, dois reatores, arma e emissão obrigatórios.
+Seu hash dourado é `0x5D654A79E5B31648`; o lote conjunto exige 5.000 hashes
+sem colisão e zero fallbacks.

@@ -253,6 +253,119 @@ struct OfficerVisualValidationResult {
     [[nodiscard]] bool isValid() const noexcept;
 };
 
+enum class EngineerBodyProfileId : std::uint8_t {
+    Maintenance,
+    Diagnostics,
+    Hazmat,
+    Count,
+};
+
+using EngineerPartId = std::uint32_t;
+using EngineerPartDefinition = WorkerPartDefinition;
+
+struct EngineerVisualGenome {
+    gdp::core::Seed seed{0};
+    EngineerBodyProfileId bodyProfile{EngineerBodyProfileId::Maintenance};
+    EngineerPartId torso{0};
+    EngineerPartId head{0};
+    EngineerPartId leftArm{0};
+    EngineerPartId rightArm{0};
+    EngineerPartId leftLeg{0};
+    EngineerPartId rightLeg{0};
+    EngineerPartId diagnosticPack{0};
+    EngineerPartId repairTool{0};
+    std::uint64_t visualHash{0};
+};
+
+struct EngineerVisual {
+    EngineerVisualGenome genome;
+    BodyProfile body;
+    WorkerMaterialSet materials;
+    WearProfile wear;
+    MeshRecipe meshRecipe;
+    TextureRecipe textureRecipe;
+    std::uint32_t fallbackCount{0};
+};
+
+enum class EngineerVisualValidationError : std::uint8_t {
+    InvalidBodyProfile,
+    MissingSocket,
+    MissingPart,
+    WrongPartSlot,
+    IncompatiblePart,
+    InvalidMeshRecipe,
+    InvalidTextureRecipe,
+    InvalidBounds,
+    InvalidRepairTool,
+    InvalidDiagnosticPack,
+    InvalidVisualHash,
+};
+
+struct EngineerVisualValidationResult {
+    std::vector<EngineerVisualValidationError> errors;
+
+    [[nodiscard]] bool isValid() const noexcept;
+};
+
+enum class IndustrialRobotBodyProfileId : std::uint8_t {
+    Sentry,
+    Foundry,
+    Siege,
+    Count,
+};
+
+using IndustrialRobotPartId = std::uint32_t;
+using IndustrialRobotPartDefinition = WorkerPartDefinition;
+
+struct IndustrialRobotVisualGenome {
+    gdp::core::Seed seed{0};
+    IndustrialRobotBodyProfileId bodyProfile{IndustrialRobotBodyProfileId::Sentry};
+    IndustrialRobotPartId torsoCore{0};
+    IndustrialRobotPartId sensorHead{0};
+    IndustrialRobotPartId leftArm{0};
+    IndustrialRobotPartId rightArm{0};
+    IndustrialRobotPartId leftLeg{0};
+    IndustrialRobotPartId rightLeg{0};
+    IndustrialRobotPartId leftReactor{0};
+    IndustrialRobotPartId rightReactor{0};
+    IndustrialRobotPartId heavyWeapon{0};
+    std::uint64_t visualHash{0};
+};
+
+struct IndustrialRobotVisual {
+    IndustrialRobotVisualGenome genome;
+    BodyProfile body;
+    WorkerMaterialSet materials;
+    WearProfile wear;
+    MeshRecipe meshRecipe;
+    TextureRecipe textureRecipe;
+    std::uint32_t fallbackCount{0};
+};
+
+enum class IndustrialRobotVisualValidationError : std::uint8_t {
+    InvalidBodyProfile,
+    MissingSocket,
+    MissingPart,
+    WrongPartSlot,
+    IncompatiblePart,
+    InvalidMeshRecipe,
+    InvalidTextureRecipe,
+    InvalidBounds,
+    InvalidTorsoCore,
+    InvalidSensorHead,
+    InvalidReactorModules,
+    InvalidHeavyArms,
+    InvalidHeavyWeapon,
+    InvalidEmissiveCore,
+    InvalidVisualHash,
+};
+
+struct IndustrialRobotVisualValidationResult {
+    std::vector<IndustrialRobotVisualValidationError> errors;
+
+    [[nodiscard]] bool isValid() const noexcept;
+};
+
 [[nodiscard]] std::span<const WorkerPartDefinition> workerPartLibrary() noexcept;
 [[nodiscard]] WorkerVisual generateWorkerVisual(gdp::core::Seed visualSeed);
 [[nodiscard]] WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual);
@@ -265,5 +378,16 @@ struct OfficerVisualValidationResult {
 [[nodiscard]] OfficerVisual generateOfficerVisual(gdp::core::Seed visualSeed);
 [[nodiscard]] OfficerVisualValidationResult validateOfficerVisual(const OfficerVisual& visual);
 [[nodiscard]] std::uint64_t officerVisualHash(const OfficerVisual& visual) noexcept;
+[[nodiscard]] std::span<const EngineerPartDefinition> engineerPartLibrary() noexcept;
+[[nodiscard]] EngineerVisual generateEngineerVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] EngineerVisualValidationResult validateEngineerVisual(const EngineerVisual& visual);
+[[nodiscard]] std::uint64_t engineerVisualHash(const EngineerVisual& visual) noexcept;
+[[nodiscard]] std::span<const IndustrialRobotPartDefinition>
+industrialRobotPartLibrary() noexcept;
+[[nodiscard]] IndustrialRobotVisual generateIndustrialRobotVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] IndustrialRobotVisualValidationResult
+validateIndustrialRobotVisual(const IndustrialRobotVisual& visual);
+[[nodiscard]] std::uint64_t
+industrialRobotVisualHash(const IndustrialRobotVisual& visual) noexcept;
 
 } // namespace gdp::procedural

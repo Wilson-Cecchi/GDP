@@ -23,8 +23,30 @@ Receitas procedurais também possuem validação e hashes dourados próprios.
 ## Subsystem
 
 MapGraph, RoomModule, Corridor, WorldValidator, população inicial de entidades,
-Combat, Worker/Guard/Officer AI, EnemyGenerator, RoomMaterialGenerator, TextureGenerator e
+Combat, Worker/Guard/Officer/Engineer AI, EnemyGenerator, RoomMaterialGenerator, TextureGenerator e
 AssetCache.
+
+O gate de loot gera 1.000 layouts de sala, exige hashes únicos, orçamento sem
+excesso, placement dentro de `lootZones`, separação entre drops e distribuição
+de Health/Ammo. Testes adicionais cobrem Key obrigatória em Secret, escala de
+dificuldade, coleta automática, capacidades máximas, distância, `roomId`,
+jogador morto e destruição adiada. A regressão OpenGL diferencia os três pickups.
+
+O gate de props gera 1.000 layouts, exige hashes únicos, orçamento exato,
+footprints contidas, separação e cobertura dos três tipos. Testes funcionais
+cobrem dano, reparo, três estados, colisão por sala, prioridade de hitscan,
+cobertura de inimigo, proteção de terminal e drop único. A regressão OpenGL
+diferencia tipo/estado e confirma a composição com inimigos e pickups.
+
+O gate de eventos gera 1.000 planos, cobre os cinco tipos, hashes únicos,
+triggers, waves, zonas e recompensa. Testes de runtime cobrem emboscada do
+terminal, entrada, espera do encontro inicial, duas ondas, ownership, lockdown,
+suporte, conclusão e proteção contra reativação/drop duplicado.
+
+O gate de iluminação gera 1.000 planos, cobre seis moods, hashes únicos,
+papéis/temas, bounds, ambiente legível, pontos e luminárias. As seeds críticas
+validam todas as salas e preservam o fingerprint estrutural. A regressão OpenGL
+confirma múltiplas luzes e a mudança temporária para alerta de lockdown.
 
 O gate de assets gera 1.000 recipes visuais, valida pixels e regras materiais,
 exercita reuse do cache e mantém o fingerprint estrutural do World separado. O
@@ -39,6 +61,15 @@ famílias materiais, quatro estados de desgaste, sidearm e módulo de rádio. A
 união dos três papéis precisa manter 3.000 hashes únicos. Testes de combate
 confirmam comando limitado por range e sala, cooldown próprio e line of sight
 para o disparo.
+O gate do Engineer adiciona mais 1.000 seeds, três perfis, 18 peças, três
+famílias materiais, quatro estados de desgaste, ferramenta técnica e mochila
+diagnóstica. O lote dos quatro papéis mantém 4.000 hashes únicos; combate valida
+reparo de aliado/prop, alvo mais próximo, cooldown e bloqueio por sala/sólido.
+O IndustrialRobot soma 1.000 seeds, três perfis pesados, 18 peças, três
+famílias metálicas, quatro estados de desgaste, núcleo/sensor, braços, dois
+reatores e arma obrigatórios. O lote dos cinco papéis mantém 5.000 hashes
+únicos; combate valida as três fases de HP, envelopes, dano/cadência,
+line of sight, colisão, sala, cooldown e morte.
 O gate de materiais industriais rasteriza Wall/Floor/Ceiling para 1.000 room
 seeds, verifica todas as condições de manutenção, hashes únicos, regras de
 composição e integração OpenGL determinística por pixels.

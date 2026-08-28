@@ -3468,25 +3468,27 @@ Security ✓
 Central Hub ✓
 ```
 
-Fase 10 concluída; a Fase 11 está em andamento com Guard e Officer.
+Fases 10 e 11 concluídas; a Fase 12 possui loot, props, eventos e iluminação procedurais funcionais.
 
 ---
 
 ## Fase 11 — Elenco
 
-**Estado atual:** em andamento. Guard possui `Patrol/Tactical/Armored`, arma
-longa e envelope de 4–8 m. Officer possui `Field/Command/Veteran`, sidearm,
-módulo de comando e envelope de 6–10 m. Cada papel tem 18 peças, materiais,
-desgaste, substreams, hash dourado, cache GPU e gate próprio de 1.000 seeds sem
-fallback. A Arena recebe Worker, Guard e Officer; o Officer reduz cooldowns de
-ataque apenas de aliados vivos a até 10 m no mesmo `roomId`, em cadência
-independente, enquanto todo disparo continua condicionado a line of sight.
+**Estado atual:** concluída. Guard opera em 4–8 m com arma longa; Officer em
+6–10 m com sidearm/comando; Engineer em 3–6 m com ferramenta/reparo. Cada papel
+possui três perfis, 18 peças, materiais, desgaste, substreams, hash dourado,
+cache GPU e gate de 1.000 seeds sem fallback. A Arena recebe os quatro papéis.
+Officer reduz cooldowns de aliados; Engineer repara o alvo visível mais próximo,
+recuperando HP ou restaurando Prop `Damaged`. Ambas as ações respeitam range,
+`roomId` e cooldown próprio; ataques e reparos respeitam line of sight.
+IndustrialRobot completa o Boss com três perfis, duas unidades traseiras,
+núcleo emissivo, arma pesada e fases >66%, 33–66% e <=33% de HP.
 
 ```text
 Guard ✓
 Officer ✓
-Engineer → próximo
-IndustrialRobot
+Engineer ✓
+IndustrialRobot ✓
 ```
 
 ---
@@ -3494,11 +3496,11 @@ IndustrialRobot
 ## Fase 12 — Procedural avançado
 
 ```text
-loot
-props
-events
-lighting
-audio
+loot ✓
+props ✓
+events ✓
+lighting ✓
+audio → próximo
 progression
 ```
 

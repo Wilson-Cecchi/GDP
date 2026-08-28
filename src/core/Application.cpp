@@ -3,7 +3,12 @@
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
+#include "gameplay/Loot.hpp"
+#include "gameplay/Props.hpp"
+#include "gameplay/RoomEvents.hpp"
 #include "render/Renderer.hpp"
+#include "world/EventGenerator.hpp"
+#include "world/LightingGenerator.hpp"
 #include "world/WorldEntities.hpp"
 
 #include <SDL3/SDL.h>
@@ -27,10 +32,35 @@ std::string sdlError(const std::string_view operation)
     return stream.str();
 }
 
+gdp::render::RoomLightingRenderData makeRenderLighting(
+    const gdp::world::RoomLightingPlan& plan,
+    const bool alert)
+{
+    static_assert(gdp::world::maxRoomLights == gdp::render::maxRenderedRoomLights);
+    gdp::render::RoomLightingRenderData lighting;
+    lighting.ambientColor = plan.ambientColor;
+    lighting.ambientIntensity = plan.ambientIntensity;
+    lighting.lightCount = static_cast<std::uint32_t>(plan.lights.size());
+    lighting.fixtureEmissive = plan.fixtureEmissive;
+    lighting.alert = alert && plan.supportsAlert;
+    for (std::size_t index = 0; index < plan.lights.size(); ++index) {
+        const gdp::world::RoomPointLight& source = plan.lights[index];
+        lighting.lights[index] = {
+            source.position,
+            source.color,
+            source.intensity,
+            source.range,
+        };
+    }
+    return lighting;
+}
+
 } // namespace
 
 Application::Application(ApplicationConfig config)
     : config_(std::move(config))
+    , baseCollisionWorld_(gameplay::CollisionWorld::fixedRoom())
+    , collisionWorld_(baseCollisionWorld_)
 {
 }
 
@@ -103,6 +133,35 @@ bool Application::initialize()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
+    roomEvents_.reserve(world_->rooms.size());
+    roomLighting_.reserve(world_->rooms.size());
+    for (const world::RoomInstance& room : world_->rooms) {
+        const auto node = std::find_if(
+            world_->graph.nodes.begin(), world_->graph.nodes.end(),
+            [&room](const world::RoomNode& candidate) { return candidate.id == room.id; });
+        if (node == world_->graph.nodes.end()) {
+            log(LogLevel::Error, "Room event generation did not find its graph node");
+            return false;
+        }
+        world::RoomEventPlan plan = world::generateRoomEventPlan(
+            room.seed, room.role, room.theme, node->depth, room.enemyZones);
+        if (!world::validateRoomEventPlan(plan, room.enemyZones).isValid()) {
+            log(LogLevel::Error, "Room event plan failed deterministic validation");
+            return false;
+        }
+        roomEvents_.push_back(gameplay::makeRoomEventRuntime(std::move(plan), room.id));
+        world::RoomLightingPlan lighting = world::generateRoomLightingPlan(
+            room.seed, room.role, room.theme, room.worldBounds);
+        if (!world::validateRoomLightingPlan(lighting, room.worldBounds).isValid()) {
+            log(LogLevel::Error, "Room lighting plan failed deterministic validation");
+            return false;
+        }
+        roomLighting_.push_back(std::move(lighting));
+    }
+    if (const entities::Entity* playerEntity = entities_.find(player_.entity())) {
+        collisionWorld_ = gameplay::collisionWorldWithProps(
+            baseCollisionWorld_, entities_, playerEntity->roomId);
+    }
     std::ostringstream worldSummary;
     worldSummary << "Generated world seed " << config_.worldSeed << " with "
                  << world_->rooms.size() << " rooms and " << world_->corridors.size()
@@ -205,6 +264,16 @@ bool Application::initialize()
                 log(LogLevel::Error, "Officer visual preparation failed");
                 return false;
             }
+        } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
+            if (!renderer_->prepareEngineerVisual(enemy->visualSeed)) {
+                log(LogLevel::Error, "Engineer visual preparation failed");
+                return false;
+            }
+        } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
+            if (!renderer_->prepareIndustrialRobotVisual(enemy->visualSeed)) {
+                log(LogLevel::Error, "IndustrialRobot visual preparation failed");
+                return false;
+            }
         }
     }
 
@@ -240,10 +309,39 @@ void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
     weapon_.fixedUpdate(step);
-    player_.fixedUpdate(playerCommand_, step, collisionWorld_);
-
     entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
+    collisionWorld_ = gameplay::collisionWorldWithProps(
+        baseCollisionWorld_, entities_, playerRoom);
+    player_.fixedUpdate(playerCommand_, step, collisionWorld_);
+
+    const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
+        entities_, player_, weapon_, playerRoom);
+    if (loot.collected > 0U) {
+        if (world_) {
+            const auto room = std::find_if(
+                world_->rooms.begin(), world_->rooms.end(),
+                [playerRoom](const world::RoomInstance& candidate) {
+                    return candidate.id == playerRoom;
+                });
+            if (room != world_->rooms.end()) {
+                room->entities.erase(std::remove_if(
+                    room->entities.begin(), room->entities.end(),
+                    [&loot](const entities::EntityId id) {
+                        return std::find(
+                            loot.collectedItems.begin(), loot.collectedItems.end(), id)
+                            != loot.collectedItems.end();
+                    }), room->entities.end());
+            }
+        }
+        (void)entities_.flushDestroyed();
+        std::ostringstream message;
+        message << "Loot collected: " << loot.collected
+                << " | health +" << static_cast<int>(loot.healthRestored)
+                << " | ammo +" << loot.ammoAdded
+                << " | keys +" << loot.keysAdded;
+        log(LogLevel::Info, message.str());
+    }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
             std::ostringstream message;
@@ -261,16 +359,35 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_);
+        if (shot.spawnedItem.isValid() && world_) {
+            const auto room = std::find_if(
+                world_->rooms.begin(), world_->rooms.end(),
+                [playerRoom](const world::RoomInstance& candidate) {
+                    return candidate.id == playerRoom;
+                });
+            if (room != world_->rooms.end()) {
+                room->entities.push_back(shot.spawnedItem);
+            }
+        }
+        if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
+            collisionWorld_ = gameplay::collisionWorldWithProps(
+                baseCollisionWorld_, entities_, playerRoom);
+        }
         std::ostringstream message;
         if (shot.outcome == gameplay::ShotOutcome::Hit
-            || shot.outcome == gameplay::ShotOutcome::Killed) {
+            || shot.outcome == gameplay::ShotOutcome::Killed
+            || shot.outcome == gameplay::ShotOutcome::Destroyed) {
             message << (shot.outcome == gameplay::ShotOutcome::Killed
-                    ? "Enemy killed: " : "Enemy hit: ")
+                    ? "Enemy killed: "
+                    : shot.outcome == gameplay::ShotOutcome::Destroyed
+                        ? "Prop destroyed: " : "Target hit: ")
                     << shot.hit->target.packed() << " | ammo "
                     << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
             log(LogLevel::Info, message.str());
         } else if (shot.outcome == gameplay::ShotOutcome::Empty) {
             log(LogLevel::Info, "Weapon empty; press R to reload");
+        } else if (shot.outcome == gameplay::ShotOutcome::ImpactProp) {
+            log(LogLevel::Info, "Protected prop absorbed the shot");
         }
     }
     firePending_ = false;
@@ -282,6 +399,10 @@ void Application::fixedUpdate(const double fixedStep)
         entities_, player_, playerRoom, collisionWorld_, step);
     (void)gameplay::updateOfficers(
         entities_, player_, playerRoom, collisionWorld_, step);
+    (void)gameplay::updateEngineers(
+        entities_, player_, playerRoom, collisionWorld_, step);
+    (void)gameplay::updateIndustrialRobots(
+        entities_, player_, playerRoom, collisionWorld_, step);
     if (playerWasAlive && !player_.state().alive) {
         log(LogLevel::Info, "Player died");
     }
@@ -291,8 +412,10 @@ void Application::fixedUpdate(const double fixedStep)
         playerEntity->transform.position = player_.state().position;
         if (entities::PlayerData* data = std::get_if<entities::PlayerData>(&playerEntity->data)) {
             data->health = player_.state().health;
+            data->keys = player_.state().keys;
         }
     }
+    bool terminalUsed = false;
     if (playerCommand_.interact) {
         const std::array targets{
             gameplay::InteractionTarget{
@@ -300,12 +423,67 @@ void Application::fixedUpdate(const double fixedStep)
                 {{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}}},
         };
         if (const auto target = player_.findInteraction(targets)) {
+            terminalUsed = *target == terminalEntity_;
             std::ostringstream message;
             message << "Player interacted with entity " << target->packed();
             log(LogLevel::Info, message.str());
         }
         interactionPending_ = false;
         playerCommand_.interact = false;
+    }
+    const auto activeEvent = std::find_if(
+        roomEvents_.begin(), roomEvents_.end(),
+        [playerRoom](const gameplay::RoomEventRuntime& runtime) {
+            return runtime.roomId == playerRoom;
+        });
+    if (activeEvent != roomEvents_.end()) {
+        const gameplay::RoomEventUpdateSummary event = gameplay::updateRoomEvent(
+            *activeEvent, entities_, true, terminalUsed, step);
+        if (!event.createdEntities.empty() && world_) {
+            const auto room = std::find_if(
+                world_->rooms.begin(), world_->rooms.end(),
+                [playerRoom](const world::RoomInstance& candidate) {
+                    return candidate.id == playerRoom;
+                });
+            if (room != world_->rooms.end()) {
+                room->entities.insert(
+                    room->entities.end(),
+                    event.createdEntities.begin(), event.createdEntities.end());
+            }
+        }
+        for (const entities::EntityId id : event.spawnedEnemies) {
+            const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
+            if (renderer_ == nullptr || enemy == nullptr) {
+                continue;
+            }
+            const bool prepared = enemy->archetype == entities::EnemyArchetype::Guard
+                ? renderer_->prepareGuardVisual(enemy->visualSeed)
+                : renderer_->prepareWorkerVisual(enemy->visualSeed);
+            if (!prepared) {
+                log(LogLevel::Error, "Procedural event enemy visual preparation failed");
+                running_ = false;
+            }
+        }
+        if (event.activated) {
+            std::ostringstream message;
+            message << "Room event activated: "
+                    << gameplay::roomEventTypeName(activeEvent->plan.type);
+            log(LogLevel::Info, message.str());
+        }
+        if (event.wavesSpawned > 0U) {
+            std::ostringstream message;
+            message << "Event wave " << activeEvent->nextWave << '/'
+                    << activeEvent->plan.waveCount << " spawned "
+                    << event.enemiesSpawned << " enemy(s)";
+            log(LogLevel::Info, message.str());
+        }
+        if (event.completed) {
+            std::ostringstream message;
+            message << "Room event completed: "
+                    << gameplay::roomEventTypeName(activeEvent->plan.type)
+                    << " | rewards " << event.rewardsSpawned;
+            log(LogLevel::Info, message.str());
+        }
     }
     ++fixedUpdates_;
 }
@@ -329,6 +507,8 @@ void Application::render()
         68.0F,
     };
     std::vector<gdp::render::EnemyRenderData> visibleEnemies;
+    std::vector<gdp::render::PickupRenderData> visiblePickups;
+    std::vector<gdp::render::PropRenderData> visibleProps;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
@@ -337,12 +517,18 @@ void Application::render()
         if (entity != nullptr && enemy != nullptr && entity->roomId == playerRoom
             && (enemy->archetype == entities::EnemyArchetype::Worker
                 || enemy->archetype == entities::EnemyArchetype::Guard
-                || enemy->archetype == entities::EnemyArchetype::Officer)) {
+                || enemy->archetype == entities::EnemyArchetype::Officer
+                || enemy->archetype == entities::EnemyArchetype::Engineer
+                || enemy->archetype == entities::EnemyArchetype::IndustrialRobot)) {
             gdp::render::EnemyVisualRole role = gdp::render::EnemyVisualRole::Worker;
             if (enemy->archetype == entities::EnemyArchetype::Guard) {
                 role = gdp::render::EnemyVisualRole::Guard;
             } else if (enemy->archetype == entities::EnemyArchetype::Officer) {
                 role = gdp::render::EnemyVisualRole::Officer;
+            } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
+                role = gdp::render::EnemyVisualRole::Engineer;
+            } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
+                role = gdp::render::EnemyVisualRole::IndustrialRobot;
             }
             visibleEnemies.push_back({
                 entity->transform.position,
@@ -352,11 +538,86 @@ void Application::render()
             });
         }
     }
+    for (const entities::EntityId id : entities_.query(entities::EntityKind::Item)) {
+        const entities::Entity* entity = entities_.find(id);
+        const entities::ItemData* item = entities_.findData<entities::ItemData>(id);
+        if (entity == nullptr || item == nullptr || entity->roomId != playerRoom) {
+            continue;
+        }
+        gdp::render::PickupVisualRole role = gdp::render::PickupVisualRole::Health;
+        if (item->type == entities::ItemType::Ammo) {
+            role = gdp::render::PickupVisualRole::Ammo;
+        } else if (item->type == entities::ItemType::Key) {
+            role = gdp::render::PickupVisualRole::Key;
+        }
+        visiblePickups.push_back({entity->transform.position, role});
+    }
+    for (const entities::EntityId id : entities_.query(entities::EntityKind::Prop)) {
+        const entities::Entity* entity = entities_.find(id);
+        const entities::PropData* prop = entities_.findData<entities::PropData>(id);
+        if (entity == nullptr || prop == nullptr || entity->roomId != playerRoom
+            || (prop->type != entities::PropType::Crate
+                && prop->type != entities::PropType::Canister
+                && prop->type != entities::PropType::Barricade)) {
+            continue;
+        }
+        gdp::render::PropVisualRole role = gdp::render::PropVisualRole::Crate;
+        if (prop->type == entities::PropType::Canister) {
+            role = gdp::render::PropVisualRole::Canister;
+        } else if (prop->type == entities::PropType::Barricade) {
+            role = gdp::render::PropVisualRole::Barricade;
+        }
+        gdp::render::PropVisualState state = gdp::render::PropVisualState::Intact;
+        if (prop->state == entities::PropState::Damaged) {
+            state = gdp::render::PropVisualState::Damaged;
+        } else if (prop->state == entities::PropState::Destroyed) {
+            state = gdp::render::PropVisualState::Destroyed;
+        }
+        visibleProps.push_back({
+            entity->transform.position,
+            entity->transform.scale,
+            role,
+            state,
+            prop->visualSeed,
+        });
+    }
     std::ostringstream title;
     title << "GDP | HP " << static_cast<int>(player_.state().health)
           << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
+    title << " | Keys " << player_.state().keys;
+    const auto activeEvent = std::find_if(
+        roomEvents_.begin(), roomEvents_.end(),
+        [playerRoom](const gameplay::RoomEventRuntime& runtime) {
+            return runtime.roomId == playerRoom;
+        });
+    if (activeEvent != roomEvents_.end()) {
+        title << " | Event " << gameplay::roomEventTypeName(activeEvent->plan.type)
+              << ':' << gameplay::roomEventPhaseName(activeEvent->phase);
+        if (gameplay::isRoomLocked(*activeEvent)) {
+            title << " [LOCKDOWN]";
+        }
+    }
+    gdp::render::RoomLightingRenderData lighting;
+    if (world_) {
+        const auto currentRoom = std::find_if(
+            world_->rooms.begin(), world_->rooms.end(),
+            [playerRoom](const world::RoomInstance& room) {
+                return room.id == playerRoom;
+            });
+        if (currentRoom != world_->rooms.end()) {
+            const std::size_t roomIndex = static_cast<std::size_t>(
+                std::distance(world_->rooms.begin(), currentRoom));
+            if (roomIndex < roomLighting_.size()) {
+                const bool alert = activeEvent != roomEvents_.end()
+                    && gameplay::isRoomLocked(*activeEvent);
+                lighting = makeRenderLighting(roomLighting_[roomIndex], alert);
+            }
+        }
+    }
     SDL_SetWindowTitle(window_, title.str().c_str());
-    if (renderer_ == nullptr || !renderer_->render(width, height, camera, visibleEnemies)) {
+    if (renderer_ == nullptr
+        || !renderer_->render(
+            width, height, camera, visibleEnemies, visiblePickups, visibleProps, lighting)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         running_ = false;
         return;
@@ -370,6 +631,8 @@ void Application::shutdown()
 
     renderer_.reset();
     entities_.clear();
+    roomEvents_.clear();
+    roomLighting_.clear();
     terminalEntity_ = {};
     world_.reset();
 

@@ -1,7 +1,7 @@
 # Enemies — Animação e IA
 
 > **Estado:** ciclo mínimo Idle/Chase/Attack/Dead do Worker validado na Fase 7 e
-> Guard e Officer com Reposition validados na Fase 11; animação, patrulha, investigação e
+> Guard, Officer, Engineer e IndustrialRobot validados na Fase 11; animação, patrulha, investigação e
 > navegação avançada permanecem planejadas.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -36,6 +36,12 @@ line of sight. A cada `2,50 s`, pode reduzir em `0,35 s` o cooldown de ataque de
 Workers e Guards vivos dentro de `10 m` e no mesmo `roomId`; ataque e comando
 possuem cooldowns independentes.
 
+O Engineer detecta em até `14 m`, opera a `1,05 m/s` no envelope de `3–6 m` e
+causa 5 de dano a cada `1 s`, sempre com line of sight. A cada `2 s`, escolhe o
+alvo reparável visível mais próximo em até `7 m`: recupera 12 HP de um Enemy
+vivo ou muda um Prop de `Damaged` para `Intact`. Nunca repara mortos,
+`Destroyed`, alvos de outra sala ou atrás de sólidos.
+
 ## Roles
 
 Worker aproxima e ataca; Guard procura linha de tiro; Officer altera ameaça do grupo;
@@ -43,8 +49,11 @@ Engineer opera sistemas; IndustrialRobot muda de fase conforme dano.
 
 ## Boss
 
-Base inicial: >66% longa distância, 33–66% maior pressão, <33% perseguição/curto alcance.
-Percentuais finais permanecem balanceáveis.
+IndustrialRobot detecta em até `24 m`. Acima de 66% de HP opera a `0,75 m/s`
+em 8–13 m e causa 12 de dano a cada `1,40 s`; entre 33–66% opera a `1 m/s` em
+4–8 m e causa 10 a cada `0,90 s`; em 33% ou menos persegue a `1,35 m/s` até
+2,25 m e causa 16 a cada `0,65 s`. As fases remotas recuam abaixo do alcance
+mínimo. Todo ataque exige line of sight e Dead encerra movimento e transições.
 
 ## Navegação
 

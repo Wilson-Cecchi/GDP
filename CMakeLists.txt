@@ -99,7 +99,10 @@ add_library(
     src/gameplay/Collision.cpp
     src/gameplay/Combat.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/Loot.cpp
     src/gameplay/Player.cpp
+    src/gameplay/Props.cpp
+    src/gameplay/RoomEvents.cpp
     src/gameplay/Weapon.cpp
 )
 
@@ -137,7 +140,11 @@ add_library(
     STATIC
     src/world/Connector.cpp
     src/world/Corridor.cpp
+    src/world/EventGenerator.cpp
+    src/world/LightingGenerator.cpp
+    src/world/LootGenerator.cpp
     src/world/MapGraph.cpp
+    src/world/PropGenerator.cpp
     src/world/RoomModule.cpp
     src/world/World.cpp
     src/world/WorldEntities.cpp
@@ -211,6 +218,38 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME gameplay_systems COMMAND gdp_gameplay_tests)
     set_tests_properties(gameplay_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_loot_tests tests/test_loot.cpp)
+    target_link_libraries(gdp_loot_tests PRIVATE gdp_gameplay gdp_world)
+    gdp_enable_warnings(gdp_loot_tests)
+    gdp_enable_sanitizers(gdp_loot_tests)
+
+    add_test(NAME loot_systems COMMAND gdp_loot_tests)
+    set_tests_properties(loot_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_prop_tests tests/test_props.cpp)
+    target_link_libraries(gdp_prop_tests PRIVATE gdp_gameplay gdp_world)
+    gdp_enable_warnings(gdp_prop_tests)
+    gdp_enable_sanitizers(gdp_prop_tests)
+
+    add_test(NAME prop_systems COMMAND gdp_prop_tests)
+    set_tests_properties(prop_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_event_tests tests/test_events.cpp)
+    target_link_libraries(gdp_event_tests PRIVATE gdp_gameplay gdp_world)
+    gdp_enable_warnings(gdp_event_tests)
+    gdp_enable_sanitizers(gdp_event_tests)
+
+    add_test(NAME room_event_systems COMMAND gdp_event_tests)
+    set_tests_properties(room_event_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_lighting_tests tests/test_lighting.cpp)
+    target_link_libraries(gdp_lighting_tests PRIVATE gdp_world)
+    gdp_enable_warnings(gdp_lighting_tests)
+    gdp_enable_sanitizers(gdp_lighting_tests)
+
+    add_test(NAME room_lighting_systems COMMAND gdp_lighting_tests)
+    set_tests_properties(room_lighting_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_combat_tests tests/test_combat.cpp)
     target_link_libraries(gdp_combat_tests PRIVATE gdp_gameplay)

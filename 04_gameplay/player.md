@@ -2,7 +2,8 @@
 
 > **Estado:** estado lógico, spawn, vida e interação inicial implementados na
 > Fase 3; binding geracional e sincronização com Entity Manager validados na
-> Fase 6. Armadura, armas e eventos entram nas fases correspondentes.
+> Fase 6; chaves e coleta automática de recursos validadas na Fase 12.
+> Armadura e eventos entram nas fases correspondentes.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -45,8 +46,9 @@ não perder o comando em frames sem update. O retorno agora é um `EntityId`
 geracional do terminal, portanto uma referência stale não seleciona outra
 entidade que reutilize o mesmo slot.
 
-O Player guarda seu próprio `EntityId`; a aplicação sincroniza posição e HP no
-registro central a cada fixed update.
+O Player guarda seu próprio `EntityId`; a aplicação sincroniza posição, HP e
+chaves no registro central a cada fixed update. Pickups próximos são coletados
+sem interromper movimento; Health e Ammo cheios permanecem disponíveis.
 
 ## Morte
 

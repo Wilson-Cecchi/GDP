@@ -1,5 +1,8 @@
 #include "world/WorldEntities.hpp"
 
+#include "world/LootGenerator.hpp"
+#include "world/PropGenerator.hpp"
+
 #include <algorithm>
 
 namespace gdp::world {
@@ -23,14 +26,65 @@ InitialEntitySet populateInitialEntities(
     if (!hasStartRoom || manager.activeCount() != 0) {
         return result;
     }
+    std::vector<LootLayout> lootLayouts;
+    std::vector<PropLayout> propLayouts;
+    lootLayouts.reserve(world.rooms.size());
+    propLayouts.reserve(world.rooms.size());
+    for (const RoomInstance& room : world.rooms) {
+        const auto node = std::find_if(
+            world.graph.nodes.begin(), world.graph.nodes.end(),
+            [&room](const RoomNode& candidate) { return candidate.id == room.id; });
+        if (node == world.graph.nodes.end()) {
+            return result;
+        }
+        LootLayout layout = generateLootLayout(
+            room.seed, room.role, room.theme, node->depth, room.lootZones);
+        if (!validateLootLayout(layout, room.lootZones).isValid()) {
+            return result;
+        }
+        lootLayouts.push_back(std::move(layout));
+        PropLayout props = generatePropLayout(
+            room.seed, room.role, room.theme, node->depth, room.propZones);
+        if (!validatePropLayout(props, room.propZones).isValid()) {
+            return result;
+        }
+        propLayouts.push_back(std::move(props));
+    }
     const auto positionInRoom = [](const RoomInstance& room, const gdp::core::Vec3 offset) {
         return room.transform.position + offset;
     };
 
-    for (RoomInstance& room : world.rooms) {
+    for (std::size_t roomIndex = 0; roomIndex < world.rooms.size(); ++roomIndex) {
+        RoomInstance& room = world.rooms[roomIndex];
         room.entities.clear();
         const auto addToRoom = [&room](const EntityId id) {
             room.entities.push_back(id);
+        };
+        const auto addLoot = [&] {
+            for (const LootDrop& drop : lootLayouts[roomIndex].drops) {
+                addToRoom(manager.createItem({
+                    .transform = {.position = drop.position},
+                    .roomId = room.id,
+                    .type = drop.type,
+                    .quantity = drop.quantity,
+                }));
+            }
+        };
+        const auto addProps = [&] {
+            for (const PropSpawn& prop : propLayouts[roomIndex].props) {
+                addToRoom(manager.createProp({
+                    .transform = {.position = prop.position, .scale = prop.scale},
+                    .roomId = room.id,
+                    .type = prop.type,
+                    .state = prop.state,
+                    .solid = prop.solid,
+                    .health = prop.health,
+                    .maximumHealth = prop.maximumHealth,
+                    .dropType = prop.dropType,
+                    .dropQuantity = prop.dropQuantity,
+                    .visualSeed = prop.visualSeed,
+                }));
+            }
         };
 
         if (room.role == RoomRole::Start) {
@@ -54,6 +108,8 @@ InitialEntitySet populateInitialEntities(
                 .visualSeed = gdp::core::deriveSeed(
                     room.seed, gdp::core::SeedDomain::EnemyVisual, 0),
             }));
+            addProps();
+            addLoot();
             continue;
         }
 
@@ -72,17 +128,9 @@ InitialEntitySet populateInitialEntities(
                     enemyVisualOrdinal++),
             }));
         };
-        const auto addItem = [&](const ItemType type, const std::uint32_t quantity) {
-            addToRoom(manager.createItem({
-                .transform = {.position = positionInRoom(room, {1.5F, 0.0F, 0.0F})},
-                .roomId = room.id,
-                .type = type,
-                .quantity = quantity,
-            }));
-        };
-        const auto addProp = [&](const PropType type,
-                                 const gdp::core::Vec3 offset,
-                                 const bool solid) {
+        const auto addFixedProp = [&](const PropType type,
+                                      const gdp::core::Vec3 offset,
+                                      const bool solid) {
             addToRoom(manager.createProp({
                 .transform = {.position = positionInRoom(room, offset)},
                 .roomId = room.id,
@@ -94,33 +142,29 @@ InitialEntitySet populateInitialEntities(
         switch (room.role) {
         case RoomRole::Normal:
             addEnemy(EnemyArchetype::Worker, {}, 50.0F);
-            addProp(PropType::Crate, {-1.5F, 0.0F, 0.0F}, true);
             break;
         case RoomRole::Hub:
-            addItem(ItemType::Health, 25);
-            addProp(PropType::Decoration, {-1.5F, 0.0F, 0.0F}, false);
             break;
         case RoomRole::Arena:
             addEnemy(EnemyArchetype::Worker, {-1.5F, 0.0F, 0.0F}, 50.0F);
             addEnemy(EnemyArchetype::Guard, {1.5F, 0.0F, 0.0F}, 75.0F);
             addEnemy(EnemyArchetype::Officer, {0.0F, 0.0F, 1.5F}, 65.0F);
+            addEnemy(EnemyArchetype::Engineer, {0.0F, 0.0F, -1.5F}, 58.0F);
             break;
         case RoomRole::DeadEnd:
-            addItem(ItemType::Ammo, 12);
-            addProp(PropType::Crate, {-1.5F, 0.0F, 0.0F}, true);
             break;
         case RoomRole::Secret:
-            addItem(ItemType::Key, 1);
-            addItem(ItemType::Health, 50);
             break;
         case RoomRole::Boss:
             addEnemy(EnemyArchetype::IndustrialRobot, {}, 250.0F);
-            addProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
+            addFixedProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
             break;
         case RoomRole::Start:
         case RoomRole::Count:
             break;
         }
+        addProps();
+        addLoot();
     }
     return result;
 }

@@ -9,6 +9,30 @@
 Rooms, loops, main path length, regeneration attempts, corridor length, secrets, enemy count,
 loot e generation time.
 
+O gate de loot executa 1.000 room seeds, exige 1.000 hashes canônicos únicos,
+budget respeitado, posições dentro das zonas transformadas, separação mínima e
+cobertura de Health/Ammo. Uma seed dourada protege o formato; integração de
+mundo reproduz tipos, quantidades e posições e mantém o fingerprint estrutural
+independente da substream `Loot`.
+
+O gate de props executa 1.000 room seeds, exige hashes únicos, budget exato,
+footprint dentro de `propZones`, separação, cobertura de crate/canister/barricade
+e protege o hash dourado `0x28BB5CB31BBAF612`. As seeds padrão e 12345 validam
+todas as salas; integração compara estado, HP, escala, drop, posição e
+`visualSeed` sem alterar o fingerprint estrutural.
+
+O gate de eventos percorre 1.000 room seeds, exige 1.000 hashes únicos,
+cobertura de `None/TerminalAmbush/Reinforcements/Lockdown/SupplyDrop`, triggers
+compatíveis, ondas completas e posições válidas. O hash dourado
+`0xB04A437A8394B962` protege o contrato; seeds padrão/12345 validam todas as
+salas sem consumir as streams estruturais, de loot ou props.
+
+O gate de iluminação percorre 1.000 room seeds, exige 1.000 hashes únicos,
+cobre os seis moods e valida contagem, bounds, cor, intensidade, alcance e
+limite mínimo de ambiente. O hash dourado `0x2D7AF8E8762A807F` protege o
+contrato; seeds padrão/12345 validam todas as salas sem alterar o fingerprint
+estrutural. O OpenGL compara pixels de luz padrão, procedural e alerta.
+
 ## Enemy metrics
 
 Role, BodyProfile, part IDs, fallback count, materials e unique VisualGenomeHash.
@@ -28,6 +52,18 @@ O gate do Officer executa mais 1.000 seeds, cobre `Field/Command/Veteran`, 18
 peças próprias, `Fabric/Polymer/PaintedSteel`, quatro estados de desgaste,
 assimetria, sidearm, módulo de comando, hashes únicos e zero fallbacks. O
 conjunto dos três papéis exige 3.000 hashes sem colisão e substreams distintas.
+
+O gate do Engineer acrescenta 1.000 seeds, cobre
+`Maintenance/Diagnostics/Hazmat`, 18 peças técnicas,
+`Aluminum/Polymer/PaintedSteel`, quatro estados de desgaste, assimetria,
+ferramenta de reparo, mochila diagnóstica, hashes únicos e zero fallbacks. O
+conjunto dos quatro papéis exige 4.000 hashes sem colisão e substreams distintas.
+
+O gate do IndustrialRobot acrescenta 1.000 seeds, cobre
+`Sentry/Foundry/Siege`, 18 peças mecânicas, `BareSteel/PaintedSteel/Aluminum`,
+quatro estados de desgaste, torso e sensores especiais, braços pesados, dois
+reatores, arma, emissão, assimetria, hashes únicos e zero fallbacks. O conjunto
+dos cinco papéis exige 5.000 hashes sem colisão e substreams distintas.
 
 ## Texture metrics
 

@@ -21,8 +21,10 @@ enum class ShotOutcome : std::uint8_t {
     Empty,
     Miss,
     ImpactWorld,
+    ImpactProp,
     Hit,
     Killed,
+    Destroyed,
 };
 
 struct HitResult {
@@ -34,6 +36,7 @@ struct HitResult {
 struct ShotResult {
     ShotOutcome outcome{ShotOutcome::Miss};
     std::optional<HitResult> hit;
+    gdp::entities::EntityId spawnedItem{};
 };
 
 [[nodiscard]] DamageOutcome applyDamage(
@@ -52,6 +55,12 @@ struct ShotResult {
 [[nodiscard]] bool hasLineOfSight(
     gdp::core::Vec3 origin,
     gdp::core::Vec3 target,
+    const CollisionWorld& collisionWorld) noexcept;
+
+[[nodiscard]] bool hasLineOfSightToProp(
+    gdp::core::Vec3 origin,
+    const gdp::entities::EntityManager& manager,
+    gdp::entities::EntityId target,
     const CollisionWorld& collisionWorld) noexcept;
 
 } // namespace gdp::gameplay

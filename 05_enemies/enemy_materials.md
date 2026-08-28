@@ -1,7 +1,7 @@
 # Enemies — Materiais, texturas e desgaste
 
 > **Estado:** material, paleta e desgaste do Worker implementados na Fase 9 e do
-> Guard e Officer na Fase 11; conjuntos multimaterial e mapas adicionais permanecem
+> Guard, Officer, Engineer e IndustrialRobot na Fase 11; conjuntos multimaterial e mapas adicionais permanecem
 > planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -20,6 +20,14 @@ e separa seus substreams de material dos do Worker.
 O Officer usa `Fabric`, `Polymer` e `PaintedSteel`, com paletas organizadas em
 azul-marinho, grafite, bordô ou oliva. Seu desgaste tende a ser menor que o do
 Guard e deriva da substream de papel 200.
+
+O Engineer seleciona `Aluminum`, `Polymer` ou `PaintedSteel`, com leitura
+técnica em verde-petróleo, laranja de manutenção, azul ou cinza. Desgaste,
+graxa e riscos usam a substream 300 sem compartilhar sequência com outros papéis.
+
+O IndustrialRobot restringe a base a `BareSteel`, `PaintedSteel` ou `Aluminum`
+e usa a substream 400. Fuligem, oxidação e risco são mais intensos, enquanto a
+receita reserva emissão controlada de 0,14 para núcleo, sensores e reatores.
 
 ## Conservação
 

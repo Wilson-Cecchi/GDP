@@ -147,6 +147,14 @@ void Player::heal(const float amount) noexcept
     state_.health = std::min(state_.maximumHealth, state_.health + amount);
 }
 
+void Player::addKeys(const std::uint32_t amount) noexcept
+{
+    if (!state_.alive || amount == 0U) {
+        return;
+    }
+    state_.keys += amount;
+}
+
 const PlayerState& Player::state() const noexcept
 {
     return state_;

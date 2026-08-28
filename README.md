@@ -54,9 +54,11 @@ especializados das pastas numeradas.
 - **Fase 10 — Materiais procedurais das salas:** implementada e validada nos
   oito perfis Industrial Corridor, Storage, Combat Room, Cafeteria, Laboratory,
   Technical Area, Security e Central Hub.
-- **Fase 11 — Elenco:** em andamento; Guard e Officer procedurais, combate de
-  média distância e comando tático implementados e validados.
-- **Próxima atualização:** expandir a Fase 11 para o inimigo Engineer.
+- **Fase 11 — Elenco:** implementada e validada; Guard, Officer, Engineer e
+  IndustrialRobot possuem geração procedural, renderer e combate funcional.
+- **Fase 12 — Procedural avançado:** em andamento; loot, props, eventos de sala
+  e iluminação procedurais funcionais, integrados e validados.
+- **Próxima atualização:** continuar a Fase 12 com áudio procedural.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -67,13 +69,15 @@ fixado.
 
 O renderer atual desenha uma sala industrial fixa com cubo indexado reutilizado,
 materiais procedurais de parede/piso/teto derivados da seed real da START,
-iluminação pontual simples, luminárias emissivas, câmera em perspectiva e
+até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
+câmera em perspectiva e
 retícula. Parede com grandes placas e rodapé amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, interage com o terminal usando `E`, dispara com o botão esquerdo
-e recarrega com `R`. HP e munição aparecem no título da janela; `Esc` encerra a
+e recarrega com `R`. Pickups próximos são coletados automaticamente; HP,
+munição e chaves aparecem no título da janela. `Esc` encerra a
 aplicação enquanto o sistema de menus ainda não existe.
 
 Na inicialização, uma seed gera um mundo lógico validado com START, BOSS,
@@ -99,6 +103,49 @@ Ele mantém distância de 6–10 m e, em cadência própria, reduz o cooldown de
 ataque de Workers e Guards vivos dentro de 10 m na mesma sala. Comandos nunca
 atravessam o limite lógico da sala; mesh, textura e cache também usam substreams
 e armazenamento exclusivos do papel.
+
+O Engineer acrescenta os perfis `Maintenance`, `Diagnostics` e `Hazmat`, com 18
+peças técnicas, ferramenta de reparo e mochila diagnóstica obrigatórias. Ele
+opera entre 3–6 m e usa um cooldown independente para reparar o aliado vivo ou
+prop danificado mais próximo dentro de 7 m, sem atravessar sólidos ou salas. A
+Arena agora reúne os quatro papéis procedurais já implementados.
+
+O IndustrialRobot fecha o elenco da Fase 11 com perfis `Sentry`, `Foundry` e
+`Siege`, biblioteca pesada de 18 peças, núcleo/sensores emissivos, braços com
+pistões, dois módulos traseiros e arma pesada. Na sala Boss, seus 250 HP ativam
+três comportamentos: acima de 66% mantém 8–13 m, entre 33–66% pressiona em
+4–8 m e abaixo de 33% persegue para atacar até 2,25 m. Velocidade, dano e
+cadência mudam por fase; sala, line of sight, colisão, cooldown e morte usam os
+mesmos contratos determinísticos do restante do elenco.
+
+O primeiro incremento da Fase 12 deriva loot exclusivamente da substream
+`Loot`, combinando papel, tema, profundidade, dificuldade, orçamento e as zonas
+válidas da sala. `Health`, `Ammo` e `Key` recebem quantidade e posição
+determinísticas, sem ocupar connectors. A START contém uma caixa de munição
+para teste imediato; recursos cheios não consomem pickups, enquanto coleta
+válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
+
+O segundo incremento usa exclusivamente a substream `Props` para distribuir
+crates, canisters e barricadas nas `propZones` transformadas, com orçamento por
+papel/profundidade/dificuldade e preferência por tema. Cada prop possui escala,
+HP, `visualSeed` e estado `Intact/Damaged/Destroyed`; tiros respeitam o alvo
+mais próximo, destruição remove a colisão e cada crate libera no máximo um
+pickup determinístico. Terminal e porta permanecem protegidos.
+
+O terceiro incremento deriva planos exclusivamente de `SeedDomain::Events`.
+`TerminalAmbush`, `Reinforcements`, `Lockdown`, `SupplyDrop` e `None` combinam
+papel, tema, profundidade, dificuldade e `enemyZones`. Na START, mirar no
+terminal e usar `E` ativa uma emboscada adicional; limpar todos os inimigos
+encerra o lockdown e cria uma única recompensa. O título e os logs expõem
+ativação, ondas e conclusão.
+
+O quarto incremento usa somente `SeedDomain::Lighting` para derivar mood,
+ambiente, luminárias e até quatro pontos de luz por sala. Papel, tema e área
+controlam densidade e paleta sem alterar o fingerprint estrutural nem qualquer
+conteúdo de gameplay. START, Arena, Boss e Security suportam alerta: durante
+lockdown, o plano muda temporariamente para vermelho e retorna ao normal após a
+conclusão. Todos os planos são validados na inicialização; a START permite
+testar a transição imediatamente pela emboscada do terminal.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
@@ -129,7 +176,7 @@ ctest --preset debug
 
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
-Gameplay, Combat, Entities e World.
+Gameplay, Loot, Props, Events, Lighting, Combat, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 

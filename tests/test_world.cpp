@@ -2,6 +2,8 @@
 #include "world/Connector.hpp"
 #include "world/Corridor.hpp"
 #include "world/MapGraph.hpp"
+#include "world/LootGenerator.hpp"
+#include "world/PropGenerator.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldEntities.hpp"
 #include "world/WorldGenerator.hpp"
@@ -101,6 +103,14 @@ void testInstantiationAndRotation()
         "connector position follows room rotation and translation");
     expect(directionFromNormal(room->connectors[0].worldNormal) == Direction::East,
         "connector normal follows room rotation");
+    expect(room->enemyZones.size() == 1U
+            && nearlyEqual(room->enemyZones.front().bounds.minimum, {9.0F, 0.0F, 18.0F})
+            && nearlyEqual(room->enemyZones.front().bounds.maximum, {11.0F, 0.0F, 22.0F}),
+        "enemy/event zones follow room rotation and translation into world space");
+    expect(room->propZones.size() == 1U
+            && nearlyEqual(room->propZones.front().bounds.minimum, {7.0F, 0.0F, 17.0F})
+            && nearlyEqual(room->propZones.front().bounds.maximum, {11.5F, 0.0F, 18.5F}),
+        "prop zones follow room rotation and translation into world space");
 
     constexpr std::array expectedDirections{
         Direction::North,
@@ -291,7 +301,7 @@ void testInitialEntityPopulation()
         *generated.world,
         manager,
         {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F});
-    expect(initial.isValid() && manager.activeCount() == 18,
+    expect(initial.isValid() && manager.activeCount() == 40,
         "eight-room world receives its complete initial entity set");
     expect(manager.query(EntityKind::Player) == std::vector<EntityId>{initial.player},
         "population creates exactly one player entity");
@@ -301,19 +311,30 @@ void testInitialEntityPopulation()
 
     bool arenaGuardValid = false;
     bool arenaOfficerValid = false;
+    bool arenaEngineerValid = false;
+    bool bossRobotValid = false;
     for (const RoomInstance& room : generated.world->rooms) {
-        if (room.role != RoomRole::Arena) {
-            continue;
-        }
         for (const EntityId id : room.entities) {
             const EnemyData* enemy = manager.findData<EnemyData>(id);
-            arenaGuardValid = arenaGuardValid || (enemy != nullptr
+            arenaGuardValid = arenaGuardValid || (room.role == RoomRole::Arena
+                && enemy != nullptr
                 && enemy->archetype == EnemyArchetype::Guard
                 && enemy->health == 75.0F && enemy->maximumHealth == 75.0F
                 && enemy->visualSeed != 0U);
-            arenaOfficerValid = arenaOfficerValid || (enemy != nullptr
+            arenaOfficerValid = arenaOfficerValid || (room.role == RoomRole::Arena
+                && enemy != nullptr
                 && enemy->archetype == EnemyArchetype::Officer
                 && enemy->health == 65.0F && enemy->maximumHealth == 65.0F
+                && enemy->visualSeed != 0U);
+            arenaEngineerValid = arenaEngineerValid || (room.role == RoomRole::Arena
+                && enemy != nullptr
+                && enemy->archetype == EnemyArchetype::Engineer
+                && enemy->health == 58.0F && enemy->maximumHealth == 58.0F
+                && enemy->visualSeed != 0U);
+            bossRobotValid = bossRobotValid || (room.role == RoomRole::Boss
+                && enemy != nullptr
+                && enemy->archetype == EnemyArchetype::IndustrialRobot
+                && enemy->health == 250.0F && enemy->maximumHealth == 250.0F
                 && enemy->visualSeed != 0U);
         }
     }
@@ -321,6 +342,10 @@ void testInitialEntityPopulation()
         "Arena population includes one healthy Guard with an isolated visual seed");
     expect(arenaOfficerValid,
         "Arena population includes one healthy Officer with an isolated visual seed");
+    expect(arenaEngineerValid,
+        "Arena population includes one healthy Engineer with an isolated visual seed");
+    expect(bossRobotValid,
+        "Boss population includes one healthy IndustrialRobot with an isolated visual seed");
 
     const auto collectEnemyVisualSeeds = [](const EntityManager& entities) {
         std::vector<gdp::core::Seed> seeds;
@@ -339,9 +364,26 @@ void testInitialEntityPopulation()
         "every populated enemy receives a non-zero isolated visual seed");
 
     bool roomLinksValid = true;
+    bool lootLayoutsValid = true;
+    bool propLayoutsValid = true;
     for (const RoomInstance& room : generated.world->rooms) {
-        const std::size_t expectedCount = (room.role == RoomRole::Start
-            || room.role == RoomRole::Arena) ? 3U : 2U;
+        const auto node = std::find_if(
+            generated.world->graph.nodes.begin(), generated.world->graph.nodes.end(),
+            [&room](const RoomNode& candidate) { return candidate.id == room.id; });
+        const LootLayout loot = node == generated.world->graph.nodes.end()
+            ? LootLayout{}
+            : generateLootLayout(
+                room.seed, room.role, room.theme, node->depth, room.lootZones);
+        const PropLayout props = node == generated.world->graph.nodes.end()
+            ? PropLayout{}
+            : generatePropLayout(
+                room.seed, room.role, room.theme, node->depth, room.propZones);
+        const std::size_t baseCount = room.role == RoomRole::Arena ? 4U
+            : room.role == RoomRole::Start ? 3U
+            : room.role == RoomRole::Normal ? 1U
+            : room.role == RoomRole::Boss ? 2U : 0U;
+        const std::size_t expectedCount
+            = baseCount + props.props.size() + loot.drops.size();
         if (room.entities.size() != expectedCount || manager.queryRoom(room.id) != room.entities) {
             roomLinksValid = false;
             break;
@@ -353,9 +395,61 @@ void testInitialEntityPopulation()
                 break;
             }
         }
+        std::size_t dropIndex = 0;
+        for (const EntityId id : room.entities) {
+            const Entity* entity = manager.find(id);
+            const ItemData* item = manager.findData<ItemData>(id);
+            if (entity == nullptr || item == nullptr) {
+                continue;
+            }
+            if (dropIndex >= loot.drops.size()
+                || item->type != loot.drops[dropIndex].type
+                || item->quantity != loot.drops[dropIndex].quantity
+                || entity->transform.position != loot.drops[dropIndex].position) {
+                lootLayoutsValid = false;
+                break;
+            }
+            ++dropIndex;
+        }
+        lootLayoutsValid = lootLayoutsValid && dropIndex == loot.drops.size()
+            && validateLootLayout(loot, room.lootZones).isValid();
+        std::size_t propIndex = 0;
+        for (const EntityId id : room.entities) {
+            const Entity* entity = manager.find(id);
+            const PropData* prop = manager.findData<PropData>(id);
+            if (entity == nullptr || prop == nullptr
+                || (prop->type != PropType::Crate
+                    && prop->type != PropType::Canister
+                    && prop->type != PropType::Barricade)) {
+                continue;
+            }
+            if (propIndex >= props.props.size()) {
+                propLayoutsValid = false;
+                break;
+            }
+            const PropSpawn& expected = props.props[propIndex];
+            if (prop->type != expected.type || prop->state != expected.state
+                || prop->solid != expected.solid || prop->health != expected.health
+                || prop->maximumHealth != expected.maximumHealth
+                || prop->dropType != expected.dropType
+                || prop->dropQuantity != expected.dropQuantity
+                || prop->visualSeed != expected.visualSeed
+                || entity->transform.position != expected.position
+                || entity->transform.scale != expected.scale) {
+                propLayoutsValid = false;
+                break;
+            }
+            ++propIndex;
+        }
+        propLayoutsValid = propLayoutsValid && propIndex == props.props.size()
+            && validatePropLayout(props, room.propZones).isValid();
     }
     expect(roomLinksValid,
         "every RoomInstance owns its expected valid deterministic content handles");
+    expect(lootLayoutsValid,
+        "room population preserves each deterministic procedural loot layout exactly");
+    expect(propLayoutsValid,
+        "room population preserves each deterministic procedural prop layout exactly");
 
     WorldGenerationResult repeated = generateWorld(12345);
     EntityManager repeatedManager;

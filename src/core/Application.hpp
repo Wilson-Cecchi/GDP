@@ -4,13 +4,16 @@
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/RoomEvents.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
+#include "world/LightingGenerator.hpp"
 #include "world/WorldGenerator.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 struct SDL_Window;
 struct SDL_GLContextState;
@@ -51,7 +54,8 @@ private:
     ApplicationConfig config_;
     Input input_;
     FixedStepClock clock_;
-    gameplay::CollisionWorld collisionWorld_{gameplay::CollisionWorld::fixedRoom()};
+    gameplay::CollisionWorld baseCollisionWorld_;
+    gameplay::CollisionWorld collisionWorld_;
     gameplay::Player player_;
     gameplay::Weapon weapon_;
     entities::EntityManager entities_;
@@ -61,6 +65,8 @@ private:
     bool firePending_{false};
     bool reloadPending_{false};
     std::optional<world::World> world_;
+    std::vector<gameplay::RoomEventRuntime> roomEvents_;
+    std::vector<world::RoomLightingPlan> roomLighting_;
     std::unique_ptr<gdp::render::Renderer> renderer_;
     SDL_Window* window_{nullptr};
     SDL_GLContextState* glContext_{nullptr};

@@ -98,6 +98,9 @@ struct RoomInstance {
     gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
     gdp::core::Aabb worldBounds{};
     std::vector<ConnectorInstance> connectors;
+    std::vector<SpawnZone> enemyZones;
+    std::vector<SpawnZone> lootZones;
+    std::vector<SpawnZone> propZones;
     std::vector<gdp::entities::EntityId> entities;
 };
 

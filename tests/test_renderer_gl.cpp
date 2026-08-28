@@ -60,6 +60,11 @@ int main()
                 {0.0F, 0.0F, -2.0F}, true, 333, gdp::render::EnemyVisualRole::Guard},
             gdp::render::EnemyRenderData{
                 {0.0F, 0.0F, 0.5F}, true, 444, gdp::render::EnemyVisualRole::Officer},
+            gdp::render::EnemyRenderData{
+                {-0.5F, 0.0F, 1.0F}, true, 555, gdp::render::EnemyVisualRole::Engineer},
+            gdp::render::EnemyRenderData{
+                {0.75F, 0.0F, 1.0F}, true, 666,
+                gdp::render::EnemyVisualRole::IndustrialRobot},
         };
         constexpr std::array workerOnly{
             gdp::render::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
@@ -72,6 +77,48 @@ int main()
             gdp::render::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 444, gdp::render::EnemyVisualRole::Officer},
         };
+        constexpr std::array engineerOnly{
+            gdp::render::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 555, gdp::render::EnemyVisualRole::Engineer},
+        };
+        constexpr std::array industrialRobotOnly{
+            gdp::render::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 666,
+                gdp::render::EnemyVisualRole::IndustrialRobot},
+        };
+        constexpr std::array pickups{
+            gdp::render::PickupRenderData{
+                {-0.60F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Health},
+            gdp::render::PickupRenderData{
+                {0.0F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Ammo},
+            gdp::render::PickupRenderData{
+                {0.60F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Key},
+        };
+        constexpr std::array props{
+            gdp::render::PropRenderData{
+                {-1.35F, 0.0F, -1.2F}, {0.78F, 0.72F, 0.78F},
+                gdp::render::PropVisualRole::Crate,
+                gdp::render::PropVisualState::Intact, 7001},
+            gdp::render::PropRenderData{
+                {0.0F, 0.0F, -1.2F}, {0.46F, 1.02F, 0.46F},
+                gdp::render::PropVisualRole::Canister,
+                gdp::render::PropVisualState::Damaged, 7002},
+            gdp::render::PropRenderData{
+                {1.35F, 0.0F, -1.2F}, {1.16F, 0.92F, 0.34F},
+                gdp::render::PropVisualRole::Barricade,
+                gdp::render::PropVisualState::Destroyed, 7003},
+        };
+        gdp::render::RoomLightingRenderData proceduralLighting;
+        proceduralLighting.ambientColor = {0.52F, 0.68F, 0.82F};
+        proceduralLighting.ambientIntensity = 0.18F;
+        proceduralLighting.lightCount = 3U;
+        proceduralLighting.fixtureEmissive = 0.84F;
+        proceduralLighting.lights[0] = {
+            {-2.0F, 3.82F, -2.0F}, {0.48F, 0.74F, 1.0F}, 1.05F, 5.4F};
+        proceduralLighting.lights[1] = {
+            {2.0F, 3.82F, -2.0F}, {0.60F, 0.82F, 1.0F}, 0.95F, 5.8F};
+        proceduralLighting.lights[2] = {
+            {0.0F, 3.82F, 2.0F}, {0.42F, 0.68F, 0.94F}, 1.10F, 5.2F};
         if (!renderer.initialize(width, height) || !renderer.render(width, height)) {
             std::cerr << "Renderer failed to produce a frame\n";
         } else {
@@ -129,6 +176,19 @@ int main()
             std::vector<std::uint8_t> centralHubPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, centralHubPixels.data());
 
+            const bool renderedProceduralLighting = renderer.render(
+                width, height, {}, {}, {}, {}, proceduralLighting);
+            std::vector<std::uint8_t> lightingPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                lightingPixels.data());
+
+            proceduralLighting.alert = true;
+            const bool renderedAlertLighting = renderer.render(
+                width, height, {}, {}, {}, {}, proceduralLighting);
+            std::vector<std::uint8_t> alertLightingPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                alertLightingPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -144,11 +204,35 @@ int main()
             std::vector<std::uint8_t> officerPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, officerPixels.data());
 
+            const bool renderedEngineer = renderer.prepareEngineerVisual(555)
+                && renderer.render(width, height, {}, engineerOnly);
+            std::vector<std::uint8_t> engineerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, engineerPixels.data());
+
+            const bool renderedIndustrialRobot
+                = renderer.prepareIndustrialRobotVisual(666)
+                && renderer.render(width, height, {}, industrialRobotOnly);
+            std::vector<std::uint8_t> industrialRobotPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                industrialRobotPixels.data());
+
+            const bool renderedPickups = renderer.render(width, height, {}, {}, pickups);
+            std::vector<std::uint8_t> pickupPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pickupPixels.data());
+
+            const bool renderedProps = renderer.render(width, height, {}, {}, {}, props);
+            std::vector<std::uint8_t> propPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                propPixels.data());
+
             const bool renderedEnemies = renderer.prepareWorkerVisual(111)
                 && renderer.prepareWorkerVisual(222)
                 && renderer.prepareGuardVisual(333)
                 && renderer.prepareOfficerVisual(444)
-                && renderer.render(width, height, {}, enemies);
+                && renderer.prepareEngineerVisual(555)
+                && renderer.prepareIndustrialRobotVisual(666)
+                && renderer.render(width, height, {}, enemies, pickups, props);
             if (!renderedEnemies) {
                 std::cerr << "Renderer failed to draw enemy placeholders\n";
             }
@@ -165,9 +249,15 @@ int main()
             std::size_t technicalChangedChannels = 0;
             std::size_t securityChangedChannels = 0;
             std::size_t centralHubChangedChannels = 0;
+            std::size_t lightingChangedChannels = 0;
+            std::size_t alertLightingChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
+            std::size_t engineerChangedChannels = 0;
+            std::size_t industrialRobotChangedChannels = 0;
+            std::size_t pickupChangedChannels = 0;
+            std::size_t propChangedChannels = 0;
             std::size_t enemyChangedChannels = 0;
             for (std::size_t index = 0; index < pixels.size(); index += 4U) {
                 darkest = std::min(darkest, pixels[index]);
@@ -197,6 +287,14 @@ int main()
                     if (centralHubPixels[index + channel] != securityPixels[index + channel]) {
                         ++centralHubChangedChannels;
                     }
+                    if (lightingPixels[index + channel]
+                        != centralHubPixels[index + channel]) {
+                        ++lightingChangedChannels;
+                    }
+                    if (alertLightingPixels[index + channel]
+                        != lightingPixels[index + channel]) {
+                        ++alertLightingChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -206,7 +304,21 @@ int main()
                     if (officerPixels[index + channel] != guardPixels[index + channel]) {
                         ++officerChangedChannels;
                     }
-                    if (pixels[index + channel] != officerPixels[index + channel]) {
+                    if (engineerPixels[index + channel] != officerPixels[index + channel]) {
+                        ++engineerChangedChannels;
+                    }
+                    if (industrialRobotPixels[index + channel]
+                        != engineerPixels[index + channel]) {
+                        ++industrialRobotChangedChannels;
+                    }
+                    if (pickupPixels[index + channel]
+                        != industrialRobotPixels[index + channel]) {
+                        ++pickupChangedChannels;
+                    }
+                    if (propPixels[index + channel] != pickupPixels[index + channel]) {
+                        ++propChangedChannels;
+                    }
+                    if (pixels[index + channel] != propPixels[index + channel]) {
                         ++enemyChangedChannels;
                     }
                 }
@@ -220,9 +332,15 @@ int main()
                 && renderedTechnicalVariant && technicalChangedChannels > 100U
                 && renderedSecurityVariant && securityChangedChannels > 100U
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
+                && renderedProceduralLighting && lightingChangedChannels > 100U
+                && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U
+                && renderedEngineer && engineerChangedChannels > 100U
+                && renderedIndustrialRobot && industrialRobotChangedChannels > 100U
+                && renderedPickups && pickupChangedChannels > 100U
+                && renderedProps && propChangedChannels > 100U
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
                 && glGetError() == GL_NO_ERROR;
             if (!passed) {

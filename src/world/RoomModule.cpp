@@ -217,6 +217,18 @@ std::optional<RoomInstance> instantiateRoom(
     for (const ConnectorDefinition& definition : module.connectors) {
         room.connectors.push_back(instantiateConnector(definition, worldOrigin, rotation));
     }
+    room.enemyZones.reserve(module.enemyZones.size());
+    for (const SpawnZone& zone : module.enemyZones) {
+        room.enemyZones.push_back({transformBounds(zone.bounds, worldOrigin, rotation)});
+    }
+    room.lootZones.reserve(module.lootZones.size());
+    for (const SpawnZone& zone : module.lootZones) {
+        room.lootZones.push_back({transformBounds(zone.bounds, worldOrigin, rotation)});
+    }
+    room.propZones.reserve(module.propZones.size());
+    for (const SpawnZone& zone : module.propZones) {
+        room.propZones.push_back({transformBounds(zone.bounds, worldOrigin, rotation)});
+    }
     return room;
 }
 

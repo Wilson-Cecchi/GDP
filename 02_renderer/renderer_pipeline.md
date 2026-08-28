@@ -2,7 +2,8 @@
 
 > **Estado:** renderer mínimo da Fase 2 implementado e validado; variantes de
 > Worker e materiais industriais preparados/cacheados antes do draw nas Fases 9
-> e 10. Filas completas, culling, transparência, UI e pós-processamento
+> e 10; iluminação procedural de sala integrada na Fase 12. Filas completas,
+> culling, transparência, UI e pós-processamento
 > permanecem planejados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
@@ -49,7 +50,8 @@ GAME STATE
 shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
 
 ```text
-room material variant → fixed room instances → Worker/Guard/Officer variants
+room material variant + lighting plan → fixed room instances + emissive fixtures
+→ enemy variants → pickup markers → props
 → framebuffer color+depth → blit → SDL window
 ```
 
@@ -63,10 +65,22 @@ chave pelo hash integral do perfil e selecionam a variante. `render()` apenas
 escolhe os canais Wall/Floor/Ceiling já enviados à GPU. A START usa Industrial;
 o teste offscreen alterna pelos outros sete ambientes, confirma mudança de
 pixels entre os oito perfis e repetição exata da mesma variante Industrial.
-`prepareWorkerVisual()`, `prepareGuardVisual()` e `prepareOfficerVisual()` usam
-mapas GPU separados por papel; `EnemyRenderData::role` seleciona mesh/textura
-sem geração durante draw. O teste offscreen posiciona os três no mesmo ponto e
-exige pixels distintos entre cada papel.
+`prepareWorkerVisual()`, `prepareGuardVisual()`, `prepareOfficerVisual()`,
+`prepareEngineerVisual()` e `prepareIndustrialRobotVisual()` usam mapas GPU separados por papel;
+`EnemyRenderData::role` seleciona mesh/textura sem geração durante draw. O teste
+offscreen posiciona os cinco no mesmo ponto e exige pixels distintos.
+`PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
+a regressão também exige contraste separado e composição com inimigos.
+`PropRenderData` desenha crate, canister e barricade com escala/tint derivados
+do papel e da `visualSeed`; `Damaged` escurece e `Destroyed` achata o volume. A
+regressão offscreen cobre os três papéis, os três estados e a composição final.
+
+`RoomLightingRenderData` fornece ambiente e até quatro pontos com posição, cor,
+intensidade e alcance. O shader acumula Lambert difuso com atenuação por alcance
+e nunca consulta o gerador. As luminárias são volumes emissivos nas posições do
+plano. O flag `alert` mistura ambiente, pontos e fixtures com vermelho enquanto
+o evento mantém a sala em lockdown; a regressão offscreen exige saídas distintas
+para iluminação padrão, procedural e alerta.
 
 ## Separação
 

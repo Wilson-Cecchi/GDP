@@ -60,7 +60,10 @@ alinhada ao destino antes de consumir a edge.
 `World` contém seed/version, graph, rooms e corridors. Depois do commit
 estrutural, `populateInitialEntities()` preenche em cada sala os `EntityId`s
 possuídos pelo manager central; IA, loot coletável e gameplay permanecem
-separados desse gate geométrico.
+separados desse gate geométrico. A instância preserva suas `lootZones` e
+`enemyZones`, `lootZones` e `propZones` já transformadas para world space;
+população/runtime posteriores derivam encontros, loot, props, eventos e iluminação em
+substreams independentes sem alterar o fingerprint estrutural.
 
 ## Herança de design
 

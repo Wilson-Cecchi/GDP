@@ -1,7 +1,7 @@
 # Enemies — Body Profiles, sockets e compatibilidade
 
-> **Estado:** catálogo do Worker validado na Fase 9 e catálogos de Guard e
-> Officer validados na Fase 11; Engineer e IndustrialRobot permanecem planejados.
+> **Estado:** catálogo do Worker validado na Fase 9 e catálogos de Guard,
+> Officer, Engineer e IndustrialRobot validados na Fase 11.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -20,6 +20,10 @@ O Guard acrescenta `Patrol`, `Tactical` e `Armored`, mapeados a envelopes
 humanos Standard, Light e Heavy sem alterar os sockets compartilhados.
 O Officer acrescenta `Field`, `Command` e `Veteran`, mapeados aos mesmos
 envelopes Standard, Light e Heavy para preservar o contrato de sockets.
+O Engineer adiciona `Maintenance`, `Diagnostics` e `Hazmat`, também mapeados a
+Standard, Light e Heavy.
+O IndustrialRobot usa `Sentry`, `Foundry` e `Siege`, restritos aos envelopes
+Compact/Heavy e às máscaras `Heavy|Mechanical`.
 
 ## Sockets
 
@@ -59,7 +63,13 @@ O Officer possui mais 18 definições. Seu slot `Back` exige um
 `MechanicalCore` vertical que representa rádio/módulo de comando; `Tool` exige
 uma `Weapon` curta, diferenciada dimensionalmente das armas longas do Guard.
 
+As 18 definições do Engineer exigem `MechanicalCore` vertical no slot `Back`
+para mochila diagnóstica e `Tool` longitudinal no slot homônimo para chave,
+sonda ou soldador, sem classificá-los como arma de fogo.
+
 ## Boss
 
-IndustrialRobot restringe a biblioteca e pode exigir torso/núcleo pesado, dois módulos
-traseiros e braços industriais pesados.
+IndustrialRobot possui 18 definições próprias. A montagem exige torso
+`MechanicalCore`, cabeça `Lens`, dois módulos traseiros `MechanicalCore`,
+braços `Piston` ampliados e `Weapon` pesada. As nove primitivas resultantes
+mantêm o mesmo contrato de sockets e bounds do pipeline comum.

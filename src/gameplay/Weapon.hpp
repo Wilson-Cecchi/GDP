@@ -25,10 +25,12 @@ public:
     void fixedUpdate(float fixedStepSeconds) noexcept;
     [[nodiscard]] FireReadiness tryFire() noexcept;
     [[nodiscard]] bool reload() noexcept;
+    [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
 
     [[nodiscard]] const WeaponDefinition& definition() const noexcept;
     [[nodiscard]] std::uint32_t magazineAmmo() const noexcept;
     [[nodiscard]] std::uint32_t reserveAmmo() const noexcept;
+    [[nodiscard]] std::uint32_t reserveCapacity() const noexcept;
     [[nodiscard]] float cooldownRemaining() const noexcept;
 
 private:

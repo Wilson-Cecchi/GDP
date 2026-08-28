@@ -47,6 +47,14 @@ bool Weapon::reload() noexcept
     return true;
 }
 
+std::uint32_t Weapon::addReserveAmmo(const std::uint32_t amount) noexcept
+{
+    const std::uint32_t capacity = definition_.reserveMaximum - reserveAmmo_;
+    const std::uint32_t accepted = std::min(amount, capacity);
+    reserveAmmo_ += accepted;
+    return accepted;
+}
+
 const WeaponDefinition& Weapon::definition() const noexcept
 {
     return definition_;
@@ -60,6 +68,11 @@ std::uint32_t Weapon::magazineAmmo() const noexcept
 std::uint32_t Weapon::reserveAmmo() const noexcept
 {
     return reserveAmmo_;
+}
+
+std::uint32_t Weapon::reserveCapacity() const noexcept
+{
+    return definition_.reserveMaximum;
 }
 
 float Weapon::cooldownRemaining() const noexcept

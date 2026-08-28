@@ -1,5 +1,7 @@
 #include "gameplay/Combat.hpp"
 
+#include "gameplay/Props.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -86,8 +88,17 @@ DamageOutcome applyDamage(
     const float amount) noexcept
 {
     gdp::entities::EnemyData* enemy = manager.findData<gdp::entities::EnemyData>(target);
-    if (enemy == nullptr || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead
-        || amount <= 0.0F) {
+    if (enemy == nullptr) {
+        const PropDamageOutcome prop = damageProp(manager, target, amount).outcome;
+        if (prop == PropDamageOutcome::Damaged) {
+            return DamageOutcome::Damaged;
+        }
+        if (prop == PropDamageOutcome::Destroyed) {
+            return DamageOutcome::Killed;
+        }
+        return DamageOutcome::Ignored;
+    }
+    if (enemy->behavior == gdp::entities::EnemyBehaviorState::Dead || amount <= 0.0F) {
         return DamageOutcome::Ignored;
     }
     enemy->health = std::max(0.0F, enemy->health - amount);
@@ -143,7 +154,40 @@ ShotResult fireHitscan(
         };
     }
 
+    for (const gdp::entities::EntityId id : manager.query(gdp::entities::EntityKind::Prop)) {
+        const gdp::entities::Entity* entity = manager.find(id);
+        const gdp::entities::PropData* prop
+            = manager.findData<gdp::entities::PropData>(id);
+        if (entity == nullptr || prop == nullptr || entity->roomId != roomId
+            || !prop->solid || prop->state == gdp::entities::PropState::Destroyed) {
+            continue;
+        }
+        const auto interval = rayAabbInterval(
+            origin, direction, propCollisionBounds(*entity, *prop), range);
+        if (!interval || interval->nearDistance > worldDistance + 1.0e-4F
+            || (nearestHit && interval->nearDistance >= nearestHit->distance)) {
+            continue;
+        }
+        nearestHit = HitResult{
+            id,
+            origin + (direction * interval->nearDistance),
+            interval->nearDistance,
+        };
+    }
+
     if (nearestHit) {
+        const gdp::entities::Entity* target = manager.find(nearestHit->target);
+        const bool targetIsProp = target != nullptr
+            && target->kind == gdp::entities::EntityKind::Prop;
+        if (targetIsProp) {
+            const PropDamageResult damage
+                = damageProp(manager, nearestHit->target, weapon.definition().damage);
+            const ShotOutcome outcome = damage.outcome == PropDamageOutcome::Destroyed
+                ? ShotOutcome::Destroyed
+                : damage.outcome == PropDamageOutcome::Damaged ? ShotOutcome::Hit
+                                                               : ShotOutcome::ImpactProp;
+            return {outcome, nearestHit, damage.spawnedDrop};
+        }
         const DamageOutcome damage = applyDamage(manager, nearestHit->target, weapon.definition().damage);
         return {
             damage == DamageOutcome::Killed ? ShotOutcome::Killed : ShotOutcome::Hit,
@@ -171,6 +215,34 @@ bool hasLineOfSight(
         offset * (1.0F / distance),
         distance,
         collisionWorld) >= distance;
+}
+
+bool hasLineOfSightToProp(
+    const gdp::core::Vec3 origin,
+    const gdp::entities::EntityManager& manager,
+    const gdp::entities::EntityId target,
+    const CollisionWorld& collisionWorld) noexcept
+{
+    const gdp::entities::Entity* entity = manager.find(target);
+    const gdp::entities::PropData* prop
+        = manager.findData<gdp::entities::PropData>(target);
+    if (entity == nullptr || prop == nullptr
+        || prop->state == gdp::entities::PropState::Destroyed) {
+        return false;
+    }
+    const gdp::core::Vec3 targetPoint = entity->transform.position
+        + gdp::core::Vec3{0.0F, entity->transform.scale.y * 0.5F, 0.0F};
+    const gdp::core::Vec3 offset = targetPoint - origin;
+    const float distance = gdp::core::length(offset);
+    if (distance <= 1.0e-7F) {
+        return true;
+    }
+    const gdp::core::Vec3 direction = offset * (1.0F / distance);
+    const auto targetInterval = rayAabbInterval(
+        origin, direction, propCollisionBounds(*entity, *prop), distance);
+    return targetInterval
+        && firstWorldDistance(origin, direction, distance, collisionWorld)
+            + 1.0e-4F >= targetInterval->nearDistance;
 }
 
 } // namespace gdp::gameplay

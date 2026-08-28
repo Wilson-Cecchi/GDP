@@ -420,6 +420,262 @@ void testOfficerRangedBehaviorAndLineOfSight()
         "Officer death clears command state together with attack state");
 }
 
+void testEngineerRepairSystem()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld room{{{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId engineer = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 5.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Engineer,
+    });
+    const EntityId worker = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 4.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId remoteWorker = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 4.0F}},
+        .roomId = 2,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId damagedProp = manager.createProp({
+        .transform = {.position = {2.0F, 0.0F, 4.0F}},
+        .roomId = 1,
+        .type = PropType::Crate,
+        .state = PropState::Damaged,
+    });
+    manager.findData<EnemyData>(worker)->health = 30.0F;
+    manager.findData<EnemyData>(remoteWorker)->health = 30.0F;
+    const EngineerConfig config{
+        .detectionRange = 14.0F,
+        .preferredMinimumRange = 3.0F,
+        .preferredMaximumRange = 6.0F,
+        .moveSpeed = 1.0F,
+        .attackDamage = 0.0F,
+        .attackInterval = 1.0F,
+        .repairRange = 7.0F,
+        .repairInterval = 2.0F,
+        .repairAmount = 12.0F,
+    };
+
+    const EnemyUpdateSummary allyRepair
+        = updateEngineers(manager, player, 1, room, 0.0F, config);
+    expect(allyRepair.repairsPerformed == 1U && allyRepair.alliesRepaired == 1U
+            && allyRepair.propsRestored == 0U
+            && gdp::core::nearlyEqual(manager.findData<EnemyData>(worker)->health, 42.0F),
+        "Engineer repairs the nearest damaged living ally by the configured amount");
+    expect(gdp::core::nearlyEqual(
+               manager.findData<EnemyData>(remoteWorker)->health, 30.0F),
+        "Engineer repair never crosses the active room boundary");
+    expect(manager.findData<PropData>(damagedProp)->state == PropState::Damaged
+            && gdp::core::nearlyEqual(
+                manager.findData<EnemyData>(engineer)->supportCooldown, 2.0F),
+        "one Engineer repair starts an independent utility cooldown");
+
+    const EnemyUpdateSummary coolingDown
+        = updateEngineers(manager, player, 1, room, 0.5F, config);
+    expect(coolingDown.repairsPerformed == 0U
+            && manager.findData<PropData>(damagedProp)->state == PropState::Damaged,
+        "Engineer cannot repair a second target before its utility cooldown expires");
+    manager.findData<EnemyData>(worker)->health
+        = manager.findData<EnemyData>(worker)->maximumHealth;
+    const EnemyUpdateSummary propRepair
+        = updateEngineers(manager, player, 1, room, 1.5F, config);
+    expect(propRepair.repairsPerformed == 1U && propRepair.propsRestored == 1U
+            && manager.findData<PropData>(damagedProp)->state == PropState::Intact,
+        "Engineer restores a damaged prop when no closer ally requires repair");
+}
+
+void testEngineerRangedBehaviorAndRepairOcclusion()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId engineer = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 8.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Engineer,
+    });
+    const EntityId damagedWorker = manager.createEnemy({
+        .transform = {.position = {2.0F, 0.0F, 2.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    manager.findData<EnemyData>(damagedWorker)->health = 20.0F;
+    const CollisionWorld blocked{
+        {{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}},
+        {{{-1.0F, 0.0F, 4.0F}, {3.0F, 3.0F, 4.5F}}},
+    };
+    const EngineerConfig config{
+        .detectionRange = 14.0F,
+        .preferredMinimumRange = 3.0F,
+        .preferredMaximumRange = 6.0F,
+        .moveSpeed = 2.0F,
+        .attackDamage = 5.0F,
+        .attackInterval = 1.0F,
+        .repairRange = 7.0F,
+        .repairInterval = 2.0F,
+        .repairAmount = 12.0F,
+    };
+    const EnemyUpdateSummary occluded
+        = updateEngineers(manager, player, 1, blocked, 0.0F, config);
+    expect(occluded.repairsPerformed == 0U && occluded.attacksLanded == 0U
+            && gdp::core::nearlyEqual(
+                manager.findData<EnemyData>(damagedWorker)->health, 20.0F),
+        "Engineer neither repairs nor attacks through blocking geometry");
+
+    const CollisionWorld open{{{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}}};
+    manager.find(damagedWorker)->transform.position = {10.0F, 0.0F, 10.0F};
+    const EnemyUpdateSummary approach
+        = updateEngineers(manager, player, 1, open, 1.0F, config);
+    expect(approach.chasing == 1U
+            && gdp::core::nearlyEqual(manager.find(engineer)->transform.position.z, 6.0F),
+        "Engineer advances into its short technical-tool firing envelope");
+    const EnemyUpdateSummary shot
+        = updateEngineers(manager, player, 1, open, 0.1F, config);
+    expect(shot.attacking == 1U && shot.attacksLanded == 1U
+            && gdp::core::nearlyEqual(player.state().health, 95.0F),
+        "Engineer attacks from preferred range only with line of sight");
+
+    manager.find(engineer)->transform.position = {0.0F, 0.0F, 1.0F};
+    const float healthBeforeRetreat = player.state().health;
+    const EnemyUpdateSummary retreat
+        = updateEngineers(manager, player, 1, open, 0.5F, config);
+    expect(retreat.repositioning == 1U
+            && gdp::core::nearlyEqual(manager.find(engineer)->transform.position.z, 2.0F)
+            && player.state().health == healthBeforeRetreat,
+        "Engineer retreats without attacking inside minimum range");
+    expect(applyDamage(manager, engineer, 500.0F) == DamageOutcome::Killed,
+        "Engineer uses the shared damage and death pipeline");
+}
+
+void testIndustrialRobotPhases()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    expect(industrialRobotPhase(250.0F, 250.0F) == IndustrialRobotPhase::LongRange
+            && industrialRobotPhase(165.0F, 250.0F) == IndustrialRobotPhase::Pressure
+            && industrialRobotPhase(82.5F, 250.0F) == IndustrialRobotPhase::Pursuit,
+        "IndustrialRobot phase thresholds use >66%, 33-66% and <=33% HP");
+
+    const CollisionWorld room{{{-16.0F, 0.0F, -16.0F}, {16.0F, 4.0F, 16.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId robot = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 14.0F}},
+        .roomId = 7,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 250.0F,
+    });
+    const EnemyUpdateSummary longApproach
+        = updateIndustrialRobots(manager, player, 7, room, 1.0F);
+    expect(longApproach.bossLongRange == 1U && longApproach.chasing == 1U
+            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 13.25F),
+        "healthy IndustrialRobot advances slowly into its long-range envelope");
+    manager.find(robot)->transform.position = {0.0F, 0.0F, 12.0F};
+    const EnemyUpdateSummary longShot
+        = updateIndustrialRobots(manager, player, 7, room, 0.1F);
+    expect(longShot.attacksLanded == 1U
+            && gdp::core::nearlyEqual(player.state().health, 88.0F),
+        "phase-one IndustrialRobot fires a high-impact long-range attack");
+
+    EnemyData* data = manager.findData<EnemyData>(robot);
+    data->health = 150.0F;
+    data->attackCooldown = 0.0F;
+    manager.find(robot)->transform.position = {0.0F, 0.0F, 6.0F};
+    const EnemyUpdateSummary pressure
+        = updateIndustrialRobots(manager, player, 7, room, 0.1F);
+    expect(pressure.bossPressure == 1U && pressure.attacksLanded == 1U
+            && gdp::core::nearlyEqual(player.state().health, 78.0F)
+            && gdp::core::nearlyEqual(data->attackCooldown, 0.9F),
+        "mid-health IndustrialRobot increases pressure and firing cadence");
+
+    data->health = 50.0F;
+    data->attackCooldown = 0.0F;
+    manager.find(robot)->transform.position = {0.0F, 0.0F, 4.0F};
+    const EnemyUpdateSummary pursuit
+        = updateIndustrialRobots(manager, player, 7, room, 1.5F);
+    expect(pursuit.bossPursuit == 1U && pursuit.chasing == 1U
+            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 1.975F),
+        "critical IndustrialRobot commits to its fastest close pursuit");
+    const EnemyUpdateSummary closeStrike
+        = updateIndustrialRobots(manager, player, 7, room, 0.1F);
+    expect(closeStrike.attacksLanded == 1U
+            && gdp::core::nearlyEqual(player.state().health, 62.0F)
+            && gdp::core::nearlyEqual(data->attackCooldown, 0.65F),
+        "critical IndustrialRobot delivers its strongest, fastest close attack");
+
+    data->health = 250.0F;
+    data->attackCooldown = 0.0F;
+    manager.find(robot)->transform.position = {0.0F, 0.0F, 2.0F};
+    const float healthBeforeRetreat = player.state().health;
+    const EnemyUpdateSummary retreat
+        = updateIndustrialRobots(manager, player, 7, room, 1.0F);
+    expect(retreat.repositioning == 1U
+            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 2.75F)
+            && player.state().health == healthBeforeRetreat,
+        "healthy IndustrialRobot repositions when the player breaches long range");
+
+    const gdp::core::Vec3 deathPosition = manager.find(robot)->transform.position;
+    expect(applyDamage(manager, robot, 500.0F) == DamageOutcome::Killed,
+        "IndustrialRobot uses the shared damage and death pipeline");
+    const EnemyUpdateSummary dead
+        = updateIndustrialRobots(manager, player, 7, room, 2.0F);
+    expect(dead.attacking == 0U && dead.chasing == 0U && dead.repositioning == 0U
+            && manager.find(robot)->transform.position == deathPosition,
+        "dead IndustrialRobot cannot move, change phase or attack");
+}
+
+void testIndustrialRobotLineOfSightAndRoomIsolation()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId blockedRobot = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 6.0F}},
+        .roomId = 3,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 250.0F,
+    });
+    const EntityId otherRoomRobot = manager.createEnemy({
+        .transform = {.position = {2.0F, 0.0F, 6.0F}},
+        .roomId = 4,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 250.0F,
+    });
+    manager.findData<EnemyData>(blockedRobot)->health = 150.0F;
+    manager.findData<EnemyData>(otherRoomRobot)->health = 150.0F;
+    const CollisionWorld blocked{
+        {{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}},
+        {{{-1.0F, 0.0F, 3.0F}, {1.0F, 3.0F, 3.5F}}},
+    };
+    const gdp::core::Vec3 otherPosition = manager.find(otherRoomRobot)->transform.position;
+    const EnemyUpdateSummary update
+        = updateIndustrialRobots(manager, player, 3, blocked, 0.5F);
+    expect(update.chasing == 1U && update.attacksLanded == 0U
+            && player.state().health == 100.0F,
+        "IndustrialRobot cannot attack through geometry and instead advances");
+    expect(manager.find(otherRoomRobot)->transform.position == otherPosition
+            && manager.findData<EnemyData>(otherRoomRobot)->behavior
+                == EnemyBehaviorState::Idle,
+        "IndustrialRobot update never crosses the active room boundary");
+    expect(manager.findData<EnemyData>(blockedRobot)->behavior == EnemyBehaviorState::Chase,
+        "occluded IndustrialRobot keeps an explicit Chase state");
+}
+
 } // namespace
 
 int main()
@@ -433,6 +689,10 @@ int main()
     testGuardLineOfSight();
     testOfficerCommandSupport();
     testOfficerRangedBehaviorAndLineOfSight();
+    testEngineerRepairSystem();
+    testEngineerRangedBehaviorAndRepairOcclusion();
+    testIndustrialRobotPhases();
+    testIndustrialRobotLineOfSightAndRoomIsolation();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";
