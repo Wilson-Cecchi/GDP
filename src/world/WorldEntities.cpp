@@ -51,7 +51,8 @@ InitialEntitySet populateInitialEntities(
         propLayouts.push_back(std::move(props));
     }
     const auto positionInRoom = [](const RoomInstance& room, const gdp::core::Vec3 offset) {
-        return room.transform.position + offset;
+        return room.transform.position
+            + gdp::core::rotateQuarterTurns(offset, room.rotation);
     };
 
     for (std::size_t roomIndex = 0; roomIndex < world.rooms.size(); ++roomIndex) {

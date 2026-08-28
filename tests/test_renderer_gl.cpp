@@ -189,6 +189,33 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 alertLightingPixels.data());
 
+            gdp::render::RoomLightingRenderData translatedLighting;
+            translatedLighting.lightCount = 1U;
+            translatedLighting.lights[0] = {
+                {16.0F, 3.82F, -14.0F}, {0.52F, 0.78F, 1.0F}, 1.10F, 5.6F};
+            constexpr gdp::render::CameraData translatedCamera{
+                {18.0F, 1.62F, -14.0F}, {1.0F, 0.0F, 0.0F}, 68.0F};
+            constexpr gdp::render::RoomRenderData translatedRoom{
+                {14.0F, 0.0F, -14.0F}, gdp::core::QuarterTurn::Degrees90};
+            std::array translatedDoors{
+                gdp::render::DoorRenderData{
+                    {18.85F, 0.0F, -14.0F}, {1.0F, 0.0F, 0.0F},
+                    1.2F, 2.2F, false},
+            };
+            const bool renderedTranslatedDoor = renderer.render(
+                width, height, translatedCamera, {}, {}, {}, translatedLighting,
+                translatedRoom, translatedDoors);
+            std::vector<std::uint8_t> translatedDoorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                translatedDoorPixels.data());
+            translatedDoors.front().locked = true;
+            const bool renderedLockedDoor = renderer.render(
+                width, height, translatedCamera, {}, {}, {}, translatedLighting,
+                translatedRoom, translatedDoors);
+            std::vector<std::uint8_t> lockedDoorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                lockedDoorPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -251,6 +278,7 @@ int main()
             std::size_t centralHubChangedChannels = 0;
             std::size_t lightingChangedChannels = 0;
             std::size_t alertLightingChangedChannels = 0;
+            std::size_t doorStateChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -295,6 +323,10 @@ int main()
                         != lightingPixels[index + channel]) {
                         ++alertLightingChangedChannels;
                     }
+                    if (lockedDoorPixels[index + channel]
+                        != translatedDoorPixels[index + channel]) {
+                        ++doorStateChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -334,6 +366,8 @@ int main()
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
+                && renderedTranslatedDoor && renderedLockedDoor
+                && doorStateChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

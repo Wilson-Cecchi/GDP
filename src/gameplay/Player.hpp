@@ -38,6 +38,9 @@ public:
     Player() = default;
 
     void spawn(gdp::core::Vec3 feetPosition, float yawDegrees = -90.0F) noexcept;
+    [[nodiscard]] bool relocate(
+        gdp::core::Vec3 feetPosition,
+        float yawDegrees) noexcept;
     void bindEntity(gdp::entities::EntityId entity) noexcept;
     void applyLook(gdp::core::Vec2 mouseDelta) noexcept;
     void fixedUpdate(

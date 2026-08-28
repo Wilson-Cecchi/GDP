@@ -1,9 +1,44 @@
 #include "gameplay/Collision.hpp"
 
 #include <algorithm>
+#include <array>
 #include <utility>
 
 namespace gdp::gameplay {
+namespace {
+
+gdp::core::Aabb transformBounds(
+    const gdp::core::Aabb localBounds,
+    const gdp::core::Vec3 origin,
+    const gdp::core::QuarterTurn rotation) noexcept
+{
+    const std::array corners{
+        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.minimum.z},
+        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.minimum.z},
+        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.minimum.z},
+        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.minimum.z},
+        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.maximum.z},
+        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.maximum.z},
+        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.maximum.z},
+        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.maximum.z},
+    };
+    gdp::core::Vec3 minimum
+        = origin + gdp::core::rotateQuarterTurns(corners.front(), rotation);
+    gdp::core::Vec3 maximum = minimum;
+    for (const gdp::core::Vec3 corner : corners) {
+        const gdp::core::Vec3 transformed
+            = origin + gdp::core::rotateQuarterTurns(corner, rotation);
+        minimum.x = std::min(minimum.x, transformed.x);
+        minimum.y = std::min(minimum.y, transformed.y);
+        minimum.z = std::min(minimum.z, transformed.z);
+        maximum.x = std::max(maximum.x, transformed.x);
+        maximum.y = std::max(maximum.y, transformed.y);
+        maximum.z = std::max(maximum.z, transformed.z);
+    }
+    return {minimum, maximum};
+}
+
+} // namespace
 
 CollisionWorld::CollisionWorld(
     const gdp::core::Aabb roomBounds,
@@ -13,17 +48,24 @@ CollisionWorld::CollisionWorld(
 {
 }
 
-CollisionWorld CollisionWorld::fixedRoom()
+CollisionWorld CollisionWorld::fixedRoom(
+    const gdp::core::Vec3 worldOrigin,
+    const gdp::core::QuarterTurn rotation)
 {
-    return {
-        {{-3.85F, 0.0F, -4.85F}, {3.85F, 4.0F, 4.85F}},
-        {
-            {{-3.025F, 0.0F, -4.025F}, {-2.575F, 2.0F, -3.575F}},
-            {{2.575F, 0.0F, -4.025F}, {3.025F, 2.0F, -3.575F}},
-            {{-1.1F, 0.0F, -2.8F}, {1.1F, 0.7F, -1.6F}},
-            {{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}},
-        },
+    constexpr gdp::core::Aabb localRoom{
+        {-3.85F, 0.0F, -4.85F}, {3.85F, 4.0F, 4.85F}};
+    constexpr std::array localSolids{
+        gdp::core::Aabb{{-3.025F, 0.0F, -4.025F}, {-2.575F, 2.0F, -3.575F}},
+        gdp::core::Aabb{{2.575F, 0.0F, -4.025F}, {3.025F, 2.0F, -3.575F}},
+        gdp::core::Aabb{{-1.1F, 0.0F, -2.8F}, {1.1F, 0.7F, -1.6F}},
+        gdp::core::Aabb{{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}},
     };
+    std::vector<gdp::core::Aabb> solids;
+    solids.reserve(localSolids.size());
+    for (const gdp::core::Aabb solid : localSolids) {
+        solids.push_back(transformBounds(solid, worldOrigin, rotation));
+    }
+    return {transformBounds(localRoom, worldOrigin, rotation), std::move(solids)};
 }
 
 CharacterMotionResult CollisionWorld::moveCharacter(

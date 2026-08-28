@@ -22,7 +22,9 @@ class CollisionWorld {
 public:
     CollisionWorld(gdp::core::Aabb roomBounds, std::vector<gdp::core::Aabb> solids = {});
 
-    [[nodiscard]] static CollisionWorld fixedRoom();
+    [[nodiscard]] static CollisionWorld fixedRoom(
+        gdp::core::Vec3 worldOrigin = {},
+        gdp::core::QuarterTurn rotation = gdp::core::QuarterTurn::Degrees0);
     [[nodiscard]] CharacterMotionResult moveCharacter(
         gdp::core::Vec3 position,
         gdp::core::Vec3 velocity,

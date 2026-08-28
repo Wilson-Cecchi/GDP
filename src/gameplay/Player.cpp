@@ -54,6 +54,23 @@ void Player::spawn(const gdp::core::Vec3 feetPosition, const float yawDegrees) n
     state_.grounded = false;
 }
 
+bool Player::relocate(
+    const gdp::core::Vec3 feetPosition,
+    const float yawDegrees) noexcept
+{
+    if (!state_.alive || !std::isfinite(feetPosition.x)
+        || !std::isfinite(feetPosition.y) || !std::isfinite(feetPosition.z)
+        || !std::isfinite(yawDegrees)) {
+        return false;
+    }
+    state_.position = feetPosition;
+    state_.velocity = {};
+    state_.yawDegrees = std::remainder(yawDegrees, 360.0F);
+    state_.pitchDegrees = 0.0F;
+    state_.grounded = false;
+    return true;
+}
+
 void Player::bindEntity(const gdp::entities::EntityId entity) noexcept
 {
     entity_ = entity;

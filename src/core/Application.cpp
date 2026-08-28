@@ -7,6 +7,7 @@
 #include "gameplay/Loot.hpp"
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomEvents.hpp"
+#include "gameplay/RoomTraversal.hpp"
 #include "render/Renderer.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -87,6 +89,40 @@ const char* progressionRewardName(const gameplay::ProgressionReward reward) noex
     return "Unknown";
 }
 
+bool prepareRoomMaterials(
+    gdp::render::Renderer& renderer,
+    const world::RoomInstance& room)
+{
+    if (room.role == world::RoomRole::Hub) {
+        return renderer.prepareCentralHubRoomMaterials(room.seed);
+    }
+    if (room.role == world::RoomRole::Arena || room.role == world::RoomRole::Boss) {
+        return renderer.prepareCombatRoomMaterials(room.seed);
+    }
+    switch (room.theme) {
+    case world::RoomTheme::Storage:
+        return renderer.prepareStorageRoomMaterials(room.seed);
+    case world::RoomTheme::Laboratory:
+        return renderer.prepareLaboratoryRoomMaterials(room.seed);
+    case world::RoomTheme::Maintenance:
+        return renderer.prepareTechnicalRoomMaterials(room.seed);
+    case world::RoomTheme::Security:
+        return renderer.prepareSecurityRoomMaterials(room.seed);
+    case world::RoomTheme::Cafeteria:
+        return renderer.prepareCafeteriaRoomMaterials(room.seed);
+    case world::RoomTheme::Industrial:
+    case world::RoomTheme::Office:
+        return renderer.prepareIndustrialRoomMaterials(room.seed);
+    }
+    return false;
+}
+
+float yawForDirection(const gdp::core::Vec3 direction) noexcept
+{
+    constexpr float radiansToDegrees = 57.29577951308232F;
+    return std::atan2(direction.z, direction.x) * radiansToDegrees;
+}
+
 } // namespace
 
 Application::Application(ApplicationConfig config)
@@ -152,6 +188,18 @@ bool Application::initialize()
         return false;
     }
     world_ = std::move(generation.world);
+    const auto startRoom = std::find_if(
+        world_->rooms.begin(), world_->rooms.end(),
+        [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
+    if (startRoom == world_->rooms.end()) {
+        log(LogLevel::Error, "Generated world does not contain a START room");
+        return false;
+    }
+    const gdp::core::Vec3 startForward = gdp::core::rotateQuarterTurns(
+        {0.0F, 0.0F, -1.0F}, startRoom->rotation);
+    const gdp::core::Vec3 startPosition = startRoom->transform.position
+        + gdp::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
+    player_.spawn(startPosition, yawForDirection(startForward));
     const world::InitialEntitySet initialEntities = world::populateInitialEntities(
         *world_,
         entities_,
@@ -165,6 +213,8 @@ bool Application::initialize()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
+    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom(
+        startRoom->transform.position, startRoom->rotation);
     roomEvents_.reserve(world_->rooms.size());
     roomLighting_.reserve(world_->rooms.size());
     for (const world::RoomInstance& room : world_->rooms) {
@@ -210,9 +260,6 @@ bool Application::initialize()
     }
     sdlInitialized_ = true;
 
-    const auto startRoom = std::find_if(
-        world_->rooms.begin(), world_->rooms.end(),
-        [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
     (void)audio_->initialize(!config_.headless);
     if (startRoom != world_->rooms.end()) {
@@ -270,14 +317,7 @@ bool Application::initialize()
         log(LogLevel::Error, "Renderer initialization failed");
         return false;
     }
-    bool roomMaterialsPrepared = false;
-    if (startRoom != world_->rooms.end()) {
-        if (startRoom->theme == world::RoomTheme::Storage) {
-            roomMaterialsPrepared = renderer_->prepareStorageRoomMaterials(startRoom->seed);
-        } else {
-            roomMaterialsPrepared = renderer_->prepareIndustrialRoomMaterials(startRoom->seed);
-        }
-    }
+    const bool roomMaterialsPrepared = prepareRoomMaterials(*renderer_, *startRoom);
     if (!roomMaterialsPrepared) {
         log(LogLevel::Error, "START room material preparation failed");
         return false;
@@ -348,7 +388,7 @@ void Application::fixedUpdate(const double fixedStep)
     const float step = static_cast<float>(fixedStep);
     weapon_.fixedUpdate(step);
     entities::Entity* playerEntity = entities_.find(player_.entity());
-    const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
+    std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     const auto awardProgress = [this](
         const gameplay::ProgressionEvent event,
         const std::uint32_t count) {
@@ -370,6 +410,58 @@ void Application::fixedUpdate(const double fixedStep)
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
     player_.fixedUpdate(playerCommand_, step, collisionWorld_);
+
+    if (playerCommand_.interact && playerEntity != nullptr && world_) {
+        const auto transition = gameplay::findRoomTransition(
+            *world_, playerRoom, player_.state().position,
+            player_.planarForwardDirection());
+        if (transition) {
+            const auto currentEvent = std::find_if(
+                roomEvents_.begin(), roomEvents_.end(),
+                [playerRoom](const gameplay::RoomEventRuntime& runtime) {
+                    return runtime.roomId == playerRoom;
+                });
+            const bool locked = currentEvent != roomEvents_.end()
+                && gameplay::isRoomLocked(*currentEvent);
+            if (locked) {
+                log(LogLevel::Info, "Door locked by active room event");
+            } else {
+                const auto destination = std::find_if(
+                    world_->rooms.begin(), world_->rooms.end(),
+                    [&transition](const world::RoomInstance& room) {
+                        return room.id == transition->destinationRoom;
+                    });
+                if (destination != world_->rooms.end()
+                    && player_.relocate(
+                        transition->destinationPosition,
+                        transition->destinationYawDegrees)) {
+                    playerRoom = destination->id;
+                    playerEntity->roomId = playerRoom;
+                    playerEntity->transform.position = player_.state().position;
+                    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom(
+                        destination->transform.position, destination->rotation);
+                    collisionWorld_ = gameplay::collisionWorldWithProps(
+                        baseCollisionWorld_, entities_, playerRoom);
+                    if (renderer_ != nullptr
+                        && !prepareRoomMaterials(*renderer_, *destination)) {
+                        log(LogLevel::Error, "Destination room material preparation failed");
+                        running_ = false;
+                    }
+                    if (audio_) {
+                        audio_->setAmbience(destination->seed,
+                            static_cast<std::uint64_t>(destination->theme));
+                    }
+                    std::ostringstream message;
+                    message << "Room transition " << transition->sourceRoom << " -> "
+                            << transition->destinationRoom << " through edge "
+                            << transition->edge;
+                    log(LogLevel::Info, message.str());
+                }
+            }
+            interactionPending_ = false;
+            playerCommand_.interact = false;
+        }
+    }
 
     const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
         entities_, player_, weapon_, playerRoom);
@@ -531,16 +623,21 @@ void Application::fixedUpdate(const double fixedStep)
     }
     bool terminalUsed = false;
     if (playerCommand_.interact) {
-        const std::array targets{
-            gameplay::InteractionTarget{
-                terminalEntity_,
-                {{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}}},
-        };
-        if (const auto target = player_.findInteraction(targets)) {
-            terminalUsed = *target == terminalEntity_;
-            std::ostringstream message;
-            message << "Player interacted with entity " << target->packed();
-            log(LogLevel::Info, message.str());
+        const entities::Entity* terminal = entities_.find(terminalEntity_);
+        if (terminal != nullptr && terminal->roomId == playerRoom) {
+            const gdp::core::Vec3 position = terminal->transform.position;
+            const std::array targets{
+                gameplay::InteractionTarget{
+                    terminalEntity_,
+                    {{position.x - 0.4F, position.y, position.z - 0.15F},
+                        {position.x + 0.4F, position.y + 2.0F, position.z + 0.15F}}},
+            };
+            if (const auto target = player_.findInteraction(targets)) {
+                terminalUsed = *target == terminalEntity_;
+                std::ostringstream message;
+                message << "Player interacted with entity " << target->packed();
+                log(LogLevel::Info, message.str());
+            }
         }
         interactionPending_ = false;
         playerCommand_.interact = false;
@@ -720,6 +817,7 @@ void Application::render()
         title << " MAX";
     }
     title << " | Score " << progress.score;
+    title << " | Room " << playerRoom;
     const auto activeEvent = std::find_if(
         roomEvents_.begin(), roomEvents_.end(),
         [playerRoom](const gameplay::RoomEventRuntime& runtime) {
@@ -733,6 +831,8 @@ void Application::render()
         }
     }
     gdp::render::RoomLightingRenderData lighting;
+    gdp::render::RoomRenderData roomRender;
+    std::vector<gdp::render::DoorRenderData> visibleDoors;
     if (world_) {
         const auto currentRoom = std::find_if(
             world_->rooms.begin(), world_->rooms.end(),
@@ -740,6 +840,8 @@ void Application::render()
                 return room.id == playerRoom;
             });
         if (currentRoom != world_->rooms.end()) {
+            roomRender.origin = currentRoom->transform.position;
+            roomRender.rotation = currentRoom->rotation;
             const std::size_t roomIndex = static_cast<std::size_t>(
                 std::distance(world_->rooms.begin(), currentRoom));
             if (roomIndex < roomLighting_.size()) {
@@ -747,12 +849,26 @@ void Application::render()
                     && gameplay::isRoomLocked(*activeEvent);
                 lighting = makeRenderLighting(roomLighting_[roomIndex], alert);
             }
+            const bool doorsLocked = activeEvent != roomEvents_.end()
+                && gameplay::isRoomLocked(*activeEvent);
+            for (const world::ConnectorInstance& connector : currentRoom->connectors) {
+                if (!connector.sealed && connector.edge) {
+                    visibleDoors.push_back({
+                        connector.worldPosition,
+                        connector.worldNormal,
+                        connector.width,
+                        connector.height,
+                        doorsLocked,
+                    });
+                }
+            }
         }
     }
     SDL_SetWindowTitle(window_, title.str().c_str());
     if (renderer_ == nullptr
         || !renderer_->render(
-            width, height, camera, visibleEnemies, visiblePickups, visibleProps, lighting)) {
+            width, height, camera, visibleEnemies, visiblePickups, visibleProps,
+            lighting, roomRender, visibleDoors)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         running_ = false;
         return;

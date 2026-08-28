@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -629,7 +630,9 @@ bool Renderer::render(
     const std::span<const EnemyRenderData> enemies,
     const std::span<const PickupRenderData> pickups,
     const std::span<const PropRenderData> props,
-    const RoomLightingRenderData lighting)
+    const RoomLightingRenderData lighting,
+    const RoomRenderData room,
+    const std::span<const DoorRenderData> doors)
 {
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
@@ -720,12 +723,39 @@ bool Renderer::render(
             fallbackTexture_.bind(gl_);
             break;
         }
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(part.position)
-            * gdp::core::scaleMatrix(part.scale);
+        const gdp::core::Vec3 position
+            = room.origin + gdp::core::rotateQuarterTurns(part.position, room.rotation);
+        gdp::core::Vec3 scale = part.scale;
+        if (room.rotation == gdp::core::QuarterTurn::Degrees90
+            || room.rotation == gdp::core::QuarterTurn::Degrees270) {
+            std::swap(scale.x, scale.z);
+        }
+        const gdp::core::Mat4 model = gdp::core::translationMatrix(position)
+            * gdp::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", part.tint);
         shader_.setFloat(gl_, "uUvScale", part.uvScale);
         shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
+        box_.draw(gl_);
+    }
+
+    fallbackTexture_.bind(gl_);
+    for (const DoorRenderData& door : doors) {
+        const bool facesX = std::abs(door.outwardNormal.x) > 0.5F;
+        const gdp::core::Vec3 scale = facesX
+            ? gdp::core::Vec3{0.12F, door.height, door.width}
+            : gdp::core::Vec3{door.width, door.height, 0.12F};
+        const gdp::core::Vec3 position = door.position
+            - (door.outwardNormal * 0.12F)
+            + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
+        const gdp::core::Mat4 model = gdp::core::translationMatrix(position)
+            * gdp::core::scaleMatrix(scale);
+        shader_.setMat4(gl_, "uModel", model);
+        shader_.setVec3(gl_, "uTint", door.locked
+                ? gdp::core::Vec3{0.90F, 0.10F, 0.05F}
+                : gdp::core::Vec3{0.10F, 0.66F, 0.72F});
+        shader_.setFloat(gl_, "uUvScale", 2.0F);
+        shader_.setFloat(gl_, "uEmissiveStrength", door.locked ? 0.65F : 0.28F);
         box_.draw(gl_);
     }
 

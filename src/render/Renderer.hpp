@@ -69,6 +69,19 @@ struct PropRenderData {
     gdp::core::Seed visualSeed{0};
 };
 
+struct RoomRenderData {
+    gdp::core::Vec3 origin{};
+    gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
+};
+
+struct DoorRenderData {
+    gdp::core::Vec3 position{};
+    gdp::core::Vec3 outwardNormal{0.0F, 0.0F, 1.0F};
+    float width{1.2F};
+    float height{2.2F};
+    bool locked{false};
+};
+
 inline constexpr std::size_t maxRenderedRoomLights = 4U;
 
 struct PointLightRenderData {
@@ -120,7 +133,9 @@ public:
         std::span<const EnemyRenderData> enemies = {},
         std::span<const PickupRenderData> pickups = {},
         std::span<const PropRenderData> props = {},
-        RoomLightingRenderData lighting = {});
+        RoomLightingRenderData lighting = {},
+        RoomRenderData room = {},
+        std::span<const DoorRenderData> doors = {});
 
 private:
     struct EnemyGpuVisual {
