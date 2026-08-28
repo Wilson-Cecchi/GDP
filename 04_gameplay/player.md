@@ -3,7 +3,8 @@
 > **Estado:** estado lógico, spawn, vida e interação inicial implementados na
 > Fase 3; binding geracional e sincronização com Entity Manager validados na
 > Fase 6; chaves, coleta automática e upgrade de HP validados na Fase 12.
-> Armadura e eventos entram nas fases correspondentes.
+> Victory/Defeat e restart estão integrados na Fase 13. Armadura permanece
+> planejada.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -55,9 +56,10 @@ sem interromper movimento; Health e Ammo cheios permanecem disponíveis.
 `health <= 0` muda `alive` apenas uma vez, bloqueia combate/movimento e gera `PlayerDied`,
 que conduz ao estado `GameOver`.
 
-Na Fase 3, dano e cura já respeitam clamp, morte idempotente e bloqueio de
-movimento. A emissão de eventos e transição para `GameOver` aguardam o sistema
-de estados.
+Na implementação atual, dano e cura respeitam clamp e morte idempotente.
+`SessionSystem` transforma a primeira morte em `Defeat`, congela todos os
+updates de gameplay e aceita `Enter` para uma nova run determinística. O estado
+terminal não pode ser sobrescrito por eventos posteriores do mesmo frame.
 
 ## Testes
 

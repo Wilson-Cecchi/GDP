@@ -129,6 +129,7 @@ Application::Application(ApplicationConfig config)
     : config_(std::move(config))
     , baseCollisionWorld_(gameplay::CollisionWorld::fixedRoom())
     , collisionWorld_(baseCollisionWorld_)
+    , session_(config_.worldSeed)
 {
 }
 
@@ -139,44 +140,66 @@ Application::~Application()
 
 int Application::run()
 {
-    if (!initialize()) {
-        return 1;
-    }
-
     using Clock = std::chrono::steady_clock;
-    auto previousTime = Clock::now();
-    clock_.reset();
-    running_ = true;
+    bool beginAnotherRun = false;
+    do {
+        restartRequested_ = false;
+        renderedFrames_ = 0U;
+        fixedUpdates_ = 0U;
+        if (!initialize()) {
+            return 1;
+        }
+        auto previousTime = Clock::now();
+        clock_.reset();
+        running_ = true;
 
-    while (running_) {
-        const auto currentTime = Clock::now();
-        const std::chrono::duration<double> elapsed = currentTime - previousTime;
-        previousTime = currentTime;
+        while (running_) {
+            const auto currentTime = Clock::now();
+            const std::chrono::duration<double> elapsed = currentTime - previousTime;
+            previousTime = currentTime;
 
-        const double frameDelta = config_.headless ? clock_.fixedStepSeconds() : elapsed.count();
-        clock_.advanceBy(frameDelta);
+            const double frameDelta = config_.headless
+                ? clock_.fixedStepSeconds() : elapsed.count();
+            clock_.advanceBy(frameDelta);
 
-        input_.beginFrame();
-        processEvents();
-        player_.applyLook(input_.mouseDelta());
+            input_.beginFrame();
+            processEvents();
+            if (!running_) {
+                continue;
+            }
+            if (session_.state().phase == gameplay::SessionPhase::Playing) {
+                player_.applyLook(input_.mouseDelta());
+            }
 
-        while (clock_.consumeFixedStep()) {
-            fixedUpdate(clock_.fixedStepSeconds());
+            while (clock_.consumeFixedStep()) {
+                fixedUpdate(clock_.fixedStepSeconds());
+            }
+
+            render();
+            ++renderedFrames_;
+
+            if (config_.frameLimit && renderedFrames_ >= *config_.frameLimit) {
+                running_ = false;
+            }
         }
 
-        render();
-        ++renderedFrames_;
-
-        if (config_.frameLimit && renderedFrames_ >= *config_.frameLimit) {
-            running_ = false;
+        std::ostringstream summary;
+        summary << "Run " << session_.state().runIndex << " ended as "
+                << gameplay::sessionPhaseName(session_.state().phase)
+                << " after " << renderedFrames_ << " frame(s) and "
+                << fixedUpdates_ << " fixed update(s)";
+        log(LogLevel::Info, summary.str());
+        beginAnotherRun = restartRequested_;
+        shutdown();
+        if (beginAnotherRun) {
+            const auto nextSeed = session_.restart();
+            if (!nextSeed) {
+                log(LogLevel::Error, "Session rejected a requested restart");
+                return 1;
+            }
+            config_.worldSeed = *nextSeed;
         }
-    }
-
-    std::ostringstream summary;
-    summary << "Shutdown after " << renderedFrames_ << " frame(s) and "
-            << fixedUpdates_ << " fixed update(s)";
-    log(LogLevel::Info, summary.str());
-    shutdown();
+    } while (beginAnotherRun);
     return 0;
 }
 
@@ -373,6 +396,18 @@ void Application::processEvents()
         running_ = false;
     }
 
+    if (session_.state().phase != gameplay::SessionPhase::Playing) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+            restartRequested_ = true;
+            running_ = false;
+        }
+        return;
+    }
+
     playerCommand_.moveForward = (input_.isKeyDown(SDL_SCANCODE_W) ? 1.0F : 0.0F)
         - (input_.isKeyDown(SDL_SCANCODE_S) ? 1.0F : 0.0F);
     playerCommand_.moveRight = (input_.isKeyDown(SDL_SCANCODE_D) ? 1.0F : 0.0F)
@@ -386,6 +421,13 @@ void Application::processEvents()
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
+    if (session_.state().phase != gameplay::SessionPhase::Playing) {
+        if (audio_) {
+            audio_->update(step);
+        }
+        ++fixedUpdates_;
+        return;
+    }
     weapon_.fixedUpdate(step);
     entities::Entity* playerEntity = entities_.find(player_.entity());
     std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
@@ -736,6 +778,39 @@ void Application::fixedUpdate(const double fixedStep)
             awardProgress(gameplay::ProgressionEvent::RoomEventCompleted, 1U);
         }
     }
+
+    world::RoomRole currentRoomRole = world::RoomRole::Count;
+    gameplay::BossStatus boss;
+    if (world_) {
+        const auto currentRoom = std::find_if(
+            world_->rooms.begin(), world_->rooms.end(),
+            [playerRoom](const world::RoomInstance& room) {
+                return room.id == playerRoom;
+            });
+        if (currentRoom != world_->rooms.end()) {
+            currentRoomRole = currentRoom->role;
+        }
+    }
+    if (currentRoomRole == world::RoomRole::Boss) {
+        boss = gameplay::bossStatus(entities_, playerRoom);
+    }
+    const gameplay::SessionUpdate sessionUpdate = session_.update(
+        player_.state().alive, currentRoomRole, boss.exists, boss.alive);
+    if (sessionUpdate.changed) {
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+        std::ostringstream message;
+        message << "Session result: "
+                << gameplay::sessionPhaseName(sessionUpdate.phase)
+                << " | run " << session_.state().runIndex
+                << " | seed " << session_.state().currentSeed;
+        log(LogLevel::Info, message.str());
+        if (audio_ && sessionUpdate.phase == gameplay::SessionPhase::Victory) {
+            audio_->play(gdp::audio::AudioEventKind::EventComplete,
+                session_.state().currentSeed, audioEventCounter_++);
+        }
+    }
     if (audio_) {
         audio_->update(step);
     }
@@ -836,7 +911,8 @@ void Application::render()
         });
     }
     std::ostringstream title;
-    title << "GDP | HP " << static_cast<int>(player_.state().health)
+    title << "GDP | Run " << (session_.state().runIndex + 1U)
+          << " | HP " << static_cast<int>(player_.state().health)
           << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
     title << " | Keys " << player_.state().keys;
     const gameplay::ProgressionState& progress = progression_.state();
@@ -849,6 +925,11 @@ void Application::render()
     }
     title << " | Score " << progress.score;
     title << " | Room " << playerRoom;
+    if (session_.state().phase == gameplay::SessionPhase::Victory) {
+        title << " | VICTORY - ENTER: NEW RUN";
+    } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
+        title << " | DEFEAT - ENTER: RETRY";
+    }
     const auto activeEvent = std::find_if(
         roomEvents_.begin(), roomEvents_.end(),
         [playerRoom](const gameplay::RoomEventRuntime& runtime) {
@@ -866,6 +947,7 @@ void Application::render()
     std::vector<gdp::render::DoorRenderData> visibleDoors;
     std::vector<gdp::render::CorridorRenderData> visibleCorridors;
     std::vector<gdp::render::RoomRenderData> connectedRooms;
+    world::RoomRole renderedRoomRole = world::RoomRole::Count;
     if (world_) {
         const auto currentRoom = std::find_if(
             world_->rooms.begin(), world_->rooms.end(),
@@ -873,6 +955,7 @@ void Application::render()
                 return room.id == playerRoom;
             });
         if (currentRoom != world_->rooms.end()) {
+            renderedRoomRole = currentRoom->role;
             roomRender.origin = currentRoom->transform.position;
             roomRender.rotation = currentRoom->rotation;
             const std::size_t roomIndex = static_cast<std::size_t>(
@@ -881,6 +964,15 @@ void Application::render()
                 const bool alert = activeEvent != roomEvents_.end()
                     && gameplay::isRoomLocked(*activeEvent);
                 lighting = makeRenderLighting(roomLighting_[roomIndex], alert);
+            }
+            if (session_.state().phase == gameplay::SessionPhase::Victory) {
+                lighting.ambientColor = {0.35F, 0.82F, 0.72F};
+                lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);
+                lighting.alert = false;
+            } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
+                lighting.ambientColor = {0.52F, 0.06F, 0.04F};
+                lighting.ambientIntensity = 0.14F;
+                lighting.alert = true;
             }
             const bool doorsLocked = activeEvent != roomEvents_.end()
                 && gameplay::isRoomLocked(*activeEvent);
@@ -938,6 +1030,11 @@ void Application::render()
             }
         }
     }
+    if (session_.state().phase == gameplay::SessionPhase::Playing) {
+        title << (renderedRoomRole == world::RoomRole::Boss
+                ? " | OBJECTIVE: DEFEAT BOSS"
+                : " | OBJECTIVE: REACH BOSS");
+    }
     SDL_SetWindowTitle(window_, title.str().c_str());
     if (renderer_ == nullptr
         || !renderer_->render(
@@ -959,7 +1056,16 @@ void Application::shutdown()
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    input_ = Input{};
+    player_ = gameplay::Player{};
+    weapon_ = gameplay::Weapon{};
     progression_ = gameplay::ProgressionSystem{};
+    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
+    collisionWorld_ = baseCollisionWorld_;
+    playerCommand_ = {};
+    interactionPending_ = false;
+    firePending_ = false;
+    reloadPending_ = false;
     audioEventCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();

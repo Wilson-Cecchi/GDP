@@ -58,6 +58,11 @@ mesmo award, resto de XP, telemetria e entradas inválidas. Também exige os nov
 benefícios reais de Player/Weapon no nível 10 e valida o estado após cada
 sequência representativa.
 
+O gate de sessão exige Playing inicial, Boss real e vivo antes de Victory,
+estado terminal idempotente, Defeat por morte e rejeição de restart prematuro.
+Também separa robôs por `roomId`, distingue vivo/morto e gera mundos válidos,
+estruturalmente distintos e reproduzíveis para a seed derivada da segunda run.
+
 O gate de travessia percorre todos os corredores de um mundo representativo nos
 dois sentidos, exige edge/destino corretos, spawn dentro dos bounds, distância e
 orientação válidas. Também cobre preservação de HP/inventário/upgrades,

@@ -3514,10 +3514,13 @@ sala ativa: colisão/material/luz/áudio ✓
 lockdown bloqueia saída ✓
 corredor contínuo: geometria/colisão ✓
 troca automática de sala ✓
+Boss: engagement e Victory ✓
+Player morto: Defeat ✓
+restart com nova seed determinística ✓
 ```
 
-**Próximo marco:** completar o objetivo de sessão até o Boss, com condição de
-vitória e reinício determinístico de uma nova run.
+**Próximo marco:** preservar conteúdo/material/iluminação das duas salas durante
+a passagem pelo corredor e representar objetivo/resultado dentro do viewport.
 
 ---
 

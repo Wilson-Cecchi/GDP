@@ -1,12 +1,21 @@
 # Interface — Menus e configurações
 
-> **Estado:** especificação técnica inicial do novo GDP.
+> **Estado:** menu principal e configurações permanecem especificados; o estado
+> terminal funcional de Victory/Defeat usa o título da janela e `Enter` na Fase
+> 13 enquanto a tela dedicada ainda não existe.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal
 
 Campanha, Speedrun, Ranking, Configurações e Sair.
+
+## Resultado provisório
+
+Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e mostram
+`ENTER: NEW RUN/RETRY` no título. `Enter` reconstrói uma run com seed derivada;
+`Esc` encerra. A futura tela de resultado deve representar o mesmo
+`SessionPhase`, sem duplicar a regra de vitória ou restart na UI.
 
 ## Navegação
 

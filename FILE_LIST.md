@@ -79,6 +79,8 @@
 - `src/gameplay/Enemy.hpp`
 - `src/gameplay/Player.cpp`
 - `src/gameplay/Player.hpp`
+- `src/gameplay/Session.cpp`
+- `src/gameplay/Session.hpp`
 - `src/gameplay/Weapon.cpp`
 - `src/gameplay/Weapon.hpp`
 - `src/main.cpp`
@@ -132,5 +134,6 @@
 - `tests/test_renderer.cpp`
 - `tests/test_renderer_gl.cpp`
 - `tests/test_room_materials.cpp`
+- `tests/test_session.cpp`
 - `tests/test_world.cpp`
 - `visual/reference_sheet_rooms_enemies.png`

@@ -58,11 +58,11 @@ especializados das pastas numeradas.
   IndustrialRobot possuem geração procedural, renderer e combate funcional.
 - **Fase 12 — Procedural avançado:** implementada e validada; loot, props,
   eventos de sala, iluminação, áudio e progressão estão integrados.
-- **Fase 13 — Vertical slice navegável:** segundo incremento implementado;
-  portas e corredores Straight/L/Z conectam fisicamente as salas geradas, com
-  caminhada contínua, troca automática de sala e lockdown sólido.
-- **Próxima atualização:** fechar o objetivo de sessão com progressão até a
-  sala Boss, condição de vitória e reinício de uma nova run.
+- **Fase 13 — Vertical slice navegável:** concluída; portas e corredores
+  Straight/L/Z conectam as salas, o IndustrialRobot encerra a run em Victory,
+  morte encerra em Defeat e `Enter` inicia um novo mundo determinístico.
+- **Próxima atualização:** manter conteúdo e apresentação multissala durante a
+  passagem pelos corredores e levar objetivo/resultado para dentro do viewport.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -71,21 +71,24 @@ domínio, geração versionada de seeds e tipos matemáticos básicos. Quando SD
 não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
-O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e rotação reais, com
-cubo indexado reutilizado, materiais procedurais de parede/piso/teto derivados
-da seed da sala, aberturas e molduras ciano nas portas, painéis vermelhos durante
-lockdown e corredores com piso, teto e paredes,
+O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e
+rotação reais, com cubo indexado reutilizado e materiais procedurais de
+parede/piso/teto derivados da seed da sala, aberturas e molduras ciano nas
+portas, painéis vermelhos durante lockdown, corredores com piso, teto e paredes,
 até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
-câmera em perspectiva e
-retícula. Parede com grandes placas e rodapé amarelo/preto, piso de placas com
+câmera em perspectiva e retícula. Parede com grandes placas e rodapé
+amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, caminha pelas portas ou usa `E` como atalho compatível, interage
 com o terminal usando `E`, dispara com o botão esquerdo
-e recarrega com `R`. Pickups próximos são coletados automaticamente; HP,
-munição e chaves aparecem no título da janela. `Esc` encerra a
+e recarrega com `R`. Pickups próximos são coletados automaticamente; run,
+objetivo, HP, munição e chaves aparecem no título da janela. `Esc` encerra a
 aplicação enquanto o sistema de menus ainda não existe.
+
+Em Victory ou Defeat, a simulação congela, o título mostra o resultado e
+`Enter` inicia uma nova run; `Esc` continua encerrando o jogo.
 
 Na inicialização, uma seed gera um mundo navegável validado com START, BOSS,
 branches, loop controlado, salas e corredores. Cada sala recebe IDs de entidades
@@ -185,6 +188,13 @@ cilíndrico atravessar retas e curvas sem teleporte. Entrar nos bounds da sala
 oposta troca automaticamente `roomId`, conteúdo, materiais, iluminação e
 ambiência; durante lockdown, somente o volume da sala atual permanece navegável.
 
+O terceiro incremento conclui o vertical slice funcional. `SessionSystem`
+mantém `Playing`, `Victory` e `Defeat`: entrar na Boss registra o
+IndustrialRobot vivo e somente sua morte concede vitória. A morte do jogador
+concede derrota; estados terminais congelam gameplay. `Enter` desmonta os
+sistemas da run e gera outro mundo a partir de uma seed derivada do valor
+inicial e do índice da run, reproduzível em execuções diferentes.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -215,7 +225,7 @@ ctest --preset debug
 
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
-Gameplay, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
+Gameplay, Session, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
 Combat, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:

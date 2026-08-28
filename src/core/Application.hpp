@@ -5,6 +5,7 @@
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/RoomEvents.hpp"
+#include "gameplay/Session.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/Progression.hpp"
@@ -64,6 +65,7 @@ private:
     gameplay::Player player_;
     gameplay::Weapon weapon_;
     gameplay::ProgressionSystem progression_;
+    gameplay::SessionSystem session_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
@@ -79,6 +81,7 @@ private:
     SDL_GLContextState* glContext_{nullptr};
     bool sdlInitialized_{false};
     bool running_{false};
+    bool restartRequested_{false};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
     std::uint64_t audioEventCounter_{0};

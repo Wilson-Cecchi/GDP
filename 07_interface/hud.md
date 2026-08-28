@@ -1,6 +1,9 @@
 # Interface — HUD
 
-> **Estado:** especificação técnica inicial do novo GDP.
+> **Estado:** HUD completo permanece especificado; HP, munição, chaves,
+> progressão, sala, evento, objetivo e resultado de sessão aparecem
+> provisoriamente no título da janela. O objetivo alterna entre `REACH BOSS` e
+> `DEFEAT BOSS`.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

@@ -118,6 +118,7 @@ add_library(
     src/gameplay/Props.cpp
     src/gameplay/RoomEvents.cpp
     src/gameplay/RoomTraversal.cpp
+    src/gameplay/Session.cpp
     src/gameplay/Weapon.cpp
 )
 
@@ -249,6 +250,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME progression_systems COMMAND gdp_progression_tests)
     set_tests_properties(progression_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_session_tests tests/test_session.cpp)
+    target_link_libraries(gdp_session_tests PRIVATE gdp_gameplay gdp_world)
+    gdp_enable_warnings(gdp_session_tests)
+    gdp_enable_sanitizers(gdp_session_tests)
+
+    add_test(NAME session_systems COMMAND gdp_session_tests)
+    set_tests_properties(session_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_room_traversal_tests tests/test_room_traversal.cpp)
     target_link_libraries(gdp_room_traversal_tests PRIVATE gdp_gameplay gdp_world)

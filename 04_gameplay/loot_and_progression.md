@@ -1,8 +1,9 @@
 # Gameplay — Loot, progressão e modos
 
 > **Estado:** loot procedural, coleta automática e progressão de sessão até o
-> nível 10 implementados e validados na Fase 12. Armor, Weapon pickup, Special
-> e persistência entre execuções permanecem planejados.
+> nível 10 implementados na Fase 12; Victory, Defeat e nova run determinística
+> implementados na Fase 13. Armor, Weapon pickup, Special e persistência entre
+> execuções permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -71,8 +72,21 @@ sala, jogador morto, remoção e ciclo de vida do Entity Manager.
 
 ## Andar
 
-Primeiro fluxo oficial pode ser: alcançar a sala Boss → derrotar Boss → `FloorComplete`.
+O primeiro fluxo oficial é: alcançar a sala Boss → registrar o
+IndustrialRobot vivo → derrotá-lo → `Victory`. Uma Boss sem entidade válida não
+conclui a run. Morte do jogador produz `Defeat`; ambos os resultados congelam
+Player, inimigos, armas, interações e eventos.
 Segredos são opcionais e nunca bloqueiam o caminho principal.
+
+`SessionSystem` é independente do loop visual. Ele recebe vida do jogador,
+papel da sala e status do Boss, mantém um estado terminal idempotente e expõe a
+seed da run. `Enter` só reinicia após Victory/Defeat. O índice começa em zero;
+a primeira run preserva a seed fornecida e as seguintes usam
+`deriveSeed(initialSeed, SeedDomain::World, runIndex)`. O restart limpa mundo,
+entidades, Player, Weapon, progressão, eventos, iluminação, áudio e renderer
+antes de inicializar a nova seed.
+Enquanto Playing, o título indica `REACH BOSS` ou `DEFEAT BOSS` conforme a sala
+ativa; o índice mostrado ao jogador começa em um.
 
 ## Campanha
 

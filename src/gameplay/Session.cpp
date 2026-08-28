@@ -1,0 +1,96 @@
+#include "gameplay/Session.hpp"
+
+namespace gdp::gameplay {
+
+SessionSystem::SessionSystem(const gdp::core::Seed initialSeed) noexcept
+    : state_{SessionPhase::Playing, initialSeed, initialSeed, 0U, false}
+{
+}
+
+SessionUpdate SessionSystem::update(
+    const bool playerAlive,
+    const gdp::world::RoomRole currentRoomRole,
+    const bool bossExists,
+    const bool bossAlive) noexcept
+{
+    SessionUpdate update{state_.phase, state_.phase, false};
+    if (state_.phase != SessionPhase::Playing) {
+        return update;
+    }
+    if (!playerAlive) {
+        state_.phase = SessionPhase::Defeat;
+    } else if (currentRoomRole == gdp::world::RoomRole::Boss && bossExists) {
+        state_.bossEngaged = state_.bossEngaged || bossAlive;
+        if (state_.bossEngaged && !bossAlive) {
+            state_.phase = SessionPhase::Victory;
+        }
+    }
+    update.phase = state_.phase;
+    update.changed = update.phase != update.previousPhase;
+    return update;
+}
+
+std::optional<gdp::core::Seed> SessionSystem::restart() noexcept
+{
+    if (state_.phase == SessionPhase::Playing) {
+        return std::nullopt;
+    }
+    ++state_.runIndex;
+    state_.currentSeed = seedForRun(state_.initialSeed, state_.runIndex);
+    state_.phase = SessionPhase::Playing;
+    state_.bossEngaged = false;
+    return state_.currentSeed;
+}
+
+const SessionState& SessionSystem::state() const noexcept
+{
+    return state_;
+}
+
+gdp::core::Seed seedForRun(
+    const gdp::core::Seed initialSeed,
+    const std::uint32_t runIndex) noexcept
+{
+    if (runIndex == 0U) {
+        return initialSeed;
+    }
+    return gdp::core::deriveSeed(
+        initialSeed, gdp::core::SeedDomain::World, runIndex);
+}
+
+const char* sessionPhaseName(const SessionPhase phase) noexcept
+{
+    switch (phase) {
+    case SessionPhase::Playing:
+        return "Playing";
+    case SessionPhase::Victory:
+        return "Victory";
+    case SessionPhase::Defeat:
+        return "Defeat";
+    }
+    return "Unknown";
+}
+
+BossStatus bossStatus(
+    const gdp::entities::EntityManager& entities,
+    const gdp::world::RoomId roomId) noexcept
+{
+    BossStatus status;
+    for (const gdp::entities::EntityId id
+        : entities.query(gdp::entities::EntityKind::Enemy)) {
+        const gdp::entities::Entity* entity = entities.find(id);
+        const gdp::entities::EnemyData* enemy
+            = entities.findData<gdp::entities::EnemyData>(id);
+        if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
+            || enemy->archetype
+                != gdp::entities::EnemyArchetype::IndustrialRobot) {
+            continue;
+        }
+        status.exists = true;
+        status.alive = status.alive
+            || enemy->behavior != gdp::entities::EnemyBehaviorState::Dead;
+    }
+    return status;
+}
+
+} // namespace gdp::gameplay
