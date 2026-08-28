@@ -33,6 +33,13 @@ limite mínimo de ambiente. O hash dourado `0x2D7AF8E8762A807F` protege o
 contrato; seeds padrão/12345 validam todas as salas sem alterar o fingerprint
 estrutural. O OpenGL compara pixels de luz padrão, procedural e alerta.
 
+O gate de áudio percorre 1.000 combinações de seed/kind/counter, exige hashes
+únicos e cobre todas as doze categorias e os sete perfis ambientes. O hash
+dourado `0xEAD1C1A48BF9FF7F` protege a receita; waveform, envelope, duração,
+clipping, cache, 16 vozes, pan, distância, loop, dispositivo dummy e fallback
+sem device são regressões dedicadas. A substream `Audio` não participa do
+fingerprint estrutural.
+
 ## Enemy metrics
 
 Role, BodyProfile, part IDs, fallback count, materials e unique VisualGenomeHash.

@@ -18,6 +18,10 @@
 struct SDL_Window;
 struct SDL_GLContextState;
 
+namespace gdp::audio {
+class AudioSystem;
+}
+
 namespace gdp::render {
 class Renderer;
 }
@@ -67,6 +71,7 @@ private:
     std::optional<world::World> world_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
+    std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<gdp::render::Renderer> renderer_;
     SDL_Window* window_{nullptr};
     SDL_GLContextState* glContext_{nullptr};
@@ -74,6 +79,7 @@ private:
     bool running_{false};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
+    std::uint64_t audioEventCounter_{0};
 };
 
 } // namespace gdp::core

@@ -48,6 +48,11 @@ papéis/temas, bounds, ambiente legível, pontos e luminárias. As seeds crític
 validam todas as salas e preservam o fingerprint estrutural. A regressão OpenGL
 confirma múltiplas luzes e a mudança temporária para alerta de lockdown.
 
+O gate de áudio gera 1.000 receitas com hashes únicos e sintetiza as doze
+categorias sem samples inválidos ou clipping. Testes do mixer silencioso cobrem
+cache, voice budget, descarte, loop, pan e distância; integrações SDL usam
+driver dummy para saída e driver inexistente para provar fallback não fatal.
+
 O gate de assets gera 1.000 recipes visuais, valida pixels e regras materiais,
 exercita reuse do cache e mantém o fingerprint estrutural do World separado. O
 gate do Worker gera outras 1.000 seeds, valida montagem/mesh/albedo/hash e exige

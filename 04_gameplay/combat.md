@@ -64,6 +64,12 @@ desacoplada `WeaponFired`, `EntityHit`, `EntityDamaged`, `EntityKilled` e
 eventos de sala é independente dessa futura fila: ele consome estado de
 encontro e produz ondas, lockdown e recompensa determinísticos.
 
+Enquanto a fila genérica permanece planejada, `Application` traduz resultados
+já consolidados em cues procedurais: tiro/arma vazia, recarga, hit/morte,
+impacto/destruição de prop, impacto no mundo, coleta, dano recebido e
+ativação/conclusão de evento. Cues espaciais usam o ponto do hitscan; nenhum som
+altera resultado, RNG estrutural ou ordem de combate.
+
 ## Testes
 
 Implementados: sem munição, cooldown, recarga, parede bloqueia, filtro por sala,

@@ -3390,7 +3390,7 @@ Security ✓
 Central Hub ✓
 ```
 
-Fases 10 e 11 concluídas; a Fase 12 possui loot, props, eventos e iluminação procedurais funcionais.
+Fases 10 e 11 concluídas; a Fase 12 possui loot, props, eventos, iluminação e áudio procedurais funcionais.
 
 ---
 
@@ -3422,8 +3422,8 @@ loot ✓
 props ✓
 events ✓
 lighting ✓
-audio → próximo
-progression
+audio ✓
+progression → próximo
 ```
 
 ---

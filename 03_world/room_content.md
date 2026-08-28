@@ -28,7 +28,7 @@ ROOM GEOMETRY
 
 ## Streams
 
-EnemySpawn, Loot, Props, Lighting e Events independentes.
+EnemySpawn, Loot, Props, Lighting, Events e Audio independentes.
 
 ## Reservas
 

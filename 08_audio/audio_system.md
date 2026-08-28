@@ -1,6 +1,7 @@
 # Audio — Sistema e procedural
 
-> **Estado:** especificação técnica inicial do novo GDP.
+> **Estado:** síntese procedural, mixer estéreo, ambiência por tema, integração
+> de gameplay e fallback silencioso implementados na Fase 12.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -10,28 +11,52 @@
 Gameplay Event → AudioEvent → AudioSystem → voice → spatialization → output
 ```
 
-## Categorias
+## Categorias implementadas
 
-WeaponFire, Impact, Footstep, Door, EnemyAttack, EnemyHit, EnemyDeath, Ambient e UI.
+`WeaponFire`, `DryFire`, `Reload`, `EnemyHit`, `EnemyDeath`, `PropImpact`,
+`PropDestroyed`, `Pickup`, `EventStart`, `EventComplete`, `PlayerHurt` e
+`Ambient`. Footstep, Door e UI dedicada permanecem planejados.
 
-## Buses
+## Mixer e buses
 
-Master, Effects, Ambient e UI.
+`AudioSystem` mistura até 16 vozes em estéreo float de 48 kHz. Master, Effects
+e Ambient possuem volumes independentes; UI permanece planejado. A mixagem
+limita a saída a `[-1, 1]`, descarta one-shots concluídos e reutiliza clips pelo
+hash integral da receita.
 
 ## Variação procedural
 
-`AudioSeed` é independente. Variantes podem combinar pitch, duração, envelope, filtro e
-layers, mas precisam preservar reconhecimento funcional do som.
+`generateAudioRecipe()` usa somente `SeedDomain::Audio` e combina pitch,
+duração, envelope, ruído, pulso e ganho. `synthesizeAudioClip()` produz a onda
+em memória: nenhum WAV externo é necessário. A mesma seed/kind/counter
+reproduz receita e samples bit a bit.
 
 ## Entidades
 
-Escolha de variante pode usar `entityAudioSeed + eventCounter`, sem consumir RNG estrutural.
+Eventos usam `sourceSeed + kind + eventCounter`, sem consumir RNG estrutural.
+`playAt()` calcula atenuação por distância e pan equal-power a partir da posição
+do listener. Disparo, impacto e destruição usam localização; recarga, coleta,
+dano recebido e estados de evento usam o centro estéreo.
 
 ## Ambiência
 
-Cada RoomTheme fornece base loop + máquinas locais + eventos raros. Eventos raros usam budget
-temporal, nunca chance por frame.
+Os sete `RoomTheme` fornecem fundações distintas de frequência, modulação e
+ruído para um loop ambiente. A START seleciona seu perfil na inicialização.
+Máquinas locais e eventos ambientes raros permanecem planejados e deverão usar
+budget temporal, nunca chance por frame.
+
+## SDL e headless
+
+O jogo abre um `SDL_AudioStream` estéreo e alimenta blocos pelo fixed update.
+Se o subsistema, dispositivo ou stream falhar, registra warning e continua em
+modo silencioso. Headless executa síntese, vozes e mixer sem abrir dispositivo,
+preservando cobertura determinística. O shutdown destrói o stream antes de
+encerrar SDL.
 
 ## Testes
 
-Device ausente; clipping; voice limit; pause; mesma seed/event; transições entre salas.
+O gate cobre 1.000 receitas/hash únicos, todas as doze categorias, sete perfis
+ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
+cache, limite de vozes, ciclo de one-shot/loop, pan, distância, dispositivo
+dummy e dispositivo ausente. Pause e transições físicas entre salas permanecem
+planejados.

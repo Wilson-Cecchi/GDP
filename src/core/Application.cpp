@@ -1,5 +1,6 @@
 #include "core/Application.hpp"
 
+#include "audio/AudioSystem.hpp"
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
@@ -178,6 +179,15 @@ bool Application::initialize()
     }
     sdlInitialized_ = true;
 
+    const auto startRoom = std::find_if(
+        world_->rooms.begin(), world_->rooms.end(),
+        [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
+    audio_ = std::make_unique<gdp::audio::AudioSystem>();
+    (void)audio_->initialize(!config_.headless);
+    if (startRoom != world_->rooms.end()) {
+        audio_->setAmbience(startRoom->seed, static_cast<std::uint64_t>(startRoom->theme));
+    }
+
     if (config_.headless) {
         log(LogLevel::Info, "GDP initialized in headless mode with a validated world");
         return true;
@@ -229,9 +239,6 @@ bool Application::initialize()
         log(LogLevel::Error, "Renderer initialization failed");
         return false;
     }
-    const auto startRoom = std::find_if(
-        world_->rooms.begin(), world_->rooms.end(),
-        [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
     bool roomMaterialsPrepared = false;
     if (startRoom != world_->rooms.end()) {
         if (startRoom->theme == world::RoomTheme::Storage) {
@@ -341,6 +348,10 @@ void Application::fixedUpdate(const double fixedStep)
                 << " | ammo +" << loot.ammoAdded
                 << " | keys +" << loot.keysAdded;
         log(LogLevel::Info, message.str());
+        if (audio_) {
+            audio_->play(gdp::audio::AudioEventKind::Pickup,
+                config_.worldSeed, audioEventCounter_++);
+        }
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
@@ -348,6 +359,10 @@ void Application::fixedUpdate(const double fixedStep)
             message << "Weapon reloaded: " << weapon_.magazineAmmo() << '/'
                     << weapon_.reserveAmmo();
             log(LogLevel::Info, message.str());
+            if (audio_) {
+                audio_->play(gdp::audio::AudioEventKind::Reload,
+                    config_.worldSeed, audioEventCounter_++);
+            }
         }
     }
     reloadPending_ = false;
@@ -359,6 +374,15 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_);
+        if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown) {
+            const gdp::audio::AudioEventKind fireKind
+                = shot.outcome == gameplay::ShotOutcome::Empty
+                ? gdp::audio::AudioEventKind::DryFire
+                : gdp::audio::AudioEventKind::WeaponFire;
+            audio_->playAt(fireKind, config_.worldSeed, audioEventCounter_++,
+                player_.cameraPosition(), player_.cameraPosition(),
+                player_.forwardDirection());
+        }
         if (shot.spawnedItem.isValid() && world_) {
             const auto room = std::find_if(
                 world_->rooms.begin(), world_->rooms.end(),
@@ -372,6 +396,30 @@ void Application::fixedUpdate(const double fixedStep)
         if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
+        }
+        if (audio_ && shot.hit) {
+            std::optional<gdp::audio::AudioEventKind> impactKind;
+            if (shot.outcome == gameplay::ShotOutcome::Hit) {
+                const entities::Entity* target = entities_.find(shot.hit->target);
+                impactKind = target != nullptr && target->kind == entities::EntityKind::Prop
+                    ? gdp::audio::AudioEventKind::PropImpact
+                    : gdp::audio::AudioEventKind::EnemyHit;
+            } else if (shot.outcome == gameplay::ShotOutcome::Killed) {
+                impactKind = gdp::audio::AudioEventKind::EnemyDeath;
+            } else if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
+                impactKind = gdp::audio::AudioEventKind::PropDestroyed;
+            } else if (shot.outcome == gameplay::ShotOutcome::ImpactProp) {
+                impactKind = gdp::audio::AudioEventKind::PropImpact;
+            }
+            if (impactKind) {
+                audio_->playAt(*impactKind, config_.worldSeed, audioEventCounter_++,
+                    shot.hit->point, player_.cameraPosition(), player_.forwardDirection());
+            }
+        } else if (audio_ && shot.outcome == gameplay::ShotOutcome::ImpactWorld) {
+            audio_->playAt(gdp::audio::AudioEventKind::PropImpact,
+                config_.worldSeed, audioEventCounter_++,
+                player_.cameraPosition() + (player_.forwardDirection() * 4.0F),
+                player_.cameraPosition(), player_.forwardDirection());
         }
         std::ostringstream message;
         if (shot.outcome == gameplay::ShotOutcome::Hit
@@ -393,16 +441,22 @@ void Application::fixedUpdate(const double fixedStep)
     firePending_ = false;
 
     const bool playerWasAlive = player_.state().alive;
-    (void)gameplay::updateWorkers(
+    const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
         entities_, player_, playerRoom, collisionWorld_, step);
-    (void)gameplay::updateGuards(
+    const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
         entities_, player_, playerRoom, collisionWorld_, step);
-    (void)gameplay::updateOfficers(
+    const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
         entities_, player_, playerRoom, collisionWorld_, step);
-    (void)gameplay::updateEngineers(
+    const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
         entities_, player_, playerRoom, collisionWorld_, step);
-    (void)gameplay::updateIndustrialRobots(
+    const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
         entities_, player_, playerRoom, collisionWorld_, step);
+    const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
+        + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
+    if (audio_ && attacksLanded > 0U) {
+        audio_->play(gdp::audio::AudioEventKind::PlayerHurt,
+            config_.worldSeed, audioEventCounter_++);
+    }
     if (playerWasAlive && !player_.state().alive) {
         log(LogLevel::Info, "Player died");
     }
@@ -469,6 +523,10 @@ void Application::fixedUpdate(const double fixedStep)
             message << "Room event activated: "
                     << gameplay::roomEventTypeName(activeEvent->plan.type);
             log(LogLevel::Info, message.str());
+            if (audio_) {
+                audio_->play(gdp::audio::AudioEventKind::EventStart,
+                    activeEvent->plan.seed, audioEventCounter_++);
+            }
         }
         if (event.wavesSpawned > 0U) {
             std::ostringstream message;
@@ -483,7 +541,14 @@ void Application::fixedUpdate(const double fixedStep)
                     << gameplay::roomEventTypeName(activeEvent->plan.type)
                     << " | rewards " << event.rewardsSpawned;
             log(LogLevel::Info, message.str());
+            if (audio_) {
+                audio_->play(gdp::audio::AudioEventKind::EventComplete,
+                    activeEvent->plan.seed, audioEventCounter_++);
+            }
         }
+    }
+    if (audio_) {
+        audio_->update(step);
     }
     ++fixedUpdates_;
 }
@@ -630,9 +695,11 @@ void Application::shutdown()
     running_ = false;
 
     renderer_.reset();
+    audio_.reset();
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    audioEventCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
 

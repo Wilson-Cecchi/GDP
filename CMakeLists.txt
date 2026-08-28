@@ -94,6 +94,19 @@ gdp_enable_warnings(gdp_entities)
 gdp_enable_sanitizers(gdp_entities)
 
 add_library(
+    gdp_audio
+    STATIC
+    src/audio/AudioSystem.cpp
+    src/audio/ProceduralAudio.cpp
+)
+
+target_compile_features(gdp_audio PUBLIC cxx_std_20)
+target_include_directories(gdp_audio PUBLIC src)
+target_link_libraries(gdp_audio PUBLIC gdp_core SDL3::SDL3)
+gdp_enable_warnings(gdp_audio)
+gdp_enable_sanitizers(gdp_audio)
+
+add_library(
     gdp_gameplay
     STATIC
     src/gameplay/Collision.cpp
@@ -164,7 +177,7 @@ add_executable(
     src/core/Application.cpp
 )
 
-target_link_libraries(gdp PRIVATE gdp_core gdp_entities gdp_gameplay gdp_renderer gdp_world)
+target_link_libraries(gdp PRIVATE gdp_audio gdp_core gdp_entities gdp_gameplay gdp_renderer gdp_world)
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
 
@@ -178,6 +191,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME core_systems COMMAND gdp_core_tests)
     set_tests_properties(core_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_audio_tests tests/test_audio.cpp)
+    target_link_libraries(gdp_audio_tests PRIVATE gdp_audio)
+    gdp_enable_warnings(gdp_audio_tests)
+    gdp_enable_sanitizers(gdp_audio_tests)
+
+    add_test(NAME procedural_audio_systems COMMAND gdp_audio_tests)
+    set_tests_properties(procedural_audio_systems PROPERTIES TIMEOUT 15)
 
     add_executable(gdp_renderer_tests tests/test_renderer.cpp)
     target_link_libraries(gdp_renderer_tests PRIVATE gdp_renderer)
@@ -310,7 +331,17 @@ if(GDP_BUILD_TESTS)
         set_tests_properties(
             bootstrap_opengl_offscreen
             PROPERTIES
-                ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+                ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy"
+                PASS_REGULAR_EXPRESSION "Procedural audio initialized at 48 kHz stereo"
+                TIMEOUT 10
+        )
+
+        add_test(NAME bootstrap_audio_device_fallback COMMAND gdp --frames 2)
+        set_tests_properties(
+            bootstrap_audio_device_fallback
+            PROPERTIES
+                ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=gdp_missing"
+                PASS_REGULAR_EXPRESSION "continuing silently"
                 TIMEOUT 10
         )
     endif()
