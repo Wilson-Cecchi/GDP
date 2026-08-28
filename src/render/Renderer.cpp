@@ -13,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -115,25 +116,67 @@ using Glyph = std::array<std::uint8_t, 7U>;
 constexpr Glyph glyphFor(const char character) noexcept
 {
     switch (character) {
+    case '0': return {0x0EU, 0x11U, 0x13U, 0x15U, 0x19U, 0x11U, 0x0EU};
+    case '1': return {0x04U, 0x0CU, 0x04U, 0x04U, 0x04U, 0x04U, 0x0EU};
+    case '2': return {0x0EU, 0x11U, 0x01U, 0x02U, 0x04U, 0x08U, 0x1FU};
+    case '3': return {0x1EU, 0x01U, 0x01U, 0x0EU, 0x01U, 0x01U, 0x1EU};
+    case '4': return {0x02U, 0x06U, 0x0AU, 0x12U, 0x1FU, 0x02U, 0x02U};
+    case '5': return {0x1FU, 0x10U, 0x10U, 0x1EU, 0x01U, 0x01U, 0x1EU};
+    case '6': return {0x0EU, 0x10U, 0x10U, 0x1EU, 0x11U, 0x11U, 0x0EU};
+    case '7': return {0x1FU, 0x01U, 0x02U, 0x04U, 0x08U, 0x08U, 0x08U};
+    case '8': return {0x0EU, 0x11U, 0x11U, 0x0EU, 0x11U, 0x11U, 0x0EU};
+    case '9': return {0x0EU, 0x11U, 0x11U, 0x0FU, 0x01U, 0x01U, 0x0EU};
     case 'A': return {0x0EU, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
     case 'B': return {0x1EU, 0x11U, 0x11U, 0x1EU, 0x11U, 0x11U, 0x1EU};
     case 'C': return {0x0FU, 0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x0FU};
     case 'D': return {0x1EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x1EU};
     case 'E': return {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x1FU};
     case 'F': return {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x10U};
+    case 'G': return {0x0FU, 0x10U, 0x10U, 0x17U, 0x11U, 0x11U, 0x0FU};
     case 'H': return {0x11U, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
     case 'I': return {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x1FU};
+    case 'J': return {0x07U, 0x02U, 0x02U, 0x02U, 0x12U, 0x12U, 0x0CU};
+    case 'K': return {0x11U, 0x12U, 0x14U, 0x18U, 0x14U, 0x12U, 0x11U};
+    case 'L': return {0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x1FU};
+    case 'M': return {0x11U, 0x1BU, 0x15U, 0x15U, 0x11U, 0x11U, 0x11U};
     case 'N': return {0x11U, 0x19U, 0x19U, 0x15U, 0x13U, 0x13U, 0x11U};
     case 'O': return {0x0EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case 'P': return {0x1EU, 0x11U, 0x11U, 0x1EU, 0x10U, 0x10U, 0x10U};
+    case 'Q': return {0x0EU, 0x11U, 0x11U, 0x11U, 0x15U, 0x12U, 0x0DU};
     case 'R': return {0x1EU, 0x11U, 0x11U, 0x1EU, 0x14U, 0x12U, 0x11U};
     case 'S': return {0x0FU, 0x10U, 0x10U, 0x0EU, 0x01U, 0x01U, 0x1EU};
     case 'T': return {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U};
     case 'U': return {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
     case 'V': return {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0AU, 0x04U};
     case 'W': return {0x11U, 0x11U, 0x11U, 0x15U, 0x15U, 0x15U, 0x0AU};
+    case 'X': return {0x11U, 0x11U, 0x0AU, 0x04U, 0x0AU, 0x11U, 0x11U};
     case 'Y': return {0x11U, 0x11U, 0x0AU, 0x04U, 0x04U, 0x04U, 0x04U};
+    case 'Z': return {0x1FU, 0x01U, 0x02U, 0x04U, 0x08U, 0x10U, 0x1FU};
+    case '-': return {0x00U, 0x00U, 0x00U, 0x0EU, 0x00U, 0x00U, 0x00U};
+    case '/': return {0x01U, 0x02U, 0x02U, 0x04U, 0x08U, 0x08U, 0x10U};
+    case ':': return {0x00U, 0x04U, 0x04U, 0x00U, 0x04U, 0x04U, 0x00U};
     default: return {};
     }
+}
+
+int bitmapTextWidth(const std::string_view text, const int scale) noexcept
+{
+    return static_cast<int>(text.size()) * 6 * scale;
+}
+
+void drawSolidRect(
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const gdp::core::Vec3 color)
+{
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    glClearColor(color.x, color.y, color.z, 1.0F);
+    glScissor(x, y, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void drawBitmapText(
@@ -1113,7 +1156,154 @@ bool Renderer::render(
     framebuffer_.presentToDefault(gl_, width, height);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
-    constexpr int hudScale = 2;
+    const int hudScale = width >= 640 && height >= 360 ? 2 : 1;
+    const int hudMargin = 6 * hudScale;
+    const int hudPadding = 4 * hudScale;
+    const int hudLineHeight = 9 * hudScale;
+    const gdp::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
+    const gdp::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
+    const gdp::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
+
+    if (hud.visible) {
+        const int health = static_cast<int>(std::round(std::max(hud.health, 0.0F)));
+        const int maximumHealth = static_cast<int>(std::round(
+            std::max(hud.maximumHealth, 1.0F)));
+        std::ostringstream healthStream;
+        healthStream << "HP " << health << '/' << maximumHealth;
+        std::ostringstream ammoStream;
+        ammoStream << "AMMO " << hud.magazineAmmo << '/' << hud.reserveAmmo;
+        std::ostringstream keysStream;
+        keysStream << "KEYS " << hud.keys;
+        const std::string healthText = healthStream.str();
+        const std::string ammoText = ammoStream.str();
+        const std::string keysText = keysStream.str();
+        const int statusTextWidth = std::max({
+            bitmapTextWidth(healthText, hudScale),
+            bitmapTextWidth(ammoText, hudScale),
+            bitmapTextWidth(keysText, hudScale),
+        });
+        const int statusWidth = statusTextWidth + (hudPadding * 2);
+        const int statusHeight = (hudPadding * 2) + (hudLineHeight * 3)
+            + (4 * hudScale);
+        const int statusX = hudMargin;
+        const int statusY = hudMargin;
+        drawSolidRect(statusX, statusY, statusWidth, statusHeight, panelColor);
+        drawSolidRect(statusX, statusY, 2 * hudScale, statusHeight, cyanColor);
+        const int statusTextX = statusX + hudPadding;
+        const int healthTextY = statusY + statusHeight - hudPadding - (7 * hudScale);
+        const float healthRatio = std::clamp(
+            std::max(hud.health, 0.0F) / std::max(hud.maximumHealth, 1.0F),
+            0.0F, 1.0F);
+        const int barWidth = statusWidth - (hudPadding * 2);
+        const int healthBarY = healthTextY - (5 * hudScale);
+        drawBitmapText(statusTextX, healthTextY, hudScale, healthText,
+            healthRatio <= 0.25F
+                ? gdp::core::Vec3{0.98F, 0.20F, 0.12F} : textColor);
+        drawSolidRect(statusTextX, healthBarY, barWidth, 3 * hudScale,
+            {0.10F, 0.14F, 0.15F});
+        drawSolidRect(statusTextX, healthBarY,
+            static_cast<int>(static_cast<float>(barWidth) * healthRatio),
+            3 * hudScale,
+            healthRatio <= 0.25F
+                ? gdp::core::Vec3{0.94F, 0.16F, 0.10F}
+                : gdp::core::Vec3{0.24F, 0.88F, 0.52F});
+        drawBitmapText(statusTextX, healthTextY - hudLineHeight,
+            hudScale, ammoText,
+            hud.magazineAmmo == 0U
+                ? gdp::core::Vec3{0.98F, 0.42F, 0.14F} : textColor);
+        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 2),
+            hudScale, keysText, cyanColor);
+
+        std::ostringstream levelStream;
+        levelStream << "LV " << hud.level;
+        std::ostringstream experienceStream;
+        experienceStream << "XP " << hud.experience;
+        if (hud.experienceForNextLevel > 0U) {
+            experienceStream << '/' << hud.experienceForNextLevel;
+        } else {
+            experienceStream << " MAX";
+        }
+        const std::string levelText = levelStream.str();
+        const std::string experienceText = experienceStream.str();
+        const int progressWidth = std::max(
+            bitmapTextWidth(levelText, hudScale),
+            bitmapTextWidth(experienceText, hudScale)) + (hudPadding * 2);
+        const int progressHeight = (hudPadding * 2) + (hudLineHeight * 2)
+            + (4 * hudScale);
+        const int progressX = std::max(hudMargin, width - hudMargin - progressWidth);
+        const int progressY = hudMargin;
+        drawSolidRect(progressX, progressY, progressWidth, progressHeight, panelColor);
+        drawSolidRect(progressX + progressWidth - (2 * hudScale), progressY,
+            2 * hudScale, progressHeight, cyanColor);
+        const int progressTextX = progressX + hudPadding;
+        const int levelTextY = progressY + progressHeight - hudPadding - (7 * hudScale);
+        drawBitmapText(progressTextX, levelTextY, hudScale, levelText, cyanColor);
+        drawBitmapText(progressTextX, levelTextY - hudLineHeight,
+            hudScale, experienceText, textColor);
+        const float experienceRatio = hud.experienceForNextLevel == 0U
+            ? 1.0F
+            : std::clamp(
+                static_cast<float>(hud.experience)
+                    / static_cast<float>(hud.experienceForNextLevel),
+                0.0F, 1.0F);
+        const int experienceBarWidth = progressWidth - (hudPadding * 2);
+        const int experienceBarY = progressY + (2 * hudScale);
+        drawSolidRect(progressTextX, experienceBarY, experienceBarWidth,
+            2 * hudScale, {0.10F, 0.14F, 0.15F});
+        drawSolidRect(progressTextX, experienceBarY,
+            static_cast<int>(static_cast<float>(experienceBarWidth) * experienceRatio),
+            2 * hudScale, cyanColor);
+
+        std::string_view eventText;
+        gdp::core::Vec3 eventColor{0.48F, 0.62F, 0.66F};
+        if (hud.eventLocked) {
+            eventText = "LOCKDOWN";
+            eventColor = {0.98F, 0.18F, 0.10F};
+        } else if (hud.event == HudEventState::Dormant) {
+            eventText = "EVENT STANDBY";
+        } else if (hud.event == HudEventState::Active) {
+            eventText = "EVENT ACTIVE";
+            eventColor = {0.98F, 0.62F, 0.14F};
+        } else if (hud.event == HudEventState::Completed) {
+            eventText = "EVENT CLEAR";
+            eventColor = {0.28F, 0.92F, 0.56F};
+        }
+        if (!eventText.empty()) {
+            const int eventWidth = bitmapTextWidth(eventText, hudScale) + (hudPadding * 2);
+            const int eventHeight = (7 * hudScale) + (hudPadding * 2);
+            const int eventX = std::max(hudMargin, width - hudMargin - eventWidth);
+            const int eventY = std::max(hudMargin,
+                height - hudMargin - eventHeight - (13 * hudScale));
+            drawSolidRect(eventX, eventY, eventWidth, eventHeight, panelColor);
+            drawBitmapText(eventX + hudPadding, eventY + hudPadding,
+                hudScale, eventText, eventColor);
+        }
+
+        std::string_view promptText;
+        gdp::core::Vec3 promptColor{0.78F, 0.90F, 0.92F};
+        if (hud.prompt == HudPrompt::OpenDoor) {
+            promptText = "E OPEN DOOR";
+        } else if (hud.prompt == HudPrompt::DoorLocked) {
+            promptText = "DOOR LOCKED";
+            promptColor = {0.98F, 0.24F, 0.12F};
+        } else if (hud.prompt == HudPrompt::UseTerminal) {
+            promptText = "E USE TERMINAL";
+        } else if (hud.prompt == HudPrompt::Reload) {
+            promptText = "R RELOAD";
+            promptColor = {0.98F, 0.62F, 0.14F};
+        }
+        if (!promptText.empty()) {
+            const int promptWidth = bitmapTextWidth(promptText, hudScale)
+                + (hudPadding * 2);
+            const int promptHeight = (7 * hudScale) + (hudPadding * 2);
+            const int promptX = (width - promptWidth) / 2;
+            const int promptY = std::max(hudMargin, height / 5);
+            drawSolidRect(promptX, promptY, promptWidth, promptHeight, panelColor);
+            drawBitmapText(promptX + hudPadding, promptY + hudPadding,
+                hudScale, promptText, promptColor);
+        }
+    }
+
     std::string_view objectiveText;
     gdp::core::Vec3 objectiveColor{0.30F, 0.88F, 0.92F};
     if (hud.objective == ObjectiveRenderState::ReachBoss) {
@@ -1123,9 +1313,10 @@ bool Renderer::render(
         objectiveColor = {0.96F, 0.56F, 0.18F};
     }
     if (!objectiveText.empty()) {
-        const int textWidth = static_cast<int>(objectiveText.size()) * 6 * hudScale;
-        drawBitmapText(std::max(8, width - textWidth - 12),
-            std::max(8, height - 24), hudScale, objectiveText, objectiveColor);
+        const int textWidth = bitmapTextWidth(objectiveText, hudScale);
+        drawBitmapText(std::max(hudMargin, width - textWidth - hudMargin),
+            std::max(hudMargin, height - hudMargin - (7 * hudScale)),
+            hudScale, objectiveText, objectiveColor);
     }
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {
@@ -1142,8 +1333,8 @@ bool Renderer::render(
         const gdp::core::Vec3 resultColor = victory
             ? gdp::core::Vec3{0.22F, 0.92F, 0.62F}
             : gdp::core::Vec3{0.96F, 0.18F, 0.10F};
-        const int resultWidth = static_cast<int>(result.size()) * 6 * hudScale;
-        const int promptWidth = static_cast<int>(prompt.size()) * 6;
+        const int resultWidth = bitmapTextWidth(result, hudScale);
+        const int promptWidth = bitmapTextWidth(prompt, 1);
         drawBitmapText((width - resultWidth) / 2, bannerY + 42,
             hudScale, result, resultColor);
         drawBitmapText((width - promptWidth) / 2, bannerY + 16,

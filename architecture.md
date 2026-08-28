@@ -3466,8 +3466,30 @@ crossfade equal-power entre ambiências das duas salas ✓
 regressões de runtime, colisão, mixer e pixels ✓
 ```
 
-**Próximo marco:** mover HP, munição, chaves, eventos e prompts contextuais do
-título para um HUD funcional dentro do viewport.
+## Fase 16 — Continuidade de encontros e luz
+
+```text
+primeira onda de eventos de entrada pré-materializada e dormente ✓
+entidades dormentes visíveis, sem IA, dano ou contagem de limpeza ✓
+ativação reutiliza entidades sem duplicação ou aparecimento tardio ✓
+emboscada de terminal permanece oculta até interação ✓
+até oito luzes combinam sala atual e adjacentes ✓
+regressões de evento, combate, headless e pixels ✓
+```
+
+## Fase 17 — HUD funcional
+
+```text
+HP, munição, chaves, nível e XP dentro do viewport ✓
+objetivo e estado de evento nas bordas ✓
+prompts de porta, terminal, bloqueio e recarga contextuais ✓
+layout responsivo preserva o centro de combate ✓
+renderer recebe snapshots sem possuir regras de gameplay ✓
+regressão OpenGL em resolução estreita ✓
+```
+
+**Próximo marco:** adicionar feedback temporário de dano, acerto, coleta e
+eventos diretamente no HUD.
 
 ---
 

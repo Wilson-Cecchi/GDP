@@ -292,6 +292,27 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 hudPixels.data());
 
+            const gdp::render::HudRenderData functionalHud{
+                .objective = gdp::render::ObjectiveRenderState::ReachBoss,
+                .visible = true,
+                .health = 24.0F,
+                .maximumHealth = 115.0F,
+                .magazineAmmo = 0U,
+                .reserveAmmo = 28U,
+                .keys = 2U,
+                .level = 4U,
+                .experience = 35U,
+                .experienceForNextLevel = 80U,
+                .event = gdp::render::HudEventState::Active,
+                .eventLocked = true,
+                .prompt = gdp::render::HudPrompt::DoorLocked,
+            };
+            const bool renderedFunctionalHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, functionalHud);
+            std::vector<std::uint8_t> functionalHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                functionalHudPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -359,6 +380,7 @@ int main()
             std::size_t corridorChangedChannels = 0;
             std::size_t connectedRoomMaterialChangedChannels = 0;
             std::size_t hudChangedChannels = 0;
+            std::size_t functionalHudChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -423,6 +445,10 @@ int main()
                         != centralHubPixels[index + channel]) {
                         ++hudChangedChannels;
                     }
+                    if (functionalHudPixels[index + channel]
+                        != centralHubPixels[index + channel]) {
+                        ++functionalHudChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -470,6 +496,7 @@ int main()
                 && renderedConnectedRoomMaterial
                 && connectedRoomMaterialChangedChannels > 100U
                 && renderedHud && hudChangedChannels > 100U
+                && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

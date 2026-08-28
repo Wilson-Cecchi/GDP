@@ -1312,6 +1312,15 @@ void Application::render()
     }
     SDL_SetWindowTitle(window_, title.str().c_str());
     gdp::render::HudRenderData hud;
+    hud.visible = true;
+    hud.health = player_.state().health;
+    hud.maximumHealth = player_.state().maximumHealth;
+    hud.magazineAmmo = weapon_.magazineAmmo();
+    hud.reserveAmmo = weapon_.reserveAmmo();
+    hud.keys = player_.state().keys;
+    hud.level = progress.level;
+    hud.experience = progress.experienceIntoLevel;
+    hud.experienceForNextLevel = nextLevelXp;
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
         hud.objective = gdp::render::ObjectiveRenderState::Victory;
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
@@ -1320,6 +1329,55 @@ void Application::render()
         hud.objective = gdp::render::ObjectiveRenderState::DefeatBoss;
     } else {
         hud.objective = gdp::render::ObjectiveRenderState::ReachBoss;
+    }
+    if (activeEvent != roomEvents_.end()) {
+        if (activeEvent->phase == gameplay::RoomEventPhase::Dormant) {
+            hud.event = gdp::render::HudEventState::Dormant;
+        } else if (activeEvent->phase == gameplay::RoomEventPhase::Active) {
+            hud.event = gdp::render::HudEventState::Active;
+        } else if (activeEvent->plan.type != world::RoomEventType::None) {
+            hud.event = gdp::render::HudEventState::Completed;
+        }
+        hud.eventLocked = gameplay::isRoomLocked(*activeEvent);
+    }
+    if (session_.state().phase == gameplay::SessionPhase::Playing && world_) {
+        const std::optional<gameplay::RoomTransition> transition
+            = gameplay::findRoomTransition(
+                *world_, playerRoom, player_.state().position,
+                player_.planarForwardDirection());
+        if (transition) {
+            const auto door = doorRuntimes_.find(transition->edge);
+            if (hud.eventLocked) {
+                hud.prompt = gdp::render::HudPrompt::DoorLocked;
+            } else if (door != doorRuntimes_.end()
+                && door->second.state != world::DoorState::Opening
+                && door->second.state != world::DoorState::Open) {
+                hud.prompt = gdp::render::HudPrompt::OpenDoor;
+            }
+        }
+        if (hud.prompt == gdp::render::HudPrompt::None
+            && activeEvent != roomEvents_.end()
+            && activeEvent->phase == gameplay::RoomEventPhase::Dormant
+            && activeEvent->plan.trigger == world::RoomEventTrigger::TerminalUse) {
+            const entities::Entity* terminal = entities_.find(terminalEntity_);
+            if (terminal != nullptr && terminal->roomId == playerRoom) {
+                const gdp::core::Vec3 position = terminal->transform.position;
+                const std::array targets{
+                    gameplay::InteractionTarget{
+                        terminalEntity_,
+                        {{position.x - 0.4F, position.y, position.z - 0.15F},
+                            {position.x + 0.4F, position.y + 2.0F,
+                                position.z + 0.15F}}},
+                };
+                if (player_.findInteraction(targets)) {
+                    hud.prompt = gdp::render::HudPrompt::UseTerminal;
+                }
+            }
+        }
+        if (hud.prompt == gdp::render::HudPrompt::None
+            && weapon_.magazineAmmo() == 0U && weapon_.reserveAmmo() > 0U) {
+            hud.prompt = gdp::render::HudPrompt::Reload;
+        }
     }
     if (renderer_ == nullptr
         || !renderer_->render(

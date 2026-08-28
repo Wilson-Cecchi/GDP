@@ -1,9 +1,8 @@
 # Interface — HUD
 
-> **Estado:** HUD completo permanece especificado. Desde a Fase 14, objetivo e
-> resultado de sessão aparecem no viewport por um passe bitmap provisório;
-> HP, munição, chaves, progressão, sala e evento permanecem no título. O objetivo
-> alterna entre `REACH BOSS` e `DEFEAT BOSS`.
+> **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,
+> XP, objetivo, evento, resultado e prompts contextuais aparecem no viewport;
+> o título permanece somente como apoio de diagnóstico.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -28,9 +27,11 @@ conceitualmente 4:3 e as laterais recebem informação.
 O viewport domina. Painéis organizam informação e não competem com combate. Alertas
 contextuais são temporários.
 
-O passe atual desenha o objetivo no topo direito e, em estado terminal, um
-banner central `VICTORY`/`DEFEAT` com o comando de `Enter`. Ele ocorre após o
-blit, não usa a projeção 3D e é deliberadamente menor que o HUD final.
+O passe atual ocorre após o blit e não usa a projeção 3D. HP, munição e chaves
+ocupam o canto inferior esquerdo; nível e XP, o inferior direito; objetivo e
+evento, o superior direito. `VICTORY`/`DEFEAT` preservam o banner central. Os
+prompts `E OPEN DOOR`, `DOOR LOCKED`, `E USE TERMINAL` e `R RELOAD` aparecem
+somente quando a mesma ação é válida ou necessária na simulação.
 
 ## Escala
 

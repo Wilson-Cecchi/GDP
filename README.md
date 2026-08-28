@@ -71,8 +71,11 @@ especializados das pastas numeradas.
   eventos de entrada já existe dormente na sala adjacente, sem IA ou colisão de
   tiro antes do gatilho, e até oito luzes combinam sala atual e vizinhas sem
   aparecer somente após a troca lógica.
-- **Próxima atualização:** levar HP, munição, chaves, evento e prompts de
-  interação para um HUD funcional dentro do viewport.
+- **Fase 17 — HUD funcional:** concluída; HP, munição, chaves, nível, XP,
+  objetivo, evento e prompts contextuais agora aparecem dentro do viewport em
+  painéis responsivos que preservam o centro do combate.
+- **Próxima atualização:** adicionar feedback temporário de dano, acerto,
+  coleta e eventos diretamente no HUD.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -230,6 +233,13 @@ até o evento liberá-los. A ativação reutiliza as mesmas entidades, evitando
 duplicação e aparecimento tardio; emboscadas de terminal continuam ocultas. O
 renderer também seleciona as luzes vizinhas mais próximas e combina até oito
 pontos, mantendo luminárias e iluminação da sala destino visíveis pelo corredor.
+
+Na Fase 17, `HudRenderData` recebe somente snapshots da simulação e desenha HP
+com barra de risco, munição, chaves, nível e progresso de XP nas bordas. Objetivo
+e estado `STANDBY/ACTIVE/CLEAR/LOCKDOWN` ficam no topo; prompts `E OPEN DOOR`,
+`DOOR LOCKED`, `E USE TERMINAL` e `R RELOAD` usam a mesma detecção contextual da
+ação real. O passe bitmap escala entre resoluções estreitas e normais sem mover
+regras de gameplay para o renderer.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com

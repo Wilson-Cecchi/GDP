@@ -100,8 +100,35 @@ enum class ObjectiveRenderState : std::uint8_t {
     Defeat,
 };
 
+enum class HudEventState : std::uint8_t {
+    None,
+    Dormant,
+    Active,
+    Completed,
+};
+
+enum class HudPrompt : std::uint8_t {
+    None,
+    OpenDoor,
+    DoorLocked,
+    UseTerminal,
+    Reload,
+};
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
+    bool visible{false};
+    float health{100.0F};
+    float maximumHealth{100.0F};
+    std::uint32_t magazineAmmo{0};
+    std::uint32_t reserveAmmo{0};
+    std::uint32_t keys{0};
+    std::uint32_t level{1};
+    std::uint32_t experience{0};
+    std::uint32_t experienceForNextLevel{0};
+    HudEventState event{HudEventState::None};
+    bool eventLocked{false};
+    HudPrompt prompt{HudPrompt::None};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;
