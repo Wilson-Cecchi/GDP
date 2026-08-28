@@ -45,6 +45,11 @@ score, contadores por fonte, eventos inválidos e ciclo fixo de nove upgrades.
 Integração prova que Vitality altera HP/cura, Firepower altera dano e Capacity
 altera reserva/munição nas instâncias reais, mantendo o estado canônico válido.
 
+O gate de travessia usa as edges/corridors do mundo gerado e testa cada endpoint
+nos dois sentidos. Destino, inset de entrada, facing, alcance, preservação de
+estado e bounds rotacionados são invariantes; nenhuma nova stream aleatória é
+consumida e o fingerprint estrutural permanece propriedade do mesmo `World`.
+
 ## Enemy metrics
 
 Role, BodyProfile, part IDs, fallback count, materials e unique VisualGenomeHash.

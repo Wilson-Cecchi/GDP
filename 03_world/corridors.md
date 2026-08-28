@@ -1,7 +1,8 @@
 # World — Corredores procedurais
 
 > **Estado:** roteamento estrutural Straight/L/Z implementado e validado na Fase
-> 5; occupancy grid detalhado, BFS/A* e geração de mesh permanecem planejados.
+> 5; as rotas já resolvem a travessia por portas na Fase 13. Occupancy grid
+> detalhado, BFS/A* e geração de mesh atravessável permanecem planejados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -28,6 +29,11 @@ BFS/A* ainda não é necessário no layout modular inicial e não é usado como
 fallback permissivo.
 
 Cada rota é validada antes de aceitar.
+
+`RoomTraversal` usa `edge` e os dois `RoomId` do `CorridorPath` como contrato de
+destino. Assim, nenhuma porta pode enviar o jogador a uma sala não ligada, e o
+mesmo corredor funciona nos dois sentidos. A etapa seguinte materializa os
+pontos da rota como piso, paredes, teto e colisão para caminhada contínua.
 
 ## Stub
 

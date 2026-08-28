@@ -1,7 +1,8 @@
 # World — Connectors e portas
 
-> **Estado:** contrato, transformação, compatibilidade e lifecycle de connectors
-> implementados e validados na Fase 4; portas animadas entram com gameplay/world.
+> **Estado:** contrato, transformação, compatibilidade e lifecycle implementados
+> na Fase 4; porta visível, interação, lockdown e travessia entre salas ligados
+> ao gameplay na Fase 13. Animação contínua permanece planejada.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -53,6 +54,11 @@ Não criar porta procurando gargalo depois.
 ## Segurança
 
 Fechamento consulta volume ocupado; uma porta não pode esmagar/teleportar jogador por bug.
+
+Na implementação atual a porta é um portal de sala deliberado: exige proximidade
+e orientação, resolve apenas uma edge com corredor válido e cria o jogador para
+dentro do connector oposto. Não existe fechamento sobre o volume do jogador.
+Durante `RoomEvent` em lockdown, a porta fica vermelha e a travessia é recusada.
 
 ## Used connector
 

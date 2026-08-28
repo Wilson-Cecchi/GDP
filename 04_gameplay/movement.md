@@ -1,7 +1,8 @@
 # Gameplay — Movimento e câmera
 
-> **Estado:** movimento, mouse look, gravidade e colisão básica implementados e
-> validados na Fase 3; portas e head bob permanecem planejados.
+> **Estado:** movimento, mouse look, gravidade e colisão básica implementados na
+> Fase 3; travessia por portas conectadas implementada na Fase 13. Head bob e
+> caminhada contínua pela mesh dos corredores permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -35,7 +36,11 @@ ocupado antes de fechar; nunca empurram o jogador através de parede.
 
 O collider inicial tem raio `0,30 m` e altura `1,80 m`. O solver restringe
 piso/teto e limites internos da sala e resolve X e Z separadamente contra AABBs,
-permitindo deslizamento. Portas serão adicionadas junto aos `Connector`s.
+permitindo deslizamento. Origem e rotação do `RoomModule` transformam bounds e
+sólidos juntos. Próximo a um connector associado a edge, olhar para a porta e
+usar `E` reposiciona o jogador 0,85 m para dentro do destino e zera somente sua
+velocidade; HP, inventário, progressão e arma são preservados. Lockdown consome
+a interação sem permitir saída.
 
 ## Câmera
 
@@ -44,5 +49,6 @@ projeção. Head bob é cosmético.
 
 ## Testes
 
-Distância equivalente em diferentes FPS; diagonal normalizada; colisão em canto; porta;
-pitch clamp; sensibilidade independente do FPS.
+Distância equivalente em diferentes FPS; diagonal normalizada; colisão em canto;
+porta nos dois sentidos para cada corredor; distância/orientação da interação;
+preservação de estado; quatro rotações; pitch clamp; sensibilidade independente do FPS.

@@ -3426,7 +3426,19 @@ audio ✓
 progression ✓
 ```
 
-**Próximo marco:** vertical slice navegável com transições físicas entre salas.
+## Fase 13 — Vertical slice navegável
+
+```text
+porta por connector/edge ✓
+travessia bidirecional ✓
+estado do jogador preservado ✓
+sala ativa: colisão/material/luz/áudio ✓
+lockdown bloqueia saída ✓
+corredor contínuo → próximo
+```
+
+**Próximo marco:** materializar os `CorridorPath::points` em geometria e colisão
+para caminhada contínua entre as salas já conectadas.
 
 ---
 

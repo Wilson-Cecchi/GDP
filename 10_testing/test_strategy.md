@@ -58,6 +58,12 @@ mesmo award, resto de XP, telemetria e entradas inválidas. Também exige os nov
 benefícios reais de Player/Weapon no nível 10 e valida o estado após cada
 sequência representativa.
 
+O gate de travessia percorre todos os corredores de um mundo representativo nos
+dois sentidos, exige edge/destino corretos, spawn dentro dos bounds, distância e
+orientação válidas. Também cobre preservação de HP/inventário/upgrades,
+rejeição de coordenadas inválidas e colisão nas quatro rotações. OpenGL desloca
+e gira a sala e diferencia porta atravessável de lockdown por pixels.
+
 O gate de assets gera 1.000 recipes visuais, valida pixels e regras materiais,
 exercita reuse do cache e mantém o fingerprint estrutural do World separado. O
 gate do Worker gera outras 1.000 seeds, valida montagem/mesh/albedo/hash e exige

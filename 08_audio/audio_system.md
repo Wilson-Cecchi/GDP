@@ -41,7 +41,8 @@ dano recebido e estados de evento usam o centro estéreo.
 ## Ambiência
 
 Os sete `RoomTheme` fornecem fundações distintas de frequência, modulação e
-ruído para um loop ambiente. A START seleciona seu perfil na inicialização.
+ruído para um loop ambiente. A START seleciona seu perfil na inicialização e
+cada travessia de porta troca o loop pela seed/tema da sala destino.
 Máquinas locais e eventos ambientes raros permanecem planejados e deverão usar
 budget temporal, nunca chance por frame.
 
@@ -58,5 +59,4 @@ encerrar SDL.
 O gate cobre 1.000 receitas/hash únicos, todas as doze categorias, sete perfis
 ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
 cache, limite de vozes, ciclo de one-shot/loop, pan, distância, dispositivo
-dummy e dispositivo ausente. Pause e transições físicas entre salas permanecem
-planejados.
+dummy e dispositivo ausente. Pause e som dedicado de porta permanecem planejados.

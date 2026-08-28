@@ -58,8 +58,11 @@ especializados das pastas numeradas.
   IndustrialRobot possuem geração procedural, renderer e combate funcional.
 - **Fase 12 — Procedural avançado:** implementada e validada; loot, props,
   eventos de sala, iluminação, áudio e progressão estão integrados.
-- **Próxima atualização:** iniciar o vertical slice navegável com transições
-  físicas entre salas.
+- **Fase 13 — Vertical slice navegável:** primeiro incremento implementado;
+  portas conectadas permitem entrar nas salas geradas preservando estado,
+  colisão, conteúdo, material, iluminação e ambiência.
+- **Próxima atualização:** transformar as rotas já geradas em corredores
+  renderizados e atravessáveis continuamente.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -68,20 +71,21 @@ domínio, geração versionada de seeds e tipos matemáticos básicos. Quando SD
 não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
-O renderer atual desenha uma sala industrial fixa com cubo indexado reutilizado,
-materiais procedurais de parede/piso/teto derivados da seed real da START,
+O renderer atual desenha a sala ocupada usando sua origem e rotação reais, com
+cubo indexado reutilizado, materiais procedurais de parede/piso/teto derivados
+da seed da sala, portas ciano e portas vermelhas durante lockdown,
 até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
 câmera em perspectiva e
 retícula. Parede com grandes placas e rodapé amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
-paredes e props, interage com o terminal usando `E`, dispara com o botão esquerdo
+paredes e props, usa `E` no terminal ou em uma porta próxima, dispara com o botão esquerdo
 e recarrega com `R`. Pickups próximos são coletados automaticamente; HP,
 munição e chaves aparecem no título da janela. `Esc` encerra a
 aplicação enquanto o sistema de menus ainda não existe.
 
-Na inicialização, uma seed gera um mundo lógico validado com START, BOSS,
+Na inicialização, uma seed gera um mundo navegável validado com START, BOSS,
 branches, loop controlado, salas e corredores. Cada sala recebe IDs de entidades
 determinísticos: jogador, terminal e um Worker ativo na START, além de inimigos,
 itens e props conforme o `RoomRole`. Cada inimigo recebe uma `visualSeed`
@@ -89,8 +93,11 @@ isolada da estrutura do mapa. O Worker visível é montado a partir de
 quatro `BodyProfile` e uma biblioteca compatível de 18 peças Box/Cylinder, com
 assimetria, materiais e desgaste próprios; sua mesh e seu albedo são preparados
 e cacheados antes do draw. Ele persegue o jogador, ataca em alcance e pode ser
-morto pela pistola hitscan. O renderer ainda apresenta somente a sala START
-fixa.
+morto pela pistola hitscan. Ao atravessar uma porta, o jogador aparece voltado
+para dentro da sala destino; HP, chaves, munição e upgrades são preservados. A
+entidade muda de `roomId`, e colisão, conteúdo visível, evento, material,
+iluminação e ambiência passam a usar a nova sala. Lockdown bloqueia a saída até
+o evento terminar.
 
 O Guard presente nas Arenas agora possui três perfis (`Patrol`, `Tactical` e
 `Armored`), biblioteca própria de 18 peças, arma longa obrigatória e paleta
@@ -162,6 +169,12 @@ e cura), `Firepower` (+4 de dano) e `Capacity` (+4 de reserva e munição). Nív
 XP e score aparecem no título; limpar o encontro inicial e a emboscada da START
 já permite alcançar o primeiro upgrade.
 
+O primeiro incremento da Fase 13 liga o grafo procedural ao fluxo do jogador.
+Cada connector consumido por uma edge produz uma porta visível; aproximar-se,
+olhar para ela e pressionar `E` resolve o corredor correspondente nos dois
+sentidos e posiciona o jogador dentro da sala oposta. Salas e conteúdo fixo
+agora respeitam origem e rotação, e a colisão usa os mesmos bounds transformados.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -175,9 +188,9 @@ pesado com grade e óleo e teto mecânico categorizado. Security acrescenta
 console monitorado, alerta vermelho confinado, piso técnico e teto claro
 regular. Central Hub fecha o conjunto com grandes superfícies neutras,
 sinalização ciano única, rotas contínuas no piso e luminárias alinhadas. O
-renderer cacheia os oito perfis pelo hash completo; como a cena navegável ainda
-é apenas a START industrial, os demais ambientes são exercitados pelo teste
-OpenGL offscreen.
+renderer cacheia os oito perfis pelo hash completo e seleciona o perfil da sala
+ocupada. O teste OpenGL offscreen também cobre sala transladada/rotacionada e a
+mudança visual de porta normal para lockdown.
 
 ## Compilar e testar
 
@@ -191,7 +204,8 @@ ctest --preset debug
 
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
-Gameplay, Loot, Props, Events, Lighting, Audio, Progression, Combat, Entities e World.
+Gameplay, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
+Combat, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 
