@@ -74,8 +74,11 @@ especializados das pastas numeradas.
 - **Fase 17 — HUD funcional:** concluída; HP, munição, chaves, nível, XP,
   objetivo, evento e prompts contextuais agora aparecem dentro do viewport em
   painéis responsivos que preservam o centro do combate.
-- **Próxima atualização:** adicionar feedback temporário de dano, acerto,
-  coleta e eventos diretamente no HUD.
+- **Fase 18 — Feedback de combate:** concluída; dano recebido marca as bordas,
+  acertos e eliminações confirmam na mira, e coleta, ondas, eventos e level-up
+  geram avisos temporários determinísticos.
+- **Próxima atualização:** implementar pausa funcional e menu in-game sem
+  avançar a simulação em segundo plano.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -241,6 +244,12 @@ e estado `STANDBY/ACTIVE/CLEAR/LOCKDOWN` ficam no topo; prompts `E OPEN DOOR`,
 ação real. O passe bitmap escala entre resoluções estreitas e normais sem mover
 regras de gameplay para o renderer.
 
+Na Fase 18, `FeedbackState` mantém timers no fixed update para dano, confirmação
+de tiro e avisos. Dano acende brevemente as quatro bordas; `Hit` e `Kill` usam
+marcadores distintos ao redor da mira. `SUPPLIES ACQUIRED`, `EVENT START`,
+`NEW WAVE`, `SECTOR CLEAR` e `LEVEL UP` aparecem por tempo limitado. Passos
+inválidos não consomem timers e reiniciar a run limpa todo feedback pendente.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -272,7 +281,7 @@ ctest --preset debug
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
 Gameplay, Session, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
-Combat, Entities e World.
+Combat, HUD Feedback, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 

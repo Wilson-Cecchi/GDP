@@ -115,6 +115,21 @@ enum class HudPrompt : std::uint8_t {
     Reload,
 };
 
+enum class HudHitFeedback : std::uint8_t {
+    None,
+    Hit,
+    Kill,
+};
+
+enum class HudNotice : std::uint8_t {
+    None,
+    Pickup,
+    EventStart,
+    Wave,
+    EventClear,
+    LevelUp,
+};
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
@@ -129,6 +144,11 @@ struct HudRenderData {
     HudEventState event{HudEventState::None};
     bool eventLocked{false};
     HudPrompt prompt{HudPrompt::None};
+    float damageFeedback{0.0F};
+    HudHitFeedback hitFeedback{HudHitFeedback::None};
+    float hitFeedbackStrength{0.0F};
+    HudNotice notice{HudNotice::None};
+    float noticeFeedbackStrength{0.0F};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

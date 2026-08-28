@@ -1165,6 +1165,24 @@ bool Renderer::render(
     const gdp::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
 
     if (hud.visible) {
+        const float damageStrength = std::clamp(hud.damageFeedback, 0.0F, 1.0F);
+        if (damageStrength > 0.0F) {
+            const int edgeThickness = std::max(1,
+                static_cast<int>((2.0F + (4.0F * damageStrength))
+                    * static_cast<float>(hudScale)));
+            const gdp::core::Vec3 damageColor{
+                0.16F + (0.78F * damageStrength),
+                0.012F + (0.045F * damageStrength),
+                0.008F,
+            };
+            drawSolidRect(0, 0, width, edgeThickness, damageColor);
+            drawSolidRect(0, height - edgeThickness, width, edgeThickness, damageColor);
+            drawSolidRect(0, edgeThickness, edgeThickness,
+                height - (edgeThickness * 2), damageColor);
+            drawSolidRect(width - edgeThickness, edgeThickness, edgeThickness,
+                height - (edgeThickness * 2), damageColor);
+        }
+
         const int health = static_cast<int>(std::round(std::max(hud.health, 0.0F)));
         const int maximumHealth = static_cast<int>(std::round(
             std::max(hud.maximumHealth, 1.0F)));
@@ -1301,6 +1319,65 @@ bool Renderer::render(
             drawSolidRect(promptX, promptY, promptWidth, promptHeight, panelColor);
             drawBitmapText(promptX + hudPadding, promptY + hudPadding,
                 hudScale, promptText, promptColor);
+        }
+
+        const float hitStrength = std::clamp(hud.hitFeedbackStrength, 0.0F, 1.0F);
+        if (hud.hitFeedback != HudHitFeedback::None && hitStrength > 0.0F) {
+            const bool killed = hud.hitFeedback == HudHitFeedback::Kill;
+            const gdp::core::Vec3 baseColor = killed
+                ? gdp::core::Vec3{1.0F, 0.26F, 0.10F}
+                : gdp::core::Vec3{0.82F, 0.94F, 0.96F};
+            const gdp::core::Vec3 markerColor = baseColor
+                * (0.32F + (0.68F * hitStrength));
+            const int centerX = width / 2;
+            const int centerY = height / 2;
+            const int gap = 10 * hudScale;
+            const int markerLength = 5 * hudScale;
+            const int markerThickness = std::max(1, hudScale);
+            drawSolidRect(centerX - gap - markerLength,
+                centerY - (markerThickness / 2), markerLength,
+                markerThickness, markerColor);
+            drawSolidRect(centerX + gap,
+                centerY - (markerThickness / 2), markerLength,
+                markerThickness, markerColor);
+            drawSolidRect(centerX - (markerThickness / 2),
+                centerY - gap - markerLength, markerThickness,
+                markerLength, markerColor);
+            drawSolidRect(centerX - (markerThickness / 2), centerY + gap,
+                markerThickness, markerLength, markerColor);
+        }
+
+        std::string_view noticeText;
+        gdp::core::Vec3 noticeColor{0.72F, 0.90F, 0.92F};
+        if (hud.notice == HudNotice::Pickup) {
+            noticeText = "SUPPLIES ACQUIRED";
+            noticeColor = {0.28F, 0.92F, 0.56F};
+        } else if (hud.notice == HudNotice::EventStart) {
+            noticeText = "EVENT START";
+            noticeColor = {0.98F, 0.58F, 0.14F};
+        } else if (hud.notice == HudNotice::Wave) {
+            noticeText = "NEW WAVE";
+            noticeColor = {0.98F, 0.38F, 0.12F};
+        } else if (hud.notice == HudNotice::EventClear) {
+            noticeText = "SECTOR CLEAR";
+            noticeColor = {0.28F, 0.92F, 0.56F};
+        } else if (hud.notice == HudNotice::LevelUp) {
+            noticeText = "LEVEL UP";
+            noticeColor = {0.32F, 0.88F, 1.0F};
+        }
+        const float noticeStrength = std::clamp(
+            hud.noticeFeedbackStrength, 0.0F, 1.0F);
+        if (!noticeText.empty() && noticeStrength > 0.0F) {
+            const int noticeWidth = bitmapTextWidth(noticeText, hudScale)
+                + (hudPadding * 2);
+            const int noticeHeight = (7 * hudScale) + (hudPadding * 2);
+            const int noticeX = (width - noticeWidth) / 2;
+            const int noticeY = std::max(hudMargin,
+                height - hudMargin - noticeHeight - (18 * hudScale));
+            drawSolidRect(noticeX, noticeY, noticeWidth, noticeHeight, panelColor);
+            drawBitmapText(noticeX + hudPadding, noticeY + hudPadding,
+                hudScale, noticeText,
+                noticeColor * (0.42F + (0.58F * noticeStrength)));
         }
     }
 

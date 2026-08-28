@@ -5,6 +5,7 @@
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Door.hpp"
+#include "gameplay/Feedback.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
 #include "gameplay/Weapon.hpp"
@@ -68,6 +69,7 @@ private:
     gameplay::Weapon weapon_;
     gameplay::ProgressionSystem progression_;
     gameplay::SessionSystem session_;
+    gameplay::FeedbackState feedback_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};

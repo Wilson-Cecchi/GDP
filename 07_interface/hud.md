@@ -2,7 +2,8 @@
 
 > **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,
 > XP, objetivo, evento, resultado e prompts contextuais aparecem no viewport;
-> o título permanece somente como apoio de diagnóstico.
+> a Fase 18 acrescenta feedback temporário de combate e eventos. O título
+> permanece somente como apoio de diagnóstico.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -32,6 +33,14 @@ ocupam o canto inferior esquerdo; nível e XP, o inferior direito; objetivo e
 evento, o superior direito. `VICTORY`/`DEFEAT` preservam o banner central. Os
 prompts `E OPEN DOOR`, `DOOR LOCKED`, `E USE TERMINAL` e `R RELOAD` aparecem
 somente quando a mesma ação é válida ou necessária na simulação.
+
+## Feedback temporário
+
+Dano recebido acende as bordas sem cobrir a área central. Acertos usam quatro
+marcas claras ao redor da mira e eliminações mudam o marcador para vermelho.
+Coleta, início de evento, nova onda, setor limpo e level-up usam mensagens
+curtas com duração controlada pelo fixed update; a UI apenas apresenta o
+snapshot e não controla a simulação.
 
 ## Escala
 

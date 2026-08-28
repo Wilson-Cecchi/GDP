@@ -3488,8 +3488,19 @@ renderer recebe snapshots sem possuir regras de gameplay ✓
 regressão OpenGL em resolução estreita ✓
 ```
 
-**Próximo marco:** adicionar feedback temporário de dano, acerto, coleta e
-eventos diretamente no HUD.
+## Fase 18 — Feedback de combate
+
+```text
+timers determinísticos de feedback no fixed update ✓
+bordas temporárias para dano recebido ✓
+marcadores distintos para acerto e eliminação ✓
+avisos de coleta, evento, onda, setor limpo e level-up ✓
+restart limpa feedback e passos inválidos não avançam timers ✓
+regressões unitárias, headless e OpenGL ✓
+```
+
+**Próximo marco:** implementar pausa funcional e menu in-game sem avançar a
+simulação em segundo plano.
 
 ---
 

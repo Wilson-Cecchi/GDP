@@ -306,6 +306,11 @@ int main()
                 .event = gdp::render::HudEventState::Active,
                 .eventLocked = true,
                 .prompt = gdp::render::HudPrompt::DoorLocked,
+                .damageFeedback = 1.0F,
+                .hitFeedback = gdp::render::HudHitFeedback::Kill,
+                .hitFeedbackStrength = 1.0F,
+                .notice = gdp::render::HudNotice::LevelUp,
+                .noticeFeedbackStrength = 1.0F,
             };
             const bool renderedFunctionalHud = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, functionalHud);

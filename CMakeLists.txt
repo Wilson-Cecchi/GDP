@@ -113,6 +113,7 @@ add_library(
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/Feedback.cpp
     src/gameplay/Loot.cpp
     src/gameplay/Player.cpp
     src/gameplay/Progression.cpp
@@ -243,6 +244,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME gameplay_systems COMMAND gdp_gameplay_tests)
     set_tests_properties(gameplay_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_feedback_tests tests/test_feedback.cpp)
+    target_link_libraries(gdp_feedback_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_feedback_tests)
+    gdp_enable_sanitizers(gdp_feedback_tests)
+
+    add_test(NAME hud_feedback_systems COMMAND gdp_feedback_tests)
+    set_tests_properties(hud_feedback_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_progression_tests tests/test_progression.cpp)
     target_link_libraries(gdp_progression_tests PRIVATE gdp_gameplay)

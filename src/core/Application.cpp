@@ -562,6 +562,7 @@ void Application::processEvents()
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
+    gameplay::updateFeedback(feedback_, step);
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
         if (audio_) {
             audio_->update(step);
@@ -588,6 +589,10 @@ void Application::fixedUpdate(const double fixedStep)
             std::ostringstream rewardMessage;
             rewardMessage << "Level reward: " << progressionRewardName(reward);
             log(LogLevel::Info, rewardMessage.str());
+        }
+        if (update.levelsGained > 0U) {
+            gameplay::signalNotice(
+                feedback_, gameplay::NoticeFeedbackKind::LevelUp);
         }
     };
     const auto collisionEvent = std::find_if(
@@ -724,6 +729,7 @@ void Application::fixedUpdate(const double fixedStep)
             audio_->play(gdp::audio::AudioEventKind::Pickup,
                 config_.worldSeed, audioEventCounter_++);
         }
+        gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
         awardProgress(gameplay::ProgressionEvent::LootCollected,
             static_cast<std::uint32_t>(loot.collected));
     }
@@ -770,6 +776,12 @@ void Application::fixedUpdate(const double fixedStep)
         if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
+        }
+        if (shot.outcome == gameplay::ShotOutcome::Hit
+            || shot.outcome == gameplay::ShotOutcome::Destroyed) {
+            gameplay::signalHit(feedback_, false);
+        } else if (shot.outcome == gameplay::ShotOutcome::Killed) {
+            gameplay::signalHit(feedback_, true);
         }
         if (audio_ && shot.hit) {
             std::optional<gdp::audio::AudioEventKind> impactKind;
@@ -839,6 +851,9 @@ void Application::fixedUpdate(const double fixedStep)
     if (audio_ && attacksLanded > 0U) {
         audio_->play(gdp::audio::AudioEventKind::PlayerHurt,
             config_.worldSeed, audioEventCounter_++);
+    }
+    if (attacksLanded > 0U) {
+        gameplay::signalPlayerDamage(feedback_);
     }
     if (playerWasAlive && !player_.state().alive) {
         log(LogLevel::Info, "Player died");
@@ -915,6 +930,8 @@ void Application::fixedUpdate(const double fixedStep)
                 audio_->play(gdp::audio::AudioEventKind::EventStart,
                     activeEvent->plan.seed, audioEventCounter_++);
             }
+            gameplay::signalNotice(
+                feedback_, gameplay::NoticeFeedbackKind::EventStart);
         }
         if (event.wavesSpawned > 0U) {
             std::ostringstream message;
@@ -922,6 +939,10 @@ void Application::fixedUpdate(const double fixedStep)
                     << activeEvent->plan.waveCount << " spawned "
                     << event.enemiesSpawned << " enemy(s)";
             log(LogLevel::Info, message.str());
+            if (!event.activated) {
+                gameplay::signalNotice(
+                    feedback_, gameplay::NoticeFeedbackKind::Wave);
+            }
         }
         if (event.completed) {
             std::ostringstream message;
@@ -933,6 +954,8 @@ void Application::fixedUpdate(const double fixedStep)
                 audio_->play(gdp::audio::AudioEventKind::EventComplete,
                     activeEvent->plan.seed, audioEventCounter_++);
             }
+            gameplay::signalNotice(
+                feedback_, gameplay::NoticeFeedbackKind::EventClear);
             awardProgress(gameplay::ProgressionEvent::RoomEventCompleted, 1U);
         }
     }
@@ -1321,6 +1344,33 @@ void Application::render()
     hud.level = progress.level;
     hud.experience = progress.experienceIntoLevel;
     hud.experienceForNextLevel = nextLevelXp;
+    hud.damageFeedback = gameplay::damageFeedbackStrength(feedback_);
+    hud.hitFeedbackStrength = gameplay::hitFeedbackStrength(feedback_);
+    if (feedback_.hit == gameplay::HitFeedbackKind::Hit) {
+        hud.hitFeedback = gdp::render::HudHitFeedback::Hit;
+    } else if (feedback_.hit == gameplay::HitFeedbackKind::Kill) {
+        hud.hitFeedback = gdp::render::HudHitFeedback::Kill;
+    }
+    hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
+    switch (feedback_.notice) {
+    case gameplay::NoticeFeedbackKind::Pickup:
+        hud.notice = gdp::render::HudNotice::Pickup;
+        break;
+    case gameplay::NoticeFeedbackKind::EventStart:
+        hud.notice = gdp::render::HudNotice::EventStart;
+        break;
+    case gameplay::NoticeFeedbackKind::Wave:
+        hud.notice = gdp::render::HudNotice::Wave;
+        break;
+    case gameplay::NoticeFeedbackKind::EventClear:
+        hud.notice = gdp::render::HudNotice::EventClear;
+        break;
+    case gameplay::NoticeFeedbackKind::LevelUp:
+        hud.notice = gdp::render::HudNotice::LevelUp;
+        break;
+    case gameplay::NoticeFeedbackKind::None:
+        break;
+    }
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
         hud.objective = gdp::render::ObjectiveRenderState::Victory;
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
@@ -1405,6 +1455,7 @@ void Application::shutdown()
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};
     progression_ = gameplay::ProgressionSystem{};
+    gameplay::clearFeedback(feedback_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};
