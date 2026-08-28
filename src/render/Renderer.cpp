@@ -110,6 +110,58 @@ constexpr std::array roomParts{
         RoomMaterialChannel::Generic, 4.0F},
 };
 
+using Glyph = std::array<std::uint8_t, 7U>;
+
+constexpr Glyph glyphFor(const char character) noexcept
+{
+    switch (character) {
+    case 'A': return {0x0EU, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
+    case 'B': return {0x1EU, 0x11U, 0x11U, 0x1EU, 0x11U, 0x11U, 0x1EU};
+    case 'C': return {0x0FU, 0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x0FU};
+    case 'D': return {0x1EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x1EU};
+    case 'E': return {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x1FU};
+    case 'F': return {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x10U};
+    case 'H': return {0x11U, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
+    case 'I': return {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x1FU};
+    case 'N': return {0x11U, 0x19U, 0x19U, 0x15U, 0x13U, 0x13U, 0x11U};
+    case 'O': return {0x0EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case 'R': return {0x1EU, 0x11U, 0x11U, 0x1EU, 0x14U, 0x12U, 0x11U};
+    case 'S': return {0x0FU, 0x10U, 0x10U, 0x0EU, 0x01U, 0x01U, 0x1EU};
+    case 'T': return {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U};
+    case 'U': return {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case 'V': return {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0AU, 0x04U};
+    case 'W': return {0x11U, 0x11U, 0x11U, 0x15U, 0x15U, 0x15U, 0x0AU};
+    case 'Y': return {0x11U, 0x11U, 0x0AU, 0x04U, 0x04U, 0x04U, 0x04U};
+    default: return {};
+    }
+}
+
+void drawBitmapText(
+    const int x,
+    const int y,
+    const int scale,
+    const std::string_view text,
+    const gdp::core::Vec3 color)
+{
+    glClearColor(color.x, color.y, color.z, 1.0F);
+    int cursor = x;
+    for (const char character : text) {
+        const Glyph glyph = glyphFor(character);
+        for (std::size_t row = 0; row < glyph.size(); ++row) {
+            for (int column = 0; column < 5; ++column) {
+                if ((glyph[row] & (1U << (4 - column))) == 0U) {
+                    continue;
+                }
+                glScissor(cursor + (column * scale),
+                    y + (static_cast<int>(glyph.size() - 1U - row) * scale),
+                    scale, scale);
+                glClear(GL_COLOR_BUFFER_BIT);
+            }
+        }
+        cursor += 6 * scale;
+    }
+}
+
 } // namespace
 
 bool Renderer::initialize(const int width, const int height)
@@ -624,7 +676,8 @@ bool Renderer::render(
     const RoomRenderData room,
     const std::span<const DoorRenderData> doors,
     const std::span<const CorridorRenderData> corridors,
-    const std::span<const RoomRenderData> connectedRooms)
+    const std::span<const RoomRenderData> connectedRooms,
+    const HudRenderData hud)
 {
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
@@ -687,15 +740,20 @@ bool Renderer::render(
         shader_.setFloat(gl_, rangeUniforms[index], light.range);
     }
 
-    auto roomMaterials = roomMaterials_.find(activeRoomMaterialKey_);
-    if (roomMaterials == roomMaterials_.end()) {
-        roomMaterials = roomMaterials_.find(fallbackRoomMaterialKey_);
-    }
-    if (roomMaterials == roomMaterials_.end()) {
+    const auto fallbackMaterials = roomMaterials_.find(fallbackRoomMaterialKey_);
+    if (fallbackMaterials == roomMaterials_.end()) {
         return false;
     }
+    const auto resolveMaterials = [this, &fallbackMaterials](const std::uint64_t key)
+        -> const RoomGpuMaterials& {
+        const std::uint64_t requestedKey = key == 0U ? activeRoomMaterialKey_ : key;
+        const auto materials = roomMaterials_.find(requestedKey);
+        return materials == roomMaterials_.end()
+            ? fallbackMaterials->second : materials->second;
+    };
 
-    const auto drawSurface = [this, &roomMaterials](
+    const auto drawSurface = [this](
+        const RoomGpuMaterials& roomMaterials,
         const gdp::core::Vec3 position,
         const gdp::core::Vec3 scale,
         const RoomMaterialChannel material,
@@ -704,17 +762,17 @@ bool Renderer::render(
         float emissiveStrength = 0.0F;
         switch (material) {
         case RoomMaterialChannel::Wall:
-            roomMaterials->second.textures[static_cast<std::size_t>(
+            roomMaterials.textures[static_cast<std::size_t>(
                 gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
             break;
         case RoomMaterialChannel::Floor:
-            roomMaterials->second.textures[static_cast<std::size_t>(
+            roomMaterials.textures[static_cast<std::size_t>(
                 gdp::procedural::IndustrialSurface::Floor)].bind(gl_);
             break;
         case RoomMaterialChannel::Ceiling:
-            roomMaterials->second.textures[static_cast<std::size_t>(
+            roomMaterials.textures[static_cast<std::size_t>(
                 gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
-            emissiveStrength = roomMaterials->second.ceilingEmissive;
+            emissiveStrength = roomMaterials.ceilingEmissive;
             break;
         case RoomMaterialChannel::Generic:
             fallbackTexture_.bind(gl_);
@@ -729,6 +787,7 @@ bool Renderer::render(
     };
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
+        const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
         const bool swapsAxes
             = renderedRoom.rotation == gdp::core::QuarterTurn::Degrees90
             || renderedRoom.rotation == gdp::core::QuarterTurn::Degrees270;
@@ -736,13 +795,13 @@ bool Renderer::render(
         const float roomHalfZ = swapsAxes ? 3.85F : 4.85F;
         constexpr float roomHeight = 4.0F;
         constexpr float shellThickness = 0.20F;
-        drawSurface(
+        drawSurface(roomMaterials,
             renderedRoom.origin
                 + gdp::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
             {(roomHalfX * 2.0F) + shellThickness, shellThickness,
                 (roomHalfZ * 2.0F) + shellThickness},
             RoomMaterialChannel::Floor, 4.0F);
-        drawSurface(
+        drawSurface(roomMaterials,
             renderedRoom.origin
                 + gdp::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
             {(roomHalfX * 2.0F) + shellThickness, shellThickness,
@@ -789,7 +848,7 @@ bool Renderer::render(
                         shellThickness, top - bottom, maximum - minimum}
                     : gdp::core::Vec3{
                         maximum - minimum, top - bottom, shellThickness};
-                drawSurface(position, scale, RoomMaterialChannel::Wall);
+                drawSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall);
             };
             if (door == doors.end()) {
                 drawWallSpan(transverseMinimum, transverseMaximum, 0.0F, roomHeight);
@@ -819,6 +878,7 @@ bool Renderer::render(
 
     constexpr float corridorShellThickness = 0.12F;
     for (const CorridorRenderData& corridor : corridors) {
+        const RoomGpuMaterials& roomMaterials = resolveMaterials(corridor.materialKey);
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
             const gdp::core::Vec3 first = corridor.points[index];
             const gdp::core::Vec3 second = corridor.points[index + 1U];
@@ -832,9 +892,10 @@ bool Renderer::render(
             const gdp::core::Vec3 floorScale = alongX
                 ? gdp::core::Vec3{length, corridorShellThickness, corridor.width}
                 : gdp::core::Vec3{corridor.width, corridorShellThickness, length};
-            drawSurface(center + gdp::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
+            drawSurface(roomMaterials,
+                center + gdp::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Floor, 2.0F);
-            drawSurface(center + gdp::core::Vec3{
+            drawSurface(roomMaterials, center + gdp::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Ceiling, 2.0F);
             const gdp::core::Vec3 wallScale = alongX
@@ -845,45 +906,30 @@ bool Renderer::render(
             const gdp::core::Vec3 sideOffset = alongX
                 ? gdp::core::Vec3{0.0F, 0.0F, corridor.width * 0.5F}
                 : gdp::core::Vec3{corridor.width * 0.5F, 0.0F, 0.0F};
-            drawSurface(wallCenter + sideOffset, wallScale, RoomMaterialChannel::Wall);
-            drawSurface(wallCenter - sideOffset, wallScale, RoomMaterialChannel::Wall);
+            drawSurface(roomMaterials, wallCenter + sideOffset,
+                wallScale, RoomMaterialChannel::Wall);
+            drawSurface(roomMaterials, wallCenter - sideOffset,
+                wallScale, RoomMaterialChannel::Wall);
         }
     }
 
-    for (const RoomPart& part : roomParts) {
-        float emissiveStrength = 0.0F;
-        switch (part.material) {
-        case RoomMaterialChannel::Wall:
-            roomMaterials->second.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
-            break;
-        case RoomMaterialChannel::Floor:
-            roomMaterials->second.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Floor)].bind(gl_);
-            break;
-        case RoomMaterialChannel::Ceiling:
-            roomMaterials->second.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
-            emissiveStrength = roomMaterials->second.ceilingEmissive;
-            break;
-        case RoomMaterialChannel::Generic:
-            fallbackTexture_.bind(gl_);
-            break;
+    const auto drawRoomParts = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
+        for (const RoomPart& part : roomParts) {
+            const gdp::core::Vec3 position = renderedRoom.origin
+                + gdp::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
+            gdp::core::Vec3 scale = part.scale;
+            if (renderedRoom.rotation == gdp::core::QuarterTurn::Degrees90
+                || renderedRoom.rotation == gdp::core::QuarterTurn::Degrees270) {
+                std::swap(scale.x, scale.z);
+            }
+            drawSurface(roomMaterials, position, scale, part.material,
+                part.uvScale, part.tint);
         }
-        const gdp::core::Vec3 position
-            = room.origin + gdp::core::rotateQuarterTurns(part.position, room.rotation);
-        gdp::core::Vec3 scale = part.scale;
-        if (room.rotation == gdp::core::QuarterTurn::Degrees90
-            || room.rotation == gdp::core::QuarterTurn::Degrees270) {
-            std::swap(scale.x, scale.z);
-        }
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(position)
-            * gdp::core::scaleMatrix(scale);
-        shader_.setMat4(gl_, "uModel", model);
-        shader_.setVec3(gl_, "uTint", part.tint);
-        shader_.setFloat(gl_, "uUvScale", part.uvScale);
-        shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
-        box_.draw(gl_);
+    };
+    drawRoomParts(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawRoomParts(connectedRoom);
     }
 
     fallbackTexture_.bind(gl_);
@@ -1045,6 +1091,42 @@ bool Renderer::render(
     framebuffer_.presentToDefault(gl_, width, height);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
+    constexpr int hudScale = 2;
+    std::string_view objectiveText;
+    gdp::core::Vec3 objectiveColor{0.30F, 0.88F, 0.92F};
+    if (hud.objective == ObjectiveRenderState::ReachBoss) {
+        objectiveText = "REACH BOSS";
+    } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {
+        objectiveText = "DEFEAT BOSS";
+        objectiveColor = {0.96F, 0.56F, 0.18F};
+    }
+    if (!objectiveText.empty()) {
+        const int textWidth = static_cast<int>(objectiveText.size()) * 6 * hudScale;
+        drawBitmapText(std::max(8, width - textWidth - 12),
+            std::max(8, height - 24), hudScale, objectiveText, objectiveColor);
+    }
+    if (hud.objective == ObjectiveRenderState::Victory
+        || hud.objective == ObjectiveRenderState::Defeat) {
+        const bool victory = hud.objective == ObjectiveRenderState::Victory;
+        const std::string_view result = victory ? "VICTORY" : "DEFEAT";
+        const std::string_view prompt = victory ? "ENTER NEW RUN" : "ENTER RETRY";
+        const int bannerWidth = std::max(1, std::min(width - 16, 260));
+        const int bannerHeight = std::max(1, std::min(height - 16, 72));
+        const int bannerX = (width - bannerWidth) / 2;
+        const int bannerY = (height - bannerHeight) / 2;
+        glClearColor(0.015F, 0.025F, 0.030F, 1.0F);
+        glScissor(bannerX, bannerY, bannerWidth, bannerHeight);
+        glClear(GL_COLOR_BUFFER_BIT);
+        const gdp::core::Vec3 resultColor = victory
+            ? gdp::core::Vec3{0.22F, 0.92F, 0.62F}
+            : gdp::core::Vec3{0.96F, 0.18F, 0.10F};
+        const int resultWidth = static_cast<int>(result.size()) * 6 * hudScale;
+        const int promptWidth = static_cast<int>(prompt.size()) * 6;
+        drawBitmapText((width - resultWidth) / 2, bannerY + 42,
+            hudScale, result, resultColor);
+        drawBitmapText((width - promptWidth) / 2, bannerY + 16,
+            1, prompt, {0.76F, 0.84F, 0.88F});
+    }
     glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
     glScissor((width / 2) - 7, (height / 2) - 1, 15, 3);
     glClear(GL_COLOR_BUFFER_BIT);

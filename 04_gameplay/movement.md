@@ -44,6 +44,11 @@ progressão e arma são preservados. Próximo a uma porta, olhar e usar `E` mant
 o reposicionamento imediato como fallback. Lockdown remove corredores e salas
 adjacentes da união e consome a interação sem permitir saída.
 
+Na Fase 14, a união visual acompanha a união navegável: conteúdo e decoração da
+sala diretamente conectada são enviados ao renderer antes da entrada, cada sala
+mantém seu próprio material e a luz ambiente converge durante o corredor. A IA
+e as regras de coleta continuam limitadas ao `roomId` atual.
+
 ## Câmera
 
 Yaw em torno do eixo vertical e pitch limitado aproximadamente a ±89°. FOV altera apenas a

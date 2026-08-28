@@ -20,6 +20,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -121,6 +122,52 @@ float yawForDirection(const gdp::core::Vec3 direction) noexcept
 {
     constexpr float radiansToDegrees = 57.29577951308232F;
     return std::atan2(direction.z, direction.x) * radiansToDegrees;
+}
+
+std::optional<float> corridorProgressAt(
+    const world::CorridorPath& corridor,
+    const gdp::core::Vec3 position) noexcept
+{
+    float totalLength = 0.0F;
+    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+        const gdp::core::Vec3 segment = corridor.points[index + 1U] - corridor.points[index];
+        totalLength += std::sqrt((segment.x * segment.x) + (segment.z * segment.z));
+    }
+    if (totalLength <= 1.0e-4F) {
+        return std::nullopt;
+    }
+
+    float traversed = 0.0F;
+    float closestDistanceSquared = std::numeric_limits<float>::max();
+    float closestProgress = 0.0F;
+    for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+        const gdp::core::Vec3 first = corridor.points[index];
+        const gdp::core::Vec3 segment = corridor.points[index + 1U] - first;
+        const float lengthSquared = (segment.x * segment.x) + (segment.z * segment.z);
+        const float length = std::sqrt(lengthSquared);
+        if (length <= 1.0e-4F) {
+            continue;
+        }
+        const gdp::core::Vec3 relative = position - first;
+        const float along = std::clamp(
+            ((relative.x * segment.x) + (relative.z * segment.z)) / lengthSquared,
+            0.0F, 1.0F);
+        const float closestX = first.x + (segment.x * along);
+        const float closestZ = first.z + (segment.z * along);
+        const float deltaX = position.x - closestX;
+        const float deltaZ = position.z - closestZ;
+        const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
+        if (distanceSquared < closestDistanceSquared) {
+            closestDistanceSquared = distanceSquared;
+            closestProgress = (traversed + (length * along)) / totalLength;
+        }
+        traversed += length;
+    }
+    const float tolerance = (corridor.width * 0.5F) + 0.20F;
+    if (closestDistanceSquared > tolerance * tolerance) {
+        return std::nullopt;
+    }
+    return std::clamp(closestProgress, 0.0F, 1.0F);
 }
 
 } // namespace
@@ -340,10 +387,13 @@ bool Application::initialize()
         log(LogLevel::Error, "Renderer initialization failed");
         return false;
     }
-    const bool roomMaterialsPrepared = prepareRoomMaterials(*renderer_, *startRoom);
-    if (!roomMaterialsPrepared) {
-        log(LogLevel::Error, "START room material preparation failed");
-        return false;
+    roomMaterialKeys_.clear();
+    for (const world::RoomInstance& room : world_->rooms) {
+        if (!prepareRoomMaterials(*renderer_, room)) {
+            log(LogLevel::Error, "World room material preparation failed");
+            return false;
+        }
+        roomMaterialKeys_.emplace(room.id, renderer_->activeRoomMaterialKey());
     }
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
         const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
@@ -475,11 +525,6 @@ void Application::fixedUpdate(const double fixedStep)
             *world_, playerRoom, false);
         collisionWorld_ = gameplay::collisionWorldWithProps(
             baseCollisionWorld_, entities_, playerRoom);
-        if (renderer_ != nullptr
-            && !prepareRoomMaterials(*renderer_, destination)) {
-            log(LogLevel::Error, "Destination room material preparation failed");
-            running_ = false;
-        }
         if (audio_) {
             audio_->setAmbience(destination.seed,
                 static_cast<std::uint64_t>(destination.theme));
@@ -840,10 +885,24 @@ void Application::render()
     std::vector<gdp::render::PropRenderData> visibleProps;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
+    std::vector<world::RoomId> visibleRoomIds{playerRoom};
+    if (world_) {
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            if (corridor.firstRoom == playerRoom) {
+                visibleRoomIds.push_back(corridor.secondRoom);
+            } else if (corridor.secondRoom == playerRoom) {
+                visibleRoomIds.push_back(corridor.firstRoom);
+            }
+        }
+    }
+    const auto isVisibleRoom = [&visibleRoomIds](const world::RoomId roomId) {
+        return std::find(visibleRoomIds.begin(), visibleRoomIds.end(), roomId)
+            != visibleRoomIds.end();
+    };
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
-        if (entity != nullptr && enemy != nullptr && entity->roomId == playerRoom
+        if (entity != nullptr && enemy != nullptr && isVisibleRoom(entity->roomId)
             && (enemy->archetype == entities::EnemyArchetype::Worker
                 || enemy->archetype == entities::EnemyArchetype::Guard
                 || enemy->archetype == entities::EnemyArchetype::Officer
@@ -870,7 +929,7 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Item)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::ItemData* item = entities_.findData<entities::ItemData>(id);
-        if (entity == nullptr || item == nullptr || entity->roomId != playerRoom) {
+        if (entity == nullptr || item == nullptr || !isVisibleRoom(entity->roomId)) {
             continue;
         }
         gdp::render::PickupVisualRole role = gdp::render::PickupVisualRole::Health;
@@ -884,7 +943,7 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Prop)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::PropData* prop = entities_.findData<entities::PropData>(id);
-        if (entity == nullptr || prop == nullptr || entity->roomId != playerRoom
+        if (entity == nullptr || prop == nullptr || !isVisibleRoom(entity->roomId)
             || (prop->type != entities::PropType::Crate
                 && prop->type != entities::PropType::Canister
                 && prop->type != entities::PropType::Barricade)) {
@@ -958,12 +1017,58 @@ void Application::render()
             renderedRoomRole = currentRoom->role;
             roomRender.origin = currentRoom->transform.position;
             roomRender.rotation = currentRoom->rotation;
+            if (const auto material = roomMaterialKeys_.find(currentRoom->id);
+                material != roomMaterialKeys_.end()) {
+                roomRender.materialKey = material->second;
+            }
             const std::size_t roomIndex = static_cast<std::size_t>(
                 std::distance(world_->rooms.begin(), currentRoom));
             if (roomIndex < roomLighting_.size()) {
                 const bool alert = activeEvent != roomEvents_.end()
                     && gameplay::isRoomLocked(*activeEvent);
                 lighting = makeRenderLighting(roomLighting_[roomIndex], alert);
+            }
+            if (!gameplay::roomContainingPosition(*world_, player_.state().position)) {
+                for (const world::CorridorPath& corridor : world_->corridors) {
+                    if (corridor.firstRoom != playerRoom
+                        && corridor.secondRoom != playerRoom) {
+                        continue;
+                    }
+                    const std::optional<float> corridorProgress = corridorProgressAt(
+                        corridor, player_.state().position);
+                    if (!corridorProgress) {
+                        continue;
+                    }
+                    const world::RoomId otherRoomId = corridor.firstRoom == playerRoom
+                        ? corridor.secondRoom : corridor.firstRoom;
+                    const auto otherRoom = std::find_if(
+                        world_->rooms.begin(), world_->rooms.end(),
+                        [otherRoomId](const world::RoomInstance& candidate) {
+                            return candidate.id == otherRoomId;
+                        });
+                    if (otherRoom == world_->rooms.end()) {
+                        break;
+                    }
+                    const std::size_t otherIndex = static_cast<std::size_t>(
+                        std::distance(world_->rooms.begin(), otherRoom));
+                    if (otherIndex >= roomLighting_.size()) {
+                        break;
+                    }
+                    float otherWeight = corridor.firstRoom == playerRoom
+                        ? *corridorProgress : 1.0F - *corridorProgress;
+                    otherWeight = otherWeight * otherWeight * (3.0F - (2.0F * otherWeight));
+                    const gdp::render::RoomLightingRenderData otherLighting
+                        = makeRenderLighting(roomLighting_[otherIndex], false);
+                    lighting.ambientColor = (lighting.ambientColor * (1.0F - otherWeight))
+                        + (otherLighting.ambientColor * otherWeight);
+                    lighting.ambientIntensity
+                        = (lighting.ambientIntensity * (1.0F - otherWeight))
+                        + (otherLighting.ambientIntensity * otherWeight);
+                    lighting.fixtureEmissive
+                        = (lighting.fixtureEmissive * (1.0F - otherWeight))
+                        + (otherLighting.fixtureEmissive * otherWeight);
+                    break;
+                }
             }
             if (session_.state().phase == gameplay::SessionPhase::Victory) {
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
@@ -1000,6 +1105,8 @@ void Application::render()
                     std::span<const gdp::core::Vec3>{corridor.points},
                     corridor.width,
                     corridor.height,
+                    roomMaterialKeys_.contains(corridor.firstRoom)
+                        ? roomMaterialKeys_.at(corridor.firstRoom) : 0U,
                 });
                 const auto connectedRoom = std::find_if(
                     world_->rooms.begin(), world_->rooms.end(),
@@ -1012,6 +1119,8 @@ void Application::render()
                 connectedRooms.push_back({
                     connectedRoom->transform.position,
                     connectedRoom->rotation,
+                    roomMaterialKeys_.contains(connectedRoom->id)
+                        ? roomMaterialKeys_.at(connectedRoom->id) : 0U,
                 });
                 const auto entryDoor = std::find_if(
                     connectedRoom->connectors.begin(), connectedRoom->connectors.end(),
@@ -1036,10 +1145,20 @@ void Application::render()
                 : " | OBJECTIVE: REACH BOSS");
     }
     SDL_SetWindowTitle(window_, title.str().c_str());
+    gdp::render::HudRenderData hud;
+    if (session_.state().phase == gameplay::SessionPhase::Victory) {
+        hud.objective = gdp::render::ObjectiveRenderState::Victory;
+    } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
+        hud.objective = gdp::render::ObjectiveRenderState::Defeat;
+    } else if (renderedRoomRole == world::RoomRole::Boss) {
+        hud.objective = gdp::render::ObjectiveRenderState::DefeatBoss;
+    } else {
+        hud.objective = gdp::render::ObjectiveRenderState::ReachBoss;
+    }
     if (renderer_ == nullptr
         || !renderer_->render(
             width, height, camera, visibleEnemies, visiblePickups, visibleProps,
-            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms)) {
+            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms, hud)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         running_ = false;
         return;
@@ -1056,6 +1175,7 @@ void Application::shutdown()
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    roomMaterialKeys_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};

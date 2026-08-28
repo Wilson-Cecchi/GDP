@@ -1,7 +1,8 @@
 # Renderer — Iluminação
 
-> **Estado:** luz pontual fixa mínima implementada no shader da Fase 2; perfis,
-> estados, seeds e budgets de sala permanecem planejados.
+> **Estado:** luz pontual mínima implementada na Fase 2; planos procedurais por
+> sala, alerta e budgets integrados na Fase 12; mistura ambiente entre salas
+> conectadas integrada na Fase 14. Flicker e estados persistentes permanecem planejados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -41,6 +42,11 @@ Security usa iluminação branca regular ocupando 20–35% da textura e posicion
 um sensor fora das luminárias. O alerta vermelho não modifica a luz global.
 Central Hub usa 135–144 pixels de luminárias lineares e alinha sua direção ao
 mesmo eixo de circulação do piso, sem adicionar sinalização de risco ao teto.
+
+Durante a passagem física por um `CorridorPath`, a posição projetada sobre seus
+segmentos produz peso bidirecional com `smoothstep`. Cor/intensidade ambiente e
+emissão de fixture interpolam entre origem e destino antes da troca de sala;
+os pontos continuam em coordenadas de mundo e o perfil ativo muda na entrada.
 
 ## Room Lighting Profile
 

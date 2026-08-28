@@ -72,6 +72,7 @@ struct PropRenderData {
 struct RoomRenderData {
     gdp::core::Vec3 origin{};
     gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
+    std::uint64_t materialKey{0};
 };
 
 struct DoorRenderData {
@@ -86,6 +87,19 @@ struct CorridorRenderData {
     std::span<const gdp::core::Vec3> points{};
     float width{1.2F};
     float height{2.2F};
+    std::uint64_t materialKey{0};
+};
+
+enum class ObjectiveRenderState : std::uint8_t {
+    None,
+    ReachBoss,
+    DefeatBoss,
+    Victory,
+    Defeat,
+};
+
+struct HudRenderData {
+    ObjectiveRenderState objective{ObjectiveRenderState::None};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 4U;
@@ -127,6 +141,10 @@ public:
     [[nodiscard]] bool prepareTechnicalRoomMaterials(gdp::core::Seed roomSeed);
     [[nodiscard]] bool prepareSecurityRoomMaterials(gdp::core::Seed roomSeed);
     [[nodiscard]] bool prepareCentralHubRoomMaterials(gdp::core::Seed roomSeed);
+    [[nodiscard]] std::uint64_t activeRoomMaterialKey() const noexcept
+    {
+        return activeRoomMaterialKey_;
+    }
     [[nodiscard]] bool prepareWorkerVisual(gdp::core::Seed visualSeed);
     [[nodiscard]] bool prepareGuardVisual(gdp::core::Seed visualSeed);
     [[nodiscard]] bool prepareOfficerVisual(gdp::core::Seed visualSeed);
@@ -143,7 +161,8 @@ public:
         RoomRenderData room = {},
         std::span<const DoorRenderData> doors = {},
         std::span<const CorridorRenderData> corridors = {},
-        std::span<const RoomRenderData> connectedRooms = {});
+        std::span<const RoomRenderData> connectedRooms = {},
+        HudRenderData hud = {});
 
 private:
     struct EnemyGpuVisual {

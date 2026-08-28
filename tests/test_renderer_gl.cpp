@@ -138,6 +138,7 @@ int main()
 
             const bool renderedStorageVariant = renderer.prepareStorageRoomMaterials(24680)
                 && renderer.render(width, height);
+            const std::uint64_t storageMaterialKey = renderer.activeRoomMaterialKey();
             std::vector<std::uint8_t> storagePixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, storagePixels.data());
 
@@ -173,6 +174,7 @@ int main()
             const bool renderedCentralHubVariant
                 = renderer.prepareCentralHubRoomMaterials(424242)
                 && renderer.render(width, height);
+            const std::uint64_t centralHubMaterialKey = renderer.activeRoomMaterialKey();
             std::vector<std::uint8_t> centralHubPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, centralHubPixels.data());
 
@@ -238,9 +240,10 @@ int main()
             const std::array corridorGeometry{
                 gdp::render::CorridorRenderData{corridorPoints, 1.2F, 2.2F},
             };
-            constexpr std::array connectedRoomGeometry{
+            const std::array connectedRoomGeometry{
                 gdp::render::RoomRenderData{
-                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0},
+                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
+                    storageMaterialKey},
             };
             const bool renderedCorridor = renderer.render(
                 width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
@@ -248,6 +251,24 @@ int main()
             std::vector<std::uint8_t> corridorPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 corridorPixels.data());
+            const std::array connectedRoomCentralHub{
+                gdp::render::RoomRenderData{
+                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
+                    centralHubMaterialKey},
+            };
+            const bool renderedConnectedRoomMaterial = renderer.render(
+                width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
+                corridorGeometry, connectedRoomCentralHub);
+            std::vector<std::uint8_t> connectedRoomMaterialPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                connectedRoomMaterialPixels.data());
+
+            const bool renderedHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                gdp::render::HudRenderData{gdp::render::ObjectiveRenderState::Victory});
+            std::vector<std::uint8_t> hudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                hudPixels.data());
 
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
@@ -313,6 +334,8 @@ int main()
             std::size_t alertLightingChangedChannels = 0;
             std::size_t doorStateChangedChannels = 0;
             std::size_t corridorChangedChannels = 0;
+            std::size_t connectedRoomMaterialChangedChannels = 0;
+            std::size_t hudChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -365,6 +388,14 @@ int main()
                         != openDoorPixels[index + channel]) {
                         ++corridorChangedChannels;
                     }
+                    if (connectedRoomMaterialPixels[index + channel]
+                        != corridorPixels[index + channel]) {
+                        ++connectedRoomMaterialChangedChannels;
+                    }
+                    if (hudPixels[index + channel]
+                        != centralHubPixels[index + channel]) {
+                        ++hudChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -408,6 +439,9 @@ int main()
                 && doorStateChangedChannels > 100U
                 && renderedOpenDoor && renderedCorridor
                 && corridorChangedChannels > 100U
+                && renderedConnectedRoomMaterial
+                && connectedRoomMaterialChangedChannels > 100U
+                && renderedHud && hudChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

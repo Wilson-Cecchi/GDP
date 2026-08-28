@@ -3441,8 +3441,20 @@ Player morto: Defeat ✓
 restart com nova seed determinística ✓
 ```
 
-**Próximo marco:** preservar conteúdo/material/iluminação das duas salas durante
-a passagem pelo corredor e representar objetivo/resultado dentro do viewport.
+## Fase 14 — Apresentação multissala
+
+```text
+materiais de todas as salas preparados antes do primeiro frame ✓
+shell e decoração com material por sala ✓
+inimigos, pickups e props adjacentes visíveis antes da entrada ✓
+IA e coleta restritas à sala lógica ✓
+mistura de ambiente/emissão ao longo do corredor ✓
+objetivo e resultado dentro do viewport ✓
+regressão OpenGL para material multissala e HUD ✓
+```
+
+**Próximo marco:** animar abertura/fechamento das portas e aplicar crossfade de
+ambiência, removendo o reposicionamento imediato da interação normal.
 
 ---
 

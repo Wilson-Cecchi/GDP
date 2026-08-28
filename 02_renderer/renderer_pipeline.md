@@ -3,8 +3,9 @@
 > **Estado:** renderer mínimo da Fase 2 implementado e validado; variantes de
 > Worker e materiais industriais preparados/cacheados antes do draw nas Fases 9
 > e 10; iluminação procedural integrada na Fase 12; transform da sala ativa e
-> portas, shells adjacentes e corredores conectados integrados na Fase 13. Filas completas,
-> culling, transparência, UI e pós-processamento
+> portas, shells adjacentes e corredores conectados integrados na Fase 13;
+> materiais/decor multissala e overlay bitmap integrados na Fase 14. Filas completas,
+> culling, transparência, HUD final e pós-processamento
 > permanecem planejados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
@@ -51,10 +52,10 @@ GAME STATE
 shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
 
 ```text
-room transforms + corridor paths + material variant + lighting plan
-→ room shells + corridor segments + doors/fixtures
+room transforms + corridor paths + per-room material keys + lighting plan
+→ current/adjacent room shells + corridor segments + doors/fixtures/decor
 → enemy variants → pickup markers → props
-→ framebuffer color+depth → blit → SDL window
+→ framebuffer color+depth → blit → objective/result overlay → SDL window
 ```
 
 O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
@@ -84,13 +85,21 @@ plano. O flag `alert` mistura ambiente, pontos e fixtures com vermelho enquanto
 o evento mantém a sala em lockdown; a regressão offscreen exige saídas distintas
 para iluminação padrão, procedural e alerta.
 
-`RoomRenderData` aplica origem e quarter-turn à shell da sala ocupada e das
-salas diretamente adjacentes. As paredes são divididas ao redor da abertura de
+`RoomRenderData` aplica origem, quarter-turn e uma chave de material à shell da
+sala ocupada e das salas diretamente adjacentes. Todos os perfis do mundo são
+preparados antes do primeiro frame; por isso a sala destino mantém shell,
+decoração, inimigos, pickups e props próprios antes da troca de `roomId`, sem
+ativar sua IA antecipadamente. As paredes são divididas ao redor da abertura de
 cada connector. `DoorRenderData` usa moldura ciano quando atravessável e painel
 vermelho durante lockdown. `CorridorRenderData` referencia os pontos do mundo e
 desenha cada trecho ortogonal com piso, teto e laterais. A regressão offscreen
 coloca uma sala fora da origem, gira 90°, diferencia os dois estados da porta e
-exige mudança de pixels com a câmera dentro de um corredor conectado.
+exige mudança de pixels com a câmera dentro de um corredor conectado e também
+ao trocar somente a chave de material da sala adjacente.
+
+Após o blit, `HudRenderData` seleciona um overlay bitmap provisório independente
+de FOV: objetivo no topo e banner central para Victory/Defeat. A regressão
+OpenGL exige alteração de pixels para o estado terminal.
 
 ## Separação
 

@@ -61,8 +61,11 @@ especializados das pastas numeradas.
 - **Fase 13 — Vertical slice navegável:** concluída; portas e corredores
   Straight/L/Z conectam as salas, o IndustrialRobot encerra a run em Victory,
   morte encerra em Defeat e `Enter` inicia um novo mundo determinístico.
-- **Próxima atualização:** manter conteúdo e apresentação multissala durante a
-  passagem pelos corredores e levar objetivo/resultado para dentro do viewport.
+- **Fase 14 — Apresentação multissala:** concluída; salas adjacentes preservam
+  materiais, decoração e entidades próprias antes da troca lógica, a luz
+  ambiente mistura durante o corredor e objetivo/resultado aparecem no viewport.
+- **Próxima atualização:** portas com abertura física e crossfade de ambiência,
+  substituindo o reposicionamento imediato por uma interação totalmente contínua.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -72,7 +75,7 @@ não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
 O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e
-rotação reais, com cubo indexado reutilizado e materiais procedurais de
+rotação reais, com cubo indexado reutilizado e materiais procedurais próprios de
 parede/piso/teto derivados da seed da sala, aberturas e molduras ciano nas
 portas, painéis vermelhos durante lockdown, corredores com piso, teto e paredes,
 até quatro luzes pontuais procedurais, luminárias emissivas, ambiente por tema,
@@ -83,8 +86,9 @@ cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, caminha pelas portas ou usa `E` como atalho compatível, interage
 com o terminal usando `E`, dispara com o botão esquerdo
-e recarrega com `R`. Pickups próximos são coletados automaticamente; run,
-objetivo, HP, munição e chaves aparecem no título da janela. `Esc` encerra a
+e recarrega com `R`. Pickups próximos são coletados automaticamente; objetivo e
+resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
+mesmos estados permanecem no título como apoio. `Esc` encerra a
 aplicação enquanto o sistema de menus ainda não existe.
 
 Em Victory ou Defeat, a simulação congela, o título mostra o resultado e
@@ -99,11 +103,12 @@ quatro `BodyProfile` e uma biblioteca compatível de 18 peças Box/Cylinder, com
 assimetria, materiais e desgaste próprios; sua mesh e seu albedo são preparados
 e cacheados antes do draw. Ele persegue o jogador, ataca em alcance e pode ser
 morto pela pistola hitscan. Ao caminhar por uma porta e pelo corredor, a sala
-destino é assumida automaticamente ao cruzar seus bounds; `E` ainda oferece a
-travessia imediata. HP, chaves, munição e upgrades são preservados. A
-entidade muda de `roomId`, e colisão, conteúdo visível, evento, material,
-iluminação e ambiência passam a usar a nova sala. Lockdown bloqueia a saída até
-o evento terminar.
+destino já permanece visível com decoração, inimigos, pickups, props e materiais
+próprios; sua IA continua inativa até a entrada. A luz ambiente mistura pelo
+trajeto e a sala é assumida automaticamente ao cruzar seus bounds; `E` ainda
+oferece a travessia imediata. HP, chaves, munição e upgrades são preservados. A
+entidade muda de `roomId`, e colisão, evento e ambiência passam a usar a nova
+sala. Lockdown bloqueia a saída até o evento terminar.
 
 O Guard presente nas Arenas agora possui três perfis (`Patrol`, `Tactical` e
 `Armored`), biblioteca própria de 18 peças, arma longa obrigatória e paleta
@@ -195,6 +200,13 @@ concede derrota; estados terminais congelam gameplay. `Enter` desmonta os
 sistemas da run e gera outro mundo a partir de uma seed derivada do valor
 inicial e do índice da run, reproduzível em execuções diferentes.
 
+O incremento da Fase 14 remove a troca brusca de apresentação no limite da
+sala. Todos os materiais do mundo são enviados à GPU antes do primeiro frame;
+cada shell e corredor referencia uma chave estável, e conteúdo/decor da sala
+adjacente entra na fila ainda durante a aproximação. No corredor, ambiente e
+emissão misturam com `smoothstep`. Um passe bitmap independente da câmera 3D
+mostra `REACH BOSS`, `DEFEAT BOSS`, `VICTORY` ou `DEFEAT` no viewport.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -208,10 +220,10 @@ pesado com grade e óleo e teto mecânico categorizado. Security acrescenta
 console monitorado, alerta vermelho confinado, piso técnico e teto claro
 regular. Central Hub fecha o conjunto com grandes superfícies neutras,
 sinalização ciano única, rotas contínuas no piso e luminárias alinhadas. O
-renderer cacheia os oito perfis pelo hash completo e seleciona o perfil da sala
-ocupada. O teste OpenGL offscreen também cobre sala transladada/rotacionada, a
-mudança visual de porta normal para lockdown e geometria vista de dentro de um
-corredor conectado.
+renderer cacheia os oito perfis pelo hash completo e seleciona o perfil de cada
+sala renderizada. O teste OpenGL offscreen também cobre sala
+transladada/rotacionada, porta normal/lockdown, geometria vista do corredor,
+materiais diferentes simultâneos em salas conectadas e o overlay terminal.
 
 ## Compilar e testar
 
