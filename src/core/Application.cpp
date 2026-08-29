@@ -1284,6 +1284,7 @@ void Application::render()
             renderedRoomRole = currentRoom->role;
             roomRender.origin = currentRoom->transform.position;
             roomRender.rotation = currentRoom->rotation;
+            roomRender.worldBounds = currentRoom->worldBounds;
             if (const auto material = roomMaterialKeys_.find(currentRoom->id);
                 material != roomMaterialKeys_.end()) {
                 roomRender.materialKey = material->second;
@@ -1384,6 +1385,7 @@ void Application::render()
                     renderedRoom.rotation,
                     roomMaterialKeys_.contains(renderedRoom.id)
                         ? roomMaterialKeys_.at(renderedRoom.id) : 0U,
+                    renderedRoom.worldBounds,
                 });
             }
             const auto edgeIsLocked = [this, &visibleEdges](const world::EdgeId edge) {

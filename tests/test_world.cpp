@@ -64,6 +64,14 @@ void testModuleValidation()
     expect(containsError(zoneResult, ModuleValidationError::ZoneOutsideBounds),
         "spawn zone outside local bounds is rejected");
 
+    RoomModule mismatchedFootprint = module;
+    mismatchedFootprint.footprint.x = 20;
+    const auto footprintResult = validateRoomModule(mismatchedFootprint);
+    expect(containsError(
+               footprintResult,
+               ModuleValidationError::BoundsFootprintMismatch),
+        "module bounds must agree with the declared structural footprint");
+
     RoomModule blockedConnector = module;
     blockedConnector.propZones.push_back(
         {{{-0.2F, 0.0F, 4.3F}, {0.2F, 1.0F, 4.8F}}});
@@ -72,6 +80,84 @@ void testModuleValidation()
                clearanceResult,
                ModuleValidationError::ZoneOverlapsConnectorClearance),
         "spawn zone inside connector clearance is rejected");
+}
+
+void testDefaultModuleStructuralVariety()
+{
+    using namespace gdp::core;
+    using namespace gdp::world;
+
+    const std::vector<RoomModule> library = makeDefaultRoomModuleLibrary();
+    bool sawCompact = false;
+    bool sawMedium = false;
+    bool sawLarge = false;
+    bool roleSizesValid = true;
+    bool rotationsValid = true;
+    for (const RoomModule& module : library) {
+        expect(validateRoomModule(module).isValid(),
+            "every default structural room module validates");
+        sawCompact = sawCompact || module.sizeClass == RoomSizeClass::Compact;
+        sawMedium = sawMedium || module.sizeClass == RoomSizeClass::Medium;
+        sawLarge = sawLarge || module.sizeClass == RoomSizeClass::Large;
+        if ((module.supportsRole(RoomRole::Hub)
+                || module.supportsRole(RoomRole::Arena)
+                || module.supportsRole(RoomRole::Boss))
+            && module.sizeClass != RoomSizeClass::Large) {
+            roleSizesValid = false;
+        }
+        if (module.supportsRole(RoomRole::Secret)
+            && module.sizeClass != RoomSizeClass::Compact) {
+            roleSizesValid = false;
+        }
+
+        for (const QuarterTurn rotation : {
+                 QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90,
+                 QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            RoomRole role = RoomRole::Normal;
+            for (const RoomRole candidate : {
+                     RoomRole::Start, RoomRole::Normal, RoomRole::Hub,
+                     RoomRole::Arena, RoomRole::DeadEnd, RoomRole::Secret,
+                     RoomRole::Boss}) {
+                if (module.supportsRole(candidate)) {
+                    role = candidate;
+                    break;
+                }
+            }
+            const auto room = instantiateRoom(
+                module, module.id, role, 77U, {23.0F, 0.0F, -19.0F}, rotation);
+            if (!room || room->sizeClass != module.sizeClass
+                || !room->worldBounds.isValid()) {
+                rotationsValid = false;
+                continue;
+            }
+            for (const ConnectorInstance& connector : room->connectors) {
+                const auto direction = directionFromNormal(connector.worldNormal);
+                if (!direction) {
+                    rotationsValid = false;
+                    continue;
+                }
+                const float plane = *direction == Direction::North
+                    ? room->worldBounds.maximum.z
+                    : *direction == Direction::South
+                    ? room->worldBounds.minimum.z
+                    : *direction == Direction::East
+                    ? room->worldBounds.maximum.x
+                    : room->worldBounds.minimum.x;
+                const float position = *direction == Direction::North
+                        || *direction == Direction::South
+                    ? connector.worldPosition.z : connector.worldPosition.x;
+                rotationsValid = rotationsValid && nearlyEqual(plane, position);
+            }
+        }
+    }
+    expect(library.size() >= 20U && sawCompact && sawMedium && sawLarge,
+        "default library contains compact, medium and large structural families");
+    expect(roleSizesValid,
+        "Hub, Arena and Boss use large modules while Secret uses compact modules");
+    expect(rotationsValid,
+        "every default module keeps bounds and connectors valid in all four rotations");
 }
 
 void testInstantiationAndRotation()
@@ -231,7 +317,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0xAD9EB33762CCF4A5ULL,
+    expect(fingerprint == 0xFEF4A385CE034FE6ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -517,6 +603,10 @@ void testWorldSeedBatch()
     bool allValid = true;
     std::uint32_t maximumAcceptedAttempt = 0;
     float maximumCorridorLength = 0.0F;
+    bool sawCompact = false;
+    bool sawMedium = false;
+    bool sawLarge = false;
+    bool roleSizesValid = true;
     for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
         const WorldGenerationResult generated = generateWorld(seed);
         if (!generated.world || !validateWorld(*generated.world).isValid()) {
@@ -527,6 +617,20 @@ void testWorldSeedBatch()
         maximumAcceptedAttempt = std::max(
             maximumAcceptedAttempt,
             generated.world->acceptedAttempt);
+        for (const RoomInstance& room : generated.world->rooms) {
+            sawCompact = sawCompact || room.sizeClass == RoomSizeClass::Compact;
+            sawMedium = sawMedium || room.sizeClass == RoomSizeClass::Medium;
+            sawLarge = sawLarge || room.sizeClass == RoomSizeClass::Large;
+            if ((room.role == RoomRole::Hub || room.role == RoomRole::Arena
+                    || room.role == RoomRole::Boss)
+                && room.sizeClass != RoomSizeClass::Large) {
+                roleSizesValid = false;
+            }
+            if (room.role == RoomRole::Secret
+                && room.sizeClass != RoomSizeClass::Compact) {
+                roleSizesValid = false;
+            }
+        }
         for (const CorridorPath& corridor : generated.world->corridors) {
             float length = 0.0F;
             for (std::size_t index = 1U; index < corridor.points.size(); ++index) {
@@ -538,6 +642,8 @@ void testWorldSeedBatch()
     }
     expect(allValid, "1,000 deterministic seeds produce valid committed worlds");
     expect(maximumAcceptedAttempt < 32U, "batch stays inside configured attempt budget");
+    expect(sawCompact && sawMedium && sawLarge && roleSizesValid,
+        "seed batch exercises all size families and preserves role-specific sizing");
     expect(maximumCorridorLength <= 17.0F,
         "local loop policy prevents map-spanning corridors");
 }
@@ -547,6 +653,7 @@ void testWorldSeedBatch()
 int main()
 {
     testModuleValidation();
+    testDefaultModuleStructuralVariety();
     testInstantiationAndRotation();
     testConnectorContracts();
     testRequiredConnectorResolution();

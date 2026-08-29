@@ -145,6 +145,12 @@ uma revisão de textura, primeiro registrar e aprovar a proposta conforme
 Um framebuffer estável não significa que a direção visual foi aprovada, e uma
 prancha aprovada não permite aceitar pixels ausentes, NaN ou perda de contraste.
 
+O gate estrutural da Fase 20 valida os 23 módulos, as três classes de tamanho,
+os papéis especiais e todos os connectors nas quatro rotações. O batch de 1.000
+mundos exige AABBs sem overlap e corredores limitados; o de 500 mundos percorre
+cada ligação nos dois sentidos. A regressão OpenGL inclui uma sala conectada
+grande para impedir o retorno das dimensões fixas no renderer.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

@@ -74,6 +74,10 @@ struct RoomRenderData {
     gdp::core::Vec3 origin{};
     gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
     std::uint64_t materialKey{0};
+    gdp::core::Aabb worldBounds{
+        {-3.85F, 0.0F, -4.85F},
+        {3.85F, 4.0F, 4.85F},
+    };
 };
 
 struct DoorRenderData {

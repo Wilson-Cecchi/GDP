@@ -90,6 +90,51 @@ bool overlaps(const gdp::core::Aabb first, const gdp::core::Aabb second) noexcep
         && first.minimum.z <= second.maximum.z && first.maximum.z >= second.minimum.z;
 }
 
+RoomModule makeRectangularModule(
+    const RoomModuleId id,
+    std::string name,
+    const RoomTheme theme,
+    const RoomSizeClass sizeClass,
+    const GridSize footprint,
+    const RoomRoleMask roles)
+{
+    constexpr float wallInset = 0.15F;
+    const float halfX = (static_cast<float>(footprint.x) * 0.5F) - wallInset;
+    const float halfZ = (static_cast<float>(footprint.z) * 0.5F) - wallInset;
+
+    RoomModule module;
+    module.id = id;
+    module.name = std::move(name);
+    module.theme = theme;
+    module.sizeClass = sizeClass;
+    module.footprint = footprint;
+    module.localBounds = {
+        {-halfX, 0.0F, -halfZ},
+        {halfX, static_cast<float>(footprint.y), halfZ},
+    };
+    module.roleCapabilities = roles;
+    module.connectors = {
+        {1, ConnectorType::Door, {0.0F, 0.0F, halfZ}, {0.0F, 0.0F, 1.0F},
+            1.2F, 2.2F, false},
+        {2, ConnectorType::Door, {0.0F, 0.0F, -halfZ}, {0.0F, 0.0F, -1.0F},
+            1.2F, 2.2F, false},
+        {3, ConnectorType::Door, {halfX, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
+            1.2F, 2.2F, false},
+        {4, ConnectorType::Door, {-halfX, 0.0F, 0.0F}, {-1.0F, 0.0F, 0.0F},
+            1.2F, 2.2F, false},
+    };
+
+    const float enemyHalfX = std::min(halfX - 1.15F, halfX * 0.48F);
+    const float enemyHalfZ = std::min(halfZ - 1.15F, halfZ * 0.34F);
+    module.enemyZones = {{{{-enemyHalfX, 0.0F, -enemyHalfZ},
+        {enemyHalfX, 0.0F, enemyHalfZ}}}};
+    module.lootZones = {{{{-halfX + 0.70F, 0.0F, -halfZ + 0.80F},
+        {-halfX + 1.90F, 0.0F, -halfZ + 2.00F}}}};
+    module.propZones = {{{{1.15F, 0.0F, -halfZ + 0.80F},
+        {halfX - 1.00F, 0.0F, halfZ - 0.80F}}}};
+    return module;
+}
+
 gdp::core::Aabb transformBounds(
     const gdp::core::Aabb localBounds,
     const gdp::core::Vec3 origin,
@@ -150,6 +195,19 @@ ModuleValidationResult validateRoomModule(const RoomModule& module)
     }
     if (!module.localBounds.isValid()) {
         result.errors.push_back(ModuleValidationError::InvalidBounds);
+    } else {
+        const gdp::core::Vec3 span = module.localBounds.maximum
+            - module.localBounds.minimum;
+        constexpr float maximumInset = 1.0F;
+        constexpr float tolerance = 1.0e-4F;
+        if (span.x > static_cast<float>(module.footprint.x) + tolerance
+            || span.y > static_cast<float>(module.footprint.y) + tolerance
+            || span.z > static_cast<float>(module.footprint.z) + tolerance
+            || span.x < static_cast<float>(module.footprint.x) - maximumInset
+            || span.y < static_cast<float>(module.footprint.y) - maximumInset
+            || span.z < static_cast<float>(module.footprint.z) - maximumInset) {
+            result.errors.push_back(ModuleValidationError::BoundsFootprintMismatch);
+        }
     }
     if (module.roleCapabilities == 0U) {
         result.errors.push_back(ModuleValidationError::NoRoleCapability);
@@ -206,6 +264,7 @@ std::optional<RoomInstance> instantiateRoom(
     room.id = roomId;
     room.role = role;
     room.theme = module.theme;
+    room.sizeClass = module.sizeClass;
     room.seed = seed;
     room.moduleId = module.id;
     room.transform.position = worldOrigin;
@@ -244,23 +303,17 @@ bool hasUnresolvedRequiredConnector(const RoomInstance& room) noexcept
 
 RoomModule makeFixedRoomModule()
 {
-    RoomModule module;
-    module.id = 1;
-    module.name = "IndustrialFixedRoom_01";
-    module.theme = RoomTheme::Industrial;
-    module.footprint = {8, 4, 10};
-    module.localBounds = {{-3.85F, 0.0F, -4.85F}, {3.85F, 4.0F, 4.85F}};
-    module.roleCapabilities = roomRoleBit(RoomRole::Start)
+    RoomModule module = makeRectangularModule(
+        1,
+        "IndustrialFixedRoom_01",
+        RoomTheme::Industrial,
+        RoomSizeClass::Medium,
+        {8, 4, 10},
+        roomRoleBit(RoomRole::Start)
         | roomRoleBit(RoomRole::Normal)
         | roomRoleBit(RoomRole::Hub)
         | roomRoleBit(RoomRole::Arena)
-        | roomRoleBit(RoomRole::DeadEnd);
-    module.connectors = {
-        {1, ConnectorType::Door, {0.0F, 0.0F, 4.85F}, {0.0F, 0.0F, 1.0F}, 1.2F, 2.2F, false},
-        {2, ConnectorType::Door, {0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F}, 1.2F, 2.2F, false},
-        {3, ConnectorType::Door, {3.85F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F}, 1.2F, 2.2F, false},
-        {4, ConnectorType::Door, {-3.85F, 0.0F, 0.0F}, {-1.0F, 0.0F, 0.0F}, 1.2F, 2.2F, false},
-    };
+        | roomRoleBit(RoomRole::DeadEnd));
     module.enemyZones = {{{{-2.0F, 0.0F, -1.0F}, {2.0F, 0.0F, 1.0F}}}};
     module.lootZones = {{{{-3.0F, 0.0F, -3.0F}, {-2.0F, 0.0F, -2.0F}}}};
     module.propZones = {{{{1.5F, 0.0F, -3.0F}, {3.0F, 0.0F, 1.5F}}}};
@@ -269,38 +322,61 @@ RoomModule makeFixedRoomModule()
 
 std::vector<RoomModule> makeDefaultRoomModuleLibrary()
 {
-    const RoomModule base = makeFixedRoomModule();
-    const auto makeVariant = [&base](
-                                 const RoomModuleId id,
-                                 std::string name,
-                                 const RoomTheme theme,
-                                 const RoomRoleMask roles) {
-        RoomModule module = base;
-        module.id = id;
-        module.name = std::move(name);
-        module.theme = theme;
-        module.roleCapabilities = roles;
-        return module;
-    };
-
     const RoomRoleMask common = roomRoleBit(RoomRole::Normal)
         | roomRoleBit(RoomRole::DeadEnd);
     return {
-        makeVariant(1, "Industrial_01", RoomTheme::Industrial,
-            common | roomRoleBit(RoomRole::Start) | roomRoleBit(RoomRole::Hub)
-                | roomRoleBit(RoomRole::Arena)),
-        makeVariant(2, "Storage_01", RoomTheme::Storage,
-            common | roomRoleBit(RoomRole::Secret)),
-        makeVariant(3, "Office_01", RoomTheme::Office,
-            common | roomRoleBit(RoomRole::Secret)),
-        makeVariant(4, "Laboratory_01", RoomTheme::Laboratory,
-            common | roomRoleBit(RoomRole::Secret) | roomRoleBit(RoomRole::Boss)),
-        makeVariant(5, "Maintenance_01", RoomTheme::Maintenance,
-            common | roomRoleBit(RoomRole::Hub) | roomRoleBit(RoomRole::Arena)
-                | roomRoleBit(RoomRole::Boss)),
-        makeVariant(6, "Security_01", RoomTheme::Security,
-            common | roomRoleBit(RoomRole::Arena) | roomRoleBit(RoomRole::Boss)),
-        makeVariant(7, "Cafeteria_01", RoomTheme::Cafeteria, common),
+        makeRectangularModule(101, "IndustrialCompact_01", RoomTheme::Industrial,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(102, "IndustrialMedium_01", RoomTheme::Industrial,
+            RoomSizeClass::Medium, {8, 4, 10}, common),
+        makeRectangularModule(103, "IndustrialStart_01", RoomTheme::Industrial,
+            RoomSizeClass::Medium, {9, 4, 10}, roomRoleBit(RoomRole::Start)),
+        makeRectangularModule(104, "IndustrialHub_01", RoomTheme::Industrial,
+            RoomSizeClass::Large, {12, 5, 12}, roomRoleBit(RoomRole::Hub)),
+
+        makeRectangularModule(201, "StorageCompact_01", RoomTheme::Storage,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(202, "StorageWide_01", RoomTheme::Storage,
+            RoomSizeClass::Medium, {10, 4, 9}, common),
+        makeRectangularModule(203, "StorageSecret_01", RoomTheme::Storage,
+            RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
+
+        makeRectangularModule(301, "OfficeCompact_01", RoomTheme::Office,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(302, "OfficeWide_01", RoomTheme::Office,
+            RoomSizeClass::Medium, {10, 4, 9}, common),
+
+        makeRectangularModule(401, "LaboratoryCompact_01", RoomTheme::Laboratory,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(402, "LaboratoryMedium_01", RoomTheme::Laboratory,
+            RoomSizeClass::Medium, {9, 5, 10}, common),
+        makeRectangularModule(403, "LaboratorySecret_01", RoomTheme::Laboratory,
+            RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
+        makeRectangularModule(404, "LaboratoryBoss_01", RoomTheme::Laboratory,
+            RoomSizeClass::Large, {14, 6, 12}, roomRoleBit(RoomRole::Boss)),
+
+        makeRectangularModule(501, "MaintenanceCompact_01", RoomTheme::Maintenance,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(502, "MaintenanceMedium_01", RoomTheme::Maintenance,
+            RoomSizeClass::Medium, {8, 5, 11}, common),
+        makeRectangularModule(503, "MaintenanceArena_01", RoomTheme::Maintenance,
+            RoomSizeClass::Large, {12, 5, 11}, roomRoleBit(RoomRole::Arena)),
+        makeRectangularModule(504, "MaintenanceBoss_01", RoomTheme::Maintenance,
+            RoomSizeClass::Large, {14, 6, 12}, roomRoleBit(RoomRole::Boss)),
+
+        makeRectangularModule(601, "SecurityCompact_01", RoomTheme::Security,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(602, "SecurityMedium_01", RoomTheme::Security,
+            RoomSizeClass::Medium, {9, 4, 10}, common),
+        makeRectangularModule(603, "SecurityArena_01", RoomTheme::Security,
+            RoomSizeClass::Large, {13, 5, 12}, roomRoleBit(RoomRole::Arena)),
+        makeRectangularModule(604, "SecurityBoss_01", RoomTheme::Security,
+            RoomSizeClass::Large, {14, 6, 13}, roomRoleBit(RoomRole::Boss)),
+
+        makeRectangularModule(701, "CafeteriaCompact_01", RoomTheme::Cafeteria,
+            RoomSizeClass::Compact, {7, 4, 9}, common),
+        makeRectangularModule(702, "CafeteriaWide_01", RoomTheme::Cafeteria,
+            RoomSizeClass::Medium, {10, 4, 9}, common),
     };
 }
 

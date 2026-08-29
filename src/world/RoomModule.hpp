@@ -36,6 +36,12 @@ enum class RoomTheme : std::uint8_t {
     Cafeteria,
 };
 
+enum class RoomSizeClass : std::uint8_t {
+    Compact,
+    Medium,
+    Large,
+};
+
 using RoomRoleMask = std::uint32_t;
 
 [[nodiscard]] constexpr RoomRoleMask roomRoleBit(const RoomRole role) noexcept
@@ -57,6 +63,7 @@ struct RoomModule {
     RoomModuleId id{0};
     std::string name;
     RoomTheme theme{RoomTheme::Industrial};
+    RoomSizeClass sizeClass{RoomSizeClass::Medium};
     GridSize footprint{};
     gdp::core::Aabb localBounds{};
     RoomRoleMask roleCapabilities{0};
@@ -73,6 +80,7 @@ enum class ModuleValidationError : std::uint8_t {
     EmptyName,
     InvalidFootprint,
     InvalidBounds,
+    BoundsFootprintMismatch,
     NoRoleCapability,
     NoConnectors,
     DuplicateConnectorId,
@@ -92,6 +100,7 @@ struct RoomInstance {
     RoomId id{0};
     RoomRole role{RoomRole::Normal};
     RoomTheme theme{RoomTheme::Industrial};
+    RoomSizeClass sizeClass{RoomSizeClass::Medium};
     gdp::core::Seed seed{0};
     RoomModuleId moduleId{0};
     gdp::core::Transform transform{};

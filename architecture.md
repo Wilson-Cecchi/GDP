@@ -3537,16 +3537,17 @@ auditoria ampliada: 10.000 gerações e 2.000 travessias ✓
 ## Fase 20 — Variedade estrutural de salas
 
 ```text
-RoomModule compactos, médios e grandes
-Hub, Arena, Boss e Secret com proporções próprias
-localBounds/footprint como fonte única de renderer e colisão
-connectors, zonas, spacing e corredores derivados dos bounds reais
-quatro rotações e travessia procedural validadas
+23 RoomModule compactos, médios e grandes ✓
+Hub, Arena e Boss grandes; Secret compacta ✓
+worldBounds como fonte do shell no renderer e da colisão ✓
+connectors, zonas, spacing e corredores derivados dos bounds reais ✓
+quatro rotações, 1.000 mundos e 500 travessias validadas ✓
 ```
 
-A biblioteca atual clona uma base aproximada de `8 × 4 × 10`; isso é baseline
-do vertical slice, não formato final. A geometria precisa estabilizar antes da
-revisão artística para que as texturas sejam aprovadas nas superfícies reais.
+A biblioteca varia footprints de `7 × 4 × 9` a `14 × 6 × 13`. O placement usa
+as bordas reais do módulo anterior e dos vizinhos de cada branch, preservando
+corredores compactos sem sobrepor salas de proporções diferentes. O renderer
+recebe os bounds da instância; nenhuma receita visual foi alterada.
 
 ## Fase 21 — Menu principal
 
@@ -3566,7 +3567,7 @@ capturas in-engine e regressões técnicas depois da implementação
 registro em visual/TEXTURE_APPROVALS.md
 ```
 
-**Próximo marco:** implementar a Fase 20; a Fase 22 não começa por código sem
+**Próximo marco:** implementar a Fase 21; a Fase 22 não começa por código sem
 aprovação visual prévia da textura correspondente.
 
 ---

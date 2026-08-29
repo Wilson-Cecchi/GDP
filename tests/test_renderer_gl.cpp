@@ -211,7 +211,8 @@ int main()
             constexpr gdp::render::CameraData translatedCamera{
                 {18.0F, 1.62F, -14.0F}, {1.0F, 0.0F, 0.0F}, 68.0F};
             constexpr gdp::render::RoomRenderData translatedRoom{
-                {14.0F, 0.0F, -14.0F}, gdp::core::QuarterTurn::Degrees90};
+                {14.0F, 0.0F, -14.0F}, gdp::core::QuarterTurn::Degrees90, 0U,
+                {{9.15F, 0.0F, -17.85F}, {18.85F, 4.0F, -10.15F}}};
             std::array translatedDoors{
                 gdp::render::DoorRenderData{
                     {18.85F, 0.0F, -14.0F}, {1.0F, 0.0F, 0.0F},
@@ -265,7 +266,8 @@ int main()
             const std::array connectedRoomGeometry{
                 gdp::render::RoomRenderData{
                     {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
-                    storageMaterialKey},
+                    storageMaterialKey,
+                    {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
             };
             const bool renderedCorridor = renderer.render(
                 width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
@@ -276,7 +278,8 @@ int main()
             const std::array connectedRoomCentralHub{
                 gdp::render::RoomRenderData{
                     {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
-                    centralHubMaterialKey},
+                    centralHubMaterialKey,
+                    {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
             };
             const bool renderedConnectedRoomMaterial = renderer.render(
                 width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
@@ -305,11 +308,13 @@ int main()
             const std::array cornerConnectedRoom{
                 gdp::render::RoomRenderData{
                     {4.0F, 0.0F, -9.85F}, gdp::core::QuarterTurn::Degrees0,
-                    storageMaterialKey},
+                    storageMaterialKey,
+                    {{0.15F, 0.0F, -14.70F}, {7.85F, 4.0F, -5.0F}}},
             };
             const gdp::render::RoomRenderData cornerRoom{
                 {-4.85F, 0.0F, 0.0F}, gdp::core::QuarterTurn::Degrees90,
-                centralHubMaterialKey};
+                centralHubMaterialKey,
+                {{-9.70F, 0.0F, -3.85F}, {0.0F, 4.0F, 3.85F}}};
             constexpr gdp::render::CameraData cornerCamera{
                 {-0.35F, 1.62F, 0.0F}, {0.94F, 0.0F, -0.34F}, 68.0F};
             gdp::render::RoomLightingRenderData cornerLighting;

@@ -5,7 +5,8 @@
 #include "world/MapGraph.hpp"
 
 #include <algorithm>
-#include <unordered_map>
+#include <limits>
+#include <vector>
 
 namespace gdp::world {
 namespace {
@@ -34,29 +35,76 @@ const RoomModule* selectModule(
         random.rangeInt(0, static_cast<int>(candidates.size() - 1U)))];
 }
 
+const RoomInstance* findPlacedRoom(
+    const std::span<const RoomInstance> rooms,
+    const RoomNodeId id) noexcept
+{
+    const auto room = std::find_if(
+        rooms.begin(), rooms.end(),
+        [id](const RoomInstance& candidate) { return candidate.id == id; });
+    return room == rooms.end() ? nullptr : &*room;
+}
+
+gdp::core::Aabb translatedBounds(
+    const gdp::core::Aabb bounds,
+    const gdp::core::Vec3 translation) noexcept
+{
+    return {bounds.minimum + translation, bounds.maximum + translation};
+}
+
+bool overlapsWithGap(
+    const gdp::core::Aabb first,
+    const gdp::core::Aabb second,
+    const float gap) noexcept
+{
+    return first.minimum.x - gap < second.maximum.x
+        && first.maximum.x + gap > second.minimum.x
+        && first.minimum.z - gap < second.maximum.z
+        && first.maximum.z + gap > second.minimum.z;
+}
+
 gdp::core::Vec3 placementForNode(
     const MapGraph& graph,
     const RoomNodeId node,
     const float spacing,
-    const std::unordered_map<RoomNodeId, gdp::core::Vec3>& placed)
+    const RoomInstance& prototype,
+    const std::span<const RoomInstance> placedRooms)
 {
+    // Preserve the former default feel as a 2.5-unit doorway-to-doorway gap,
+    // while allowing callers to request roomier maps through roomSpacing.
+    const float corridorClearance = std::max(2.5F, spacing - 9.5F);
     const auto main = std::find(graph.mainPath.begin(), graph.mainPath.end(), node);
     if (main != graph.mainPath.end()) {
-        const auto index = static_cast<float>(std::distance(graph.mainPath.begin(), main));
-        return {0.0F, 0.0F, -index * spacing};
+        if (main == graph.mainPath.begin()) {
+            return {};
+        }
+        const RoomNodeId previousId = *(main - 1);
+        const RoomInstance* previous = findPlacedRoom(placedRooms, previousId);
+        if (previous == nullptr) {
+            return {};
+        }
+        return {
+            previous->transform.position.x,
+            0.0F,
+            previous->worldBounds.minimum.z - corridorClearance
+                - prototype.worldBounds.maximum.z,
+        };
     }
 
-    RoomNodeId parent = graph.mainPath.size() > 1U ? graph.mainPath[1] : graph.mainPath.front();
+    std::vector<const RoomInstance*> neighbors;
     for (const MapEdge& edge : graph.edges) {
-        if (edge.first == node && placed.contains(edge.second)) {
-            parent = edge.second;
-            break;
-        }
-        if (edge.second == node && placed.contains(edge.first)) {
-            parent = edge.first;
-            break;
+        const RoomNodeId other = edge.first == node ? edge.second
+            : edge.second == node ? edge.first : 0U;
+        if (other != 0U) {
+            if (const RoomInstance* neighbor = findPlacedRoom(placedRooms, other)) {
+                neighbors.push_back(neighbor);
+            }
         }
     }
+    if (neighbors.empty()) {
+        return {};
+    }
+
     std::size_t branchOrdinal = 0;
     for (const RoomNode& candidate : graph.nodes) {
         if (candidate.id == node) {
@@ -68,7 +116,39 @@ gdp::core::Vec3 placementForNode(
         }
     }
     const float side = (branchOrdinal % 2U == 0U) ? -1.0F : 1.0F;
-    return placed.at(parent) + gdp::core::Vec3{side * spacing, 0.0F, 0.0F};
+    float averageZ = 0.0F;
+    float sideBoundary = side < 0.0F
+        ? std::numeric_limits<float>::max()
+        : std::numeric_limits<float>::lowest();
+    for (const RoomInstance* neighbor : neighbors) {
+        averageZ += neighbor->transform.position.z;
+        sideBoundary = side < 0.0F
+            ? std::min(sideBoundary, neighbor->worldBounds.minimum.x)
+            : std::max(sideBoundary, neighbor->worldBounds.maximum.x);
+    }
+    averageZ /= static_cast<float>(neighbors.size());
+
+    gdp::core::Vec3 position{
+        side < 0.0F
+            ? sideBoundary - corridorClearance - prototype.worldBounds.maximum.x
+            : sideBoundary + corridorClearance - prototype.worldBounds.minimum.x,
+        0.0F,
+        averageZ,
+    };
+    for (int adjustment = 0; adjustment < 64; ++adjustment) {
+        const gdp::core::Aabb candidateBounds
+            = translatedBounds(prototype.worldBounds, position);
+        const bool overlaps = std::any_of(
+            placedRooms.begin(), placedRooms.end(),
+            [candidateBounds](const RoomInstance& room) {
+                return overlapsWithGap(candidateBounds, room.worldBounds, 0.5F);
+            });
+        if (!overlaps) {
+            break;
+        }
+        position.x += side;
+    }
+    return position;
 }
 
 ConnectorInstance* chooseConnector(RoomInstance& room, const gdp::core::Vec3 target)
@@ -108,7 +188,6 @@ CandidateOutcome generateCandidate(
         return {std::nullopt, GenerationFailure::GraphInvalid};
     }
 
-    std::unordered_map<RoomNodeId, gdp::core::Vec3> placements;
     candidate.rooms.reserve(candidate.graph.nodes.size());
     for (const RoomNode& node : candidate.graph.nodes) {
         const gdp::core::Seed roomSeed = gdp::core::deriveSeed(
@@ -119,10 +198,14 @@ CandidateOutcome generateCandidate(
         if (module == nullptr) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }
-        const gdp::core::Vec3 position = placementForNode(
-            candidate.graph, node.id, config.roomSpacing, placements);
-        placements[node.id] = position;
         const auto rotation = static_cast<gdp::core::QuarterTurn>(random.rangeInt(0, 3));
+        const auto prototype = instantiateRoom(
+            *module, node.id, node.role, roomSeed, {}, rotation);
+        if (!prototype) {
+            return {std::nullopt, GenerationFailure::ModuleUnavailable};
+        }
+        const gdp::core::Vec3 position = placementForNode(
+            candidate.graph, node.id, config.roomSpacing, *prototype, candidate.rooms);
         auto room = instantiateRoom(*module, node.id, node.role, roomSeed, position, rotation);
         if (!room) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};

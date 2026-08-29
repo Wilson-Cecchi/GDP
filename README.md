@@ -85,15 +85,14 @@ especializados das pastas numeradas.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
   próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
   abertas e lockdown aguarda o collider liberar o vão antes de bloquear a rota.
-- **Fase 20 — Variedade estrutural de salas:** planejada; substituir a base
-  única por módulos compactos, médios e grandes, com Hub, Arena, Boss e Secret
-  usando dimensões e layouts próprios.
+- **Fase 20 — Variedade estrutural de salas:** implementada e validada; a
+  biblioteca possui módulos compactos, médios e grandes, com Hub, Arena, Boss e
+  Secret usando dimensões próprias e placement derivado dos bounds reais.
 - **Fase 21 — Menu principal:** planejada; início de run e saída antes da
   geração do mundo.
 - **Fase 22 — Revisão visual aprovada:** planejada; revisar texturas por unidade
   visual somente após aprovação explícita de uma prancha anterior à implementação.
-- **Próxima atualização:** implementar a variedade estrutural de salas antes de
-  refazer as superfícies visuais.
+- **Próxima atualização:** implementar o menu principal antes da geração da run.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -308,22 +307,24 @@ sala renderizada. O teste OpenGL offscreen também cobre sala
 transladada/rotacionada, porta normal/lockdown, geometria vista do corredor,
 materiais diferentes simultâneos em salas conectadas e o overlay terminal.
 
-## Planejamento da variedade estrutural de salas
+## Variedade estrutural de salas
 
-As sete variantes atuais de `RoomModule` reutilizam a mesma base aproximada de
-`8 × 4 × 10`; uma rotação apenas troca largura e profundidade. Essa geometria é
-um baseline do vertical slice, não o formato final das salas.
+A Fase 20 substituiu as sete cópias da base aproximada de `8 × 4 × 10` por 23
+módulos retangulares distribuídos entre famílias compactas, médias e grandes.
+Os footprints variam de `7 × 4 × 9` a `14 × 6 × 13`; Hub, Arena e Boss usam
+módulos grandes próprios, enquanto Secret usa módulos compactos dedicados.
 
-A Fase 20 introduzirá famílias compactas, médias e grandes. Hub, Arena, Boss e
-Secret terão proporções e composição próprias. `footprint` e `localBounds`
-passarão a ser a fonte única para renderer, colisão, connectors, zonas de spawn,
-spacing e validação de corredores, removendo dimensões fixas paralelas. Toda
-variante deverá funcionar nas quatro rotações, manter as portas livres e passar
-pelos lotes determinísticos de geração e travessia.
+`localBounds` e `footprint` agora definem renderer, colisão, connectors, zonas
+de spawn e o fingerprint determinístico. O placement calcula a separação entre
+os AABBs reais das salas: o caminho principal avança a partir da borda do
+módulo anterior e branches consideram todas as salas vizinhas já posicionadas.
+Assim, aumentar uma sala não alonga nem quebra o corredor por manter centros em
+uma grade de tamanho fixo.
 
-Essa fase precede a revisão artística porque as texturas devem ser avaliadas nas
-superfícies e proporções definitivas, evitando aprovar um material em uma caixa
-que será substituída logo depois.
+Todos os módulos validam connectors e zonas nas quatro rotações. Os lotes
+permanentes cobrem 1.000 mundos estruturais, 500 mundos atravessados nos dois
+sentidos e uma sala grande conectada no teste OpenGL. Nenhuma receita de textura
+foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 ## Gate obrigatório de aprovação visual
 

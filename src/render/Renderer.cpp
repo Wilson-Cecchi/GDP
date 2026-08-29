@@ -839,37 +839,39 @@ bool Renderer::render(
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
-        const bool swapsAxes
-            = renderedRoom.rotation == gdp::core::QuarterTurn::Degrees90
-            || renderedRoom.rotation == gdp::core::QuarterTurn::Degrees270;
-        const float roomHalfX = swapsAxes ? 4.85F : 3.85F;
-        const float roomHalfZ = swapsAxes ? 3.85F : 4.85F;
-        constexpr float roomHeight = 4.0F;
+        const gdp::core::Aabb bounds = renderedRoom.worldBounds;
+        const float roomWidth = bounds.maximum.x - bounds.minimum.x;
+        const float roomDepth = bounds.maximum.z - bounds.minimum.z;
+        const float roomHeight = bounds.maximum.y - bounds.minimum.y;
+        const gdp::core::Vec3 roomCenter{
+            (bounds.minimum.x + bounds.maximum.x) * 0.5F,
+            bounds.minimum.y,
+            (bounds.minimum.z + bounds.maximum.z) * 0.5F,
+        };
         constexpr float shellThickness = 0.20F;
         drawSurface(roomMaterials,
-            renderedRoom.origin
-                + gdp::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
-            {(roomHalfX * 2.0F) + shellThickness, shellThickness,
-                (roomHalfZ * 2.0F) + shellThickness},
+            roomCenter + gdp::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
+            {roomWidth + shellThickness, shellThickness,
+                roomDepth + shellThickness},
             RoomMaterialChannel::Floor, 4.0F);
         drawSurface(roomMaterials,
-            renderedRoom.origin
+            roomCenter
                 + gdp::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
-            {(roomHalfX * 2.0F) + shellThickness, shellThickness,
-                (roomHalfZ * 2.0F) + shellThickness},
+            {roomWidth + shellThickness, shellThickness,
+                roomDepth + shellThickness},
             RoomMaterialChannel::Ceiling, 4.0F);
 
         const auto drawWall = [&](const gdp::core::Vec3 normal) {
             const bool facesX = std::abs(normal.x) > 0.5F;
             const float wallCenter = facesX
-                ? renderedRoom.origin.x + (normal.x * roomHalfX)
-                : renderedRoom.origin.z + (normal.z * roomHalfZ);
+                ? (normal.x > 0.0F ? bounds.maximum.x : bounds.minimum.x)
+                : (normal.z > 0.0F ? bounds.maximum.z : bounds.minimum.z);
             const float transverseMinimum = facesX
-                ? renderedRoom.origin.z - roomHalfZ
-                : renderedRoom.origin.x - roomHalfX;
+                ? bounds.minimum.z
+                : bounds.minimum.x;
             const float transverseMaximum = facesX
-                ? renderedRoom.origin.z + roomHalfZ
-                : renderedRoom.origin.x + roomHalfX;
+                ? bounds.maximum.z
+                : bounds.maximum.x;
             const auto door = std::find_if(
                 doors.begin(), doors.end(), [&](const DoorRenderData& candidate) {
                     const float candidatePlane
@@ -889,10 +891,10 @@ bool Renderer::render(
                 const float transverseCenter = (minimum + maximum) * 0.5F;
                 const gdp::core::Vec3 position = facesX
                     ? gdp::core::Vec3{wallCenter,
-                        renderedRoom.origin.y + ((bottom + top) * 0.5F),
+                        bounds.minimum.y + ((bottom + top) * 0.5F),
                         transverseCenter}
                     : gdp::core::Vec3{transverseCenter,
-                        renderedRoom.origin.y + ((bottom + top) * 0.5F),
+                        bounds.minimum.y + ((bottom + top) * 0.5F),
                         wallCenter};
                 const gdp::core::Vec3 scale = facesX
                     ? gdp::core::Vec3{

@@ -42,9 +42,12 @@ std::uint64_t worldFingerprint(const World& world) noexcept
     for (const RoomInstance& room : world.rooms) {
         hash = gdp::core::hashCombine(hash, room.id);
         hash = gdp::core::hashCombine(hash, room.moduleId);
+        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(room.sizeClass));
         hash = gdp::core::hashCombine(hash, room.seed);
         hash = addVec3(hash, room.transform.position);
         hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(room.rotation));
+        hash = addVec3(hash, room.worldBounds.minimum);
+        hash = addVec3(hash, room.worldBounds.maximum);
         for (const ConnectorInstance& connector : room.connectors) {
             hash = gdp::core::hashCombine(hash, connector.definitionId);
             hash = addVec3(hash, connector.worldPosition);
