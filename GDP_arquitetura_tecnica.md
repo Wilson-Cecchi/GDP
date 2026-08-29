@@ -3577,8 +3577,20 @@ restart limpa feedback e passos inválidos não avançam timers ✓
 regressões unitárias, headless e OpenGL ✓
 ```
 
-**Próximo marco:** implementar pausa funcional e menu in-game sem avançar a
-simulação em segundo plano.
+## Fase 19 — Pausa funcional
+
+```text
+Esc alterna pausa sem encerrar a run ✓
+fixed update, look e comandos ficam congelados ✓
+mouse relativo é liberado e restaurado ✓
+Resume, Restart Run e Exit Game funcionais ✓
+navegação W/S, setas, Enter e wrap determinístico ✓
+overlay responsivo oculta mira e feedback transitório ✓
+regressões unitárias, headless e OpenGL ✓
+```
+
+**Próximo marco:** implementar menu principal com início de run e saída antes
+da geração do mundo.
 
 ---
 

@@ -115,6 +115,7 @@ add_library(
     src/gameplay/Enemy.cpp
     src/gameplay/Feedback.cpp
     src/gameplay/Loot.cpp
+    src/gameplay/Pause.cpp
     src/gameplay/Player.cpp
     src/gameplay/Progression.cpp
     src/gameplay/Props.cpp
@@ -252,6 +253,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME hud_feedback_systems COMMAND gdp_feedback_tests)
     set_tests_properties(hud_feedback_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_pause_tests tests/test_pause.cpp)
+    target_link_libraries(gdp_pause_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_pause_tests)
+    gdp_enable_sanitizers(gdp_pause_tests)
+
+    add_test(NAME pause_menu_systems COMMAND gdp_pause_tests)
+    set_tests_properties(pause_menu_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_progression_tests tests/test_progression.cpp)
     target_link_libraries(gdp_progression_tests PRIVATE gdp_gameplay)

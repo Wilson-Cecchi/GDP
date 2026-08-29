@@ -318,6 +318,15 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::render::HudRenderData pausedHud = functionalHud;
+            pausedHud.paused = true;
+            pausedHud.pauseSelection = gdp::render::HudPauseSelection::RestartRun;
+            const bool renderedPauseMenu = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, pausedHud);
+            std::vector<std::uint8_t> pauseMenuPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pauseMenuPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -386,6 +395,7 @@ int main()
             std::size_t connectedRoomMaterialChangedChannels = 0;
             std::size_t hudChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t pauseMenuChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -454,6 +464,10 @@ int main()
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
                     }
+                    if (pauseMenuPixels[index + channel]
+                        != functionalHudPixels[index + channel]) {
+                        ++pauseMenuChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -502,6 +516,7 @@ int main()
                 && connectedRoomMaterialChangedChannels > 100U
                 && renderedHud && hudChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

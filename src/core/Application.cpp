@@ -282,7 +282,8 @@ int Application::run()
             if (!running_) {
                 continue;
             }
-            if (session_.state().phase == gameplay::SessionPhase::Playing) {
+            if (session_.state().phase == gameplay::SessionPhase::Playing
+                && !pauseMenu_.paused) {
                 player_.applyLook(input_.mouseDelta());
             }
 
@@ -533,8 +534,8 @@ void Application::processEvents()
         }
     }
 
-    if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
-        running_ = false;
+    if (!running_) {
+        return;
     }
 
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
@@ -542,9 +543,47 @@ void Application::processEvents()
         interactionPending_ = false;
         firePending_ = false;
         reloadPending_ = false;
+        if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            running_ = false;
+        }
         if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
             restartRequested_ = true;
             running_ = false;
+        }
+        return;
+    }
+
+    if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+        setPaused(!pauseMenu_.paused);
+        return;
+    }
+
+    if (pauseMenu_.paused) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+        const bool moveUp = input_.wasKeyPressed(SDL_SCANCODE_UP)
+            || input_.wasKeyPressed(SDL_SCANCODE_W);
+        const bool moveDown = input_.wasKeyPressed(SDL_SCANCODE_DOWN)
+            || input_.wasKeyPressed(SDL_SCANCODE_S);
+        if (moveUp != moveDown) {
+            gameplay::movePauseSelection(pauseMenu_, moveUp ? -1 : 1);
+        }
+        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+            const gameplay::PauseMenuCommand command
+                = gameplay::activatePauseSelection(pauseMenu_);
+            if (command == gameplay::PauseMenuCommand::Resume) {
+                setPaused(false);
+            } else if (command == gameplay::PauseMenuCommand::RestartRun) {
+                log(LogLevel::Info, "Pause menu requested run restart");
+                restartRequested_ = true;
+                running_ = false;
+            } else if (command == gameplay::PauseMenuCommand::ExitGame) {
+                log(LogLevel::Info, "Pause menu requested game exit");
+                restartRequested_ = false;
+                running_ = false;
+            }
         }
         return;
     }
@@ -559,8 +598,29 @@ void Application::processEvents()
     playerCommand_.interact = interactionPending_;
 }
 
+void Application::setPaused(const bool paused)
+{
+    if (paused) {
+        gameplay::openPauseMenu(pauseMenu_);
+    } else {
+        gameplay::closePauseMenu(pauseMenu_);
+    }
+    playerCommand_ = {};
+    interactionPending_ = false;
+    firePending_ = false;
+    reloadPending_ = false;
+    if (!config_.headless && window_ != nullptr
+        && !SDL_SetWindowRelativeMouseMode(window_, !paused)) {
+        log(LogLevel::Warning, sdlError("Pause mouse mode update failed"));
+    }
+    log(LogLevel::Info, paused ? "Game paused" : "Game resumed");
+}
+
 void Application::fixedUpdate(const double fixedStep)
 {
+    if (pauseMenu_.paused) {
+        return;
+    }
     const float step = static_cast<float>(fixedStep);
     gameplay::updateFeedback(feedback_, step);
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
@@ -1333,6 +1393,9 @@ void Application::render()
                 ? " | OBJECTIVE: DEFEAT BOSS"
                 : " | OBJECTIVE: REACH BOSS");
     }
+    if (pauseMenu_.paused) {
+        title << " | PAUSED";
+    }
     SDL_SetWindowTitle(window_, title.str().c_str());
     gdp::render::HudRenderData hud;
     hud.visible = true;
@@ -1352,6 +1415,12 @@ void Application::render()
         hud.hitFeedback = gdp::render::HudHitFeedback::Kill;
     }
     hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
+    hud.paused = pauseMenu_.paused;
+    if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
+        hud.pauseSelection = gdp::render::HudPauseSelection::RestartRun;
+    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
+        hud.pauseSelection = gdp::render::HudPauseSelection::ExitGame;
+    }
     switch (feedback_.notice) {
     case gameplay::NoticeFeedbackKind::Pickup:
         hud.notice = gdp::render::HudNotice::Pickup;
@@ -1456,6 +1525,7 @@ void Application::shutdown()
     weapon_ = gameplay::Weapon{};
     progression_ = gameplay::ProgressionSystem{};
     gameplay::clearFeedback(feedback_);
+    gameplay::closePauseMenu(pauseMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};

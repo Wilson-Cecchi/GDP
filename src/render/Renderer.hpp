@@ -130,6 +130,12 @@ enum class HudNotice : std::uint8_t {
     LevelUp,
 };
 
+enum class HudPauseSelection : std::uint8_t {
+    Resume,
+    RestartRun,
+    ExitGame,
+};
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
@@ -149,6 +155,8 @@ struct HudRenderData {
     float hitFeedbackStrength{0.0F};
     HudNotice notice{HudNotice::None};
     float noticeFeedbackStrength{0.0F};
+    bool paused{false};
+    HudPauseSelection pauseSelection{HudPauseSelection::Resume};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

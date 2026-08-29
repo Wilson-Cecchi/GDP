@@ -6,6 +6,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Feedback.hpp"
+#include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
 #include "gameplay/Weapon.hpp"
@@ -59,6 +60,7 @@ private:
     void fixedUpdate(double fixedStepSeconds);
     void render();
     void shutdown();
+    void setPaused(bool paused);
 
     ApplicationConfig config_;
     Input input_;
@@ -70,6 +72,7 @@ private:
     gameplay::ProgressionSystem progression_;
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
+    gameplay::PauseMenuState pauseMenu_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};

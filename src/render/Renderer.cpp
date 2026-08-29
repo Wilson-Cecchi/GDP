@@ -1166,7 +1166,7 @@ bool Renderer::render(
 
     if (hud.visible) {
         const float damageStrength = std::clamp(hud.damageFeedback, 0.0F, 1.0F);
-        if (damageStrength > 0.0F) {
+        if (!hud.paused && damageStrength > 0.0F) {
             const int edgeThickness = std::max(1,
                 static_cast<int>((2.0F + (4.0F * damageStrength))
                     * static_cast<float>(hudScale)));
@@ -1310,7 +1310,7 @@ bool Renderer::render(
             promptText = "R RELOAD";
             promptColor = {0.98F, 0.62F, 0.14F};
         }
-        if (!promptText.empty()) {
+        if (!hud.paused && !promptText.empty()) {
             const int promptWidth = bitmapTextWidth(promptText, hudScale)
                 + (hudPadding * 2);
             const int promptHeight = (7 * hudScale) + (hudPadding * 2);
@@ -1322,7 +1322,8 @@ bool Renderer::render(
         }
 
         const float hitStrength = std::clamp(hud.hitFeedbackStrength, 0.0F, 1.0F);
-        if (hud.hitFeedback != HudHitFeedback::None && hitStrength > 0.0F) {
+        if (!hud.paused && hud.hitFeedback != HudHitFeedback::None
+            && hitStrength > 0.0F) {
             const bool killed = hud.hitFeedback == HudHitFeedback::Kill;
             const gdp::core::Vec3 baseColor = killed
                 ? gdp::core::Vec3{1.0F, 0.26F, 0.10F}
@@ -1367,7 +1368,7 @@ bool Renderer::render(
         }
         const float noticeStrength = std::clamp(
             hud.noticeFeedbackStrength, 0.0F, 1.0F);
-        if (!noticeText.empty() && noticeStrength > 0.0F) {
+        if (!hud.paused && !noticeText.empty() && noticeStrength > 0.0F) {
             const int noticeWidth = bitmapTextWidth(noticeText, hudScale)
                 + (hudPadding * 2);
             const int noticeHeight = (7 * hudScale) + (hudPadding * 2);
@@ -1417,11 +1418,53 @@ bool Renderer::render(
         drawBitmapText((width - promptWidth) / 2, bannerY + 16,
             1, prompt, {0.76F, 0.84F, 0.88F});
     }
-    glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
-    glScissor((width / 2) - 7, (height / 2) - 1, 15, 3);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glScissor((width / 2) - 1, (height / 2) - 7, 3, 15);
-    glClear(GL_COLOR_BUFFER_BIT);
+    if (hud.paused) {
+        const int menuWidth = std::max(1, std::min(width - 16, 180 * hudScale));
+        const int menuHeight = std::max(1, std::min(height - 16, 95 * hudScale));
+        const int menuX = (width - menuWidth) / 2;
+        const int menuY = (height - menuHeight) / 2;
+        drawSolidRect(menuX, menuY, menuWidth, menuHeight,
+            {0.012F, 0.024F, 0.030F});
+        drawSolidRect(menuX, menuY + menuHeight - (2 * hudScale),
+            menuWidth, 2 * hudScale, cyanColor);
+        constexpr std::string_view pauseTitle = "PAUSED";
+        const int titleWidth = bitmapTextWidth(pauseTitle, hudScale);
+        drawBitmapText((width - titleWidth) / 2,
+            menuY + menuHeight - (14 * hudScale), hudScale,
+            pauseTitle, cyanColor);
+
+        constexpr std::array<std::string_view, 3> options{
+            "RESUME", "RESTART RUN", "EXIT GAME",
+        };
+        const std::size_t selected = hud.pauseSelection == HudPauseSelection::RestartRun
+            ? 1U : hud.pauseSelection == HudPauseSelection::ExitGame ? 2U : 0U;
+        const int firstOptionY = menuY + menuHeight - (34 * hudScale);
+        for (std::size_t index = 0; index < options.size(); ++index) {
+            const int optionWidth = bitmapTextWidth(options[index], hudScale);
+            const int optionY = firstOptionY
+                - (static_cast<int>(index) * 14 * hudScale);
+            if (index == selected) {
+                drawSolidRect((width - optionWidth) / 2 - (4 * hudScale),
+                    optionY - (2 * hudScale), optionWidth + (8 * hudScale),
+                    11 * hudScale, {0.06F, 0.18F, 0.21F});
+            }
+            drawBitmapText((width - optionWidth) / 2, optionY,
+                hudScale, options[index],
+                index == selected ? cyanColor : textColor);
+        }
+        const std::string_view controls = width >= 480
+            ? "W S SELECT  ENTER CONFIRM  ESC RESUME"
+            : "W S  ENTER  ESC";
+        const int controlsWidth = bitmapTextWidth(controls, 1);
+        drawBitmapText((width - controlsWidth) / 2, menuY + (6 * hudScale),
+            1, controls, {0.48F, 0.62F, 0.66F});
+    } else {
+        glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
+        glScissor((width / 2) - 7, (height / 2) - 1, 15, 3);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glScissor((width / 2) - 1, (height / 2) - 7, 3, 15);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
     glDisable(GL_SCISSOR_TEST);
     glEnable(GL_DEPTH_TEST);
     const GLenum error = glGetError();

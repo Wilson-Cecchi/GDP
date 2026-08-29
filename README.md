@@ -77,8 +77,11 @@ especializados das pastas numeradas.
 - **Fase 18 — Feedback de combate:** concluída; dano recebido marca as bordas,
   acertos e eliminações confirmam na mira, e coleta, ondas, eventos e level-up
   geram avisos temporários determinísticos.
-- **Próxima atualização:** implementar pausa funcional e menu in-game sem
-  avançar a simulação em segundo plano.
+- **Fase 19 — Pausa funcional:** concluída; `Esc` congela a simulação e abre um
+  menu responsivo com `RESUME`, `RESTART RUN` e `EXIT GAME`, liberando o mouse
+  até o retorno ao gameplay.
+- **Próxima atualização:** implementar menu principal com início de run e saída
+  antes da geração do mundo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -102,8 +105,9 @@ paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, dispara com o botão esquerdo
 e recarrega com `R`. Pickups próximos são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
-mesmos estados permanecem no título como apoio. `Esc` encerra a
-aplicação enquanto o sistema de menus ainda não existe.
+mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
+run; `W/S` ou setas navegam, `Enter` confirma e `Esc` retorna
+ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
 
 Em Victory ou Defeat, a simulação congela, o título mostra o resultado e
 `Enter` inicia uma nova run; `Esc` continua encerrando o jogo.
@@ -250,6 +254,13 @@ marcadores distintos ao redor da mira. `SUPPLIES ACQUIRED`, `EVENT START`,
 `NEW WAVE`, `SECTOR CLEAR` e `LEVEL UP` aparecem por tempo limitado. Passos
 inválidos não consomem timers e reiniciar a run limpa todo feedback pendente.
 
+Na Fase 19, `PauseMenuState` mantém seleção segura em `RESUME`, navegação com
+wrap e comandos separados para retomar, reconstruir a run ou sair. Enquanto
+pausado, look, input pendente, IA, portas, arma, eventos, áudio atualizado pelo
+game loop e timers de HUD não avançam. O mouse relativo é liberado na abertura
+e restaurado no retorno; o renderer oculta mira e feedback transitório sob o
+overlay central.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
 iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
@@ -281,7 +292,7 @@ ctest --preset debug
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
 Gameplay, Session, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
-Combat, HUD Feedback, Entities e World.
+Combat, HUD Feedback, Pause Menu, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 
