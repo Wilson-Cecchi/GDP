@@ -3310,7 +3310,8 @@ Transform
 START/BOSS únicos, main path explícito, branches DeadEnd/Secret, Hub/Arena,
 depth BFS e loop budget. `WorldGenerator` deriva streams por tentativa, grafo e
 sala, seleciona módulos compatíveis, posiciona sem overlap, consome connector
-pairs e roteia corredores Straight/L/Z sem atravessar salas alheias. O candidato
+pairs e roteia corredores Straight/L/Z sem reentrar nas salas dos endpoints nem
+atravessar salas alheias. O candidato
 só vira `World` após gates de graph, geometry, connectors e corridors. Um
 fingerprint dourado detecta deriva estrutural entre builds; 1.000 seeds passam
 em Debug, Release e ASan/UBSan. `--seed N` permite reprodução direta.
@@ -3587,6 +3588,18 @@ Resume, Restart Run e Exit Game funcionais ✓
 navegação W/S, setas, Enter e wrap determinístico ✓
 overlay responsivo oculta mira e feedback transitório ✓
 regressões unitárias, headless e OpenGL ✓
+```
+
+## Estabilização de travessia pós-Fase 19
+
+```text
+segmentos intermediários não reentram nas salas dos endpoints ✓
+seeds anteriormente quebradas atravessam cada corredor nos dois sentidos ✓
+batch permanente de 500 mundos fisicamente atravessáveis ✓
+roomId só muda após raio e altura do collider liberarem o vão ✓
+lockdown mantém porta passável aberta enquanto ocupada ✓
+colisão de lockdown acompanha o estado físico por edge ✓
+auditoria ampliada: 10.000 gerações e 2.000 travessias ✓
 ```
 
 **Próximo marco:** implementar menu principal com início de run e saída antes

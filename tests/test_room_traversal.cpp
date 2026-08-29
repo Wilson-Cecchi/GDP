@@ -77,6 +77,48 @@ bool moveToWaypoint(
     return false;
 }
 
+bool everyCorridorTraversesBothWays(const gdp::world::World& world)
+{
+    using namespace gdp;
+    for (const world::CorridorPath& corridor : world.corridors) {
+        const world::RoomId endpoints[2]{corridor.firstRoom, corridor.secondRoom};
+        for (const world::RoomId sourceId : endpoints) {
+            const world::RoomId destinationId = sourceId == corridor.firstRoom
+                ? corridor.secondRoom : corridor.firstRoom;
+            const world::RoomInstance* source = findRoom(world, sourceId);
+            const world::RoomInstance* destination = findRoom(world, destinationId);
+            const world::ConnectorInstance* sourceDoor
+                = source == nullptr ? nullptr : connectorForEdge(*source, corridor.edge);
+            const world::ConnectorInstance* destinationDoor = destination == nullptr
+                ? nullptr : connectorForEdge(*destination, corridor.edge);
+            if (source == nullptr || destination == nullptr
+                || sourceDoor == nullptr || destinationDoor == nullptr) {
+                return false;
+            }
+
+            const gameplay::CollisionWorld navigation
+                = gameplay::makeRoomNavigationCollision(world, sourceId, false);
+            std::vector<core::Vec3> waypoints = corridor.points;
+            if (sourceId == corridor.secondRoom) {
+                std::reverse(waypoints.begin(), waypoints.end());
+            }
+            waypoints.push_back(destinationDoor->worldPosition
+                - (destinationDoor->worldNormal * 0.75F));
+            core::Vec3 position = sourceDoor->worldPosition
+                - (sourceDoor->worldNormal * 0.55F);
+            for (const core::Vec3 waypoint : waypoints) {
+                if (!moveToWaypoint(navigation, position, waypoint)) {
+                    return false;
+                }
+            }
+            if (!destination->worldBounds.contains(position)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void testEveryGeneratedConnectionTraversesBothWays()
 {
     using namespace gdp;
@@ -163,6 +205,30 @@ void testRangeInvalidInputAndPlayerRelocation()
         "invalid relocation cannot corrupt player state");
 }
 
+void testCharacterRoomAdoptionRequiresFullClearance()
+{
+    using namespace gdp;
+    const auto room = world::instantiateRoom(
+        world::makeFixedRoomModule(), 1U, world::RoomRole::Normal,
+        99U, {}, core::QuarterTurn::Degrees0);
+    expect(room.has_value(), "fixed room instantiates for adoption clearance test");
+    if (!room) {
+        return;
+    }
+    world::World generated;
+    generated.rooms.push_back(*room);
+    const core::Vec3 thresholdPosition{0.0F, 0.0F, 4.75F};
+    const core::Vec3 safePosition{0.0F, 0.0F, 4.50F};
+    expect(gameplay::roomContainingPosition(generated, thresholdPosition) == 1U
+            && !gameplay::roomContainingCharacter(generated, thresholdPosition),
+        "a point across the threshold does not adopt the room before collider clearance");
+    expect(gameplay::roomContainingCharacter(generated, safePosition) == 1U,
+        "a fully cleared character collider adopts the destination room");
+    expect(!gameplay::roomContainingCharacter(
+            generated, safePosition, {.radius = -1.0F, .height = 1.8F}),
+        "invalid character collider cannot adopt a room");
+}
+
 void testRotatedRoomCollisionMatchesModuleBounds()
 {
     using namespace gdp;
@@ -215,11 +281,123 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
     (void)gameplay::updateDoor(door, 1.0F, false, false);
     expect(door.state == world::DoorState::Open,
         "reopened door returns to its fully open state");
+    (void)gameplay::updateDoor(door, 1.0F, true, true);
+    expect(door.state == world::DoorState::Open
+            && gameplay::isDoorPassable(door),
+        "lockdown holds an occupied passable door open until the player clears it");
     (void)gameplay::updateDoor(door, 1.0F, true, false);
     expect(door.state == world::DoorState::Locked
             && !gameplay::isDoorPassable(door)
             && !gameplay::requestDoorOpen(door, true),
-        "lockdown closes the door and rejects interaction");
+        "lockdown closes a cleared door and rejects interaction");
+}
+
+void testPreviouslyBrokenCorridorSeedsTraverseBothWays()
+{
+    using namespace gdp;
+    constexpr std::array<core::Seed, 8> regressionSeeds{
+        9U, 48U, 49U, 52U, 102U, 147U, 152U, 180U,
+    };
+    for (const core::Seed seed : regressionSeeds) {
+        const world::WorldGenerationResult generated = world::generateWorld(seed);
+        expect(generated.succeeded() && generated.world
+                && everyCorridorTraversesBothWays(*generated.world),
+            "previously broken corridor seed generates only traversable routes");
+    }
+}
+
+void testCorridorTraversalSeedBatch()
+{
+    using namespace gdp;
+    bool allTraversable = true;
+    for (core::Seed seed = 0; seed < 500U; ++seed) {
+        const world::WorldGenerationResult generated = world::generateWorld(seed);
+        if (!generated.world || !everyCorridorTraversesBothWays(*generated.world)) {
+            std::cerr << "Corridor traversal batch failed at seed " << seed << '\n';
+            allTraversable = false;
+            break;
+        }
+    }
+    expect(allTraversable,
+        "500 deterministic worlds keep every corridor traversable in both directions");
+}
+
+void testLockdownEntryKeepsPlayerMobile()
+{
+    using namespace gdp;
+    const world::WorldGenerationResult generated = world::generateWorld(0U);
+    expect(generated.succeeded(), "lockdown entry regression world generates");
+    if (!generated.world) {
+        return;
+    }
+    const world::CorridorPath* route = nullptr;
+    const world::RoomInstance* source = nullptr;
+    const world::RoomInstance* destination = nullptr;
+    for (const world::CorridorPath& corridor : generated.world->corridors) {
+        const world::RoomInstance* first = findRoom(*generated.world, corridor.firstRoom);
+        const world::RoomInstance* second = findRoom(*generated.world, corridor.secondRoom);
+        if (first != nullptr && second != nullptr
+            && (second->role == world::RoomRole::Arena
+                || second->role == world::RoomRole::Boss)) {
+            route = &corridor;
+            source = first;
+            destination = second;
+            break;
+        }
+        if (first != nullptr && second != nullptr
+            && (first->role == world::RoomRole::Arena
+                || first->role == world::RoomRole::Boss)) {
+            route = &corridor;
+            source = second;
+            destination = first;
+            break;
+        }
+    }
+    expect(route != nullptr && source != nullptr && destination != nullptr,
+        "regression world exposes a corridor entering a lockdown room");
+    if (route == nullptr || source == nullptr || destination == nullptr) {
+        return;
+    }
+    const world::ConnectorInstance* entry = connectorForEdge(*destination, route->edge);
+    expect(entry != nullptr, "lockdown destination owns its entry connector");
+    if (entry == nullptr) {
+        return;
+    }
+
+    const gameplay::CollisionWorld openNavigation
+        = gameplay::makeRoomNavigationCollision(*generated.world, source->id, false);
+    core::Vec3 position = entry->worldPosition + (entry->worldNormal * 0.50F);
+    const core::Vec3 inward = entry->worldNormal * -1.0F;
+    for (int step = 0; step < 120
+         && gameplay::roomContainingCharacter(*generated.world, position)
+            != destination->id;
+         ++step) {
+        position = openNavigation.moveCharacter(
+            position, inward * 4.5F, 1.0F / 120.0F, {}).position;
+    }
+    expect(gameplay::roomContainingCharacter(*generated.world, position)
+            == destination->id,
+        "destination is adopted only after the character fully clears the threshold");
+
+    gameplay::DoorRuntime door = gameplay::makeDoorRuntime(route->edge);
+    expect(gameplay::requestDoorOpen(door, false),
+        "lockdown regression door starts opening");
+    (void)gameplay::updateDoor(door, 1.0F, false, true);
+    (void)gameplay::updateDoor(door, 1.0F / 60.0F, true, true);
+    expect(gameplay::isDoorPassable(door),
+        "new lockdown does not close its occupied entry door");
+
+    const gameplay::CollisionWorld lockedNavigation
+        = gameplay::makeRoomNavigationCollision(*generated.world, destination->id, false);
+    expect(lockedNavigation.canOccupy(position),
+        "newly adopted lockdown position remains valid navigation space");
+    const core::Vec3 beforeMove = position;
+    for (int step = 0; step < 30; ++step) {
+        position = lockedNavigation.moveCharacter(
+            position, inward * 4.5F, 1.0F / 120.0F, {}).position;
+    }
+    expect(!core::nearlyEqual(position, beforeMove, 1.0e-5F),
+        "player can continue into the lockdown room instead of becoming immobilized");
 }
 
 void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
@@ -326,8 +504,12 @@ int main()
 {
     testEveryGeneratedConnectionTraversesBothWays();
     testRangeInvalidInputAndPlayerRelocation();
+    testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();
     testDoorRuntimeOpensHoldsClosesAndLocks();
+    testPreviouslyBrokenCorridorSeedsTraverseBothWays();
+    testCorridorTraversalSeedBatch();
+    testLockdownEntryKeepsPlayerMobile();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
 
     if (failures != 0) {

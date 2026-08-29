@@ -250,6 +250,29 @@ std::optional<gdp::world::RoomId> roomContainingPosition(
     return std::nullopt;
 }
 
+std::optional<gdp::world::RoomId> roomContainingCharacter(
+    const gdp::world::World& world,
+    const gdp::core::Vec3 feetPosition,
+    const CharacterCollider collider) noexcept
+{
+    if (!std::isfinite(collider.radius) || !std::isfinite(collider.height)
+        || collider.radius < 0.0F || collider.height <= 0.0F) {
+        return std::nullopt;
+    }
+    const float top = feetPosition.y + collider.height;
+    for (const gdp::world::RoomInstance& room : world.rooms) {
+        if (feetPosition.x >= room.worldBounds.minimum.x + collider.radius
+            && feetPosition.x <= room.worldBounds.maximum.x - collider.radius
+            && feetPosition.z >= room.worldBounds.minimum.z + collider.radius
+            && feetPosition.z <= room.worldBounds.maximum.z - collider.radius
+            && feetPosition.y >= room.worldBounds.minimum.y - 1.0e-4F
+            && top <= room.worldBounds.maximum.y + 1.0e-4F) {
+            return room.id;
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<float> corridorProgressAt(
     const gdp::world::CorridorPath& corridor,
     const gdp::core::Vec3 feetPosition) noexcept

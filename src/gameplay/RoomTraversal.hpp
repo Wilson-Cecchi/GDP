@@ -35,6 +35,11 @@ struct RoomTransition {
     const gdp::world::World& world,
     gdp::core::Vec3 feetPosition) noexcept;
 
+[[nodiscard]] std::optional<gdp::world::RoomId> roomContainingCharacter(
+    const gdp::world::World& world,
+    gdp::core::Vec3 feetPosition,
+    CharacterCollider collider = {}) noexcept;
+
 [[nodiscard]] std::optional<float> corridorProgressAt(
     const gdp::world::CorridorPath& corridor,
     gdp::core::Vec3 feetPosition) noexcept;

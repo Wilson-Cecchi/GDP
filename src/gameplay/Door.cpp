@@ -53,6 +53,11 @@ DoorUpdate updateDoor(
 
     if (locked) {
         door.holdRemaining = 0.0F;
+        if (occupied && isDoorPassable(door, config)) {
+            door.state = gdp::world::DoorState::Open;
+            door.openness = 1.0F;
+            return result;
+        }
         if (door.openness > 0.0F) {
             if (door.state != gdp::world::DoorState::Closing) {
                 result.startedClosing = true;

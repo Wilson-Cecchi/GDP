@@ -30,7 +30,10 @@ bool pathIsClear(
 {
     for (std::size_t index = 0; index + 1U < points.size(); ++index) {
         for (const RoomInstance& room : rooms) {
-            if (room.id == firstRoom || room.id == secondRoom) {
+            const bool exitsFirstRoom = room.id == firstRoom && index == 0U;
+            const bool entersSecondRoom = room.id == secondRoom
+                && index + 2U == points.size();
+            if (exitsFirstRoom || entersSecondRoom) {
                 continue;
             }
             if (segmentHitsRoom(points[index], points[index + 1U], width * 0.5F,

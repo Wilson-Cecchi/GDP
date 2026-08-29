@@ -80,6 +80,9 @@ especializados das pastas numeradas.
 - **Fase 19 — Pausa funcional:** concluída; `Esc` congela a simulação e abre um
   menu responsivo com `RESUME`, `RESTART RUN` e `EXIT GAME`, liberando o mouse
   até o retorno ao gameplay.
+- **Estabilização de travessia:** concluída; corredores não podem reentrar nas
+  próprias salas depois do stub da porta, e lockdown aguarda o collider liberar
+  o vão antes de fechar e bloquear a rota.
 - **Próxima atualização:** implementar menu principal com início de run e saída
   antes da geração do mundo.
 
@@ -208,9 +211,10 @@ agora respeitam origem e rotação, e a colisão usa os mesmos bounds transforma
 O segundo incremento materializa cada sequência `CorridorPath::points` como
 trechos ortogonais com piso, teto e laterais. A colisão combina volumes da sala,
 do corredor e da sala adjacente com sobreposição suficiente para o collider
-cilíndrico atravessar retas e curvas sem teleporte. Entrar nos bounds da sala
-oposta troca automaticamente `roomId`, conteúdo, materiais, iluminação e
-ambiência; durante lockdown, somente o volume da sala atual permanece navegável.
+cilíndrico atravessar retas e curvas sem teleporte. A troca de `roomId`, conteúdo,
+materiais, iluminação e ambiência ocorre apenas quando o collider inteiro libera
+o vão. Em lockdown, a rota permanece navegável enquanto a porta passável está
+ocupada e só é removida depois que o jogador entra com segurança e o painel fecha.
 
 O terceiro incremento conclui o vertical slice funcional. `SessionSystem`
 mantém `Playing`, `Victory` e `Defeat`: entrar na Boss registra o
@@ -230,7 +234,8 @@ Na Fase 15, `DoorRuntime` substitui o reposicionamento interativo por estados
 `Closed/Opening/Open/Closing/Locked`. Cada edge começa fechada, abre em 0,45 s,
 fica livre a partir de 90%, não fecha sobre o jogador e volta a bloquear somente
 depois que o corredor está vazio. Os painéis deslizam lateralmente e lockdown
-força fechamento/bloqueio. O áudio mantém dois loops cacheados no corredor e
+solicita fechamento/bloqueio assim que o vão fica livre. O áudio mantém dois
+loops cacheados no corredor e
 aplica crossfade equal-power com o mesmo progresso suavizado da iluminação.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
@@ -260,6 +265,14 @@ pausado, look, input pendente, IA, portas, arma, eventos, áudio atualizado pelo
 game loop e timers de HUD não avançam. O mouse relativo é liberado na abertura
 e restaurado no retorno; o renderer oculta mira e feedback transitório sob o
 overlay central.
+
+Na estabilização posterior à Fase 19, `CorridorPath` passou a permitir contato
+com a sala de origem apenas no primeiro stub e com a sala destino apenas no
+último. Isso rejeita curvas que atravessavam novamente a própria sala. A adoção
+de sala agora considera raio e altura do personagem; lockdown segura uma porta
+passável ocupada e a colisão segue o estado físico de cada edge. A regressão
+permanente percorre 500 mundos e as seeds anteriormente problemáticas; auditorias
+ampliadas validaram 10.000 mundos gerados e 2.000 mundos atravessados.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com

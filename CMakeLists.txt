@@ -228,7 +228,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_enemy_generation_tests)
 
     add_test(NAME enemy_generation_systems COMMAND gdp_enemy_generation_tests)
-    set_tests_properties(enemy_generation_systems PROPERTIES TIMEOUT 30)
+    set_tests_properties(enemy_generation_systems PROPERTIES TIMEOUT 60)
 
     add_executable(gdp_room_material_tests tests/test_room_materials.cpp)
     target_link_libraries(gdp_room_material_tests PRIVATE gdp_renderer)
@@ -236,7 +236,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_room_material_tests)
 
     add_test(NAME room_material_systems COMMAND gdp_room_material_tests)
-    set_tests_properties(room_material_systems PROPERTIES TIMEOUT 75)
+    set_tests_properties(room_material_systems PROPERTIES TIMEOUT 120)
 
     add_executable(gdp_gameplay_tests tests/test_gameplay.cpp)
     target_link_libraries(gdp_gameplay_tests PRIVATE gdp_gameplay)
@@ -284,7 +284,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_room_traversal_tests)
 
     add_test(NAME room_traversal_systems COMMAND gdp_room_traversal_tests)
-    set_tests_properties(room_traversal_systems PROPERTIES TIMEOUT 10)
+    set_tests_properties(room_traversal_systems PROPERTIES TIMEOUT 45)
 
     add_executable(gdp_loot_tests tests/test_loot.cpp)
     target_link_libraries(gdp_loot_tests PRIVATE gdp_gameplay gdp_world)

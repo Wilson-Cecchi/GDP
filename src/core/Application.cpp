@@ -663,7 +663,8 @@ void Application::fixedUpdate(const double fixedStep)
     const bool doorsLocked = collisionEvent != roomEvents_.end()
         && gameplay::isRoomLocked(*collisionEvent);
     std::optional<world::EdgeId> occupiedCorridorEdge;
-    if (world_ && !gameplay::roomContainingPosition(*world_, player_.state().position)) {
+    if (world_ && !gameplay::roomContainingCharacter(
+            *world_, player_.state().position)) {
         for (const world::CorridorPath& corridor : world_->corridors) {
             if (gameplay::corridorProgressAt(corridor, player_.state().position)) {
                 occupiedCorridorEdge = corridor.edge;
@@ -686,8 +687,9 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
     if (world_ && playerEntity != nullptr) {
+        // Runtime door passability preserves an occupied lockdown threshold.
         baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
-            *world_, playerRoom, doorsLocked, blockedDoorEdges);
+            *world_, playerRoom, false, blockedDoorEdges);
     }
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
@@ -717,7 +719,7 @@ void Application::fixedUpdate(const double fixedStep)
     };
 
     if (playerEntity != nullptr && world_) {
-        const auto enteredRoom = gameplay::roomContainingPosition(
+        const auto enteredRoom = gameplay::roomContainingCharacter(
             *world_, player_.state().position);
         if (enteredRoom && *enteredRoom != playerRoom) {
             const auto destination = std::find_if(
