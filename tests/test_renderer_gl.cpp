@@ -369,6 +369,22 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 pauseMenuPixels.data());
 
+            gdp::render::HudRenderData mainMenuHud;
+            mainMenuHud.mainMenu = true;
+            const bool renderedMainMenu = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
+            std::vector<std::uint8_t> mainMenuPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mainMenuPixels.data());
+
+            mainMenuHud.mainMenuSelection
+                = gdp::render::HudMainMenuSelection::ExitGame;
+            const bool renderedMainMenuExit = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
+            std::vector<std::uint8_t> mainMenuExitPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mainMenuExitPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -439,6 +455,8 @@ int main()
             std::size_t hudChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
+            std::size_t mainMenuChangedChannels = 0;
+            std::size_t mainMenuSelectionChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -518,6 +536,13 @@ int main()
                         != functionalHudPixels[index + channel]) {
                         ++pauseMenuChangedChannels;
                     }
+                    if (mainMenuPixels[index + channel] != baseline[index + channel]) {
+                        ++mainMenuChangedChannels;
+                    }
+                    if (mainMenuExitPixels[index + channel]
+                        != mainMenuPixels[index + channel]) {
+                        ++mainMenuSelectionChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -568,6 +593,8 @@ int main()
                 && renderedHud && hudChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
+                && renderedMainMenu && mainMenuChangedChannels > 500U
+                && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

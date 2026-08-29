@@ -35,10 +35,12 @@ void Input::handleEvent(const SDL_Event& event) noexcept
 
     if (event.type == SDL_EVENT_MOUSE_MOTION) {
         mouseDelta_ = mouseDelta_ + Vec2{event.motion.xrel, event.motion.yrel};
+        mousePosition_ = {event.motion.x, event.motion.y};
         return;
     }
 
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        mousePosition_ = {event.button.x, event.button.y};
         const auto button = static_cast<unsigned int>(event.button.button);
         if (!isValidMouseButton(button)) {
             return;
@@ -52,6 +54,7 @@ void Input::handleEvent(const SDL_Event& event) noexcept
     }
 
     if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        mousePosition_ = {event.button.x, event.button.y};
         const auto button = static_cast<unsigned int>(event.button.button);
         if (!isValidMouseButton(button)) {
             return;
@@ -101,6 +104,11 @@ bool Input::wasMouseButtonReleased(const unsigned int button) const noexcept
 Vec2 Input::mouseDelta() const noexcept
 {
     return mouseDelta_;
+}
+
+Vec2 Input::mousePosition() const noexcept
+{
+    return mousePosition_;
 }
 
 bool Input::isValidScancode(const SDL_Scancode scancode) noexcept

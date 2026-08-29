@@ -6,6 +6,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Feedback.hpp"
+#include "gameplay/MainMenu.hpp"
 #include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
@@ -56,6 +57,7 @@ public:
 
 private:
     bool initialize();
+    bool initializeRun();
     void processEvents();
     void fixedUpdate(double fixedStepSeconds);
     void render();
@@ -72,6 +74,7 @@ private:
     gameplay::ProgressionSystem progression_;
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
+    gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
@@ -91,6 +94,7 @@ private:
     bool sdlInitialized_{false};
     bool running_{false};
     bool restartRequested_{false};
+    bool fatalError_{false};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
     std::uint64_t audioEventCounter_{0};

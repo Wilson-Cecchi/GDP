@@ -79,6 +79,8 @@
 - `src/gameplay/Door.hpp`
 - `src/gameplay/Enemy.cpp`
 - `src/gameplay/Enemy.hpp`
+- `src/gameplay/MainMenu.cpp`
+- `src/gameplay/MainMenu.hpp`
 - `src/gameplay/Player.cpp`
 - `src/gameplay/Player.hpp`
 - `src/gameplay/Session.cpp`
@@ -127,12 +129,14 @@
 - `src/world/WorldGenerator.hpp`
 - `src/world/WorldValidation.cpp`
 - `src/world/WorldValidation.hpp`
+- `tests/check_main_menu_bootstrap.cmake`
 - `tests/test_assets.cpp`
 - `tests/test_combat.cpp`
 - `tests/test_core.cpp`
 - `tests/test_enemy_generation.cpp`
 - `tests/test_entities.cpp`
 - `tests/test_gameplay.cpp`
+- `tests/test_main_menu.cpp`
 - `tests/test_renderer.cpp`
 - `tests/test_renderer_gl.cpp`
 - `tests/test_room_materials.cpp`

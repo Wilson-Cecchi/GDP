@@ -5,6 +5,7 @@
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
 #include "gameplay/Loot.hpp"
+#include "gameplay/MainMenu.hpp"
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
@@ -287,11 +288,17 @@ int Application::run()
 {
     using Clock = std::chrono::steady_clock;
     bool beginAnotherRun = false;
+    bool launchRunImmediately = config_.headless;
     do {
         restartRequested_ = false;
+        fatalError_ = false;
         renderedFrames_ = 0U;
         fixedUpdates_ = 0U;
         if (!initialize()) {
+            return 1;
+        }
+        if (launchRunImmediately && !initializeRun()) {
+            shutdown();
             return 1;
         }
         auto previousTime = Clock::now();
@@ -313,7 +320,7 @@ int Application::run()
                 continue;
             }
             if (session_.state().phase == gameplay::SessionPhase::Playing
-                && !pauseMenu_.paused) {
+                && !mainMenu_.active && !pauseMenu_.paused) {
                 player_.applyLook(input_.mouseDelta());
             }
 
@@ -329,14 +336,22 @@ int Application::run()
             }
         }
 
+        const bool hadRun = world_.has_value();
         std::ostringstream summary;
-        summary << "Run " << session_.state().runIndex << " ended as "
-                << gameplay::sessionPhaseName(session_.state().phase)
-                << " after " << renderedFrames_ << " frame(s) and "
+        if (hadRun) {
+            summary << "Run " << session_.state().runIndex << " ended as "
+                    << gameplay::sessionPhaseName(session_.state().phase);
+        } else {
+            summary << "Application closed from MainMenu";
+        }
+        summary << " after " << renderedFrames_ << " frame(s) and "
                 << fixedUpdates_ << " fixed update(s)";
         log(LogLevel::Info, summary.str());
         beginAnotherRun = restartRequested_;
         shutdown();
+        if (fatalError_) {
+            return 1;
+        }
         if (beginAnotherRun) {
             const auto nextSeed = session_.restart();
             if (!nextSeed) {
@@ -344,12 +359,80 @@ int Application::run()
                 return 1;
             }
             config_.worldSeed = *nextSeed;
+            launchRunImmediately = true;
         }
     } while (beginAnotherRun);
     return 0;
 }
 
 bool Application::initialize()
+{
+    SDL_SetAppMetadata("GDP", "0.1.0", "dev.wkc.gdp");
+
+    const SDL_InitFlags flags = config_.headless ? SDL_INIT_EVENTS : SDL_INIT_VIDEO;
+    if (!SDL_Init(flags)) {
+        log(LogLevel::Error, sdlError("SDL_Init failed"));
+        return false;
+    }
+    sdlInitialized_ = true;
+
+    audio_ = std::make_unique<gdp::audio::AudioSystem>();
+    (void)audio_->initialize(!config_.headless);
+
+    if (config_.headless) {
+        log(LogLevel::Info, "GDP headless platform initialized");
+        return true;
+    }
+
+    if (!SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3)
+        || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3)
+        || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)
+        || !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1)
+        || !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24)) {
+        log(LogLevel::Error, sdlError("SDL_GL_SetAttribute failed"));
+        return false;
+    }
+
+    const SDL_WindowFlags windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
+        | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    window_ = SDL_CreateWindow("GDP", config_.windowWidth, config_.windowHeight, windowFlags);
+    if (window_ == nullptr) {
+        log(LogLevel::Error, sdlError("SDL_CreateWindow failed"));
+        return false;
+    }
+
+    glContext_ = SDL_GL_CreateContext(window_);
+    if (glContext_ == nullptr) {
+        log(LogLevel::Error, sdlError("SDL_GL_CreateContext failed"));
+        return false;
+    }
+
+    if (!SDL_GL_MakeCurrent(window_, glContext_)) {
+        log(LogLevel::Error, sdlError("SDL_GL_MakeCurrent failed"));
+        return false;
+    }
+
+    if (!SDL_GL_SetSwapInterval(1)) {
+        log(LogLevel::Warning, sdlError("VSync unavailable"));
+    }
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    if (!SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)) {
+        log(LogLevel::Error, sdlError("SDL_GetWindowSizeInPixels failed"));
+        return false;
+    }
+    renderer_ = std::make_unique<gdp::render::Renderer>();
+    if (!renderer_->initialize(drawableWidth, drawableHeight)) {
+        log(LogLevel::Error, "Renderer initialization failed");
+        return false;
+    }
+    gameplay::openMainMenu(mainMenu_);
+    log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
+    log(LogLevel::Info, "Main menu initialized before world generation");
+    return true;
+}
+
+bool Application::initializeRun()
 {
     world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
     if (!generation.succeeded()) {
@@ -364,14 +447,14 @@ bool Application::initialize()
         log(LogLevel::Error, "Generated world does not contain a START room");
         return false;
     }
+
     const gdp::core::Vec3 startForward = gdp::core::rotateQuarterTurns(
         {0.0F, 0.0F, -1.0F}, startRoom->rotation);
     const gdp::core::Vec3 startPosition = startRoom->transform.position
         + gdp::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
     player_.spawn(startPosition, yawForDirection(startForward));
     const world::InitialEntitySet initialEntities = world::populateInitialEntities(
-        *world_,
-        entities_,
+        *world_, entities_,
         {
             .transform = {.position = player_.state().position},
             .health = player_.state().health,
@@ -382,12 +465,11 @@ bool Application::initialize()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
-    doorRuntimes_.clear();
+
     std::vector<world::EdgeId> initiallyBlockedEdges;
     initiallyBlockedEdges.reserve(world_->corridors.size());
     for (const world::CorridorPath& corridor : world_->corridors) {
-        doorRuntimes_.emplace(
-            corridor.edge, gameplay::makeDoorRuntime(corridor.edge));
+        doorRuntimes_.emplace(corridor.edge, gameplay::makeDoorRuntime(corridor.edge));
         initiallyBlockedEdges.push_back(corridor.edge);
     }
     baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
@@ -436,121 +518,62 @@ bool Application::initialize()
         collisionWorld_ = gameplay::collisionWorldWithProps(
             baseCollisionWorld_, entities_, playerEntity->roomId);
     }
+
+    if (audio_) {
+        audio_->setAmbience(startRoom->seed, static_cast<std::uint64_t>(startRoom->theme));
+    }
+    if (!config_.headless) {
+        if (renderer_ == nullptr) {
+            log(LogLevel::Error, "Run initialization requires an active renderer");
+            return false;
+        }
+        for (const world::RoomInstance& room : world_->rooms) {
+            if (!prepareRoomMaterials(*renderer_, room)) {
+                log(LogLevel::Error, "World room material preparation failed");
+                return false;
+            }
+            roomMaterialKeys_.emplace(room.id, renderer_->activeRoomMaterialKey());
+        }
+        for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
+            const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
+            if (enemy == nullptr) {
+                continue;
+            }
+            bool prepared = true;
+            if (enemy->archetype == entities::EnemyArchetype::Worker) {
+                prepared = renderer_->prepareWorkerVisual(enemy->visualSeed);
+            } else if (enemy->archetype == entities::EnemyArchetype::Guard) {
+                prepared = renderer_->prepareGuardVisual(enemy->visualSeed);
+            } else if (enemy->archetype == entities::EnemyArchetype::Officer) {
+                prepared = renderer_->prepareOfficerVisual(enemy->visualSeed);
+            } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
+                prepared = renderer_->prepareEngineerVisual(enemy->visualSeed);
+            } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
+                prepared = renderer_->prepareIndustrialRobotVisual(enemy->visualSeed);
+            }
+            if (!prepared) {
+                log(LogLevel::Error, "Enemy visual preparation failed");
+                return false;
+            }
+        }
+        if (!SDL_SetWindowRelativeMouseMode(window_, true)) {
+            log(LogLevel::Warning, sdlError("Relative mouse mode unavailable"));
+        }
+    }
+    gameplay::closeMainMenu(mainMenu_);
+    input_ = Input{};
+
     std::ostringstream worldSummary;
     worldSummary << "Generated world seed " << config_.worldSeed << " with "
                  << world_->rooms.size() << " rooms and " << world_->corridors.size()
                  << " corridors and " << entities_.activeCount()
                  << " entities on attempt " << world_->acceptedAttempt;
     log(LogLevel::Info, worldSummary.str());
-
-    SDL_SetAppMetadata("GDP", "0.1.0", "dev.wkc.gdp");
-
-    const SDL_InitFlags flags = config_.headless ? SDL_INIT_EVENTS : SDL_INIT_VIDEO;
-    if (!SDL_Init(flags)) {
-        log(LogLevel::Error, sdlError("SDL_Init failed"));
-        return false;
-    }
-    sdlInitialized_ = true;
-
-    audio_ = std::make_unique<gdp::audio::AudioSystem>();
-    (void)audio_->initialize(!config_.headless);
-    if (startRoom != world_->rooms.end()) {
-        audio_->setAmbience(startRoom->seed, static_cast<std::uint64_t>(startRoom->theme));
-    }
-
     if (config_.headless) {
         log(LogLevel::Info, "GDP initialized in headless mode with a validated world");
-        return true;
+    } else {
+        log(LogLevel::Info, "Run initialized after main menu confirmation");
     }
-
-    if (!SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3)
-        || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3)
-        || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)
-        || !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1)
-        || !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24)) {
-        log(LogLevel::Error, sdlError("SDL_GL_SetAttribute failed"));
-        return false;
-    }
-
-    const SDL_WindowFlags windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
-        | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    window_ = SDL_CreateWindow("GDP", config_.windowWidth, config_.windowHeight, windowFlags);
-    if (window_ == nullptr) {
-        log(LogLevel::Error, sdlError("SDL_CreateWindow failed"));
-        return false;
-    }
-
-    glContext_ = SDL_GL_CreateContext(window_);
-    if (glContext_ == nullptr) {
-        log(LogLevel::Error, sdlError("SDL_GL_CreateContext failed"));
-        return false;
-    }
-
-    if (!SDL_GL_MakeCurrent(window_, glContext_)) {
-        log(LogLevel::Error, sdlError("SDL_GL_MakeCurrent failed"));
-        return false;
-    }
-
-    if (!SDL_GL_SetSwapInterval(1)) {
-        log(LogLevel::Warning, sdlError("VSync unavailable"));
-    }
-    if (!SDL_SetWindowRelativeMouseMode(window_, true)) {
-        log(LogLevel::Warning, sdlError("Relative mouse mode unavailable"));
-    }
-
-    int drawableWidth = 0;
-    int drawableHeight = 0;
-    if (!SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)) {
-        log(LogLevel::Error, sdlError("SDL_GetWindowSizeInPixels failed"));
-        return false;
-    }
-    renderer_ = std::make_unique<gdp::render::Renderer>();
-    if (!renderer_->initialize(drawableWidth, drawableHeight)) {
-        log(LogLevel::Error, "Renderer initialization failed");
-        return false;
-    }
-    roomMaterialKeys_.clear();
-    for (const world::RoomInstance& room : world_->rooms) {
-        if (!prepareRoomMaterials(*renderer_, room)) {
-            log(LogLevel::Error, "World room material preparation failed");
-            return false;
-        }
-        roomMaterialKeys_.emplace(room.id, renderer_->activeRoomMaterialKey());
-    }
-    for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
-        const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
-        if (enemy == nullptr) {
-            continue;
-        }
-        if (enemy->archetype == entities::EnemyArchetype::Worker) {
-            if (!renderer_->prepareWorkerVisual(enemy->visualSeed)) {
-                log(LogLevel::Error, "Worker visual preparation failed");
-                return false;
-            }
-        } else if (enemy->archetype == entities::EnemyArchetype::Guard) {
-            if (!renderer_->prepareGuardVisual(enemy->visualSeed)) {
-                log(LogLevel::Error, "Guard visual preparation failed");
-                return false;
-            }
-        } else if (enemy->archetype == entities::EnemyArchetype::Officer) {
-            if (!renderer_->prepareOfficerVisual(enemy->visualSeed)) {
-                log(LogLevel::Error, "Officer visual preparation failed");
-                return false;
-            }
-        } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
-            if (!renderer_->prepareEngineerVisual(enemy->visualSeed)) {
-                log(LogLevel::Error, "Engineer visual preparation failed");
-                return false;
-            }
-        } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
-            if (!renderer_->prepareIndustrialRobotVisual(enemy->visualSeed)) {
-                log(LogLevel::Error, "IndustrialRobot visual preparation failed");
-                return false;
-            }
-        }
-    }
-
-    log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     return true;
 }
 
@@ -565,6 +588,78 @@ void Application::processEvents()
     }
 
     if (!running_) {
+        return;
+    }
+
+    if (mainMenu_.active) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+
+        if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            log(LogLevel::Info, "Main menu requested game exit");
+            running_ = false;
+            return;
+        }
+
+        std::optional<gdp::render::HudMainMenuSelection> pointedSelection;
+        if (window_ != nullptr) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableWidth = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                pointedSelection = gdp::render::mainMenuSelectionAt(
+                    drawableWidth, drawableHeight,
+                    pointer.x * static_cast<float>(drawableWidth)
+                        / static_cast<float>(windowWidth),
+                    pointer.y * static_cast<float>(drawableHeight)
+                        / static_cast<float>(windowHeight));
+            }
+        }
+        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            gameplay::selectMainMenuOption(
+                mainMenu_,
+                *pointedSelection == gdp::render::HudMainMenuSelection::ExitGame
+                    ? gameplay::MainMenuOption::ExitGame
+                    : gameplay::MainMenuOption::StartRun);
+        }
+
+        const bool moveUp = input_.wasKeyPressed(SDL_SCANCODE_UP)
+            || input_.wasKeyPressed(SDL_SCANCODE_W);
+        const bool moveDown = input_.wasKeyPressed(SDL_SCANCODE_DOWN)
+            || input_.wasKeyPressed(SDL_SCANCODE_S);
+        if (moveUp != moveDown) {
+            gameplay::moveMainMenuSelection(mainMenu_, moveUp ? -1 : 1);
+        }
+
+        gameplay::MainMenuCommand command = gameplay::MainMenuCommand::None;
+        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+            command = gameplay::activateMainMenuSelection(mainMenu_);
+        } else if (pointedSelection
+            && input_.wasMouseButtonPressed(SDL_BUTTON_LEFT)) {
+            gameplay::selectMainMenuOption(
+                mainMenu_,
+                *pointedSelection == gdp::render::HudMainMenuSelection::ExitGame
+                    ? gameplay::MainMenuOption::ExitGame
+                    : gameplay::MainMenuOption::StartRun);
+            command = gameplay::activateMainMenuSelection(mainMenu_);
+        }
+
+        if (command == gameplay::MainMenuCommand::StartRun) {
+            log(LogLevel::Info, "Main menu requested run start");
+            if (!initializeRun()) {
+                fatalError_ = true;
+                running_ = false;
+            }
+        } else if (command == gameplay::MainMenuCommand::ExitGame) {
+            log(LogLevel::Info, "Main menu requested game exit");
+            running_ = false;
+        }
         return;
     }
 
@@ -607,6 +702,8 @@ void Application::processEvents()
                 setPaused(false);
             } else if (command == gameplay::PauseMenuCommand::RestartRun) {
                 log(LogLevel::Info, "Pause menu requested run restart");
+                (void)session_.update(
+                    false, world::RoomRole::Count, false, false);
                 restartRequested_ = true;
                 running_ = false;
             } else if (command == gameplay::PauseMenuCommand::ExitGame) {
@@ -648,7 +745,7 @@ void Application::setPaused(const bool paused)
 
 void Application::fixedUpdate(const double fixedStep)
 {
-    if (pauseMenu_.paused) {
+    if (mainMenu_.active || pauseMenu_.paused) {
         return;
     }
     const float step = static_cast<float>(fixedStep);
@@ -1148,6 +1245,25 @@ void Application::render()
         return;
     }
 
+    if (mainMenu_.active) {
+        SDL_SetWindowTitle(window_, "GDP | MAIN MENU");
+        gdp::render::HudRenderData hud;
+        hud.mainMenu = true;
+        hud.mainMenuSelection
+            = mainMenu_.selection == gameplay::MainMenuOption::ExitGame
+            ? gdp::render::HudMainMenuSelection::ExitGame
+            : gdp::render::HudMainMenuSelection::StartRun;
+        if (renderer_ == nullptr || !renderer_->render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
+            log(LogLevel::Error, "Renderer failed while drawing the main menu");
+            fatalError_ = true;
+            running_ = false;
+            return;
+        }
+        SDL_GL_SwapWindow(window_);
+        return;
+    }
+
     const gdp::render::CameraData camera{
         player_.cameraPosition(),
         player_.forwardDirection(),
@@ -1539,6 +1655,7 @@ void Application::render()
             width, height, camera, visibleEnemies, visiblePickups, visibleProps,
             lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms, hud)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
+        fatalError_ = true;
         running_ = false;
         return;
     }
@@ -1561,6 +1678,7 @@ void Application::shutdown()
     weapon_ = gameplay::Weapon{};
     progression_ = gameplay::ProgressionSystem{};
     gameplay::clearFeedback(feedback_);
+    gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;

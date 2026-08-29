@@ -22,6 +22,7 @@ public:
     [[nodiscard]] bool wasMouseButtonPressed(unsigned int button) const noexcept;
     [[nodiscard]] bool wasMouseButtonReleased(unsigned int button) const noexcept;
     [[nodiscard]] Vec2 mouseDelta() const noexcept;
+    [[nodiscard]] Vec2 mousePosition() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(SDL_SCANCODE_COUNT);
@@ -37,6 +38,7 @@ private:
     std::array<bool, mouseButtonCount> mouseButtonsPressed_{};
     std::array<bool, mouseButtonCount> mouseButtonsReleased_{};
     Vec2 mouseDelta_{};
+    Vec2 mousePosition_{};
 };
 
 } // namespace gdp::core

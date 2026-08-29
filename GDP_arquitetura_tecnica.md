@@ -3630,9 +3630,18 @@ recebe os bounds da instância; nenhuma receita visual foi alterada.
 ## Fase 21 — Menu principal
 
 ```text
-início de run antes da geração do mundo
-saída segura pelo fluxo principal
+START RUN antes da geração do mundo ✓
+EXIT GAME e Esc encerram sem criar uma dungeon ✓
+teclado e mouse com layout responsivo compartilhado ✓
+headless preserva início automático para automação ✓
+regressões unitárias, OpenGL e bootstrap sem geração antecipada ✓
 ```
+
+`Application::initialize` prepara apenas plataforma, áudio, janela e renderer.
+`initializeRun` concentra mundo, entidades, eventos, iluminação e recursos da
+run e só é chamado pela confirmação do menu ou pelo bootstrap headless. O
+overlay usa o mesmo layout puro para desenho e hit test em pixels, inclusive em
+janelas high-DPI.
 
 ## Fase 22 — Revisão visual com aprovação prévia
 
@@ -3645,8 +3654,8 @@ capturas in-engine e regressões técnicas depois da implementação
 registro em visual/TEXTURE_APPROVALS.md
 ```
 
-**Próximo marco:** implementar a Fase 21; a Fase 22 não começa por código sem
-aprovação visual prévia da textura correspondente.
+**Próximo marco:** preparar a primeira prancha versionada da Fase 22; nenhuma
+textura muda em código sem aprovação visual prévia da unidade correspondente.
 
 ---
 

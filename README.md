@@ -88,11 +88,12 @@ especializados das pastas numeradas.
 - **Fase 20 — Variedade estrutural de salas:** implementada e validada; a
   biblioteca possui módulos compactos, médios e grandes, com Hub, Arena, Boss e
   Secret usando dimensões próprias e placement derivado dos bounds reais.
-- **Fase 21 — Menu principal:** planejada; início de run e saída antes da
-  geração do mundo.
+- **Fase 21 — Menu principal:** implementada e validada; `START RUN` cria a
+  dungeon somente após confirmação e `EXIT GAME` encerra pelo fluxo principal.
 - **Fase 22 — Revisão visual aprovada:** planejada; revisar texturas por unidade
   visual somente após aprovação explícita de uma prancha anterior à implementação.
-- **Próxima atualização:** implementar o menu principal antes da geração da run.
+- **Próxima atualização:** preparar a primeira proposta visual versionada da
+  Fase 22 e aguardar aprovação explícita antes de alterar qualquer textura.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -325,6 +326,22 @@ Todos os módulos validam connectors e zonas nas quatro rotações. Os lotes
 permanentes cobrem 1.000 mundos estruturais, 500 mundos atravessados nos dois
 sentidos e uma sala grande conectada no teste OpenGL. Nenhuma receita de textura
 foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
+
+## Menu principal antes da run
+
+A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
+gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
+responsivo com `START RUN` e `EXIT GAME`; `W/S` ou setas mudam a seleção com
+wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
+entidades, eventos, iluminação e materiais específicos só são preparados ao
+confirmar `START RUN`.
+
+O modo `--headless` ignora apenas essa espera interativa e inicia a run
+automaticamente para preservar os testes determinísticos. A regressão OpenGL
+verifica o overlay e suas duas seleções; outra integração encerra ainda no menu
+e falha se encontrar o log de geração do mundo. O restart da pausa também marca
+a run atual como encerrada antes de derivar a próxima seed, evitando a rejeição
+de um reinício solicitado durante `Playing`.
 
 ## Gate obrigatório de aprovação visual
 

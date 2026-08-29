@@ -207,6 +207,60 @@ void drawBitmapText(
 
 } // namespace
 
+bool UiRect::contains(const int pointX, const int pointY) const noexcept
+{
+    return pointX >= x && pointX < x + width
+        && pointY >= y && pointY < y + height;
+}
+
+MainMenuLayout makeMainMenuLayout(const int width, const int height) noexcept
+{
+    const int safeWidth = std::max(width, 1);
+    const int safeHeight = std::max(height, 1);
+    const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
+    const int panelWidth = std::max(1, std::min(safeWidth - 16, 210 * scale));
+    const int panelHeight = std::max(1, std::min(safeHeight - 16, 122 * scale));
+    const int panelX = (safeWidth - panelWidth) / 2;
+    const int panelY = (safeHeight - panelHeight) / 2;
+    const int buttonWidth = std::max(1,
+        std::min(panelWidth - (20 * scale), 112 * scale));
+    const int buttonHeight = std::max(1, std::min(13 * scale, panelHeight));
+    const int buttonX = (safeWidth - buttonWidth) / 2;
+    const int maximumButtonY = panelY + panelHeight - buttonHeight;
+    const int startY = std::clamp(
+        panelY + (44 * scale), panelY, maximumButtonY);
+    const int exitY = std::clamp(
+        startY - (20 * scale), panelY, maximumButtonY);
+    return {
+        scale,
+        {panelX, panelY, panelWidth, panelHeight},
+        {buttonX, startY, buttonWidth, buttonHeight},
+        {buttonX, exitY, buttonWidth, buttonHeight},
+    };
+}
+
+std::optional<HudMainMenuSelection> mainMenuSelectionAt(
+    const int width,
+    const int height,
+    const float pointerX,
+    const float pointerY) noexcept
+{
+    if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
+        || !std::isfinite(pointerY)) {
+        return std::nullopt;
+    }
+    const int pixelX = static_cast<int>(pointerX);
+    const int pixelY = height - 1 - static_cast<int>(pointerY);
+    const MainMenuLayout layout = makeMainMenuLayout(width, height);
+    if (layout.startButton.contains(pixelX, pixelY)) {
+        return HudMainMenuSelection::StartRun;
+    }
+    if (layout.exitButton.contains(pixelX, pixelY)) {
+        return HudMainMenuSelection::ExitGame;
+    }
+    return std::nullopt;
+}
+
 bool Renderer::initialize(const int width, const int height)
 {
     if (!loadGlApi(gl_)) {
@@ -1216,6 +1270,66 @@ bool Renderer::render(
     const gdp::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
     const gdp::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
     const gdp::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
+
+    if (hud.mainMenu) {
+        const MainMenuLayout layout = makeMainMenuLayout(width, height);
+        const int scale = layout.scale;
+        drawSolidRect(0, 0, width, height, {0.006F, 0.012F, 0.016F});
+        drawSolidRect(layout.panel.x, layout.panel.y,
+            layout.panel.width, layout.panel.height, panelColor);
+        drawSolidRect(layout.panel.x,
+            layout.panel.y + layout.panel.height - (2 * scale),
+            layout.panel.width, 2 * scale, cyanColor);
+
+        constexpr std::string_view title = "GDP";
+        constexpr std::string_view subtitle = "GENERATED DUNGEON PROTOCOL";
+        drawBitmapText((width - bitmapTextWidth(title, 3 * scale)) / 2,
+            layout.panel.y + layout.panel.height - (26 * scale),
+            3 * scale, title, cyanColor);
+        drawBitmapText((width - bitmapTextWidth(subtitle, 1)) / 2,
+            layout.panel.y + layout.panel.height - (38 * scale),
+            1, subtitle, {0.48F, 0.62F, 0.66F});
+
+        constexpr std::array<std::string_view, 2> options{
+            "START RUN", "EXIT GAME",
+        };
+        const std::array<UiRect, 2> buttons{
+            layout.startButton, layout.exitButton,
+        };
+        const std::size_t selected
+            = hud.mainMenuSelection == HudMainMenuSelection::ExitGame ? 1U : 0U;
+        for (std::size_t index = 0; index < buttons.size(); ++index) {
+            const UiRect button = buttons[index];
+            if (index == selected) {
+                drawSolidRect(button.x, button.y, button.width, button.height,
+                    {0.06F, 0.18F, 0.21F});
+                drawSolidRect(button.x, button.y, 2 * scale,
+                    button.height, cyanColor);
+            }
+            const int textWidth = bitmapTextWidth(options[index], scale);
+            drawBitmapText((width - textWidth) / 2,
+                button.y + (3 * scale), scale, options[index],
+                index == selected ? cyanColor : textColor);
+        }
+
+        const std::string_view controls = width >= 480
+            ? "W S SELECT  ENTER CONFIRM  MOUSE SELECT"
+            : "W S  ENTER  MOUSE";
+        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
+            layout.panel.y + (7 * scale), 1, controls,
+            {0.48F, 0.62F, 0.66F});
+
+        glDisable(GL_SCISSOR_TEST);
+        glEnable(GL_DEPTH_TEST);
+        const GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::ostringstream message;
+            message << "OpenGL main menu render error: 0x" << std::hex << error;
+            gdp::core::log(gdp::core::LogLevel::Error, message.str());
+            return false;
+        }
+        return true;
+    }
 
     if (hud.visible) {
         const float damageStrength = std::clamp(hud.damageFeedback, 0.0F, 1.0F);

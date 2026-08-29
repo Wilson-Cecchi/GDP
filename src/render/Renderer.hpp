@@ -13,6 +13,7 @@
 #include <span>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 
 namespace gdp::render {
@@ -140,6 +141,34 @@ enum class HudPauseSelection : std::uint8_t {
     ExitGame,
 };
 
+enum class HudMainMenuSelection : std::uint8_t {
+    StartRun,
+    ExitGame,
+};
+
+struct UiRect {
+    int x{0};
+    int y{0};
+    int width{0};
+    int height{0};
+
+    [[nodiscard]] bool contains(int pointX, int pointY) const noexcept;
+};
+
+struct MainMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    UiRect startButton{};
+    UiRect exitButton{};
+};
+
+[[nodiscard]] MainMenuLayout makeMainMenuLayout(int width, int height) noexcept;
+[[nodiscard]] std::optional<HudMainMenuSelection> mainMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
@@ -161,6 +190,8 @@ struct HudRenderData {
     float noticeFeedbackStrength{0.0F};
     bool paused{false};
     HudPauseSelection pauseSelection{HudPauseSelection::Resume};
+    bool mainMenu{false};
+    HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

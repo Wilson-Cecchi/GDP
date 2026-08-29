@@ -1,6 +1,7 @@
 #include "core/Math.hpp"
 #include "render/Camera.hpp"
 #include "render/Mesh.hpp"
+#include "render/Renderer.hpp"
 #include "render/Texture.hpp"
 
 #include <cmath>
@@ -101,6 +102,49 @@ void testCameraAndMatrices()
         "projection uses OpenGL perspective convention");
 }
 
+void testMainMenuLayout()
+{
+    using namespace gdp::render;
+
+    const MainMenuLayout wide = makeMainMenuLayout(1280, 720);
+    expect(wide.scale == 2, "wide menu uses doubled bitmap scale");
+    expect(wide.panel.x >= 0 && wide.panel.y >= 0
+            && wide.panel.x + wide.panel.width <= 1280
+            && wide.panel.y + wide.panel.height <= 720,
+        "wide menu panel stays within the framebuffer");
+    expect(wide.panel.contains(wide.startButton.x, wide.startButton.y),
+        "Start Run button is inside the menu panel");
+    expect(wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
+        "Exit Game button is inside the menu panel");
+
+    const float startX = static_cast<float>(wide.startButton.x + wide.startButton.width / 2);
+    const float startY = static_cast<float>(
+        720 - 1 - (wide.startButton.y + wide.startButton.height / 2));
+    const float exitX = static_cast<float>(wide.exitButton.x + wide.exitButton.width / 2);
+    const float exitY = static_cast<float>(
+        720 - 1 - (wide.exitButton.y + wide.exitButton.height / 2));
+    expect(mainMenuSelectionAt(1280, 720, startX, startY)
+            == HudMainMenuSelection::StartRun,
+        "top-origin pointer maps to Start Run");
+    expect(mainMenuSelectionAt(1280, 720, exitX, exitY)
+            == HudMainMenuSelection::ExitGame,
+        "top-origin pointer maps to Exit Game");
+    expect(!mainMenuSelectionAt(1280, 720, 0.0F, 0.0F),
+        "pointer outside buttons has no selection");
+
+    const MainMenuLayout compact = makeMainMenuLayout(320, 200);
+    expect(compact.scale == 1, "compact menu uses base bitmap scale");
+    expect(compact.panel.x >= 0 && compact.panel.y >= 0
+            && compact.panel.x + compact.panel.width <= 320
+            && compact.panel.y + compact.panel.height <= 200,
+        "compact menu remains within the framebuffer");
+
+    const MainMenuLayout tiny = makeMainMenuLayout(12, 12);
+    expect(tiny.panel.contains(tiny.startButton.x, tiny.startButton.y)
+            && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
+        "tiny menu clamps both hit targets inside the framebuffer");
+}
+
 } // namespace
 
 int main()
@@ -108,6 +152,7 @@ int main()
     testMesh();
     testTextureData();
     testCameraAndMatrices();
+    testMainMenuLayout();
 
     if (failures != 0) {
         std::cerr << failures << " renderer test(s) failed\n";

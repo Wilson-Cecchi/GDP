@@ -115,6 +115,7 @@ add_library(
     src/gameplay/Enemy.cpp
     src/gameplay/Feedback.cpp
     src/gameplay/Loot.cpp
+    src/gameplay/MainMenu.cpp
     src/gameplay/Pause.cpp
     src/gameplay/Player.cpp
     src/gameplay/Progression.cpp
@@ -262,6 +263,14 @@ if(GDP_BUILD_TESTS)
     add_test(NAME pause_menu_systems COMMAND gdp_pause_tests)
     set_tests_properties(pause_menu_systems PROPERTIES TIMEOUT 10)
 
+    add_executable(gdp_main_menu_tests tests/test_main_menu.cpp)
+    target_link_libraries(gdp_main_menu_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_main_menu_tests)
+    gdp_enable_sanitizers(gdp_main_menu_tests)
+
+    add_test(NAME main_menu_systems COMMAND gdp_main_menu_tests)
+    set_tests_properties(main_menu_systems PROPERTIES TIMEOUT 10)
+
     add_executable(gdp_progression_tests tests/test_progression.cpp)
     target_link_libraries(gdp_progression_tests PRIVATE gdp_gameplay)
     gdp_enable_warnings(gdp_progression_tests)
@@ -378,9 +387,17 @@ if(GDP_BUILD_TESTS)
             bootstrap_opengl_offscreen
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy"
-                PASS_REGULAR_EXPRESSION "Procedural audio initialized at 48 kHz stereo"
+                PASS_REGULAR_EXPRESSION "Main menu initialized before world generation"
                 TIMEOUT 10
         )
+
+        add_test(
+            NAME main_menu_defers_world_generation
+            COMMAND ${CMAKE_COMMAND}
+                -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_main_menu_bootstrap.cmake
+        )
+        set_tests_properties(main_menu_defers_world_generation PROPERTIES TIMEOUT 10)
 
         add_test(NAME bootstrap_audio_device_fallback COMMAND gdp --frames 2)
         set_tests_properties(

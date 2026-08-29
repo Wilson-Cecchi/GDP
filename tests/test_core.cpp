@@ -175,18 +175,26 @@ void testInput()
     input.beginFrame();
     event = {};
     event.type = SDL_EVENT_MOUSE_MOTION;
+    event.motion.x = 120.0F;
+    event.motion.y = 90.0F;
     event.motion.xrel = 2.5F;
     event.motion.yrel = -1.0F;
     input.handleEvent(event);
+    event.motion.x = 124.0F;
+    event.motion.y = 92.0F;
     event.motion.xrel = 1.5F;
     event.motion.yrel = 3.0F;
     input.handleEvent(event);
     expect(input.mouseDelta() == gdp::core::Vec2{4.0F, 2.0F},
         "mouse motion accumulates during a frame");
+    expect(input.mousePosition() == gdp::core::Vec2{124.0F, 92.0F},
+        "mouse motion keeps the latest absolute position");
 
     event = {};
     event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
     event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = 124.0F;
+    event.button.y = 92.0F;
     input.handleEvent(event);
     expect(input.isMouseButtonDown(SDL_BUTTON_LEFT), "mouse button held state is captured");
     expect(input.wasMouseButtonPressed(SDL_BUTTON_LEFT), "mouse press transition is captured");
@@ -195,6 +203,8 @@ void testInput()
     expect(input.isMouseButtonDown(SDL_BUTTON_LEFT), "beginFrame preserves held state");
     expect(!input.wasMouseButtonPressed(SDL_BUTTON_LEFT), "beginFrame clears transitions");
     expect(input.mouseDelta() == gdp::core::Vec2{}, "beginFrame clears mouse delta");
+    expect(input.mousePosition() == gdp::core::Vec2{124.0F, 92.0F},
+        "beginFrame preserves absolute mouse position");
 
     event.type = SDL_EVENT_MOUSE_BUTTON_UP;
     input.handleEvent(event);

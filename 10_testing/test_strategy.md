@@ -151,6 +151,14 @@ mundos exige AABBs sem overlap e corredores limitados; o de 500 mundos percorre
 cada ligação nos dois sentidos. A regressão OpenGL inclui uma sala conectada
 grande para impedir o retorno das dimensões fixas no renderer.
 
+O gate do menu principal cobre estado inicial seguro, navegação com wrap,
+seleção por ponteiro, ativação única e posição absoluta do mouse preservada
+entre frames. O teste CPU valida o mesmo layout responsivo usado pelo hit test;
+a regressão OpenGL diferencia `START RUN` de `EXIT GAME`. A integração
+`main_menu_defers_world_generation` abre duas frames no driver offscreen e
+falha caso uma seed de mundo seja gerada antes da confirmação. Os bootstraps
+headless continuam criando a run diretamente para exercer o gameplay real.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
