@@ -15,7 +15,7 @@ struct WorldGenerationConfig {
     std::uint32_t roomCount{8};
     std::uint32_t loopBudget{1};
     std::uint32_t maximumAttempts{32};
-    float roomSpacing{14.0F};
+    float roomSpacing{12.0F};
 };
 
 struct WorldGenerationResult {

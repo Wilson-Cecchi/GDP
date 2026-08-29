@@ -285,6 +285,43 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 connectedRoomMaterialPixels.data());
 
+            constexpr std::array cornerPoints{
+                gdp::core::Vec3{0.0F, 0.0F, 0.0F},
+                gdp::core::Vec3{4.0F, 0.0F, 0.0F},
+                gdp::core::Vec3{4.0F, 0.0F, -5.0F},
+            };
+            const std::array cornerCorridor{
+                gdp::render::CorridorRenderData{
+                    cornerPoints, 1.2F, 2.2F, centralHubMaterialKey},
+            };
+            constexpr std::array cornerDoors{
+                gdp::render::DoorRenderData{
+                    {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
+                    1.2F, 2.2F, false, 1.0F},
+                gdp::render::DoorRenderData{
+                    {4.0F, 0.0F, -5.0F}, {0.0F, 0.0F, 1.0F},
+                    1.2F, 2.2F, false, 1.0F},
+            };
+            const std::array cornerConnectedRoom{
+                gdp::render::RoomRenderData{
+                    {4.0F, 0.0F, -9.85F}, gdp::core::QuarterTurn::Degrees0,
+                    storageMaterialKey},
+            };
+            const gdp::render::RoomRenderData cornerRoom{
+                {-4.85F, 0.0F, 0.0F}, gdp::core::QuarterTurn::Degrees90,
+                centralHubMaterialKey};
+            constexpr gdp::render::CameraData cornerCamera{
+                {-0.35F, 1.62F, 0.0F}, {0.94F, 0.0F, -0.34F}, 68.0F};
+            gdp::render::RoomLightingRenderData cornerLighting;
+            cornerLighting.ambientColor = {0.62F, 0.72F, 0.82F};
+            cornerLighting.ambientIntensity = 0.30F;
+            const bool renderedCornerCorridor = renderer.render(
+                width, height, cornerCamera, {}, {}, {}, cornerLighting,
+                cornerRoom, cornerDoors, cornerCorridor, cornerConnectedRoom);
+            std::vector<std::uint8_t> cornerCorridorPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                cornerCorridorPixels.data());
+
             const bool renderedHud = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
                 gdp::render::HudRenderData{gdp::render::ObjectiveRenderState::Victory});
@@ -393,6 +430,7 @@ int main()
             std::size_t doorMotionChangedChannels = 0;
             std::size_t corridorChangedChannels = 0;
             std::size_t connectedRoomMaterialChangedChannels = 0;
+            std::size_t cornerCyanPixels = 0;
             std::size_t hudChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
@@ -407,6 +445,13 @@ int main()
             for (std::size_t index = 0; index < pixels.size(); index += 4U) {
                 darkest = std::min(darkest, pixels[index]);
                 brightest = std::max(brightest, pixels[index]);
+                if (cornerCorridorPixels[index + 1U]
+                        > cornerCorridorPixels[index] + 8U
+                    && cornerCorridorPixels[index + 2U]
+                        > cornerCorridorPixels[index] + 8U
+                    && cornerCorridorPixels[index + 2U] > 24U) {
+                    ++cornerCyanPixels;
+                }
                 for (std::size_t channel = 0; channel < 3U; ++channel) {
                     if (roomPixels[index + channel] != baseline[index + channel]) {
                         ++roomChangedChannels;
@@ -514,6 +559,7 @@ int main()
                 && corridorChangedChannels > 100U
                 && renderedConnectedRoomMaterial
                 && connectedRoomMaterialChangedChannels > 100U
+                && renderedCornerCorridor && cornerCyanPixels > 20U
                 && renderedHud && hudChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
@@ -531,6 +577,7 @@ int main()
                           << " | corridor rendered=" << renderedCorridor
                           << " openDoor=" << renderedOpenDoor
                           << " changed=" << corridorChangedChannels
+                          << " cornerCyan=" << cornerCyanPixels
                           << " doorState=" << doorStateChangedChannels << '\n';
             }
         }

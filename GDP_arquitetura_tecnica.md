@@ -3309,9 +3309,10 @@ Transform
 **Estado atual:** implementada e validada. `MapGraph` cria base conectada com
 START/BOSS únicos, main path explícito, branches DeadEnd/Secret, Hub/Arena,
 depth BFS e loop budget. `WorldGenerator` deriva streams por tentativa, grafo e
-sala, seleciona módulos compatíveis, posiciona sem overlap, consome connector
-pairs e roteia corredores Straight/L/Z sem reentrar nas salas dos endpoints nem
-atravessar salas alheias. O candidato
+sala, seleciona módulos compatíveis, posiciona sem overlap com espaçamento
+padrão de 12 unidades, consome connector pairs e roteia corredores Straight/L/Z
+sem reentrar nas salas dos endpoints nem atravessar salas alheias. Loops fecham
+somente uma branch e um nó próximo do main path. O candidato
 só vira `World` após gates de graph, geometry, connectors e corridors. Um
 fingerprint dourado detecta deriva estrutural entre builds; 1.000 seeds passam
 em Debug, Release e ASan/UBSan. `--seed N` permite reprodução direta.
@@ -3599,6 +3600,9 @@ batch permanente de 500 mundos fisicamente atravessáveis ✓
 roomId só muda após raio e altura do collider liberarem o vão ✓
 lockdown mantém porta passável aberta enquanto ocupada ✓
 colisão de lockdown acompanha o estado físico por edge ✓
+loops locais e limite auditado de 16,3 unidades por corredor ✓
+juntas em L sem paredes internas cruzando a passagem ✓
+shells, portas, conteúdo e luz antecipados por duas conexões ✓
 auditoria ampliada: 10.000 gerações e 2.000 travessias ✓
 ```
 

@@ -81,8 +81,8 @@ especializados das pastas numeradas.
   menu responsivo com `RESUME`, `RESTART RUN` e `EXIT GAME`, liberando o mouse
   até o retorno ao gameplay.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
-  próprias salas depois do stub da porta, e lockdown aguarda o collider liberar
-  o vão antes de fechar e bloquear a rota.
+  próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
+  abertas e lockdown aguarda o collider liberar o vão antes de bloquear a rota.
 - **Próxima atualização:** implementar menu principal com início de run e saída
   antes da geração do mundo.
 
@@ -93,11 +93,11 @@ domínio, geração versionada de seeds e tipos matemáticos básicos. Quando SD
 não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
-O renderer atual desenha a sala ocupada e as salas adjacentes usando origem e
-rotação reais, com cubo indexado reutilizado e materiais procedurais próprios de
+O renderer atual desenha a sala ocupada e a geometria alcançável em até duas
+conexões usando origem e rotação reais, com cubo indexado reutilizado e materiais procedurais próprios de
 parede/piso/teto derivados da seed da sala, aberturas e molduras ciano nas
 portas, painéis vermelhos durante lockdown, corredores com piso, teto e paredes,
-até oito luzes pontuais combinadas entre a sala atual e as adjacentes,
+até oito luzes pontuais combinadas entre a sala atual e as duas camadas vizinhas,
 luminárias emissivas, ambiente por tema,
 câmera em perspectiva e retícula. Parede com grandes placas e rodapé
 amarelo/preto, piso de placas com
@@ -270,9 +270,16 @@ Na estabilização posterior à Fase 19, `CorridorPath` passou a permitir contat
 com a sala de origem apenas no primeiro stub e com a sala destino apenas no
 último. Isso rejeita curvas que atravessavam novamente a própria sala. A adoção
 de sala agora considera raio e altura do personagem; lockdown segura uma porta
-passável ocupada e a colisão segue o estado físico de cada edge. A regressão
-permanente percorre 500 mundos e as seeds anteriormente problemáticas; auditorias
-ampliadas validaram 10.000 mundos gerados e 2.000 mundos atravessados.
+passável ocupada e a colisão segue o estado físico de cada edge. Loops agora
+fecham somente branches a dois passos no grafo, o espaçamento padrão caiu de 14
+para 12 unidades e a auditoria de 10.000 mundos limita a maior rota a 16,3
+unidades — a Run 2 da seed padrão caiu de 46,3 para 15,3. Nas curvas, paredes
+internas são aparadas, paredes externas se encontram e piso/teto cobrem a junta.
+O renderer antecipa shells, portas, corredores, entidades e luzes por duas
+conexões, evitando que a parede da próxima saída desapareça somente ao trocar o
+`roomId`. A regressão permanente percorre 500 mundos e as seeds anteriormente
+problemáticas; auditorias ampliadas validaram 10.000 mundos gerados e 2.000
+mundos atravessados.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto com

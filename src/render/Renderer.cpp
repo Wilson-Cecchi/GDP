@@ -930,6 +930,27 @@ bool Renderer::render(
     constexpr float corridorShellThickness = 0.12F;
     for (const CorridorRenderData& corridor : corridors) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(corridor.materialKey);
+        const float corridorHalfWidth = corridor.width * 0.5F;
+        for (std::size_t index = 1U; index + 1U < corridor.points.size(); ++index) {
+            const gdp::core::Vec3 incoming = gdp::core::normalized(
+                corridor.points[index] - corridor.points[index - 1U]);
+            const gdp::core::Vec3 outgoing = gdp::core::normalized(
+                corridor.points[index + 1U] - corridor.points[index]);
+            if (std::abs(gdp::core::dot(incoming, outgoing)) > 0.5F) {
+                continue;
+            }
+            const gdp::core::Vec3 corner = corridor.points[index];
+            const gdp::core::Vec3 cornerScale{
+                corridor.width, corridorShellThickness, corridor.width};
+            drawSurface(roomMaterials,
+                corner + gdp::core::Vec3{
+                    0.0F, -corridorShellThickness * 0.5F, 0.0F},
+                cornerScale, RoomMaterialChannel::Floor, 2.0F);
+            drawSurface(roomMaterials,
+                corner + gdp::core::Vec3{
+                    0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
+                cornerScale, RoomMaterialChannel::Ceiling, 2.0F);
+        }
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
             const gdp::core::Vec3 first = corridor.points[index];
             const gdp::core::Vec3 second = corridor.points[index + 1U];
@@ -949,18 +970,48 @@ bool Renderer::render(
             drawSurface(roomMaterials, center + gdp::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Ceiling, 2.0F);
-            const gdp::core::Vec3 wallScale = alongX
-                ? gdp::core::Vec3{length, corridor.height, corridorShellThickness}
-                : gdp::core::Vec3{corridorShellThickness, corridor.height, length};
-            const gdp::core::Vec3 wallCenter
-                = center + gdp::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
-            const gdp::core::Vec3 sideOffset = alongX
-                ? gdp::core::Vec3{0.0F, 0.0F, corridor.width * 0.5F}
-                : gdp::core::Vec3{corridor.width * 0.5F, 0.0F, 0.0F};
-            drawSurface(roomMaterials, wallCenter + sideOffset,
-                wallScale, RoomMaterialChannel::Wall);
-            drawSurface(roomMaterials, wallCenter - sideOffset,
-                wallScale, RoomMaterialChannel::Wall);
+            const gdp::core::Vec3 direction = gdp::core::normalized(second - first);
+            const gdp::core::Vec3 left{-direction.z, 0.0F, direction.x};
+            for (const float sideSign : {-1.0F, 1.0F}) {
+                const gdp::core::Vec3 side = left * sideSign;
+                gdp::core::Vec3 wallStart = first;
+                gdp::core::Vec3 wallEnd = second;
+                if (index > 0U) {
+                    const gdp::core::Vec3 previousDirection = gdp::core::normalized(
+                        first - corridor.points[index - 1U]);
+                    if (std::abs(gdp::core::dot(previousDirection, direction)) < 0.5F) {
+                        const bool inner = gdp::core::dot(
+                            side, previousDirection * -1.0F) > 0.5F;
+                        wallStart = wallStart
+                            + direction * (inner ? corridorHalfWidth : -corridorHalfWidth);
+                    }
+                }
+                if (index + 2U < corridor.points.size()) {
+                    const gdp::core::Vec3 nextDirection = gdp::core::normalized(
+                        corridor.points[index + 2U] - second);
+                    if (std::abs(gdp::core::dot(direction, nextDirection)) < 0.5F) {
+                        const bool inner = gdp::core::dot(side, nextDirection) > 0.5F;
+                        wallEnd = wallEnd
+                            + direction * (inner ? -corridorHalfWidth : corridorHalfWidth);
+                    }
+                }
+                const float wallLength = alongX
+                    ? std::abs(wallEnd.x - wallStart.x)
+                    : std::abs(wallEnd.z - wallStart.z);
+                if (wallLength <= 1.0e-4F) {
+                    continue;
+                }
+                const gdp::core::Vec3 wallScale = alongX
+                    ? gdp::core::Vec3{
+                        wallLength, corridor.height, corridorShellThickness}
+                    : gdp::core::Vec3{
+                        corridorShellThickness, corridor.height, wallLength};
+                const gdp::core::Vec3 wallCenter = (wallStart + wallEnd) * 0.5F
+                    + side * corridorHalfWidth
+                    + gdp::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
+                drawSurface(roomMaterials, wallCenter,
+                    wallScale, RoomMaterialChannel::Wall);
+            }
         }
     }
 

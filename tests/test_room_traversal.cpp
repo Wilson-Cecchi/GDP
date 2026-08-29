@@ -295,8 +295,9 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
 void testPreviouslyBrokenCorridorSeedsTraverseBothWays()
 {
     using namespace gdp;
-    constexpr std::array<core::Seed, 8> regressionSeeds{
+    constexpr std::array<core::Seed, 9> regressionSeeds{
         9U, 48U, 49U, 52U, 102U, 147U, 152U, 180U,
+        17'590'678'094'381'256'222ULL,
     };
     for (const core::Seed seed : regressionSeeds) {
         const world::WorldGenerationResult generated = world::generateWorld(seed);

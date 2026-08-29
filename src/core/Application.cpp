@@ -58,6 +58,43 @@ gdp::render::RoomLightingRenderData makeRenderLighting(
     return lighting;
 }
 
+std::vector<gdp::world::RoomId> roomsWithinGraphDistance(
+    const gdp::world::World& world,
+    const gdp::world::RoomId origin,
+    const std::uint32_t maximumDistance)
+{
+    if (origin == 0U) {
+        return {};
+    }
+    std::vector<gdp::world::RoomId> rooms{origin};
+    std::size_t layerBegin = 0U;
+    std::size_t layerEnd = rooms.size();
+    for (std::uint32_t depth = 0U; depth < maximumDistance; ++depth) {
+        for (std::size_t index = layerBegin; index < layerEnd; ++index) {
+            const gdp::world::RoomId roomId = rooms[index];
+            for (const gdp::world::CorridorPath& corridor : world.corridors) {
+                gdp::world::RoomId neighbor = 0U;
+                if (corridor.firstRoom == roomId) {
+                    neighbor = corridor.secondRoom;
+                } else if (corridor.secondRoom == roomId) {
+                    neighbor = corridor.firstRoom;
+                }
+                if (neighbor != 0U
+                    && std::find(rooms.begin(), rooms.end(), neighbor) == rooms.end()) {
+                    rooms.push_back(neighbor);
+                }
+            }
+        }
+        layerBegin = layerEnd;
+        layerEnd = rooms.size();
+        if (layerBegin == layerEnd) {
+            break;
+        }
+    }
+    std::sort(rooms.begin(), rooms.end());
+    return rooms;
+}
+
 void appendConnectedRoomLights(
     gdp::render::RoomLightingRenderData& lighting,
     const gdp::world::World& world,
@@ -72,17 +109,10 @@ void appendConnectedRoomLights(
         std::size_t lightIndex{0};
     };
 
-    std::vector<gdp::world::RoomId> connectedRoomIds;
-    for (const gdp::world::CorridorPath& corridor : world.corridors) {
-        if (corridor.firstRoom == currentRoomId) {
-            connectedRoomIds.push_back(corridor.secondRoom);
-        } else if (corridor.secondRoom == currentRoomId) {
-            connectedRoomIds.push_back(corridor.firstRoom);
-        }
-    }
-    std::sort(connectedRoomIds.begin(), connectedRoomIds.end());
+    std::vector<gdp::world::RoomId> connectedRoomIds
+        = roomsWithinGraphDistance(world, currentRoomId, 2U);
     connectedRoomIds.erase(
-        std::unique(connectedRoomIds.begin(), connectedRoomIds.end()),
+        std::remove(connectedRoomIds.begin(), connectedRoomIds.end(), currentRoomId),
         connectedRoomIds.end());
 
     std::vector<Candidate> candidates;
@@ -1128,16 +1158,9 @@ void Application::render()
     std::vector<gdp::render::PropRenderData> visibleProps;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
-    std::vector<world::RoomId> visibleRoomIds{playerRoom};
-    if (world_) {
-        for (const world::CorridorPath& corridor : world_->corridors) {
-            if (corridor.firstRoom == playerRoom) {
-                visibleRoomIds.push_back(corridor.secondRoom);
-            } else if (corridor.secondRoom == playerRoom) {
-                visibleRoomIds.push_back(corridor.firstRoom);
-            }
-        }
-    }
+    std::vector<world::RoomId> visibleRoomIds = world_
+        ? roomsWithinGraphDistance(*world_, playerRoom, 2U)
+        : std::vector<world::RoomId>{playerRoom};
     const auto isVisibleRoom = [&visibleRoomIds](const world::RoomId roomId) {
         return std::find(visibleRoomIds.begin(), visibleRoomIds.end(), roomId)
             != visibleRoomIds.end();
@@ -1326,30 +1349,20 @@ void Application::render()
                 lighting.ambientIntensity = 0.14F;
                 lighting.alert = true;
             }
-            const bool doorsLocked = activeEvent != roomEvents_.end()
-                && gameplay::isRoomLocked(*activeEvent);
-            for (const world::ConnectorInstance& connector : currentRoom->connectors) {
-                if (!connector.sealed && connector.edge) {
-                    const auto door = doorRuntimes_.find(*connector.edge);
-                    visibleDoors.push_back({
-                        connector.worldPosition,
-                        connector.worldNormal,
-                        connector.width,
-                        connector.height,
-                        doorsLocked,
-                        door == doorRuntimes_.end() ? 0.0F : door->second.openness,
-                    });
-                }
-            }
+            const std::vector<world::RoomId> geometryAnchors
+                = roomsWithinGraphDistance(*world_, playerRoom, 1U);
+            std::vector<world::EdgeId> visibleEdges;
             for (const world::CorridorPath& corridor : world_->corridors) {
-                world::RoomId connectedRoomId = 0U;
-                if (corridor.firstRoom == playerRoom) {
-                    connectedRoomId = corridor.secondRoom;
-                } else if (corridor.secondRoom == playerRoom) {
-                    connectedRoomId = corridor.firstRoom;
-                } else {
+                const bool touchesAnchor = std::find(
+                    geometryAnchors.begin(), geometryAnchors.end(), corridor.firstRoom)
+                        != geometryAnchors.end()
+                    || std::find(
+                        geometryAnchors.begin(), geometryAnchors.end(), corridor.secondRoom)
+                        != geometryAnchors.end();
+                if (!touchesAnchor) {
                     continue;
                 }
+                visibleEdges.push_back(corridor.edge);
                 visibleCorridors.push_back({
                     std::span<const gdp::core::Vec3>{corridor.points},
                     corridor.width,
@@ -1357,33 +1370,52 @@ void Application::render()
                     roomMaterialKeys_.contains(corridor.firstRoom)
                         ? roomMaterialKeys_.at(corridor.firstRoom) : 0U,
                 });
-                const auto connectedRoom = std::find_if(
-                    world_->rooms.begin(), world_->rooms.end(),
-                    [connectedRoomId](const world::RoomInstance& candidate) {
-                        return candidate.id == connectedRoomId;
-                    });
-                if (connectedRoom == world_->rooms.end()) {
+            }
+            const std::vector<world::RoomId> geometryRooms
+                = roomsWithinGraphDistance(*world_, playerRoom, 2U);
+            for (const world::RoomInstance& renderedRoom : world_->rooms) {
+                if (renderedRoom.id == playerRoom
+                    || std::find(geometryRooms.begin(), geometryRooms.end(), renderedRoom.id)
+                        == geometryRooms.end()) {
                     continue;
                 }
                 connectedRooms.push_back({
-                    connectedRoom->transform.position,
-                    connectedRoom->rotation,
-                    roomMaterialKeys_.contains(connectedRoom->id)
-                        ? roomMaterialKeys_.at(connectedRoom->id) : 0U,
+                    renderedRoom.transform.position,
+                    renderedRoom.rotation,
+                    roomMaterialKeys_.contains(renderedRoom.id)
+                        ? roomMaterialKeys_.at(renderedRoom.id) : 0U,
                 });
-                const auto entryDoor = std::find_if(
-                    connectedRoom->connectors.begin(), connectedRoom->connectors.end(),
-                    [&corridor](const world::ConnectorInstance& connector) {
-                        return !connector.sealed && connector.edge == corridor.edge;
+            }
+            const auto edgeIsLocked = [this, &visibleEdges](const world::EdgeId edge) {
+                if (std::find(visibleEdges.begin(), visibleEdges.end(), edge)
+                    == visibleEdges.end()) {
+                    return false;
+                }
+                return std::any_of(
+                    roomEvents_.begin(), roomEvents_.end(),
+                    [this, edge](const gameplay::RoomEventRuntime& runtime) {
+                        return gameplay::isRoomLocked(runtime)
+                            && edgeTouchesRoom(*world_, edge, runtime.roomId);
                     });
-                if (entryDoor != connectedRoom->connectors.end()) {
-                    const auto door = doorRuntimes_.find(corridor.edge);
+            };
+            for (const world::RoomInstance& renderedRoom : world_->rooms) {
+                if (std::find(geometryRooms.begin(), geometryRooms.end(), renderedRoom.id)
+                    == geometryRooms.end()) {
+                    continue;
+                }
+                for (const world::ConnectorInstance& connector : renderedRoom.connectors) {
+                    if (connector.sealed || !connector.edge
+                        || std::find(visibleEdges.begin(), visibleEdges.end(), *connector.edge)
+                            == visibleEdges.end()) {
+                        continue;
+                    }
+                    const auto door = doorRuntimes_.find(*connector.edge);
                     visibleDoors.push_back({
-                        entryDoor->worldPosition,
-                        entryDoor->worldNormal,
-                        entryDoor->width,
-                        entryDoor->height,
-                        false,
+                        connector.worldPosition,
+                        connector.worldNormal,
+                        connector.width,
+                        connector.height,
+                        edgeIsLocked(*connector.edge),
                         door == doorRuntimes_.end() ? 0.0F : door->second.openness,
                     });
                 }

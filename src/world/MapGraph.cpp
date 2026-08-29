@@ -143,18 +143,49 @@ MapGraph generateMapGraph(const gdp::core::Seed seed, MapGraphConfig config)
         ++degrees[index];
     }
 
+    // A loop must close a nearby branch. Arbitrary pairs can be valid as a
+    // graph while producing a corridor that runs beside several rooms before
+    // reaching its destination.
+    const auto treeLinks = adjacency(graph);
+    const auto isMainNode = [&graph](const RoomNodeId id) {
+        return std::find(graph.mainPath.begin(), graph.mainPath.end(), id)
+            != graph.mainPath.end();
+    };
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> loopCandidates;
+    for (std::uint32_t firstIndex = 0; firstIndex < config.roomCount; ++firstIndex) {
+        for (std::uint32_t secondIndex = firstIndex + 1U;
+             secondIndex < config.roomCount; ++secondIndex) {
+            const RoomNodeId first = firstIndex + 1U;
+            const RoomNodeId second = secondIndex + 1U;
+            if (isMainNode(first) == isMainNode(second)
+                || connections.contains(connectionKey(first, second))) {
+                continue;
+            }
+            const bool shareNeighbor = std::any_of(
+                treeLinks.at(first).begin(), treeLinks.at(first).end(),
+                [&treeLinks, second](const RoomNodeId neighbor) {
+                    const auto& secondLinks = treeLinks.at(second);
+                    return std::find(secondLinks.begin(), secondLinks.end(), neighbor)
+                        != secondLinks.end();
+                });
+            if (shareNeighbor) {
+                loopCandidates.push_back({firstIndex, secondIndex});
+            }
+        }
+    }
+
     std::uint32_t loopsAdded = 0;
-    for (std::uint32_t attempt = 0; attempt < 128U && loopsAdded < config.loopBudget; ++attempt) {
-        const auto firstIndex = static_cast<std::uint32_t>(random.rangeInt(
-            0, static_cast<int>(config.roomCount - 1U)));
-        const auto secondIndex = static_cast<std::uint32_t>(random.rangeInt(
-            0, static_cast<int>(config.roomCount - 1U)));
-        const RoomNodeId first = firstIndex + 1U;
-        const RoomNodeId second = secondIndex + 1U;
-        if (first == second || degrees[firstIndex] >= 4U || degrees[secondIndex] >= 4U
-            || connections.contains(connectionKey(first, second))) {
+    while (!loopCandidates.empty() && loopsAdded < config.loopBudget) {
+        const auto selected = static_cast<std::size_t>(random.rangeInt(
+            0, static_cast<int>(loopCandidates.size() - 1U)));
+        const auto [firstIndex, secondIndex] = loopCandidates[selected];
+        loopCandidates.erase(loopCandidates.begin()
+            + static_cast<std::ptrdiff_t>(selected));
+        if (degrees[firstIndex] >= 4U || degrees[secondIndex] >= 4U) {
             continue;
         }
+        const RoomNodeId first = firstIndex + 1U;
+        const RoomNodeId second = secondIndex + 1U;
         graph.edges.push_back({nextEdge++, first, second, false});
         connections.insert(connectionKey(first, second));
         ++degrees[firstIndex];

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <string_view>
@@ -200,6 +201,13 @@ void testMapGraph()
     expect(graph.nodes.size() == 8U, "graph contains requested room count");
     expect(graph.edges.size() == 8U, "graph spends its single loop budget");
     expect(graph.mainPath.front() == 1U, "main path begins at START");
+    const MapEdge& loop = graph.edges.back();
+    const bool firstIsBranch = loop.first > graph.mainPath.size();
+    const bool secondIsBranch = loop.second > graph.mainPath.size();
+    const RoomNodeId mainEndpoint = firstIsBranch ? loop.second : loop.first;
+    expect(firstIsBranch != secondIsBranch
+            && (mainEndpoint == 1U || mainEndpoint == 3U),
+        "loop closes a local branch instead of creating a map-spanning corridor");
     expect(graphToDot(graph).find("graph GDP") != std::string::npos,
         "graph debug dump uses DOT format");
 
@@ -223,7 +231,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0xEB5C70FAD7140A84ULL,
+    expect(fingerprint == 0xAD9EB33762CCF4A5ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -508,6 +516,7 @@ void testWorldSeedBatch()
 
     bool allValid = true;
     std::uint32_t maximumAcceptedAttempt = 0;
+    float maximumCorridorLength = 0.0F;
     for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
         const WorldGenerationResult generated = generateWorld(seed);
         if (!generated.world || !validateWorld(*generated.world).isValid()) {
@@ -518,9 +527,19 @@ void testWorldSeedBatch()
         maximumAcceptedAttempt = std::max(
             maximumAcceptedAttempt,
             generated.world->acceptedAttempt);
+        for (const CorridorPath& corridor : generated.world->corridors) {
+            float length = 0.0F;
+            for (std::size_t index = 1U; index < corridor.points.size(); ++index) {
+                length += std::abs(corridor.points[index].x - corridor.points[index - 1U].x)
+                    + std::abs(corridor.points[index].z - corridor.points[index - 1U].z);
+            }
+            maximumCorridorLength = std::max(maximumCorridorLength, length);
+        }
     }
     expect(allValid, "1,000 deterministic seeds produce valid committed worlds");
     expect(maximumAcceptedAttempt < 32U, "batch stays inside configured attempt budget");
+    expect(maximumCorridorLength <= 17.0F,
+        "local loop policy prevents map-spanning corridors");
 }
 
 } // namespace
