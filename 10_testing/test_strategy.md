@@ -139,6 +139,12 @@ Manter seeds para casos: simples, denso, loops, secret, boss, stress e falhas hi
 
 Salvar dumps de seeds conhecidas. Mudanças intencionais precisam ser revisadas, não aceitas automaticamente.
 
+Regressão visual técnica e aprovação artística são gates independentes. Para
+uma revisão de textura, primeiro registrar e aprovar a proposta conforme
+`visual/TEXTURE_APPROVALS.md`; somente então implementar e atualizar os dumps.
+Um framebuffer estável não significa que a direção visual foi aprovada, e uma
+prancha aprovada não permite aceitar pixels ausentes, NaN ou perda de contraste.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

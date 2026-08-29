@@ -86,6 +86,11 @@ dos cinco papéis exige 5.000 hashes sem colisão e substreams distintas.
 
 Family, resolution, generation ms, cache hit e min/max de canais.
 
+Esses gates validam o baseline técnico, não aprovam a direção artística. Toda
+revisão de textura precisa primeiro de proposta e aprovação registradas em
+`visual/TEXTURE_APPROVALS.md`; depois da implementação, as métricas e regressões
+abaixo continuam obrigatórias.
+
 O gate do Industrial Corridor executa 1.000 room seeds, rasteriza Wall, Floor e
 Ceiling e exige `Maintained/Used/Worn`, hashes únicos, rodapé amarelo apenas na
 base, faixa central de tráfego e luminárias contrastantes. O teste OpenGL troca

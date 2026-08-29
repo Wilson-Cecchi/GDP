@@ -25,6 +25,8 @@ Os guias antigos detalhados de peças e materiais foram preservados dentro das s
 inimigos e ambientes como arquivos `*_reference.md`.
 
 A prancha visual gerada está em `visual/reference_sheet_rooms_enemies.png`.
+O gate e o registro obrigatório para futuras revisões estão em
+`visual/TEXTURE_APPROVALS.md`.
 
 Documentos `*_reference.md` preservam conteúdo e resultados históricos do GDP
 anterior. Contratos atuais são definidos por `architecture.md` e pelos documentos
@@ -83,8 +85,15 @@ especializados das pastas numeradas.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
   próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
   abertas e lockdown aguarda o collider liberar o vão antes de bloquear a rota.
-- **Próxima atualização:** implementar menu principal com início de run e saída
-  antes da geração do mundo.
+- **Fase 20 — Variedade estrutural de salas:** planejada; substituir a base
+  única por módulos compactos, médios e grandes, com Hub, Arena, Boss e Secret
+  usando dimensões e layouts próprios.
+- **Fase 21 — Menu principal:** planejada; início de run e saída antes da
+  geração do mundo.
+- **Fase 22 — Revisão visual aprovada:** planejada; revisar texturas por unidade
+  visual somente após aprovação explícita de uma prancha anterior à implementação.
+- **Próxima atualização:** implementar a variedade estrutural de salas antes de
+  refazer as superfícies visuais.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -298,6 +307,44 @@ renderer cacheia os oito perfis pelo hash completo e seleciona o perfil de cada
 sala renderizada. O teste OpenGL offscreen também cobre sala
 transladada/rotacionada, porta normal/lockdown, geometria vista do corredor,
 materiais diferentes simultâneos em salas conectadas e o overlay terminal.
+
+## Planejamento da variedade estrutural de salas
+
+As sete variantes atuais de `RoomModule` reutilizam a mesma base aproximada de
+`8 × 4 × 10`; uma rotação apenas troca largura e profundidade. Essa geometria é
+um baseline do vertical slice, não o formato final das salas.
+
+A Fase 20 introduzirá famílias compactas, médias e grandes. Hub, Arena, Boss e
+Secret terão proporções e composição próprias. `footprint` e `localBounds`
+passarão a ser a fonte única para renderer, colisão, connectors, zonas de spawn,
+spacing e validação de corredores, removendo dimensões fixas paralelas. Toda
+variante deverá funcionar nas quatro rotações, manter as portas livres e passar
+pelos lotes determinísticos de geração e travessia.
+
+Essa fase precede a revisão artística porque as texturas devem ser avaliadas nas
+superfícies e proporções definitivas, evitando aprovar um material em uma caixa
+que será substituída logo depois.
+
+## Gate obrigatório de aprovação visual
+
+Os materiais implementados nas Fases 9 e 10 são baseline técnico funcional e
+continuam disponíveis durante o desenvolvimento, mas ainda não são arte final
+aprovada. O protocolo e o inventário ficam em
+[`visual/TEXTURE_APPROVALS.md`](visual/TEXTURE_APPROVALS.md).
+
+Para cada superfície ou família visual, o fluxo obrigatório é:
+
+1. definir objetivo, referências, material, paleta, densidade e desgaste;
+2. produzir uma prancha versionada com seeds representativas antes de editar a
+   implementação definitiva;
+3. aguardar aprovação visual explícita do usuário para aquela unidade;
+4. revisar a proposta sem trocar o código atual quando ela não for aprovada;
+5. implementar somente a versão aprovada;
+6. validar no jogo contra a prancha, além dos testes técnicos automatizados.
+
+Aprovar `Storage/Wall`, por exemplo, não aprova `Storage/Floor`, outro ambiente
+ou uma versão futura. Como as recipes são procedurais, a aprovação cobre a
+família e as regras demonstradas pela prancha, não cada seed possível.
 
 ## Compilar e testar
 

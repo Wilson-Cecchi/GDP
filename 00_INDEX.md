@@ -27,11 +27,16 @@ especificação especializada mais recente
 
 O `README(6).md` é histórico técnico: pode preservar decisões já testadas, mas não impõe código C/SDL2 à nova versão C++/SDL3/OpenGL.
 
+Para alterações artísticas, `visual/TEXTURE_APPROVALS.md` acrescenta um gate
+humano obrigatório: a decisão explícita do usuário sobre uma proposta visual
+versionada é necessária antes da implementação daquela unidade.
+
 ## Referências preservadas
 
 - `05_enemies/part_library_reference.md`: preserva o catálogo de perfis, peças e regras visuais de `Guia_de_texturas_de_Inimigos.md`.
 - `06_environments/room_materials_reference.md`: preserva os materiais e a composição dos oito ambientes de `Guia_de_texturas(1).md`.
 - prancha visual: referência de estilo, não layout obrigatório.
+- `visual/TEXTURE_APPROVALS.md`: protocolo e registro das aprovações visuais.
 
 ## Critério de documentação suficiente
 

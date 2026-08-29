@@ -138,4 +138,5 @@
 - `tests/test_room_materials.cpp`
 - `tests/test_session.cpp`
 - `tests/test_world.cpp`
+- `visual/TEXTURE_APPROVALS.md`
 - `visual/reference_sheet_rooms_enemies.png`

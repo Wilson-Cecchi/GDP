@@ -6,6 +6,10 @@
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
+> **Gate visual:** os oito perfis atuais são baseline técnico, não arte final
+> aprovada. Toda revisão segue `visual/TEXTURE_APPROVALS.md`; nenhuma receita
+> revisada é implementada antes da aprovação explícita da sua prancha.
+
 ## Regra principal
 
 A sala inteira tem prioridade sobre um tile isolado:
@@ -50,6 +54,10 @@ definir o orçamento total da sala; depois distribuir.
 
 Imagens representam composição, iluminação, material, densidade e linguagem visual; não
 representam layout, textura, cor ou quantidade exatos.
+
+Na revisão visual, a referência deve ser convertida em uma proposta identificada
+por versão. Uma prancha aprovada autoriza somente a superfície ou família nela
+nomeada; outras superfícies e novas versões continuam aguardando aprovação.
 
 ## Sinalização
 

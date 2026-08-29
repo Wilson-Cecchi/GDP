@@ -3103,6 +3103,12 @@ Para centenas de seeds:
 
 # 110. Teste de textura
 
+As texturas implementadas até aqui são baseline técnico, não aprovação
+artística final. Antes de modificar uma recipe por direção visual, é obrigatório
+seguir `visual/TEXTURE_APPROVALS.md`: produzir uma prancha versionada da unidade,
+apresentar seeds representativas e obter aprovação explícita antes da
+implementação. Aprovação e regressão automatizada são gates independentes.
+
 Para cada família:
 
 ```text
@@ -3606,8 +3612,40 @@ shells, portas, conteúdo e luz antecipados por duas conexões ✓
 auditoria ampliada: 10.000 gerações e 2.000 travessias ✓
 ```
 
-**Próximo marco:** implementar menu principal com início de run e saída antes
-da geração do mundo.
+## Fase 20 — Variedade estrutural de salas
+
+```text
+RoomModule compactos, médios e grandes
+Hub, Arena, Boss e Secret com proporções próprias
+localBounds/footprint como fonte única de renderer e colisão
+connectors, zonas, spacing e corredores derivados dos bounds reais
+quatro rotações e travessia procedural validadas
+```
+
+A biblioteca atual clona uma base aproximada de `8 × 4 × 10`; isso é baseline
+do vertical slice, não formato final. A geometria precisa estabilizar antes da
+revisão artística para que as texturas sejam aprovadas nas superfícies reais.
+
+## Fase 21 — Menu principal
+
+```text
+início de run antes da geração do mundo
+saída segura pelo fluxo principal
+```
+
+## Fase 22 — Revisão visual com aprovação prévia
+
+```text
+texturas atuais classificadas como baseline técnico
+uma proposta versionada por superfície ou família visual
+prancha com seeds representativas antes de alterar a implementação
+aprovação explícita do usuário limitada à unidade apresentada
+capturas in-engine e regressões técnicas depois da implementação
+registro em visual/TEXTURE_APPROVALS.md
+```
+
+**Próximo marco:** implementar a Fase 20; a Fase 22 não começa por código sem
+aprovação visual prévia da textura correspondente.
 
 ---
 

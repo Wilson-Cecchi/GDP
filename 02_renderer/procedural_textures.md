@@ -6,6 +6,8 @@
 > máscaras completas permanecem planejados. Albedos estruturados dos primeiros
 > ambientes Industrial, Storage, Combat Room, Cafeteria, Laboratory, Technical
 > Area, Security e Central Hub integrados na Fase 10.
+> Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
+> gate pré-implementação de `visual/TEXTURE_APPROVALS.md`.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -30,6 +32,17 @@ ALBEDO + ROUGHNESS + METALLIC + NORMAL + EMISSIVE
 ```
 
 sem depender de uma imagem final pronta.
+
+## Gate de revisão visual
+
+Antes de alterar uma recipe existente por motivo artístico, preparar uma
+prancha versionada da unidade visual com no mínimo três seeds, detalhe próximo,
+enquadramento de gameplay e iluminação neutra. Até a resposta explícita
+`APROVADA PARA IMPLEMENTAÇÃO`, a proposta não pode substituir a recipe atual.
+
+A aprovação se aplica à recipe/superfície citada, não a todas as variantes do
+tema. Depois da implementação, capturas in-engine precisam demonstrar aderência
+à prancha aprovada sem dispensar os gates técnicos abaixo.
 
 A Fase 2 estabeleceu `ImageData` RGBA validado, filtros nearest, repetição,
 mipmap e lifetime RAII. A Fase 8 acrescentou a geração de albedo por receita com
