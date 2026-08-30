@@ -49,11 +49,20 @@ if(NOT gdp_renderer_contents MATCHES
         "#include[ \t]+\"game/visual/GdpRenderData.hpp\"")
     message(FATAL_ERROR "GDP renderer must consume the render data contract")
 endif()
+if(NOT gdp_renderer_contents MATCHES "gdp::game::visual::HudRenderData")
+    message(FATAL_ERROR "GDP renderer must consume game-owned presentation DTOs")
+endif()
 if(gdp_renderer_contents MATCHES "struct[ \t]+HudRenderData"
     OR gdp_renderer_contents MATCHES "enum[ \t]+class[ \t]+EnemyVisualRole")
     message(FATAL_ERROR "GDP renderer class header must not own presentation DTOs")
 endif()
 file(READ "${gdp_render_data_header}" gdp_render_data_contents)
+if(NOT gdp_render_data_contents MATCHES
+        "namespace[ \t]+gdp::game::visual[ \t{]"
+    OR gdp_render_data_contents MATCHES
+        "namespace[ \t]+gdp::render[ \t{]")
+    message(FATAL_ERROR "GDP presentation DTOs must be owned by gdp::game::visual")
+endif()
 if(NOT gdp_render_data_contents MATCHES "struct[ \t]+HudRenderData"
     OR NOT gdp_render_data_contents MATCHES "struct[ \t]+RoomRenderData"
     OR NOT gdp_render_data_contents MATCHES

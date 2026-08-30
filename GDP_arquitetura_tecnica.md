@@ -688,6 +688,11 @@ para o contrato `src/game/visual/GdpRenderData.*`. O namespace foi preservado
 temporariamente para separar essa mudança estrutural de um futuro rename e não
 confundir tipos GDP com `Camera`, `ImageData`, `Mesh` e `Texture` reutilizáveis.
 
+Na Fase 35, esse contrato passou de `gdp::render` para
+`gdp::game::visual`. A aplicação produz dados pertencentes ao jogo e o renderer
+concreto apenas os consome; as primitivas da fundação continuam em
+`gdp::render`, sem conhecer HUD, objetivos, inimigos ou salas do GDP.
+
 ---
 
 # 8. Sistema de seed

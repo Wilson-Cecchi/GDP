@@ -86,30 +86,30 @@ int main(const int argc, char* argv[])
                 gdp::core::Vec3{0.0F, 0.0F, -14.0F},
             };
             const std::array corridor{
-                gdp::render::CorridorRenderData{corridorPoints, 2.8F, 3.2F},
+                gdp::game::visual::CorridorRenderData{corridorPoints, 2.8F, 3.2F},
             };
             constexpr std::array doors{
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {0.0F, 0.0F, -14.0F}, {0.0F, 0.0F, 1.0F},
                     2.8F, 3.2F, false, 1.0F},
             };
-            constexpr gdp::render::RoomRenderData roomBehindCamera{
+            constexpr gdp::game::visual::RoomRenderData roomBehindCamera{
                 {0.0F, 0.0F, 10.0F}, gdp::core::QuarterTurn::Degrees0, 0U,
                 {{-4.0F, 0.0F, 5.0F}, {4.0F, 4.0F, 15.0F}}};
             constexpr std::array connectedRoom{
-                gdp::render::RoomRenderData{
+                gdp::game::visual::RoomRenderData{
                     {0.0F, 0.0F, -18.0F}, gdp::core::QuarterTurn::Degrees0, 0U,
                     {{-4.8F, 0.0F, -22.0F}, {4.8F, 4.2F, -14.0F}}},
             };
-            constexpr gdp::render::CameraData gameplayCamera{
+            constexpr gdp::game::visual::CameraData gameplayCamera{
                 {0.0F, 1.58F, 3.25F}, {0.14F, -0.015F, -0.99F}, 70.0F};
-            constexpr gdp::render::CameraData closeCamera{
+            constexpr gdp::game::visual::CameraData closeCamera{
                 {0.15F, 1.55F, 1.80F}, {0.94F, -0.08F, -0.33F}, 58.0F};
-            constexpr gdp::render::CameraData ceilingCamera{
+            constexpr gdp::game::visual::CameraData ceilingCamera{
                 {0.0F, 1.50F, 2.50F}, {0.0F, 0.62F, -0.78F}, 68.0F};
-            constexpr gdp::render::CameraData ceilingCloseCamera{
+            constexpr gdp::game::visual::CameraData ceilingCloseCamera{
                 {0.35F, 1.68F, -2.2F}, {-0.10F, 0.90F, -0.42F}, 60.0F};
-            gdp::render::RoomLightingRenderData lighting;
+            gdp::game::visual::RoomLightingRenderData lighting;
             lighting.ambientColor = {0.78F, 0.82F, 0.86F};
             lighting.ambientIntensity = 0.22F;
             lighting.fixtureEmissive = 0.72F;
@@ -141,10 +141,10 @@ int main(const int argc, char* argv[])
                     passed = false;
                     continue;
                 }
-                const auto captureView = [&](const gdp::render::CameraData view,
+                const auto captureView = [&](const gdp::game::visual::CameraData view,
                                               const char* const unit,
                                               const char* const suffix,
-                                              const gdp::render::RoomLightingRenderData&
+                                              const gdp::game::visual::RoomLightingRenderData&
                                                   captureLighting) {
                     if (!renderer.render(width, height, view, {}, {}, {}, captureLighting,
                             roomBehindCamera, doors, corridor, connectedRoom)) {
@@ -168,7 +168,7 @@ int main(const int argc, char* argv[])
                     "gameplay", lighting);
                 captureView(closeCamera, "industrial_corridor_wall_v2_hd",
                     "close", lighting);
-                gdp::render::RoomLightingRenderData ceilingLighting = lighting;
+                gdp::game::visual::RoomLightingRenderData ceilingLighting = lighting;
                 ceilingLighting.fixtureEmissive = 0.22F;
                 captureView(ceilingCamera, "industrial_corridor_ceiling_v1_hd",
                     "gameplay", ceilingLighting);
@@ -177,14 +177,14 @@ int main(const int argc, char* argv[])
                 if (capture.seed == 2U) {
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "on", lighting);
-                    gdp::render::RoomLightingRenderData offLighting = lighting;
+                    gdp::game::visual::RoomLightingRenderData offLighting = lighting;
                     offLighting.fixtureEmissive = 0.0F;
                     for (std::size_t index = 0; index < offLighting.lightCount; ++index) {
                         offLighting.lights[index].intensity = 0.0F;
                     }
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "off", offLighting);
-                    gdp::render::RoomLightingRenderData alertLighting = lighting;
+                    gdp::game::visual::RoomLightingRenderData alertLighting = lighting;
                     alertLighting.alert = true;
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "alert", alertLighting);

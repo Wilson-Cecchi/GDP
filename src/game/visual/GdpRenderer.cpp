@@ -19,6 +19,33 @@
 #include <utility>
 
 namespace gdp::render {
+
+using gdp::game::visual::CameraData;
+using gdp::game::visual::CorridorRenderData;
+using gdp::game::visual::DoorRenderData;
+using gdp::game::visual::EnemyRenderData;
+using gdp::game::visual::EnemyVisualRole;
+using gdp::game::visual::HudEventState;
+using gdp::game::visual::HudHitFeedback;
+using gdp::game::visual::HudMainMenuSelection;
+using gdp::game::visual::HudNotice;
+using gdp::game::visual::HudPauseSelection;
+using gdp::game::visual::HudPrompt;
+using gdp::game::visual::HudRenderData;
+using gdp::game::visual::MainMenuLayout;
+using gdp::game::visual::ObjectiveRenderState;
+using gdp::game::visual::PickupRenderData;
+using gdp::game::visual::PickupVisualRole;
+using gdp::game::visual::PointLightRenderData;
+using gdp::game::visual::PropRenderData;
+using gdp::game::visual::PropVisualRole;
+using gdp::game::visual::PropVisualState;
+using gdp::game::visual::RoomLightingRenderData;
+using gdp::game::visual::RoomRenderData;
+using gdp::game::visual::UiRect;
+using gdp::game::visual::makeMainMenuLayout;
+using gdp::game::visual::maxRenderedRoomLights;
+
 namespace {
 
 constexpr std::string_view vertexShaderSource = R"glsl(#version 330 core

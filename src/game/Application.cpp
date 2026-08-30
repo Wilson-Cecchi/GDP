@@ -10,6 +10,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "platform/SdlInput.hpp"
+#include "game/visual/GdpRenderData.hpp"
 #include "game/visual/GdpRenderer.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
@@ -44,12 +45,12 @@ std::string sdlError(const std::string_view operation)
     return stream.str();
 }
 
-gdp::render::RoomLightingRenderData makeRenderLighting(
+visual::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert)
 {
-    static_assert(gdp::world::maxRoomLights <= gdp::render::maxRenderedRoomLights);
-    gdp::render::RoomLightingRenderData lighting;
+    static_assert(gdp::world::maxRoomLights <= visual::maxRenderedRoomLights);
+    visual::RoomLightingRenderData lighting;
     lighting.ambientColor = plan.ambientColor;
     lighting.ambientIntensity = plan.ambientIntensity;
     lighting.lightCount = static_cast<std::uint32_t>(plan.lights.size());
@@ -105,14 +106,14 @@ std::vector<gdp::world::RoomId> roomsWithinGraphDistance(
 }
 
 void appendConnectedRoomLights(
-    gdp::render::RoomLightingRenderData& lighting,
+    visual::RoomLightingRenderData& lighting,
     const gdp::world::World& world,
     const std::vector<gdp::world::RoomLightingPlan>& roomLighting,
     const gdp::world::RoomId currentRoomId,
     const gdp::core::Vec3 observerPosition)
 {
     struct Candidate {
-        gdp::render::PointLightRenderData light;
+        visual::PointLightRenderData light;
         float distanceSquared{0.0F};
         gdp::world::RoomId roomId{0};
         std::size_t lightIndex{0};
@@ -166,9 +167,9 @@ void appendConnectedRoomLights(
         });
 
     std::size_t lightCount = std::min<std::size_t>(
-        lighting.lightCount, gdp::render::maxRenderedRoomLights);
+        lighting.lightCount, visual::maxRenderedRoomLights);
     for (const Candidate& candidate : candidates) {
-        if (lightCount >= gdp::render::maxRenderedRoomLights) {
+        if (lightCount >= visual::maxRenderedRoomLights) {
             break;
         }
         lighting.lights[lightCount++] = candidate.light;
@@ -611,7 +612,7 @@ void Application::processEvents()
             return;
         }
 
-        std::optional<gdp::render::HudMainMenuSelection> pointedSelection;
+        std::optional<visual::HudMainMenuSelection> pointedSelection;
         if (window_ != nullptr) {
             int windowWidth = 0;
             int windowHeight = 0;
@@ -621,7 +622,7 @@ void Application::processEvents()
                 && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
                 && windowWidth > 0 && windowHeight > 0) {
                 const Vec2 pointer = input_.mousePosition();
-                pointedSelection = gdp::render::mainMenuSelectionAt(
+                pointedSelection = visual::mainMenuSelectionAt(
                     drawableWidth, drawableHeight,
                     pointer.x * static_cast<float>(drawableWidth)
                         / static_cast<float>(windowWidth),
@@ -632,7 +633,7 @@ void Application::processEvents()
         if (pointedSelection && input_.mouseDelta() != Vec2{}) {
             gameplay::selectMainMenuOption(
                 mainMenu_,
-                *pointedSelection == gdp::render::HudMainMenuSelection::ExitGame
+                *pointedSelection == visual::HudMainMenuSelection::ExitGame
                     ? gameplay::MainMenuOption::ExitGame
                     : gameplay::MainMenuOption::StartRun);
         }
@@ -652,7 +653,7 @@ void Application::processEvents()
             && input_.wasMouseButtonPressed(MouseButton::Primary)) {
             gameplay::selectMainMenuOption(
                 mainMenu_,
-                *pointedSelection == gdp::render::HudMainMenuSelection::ExitGame
+                *pointedSelection == visual::HudMainMenuSelection::ExitGame
                     ? gameplay::MainMenuOption::ExitGame
                     : gameplay::MainMenuOption::StartRun);
             command = gameplay::activateMainMenuSelection(mainMenu_);
@@ -1256,12 +1257,12 @@ void Application::render()
 
     if (mainMenu_.active) {
         SDL_SetWindowTitle(window_, "GDP | MAIN MENU");
-        gdp::render::HudRenderData hud;
+        visual::HudRenderData hud;
         hud.mainMenu = true;
         hud.mainMenuSelection
             = mainMenu_.selection == gameplay::MainMenuOption::ExitGame
-            ? gdp::render::HudMainMenuSelection::ExitGame
-            : gdp::render::HudMainMenuSelection::StartRun;
+            ? visual::HudMainMenuSelection::ExitGame
+            : visual::HudMainMenuSelection::StartRun;
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
             log(LogLevel::Error, "Renderer failed while drawing the main menu");
@@ -1273,14 +1274,14 @@ void Application::render()
         return;
     }
 
-    const gdp::render::CameraData camera{
+    const visual::CameraData camera{
         player_.cameraPosition(),
         player_.forwardDirection(),
         68.0F,
     };
-    std::vector<gdp::render::EnemyRenderData> visibleEnemies;
-    std::vector<gdp::render::PickupRenderData> visiblePickups;
-    std::vector<gdp::render::PropRenderData> visibleProps;
+    std::vector<visual::EnemyRenderData> visibleEnemies;
+    std::vector<visual::PickupRenderData> visiblePickups;
+    std::vector<visual::PropRenderData> visibleProps;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     std::vector<world::RoomId> visibleRoomIds = world_
@@ -1299,15 +1300,15 @@ void Application::render()
                 || enemy->archetype == entities::EnemyArchetype::Officer
                 || enemy->archetype == entities::EnemyArchetype::Engineer
                 || enemy->archetype == entities::EnemyArchetype::IndustrialRobot)) {
-            gdp::render::EnemyVisualRole role = gdp::render::EnemyVisualRole::Worker;
+            visual::EnemyVisualRole role = visual::EnemyVisualRole::Worker;
             if (enemy->archetype == entities::EnemyArchetype::Guard) {
-                role = gdp::render::EnemyVisualRole::Guard;
+                role = visual::EnemyVisualRole::Guard;
             } else if (enemy->archetype == entities::EnemyArchetype::Officer) {
-                role = gdp::render::EnemyVisualRole::Officer;
+                role = visual::EnemyVisualRole::Officer;
             } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
-                role = gdp::render::EnemyVisualRole::Engineer;
+                role = visual::EnemyVisualRole::Engineer;
             } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
-                role = gdp::render::EnemyVisualRole::IndustrialRobot;
+                role = visual::EnemyVisualRole::IndustrialRobot;
             }
             visibleEnemies.push_back({
                 entity->transform.position,
@@ -1324,11 +1325,11 @@ void Application::render()
         if (entity == nullptr || item == nullptr || !isVisibleRoom(entity->roomId)) {
             continue;
         }
-        gdp::render::PickupVisualRole role = gdp::render::PickupVisualRole::Health;
+        visual::PickupVisualRole role = visual::PickupVisualRole::Health;
         if (item->type == entities::ItemType::Ammo) {
-            role = gdp::render::PickupVisualRole::Ammo;
+            role = visual::PickupVisualRole::Ammo;
         } else if (item->type == entities::ItemType::Key) {
-            role = gdp::render::PickupVisualRole::Key;
+            role = visual::PickupVisualRole::Key;
         }
         visiblePickups.push_back({entity->transform.position, role});
     }
@@ -1341,17 +1342,17 @@ void Application::render()
                 && prop->type != entities::PropType::Barricade)) {
             continue;
         }
-        gdp::render::PropVisualRole role = gdp::render::PropVisualRole::Crate;
+        visual::PropVisualRole role = visual::PropVisualRole::Crate;
         if (prop->type == entities::PropType::Canister) {
-            role = gdp::render::PropVisualRole::Canister;
+            role = visual::PropVisualRole::Canister;
         } else if (prop->type == entities::PropType::Barricade) {
-            role = gdp::render::PropVisualRole::Barricade;
+            role = visual::PropVisualRole::Barricade;
         }
-        gdp::render::PropVisualState state = gdp::render::PropVisualState::Intact;
+        visual::PropVisualState state = visual::PropVisualState::Intact;
         if (prop->state == entities::PropState::Damaged) {
-            state = gdp::render::PropVisualState::Damaged;
+            state = visual::PropVisualState::Damaged;
         } else if (prop->state == entities::PropState::Destroyed) {
-            state = gdp::render::PropVisualState::Destroyed;
+            state = visual::PropVisualState::Destroyed;
         }
         visibleProps.push_back({
             entity->transform.position,
@@ -1393,11 +1394,11 @@ void Application::render()
             title << " [LOCKDOWN]";
         }
     }
-    gdp::render::RoomLightingRenderData lighting;
-    gdp::render::RoomRenderData roomRender;
-    std::vector<gdp::render::DoorRenderData> visibleDoors;
-    std::vector<gdp::render::CorridorRenderData> visibleCorridors;
-    std::vector<gdp::render::RoomRenderData> connectedRooms;
+    visual::RoomLightingRenderData lighting;
+    visual::RoomRenderData roomRender;
+    std::vector<visual::DoorRenderData> visibleDoors;
+    std::vector<visual::CorridorRenderData> visibleCorridors;
+    std::vector<visual::RoomRenderData> connectedRooms;
     world::RoomRole renderedRoomRole = world::RoomRole::Count;
     if (world_) {
         const auto currentRoom = std::find_if(
@@ -1451,7 +1452,7 @@ void Application::render()
                     float otherWeight = corridor.firstRoom == playerRoom
                         ? *corridorProgress : 1.0F - *corridorProgress;
                     otherWeight = otherWeight * otherWeight * (3.0F - (2.0F * otherWeight));
-                    const gdp::render::RoomLightingRenderData otherLighting
+                    const visual::RoomLightingRenderData otherLighting
                         = makeRenderLighting(roomLighting_[otherIndex], false);
                     lighting.ambientColor = (lighting.ambientColor * (1.0F - otherWeight))
                         + (otherLighting.ambientColor * otherWeight);
@@ -1558,7 +1559,7 @@ void Application::render()
         title << " | PAUSED";
     }
     SDL_SetWindowTitle(window_, title.str().c_str());
-    gdp::render::HudRenderData hud;
+    visual::HudRenderData hud;
     hud.visible = true;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
@@ -1571,52 +1572,52 @@ void Application::render()
     hud.damageFeedback = gameplay::damageFeedbackStrength(feedback_);
     hud.hitFeedbackStrength = gameplay::hitFeedbackStrength(feedback_);
     if (feedback_.hit == gameplay::HitFeedbackKind::Hit) {
-        hud.hitFeedback = gdp::render::HudHitFeedback::Hit;
+        hud.hitFeedback = visual::HudHitFeedback::Hit;
     } else if (feedback_.hit == gameplay::HitFeedbackKind::Kill) {
-        hud.hitFeedback = gdp::render::HudHitFeedback::Kill;
+        hud.hitFeedback = visual::HudHitFeedback::Kill;
     }
     hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
     hud.paused = pauseMenu_.paused;
     if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
-        hud.pauseSelection = gdp::render::HudPauseSelection::RestartRun;
+        hud.pauseSelection = visual::HudPauseSelection::RestartRun;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
-        hud.pauseSelection = gdp::render::HudPauseSelection::ExitGame;
+        hud.pauseSelection = visual::HudPauseSelection::ExitGame;
     }
     switch (feedback_.notice) {
     case gameplay::NoticeFeedbackKind::Pickup:
-        hud.notice = gdp::render::HudNotice::Pickup;
+        hud.notice = visual::HudNotice::Pickup;
         break;
     case gameplay::NoticeFeedbackKind::EventStart:
-        hud.notice = gdp::render::HudNotice::EventStart;
+        hud.notice = visual::HudNotice::EventStart;
         break;
     case gameplay::NoticeFeedbackKind::Wave:
-        hud.notice = gdp::render::HudNotice::Wave;
+        hud.notice = visual::HudNotice::Wave;
         break;
     case gameplay::NoticeFeedbackKind::EventClear:
-        hud.notice = gdp::render::HudNotice::EventClear;
+        hud.notice = visual::HudNotice::EventClear;
         break;
     case gameplay::NoticeFeedbackKind::LevelUp:
-        hud.notice = gdp::render::HudNotice::LevelUp;
+        hud.notice = visual::HudNotice::LevelUp;
         break;
     case gameplay::NoticeFeedbackKind::None:
         break;
     }
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
-        hud.objective = gdp::render::ObjectiveRenderState::Victory;
+        hud.objective = visual::ObjectiveRenderState::Victory;
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
-        hud.objective = gdp::render::ObjectiveRenderState::Defeat;
+        hud.objective = visual::ObjectiveRenderState::Defeat;
     } else if (renderedRoomRole == world::RoomRole::Boss) {
-        hud.objective = gdp::render::ObjectiveRenderState::DefeatBoss;
+        hud.objective = visual::ObjectiveRenderState::DefeatBoss;
     } else {
-        hud.objective = gdp::render::ObjectiveRenderState::ReachBoss;
+        hud.objective = visual::ObjectiveRenderState::ReachBoss;
     }
     if (activeEvent != roomEvents_.end()) {
         if (activeEvent->phase == gameplay::RoomEventPhase::Dormant) {
-            hud.event = gdp::render::HudEventState::Dormant;
+            hud.event = visual::HudEventState::Dormant;
         } else if (activeEvent->phase == gameplay::RoomEventPhase::Active) {
-            hud.event = gdp::render::HudEventState::Active;
+            hud.event = visual::HudEventState::Active;
         } else if (activeEvent->plan.type != world::RoomEventType::None) {
-            hud.event = gdp::render::HudEventState::Completed;
+            hud.event = visual::HudEventState::Completed;
         }
         hud.eventLocked = gameplay::isRoomLocked(*activeEvent);
     }
@@ -1628,14 +1629,14 @@ void Application::render()
         if (transition) {
             const auto door = doorRuntimes_.find(transition->edge);
             if (hud.eventLocked) {
-                hud.prompt = gdp::render::HudPrompt::DoorLocked;
+                hud.prompt = visual::HudPrompt::DoorLocked;
             } else if (door != doorRuntimes_.end()
                 && door->second.state != world::DoorState::Opening
                 && door->second.state != world::DoorState::Open) {
-                hud.prompt = gdp::render::HudPrompt::OpenDoor;
+                hud.prompt = visual::HudPrompt::OpenDoor;
             }
         }
-        if (hud.prompt == gdp::render::HudPrompt::None
+        if (hud.prompt == visual::HudPrompt::None
             && activeEvent != roomEvents_.end()
             && activeEvent->phase == gameplay::RoomEventPhase::Dormant
             && activeEvent->plan.trigger == world::RoomEventTrigger::TerminalUse) {
@@ -1650,13 +1651,13 @@ void Application::render()
                                 position.z + 0.15F}}},
                 };
                 if (player_.findInteraction(targets)) {
-                    hud.prompt = gdp::render::HudPrompt::UseTerminal;
+                    hud.prompt = visual::HudPrompt::UseTerminal;
                 }
             }
         }
-        if (hud.prompt == gdp::render::HudPrompt::None
+        if (hud.prompt == visual::HudPrompt::None
             && weapon_.magazineAmmo() == 0U && weapon_.reserveAmmo() > 0U) {
-            hud.prompt = gdp::render::HudPrompt::Reload;
+            hud.prompt = visual::HudPrompt::Reload;
         }
     }
     if (renderer_ == nullptr

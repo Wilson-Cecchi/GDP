@@ -134,7 +134,7 @@ void testCameraAndMatrices()
 
 void testMainMenuLayout()
 {
-    using namespace gdp::render;
+    using namespace gdp::game::visual;
 
     const MainMenuLayout wide = makeMainMenuLayout(1280, 720);
     expect(wide.scale == 2, "wide menu uses doubled bitmap scale");

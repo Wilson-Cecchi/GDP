@@ -54,64 +54,64 @@ int main()
     {
         gdp::render::GdpRenderer renderer;
         constexpr std::array enemies{
-            gdp::render::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
-            gdp::render::EnemyRenderData{{-1.5F, 0.0F, -1.0F}, false, 222},
-            gdp::render::EnemyRenderData{
-                {0.0F, 0.0F, -2.0F}, true, 333, gdp::render::EnemyVisualRole::Guard},
-            gdp::render::EnemyRenderData{
-                {0.0F, 0.0F, 0.5F}, true, 444, gdp::render::EnemyVisualRole::Officer},
-            gdp::render::EnemyRenderData{
-                {-0.5F, 0.0F, 1.0F}, true, 555, gdp::render::EnemyVisualRole::Engineer},
-            gdp::render::EnemyRenderData{
+            gdp::game::visual::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
+            gdp::game::visual::EnemyRenderData{{-1.5F, 0.0F, -1.0F}, false, 222},
+            gdp::game::visual::EnemyRenderData{
+                {0.0F, 0.0F, -2.0F}, true, 333, gdp::game::visual::EnemyVisualRole::Guard},
+            gdp::game::visual::EnemyRenderData{
+                {0.0F, 0.0F, 0.5F}, true, 444, gdp::game::visual::EnemyVisualRole::Officer},
+            gdp::game::visual::EnemyRenderData{
+                {-0.5F, 0.0F, 1.0F}, true, 555, gdp::game::visual::EnemyVisualRole::Engineer},
+            gdp::game::visual::EnemyRenderData{
                 {0.75F, 0.0F, 1.0F}, true, 666,
-                gdp::render::EnemyVisualRole::IndustrialRobot},
-            gdp::render::EnemyRenderData{
+                gdp::game::visual::EnemyVisualRole::IndustrialRobot},
+            gdp::game::visual::EnemyRenderData{
                 {-0.75F, 0.0F, 0.5F}, true, 111,
-                gdp::render::EnemyVisualRole::Worker, false},
+                gdp::game::visual::EnemyVisualRole::Worker, false},
         };
         constexpr std::array workerOnly{
-            gdp::render::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
+            gdp::game::visual::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
         };
         constexpr std::array guardOnly{
-            gdp::render::EnemyRenderData{
-                {1.5F, 0.0F, -0.5F}, true, 333, gdp::render::EnemyVisualRole::Guard},
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 333, gdp::game::visual::EnemyVisualRole::Guard},
         };
         constexpr std::array officerOnly{
-            gdp::render::EnemyRenderData{
-                {1.5F, 0.0F, -0.5F}, true, 444, gdp::render::EnemyVisualRole::Officer},
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 444, gdp::game::visual::EnemyVisualRole::Officer},
         };
         constexpr std::array engineerOnly{
-            gdp::render::EnemyRenderData{
-                {1.5F, 0.0F, -0.5F}, true, 555, gdp::render::EnemyVisualRole::Engineer},
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 555, gdp::game::visual::EnemyVisualRole::Engineer},
         };
         constexpr std::array industrialRobotOnly{
-            gdp::render::EnemyRenderData{
+            gdp::game::visual::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 666,
-                gdp::render::EnemyVisualRole::IndustrialRobot},
+                gdp::game::visual::EnemyVisualRole::IndustrialRobot},
         };
         constexpr std::array pickups{
-            gdp::render::PickupRenderData{
-                {-0.60F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Health},
-            gdp::render::PickupRenderData{
-                {0.0F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Ammo},
-            gdp::render::PickupRenderData{
-                {0.60F, 0.0F, -0.5F}, gdp::render::PickupVisualRole::Key},
+            gdp::game::visual::PickupRenderData{
+                {-0.60F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Health},
+            gdp::game::visual::PickupRenderData{
+                {0.0F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Ammo},
+            gdp::game::visual::PickupRenderData{
+                {0.60F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Key},
         };
         constexpr std::array props{
-            gdp::render::PropRenderData{
+            gdp::game::visual::PropRenderData{
                 {-1.35F, 0.0F, -1.2F}, {0.78F, 0.72F, 0.78F},
-                gdp::render::PropVisualRole::Crate,
-                gdp::render::PropVisualState::Intact, 7001},
-            gdp::render::PropRenderData{
+                gdp::game::visual::PropVisualRole::Crate,
+                gdp::game::visual::PropVisualState::Intact, 7001},
+            gdp::game::visual::PropRenderData{
                 {0.0F, 0.0F, -1.2F}, {0.46F, 1.02F, 0.46F},
-                gdp::render::PropVisualRole::Canister,
-                gdp::render::PropVisualState::Damaged, 7002},
-            gdp::render::PropRenderData{
+                gdp::game::visual::PropVisualRole::Canister,
+                gdp::game::visual::PropVisualState::Damaged, 7002},
+            gdp::game::visual::PropRenderData{
                 {1.35F, 0.0F, -1.2F}, {1.16F, 0.92F, 0.34F},
-                gdp::render::PropVisualRole::Barricade,
-                gdp::render::PropVisualState::Destroyed, 7003},
+                gdp::game::visual::PropVisualRole::Barricade,
+                gdp::game::visual::PropVisualState::Destroyed, 7003},
         };
-        gdp::render::RoomLightingRenderData proceduralLighting;
+        gdp::game::visual::RoomLightingRenderData proceduralLighting;
         proceduralLighting.ambientColor = {0.52F, 0.68F, 0.82F};
         proceduralLighting.ambientIntensity = 0.18F;
         proceduralLighting.lightCount = 8U;
@@ -204,17 +204,17 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 alertLightingPixels.data());
 
-            gdp::render::RoomLightingRenderData translatedLighting;
+            gdp::game::visual::RoomLightingRenderData translatedLighting;
             translatedLighting.lightCount = 1U;
             translatedLighting.lights[0] = {
                 {16.0F, 3.82F, -14.0F}, {0.52F, 0.78F, 1.0F}, 1.10F, 5.6F};
-            constexpr gdp::render::CameraData translatedCamera{
+            constexpr gdp::game::visual::CameraData translatedCamera{
                 {18.0F, 1.62F, -14.0F}, {1.0F, 0.0F, 0.0F}, 68.0F};
-            constexpr gdp::render::RoomRenderData translatedRoom{
+            constexpr gdp::game::visual::RoomRenderData translatedRoom{
                 {14.0F, 0.0F, -14.0F}, gdp::core::QuarterTurn::Degrees90, 0U,
                 {{9.15F, 0.0F, -17.85F}, {18.85F, 4.0F, -10.15F}}};
             std::array translatedDoors{
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {18.85F, 0.0F, -14.0F}, {1.0F, 0.0F, 0.0F},
                     1.2F, 2.2F, false},
             };
@@ -242,14 +242,14 @@ int main()
                 movingDoorPixels.data());
 
             constexpr std::array corridorDoors{
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F},
                     1.2F, 2.2F, false},
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {0.0F, 0.0F, -10.0F}, {0.0F, 0.0F, 1.0F},
                     1.2F, 2.2F, false},
             };
-            constexpr gdp::render::CameraData corridorCamera{
+            constexpr gdp::game::visual::CameraData corridorCamera{
                 {0.0F, 1.62F, -7.0F}, {0.0F, 0.0F, -1.0F}, 68.0F};
             const bool renderedOpenDoor = renderer.render(
                 width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors);
@@ -261,10 +261,10 @@ int main()
                 gdp::core::Vec3{0.0F, 0.0F, -10.0F},
             };
             const std::array corridorGeometry{
-                gdp::render::CorridorRenderData{corridorPoints, 1.2F, 2.2F},
+                gdp::game::visual::CorridorRenderData{corridorPoints, 1.2F, 2.2F},
             };
             const std::array connectedRoomGeometry{
-                gdp::render::RoomRenderData{
+                gdp::game::visual::RoomRenderData{
                     {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
                     storageMaterialKey,
                     {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
@@ -276,7 +276,7 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 corridorPixels.data());
             const std::array connectedRoomCentralHub{
-                gdp::render::RoomRenderData{
+                gdp::game::visual::RoomRenderData{
                     {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
                     centralHubMaterialKey,
                     {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
@@ -294,30 +294,30 @@ int main()
                 gdp::core::Vec3{4.0F, 0.0F, -5.0F},
             };
             const std::array cornerCorridor{
-                gdp::render::CorridorRenderData{
+                gdp::game::visual::CorridorRenderData{
                     cornerPoints, 1.2F, 2.2F, centralHubMaterialKey},
             };
             constexpr std::array cornerDoors{
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
                     1.2F, 2.2F, false, 1.0F},
-                gdp::render::DoorRenderData{
+                gdp::game::visual::DoorRenderData{
                     {4.0F, 0.0F, -5.0F}, {0.0F, 0.0F, 1.0F},
                     1.2F, 2.2F, false, 1.0F},
             };
             const std::array cornerConnectedRoom{
-                gdp::render::RoomRenderData{
+                gdp::game::visual::RoomRenderData{
                     {4.0F, 0.0F, -9.85F}, gdp::core::QuarterTurn::Degrees0,
                     storageMaterialKey,
                     {{0.15F, 0.0F, -14.70F}, {7.85F, 4.0F, -5.0F}}},
             };
-            const gdp::render::RoomRenderData cornerRoom{
+            const gdp::game::visual::RoomRenderData cornerRoom{
                 {-4.85F, 0.0F, 0.0F}, gdp::core::QuarterTurn::Degrees90,
                 centralHubMaterialKey,
                 {{-9.70F, 0.0F, -3.85F}, {0.0F, 4.0F, 3.85F}}};
-            constexpr gdp::render::CameraData cornerCamera{
+            constexpr gdp::game::visual::CameraData cornerCamera{
                 {-0.35F, 1.62F, 0.0F}, {0.94F, 0.0F, -0.34F}, 68.0F};
-            gdp::render::RoomLightingRenderData cornerLighting;
+            gdp::game::visual::RoomLightingRenderData cornerLighting;
             cornerLighting.ambientColor = {0.62F, 0.72F, 0.82F};
             cornerLighting.ambientIntensity = 0.30F;
             const bool renderedCornerCorridor = renderer.render(
@@ -329,13 +329,13 @@ int main()
 
             const bool renderedHud = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
-                gdp::render::HudRenderData{gdp::render::ObjectiveRenderState::Victory});
+                gdp::game::visual::HudRenderData{gdp::game::visual::ObjectiveRenderState::Victory});
             std::vector<std::uint8_t> hudPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 hudPixels.data());
 
-            const gdp::render::HudRenderData functionalHud{
-                .objective = gdp::render::ObjectiveRenderState::ReachBoss,
+            const gdp::game::visual::HudRenderData functionalHud{
+                .objective = gdp::game::visual::ObjectiveRenderState::ReachBoss,
                 .visible = true,
                 .health = 24.0F,
                 .maximumHealth = 115.0F,
@@ -345,13 +345,13 @@ int main()
                 .level = 4U,
                 .experience = 35U,
                 .experienceForNextLevel = 80U,
-                .event = gdp::render::HudEventState::Active,
+                .event = gdp::game::visual::HudEventState::Active,
                 .eventLocked = true,
-                .prompt = gdp::render::HudPrompt::DoorLocked,
+                .prompt = gdp::game::visual::HudPrompt::DoorLocked,
                 .damageFeedback = 1.0F,
-                .hitFeedback = gdp::render::HudHitFeedback::Kill,
+                .hitFeedback = gdp::game::visual::HudHitFeedback::Kill,
                 .hitFeedbackStrength = 1.0F,
-                .notice = gdp::render::HudNotice::LevelUp,
+                .notice = gdp::game::visual::HudNotice::LevelUp,
                 .noticeFeedbackStrength = 1.0F,
             };
             const bool renderedFunctionalHud = renderer.render(
@@ -360,16 +360,16 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
-            gdp::render::HudRenderData pausedHud = functionalHud;
+            gdp::game::visual::HudRenderData pausedHud = functionalHud;
             pausedHud.paused = true;
-            pausedHud.pauseSelection = gdp::render::HudPauseSelection::RestartRun;
+            pausedHud.pauseSelection = gdp::game::visual::HudPauseSelection::RestartRun;
             const bool renderedPauseMenu = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, pausedHud);
             std::vector<std::uint8_t> pauseMenuPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 pauseMenuPixels.data());
 
-            gdp::render::HudRenderData mainMenuHud;
+            gdp::game::visual::HudRenderData mainMenuHud;
             mainMenuHud.mainMenu = true;
             const bool renderedMainMenu = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
@@ -378,7 +378,7 @@ int main()
                 mainMenuPixels.data());
 
             mainMenuHud.mainMenuSelection
-                = gdp::render::HudMainMenuSelection::ExitGame;
+                = gdp::game::visual::HudMainMenuSelection::ExitGame;
             const bool renderedMainMenuExit = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
             std::vector<std::uint8_t> mainMenuExitPixels(baseline.size());

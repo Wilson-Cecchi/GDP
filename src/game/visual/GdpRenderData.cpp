@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace gdp::render {
+namespace gdp::game::visual {
 
 bool UiRect::contains(const int pointX, const int pointY) const noexcept
 {
@@ -59,4 +59,4 @@ std::optional<HudMainMenuSelection> mainMenuSelectionAt(
     return std::nullopt;
 }
 
-} // namespace gdp::render
+} // namespace gdp::game::visual

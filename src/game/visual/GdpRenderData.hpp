@@ -9,7 +9,7 @@
 #include <optional>
 #include <span>
 
-namespace gdp::render {
+namespace gdp::game::visual {
 
 struct CameraData {
     gdp::core::Vec3 position{0.0F, 1.62F, 4.0F};
@@ -207,4 +207,4 @@ struct RoomLightingRenderData {
     bool alert{false};
 };
 
-} // namespace gdp::render
+} // namespace gdp::game::visual

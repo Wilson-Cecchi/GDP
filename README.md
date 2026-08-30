@@ -138,6 +138,10 @@ especializados das pastas numeradas.
   entidades, HUD e iluminação passaram para `game/visual/GdpRenderData`.
   `GdpRenderer` agora consome esse contrato separado, sem alterar tipos,
   namespaces, gameplay ou pixels renderizados.
+- **Fase 35 — Propriedade dos dados visuais:** o contrato de apresentação
+  passou de `gdp::render` para `gdp::game::visual`. Os DTOs específicos do GDP
+  não ocupam mais o namespace das primitivas gráficas reutilizáveis; nomes,
+  valores e representação permanecem inalterados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

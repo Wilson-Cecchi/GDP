@@ -50,16 +50,16 @@ public:
     [[nodiscard]] bool render(
         int width,
         int height,
-        CameraData camera = {},
-        std::span<const EnemyRenderData> enemies = {},
-        std::span<const PickupRenderData> pickups = {},
-        std::span<const PropRenderData> props = {},
-        RoomLightingRenderData lighting = {},
-        RoomRenderData room = {},
-        std::span<const DoorRenderData> doors = {},
-        std::span<const CorridorRenderData> corridors = {},
-        std::span<const RoomRenderData> connectedRooms = {},
-        HudRenderData hud = {});
+        gdp::game::visual::CameraData camera = {},
+        std::span<const gdp::game::visual::EnemyRenderData> enemies = {},
+        std::span<const gdp::game::visual::PickupRenderData> pickups = {},
+        std::span<const gdp::game::visual::PropRenderData> props = {},
+        gdp::game::visual::RoomLightingRenderData lighting = {},
+        gdp::game::visual::RoomRenderData room = {},
+        std::span<const gdp::game::visual::DoorRenderData> doors = {},
+        std::span<const gdp::game::visual::CorridorRenderData> corridors = {},
+        std::span<const gdp::game::visual::RoomRenderData> connectedRooms = {},
+        gdp::game::visual::HudRenderData hud = {});
 
 private:
     struct EnemyGpuVisual {
