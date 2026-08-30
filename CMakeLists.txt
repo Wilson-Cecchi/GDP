@@ -155,7 +155,7 @@ gdp_enable_warnings(gdp_gameplay)
 gdp_enable_sanitizers(gdp_gameplay)
 
 add_library(
-    gdp_render_foundation
+    wkc_forge_render
     STATIC
     src/render/Camera.cpp
     src/render/Framebuffer.cpp
@@ -165,11 +165,11 @@ add_library(
     src/render/Texture.cpp
 )
 
-target_compile_features(gdp_render_foundation PUBLIC cxx_std_20)
-target_include_directories(gdp_render_foundation PUBLIC src)
-target_link_libraries(gdp_render_foundation PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
-gdp_enable_warnings(gdp_render_foundation)
-gdp_enable_sanitizers(gdp_render_foundation)
+target_compile_features(wkc_forge_render PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_render PUBLIC src)
+target_link_libraries(wkc_forge_render PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
+gdp_enable_warnings(wkc_forge_render)
+gdp_enable_sanitizers(wkc_forge_render)
 
 add_library(
     gdp_procedural_assets
@@ -181,7 +181,7 @@ add_library(
 
 target_compile_features(gdp_procedural_assets PUBLIC cxx_std_20)
 target_include_directories(gdp_procedural_assets PUBLIC src)
-target_link_libraries(gdp_procedural_assets PUBLIC gdp_core gdp_render_foundation)
+target_link_libraries(gdp_procedural_assets PUBLIC gdp_core wkc_forge_render)
 gdp_enable_warnings(gdp_procedural_assets)
 gdp_enable_sanitizers(gdp_procedural_assets)
 
@@ -197,7 +197,7 @@ target_compile_features(gdp_visual_content PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_content PUBLIC src)
 target_link_libraries(
     gdp_visual_content
-    PUBLIC gdp_core gdp_procedural_assets gdp_render_foundation
+    PUBLIC gdp_core gdp_procedural_assets wkc_forge_render
 )
 gdp_enable_warnings(gdp_visual_content)
 gdp_enable_sanitizers(gdp_visual_content)
@@ -213,7 +213,7 @@ target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_renderer PUBLIC src)
 target_link_libraries(
     gdp_visual_renderer
-    PUBLIC gdp_core gdp_procedural_assets gdp_render_foundation gdp_visual_content
+    PUBLIC gdp_core gdp_procedural_assets wkc_forge_render gdp_visual_content
 )
 gdp_enable_warnings(gdp_visual_renderer)
 gdp_enable_sanitizers(gdp_visual_renderer)

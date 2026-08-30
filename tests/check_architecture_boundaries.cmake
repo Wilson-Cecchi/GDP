@@ -11,6 +11,14 @@ if(root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_renderer[ \t\r\n]+STATIC")
     message(FATAL_ERROR "Ambiguous gdp_renderer target must not return")
 endif()
+if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_render[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Generic render foundation must belong to WKC Forge")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_render_foundation[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP-prefixed render foundation target must not return")
+endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")
 set(game_application "${GDP_SOURCE_DIR}/src/game/Application.hpp")

@@ -584,13 +584,13 @@ sem conhecer os sistemas do GDP. O catálogo tipado `game/SeedDomains` pertence
 ao jogo; seus IDs explícitos 1–17 são parte do contrato determinístico e não
 podem mudar sem uma alteração deliberada da versão de geração.
 
-A fronteira visual intermediária possui quatro targets: `gdp_render_foundation`
+A fronteira visual intermediária possui quatro targets: `wkc_forge_render`
 contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
 `gdp_procedural_assets` contém receitas, hashing e geradores genéricos;
 `gdp_visual_content` contém Worker, materiais de sala e `game/visual`; e
 `gdp_visual_renderer` compõe a apresentação concreta do GDP. Esses nomes
-permanecem temporários até a fronteira estabilizar; não representam ainda o
-rename para WKC Forge.
+de target GDP permanecem temporários até suas fronteiras estabilizarem;
+`wkc_forge_render` é a primeira adoção explícita do nome da engine.
 
 Na Fase 31, todo o conteúdo desse target foi agrupado fisicamente em
 `src/game/visual`, e `src/procedural` ficou restrito à fundação reutilizável.
@@ -624,6 +624,11 @@ Na Fase 37, o target concreto passou de `gdp_renderer` para
 `gdp_visual_renderer`. O nome separa a composição específica do jogo de
 `gdp_render_foundation`; a regressão arquitetural impede que o target ambíguo
 retorne antes da futura adoção dos nomes WKC Forge pela fundação.
+
+Na Fase 38, `gdp_render_foundation` passou para `wkc_forge_render`, primeiro
+target a assumir explicitamente a identidade da engine. O namespace público
+permanece temporariamente `gdp::render`, isolando o rename do target de uma
+futura migração das APIs C++.
 
 ---
 
@@ -3244,8 +3249,8 @@ Math
 
 ## Fase 2 — Renderer mínimo
 
-**Estado atual:** implementada e validada. `gdp_render_foundation` carrega a API OpenGL
-3.3, compila/linka um shader básico iluminado, envia uma box indexada com hard
+**Estado atual:** implementada e validada. `wkc_forge_render` carrega a API
+OpenGL 3.3, compila/linka um shader básico iluminado, envia uma box indexada com hard
 edges para VAO/VBO/EBO, cria textura RGBA determinística, câmera perspectiva,
 depth test e framebuffer redimensionável com color texture e depth buffer. A
 cena de integração monta uma sala industrial fixa com nove instâncias e uma luz

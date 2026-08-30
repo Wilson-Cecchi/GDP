@@ -21,6 +21,8 @@
 > mantendo as primitivas reutilizáveis qualificadas em `gdp::render`.
 > A Fase 37 renomeou o target concreto para `gdp_visual_renderer`, distinguindo
 > a composição GDP de `gdp_render_foundation`.
+> A Fase 38 renomeou a fundação para `wkc_forge_render`; o namespace
+> `gdp::render` permanece temporariamente compatível.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -75,7 +77,7 @@ room transforms + corridor paths + per-room material keys + lighting plan
 O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
 OpenGL encerram o frame com log e recursos GPU são destruídos antes do contexto.
 Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
-`gdp_render_foundation`. Receitas e geradores reutilizáveis ficam em
+`wkc_forge_render`. Receitas e geradores reutilizáveis ficam em
 `gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
 do GDP ficam em `gdp_visual_content`; `gdp_visual_renderer` realiza a composição
 final.

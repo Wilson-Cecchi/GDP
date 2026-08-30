@@ -150,6 +150,10 @@ especializados das pastas numeradas.
   `gdp_renderer` para `gdp_visual_renderer`. O nome agora o diferencia de
   `gdp_render_foundation`, sem antecipar o futuro rename da fundação para WKC
   Forge ou alterar nomes dos executáveis de teste.
+- **Fase 38 — Fundação gráfica WKC Forge:** o target genérico passou de
+  `gdp_render_foundation` para `wkc_forge_render`. Ele continua expondo
+  temporariamente o namespace `gdp::render`, permitindo validar separadamente
+  o primeiro nome WKC Forge antes de qualquer rename amplo de APIs.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
