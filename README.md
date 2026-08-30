@@ -102,6 +102,10 @@ especializados das pastas numeradas.
   predominante, com vigas, hatches, ventilação e três níveis de desgaste. Não
   existem luminárias ou emissão pintadas. As capturas Maintained, Used e Worn
   foram aprovadas antes do commit da fase.
+- **Fase 25 — Fronteira inicial WKC Forge/GDP:** a composição concreta da
+  aplicação foi retirada de `core` e passou para `game`, inclusive no namespace
+  e no target executável. A mudança preserva gameplay, geração procedural,
+  hashes e renderização enquanto inicia a separação incremental da infraestrutura.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

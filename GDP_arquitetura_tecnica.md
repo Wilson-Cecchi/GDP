@@ -510,9 +510,11 @@ gdp/
 ├── src/
 │   ├── main.cpp
 │   │
-│   ├── core/
+│   ├── game/
 │   │   ├── Application.cpp
-│   │   ├── Application.hpp
+│   │   └── Application.hpp
+│   │
+│   ├── core/
 │   │   ├── Time.cpp
 │   │   ├── Time.hpp
 │   │   ├── Random.cpp
@@ -636,6 +638,10 @@ A pasta de código pode começar muito menor.
 A estrutura de `src/` representa o destino arquitetural da engine, não o primeiro
 commit. A estrutura de `docs/`, por outro lado, representa a organização oficial
 da Technical Bible e deve acompanhar a evolução dos subsistemas implementados.
+
+`game/Application` pertence à camada concreta do GDP: compõe plataforma,
+gameplay, mundo, áudio e renderização. Ela pode depender da infraestrutura, mas
+não integra o núcleo reutilizável nem pode ser uma dependência dele.
 
 ---
 

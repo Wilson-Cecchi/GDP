@@ -33,14 +33,14 @@ namespace gdp::render {
 class Renderer;
 }
 
-namespace gdp::core {
+namespace gdp::game {
 
 struct ApplicationConfig {
     bool headless{false};
     std::optional<std::uint64_t> frameLimit;
     int windowWidth{1280};
     int windowHeight{720};
-    Seed worldSeed{0x4744505F574F524CULL};
+    gdp::core::Seed worldSeed{0x4744505F574F524CULL};
 };
 
 class Application {
@@ -65,8 +65,8 @@ private:
     void setPaused(bool paused);
 
     ApplicationConfig config_;
-    Input input_;
-    FixedStepClock clock_;
+    gdp::core::Input input_;
+    gdp::core::FixedStepClock clock_;
     gameplay::CollisionWorld baseCollisionWorld_;
     gameplay::CollisionWorld collisionWorld_;
     gameplay::Player player_;
@@ -100,4 +100,4 @@ private:
     std::uint64_t audioEventCounter_{0};
 };
 
-} // namespace gdp::core
+} // namespace gdp::game

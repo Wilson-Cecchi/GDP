@@ -1,4 +1,4 @@
-#include "core/Application.hpp"
+#include "game/Application.hpp"
 
 #include <charconv>
 #include <cstdint>
@@ -47,7 +47,7 @@ std::optional<std::uint64_t> parseFrameLimit(const std::string_view value)
 
 int main(const int argc, char* argv[])
 {
-    gdp::core::ApplicationConfig config;
+    gdp::game::ApplicationConfig config;
 
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument{argv[index]};
@@ -97,6 +97,6 @@ int main(const int argc, char* argv[])
         return 2;
     }
 
-    gdp::core::Application application{config};
+    gdp::game::Application application{config};
     return application.run();
 }

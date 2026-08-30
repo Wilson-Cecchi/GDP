@@ -1,4 +1,4 @@
-#include "core/Application.hpp"
+#include "game/Application.hpp"
 
 #include "audio/AudioSystem.hpp"
 #include "core/Log.hpp"
@@ -26,7 +26,12 @@
 #include <utility>
 #include <vector>
 
-namespace gdp::core {
+namespace gdp::game {
+
+using gdp::core::Input;
+using gdp::core::LogLevel;
+using gdp::core::Vec2;
+using gdp::core::log;
 namespace {
 
 std::string sdlError(const std::string_view operation)
@@ -1706,4 +1711,4 @@ void Application::shutdown()
     }
 }
 
-} // namespace gdp::core
+} // namespace gdp::game

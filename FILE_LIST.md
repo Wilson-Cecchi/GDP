@@ -54,8 +54,6 @@
 - `MANIFEST.json`
 - `README.md`
 - `architecture.md`
-- `src/core/Application.cpp`
-- `src/core/Application.hpp`
 - `src/core/Hash.cpp`
 - `src/core/Hash.hpp`
 - `src/core/Input.cpp`
@@ -69,6 +67,8 @@
 - `src/core/Seed.hpp`
 - `src/core/Time.cpp`
 - `src/core/Time.hpp`
+- `src/game/Application.cpp`
+- `src/game/Application.hpp`
 - `src/entities/EntityManager.cpp`
 - `src/entities/EntityManager.hpp`
 - `src/gameplay/Collision.cpp`

@@ -181,7 +181,7 @@ gdp_enable_sanitizers(gdp_world)
 add_executable(
     gdp
     src/main.cpp
-    src/core/Application.cpp
+    src/game/Application.cpp
 )
 
 target_link_libraries(gdp PRIVATE gdp_audio gdp_core gdp_entities gdp_gameplay gdp_renderer gdp_world)
