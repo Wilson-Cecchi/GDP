@@ -14,6 +14,12 @@ if(NOT EXISTS "${game_application}")
     message(FATAL_ERROR "GDP Application is missing from src/game")
 endif()
 
+set(platform_input "${GDP_SOURCE_DIR}/src/platform/Input.hpp")
+file(READ "${platform_input}" platform_input_header)
+if(platform_input_header MATCHES "SDL")
+    message(FATAL_ERROR "platform/Input.hpp must not expose SDL types")
+endif()
+
 file(READ "${game_application}" application_header)
 if(NOT application_header MATCHES "namespace[ \t]+gdp::game")
     message(FATAL_ERROR "GDP Application must use the gdp::game namespace")

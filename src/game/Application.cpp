@@ -9,6 +9,7 @@
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
+#include "platform/SdlInput.hpp"
 #include "render/Renderer.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
@@ -32,6 +33,8 @@ using gdp::core::LogLevel;
 using gdp::core::Vec2;
 using gdp::core::log;
 using gdp::platform::Input;
+using gdp::platform::Key;
+using gdp::platform::MouseButton;
 namespace {
 
 std::string sdlError(const std::string_view operation)
@@ -586,7 +589,7 @@ void Application::processEvents()
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        input_.handleEvent(event);
+        (void)gdp::platform::handleSdlInputEvent(input_, event);
         if (event.type == SDL_EVENT_QUIT) {
             running_ = false;
         }
@@ -602,7 +605,7 @@ void Application::processEvents()
         firePending_ = false;
         reloadPending_ = false;
 
-        if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+        if (input_.wasKeyPressed(Key::Escape)) {
             log(LogLevel::Info, "Main menu requested game exit");
             running_ = false;
             return;
@@ -634,19 +637,19 @@ void Application::processEvents()
                     : gameplay::MainMenuOption::StartRun);
         }
 
-        const bool moveUp = input_.wasKeyPressed(SDL_SCANCODE_UP)
-            || input_.wasKeyPressed(SDL_SCANCODE_W);
-        const bool moveDown = input_.wasKeyPressed(SDL_SCANCODE_DOWN)
-            || input_.wasKeyPressed(SDL_SCANCODE_S);
+        const bool moveUp = input_.wasKeyPressed(Key::Up)
+            || input_.wasKeyPressed(Key::W);
+        const bool moveDown = input_.wasKeyPressed(Key::Down)
+            || input_.wasKeyPressed(Key::S);
         if (moveUp != moveDown) {
             gameplay::moveMainMenuSelection(mainMenu_, moveUp ? -1 : 1);
         }
 
         gameplay::MainMenuCommand command = gameplay::MainMenuCommand::None;
-        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+        if (input_.wasKeyPressed(Key::Enter)) {
             command = gameplay::activateMainMenuSelection(mainMenu_);
         } else if (pointedSelection
-            && input_.wasMouseButtonPressed(SDL_BUTTON_LEFT)) {
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
             gameplay::selectMainMenuOption(
                 mainMenu_,
                 *pointedSelection == gdp::render::HudMainMenuSelection::ExitGame
@@ -673,17 +676,17 @@ void Application::processEvents()
         interactionPending_ = false;
         firePending_ = false;
         reloadPending_ = false;
-        if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+        if (input_.wasKeyPressed(Key::Escape)) {
             running_ = false;
         }
-        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+        if (input_.wasKeyPressed(Key::Enter)) {
             restartRequested_ = true;
             running_ = false;
         }
         return;
     }
 
-    if (input_.wasKeyPressed(SDL_SCANCODE_ESCAPE)) {
+    if (input_.wasKeyPressed(Key::Escape)) {
         setPaused(!pauseMenu_.paused);
         return;
     }
@@ -693,14 +696,14 @@ void Application::processEvents()
         interactionPending_ = false;
         firePending_ = false;
         reloadPending_ = false;
-        const bool moveUp = input_.wasKeyPressed(SDL_SCANCODE_UP)
-            || input_.wasKeyPressed(SDL_SCANCODE_W);
-        const bool moveDown = input_.wasKeyPressed(SDL_SCANCODE_DOWN)
-            || input_.wasKeyPressed(SDL_SCANCODE_S);
+        const bool moveUp = input_.wasKeyPressed(Key::Up)
+            || input_.wasKeyPressed(Key::W);
+        const bool moveDown = input_.wasKeyPressed(Key::Down)
+            || input_.wasKeyPressed(Key::S);
         if (moveUp != moveDown) {
             gameplay::movePauseSelection(pauseMenu_, moveUp ? -1 : 1);
         }
-        if (input_.wasKeyPressed(SDL_SCANCODE_RETURN)) {
+        if (input_.wasKeyPressed(Key::Enter)) {
             const gameplay::PauseMenuCommand command
                 = gameplay::activatePauseSelection(pauseMenu_);
             if (command == gameplay::PauseMenuCommand::Resume) {
@@ -720,13 +723,14 @@ void Application::processEvents()
         return;
     }
 
-    playerCommand_.moveForward = (input_.isKeyDown(SDL_SCANCODE_W) ? 1.0F : 0.0F)
-        - (input_.isKeyDown(SDL_SCANCODE_S) ? 1.0F : 0.0F);
-    playerCommand_.moveRight = (input_.isKeyDown(SDL_SCANCODE_D) ? 1.0F : 0.0F)
-        - (input_.isKeyDown(SDL_SCANCODE_A) ? 1.0F : 0.0F);
-    interactionPending_ = interactionPending_ || input_.wasKeyPressed(SDL_SCANCODE_E);
-    firePending_ = firePending_ || input_.wasMouseButtonPressed(SDL_BUTTON_LEFT);
-    reloadPending_ = reloadPending_ || input_.wasKeyPressed(SDL_SCANCODE_R);
+    playerCommand_.moveForward = (input_.isKeyDown(Key::W) ? 1.0F : 0.0F)
+        - (input_.isKeyDown(Key::S) ? 1.0F : 0.0F);
+    playerCommand_.moveRight = (input_.isKeyDown(Key::D) ? 1.0F : 0.0F)
+        - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
+    interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
+    firePending_ = firePending_
+        || input_.wasMouseButtonPressed(MouseButton::Primary);
+    reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
     playerCommand_.interact = interactionPending_;
 }
 

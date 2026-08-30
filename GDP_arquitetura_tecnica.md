@@ -528,7 +528,9 @@ gdp/
 │   │   ├── Window.cpp
 │   │   ├── Window.hpp
 │   │   ├── Input.cpp
-│   │   └── Input.hpp
+│   │   ├── Input.hpp
+│   │   ├── SdlInput.cpp
+│   │   └── SdlInput.hpp
 │   │
 │   ├── render/
 │   │   ├── Renderer.cpp
@@ -647,9 +649,10 @@ As dependências entre targets devem ser declaradas no CMake. O diretório `core
 só pode incluir seus próprios contratos; uma regressão automatizada protege essa
 fronteira enquanto os demais subsistemas são separados incrementalmente.
 
-`platform/Input` concentra o snapshot de teclado/mouse e a tradução de eventos
-SDL. Assim, `core` permanece independente do backend de plataforma; ocultar os
-tipos SDL da interface pública de input continua como uma extração posterior.
+`platform/Input` mantém o snapshot de teclado/mouse em tipos neutros, sem expor
+SDL. `platform/SdlInput` é um adaptador separado que traduz eventos do backend
+para esse contrato. Assim, estado de input e integração de plataforma podem ser
+testados e substituídos independentemente.
 
 ---
 

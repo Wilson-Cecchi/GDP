@@ -69,6 +69,8 @@
 - `src/game/Application.hpp`
 - `src/platform/Input.cpp`
 - `src/platform/Input.hpp`
+- `src/platform/SdlInput.cpp`
+- `src/platform/SdlInput.hpp`
 - `src/entities/EntityManager.cpp`
 - `src/entities/EntityManager.hpp`
 - `src/gameplay/Collision.cpp`
@@ -143,6 +145,7 @@
 - `tests/test_renderer.cpp`
 - `tests/test_renderer_gl.cpp`
 - `tests/test_room_materials.cpp`
+- `tests/test_sdl_input.cpp`
 - `tests/test_session.cpp`
 - `tests/test_world.cpp`
 - `visual/TEXTURE_APPROVALS.md`

@@ -1,7 +1,5 @@
 #include "platform/Input.hpp"
 
-#include <SDL3/SDL_events.h>
-
 #include <cstddef>
 
 namespace gdp::platform {
@@ -15,38 +13,35 @@ void Input::beginFrame() noexcept
     mouseDelta_ = {};
 }
 
-void Input::handleEvent(const SDL_Event& event) noexcept
+void Input::handleKey(const Key key, const bool down, const bool repeat) noexcept
 {
-    if (event.type == SDL_EVENT_KEY_DOWN && isValidScancode(event.key.scancode)) {
-        const auto index = static_cast<std::size_t>(event.key.scancode);
-        if (!event.key.repeat && !keysDown_[index]) {
+    if (!isValidKey(key)) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(key);
+    if (down) {
+        if (!repeat && !keysDown_[index]) {
             keysPressed_[index] = true;
         }
         keysDown_[index] = true;
         return;
     }
 
-    if (event.type == SDL_EVENT_KEY_UP && isValidScancode(event.key.scancode)) {
-        const auto index = static_cast<std::size_t>(event.key.scancode);
-        keysReleased_[index] = keysDown_[index];
-        keysDown_[index] = false;
+    keysReleased_[index] = keysDown_[index];
+    keysDown_[index] = false;
+}
+
+void Input::handleMouseButton(
+    const MouseButton button,
+    const bool down,
+    const gdp::core::Vec2 position) noexcept
+{
+    mousePosition_ = position;
+    if (!isValidMouseButton(button)) {
         return;
     }
-
-    if (event.type == SDL_EVENT_MOUSE_MOTION) {
-        mouseDelta_ = mouseDelta_
-            + gdp::core::Vec2{event.motion.xrel, event.motion.yrel};
-        mousePosition_ = {event.motion.x, event.motion.y};
-        return;
-    }
-
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-        mousePosition_ = {event.button.x, event.button.y};
-        const auto button = static_cast<unsigned int>(event.button.button);
-        if (!isValidMouseButton(button)) {
-            return;
-        }
-        const auto index = static_cast<std::size_t>(button);
+    const auto index = static_cast<std::size_t>(button);
+    if (down) {
         if (!mouseButtonsDown_[index]) {
             mouseButtonsPressed_[index] = true;
         }
@@ -54,49 +49,46 @@ void Input::handleEvent(const SDL_Event& event) noexcept
         return;
     }
 
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-        mousePosition_ = {event.button.x, event.button.y};
-        const auto button = static_cast<unsigned int>(event.button.button);
-        if (!isValidMouseButton(button)) {
-            return;
-        }
-        const auto index = static_cast<std::size_t>(button);
-        mouseButtonsReleased_[index] = mouseButtonsDown_[index];
-        mouseButtonsDown_[index] = false;
-    }
+    mouseButtonsReleased_[index] = mouseButtonsDown_[index];
+    mouseButtonsDown_[index] = false;
 }
 
-bool Input::isKeyDown(const SDL_Scancode scancode) const noexcept
+void Input::handleMouseMotion(
+    const gdp::core::Vec2 position,
+    const gdp::core::Vec2 delta) noexcept
 {
-    return isValidScancode(scancode)
-        && keysDown_[static_cast<std::size_t>(scancode)];
+    mouseDelta_ = mouseDelta_ + delta;
+    mousePosition_ = position;
 }
 
-bool Input::wasKeyPressed(const SDL_Scancode scancode) const noexcept
+bool Input::isKeyDown(const Key key) const noexcept
 {
-    return isValidScancode(scancode)
-        && keysPressed_[static_cast<std::size_t>(scancode)];
+    return isValidKey(key) && keysDown_[static_cast<std::size_t>(key)];
 }
 
-bool Input::wasKeyReleased(const SDL_Scancode scancode) const noexcept
+bool Input::wasKeyPressed(const Key key) const noexcept
 {
-    return isValidScancode(scancode)
-        && keysReleased_[static_cast<std::size_t>(scancode)];
+    return isValidKey(key) && keysPressed_[static_cast<std::size_t>(key)];
 }
 
-bool Input::isMouseButtonDown(const unsigned int button) const noexcept
+bool Input::wasKeyReleased(const Key key) const noexcept
+{
+    return isValidKey(key) && keysReleased_[static_cast<std::size_t>(key)];
+}
+
+bool Input::isMouseButtonDown(const MouseButton button) const noexcept
 {
     return isValidMouseButton(button)
         && mouseButtonsDown_[static_cast<std::size_t>(button)];
 }
 
-bool Input::wasMouseButtonPressed(const unsigned int button) const noexcept
+bool Input::wasMouseButtonPressed(const MouseButton button) const noexcept
 {
     return isValidMouseButton(button)
         && mouseButtonsPressed_[static_cast<std::size_t>(button)];
 }
 
-bool Input::wasMouseButtonReleased(const unsigned int button) const noexcept
+bool Input::wasMouseButtonReleased(const MouseButton button) const noexcept
 {
     return isValidMouseButton(button)
         && mouseButtonsReleased_[static_cast<std::size_t>(button)];
@@ -112,14 +104,14 @@ gdp::core::Vec2 Input::mousePosition() const noexcept
     return mousePosition_;
 }
 
-bool Input::isValidScancode(const SDL_Scancode scancode) noexcept
+bool Input::isValidKey(const Key key) noexcept
 {
-    return scancode > SDL_SCANCODE_UNKNOWN && scancode < SDL_SCANCODE_COUNT;
+    return key < Key::Count;
 }
 
-bool Input::isValidMouseButton(const unsigned int button) noexcept
+bool Input::isValidMouseButton(const MouseButton button) noexcept
 {
-    return button > 0U && button < mouseButtonCount;
+    return button < MouseButton::Count;
 }
 
 } // namespace gdp::platform

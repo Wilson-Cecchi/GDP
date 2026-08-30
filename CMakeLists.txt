@@ -87,9 +87,21 @@ add_library(
 
 target_compile_features(gdp_platform PUBLIC cxx_std_20)
 target_include_directories(gdp_platform PUBLIC src)
-target_link_libraries(gdp_platform PUBLIC gdp_core SDL3::SDL3)
+target_link_libraries(gdp_platform PUBLIC gdp_core)
 gdp_enable_warnings(gdp_platform)
 gdp_enable_sanitizers(gdp_platform)
+
+add_library(
+    gdp_platform_sdl
+    STATIC
+    src/platform/SdlInput.cpp
+)
+
+target_compile_features(gdp_platform_sdl PUBLIC cxx_std_20)
+target_include_directories(gdp_platform_sdl PUBLIC src)
+target_link_libraries(gdp_platform_sdl PUBLIC gdp_platform SDL3::SDL3)
+gdp_enable_warnings(gdp_platform_sdl)
+gdp_enable_sanitizers(gdp_platform_sdl)
 
 add_library(
     gdp_entities
@@ -204,6 +216,7 @@ target_link_libraries(
     gdp_entities
     gdp_gameplay
     gdp_platform
+    gdp_platform_sdl
     gdp_renderer
     gdp_world
     SDL3::SDL3
@@ -237,6 +250,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME platform_input_systems COMMAND gdp_input_tests)
     set_tests_properties(platform_input_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_sdl_input_tests tests/test_sdl_input.cpp)
+    target_link_libraries(gdp_sdl_input_tests PRIVATE gdp_platform_sdl)
+    gdp_enable_warnings(gdp_sdl_input_tests)
+    gdp_enable_sanitizers(gdp_sdl_input_tests)
+
+    add_test(NAME sdl_input_adapter_systems COMMAND gdp_sdl_input_tests)
+    set_tests_properties(sdl_input_adapter_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_audio_tests tests/test_audio.cpp)
     target_link_libraries(gdp_audio_tests PRIVATE gdp_audio)
