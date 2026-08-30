@@ -154,6 +154,10 @@ especializados das pastas numeradas.
   `gdp_render_foundation` para `wkc_forge_render`. Ele continua expondo
   temporariamente o namespace `gdp::render`, permitindo validar separadamente
   o primeiro nome WKC Forge antes de qualquer rename amplo de APIs.
+- **Fase 39 — Core WKC Forge:** o target genérico passou de `gdp_core` para
+  `wkc_forge_core`. Hash, Log, Math, Random, Seed e Time permanecem
+  compatíveis em `gdp::core`, enquanto `wkc_forge_render` deixa de depender de
+  qualquer target com identidade GDP.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

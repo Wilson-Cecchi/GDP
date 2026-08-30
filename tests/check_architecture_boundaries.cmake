@@ -4,6 +4,14 @@ endif()
 
 file(READ "${GDP_SOURCE_DIR}/CMakeLists.txt" root_cmake_contents)
 if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_core[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Generic core must belong to WKC Forge")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_core[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP-prefixed core target must not return")
+endif()
+if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_visual_renderer[ \t\r\n]+STATIC")
     message(FATAL_ERROR "GDP concrete renderer target must be named gdp_visual_renderer")
 endif()
@@ -18,6 +26,10 @@ endif()
 if(root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_render_foundation[ \t\r\n]+STATIC")
     message(FATAL_ERROR "GDP-prefixed render foundation target must not return")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "target_link_libraries\\(wkc_forge_render[ \t]+PUBLIC[ \t]+wkc_forge_core")
+    message(FATAL_ERROR "WKC Forge render must depend on WKC Forge core")
 endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")

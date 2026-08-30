@@ -65,7 +65,7 @@ function(gdp_enable_sanitizers target_name)
 endfunction()
 
 add_library(
-    gdp_core
+    wkc_forge_core
     STATIC
     src/core/Hash.cpp
     src/core/Log.cpp
@@ -74,10 +74,10 @@ add_library(
     src/core/Time.cpp
 )
 
-target_compile_features(gdp_core PUBLIC cxx_std_20)
-target_include_directories(gdp_core PUBLIC src)
-gdp_enable_warnings(gdp_core)
-gdp_enable_sanitizers(gdp_core)
+target_compile_features(wkc_forge_core PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_core PUBLIC src)
+gdp_enable_warnings(wkc_forge_core)
+gdp_enable_sanitizers(wkc_forge_core)
 
 add_library(
     gdp_platform
@@ -87,7 +87,7 @@ add_library(
 
 target_compile_features(gdp_platform PUBLIC cxx_std_20)
 target_include_directories(gdp_platform PUBLIC src)
-target_link_libraries(gdp_platform PUBLIC gdp_core)
+target_link_libraries(gdp_platform PUBLIC wkc_forge_core)
 gdp_enable_warnings(gdp_platform)
 gdp_enable_sanitizers(gdp_platform)
 
@@ -111,7 +111,7 @@ add_library(
 
 target_compile_features(gdp_entities PUBLIC cxx_std_20)
 target_include_directories(gdp_entities PUBLIC src)
-target_link_libraries(gdp_entities PUBLIC gdp_core)
+target_link_libraries(gdp_entities PUBLIC wkc_forge_core)
 gdp_enable_warnings(gdp_entities)
 gdp_enable_sanitizers(gdp_entities)
 
@@ -124,7 +124,7 @@ add_library(
 
 target_compile_features(gdp_audio PUBLIC cxx_std_20)
 target_include_directories(gdp_audio PUBLIC src)
-target_link_libraries(gdp_audio PUBLIC gdp_core SDL3::SDL3)
+target_link_libraries(gdp_audio PUBLIC wkc_forge_core SDL3::SDL3)
 gdp_enable_warnings(gdp_audio)
 gdp_enable_sanitizers(gdp_audio)
 
@@ -150,7 +150,7 @@ add_library(
 
 target_compile_features(gdp_gameplay PUBLIC cxx_std_20)
 target_include_directories(gdp_gameplay PUBLIC src)
-target_link_libraries(gdp_gameplay PUBLIC gdp_core gdp_entities)
+target_link_libraries(gdp_gameplay PUBLIC wkc_forge_core gdp_entities)
 gdp_enable_warnings(gdp_gameplay)
 gdp_enable_sanitizers(gdp_gameplay)
 
@@ -167,7 +167,7 @@ add_library(
 
 target_compile_features(wkc_forge_render PUBLIC cxx_std_20)
 target_include_directories(wkc_forge_render PUBLIC src)
-target_link_libraries(wkc_forge_render PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
+target_link_libraries(wkc_forge_render PUBLIC wkc_forge_core SDL3::SDL3 OpenGL::GL)
 gdp_enable_warnings(wkc_forge_render)
 gdp_enable_sanitizers(wkc_forge_render)
 
@@ -181,7 +181,7 @@ add_library(
 
 target_compile_features(gdp_procedural_assets PUBLIC cxx_std_20)
 target_include_directories(gdp_procedural_assets PUBLIC src)
-target_link_libraries(gdp_procedural_assets PUBLIC gdp_core wkc_forge_render)
+target_link_libraries(gdp_procedural_assets PUBLIC wkc_forge_core wkc_forge_render)
 gdp_enable_warnings(gdp_procedural_assets)
 gdp_enable_sanitizers(gdp_procedural_assets)
 
@@ -197,7 +197,7 @@ target_compile_features(gdp_visual_content PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_content PUBLIC src)
 target_link_libraries(
     gdp_visual_content
-    PUBLIC gdp_core gdp_procedural_assets wkc_forge_render
+    PUBLIC wkc_forge_core gdp_procedural_assets wkc_forge_render
 )
 gdp_enable_warnings(gdp_visual_content)
 gdp_enable_sanitizers(gdp_visual_content)
@@ -213,7 +213,7 @@ target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_renderer PUBLIC src)
 target_link_libraries(
     gdp_visual_renderer
-    PUBLIC gdp_core gdp_procedural_assets wkc_forge_render gdp_visual_content
+    PUBLIC wkc_forge_core gdp_procedural_assets wkc_forge_render gdp_visual_content
 )
 gdp_enable_warnings(gdp_visual_renderer)
 gdp_enable_sanitizers(gdp_visual_renderer)
@@ -237,7 +237,7 @@ add_library(
 
 target_compile_features(gdp_world PUBLIC cxx_std_20)
 target_include_directories(gdp_world PUBLIC src)
-target_link_libraries(gdp_world PUBLIC gdp_core gdp_entities)
+target_link_libraries(gdp_world PUBLIC wkc_forge_core gdp_entities)
 gdp_enable_warnings(gdp_world)
 gdp_enable_sanitizers(gdp_world)
 
@@ -253,7 +253,7 @@ target_link_libraries(
     gdp
     PRIVATE
     gdp_audio
-    gdp_core
+    wkc_forge_core
     gdp_entities
     gdp_gameplay
     gdp_platform
@@ -277,7 +277,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(architecture_boundaries PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_core_tests tests/test_core.cpp)
-    target_link_libraries(gdp_core_tests PRIVATE gdp_core)
+    target_link_libraries(gdp_core_tests PRIVATE wkc_forge_core)
     gdp_enable_warnings(gdp_core_tests)
     gdp_enable_sanitizers(gdp_core_tests)
 
@@ -285,7 +285,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(core_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_seed_domain_tests tests/test_seed_domains.cpp)
-    target_link_libraries(gdp_seed_domain_tests PRIVATE gdp_core)
+    target_link_libraries(gdp_seed_domain_tests PRIVATE wkc_forge_core)
     gdp_enable_warnings(gdp_seed_domain_tests)
     gdp_enable_sanitizers(gdp_seed_domain_tests)
 

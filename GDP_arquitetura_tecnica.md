@@ -708,6 +708,11 @@ target a assumir explicitamente a identidade da engine. O namespace público
 permanece temporariamente `gdp::render`, isolando o rename do target de uma
 futura migração das APIs C++.
 
+Na Fase 39, `gdp_core` passou para `wkc_forge_core`. O target contém somente
+Hash, Log, Math, Random, Seed e Time, e `wkc_forge_render` agora depende dessa
+base sem atravessar um target identificado como GDP. O namespace `gdp::core`
+permanece temporariamente compatível.
+
 ---
 
 # 8. Sistema de seed
