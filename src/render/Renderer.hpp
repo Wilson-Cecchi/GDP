@@ -269,13 +269,19 @@ private:
         Texture properties;
     };
 
+    struct CeilingFixtureGpuMaterial {
+        Texture albedo;
+        Texture normal;
+        Texture properties;
+        Texture emission;
+    };
+
     struct RoomGpuMaterials {
         std::array<Texture,
             static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
         std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
         gdp::core::Vec2 wallUvOffset{};
         float wallTone{1.0F};
-        float ceilingEmissive{0.0F};
     };
 
     GlApi gl_{};
@@ -284,6 +290,7 @@ private:
     Shader shader_{};
     Mesh box_{};
     Texture fallbackTexture_{};
+    CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
     gdp::procedural::AssetCache<MeshData> meshCache_{};
     gdp::procedural::AssetCache<ImageData> textureCache_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> workerVisuals_{};

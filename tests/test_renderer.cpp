@@ -68,6 +68,33 @@ void testTextureData()
     expect(first.rgba.size() == 8U * 8U * 4U, "texture contains four channels per pixel");
     expect(first.rgba[0] != first.rgba[(2U * 4U)], "checker pattern contains two tones");
 
+    const CeilingFixtureMaterialImages fixture = makeCeilingFixtureMaterialImages();
+    const CeilingFixtureMaterialImages repeatedFixture
+        = makeCeilingFixtureMaterialImages();
+    expect(validateImageData(fixture.albedo) && validateImageData(fixture.normal)
+            && validateImageData(fixture.properties) && validateImageData(fixture.emission)
+            && fixture.albedo.width == 1024 && fixture.albedo.height == 1024,
+        "independent ceiling-fixture material provides four valid 1024 HD maps");
+    expect(fixture.albedo.rgba == repeatedFixture.albedo.rgba
+            && fixture.normal.rgba == repeatedFixture.normal.rgba
+            && fixture.properties.rgba == repeatedFixture.properties.rgba
+            && fixture.emission.rgba == repeatedFixture.emission.rgba,
+        "ceiling-fixture HD maps are byte-exact and deterministic");
+    const auto fixturePixel = [](const int x, const int y) {
+        return (static_cast<std::size_t>(y) * 1024U + static_cast<std::size_t>(x)) * 4U;
+    };
+    const std::size_t housing = fixturePixel(256, 512);
+    const std::size_t metal = fixturePixel(600, 512);
+    const std::size_t lens = fixturePixel(896, 512);
+    expect(fixture.albedo.rgba[housing] < 80U && fixture.albedo.rgba[lens] > 210U,
+        "ceiling-fixture atlas separates graphite housing from its frosted lens");
+    expect(fixture.properties.rgba[metal + 1U] > 220U
+            && fixture.properties.rgba[housing + 1U] < 100U,
+        "packed material map separates exposed metal from painted housing");
+    expect(fixture.emission.rgba[housing] == 0U && fixture.emission.rgba[metal] == 0U
+            && fixture.emission.rgba[lens] > 240U,
+        "emission map isolates light output to the lens atlas region");
+
     ImageData malformed = first;
     malformed.rgba.pop_back();
     expect(!validateImageData(malformed), "malformed texture data is rejected");

@@ -143,6 +143,25 @@ bool pixelMatches(
         && image.rgba[pixel + 2U] == color[2];
 }
 
+std::size_t exactColorCount(
+    const gdp::render::ImageData& image,
+    const gdp::core::Vec3 color) noexcept
+{
+    const std::array<std::uint8_t, 3> expected{
+        static_cast<std::uint8_t>(color.x * 255.0F + 0.5F),
+        static_cast<std::uint8_t>(color.y * 255.0F + 0.5F),
+        static_cast<std::uint8_t>(color.z * 255.0F + 0.5F),
+    };
+    std::size_t count = 0;
+    for (std::size_t pixel = 0; pixel < image.rgba.size(); pixel += 4U) {
+        if (image.rgba[pixel] == expected[0] && image.rgba[pixel + 1U] == expected[1]
+            && image.rgba[pixel + 2U] == expected[2]) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 void testRepresentativeMaterialSet()
 {
     using namespace gdp::procedural;
@@ -168,7 +187,7 @@ void testRepresentativeMaterialSet()
     expect(!floor.safetyStripe && floor.family == MaterialFamily::BareSteel,
         "floor uses non-striped dark bare steel");
     expect(!ceiling.safetyStripe && ceiling.emissiveAmount > 0.0F,
-        "ceiling reserves emission for regular linear lights");
+        "ceiling keeps fixture metadata separate from its neutral albedo");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "wall, floor and ceiling derive independent material sub-seeds");
 }
@@ -226,19 +245,16 @@ void testStructuredSurfaceAlbedos()
     expect(floorCenter > (floorLeft + floorRight) * 0.5F,
         "floor albedo preserves a brighter directional traffic lane");
 
-    std::uint8_t brightestRed = 0U;
-    std::uint8_t darkestRed = 255U;
-    for (std::size_t pixel = 0; pixel < ceiling->rgba.size(); pixel += 4U) {
-        brightestRed = std::max(brightestRed, ceiling->rgba[pixel]);
-        darkestRed = std::min(darkestRed, ceiling->rgba[pixel]);
-    }
-    expect(brightestRed > darkestRed + 80U,
-        "ceiling albedo contains high-contrast regular luminaires");
+    const auto& ceilingRecipe
+        = materials.surfaces[static_cast<std::size_t>(IndustrialSurface::Ceiling)];
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Industrial ceiling albedo contains no painted luminaires");
 
     expect(imageHash(*floor) == 0x2C3178D13AB6A494ULL,
         "Industrial floor albedo stays unchanged by the approved wall revision");
-    expect(imageHash(*ceiling) == 0x785F4097723681BDULL,
-        "Industrial ceiling albedo stays unchanged by the approved wall revision");
+    const auto repeatedCeiling = generateIndustrialSurfaceAlbedo(ceilingRecipe);
+    expect(repeatedCeiling && imageHash(*ceiling) == imageHash(*repeatedCeiling),
+        "neutral Industrial ceiling remains byte-exact for a repeated recipe");
 }
 
 void testIndustrialHdMaterialMaps()
@@ -464,7 +480,7 @@ void testRepresentativeStorageMaterialSet()
     expect(floor.family == MaterialFamily::Ceramic && floor.oxidationAmount == 0.0F,
         "Storage floor represents non-oxidizing industrial concrete");
     expect(ceiling.family == MaterialFamily::BareSteel && ceiling.emissiveAmount > 0.0F,
-        "Storage ceiling reserves weak emission for spaced fixtures");
+        "Storage ceiling keeps fixture metadata outside its structural albedo");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Storage surfaces use independent room-material sub-seeds");
 }
@@ -511,14 +527,10 @@ void testStructuredStorageAlbedos()
             < averageRedRow(*floor, dragY + 1, minimumX, maximumX),
         "Storage concrete floor contains a controlled horizontal drag mark");
 
-    std::uint8_t brightestRed = 0U;
-    std::uint8_t darkestRed = 255U;
-    for (std::size_t pixel = 0; pixel < ceiling->rgba.size(); pixel += 4U) {
-        brightestRed = std::max(brightestRed, ceiling->rgba[pixel]);
-        darkestRed = std::min(darkestRed, ceiling->rgba[pixel]);
-    }
-    expect(brightestRed > darkestRed + 70U,
-        "Storage ceiling preserves readable contrast despite weaker irregular lighting");
+    const auto& ceilingRecipe
+        = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Storage ceiling albedo contains beams but no painted luminaires");
 }
 
 void testStorageValidationFailures()
@@ -537,7 +549,7 @@ void testStorageValidationFailures()
     expect(containsError(
                validateStorageSurfaceRecipe(invalid),
                StorageMaterialValidationError::InvalidSurfaceRule),
-        "Storage ceiling without its navigation-light budget is rejected");
+        "Storage ceiling without external-fixture metadata is rejected");
     invalid = valid.surfaces[0];
     invalid.panelRows = 5;
     expect(containsError(
@@ -615,7 +627,7 @@ void testRepresentativeCombatMaterialSet()
         "Combat floor reserves marking for a clear arena perimeter");
     expect(ceiling.family == MaterialFamily::BareSteel && ceiling.emissiveAmount > 0.0F
             && ceiling.impactAmount == 0.0F && ceiling.markingAmount == 0.0F,
-        "Combat ceiling uses reinforced dark steel with navigational lighting");
+        "Combat ceiling keeps reinforced structure separate from fixture metadata");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Combat surfaces use independent room-material sub-seeds");
 }
@@ -668,14 +680,10 @@ void testStructuredCombatAlbedos()
     expect(arenaPixels >= 180U && arenaPixels <= 192U,
         "Combat floor draws one muted and continuous arena perimeter");
 
-    std::uint8_t brightestRed = 0U;
-    std::uint8_t darkestRed = 255U;
-    for (std::size_t pixel = 0; pixel < ceiling->rgba.size(); pixel += 4U) {
-        brightestRed = std::max(brightestRed, ceiling->rgba[pixel]);
-        darkestRed = std::min(darkestRed, ceiling->rgba[pixel]);
-    }
-    expect(brightestRed > darkestRed + 100U,
-        "Combat ceiling keeps heavy beams readable beneath spaced fixtures");
+    const auto& ceilingRecipe
+        = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Combat ceiling albedo preserves heavy beams without painted fixtures");
 }
 
 void testCombatValidationFailures()
@@ -700,7 +708,7 @@ void testCombatValidationFailures()
     expect(containsError(
                validateCombatSurfaceRecipe(invalid),
                CombatMaterialValidationError::InvalidSurfaceRule),
-        "Combat ceiling without navigation-light budget is rejected");
+        "Combat ceiling without external-fixture metadata is rejected");
     invalid.resolution = 63;
     expect(containsError(
                validateCombatSurfaceRecipe(invalid),
@@ -777,7 +785,7 @@ void testRepresentativeCafeteriaMaterialSet()
         "Cafeteria floor reserves wear for traffic and furniture contact");
     expect(ceiling.family == MaterialFamily::Aluminum && ceiling.emissiveAmount > 0.0F
             && ceiling.stripeAmount == 0.0F,
-        "Cafeteria ceiling uses regular light panels with uniform emission");
+        "Cafeteria ceiling keeps fixture metadata outside its neutral panels");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Cafeteria surfaces use independent room-material sub-seeds");
 }
@@ -856,14 +864,10 @@ void testStructuredCafeteriaAlbedos()
     expect(furniturePixels == 48U,
         "Cafeteria floor contains four controlled circular furniture contacts");
 
-    std::uint8_t brightestRed = 0U;
-    std::uint8_t darkestRed = 255U;
-    for (std::size_t pixel = 0; pixel < ceiling->rgba.size(); pixel += 4U) {
-        brightestRed = std::max(brightestRed, ceiling->rgba[pixel]);
-        darkestRed = std::min(darkestRed, ceiling->rgba[pixel]);
-    }
-    expect(brightestRed > darkestRed + 80U,
-        "Cafeteria ceiling keeps regular light panels clearly readable");
+    const auto& ceilingRecipe
+        = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Cafeteria ceiling albedo contains no painted light panels");
 }
 
 void testCafeteriaValidationFailures()
@@ -888,7 +892,7 @@ void testCafeteriaValidationFailures()
     expect(containsError(
                validateCafeteriaSurfaceRecipe(invalid),
                CafeteriaMaterialValidationError::InvalidSurfaceRule),
-        "Cafeteria ceiling without uniform-light budget is rejected");
+        "Cafeteria ceiling without external-fixture metadata is rejected");
     invalid.resolution = 63;
     expect(containsError(
                validateCafeteriaSurfaceRecipe(invalid),
@@ -966,7 +970,7 @@ void testRepresentativeLaboratoryMaterialSet()
     expect(ceiling.family == MaterialFamily::Aluminum
             && ceiling.lightingCoverage >= 0.25F && ceiling.lightingCoverage <= 0.34F
             && ceiling.emissiveAmount > 0.0F,
-        "Laboratory ceiling reserves a controlled fraction for intense white lights");
+        "Laboratory ceiling keeps fixture planning metadata outside its albedo");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Laboratory surfaces use independent room-material sub-seeds");
 }
@@ -1035,25 +1039,8 @@ void testStructuredLaboratoryAlbedos()
 
     const auto& ceilingRecipe
         = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
-    const std::uint32_t panelCount = static_cast<std::uint32_t>(ceilingRecipe.panelColumns)
-        * static_cast<std::uint32_t>(ceilingRecipe.panelRows);
-    const std::uint32_t fixtureCount = std::max(1U,
-        static_cast<std::uint32_t>(std::lround(
-            static_cast<float>(panelCount) * ceilingRecipe.lightingCoverage)));
-    const std::uint32_t cellWidth = ceilingRecipe.resolution / ceilingRecipe.panelColumns;
-    const std::uint32_t fixtureHalfWidth = std::max(5U, cellWidth / 4U);
-    const std::size_t expectedBrightPixels = static_cast<std::size_t>(fixtureCount)
-        * static_cast<std::size_t>((fixtureHalfWidth * 2U) + 1U) * 5U;
-    std::size_t brightPixels = 0;
-    for (std::size_t pixel = 0; pixel < ceiling->rgba.size(); pixel += 4U) {
-        if (ceiling->rgba[pixel] > 210U && ceiling->rgba[pixel + 1U] > 210U
-            && ceiling->rgba[pixel + 2U] > 210U) {
-            ++brightPixels;
-        }
-    }
-    expect(brightPixels == expectedBrightPixels
-            && fixtureCount * 5U >= panelCount && fixtureCount * 5U <= panelCount * 2U,
-        "Laboratory ceiling lights occupy a precise 20-40% modular budget");
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Laboratory ceiling albedo remains neutral without luminous modules");
 }
 
 void testLaboratoryValidationFailures()
@@ -1078,7 +1065,7 @@ void testLaboratoryValidationFailures()
     expect(containsError(
                validateLaboratorySurfaceRecipe(invalid),
                LaboratoryMaterialValidationError::InvalidSurfaceRule),
-        "Laboratory ceiling without its modular light budget is rejected");
+        "Laboratory ceiling without external-fixture planning metadata is rejected");
     invalid.resolution = 63;
     expect(containsError(
                validateLaboratorySurfaceRecipe(invalid),
@@ -1155,7 +1142,7 @@ void testRepresentativeTechnicalMaterialSet()
         "Technical floor reserves a controlled oil and grate budget");
     expect(ceiling.family == MaterialFamily::BareSteel && ceiling.pipeAmount > 0.0F
             && ceiling.mechanicalAmount > 0.0F && ceiling.emissiveAmount > 0.0F,
-        "Technical ceiling combines categorized mechanics with protected lighting");
+        "Technical ceiling keeps categorized mechanics separate from fixtures");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Technical surfaces use independent room-material sub-seeds");
 }
@@ -1245,8 +1232,8 @@ void testStructuredTechnicalAlbedos()
             ++fixturePixels;
         }
     }
-    expect(fixturePixels == 85U,
-        "Technical ceiling guarantees exactly one protected navigation fixture");
+    expect(fixturePixels == 0U,
+        "Technical ceiling albedo contains no protected navigation fixture");
 }
 
 void testTechnicalValidationFailures()
@@ -1271,7 +1258,7 @@ void testTechnicalValidationFailures()
     expect(containsError(
                validateTechnicalSurfaceRecipe(invalid),
                TechnicalMaterialValidationError::InvalidSurfaceRule),
-        "Technical ceiling without protected-light budget is rejected");
+        "Technical ceiling without external-fixture metadata is rejected");
     invalid.resolution = 63;
     expect(containsError(
                validateTechnicalSurfaceRecipe(invalid),
@@ -1348,7 +1335,7 @@ void testRepresentativeSecurityMaterialSet()
         "Security floor reserves clean technical access details without alerts");
     expect(ceiling.family == MaterialFamily::Aluminum && ceiling.statusAmount > 0.0F
             && ceiling.emissiveAmount > 0.0F,
-        "Security ceiling combines regular luminaires with one sensor budget");
+        "Security ceiling keeps its sensor budget separate from external luminaires");
     expect(wall.seed != floor.seed && floor.seed != ceiling.seed && wall.seed != ceiling.seed,
         "Security surfaces use independent room-material sub-seeds");
 }
@@ -1452,10 +1439,8 @@ void testStructuredSecurityAlbedos()
             ++lightPixels;
         }
     }
-    const float lightCoverage = static_cast<float>(lightPixels)
-        / static_cast<float>(ceiling->width * ceiling->height);
-    expect(lightCoverage >= 0.20F && lightCoverage <= 0.35F,
-        "Security ceiling keeps regular neutral lights within the 20-35% budget");
+    expect(lightPixels == 0U,
+        "Security ceiling albedo contains no painted neutral lights");
 }
 
 void testSecurityValidationFailures()
@@ -1480,7 +1465,7 @@ void testSecurityValidationFailures()
     expect(containsError(
                validateSecuritySurfaceRecipe(invalid),
                SecurityMaterialValidationError::InvalidSurfaceRule),
-        "Security ceiling without regular-light budget is rejected");
+        "Security ceiling without external-fixture metadata is rejected");
     invalid.resolution = 63;
     expect(containsError(
                validateSecuritySurfaceRecipe(invalid),
@@ -1557,7 +1542,7 @@ void testRepresentativeCentralHubMaterialSet()
         "Central Hub floor owns continuous navigation without competing focal details");
     expect(ceiling.structureAmount > 0.0F && ceiling.navigationAmount == 0.0F
             && ceiling.focalAmount == 0.0F && ceiling.emissiveAmount > 0.0F,
-        "Central Hub ceiling owns route-aligned regular lighting");
+        "Central Hub ceiling keeps structure separate from route-aligned fixtures");
     expect(wall.routeAxis == first.routeAxis && floor.routeAxis == first.routeAxis
             && ceiling.routeAxis == first.routeAxis,
         "Central Hub surfaces share one room-level orientation axis");
@@ -1583,23 +1568,6 @@ void testStructuredCentralHubAlbedos()
     if (!wall || !floor || !ceiling) {
         return;
     }
-
-    const auto exactColorCount = [](const gdp::render::ImageData& image,
-                                     const gdp::core::Vec3 color) {
-        const std::array<std::uint8_t, 3> expected{
-            static_cast<std::uint8_t>(color.x * 255.0F + 0.5F),
-            static_cast<std::uint8_t>(color.y * 255.0F + 0.5F),
-            static_cast<std::uint8_t>(color.z * 255.0F + 0.5F),
-        };
-        std::size_t count = 0;
-        for (std::size_t pixel = 0; pixel < image.rgba.size(); pixel += 4U) {
-            if (image.rgba[pixel] == expected[0] && image.rgba[pixel + 1U] == expected[1]
-                && image.rgba[pixel + 2U] == expected[2]) {
-                ++count;
-            }
-        }
-        return count;
-    };
 
     const auto& wallRecipe
         = materials.surfaces[static_cast<std::size_t>(RoomSurface::Wall)];
@@ -1644,11 +1612,8 @@ void testStructuredCentralHubAlbedos()
     expect(routeIsContinuous,
         "Central Hub cyan navigation reaches both texture edges without breaks");
 
-    const std::size_t lightPixels = exactColorCount(*ceiling, ceilingRecipe.accentColor);
-    const std::size_t expectedLightPixels
-        = materials.routeAxis == CentralHubRouteAxis::Cross ? 135U : 144U;
-    expect(lightPixels == expectedLightPixels,
-        "Central Hub ceiling uses sparse route-aligned linear fixtures");
+    expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
+        "Central Hub ceiling albedo contains no route-aligned fixtures");
 
     constexpr gdp::core::Vec3 forbiddenYellow{0.765F, 0.545F, 0.0F};
     expect(exactColorCount(*wall, forbiddenYellow) == 0U
@@ -1679,7 +1644,7 @@ void testCentralHubValidationFailures()
     expect(containsError(
                validateCentralHubSurfaceRecipe(invalid),
                CentralHubMaterialValidationError::InvalidSurfaceRule),
-        "Central Hub ceiling without directional lighting is rejected");
+        "Central Hub ceiling without external-fixture metadata is rejected");
     invalid = valid.surfaces[0];
     invalid.accentColor = {0.765F, 0.545F, 0.0F};
     expect(containsError(

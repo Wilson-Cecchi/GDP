@@ -93,9 +93,12 @@ especializados das pastas numeradas.
 - **Fase 22 — Revisão visual aprovada:** concluída; a proposta
   `Industrial Corridor/Wall v1` foi recusada e substituída pela v2 HD, aceita no
   jogo com mapas `1024×1024`, Albedo/Normal/RMA, UV físico e filtragem trilinear.
-- **Próxima atualização:** separar definitivamente tetos e luminárias: todo teto
-  revisado será neutro, enquanto `Lighting/CeilingFixture` terá modelo, textura
-  e emissão próprios, submetidos a aprovação visual independente.
+- **Fase 23 — Separação teto/luminária:** concluída e aceita; os oito albedos de teto
+  não desenham mais lâmpadas e não recebem emissão. A proposta
+  `Lighting/CeilingFixture v1 HD` foi aprovada e implementada com carcaça, aro,
+  junta, lente e fixadores, além de Albedo/Normal/RMA/Emission `1024×1024`.
+- **Próxima atualização:** preparar `Industrial Corridor/Ceiling v1 HD` como
+  superfície arquitetônica neutra, sem luminárias ou emissão pintadas.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -293,18 +296,20 @@ problemáticas; auditorias ampliadas validaram 10.000 mundos gerados e 2.000
 mundos atravessados.
 
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
-marcação logística curta, concreto empoeirado com marcas de arrasto e teto com
-iluminação mais fraca/irregular. Combat Room acrescenta placas blindadas verde-
-oliva com 1–3 impactos, piso escuro demarcado e teto reforçado com luzes
-espaçadas. Cafeteria fornece painéis claros com faixa institucional vermelha,
-piso lavável marcado por circulação/mobiliário e teto regular de luz uniforme.
+marcação logística curta, concreto empoeirado com marcas de arrasto e teto
+escuro com vigas. Combat Room acrescenta placas blindadas verde-oliva com 1–3
+impactos, piso escuro demarcado e teto estrutural reforçado. Cafeteria fornece
+painéis claros com faixa institucional vermelha, piso lavável marcado por
+circulação/mobiliário e teto modular neutro.
 Laboratory acrescenta painéis frios precisos, módulo científico com indicadores,
 piso técnico azul e contaminação localizada, além de teto branco modular. O
 perfil Technical Area usa tubos volumétricos, caixa/válvula conectadas, piso
 pesado com grade e óleo e teto mecânico categorizado. Security acrescenta
 console monitorado, alerta vermelho confinado, piso técnico e teto claro
 regular. Central Hub fecha o conjunto com grandes superfícies neutras,
-sinalização ciano única, rotas contínuas no piso e luminárias alinhadas. O
+sinalização ciano única, rotas contínuas no piso e teto arquitetônico neutro.
+As luminárias são modelos independentes posicionados pelo plano de iluminação e
+usam material próprio, sem qualquer representação gravada nos tetos. O
 renderer cacheia os oito perfis pelo hash completo e seleciona o perfil de cada
 sala renderizada. O teste OpenGL offscreen também cobre sala
 transladada/rotacionada, porta normal/lockdown, geometria vista do corredor,

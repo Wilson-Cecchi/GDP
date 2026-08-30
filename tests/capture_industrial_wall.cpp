@@ -105,6 +105,8 @@ int main(const int argc, char* argv[])
                 {0.0F, 1.58F, 3.25F}, {0.14F, -0.015F, -0.99F}, 70.0F};
             constexpr gdp::render::CameraData closeCamera{
                 {0.15F, 1.55F, 1.80F}, {0.94F, -0.08F, -0.33F}, 58.0F};
+            constexpr gdp::render::CameraData ceilingCamera{
+                {0.0F, 1.50F, 2.50F}, {0.0F, 0.62F, -0.78F}, 68.0F};
             gdp::render::RoomLightingRenderData lighting;
             lighting.ambientColor = {0.78F, 0.82F, 0.86F};
             lighting.ambientIntensity = 0.22F;
@@ -138,8 +140,10 @@ int main(const int argc, char* argv[])
                     continue;
                 }
                 const auto captureView = [&](const gdp::render::CameraData view,
-                                              const char* const suffix) {
-                    if (!renderer.render(width, height, view, {}, {}, {}, lighting,
+                                              const char* const suffix,
+                                              const gdp::render::RoomLightingRenderData&
+                                                  captureLighting) {
+                    if (!renderer.render(width, height, view, {}, {}, {}, captureLighting,
                             roomBehindCamera, doors, corridor, connectedRoom)) {
                         std::cerr << "Render failed for seed " << capture.seed << '\n';
                         passed = false;
@@ -157,8 +161,20 @@ int main(const int argc, char* argv[])
                         std::cout << path.string() << '\n';
                     }
                 };
-                captureView(gameplayCamera, "gameplay");
-                captureView(closeCamera, "close");
+                captureView(gameplayCamera, "gameplay", lighting);
+                captureView(closeCamera, "close", lighting);
+                if (capture.seed == 2U) {
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_on", lighting);
+                    gdp::render::RoomLightingRenderData offLighting = lighting;
+                    offLighting.fixtureEmissive = 0.0F;
+                    for (std::size_t index = 0; index < offLighting.lightCount; ++index) {
+                        offLighting.lights[index].intensity = 0.0F;
+                    }
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_off", offLighting);
+                    gdp::render::RoomLightingRenderData alertLighting = lighting;
+                    alertLighting.alert = true;
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_alert", alertLighting);
+                }
             }
         }
     }

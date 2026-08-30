@@ -79,6 +79,28 @@ resultado final:
 
 ## Propostas ativas
 
+### Lighting/CeilingFixture — v1 HD
+
+```text
+unidade visual: Lighting/CeilingFixture
+versão da proposta: v1 HD
+arquivo/prancha: visual/proposals/ceiling_fixture_proposal_v1_hd.png
+seeds mostradas: não aplicável; uma base com estados ON, OFF e ALERT
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO ("pode prosseguir")
+data: 2026-08-30
+commit de implementação: `feat: separate HD ceiling fixtures from room materials`
+capturas no jogo: visual/validation/ceiling_fixture_v1_hd_on.png;
+                  visual/validation/ceiling_fixture_v1_hd_off.png;
+                  visual/validation/ceiling_fixture_v1_hd_alert.png
+resultado final: ACEITA NO JOGO ("aprovado")
+```
+
+Os oito albedos de teto permanecem neutros. A implementação v1 HD substitui o
+provisório por carcaça, aro, junta, lente e fixadores físicos, com atlas
+`1024×1024` de Albedo, Normal, RMA e Emission; somente a lente recebe emissão.
+Contrato e prompt estão em
+[`proposals/ceiling_fixture_proposal_v1_hd.md`](proposals/ceiling_fixture_proposal_v1_hd.md).
+
 ### Industrial Corridor/Wall — v2 HD
 
 ```text
@@ -157,7 +179,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Weapon/first-person presentation | Não revisada |
 | Player presentation | Não revisada |
 | HUD/map visual language | Não revisada |
-| Lighting/CeilingFixture | Não revisada; asset e material independentes do teto |
+| Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes
 

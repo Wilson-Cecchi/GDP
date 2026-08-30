@@ -3442,26 +3442,27 @@ Wear
 sala três sub-receitas independentes e um hash canônico para
 Wall/Floor/Ceiling. Industrial seleciona
 `Maintained/Used/Worn` e gera placas com rodapé de segurança, piso
-antiderrapante com faixa de tráfego e luminárias lineares regulares. Storage
+antiderrapante com faixa de tráfego e teto modular neutro. Storage
 seleciona `Orderly/Dusty/Neglected` e gera metal amarronzado com oxidação local e
 marcação logística curta, concreto com manchas largas/arrasto/rachadura rara e
-teto escuro com vigas e luminárias fracas que podem falhar. Combat seleciona
+teto escuro com vigas neutras. Combat seleciona
 `Ready/Active/Scarred` e gera blindagem verde-oliva com 1–3 impactos, delimitação
-de arena no piso e vigas pesadas com luzes espaçadas. Hashes de perfil e
+de arena no piso e vigas pesadas sem luz gravada. Hashes de perfil e
 substreams não colidem. Cafeteria seleciona `Clean/InUse/Faded` e gera painéis
 claros com faixa vermelha contínua, piso lavável com circulação e contatos de
-mobiliário e teto regular com luz uniforme. Laboratory seleciona
+mobiliário e teto regular neutro. Laboratory seleciona
 `Sterile/Operational/Contained` e gera painéis frios com módulo científico,
-piso técnico azul com contaminação localizada e teto simétrico com 20–40% dos
-módulos iluminados. Cache e upload ocorrem antes do draw e o renderer troca o
+piso técnico azul com contaminação localizada e teto simétrico sem módulos
+luminosos pintados. Cache e upload ocorrem antes do draw e o renderer troca o
 conjunto completo por perfil. Technical Area seleciona
 `Serviced/Working/Overloaded` e combina tubos conectados, óleo/grade no piso e
 categorias mecânicas no teto sem abandonar a base simples.
 Security seleciona `Secured/Monitored/Alert` e mantém console/indicadores
-agrupados, acesso limpo no piso e iluminação regular. Central Hub seleciona
+agrupados, acesso limpo no piso e teto claro neutro. Central Hub seleciona
 `Open/Active/Rerouted`, compartilha um eixo `Horizontal/Vertical/Cross` entre as
 superfícies e combina sinalização ciano única, uma rota ou cruzamento contínuo e
-luminárias alinhadas sem amarelo/preto decorativo. Gates de 1.000 room seeds por
+teto arquitetônico neutro. Luminárias pertencem ao modelo e material
+`Lighting/CeilingFixture`, fora desses albedos. Gates de 1.000 room seeds por
 perfil cobriram as 24 condições e produziram 8.000 hashes únicos sem alterar o
 fingerprint estrutural do World.
 
@@ -3677,8 +3678,26 @@ faixas emissivas ou brilho pintado; `Lighting/CeilingFixture` é uma unidade
 visual própria, ligada ao modelo físico e ao material emissivo independente.
 Todo prompt futuro de teto deve declarar explicitamente essa exclusão.
 
-**Próximo marco:** remover as luminárias gravadas nos baselines de teto e
-submeter `Lighting/CeilingFixture` a uma aprovação visual própria.
+## Fase 23 — Separação entre teto e luminária
+
+As oito famílias de albedo de teto não desenham mais lâmpadas, lentes ou faixas
+emissivas. O renderer também envia emissão zero para o material do teto. Os
+pontos de luz continuam posicionando o modelo físico, agora ligado a uma
+textura técnica própria e filtrada de forma independente; `ON`, `OFF` e
+`ALERT` permanecem estados de runtime do material da luminária.
+
+Testes contam zero ocorrências da cor reservada de luminária em cada teto. A
+proposta `Lighting/CeilingFixture v1 HD` foi aprovada e implementada como um
+modelo composto por carcaça, aro, junta, lente e quatro fixadores. Um atlas
+`1024×1024` fornece Albedo, Normal, RMA e Emission com filtragem trilinear; a
+máscara explícita mantém carcaça/metal/junta sem emissão e limita a luz à lente.
+O estado `OFF` reduz emissão a zero sem remover a geometria, enquanto `ALERT`
+usa vermelho controlado no mesmo material.
+
+As capturas `ON`, `OFF` e `ALERT` foram aceitas no jogo em 2026-08-30.
+
+**Próximo marco:** proposta `Industrial Corridor/Ceiling v1 HD`, mantendo o
+teto arquitetônico neutro e a luminária como asset independente já aprovado.
 
 ---
 

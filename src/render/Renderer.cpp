@@ -51,6 +51,7 @@ in vec2 vUv;
 uniform sampler2D uAlbedo;
 uniform sampler2D uNormalMap;
 uniform sampler2D uMaterialMap;
+uniform sampler2D uEmissionMap;
 uniform vec3 uTint;
 uniform vec3 uCameraPosition;
 const int MAX_LIGHTS = 8;
@@ -65,6 +66,7 @@ uniform vec2 uUvScale;
 uniform vec2 uUvOffset;
 uniform float uEmissiveStrength;
 uniform int uDetailedMaterial;
+uniform int uUseEmissionMap;
 
 out vec4 fragmentColor;
 
@@ -122,7 +124,9 @@ void main()
             result += reflectance * highlight * diffuse * radiance;
         }
     }
-    float emissiveMask = smoothstep(0.62, 0.82, max(albedo.r, max(albedo.g, albedo.b)));
+    float emissiveMask = uUseEmissionMap != 0
+        ? texture(uEmissionMap, materialUv).r
+        : smoothstep(0.62, 0.82, max(albedo.r, max(albedo.g, albedo.b)));
     fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength), 1.0);
 }
 )glsl";
@@ -317,6 +321,18 @@ bool Renderer::initialize(const int width, const int height)
     if (!fallbackTexture_.upload(gl_, makeIndustrialCheckerImage())) {
         return false;
     }
+    const CeilingFixtureMaterialImages fixtureImages
+        = makeCeilingFixtureMaterialImages();
+    if (!ceilingFixtureMaterial_.albedo.upload(
+            gl_, fixtureImages.albedo, TextureSampling::Trilinear)
+        || !ceilingFixtureMaterial_.normal.upload(
+            gl_, fixtureImages.normal, TextureSampling::Trilinear)
+        || !ceilingFixtureMaterial_.properties.upload(
+            gl_, fixtureImages.properties, TextureSampling::Trilinear)
+        || !ceilingFixtureMaterial_.emission.upload(
+            gl_, fixtureImages.emission, TextureSampling::Trilinear)) {
+        return false;
+    }
     if (!framebuffer_.resize(gl_, width, height)) {
         return false;
     }
@@ -398,8 +414,6 @@ bool Renderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::IndustrialSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     if (roomSeed == 0U) {
@@ -437,8 +451,6 @@ bool Renderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -473,8 +485,6 @@ bool Renderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -509,8 +519,6 @@ bool Renderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -545,8 +553,6 @@ bool Renderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -581,8 +587,6 @@ bool Renderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -617,8 +621,6 @@ bool Renderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -653,8 +655,6 @@ bool Renderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
             return false;
         }
     }
-    gpuMaterials.ceilingEmissive = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::RoomSurface::Ceiling)].emissiveAmount;
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     return true;
@@ -869,6 +869,8 @@ bool Renderer::render(
     shader_.setInt(gl_, "uAlbedo", 0);
     shader_.setInt(gl_, "uNormalMap", 1);
     shader_.setInt(gl_, "uMaterialMap", 2);
+    shader_.setInt(gl_, "uEmissionMap", 3);
+    shader_.setInt(gl_, "uUseEmissionMap", 0);
     shader_.setVec3(gl_, "uCameraPosition", camera.position);
     shader_.setMat4(gl_, "uView", camera_.viewMatrix());
     shader_.setMat4(
@@ -972,7 +974,6 @@ bool Renderer::render(
         case RoomMaterialChannel::Ceiling:
             roomMaterials.textures[static_cast<std::size_t>(
                 gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
-            emissiveStrength = roomMaterials.ceilingEmissive;
             break;
         case RoomMaterialChannel::Generic:
             fallbackTexture_.bind(gl_);
@@ -1263,22 +1264,61 @@ bool Renderer::render(
             panelScale, panelColor, panelEmissive);
     }
 
-    fallbackTexture_.bind(gl_);
+    ceilingFixtureMaterial_.albedo.bind(gl_, 0U);
+    ceilingFixtureMaterial_.normal.bind(gl_, 1U);
+    ceilingFixtureMaterial_.properties.bind(gl_, 2U);
+    ceilingFixtureMaterial_.emission.bind(gl_, 3U);
+    shader_.setInt(gl_, "uDetailedMaterial", 1);
+    shader_.setInt(gl_, "uUseEmissionMap", 1);
+    constexpr gdp::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
         const gdp::core::Vec3 fixtureColor = lighting.alert
-            ? alertColor : light.color;
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(light.position)
-            * gdp::core::scaleMatrix({0.62F, 0.08F, 0.24F});
-        shader_.setMat4(gl_, "uModel", model);
-        shader_.setVec3(gl_, "uTint", fixtureColor);
-        shader_.setInt(gl_, "uDetailedMaterial", 0);
-        shader_.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
-        shader_.setVec2(gl_, "uUvOffset", {});
-        shader_.setFloat(gl_, "uEmissiveStrength",
-            lighting.alert ? lighting.fixtureEmissive * 1.35F : lighting.fixtureEmissive);
-        box_.draw(gl_);
+            ? fixtureAlertColor : light.color;
+        const float lensEmission = lighting.alert
+            ? lighting.fixtureEmissive * 1.35F : lighting.fixtureEmissive;
+        const gdp::core::Vec3 lensTint = lensEmission > 0.01F
+            ? fixtureColor : gdp::core::Vec3{0.42F, 0.44F, 0.43F};
+        const auto drawFixturePiece = [this, &light](
+            const gdp::core::Vec3 offset,
+            const gdp::core::Vec3 scale,
+            const gdp::core::Vec2 uvScale,
+            const gdp::core::Vec2 uvOffset,
+            const gdp::core::Vec3 tint,
+            const float emissiveStrength) {
+            shader_.setMat4(gl_, "uModel",
+                gdp::core::translationMatrix(light.position + offset)
+                    * gdp::core::scaleMatrix(scale));
+            shader_.setVec3(gl_, "uTint", tint);
+            shader_.setVec2(gl_, "uUvScale", uvScale);
+            shader_.setVec2(gl_, "uUvOffset", uvOffset);
+            shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
+            box_.draw(gl_);
+        };
+        constexpr gdp::core::Vec3 neutralTint{1.0F, 1.0F, 1.0F};
+        drawFixturePiece({0.0F, 0.095F, 0.0F}, {1.20F, 0.12F, 0.28F},
+            {0.46F, 0.96F}, {0.02F, 0.02F}, neutralTint, 0.0F);
+        drawFixturePiece({0.0F, 0.015F, 0.0F}, {1.17F, 0.055F, 0.255F},
+            {0.14F, 0.96F}, {0.52F, 0.02F}, neutralTint, 0.0F);
+        drawFixturePiece({0.0F, -0.022F, 0.0F}, {1.10F, 0.040F, 0.215F},
+            {0.05F, 0.96F}, {0.69F, 0.02F}, neutralTint, 0.0F);
+        drawFixturePiece({0.0F, -0.052F, 0.0F}, {1.03F, 0.030F, 0.170F},
+            {0.21F, 0.96F}, {0.77F, 0.02F}, lensTint, lensEmission);
+
+        constexpr std::array fastenerOffsets{
+            gdp::core::Vec3{-0.525F, -0.041F, -0.105F},
+            gdp::core::Vec3{0.525F, -0.041F, -0.105F},
+            gdp::core::Vec3{-0.525F, -0.041F, 0.105F},
+            gdp::core::Vec3{0.525F, -0.041F, 0.105F},
+        };
+        for (const gdp::core::Vec3 fastenerOffset : fastenerOffsets) {
+            drawFixturePiece(fastenerOffset, {0.045F, 0.018F, 0.045F},
+                {0.14F, 0.96F}, {0.52F, 0.02F}, neutralTint, 0.0F);
+        }
     }
+    shader_.setInt(gl_, "uUseEmissionMap", 0);
+    shader_.setInt(gl_, "uDetailedMaterial", 0);
+    shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
 
     for (const EnemyRenderData& enemy : enemies) {
         auto* visuals = &workerVisuals_;

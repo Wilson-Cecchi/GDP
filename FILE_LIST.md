@@ -148,8 +148,14 @@
 - `visual/proposals/industrial_corridor_wall_proposal_v1.png`
 - `visual/proposals/industrial_corridor_wall_proposal_v2_hd.md`
 - `visual/proposals/industrial_corridor_wall_proposal_v2_hd.png`
+- `visual/proposals/ceiling_fixture_proposal_v1_hd.md`
+- `visual/proposals/ceiling_fixture_proposal_v1_hd.png`
 - `visual/reference_sheet_rooms_enemies.png`
 - `visual/validation/industrial_corridor_wall_v1_maintained_seed2.png`
+- `visual/validation/ceiling_fixture_separation_technical_baseline.png`
+- `visual/validation/ceiling_fixture_v1_hd_alert.png`
+- `visual/validation/ceiling_fixture_v1_hd_off.png`
+- `visual/validation/ceiling_fixture_v1_hd_on.png`
 - `visual/validation/industrial_corridor_wall_v1_used_seed3.png`
 - `visual/validation/industrial_corridor_wall_v1_worn_seed1.png`
 - `visual/validation/industrial_corridor_wall_v2_hd_maintained_seed2_close.png`

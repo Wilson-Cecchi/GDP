@@ -1336,13 +1336,6 @@ std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
                 if ((y % 8U) == 4U && (x % 8U) >= 2U && (x % 8U) <= 5U) {
                     color = multiply(color, 0.78F);
                 }
-            } else if (recipe.surface == IndustrialSurface::Ceiling) {
-                const std::uint32_t center = recipe.resolution / 2U;
-                const bool linearLight = x >= center - 3U && x <= center + 3U
-                    && panelY > 3U && panelY + 4U < cellHeight;
-                if (linearLight) {
-                    color = recipe.accentColor;
-                }
             }
 
             writePixel(image, x, y, color);
@@ -1605,14 +1598,6 @@ std::optional<gdp::render::ImageData> generateStorageSurfaceAlbedo(
                 if (beam) {
                     color = multiply(color, 0.58F);
                 }
-                const bool fixture = panelX > (cellWidth / 2U) - 2U
-                    && panelX < (cellWidth / 2U) + 3U
-                    && panelY > 5U && panelY + 6U < cellHeight;
-                const bool failed = unitNoise(gdp::core::hashCombine(
-                    recipe.seed ^ 0x11A47ULL, panelId)) < recipe.detailAmount;
-                if (fixture) {
-                    color = failed ? multiply(recipe.accentColor, 0.22F) : recipe.accentColor;
-                }
             }
             writePixel(image, x, y, color);
         }
@@ -1838,14 +1823,6 @@ std::optional<gdp::render::ImageData> generateCombatSurfaceAlbedo(
                 if (panelX < beamWidth) {
                     color = multiply(color, 0.48F);
                 }
-                const std::uint32_t quarter = cellWidth / 4U;
-                const bool fixtureX = (panelX > quarter - 2U && panelX < quarter + 3U)
-                    || (panelX > (quarter * 3U) - 2U && panelX < (quarter * 3U) + 3U);
-                const bool fixture = fixtureX
-                    && panelY > cellHeight / 3U && panelY < (cellHeight * 2U) / 3U;
-                if (fixture) {
-                    color = recipe.accentColor;
-                }
             }
             writePixel(image, x, y, color);
         }
@@ -2060,17 +2037,6 @@ std::optional<gdp::render::ImageData> generateCafeteriaSurfaceAlbedo(
                         color = multiply(recipe.secondaryColor,
                             0.68F + recipe.furnitureMarkAmount);
                     }
-                }
-            } else {
-                const std::uint32_t fixtureHalfWidth = std::max(4U, cellWidth / 4U);
-                const std::uint32_t centerX = cellWidth / 2U;
-                const std::uint32_t centerY = cellHeight / 2U;
-                const bool fixture = panelX >= centerX - fixtureHalfWidth
-                    && panelX <= centerX + fixtureHalfWidth
-                    && panelY >= centerY - 2U && panelY <= centerY + 2U;
-                if (fixture) {
-                    color = multiply(recipe.accentColor,
-                        0.86F + recipe.emissiveAmount * 0.20F);
                 }
             }
             writePixel(image, x, y, color);
@@ -2290,36 +2256,6 @@ std::optional<gdp::render::ImageData> generateLaboratorySurfaceAlbedo(
                         color = mix(color, {0.25F, 0.34F, 0.27F},
                             0.34F + recipe.contaminationAmount);
                     }
-                }
-            } else {
-                const std::uint32_t panelCount
-                    = static_cast<std::uint32_t>(recipe.panelColumns)
-                    * static_cast<std::uint32_t>(recipe.panelRows);
-                const std::uint32_t fixtureCount = std::max(1U,
-                    static_cast<std::uint32_t>(std::lround(
-                        static_cast<float>(panelCount) * recipe.lightingCoverage)));
-                const std::uint32_t panelLinear = (y / cellHeight) * recipe.panelColumns
-                    + (x / cellWidth);
-                const std::uint32_t fixtureOffset
-                    = static_cast<std::uint32_t>(recipe.seed % panelCount);
-                const std::uint32_t rotatedPanel
-                    = (panelLinear + panelCount - fixtureOffset) % panelCount;
-                const bool litPanel = rotatedPanel < fixtureCount;
-                const std::uint32_t centerX = cellWidth / 2U;
-                const std::uint32_t centerY = cellHeight / 2U;
-                const std::uint32_t fixtureHalfWidth = std::max(5U, cellWidth / 4U);
-                const bool fixture = litPanel
-                    && panelX >= centerX - fixtureHalfWidth
-                    && panelX <= centerX + fixtureHalfWidth
-                    && panelY >= centerY - 2U && panelY <= centerY + 2U;
-                if (fixture) {
-                    color = multiply(recipe.accentColor,
-                        0.90F + recipe.emissiveAmount * 0.10F);
-                } else if (!litPanel && panelY >= centerY - 4U && panelY <= centerY + 4U
-                    && panelX >= centerX - fixtureHalfWidth
-                    && panelX <= centerX + fixtureHalfWidth
-                    && (panelY % 3U == 0U)) {
-                    color = multiply(recipe.secondaryColor, 0.72F);
                 }
             }
             writePixel(image, x, y, color);
@@ -2560,26 +2496,13 @@ std::optional<gdp::render::ImageData> generateTechnicalSurfaceAlbedo(
                         : mix(color, {0.09F, 0.10F, 0.09F}, 0.56F);
                 }
             } else {
-                const std::uint32_t panelCount
-                    = static_cast<std::uint32_t>(recipe.panelColumns)
-                    * static_cast<std::uint32_t>(recipe.panelRows);
                 const std::uint32_t panelLinear = (y / cellHeight) * recipe.panelColumns
                     + (x / cellWidth);
-                const std::uint32_t lightPanel
-                    = static_cast<std::uint32_t>(recipe.seed % panelCount);
                 const float category = unitNoise(gdp::core::hashCombine(
                     recipe.seed ^ 0xCE111A6ULL, panelLinear));
                 const std::uint32_t centerX = cellWidth / 2U;
                 const std::uint32_t centerY = cellHeight / 2U;
-                if (panelLinear == lightPanel) {
-                    const bool fixture = panelX >= centerX - 8U && panelX <= centerX + 8U
-                        && panelY >= centerY - 2U && panelY <= centerY + 2U;
-                    if (fixture) {
-                        color = recipe.accentColor;
-                    } else if (panelY == centerY - 4U || panelY == centerY + 4U) {
-                        color = multiply(recipe.secondaryColor, 0.58F);
-                    }
-                } else if (category < 0.60F) {
+                if (category < 0.60F) {
                     if (panelY >= centerY - 3U && panelY <= centerY + 3U) {
                         color = panelY == centerY - 3U
                             ? gdp::core::Vec3{0.08F, 0.09F, 0.08F}
@@ -2839,13 +2762,6 @@ std::optional<gdp::render::ImageData> generateSecuritySurfaceAlbedo(
                     color = multiply(recipe.secondaryColor, 0.72F);
                 }
             } else {
-                const std::uint32_t centerX = cellWidth / 2U;
-                const std::uint32_t centerY = cellHeight / 2U;
-                const bool fixture = panelX >= centerX - 12U && panelX <= centerX + 12U
-                    && panelY >= centerY - 4U && panelY <= centerY + 4U;
-                if (fixture) {
-                    color = recipe.accentColor;
-                }
                 const std::uint32_t panelCount
                     = static_cast<std::uint32_t>(recipe.panelColumns)
                     * static_cast<std::uint32_t>(recipe.panelRows);
@@ -3072,22 +2988,6 @@ std::optional<gdp::render::ImageData> generateCentralHubSurfaceAlbedo(
                     || recipe.routeAxis == CentralHubRouteAxis::Cross;
                 if ((horizontalRoute && y >= 31U && y <= 32U)
                     || (verticalRoute && x >= 31U && x <= 32U)) {
-                    color = recipe.accentColor;
-                }
-            } else {
-                const bool horizontalLights
-                    = recipe.routeAxis == CentralHubRouteAxis::Horizontal;
-                const bool verticalLights = recipe.routeAxis == CentralHubRouteAxis::Vertical;
-                const bool fixture = horizontalLights
-                    ? (x >= 20U && x < 44U
-                        && ((y >= 15U && y < 18U) || (y >= 47U && y < 50U)))
-                    : (verticalLights
-                            ? (y >= 20U && y < 44U
-                                && ((x >= 15U && x < 18U)
-                                    || (x >= 47U && x < 50U)))
-                            : ((x >= 20U && x < 44U && y >= 31U && y < 34U)
-                                || (y >= 20U && y < 44U && x >= 31U && x < 34U)));
-                if (fixture) {
                     color = recipe.accentColor;
                 }
             }
