@@ -94,6 +94,177 @@ struct IndustrialWallSample {
     bool exposed{false};
 };
 
+struct IndustrialCeilingSample {
+    gdp::core::Vec3 albedo{};
+    float height{0.5F};
+    float roughness{0.44F};
+    float metalness{0.74F};
+    float ambientOcclusion{1.0F};
+};
+
+IndustrialCeilingSample industrialCeilingSample(
+    const IndustrialSurfaceRecipe& recipe,
+    const std::uint32_t x,
+    const std::uint32_t y,
+    const std::uint32_t cellWidth,
+    const std::uint32_t cellHeight) noexcept
+{
+    constexpr gdp::core::Vec3 recessedJoint{0.055F, 0.063F, 0.068F};
+    constexpr gdp::core::Vec3 exposedSteel{0.48F, 0.51F, 0.52F};
+    constexpr gdp::core::Vec3 grime{0.16F, 0.15F, 0.14F};
+
+    IndustrialCeilingSample sample;
+    const std::uint32_t panelX = x % cellWidth;
+    const std::uint32_t panelY = y % cellHeight;
+    const std::uint32_t edgeX = std::min(panelX, cellWidth - 1U - panelX);
+    const std::uint32_t edgeY = std::min(panelY, cellHeight - 1U - panelY);
+    const std::uint32_t edge = std::min(edgeX, edgeY);
+    const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+        | (x / cellWidth);
+    const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+    const std::uint32_t seamWidth = std::max(5U, recipe.resolution / 220U);
+    const std::uint32_t beamWidth = std::max(24U, recipe.resolution / 38U);
+    const std::uint32_t bevelWidth = beamWidth + std::max(12U, recipe.resolution / 80U);
+
+    const float panelVariation = 0.08F + unitNoise(
+        gdp::core::hashCombine(recipe.seed, panelId)) * 0.13F;
+    sample.albedo = mix(recipe.baseColor, recipe.secondaryColor, panelVariation);
+    const float macro = (smoothNoise(recipe.seed ^ 0x4345494CULL, x, y, 144U) - 0.5F)
+        * 0.042F;
+    const float brushed = (smoothNoise(recipe.seed ^ 0x42525553ULL, x, y, 9U) - 0.5F)
+        * 0.018F;
+    const float grain = (unitNoise(gdp::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
+        * 0.008F;
+    sample.albedo = add(sample.albedo, macro + brushed + grain);
+    sample.height = 0.50F + (brushed * 0.32F) + (grain * 0.10F);
+    sample.roughness = 0.44F + (brushed * 1.2F);
+
+    const bool seam = edge <= seamWidth;
+    const bool beam = !seam && edge <= beamWidth;
+    const bool bevel = !seam && !beam && edge <= bevelWidth;
+    if (seam) {
+        sample.albedo = recessedJoint;
+        sample.height = 0.18F;
+        sample.roughness = 0.76F;
+        sample.metalness = 0.34F;
+        sample.ambientOcclusion = 0.48F;
+    } else if (beam) {
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.54F);
+        sample.height = 0.66F;
+        sample.roughness = 0.31F;
+        sample.metalness = 0.88F;
+    } else if (bevel) {
+        const float amount = static_cast<float>(bevelWidth - edge)
+            / static_cast<float>(bevelWidth - beamWidth);
+        sample.albedo = mix(sample.albedo, exposedSteel, amount * 0.18F);
+        sample.height = 0.52F + amount * 0.10F;
+        sample.roughness = 0.36F;
+        sample.metalness = 0.84F;
+    }
+
+    const std::uint32_t hatchLeft = cellWidth * 29U / 100U;
+    const std::uint32_t hatchRight = cellWidth * 71U / 100U;
+    const std::uint32_t hatchBottom = cellHeight * 31U / 100U;
+    const std::uint32_t hatchTop = cellHeight * 69U / 100U;
+    const bool insideHatch = panelX >= hatchLeft && panelX <= hatchRight
+        && panelY >= hatchBottom && panelY <= hatchTop;
+    if (insideHatch) {
+        const std::uint32_t hatchEdge = std::min({
+            panelX - hatchLeft, hatchRight - panelX,
+            panelY - hatchBottom, hatchTop - panelY});
+        if (hatchEdge <= seamWidth) {
+            sample.albedo = recessedJoint;
+            sample.height = 0.30F;
+            sample.roughness = 0.70F;
+            sample.metalness = 0.42F;
+            sample.ambientOcclusion = 0.62F;
+        } else if (hatchEdge <= seamWidth + 8U) {
+            sample.albedo = mix(sample.albedo, exposedSteel, 0.22F);
+            sample.height = 0.58F;
+            sample.roughness = 0.34F;
+            sample.metalness = 0.90F;
+        } else {
+            sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.13F);
+            sample.height += 0.018F;
+            sample.metalness = 0.76F;
+        }
+    }
+
+    const std::uint32_t ventBand = std::max(10U, cellWidth / 28U);
+    const bool ventColumn = panelX > bevelWidth + 16U
+        && panelX < bevelWidth + 16U + ventBand * 3U
+        && panelY > cellHeight / 5U && panelY < cellHeight * 4U / 5U;
+    if (ventColumn) {
+        const bool slot = ((panelY + static_cast<std::uint32_t>(recipe.seed))
+            / std::max(8U, recipe.resolution / 96U)) % 3U == 0U;
+        if (slot) {
+            sample.albedo = recessedJoint;
+            sample.height = 0.24F;
+            sample.roughness = 0.68F;
+            sample.metalness = 0.46F;
+            sample.ambientOcclusion = 0.56F;
+        }
+    }
+
+    const std::uint32_t boltInset = beamWidth + 14U;
+    const std::array boltCenters{
+        std::pair{boltInset, boltInset},
+        std::pair{cellWidth - 1U - boltInset, boltInset},
+        std::pair{boltInset, cellHeight - 1U - boltInset},
+        std::pair{cellWidth - 1U - boltInset, cellHeight - 1U - boltInset},
+    };
+    const std::uint32_t boltRadius = std::max(5U, recipe.resolution / 180U);
+    for (const auto& [boltX, boltY] : boltCenters) {
+        const int deltaX = static_cast<int>(panelX) - static_cast<int>(boltX);
+        const int deltaY = static_cast<int>(panelY) - static_cast<int>(boltY);
+        const std::uint32_t distanceSquared = static_cast<std::uint32_t>(
+            (deltaX * deltaX) + (deltaY * deltaY));
+        if (distanceSquared <= boltRadius * boltRadius) {
+            const bool core = distanceSquared <= (boltRadius / 2U) * (boltRadius / 2U);
+            sample.albedo = core ? recessedJoint : exposedSteel;
+            sample.height = core ? 0.43F : 0.68F;
+            sample.roughness = core ? 0.39F : 0.23F;
+            sample.metalness = core ? 0.82F : 0.96F;
+            sample.ambientOcclusion = core ? 0.72F : 0.95F;
+        }
+    }
+
+    const float dirtNoise = smoothNoise(recipe.seed ^ 0x43444952ULL, x, y, 38U);
+    const float dirtAffinity = seam ? 0.55F : (insideHatch ? 0.11F : 0.045F);
+    if (dirtNoise < recipe.dirtAmount * dirtAffinity) {
+        sample.albedo = mix(sample.albedo, grime, seam ? 0.46F : 0.27F);
+        sample.roughness = std::max(sample.roughness, 0.78F);
+        sample.metalness = std::max(0.52F, sample.metalness * 0.82F);
+        sample.ambientOcclusion *= 0.78F;
+    }
+
+    const bool wearZone = beam || bevel || (insideHatch && !seam);
+    const float chipNoise = smoothNoise(recipe.seed ^ 0x43484950ULL, x, y, 11U);
+    if (wearZone && chipNoise < recipe.wearAmount * (bevel ? 0.31F : 0.13F)) {
+        sample.albedo = exposedSteel;
+        sample.height -= 0.022F;
+        sample.roughness = 0.25F;
+        sample.metalness = 0.96F;
+    }
+
+    const float scratchNoise = unitNoise(gdp::core::hashCombine(
+        recipe.seed ^ 0x43534352ULL, pixelId));
+    const bool hairlineScratch = !seam
+        && ((x + y * 2U) % 241U == 0U || x % 173U == 0U)
+        && scratchNoise < recipe.wearAmount * 0.42F;
+    if (hairlineScratch) {
+        sample.albedo = mix(sample.albedo, exposedSteel, 0.46F);
+        sample.height -= 0.012F;
+        sample.roughness = 0.29F;
+        sample.metalness = 0.94F;
+    }
+
+    sample.roughness = std::clamp(sample.roughness, 0.08F, 1.0F);
+    sample.metalness = std::clamp(sample.metalness, 0.0F, 1.0F);
+    sample.ambientOcclusion = std::clamp(sample.ambientOcclusion, 0.0F, 1.0F);
+    return sample;
+}
+
 IndustrialWallSample industrialWallSample(
     const IndustrialSurfaceRecipe& recipe,
     const std::uint32_t x,
@@ -397,10 +568,12 @@ IndustrialSurfaceRecipe makeSurfaceRecipe(
         recipe.safetyStripe = false;
         break;
     case IndustrialSurface::Ceiling:
-        recipe.family = MaterialFamily::Aluminum;
-        recipe.baseColor = multiply({0.17F, 0.18F, 0.19F}, tone);
-        recipe.secondaryColor = multiply({0.11F, 0.12F, 0.13F}, tone);
-        recipe.accentColor = {0.88F, 0.87F, 0.80F};
+        recipe.version = 2;
+        recipe.resolution = 1024;
+        recipe.family = MaterialFamily::BareSteel;
+        recipe.baseColor = multiply({0.38F, 0.40F, 0.42F}, tone);
+        recipe.secondaryColor = multiply({0.20F, 0.22F, 0.23F}, tone);
+        recipe.accentColor = {0.83F, 0.60F, 0.0F};
         recipe.panelColumns = 2;
         recipe.panelRows = static_cast<std::uint8_t>(random.rangeInt(2, 4));
         recipe.emissiveAmount = random.rangeFloat(0.38F, 0.62F);
@@ -1169,6 +1342,43 @@ IndustrialSurfaceRecipe makeIndustrialWallArchetypeRecipe(
     return recipe;
 }
 
+IndustrialSurfaceRecipe makeIndustrialCeilingArchetypeRecipe(
+    const IndustrialCondition condition)
+{
+    IndustrialSurfaceRecipe recipe;
+    recipe.version = 2;
+    recipe.seed = 0x48445F4345494C00ULL + static_cast<std::uint64_t>(condition);
+    recipe.surface = IndustrialSurface::Ceiling;
+    recipe.family = MaterialFamily::BareSteel;
+    recipe.baseColor = {0.38F, 0.40F, 0.42F};
+    recipe.secondaryColor = {0.20F, 0.22F, 0.23F};
+    recipe.accentColor = {0.83F, 0.60F, 0.0F};
+    recipe.panelColumns = 2U;
+    recipe.panelRows = 2U;
+    recipe.emissiveAmount = 0.50F;
+    recipe.safetyStripe = false;
+    recipe.resolution = 1024U;
+    switch (condition) {
+    case IndustrialCondition::Maintained:
+        recipe.wearAmount = 0.09F;
+        recipe.dirtAmount = 0.07F;
+        break;
+    case IndustrialCondition::Used:
+        recipe.wearAmount = 0.29F;
+        recipe.dirtAmount = 0.24F;
+        break;
+    case IndustrialCondition::Worn:
+        recipe.wearAmount = 0.56F;
+        recipe.dirtAmount = 0.48F;
+        break;
+    case IndustrialCondition::Count:
+        recipe.wearAmount = 0.29F;
+        recipe.dirtAmount = 0.24F;
+        break;
+    }
+    return recipe;
+}
+
 IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     const IndustrialSurfaceRecipe& recipe)
 {
@@ -1195,11 +1405,13 @@ IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     }
     const bool powerOfTwo = recipe.resolution != 0U
         && (recipe.resolution & (recipe.resolution - 1U)) == 0U;
-    const bool hdWall = recipe.surface == IndustrialSurface::Wall
+    const bool hdDetailedSurface
+        = (recipe.surface == IndustrialSurface::Wall
+              || recipe.surface == IndustrialSurface::Ceiling)
         && recipe.version == 2U && recipe.resolution == 1024U;
-    const bool legacySurface = recipe.surface != IndustrialSurface::Wall
+    const bool legacyFloor = recipe.surface == IndustrialSurface::Floor
         && recipe.resolution >= 32U && recipe.resolution <= 256U;
-    if (!powerOfTwo || (!hdWall && !legacySurface)) {
+    if (!powerOfTwo || (!hdDetailedSurface && !legacyFloor)) {
         result.errors.push_back(IndustrialMaterialValidationError::InvalidResolution);
     }
     if (recipe.surface < IndustrialSurface::Count) {
@@ -1296,6 +1508,12 @@ std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
                         recipe, x, y, cellWidth, cellHeight, stripeHeight).albedo);
                 continue;
             }
+            if (recipe.surface == IndustrialSurface::Ceiling) {
+                writePixel(image, x, y,
+                    industrialCeilingSample(
+                        recipe, x, y, cellWidth, cellHeight).albedo);
+                continue;
+            }
             const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
@@ -1388,6 +1606,62 @@ std::optional<IndustrialWallMaterialImages> generateIndustrialWallMaterialImages
             const gdp::core::Vec3 normal = gdp::core::normalized({
                 (heightAt(left, y) - heightAt(right, y)) * 2.8F,
                 (heightAt(x, down) - heightAt(x, up)) * 2.8F,
+                1.0F,
+            });
+            writePixel(images.normal, x, y, {
+                normal.x * 0.5F + 0.5F,
+                normal.y * 0.5F + 0.5F,
+                normal.z * 0.5F + 0.5F,
+            });
+        }
+    }
+    return images;
+}
+
+std::optional<IndustrialCeilingMaterialImages> generateIndustrialCeilingMaterialImages(
+    const IndustrialSurfaceRecipe& recipe)
+{
+    if (!validateIndustrialSurfaceRecipe(recipe).isValid()
+        || recipe.surface != IndustrialSurface::Ceiling) {
+        return std::nullopt;
+    }
+
+    IndustrialCeilingMaterialImages images;
+    for (gdp::render::ImageData* const image
+        : {&images.albedo, &images.normal, &images.properties}) {
+        image->width = static_cast<int>(recipe.resolution);
+        image->height = static_cast<int>(recipe.resolution);
+        image->rgba.resize(static_cast<std::size_t>(recipe.resolution)
+            * static_cast<std::size_t>(recipe.resolution) * 4U);
+    }
+    const std::uint32_t cellWidth = recipe.resolution / recipe.panelColumns;
+    const std::uint32_t cellHeight = recipe.resolution / recipe.panelRows;
+    std::vector<float> heightMap(static_cast<std::size_t>(recipe.resolution)
+        * static_cast<std::size_t>(recipe.resolution));
+
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const IndustrialCeilingSample sample = industrialCeilingSample(
+                recipe, x, y, cellWidth, cellHeight);
+            writePixel(images.albedo, x, y, sample.albedo);
+            writePixel(images.properties, x, y,
+                {sample.roughness, sample.metalness, sample.ambientOcclusion});
+            heightMap[static_cast<std::size_t>(y) * recipe.resolution + x]
+                = sample.height;
+        }
+    }
+    const auto heightAt = [&](const std::uint32_t sampleX, const std::uint32_t sampleY) {
+        return heightMap[static_cast<std::size_t>(sampleY) * recipe.resolution + sampleX];
+    };
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const std::uint32_t left = x == 0U ? x : x - 1U;
+            const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
+            const std::uint32_t down = y == 0U ? y : y - 1U;
+            const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
+            const gdp::core::Vec3 normal = gdp::core::normalized({
+                (heightAt(left, y) - heightAt(right, y)) * 3.2F,
+                (heightAt(x, down) - heightAt(x, up)) * 3.2F,
                 1.0F,
             });
             writePixel(images.normal, x, y, {

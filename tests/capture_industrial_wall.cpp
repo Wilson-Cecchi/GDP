@@ -107,6 +107,8 @@ int main(const int argc, char* argv[])
                 {0.15F, 1.55F, 1.80F}, {0.94F, -0.08F, -0.33F}, 58.0F};
             constexpr gdp::render::CameraData ceilingCamera{
                 {0.0F, 1.50F, 2.50F}, {0.0F, 0.62F, -0.78F}, 68.0F};
+            constexpr gdp::render::CameraData ceilingCloseCamera{
+                {0.35F, 1.68F, -2.2F}, {-0.10F, 0.90F, -0.42F}, 60.0F};
             gdp::render::RoomLightingRenderData lighting;
             lighting.ambientColor = {0.78F, 0.82F, 0.86F};
             lighting.ambientIntensity = 0.22F;
@@ -140,6 +142,7 @@ int main(const int argc, char* argv[])
                     continue;
                 }
                 const auto captureView = [&](const gdp::render::CameraData view,
+                                              const char* const unit,
                                               const char* const suffix,
                                               const gdp::render::RoomLightingRenderData&
                                                   captureLighting) {
@@ -152,7 +155,7 @@ int main(const int argc, char* argv[])
                     glReadPixels(
                         0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
                     const std::filesystem::path path = outputDirectory
-                        / (std::string{"industrial_corridor_wall_v2_hd_"}
+                        / (std::string{unit} + '_'
                             + capture.label + '_' + suffix + ".ppm");
                     if (!savePpm(path, width, height, pixels)) {
                         std::cerr << "Could not save " << path << '\n';
@@ -161,19 +164,30 @@ int main(const int argc, char* argv[])
                         std::cout << path.string() << '\n';
                     }
                 };
-                captureView(gameplayCamera, "gameplay", lighting);
-                captureView(closeCamera, "close", lighting);
+                captureView(gameplayCamera, "industrial_corridor_wall_v2_hd",
+                    "gameplay", lighting);
+                captureView(closeCamera, "industrial_corridor_wall_v2_hd",
+                    "close", lighting);
+                gdp::render::RoomLightingRenderData ceilingLighting = lighting;
+                ceilingLighting.fixtureEmissive = 0.22F;
+                captureView(ceilingCamera, "industrial_corridor_ceiling_v1_hd",
+                    "gameplay", ceilingLighting);
+                captureView(ceilingCloseCamera, "industrial_corridor_ceiling_v1_hd",
+                    "close", ceilingLighting);
                 if (capture.seed == 2U) {
-                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_on", lighting);
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd",
+                        "on", lighting);
                     gdp::render::RoomLightingRenderData offLighting = lighting;
                     offLighting.fixtureEmissive = 0.0F;
                     for (std::size_t index = 0; index < offLighting.lightCount; ++index) {
                         offLighting.lights[index].intensity = 0.0F;
                     }
-                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_off", offLighting);
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd",
+                        "off", offLighting);
                     gdp::render::RoomLightingRenderData alertLighting = lighting;
                     alertLighting.alert = true;
-                    captureView(ceilingCamera, "ceiling_fixture_v1_hd_alert", alertLighting);
+                    captureView(ceilingCamera, "ceiling_fixture_v1_hd",
+                        "alert", alertLighting);
                 }
             }
         }

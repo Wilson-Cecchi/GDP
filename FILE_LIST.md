@@ -150,6 +150,8 @@
 - `visual/proposals/industrial_corridor_wall_proposal_v2_hd.png`
 - `visual/proposals/ceiling_fixture_proposal_v1_hd.md`
 - `visual/proposals/ceiling_fixture_proposal_v1_hd.png`
+- `visual/proposals/industrial_corridor_ceiling_proposal_v1_hd.md`
+- `visual/proposals/industrial_corridor_ceiling_proposal_v1_hd.png`
 - `visual/reference_sheet_rooms_enemies.png`
 - `visual/validation/industrial_corridor_wall_v1_maintained_seed2.png`
 - `visual/validation/ceiling_fixture_separation_technical_baseline.png`
@@ -164,3 +166,10 @@
 - `visual/validation/industrial_corridor_wall_v2_hd_used_seed3_gameplay.png`
 - `visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_close.png`
 - `visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_gameplay.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_maintained_seed2_close.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_maintained_seed2_gameplay.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_used_seed3_close.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_used_seed3_gameplay.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_worn_seed1_close.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_worn_seed1_gameplay.png`
+- `visual/validation/industrial_corridor_ceiling_v1_hd_comparison.png`

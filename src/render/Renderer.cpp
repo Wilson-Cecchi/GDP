@@ -390,18 +390,49 @@ bool Renderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         sharedWall.emplace(std::move(wallMaterial));
     }
 
+    auto& sharedCeiling = industrialCeilingMaterials_[conditionIndex];
+    if (!sharedCeiling) {
+        const gdp::procedural::IndustrialSurfaceRecipe archetype
+            = gdp::procedural::makeIndustrialCeilingArchetypeRecipe(materials.condition);
+        const auto images = gdp::procedural::generateIndustrialCeilingMaterialImages(
+            archetype);
+        if (!images) {
+            return false;
+        }
+        IndustrialWallGpuMaterial ceilingMaterial;
+        if (!ceilingMaterial.albedo.upload(
+                gl_, images->albedo, TextureSampling::Trilinear)
+            || !ceilingMaterial.normal.upload(
+                gl_, images->normal, TextureSampling::Trilinear)
+            || !ceilingMaterial.properties.upload(
+                gl_, images->properties, TextureSampling::Trilinear)) {
+            return false;
+        }
+        sharedCeiling.emplace(std::move(ceilingMaterial));
+    }
+
     RoomGpuMaterials gpuMaterials;
     gpuMaterials.industrialWallCondition = materials.condition;
+    gpuMaterials.industrialCeilingCondition = materials.condition;
     gpuMaterials.wallUvOffset = {
         static_cast<float>((roomSeed >> 8U) & 1U) * 0.5F,
         0.0F,
     };
+    gpuMaterials.ceilingUvOffset = {
+        static_cast<float>((roomSeed >> 10U) & 1U) * 0.5F,
+        static_cast<float>((roomSeed >> 11U) & 1U) * 0.5F,
+    };
     const auto& wallRecipe = materials.surfaces[static_cast<std::size_t>(
         gdp::procedural::IndustrialSurface::Wall)];
     gpuMaterials.wallTone = std::clamp(wallRecipe.baseColor.x / 0.33F, 0.94F, 1.06F);
+    const auto& ceilingRecipe = materials.surfaces[static_cast<std::size_t>(
+        gdp::procedural::IndustrialSurface::Ceiling)];
+    gpuMaterials.ceilingTone = std::clamp(
+        ceilingRecipe.baseColor.x / 0.38F, 0.94F, 1.06F);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const gdp::procedural::IndustrialSurfaceRecipe& recipe = materials.surfaces[index];
-        if (recipe.surface == gdp::procedural::IndustrialSurface::Wall) {
+        if (recipe.surface == gdp::procedural::IndustrialSurface::Wall
+            || recipe.surface == gdp::procedural::IndustrialSurface::Ceiling) {
             continue;
         }
         const auto textureData = textureCache_.acquire(
@@ -948,6 +979,7 @@ bool Renderer::render(
         float emissiveStrength = 0.0F;
         bool detailedMaterial = false;
         gdp::core::Vec3 resolvedTint = tint;
+        gdp::core::Vec2 materialUvOffset{};
         switch (material) {
         case RoomMaterialChannel::Wall:
             if (roomMaterials.industrialWallCondition) {
@@ -960,6 +992,7 @@ bool Renderer::render(
                     wallMaterial->properties.bind(gl_, 2U);
                     detailedMaterial = true;
                     resolvedTint = tint * roomMaterials.wallTone;
+                    materialUvOffset = roomMaterials.wallUvOffset;
                 }
             }
             if (!detailedMaterial) {
@@ -972,8 +1005,23 @@ bool Renderer::render(
                 gdp::procedural::IndustrialSurface::Floor)].bind(gl_);
             break;
         case RoomMaterialChannel::Ceiling:
-            roomMaterials.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
+            if (roomMaterials.industrialCeilingCondition) {
+                const std::size_t conditionIndex = static_cast<std::size_t>(
+                    *roomMaterials.industrialCeilingCondition);
+                const auto& ceilingMaterial = industrialCeilingMaterials_[conditionIndex];
+                if (ceilingMaterial) {
+                    ceilingMaterial->albedo.bind(gl_, 0U);
+                    ceilingMaterial->normal.bind(gl_, 1U);
+                    ceilingMaterial->properties.bind(gl_, 2U);
+                    detailedMaterial = true;
+                    resolvedTint = tint * roomMaterials.ceilingTone;
+                    materialUvOffset = roomMaterials.ceilingUvOffset;
+                }
+            }
+            if (!detailedMaterial) {
+                roomMaterials.textures[static_cast<std::size_t>(
+                    gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
+            }
             break;
         case RoomMaterialChannel::Generic:
             fallbackTexture_.bind(gl_);
@@ -989,7 +1037,7 @@ bool Renderer::render(
             customUv ? detailedUvScale : gdp::core::Vec2{uvScale, uvScale});
         shader_.setVec2(gl_, "uUvOffset",
             customUv
-                ? detailedUvOffset + roomMaterials.wallUvOffset
+                ? detailedUvOffset + materialUvOffset
                 : gdp::core::Vec2{});
         shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
         box_.draw(gl_);
@@ -1017,7 +1065,9 @@ bool Renderer::render(
                 + gdp::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
             {roomWidth + shellThickness, shellThickness,
                 roomDepth + shellThickness},
-            RoomMaterialChannel::Ceiling, 4.0F);
+            RoomMaterialChannel::Ceiling, 1.0F, {1.0F, 1.0F, 1.0F},
+            {roomWidth / 4.0F, roomDepth / 4.0F},
+            {bounds.minimum.x / 4.0F, bounds.minimum.z / 4.0F});
 
         const auto drawWall = [&](const gdp::core::Vec3 normal) {
             const bool facesX = std::abs(normal.x) > 0.5F;
@@ -1112,7 +1162,10 @@ bool Renderer::render(
             drawSurface(roomMaterials,
                 corner + gdp::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
-                cornerScale, RoomMaterialChannel::Ceiling, 2.0F);
+                cornerScale, RoomMaterialChannel::Ceiling, 1.0F,
+                {1.0F, 1.0F, 1.0F},
+                {corridor.width / 4.0F, corridor.width / 4.0F},
+                {corner.x / 4.0F, corner.z / 4.0F});
         }
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
             const gdp::core::Vec3 first = corridor.points[index];
@@ -1132,7 +1185,11 @@ bool Renderer::render(
                 floorScale, RoomMaterialChannel::Floor, 2.0F);
             drawSurface(roomMaterials, center + gdp::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
-                floorScale, RoomMaterialChannel::Ceiling, 2.0F);
+                floorScale, RoomMaterialChannel::Ceiling, 1.0F,
+                {1.0F, 1.0F, 1.0F},
+                {floorScale.x / 4.0F, floorScale.z / 4.0F},
+                {(alongX ? std::min(first.x, second.x) : center.x) / 4.0F,
+                    (alongX ? center.z : std::min(first.z, second.z)) / 4.0F});
             const gdp::core::Vec3 direction = gdp::core::normalized(second - first);
             const gdp::core::Vec3 left{-direction.z, 0.0F, direction.x};
             for (const float sideSign : {-1.0F, 1.0F}) {

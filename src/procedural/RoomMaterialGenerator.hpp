@@ -53,6 +53,8 @@ struct IndustrialWallMaterialImages {
     gdp::render::ImageData properties;
 };
 
+using IndustrialCeilingMaterialImages = IndustrialWallMaterialImages;
+
 enum class StorageCondition : std::uint8_t {
     Orderly,
     Dusty,
@@ -502,6 +504,10 @@ struct CentralHubMaterialValidationResult {
     IndustrialCondition condition);
 [[nodiscard]] std::optional<IndustrialWallMaterialImages>
 generateIndustrialWallMaterialImages(const IndustrialSurfaceRecipe& recipe);
+[[nodiscard]] IndustrialSurfaceRecipe makeIndustrialCeilingArchetypeRecipe(
+    IndustrialCondition condition);
+[[nodiscard]] std::optional<IndustrialCeilingMaterialImages>
+generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
 
 [[nodiscard]] StorageRoomMaterialSet generateStorageRoomMaterials(
     gdp::core::Seed roomSeed);

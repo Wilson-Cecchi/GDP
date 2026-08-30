@@ -176,7 +176,7 @@ void testRepresentativeMaterialSet()
         "same room seed reproduces the complete material set exactly");
     expect(first.materialHash != different.materialHash,
         "different room seed changes the room material hash");
-    expect(first.materialHash == 0x18131E4CBD3FEC4FULL,
+    expect(first.materialHash == 0x2939126C921FC2C5ULL,
         "golden Industrial Corridor material hash remains stable across builds");
 
     const auto& wall = first.surfaces[static_cast<std::size_t>(IndustrialSurface::Wall)];
@@ -315,6 +315,87 @@ void testIndustrialHdMaterialMaps()
         "HD material maps increase exposed metal strictly across approved conditions");
 }
 
+void testApprovedIndustrialCeilingDirection()
+{
+    using namespace gdp::procedural;
+
+    constexpr std::array conditions{
+        IndustrialCondition::Maintained,
+        IndustrialCondition::Used,
+        IndustrialCondition::Worn,
+    };
+    constexpr std::array<gdp::core::Seed, 3> approvedSeeds{2U, 3U, 1U};
+    std::array<std::uint64_t, conditions.size()> albedoHashes{};
+    for (std::size_t index = 0; index < conditions.size(); ++index) {
+        const IndustrialSurfaceRecipe recipe = makeIndustrialCeilingArchetypeRecipe(
+            conditions[index]);
+        const auto images = generateIndustrialCeilingMaterialImages(recipe);
+        expect(recipe.version == 2U && recipe.resolution == 1024U
+                && recipe.surface == IndustrialSurface::Ceiling
+                && recipe.family == MaterialFamily::BareSteel,
+            "approved Industrial ceiling uses the versioned 1024 metallic-steel contract");
+        expect(images && gdp::render::validateImageData(images->albedo)
+                && gdp::render::validateImageData(images->normal)
+                && gdp::render::validateImageData(images->properties),
+            "HD ceiling produces renderer-valid Albedo, Normal and RMA maps");
+        if (!images) {
+            continue;
+        }
+
+        albedoHashes[index] = imageHash(images->albedo);
+        std::size_t perturbedNormals = 0U;
+        std::size_t clearlyMetallicPixels = 0U;
+        std::size_t nonMetallicPixels = 0U;
+        std::uint64_t metalnessSum = 0U;
+        std::uint8_t minimumRoughness = 255U;
+        std::uint8_t maximumRoughness = 0U;
+        std::uint8_t maximumMetalness = 0U;
+        const std::size_t pixelCount = images->properties.rgba.size() / 4U;
+        for (std::size_t pixel = 0; pixel < images->properties.rgba.size(); pixel += 4U) {
+            const int normalX = static_cast<int>(images->normal.rgba[pixel]) - 128;
+            const int normalY = static_cast<int>(images->normal.rgba[pixel + 1U]) - 128;
+            if (std::abs(normalX) + std::abs(normalY) >= 3) {
+                ++perturbedNormals;
+            }
+            const std::uint8_t roughness = images->properties.rgba[pixel];
+            const std::uint8_t metalness = images->properties.rgba[pixel + 1U];
+            minimumRoughness = std::min(minimumRoughness, roughness);
+            maximumRoughness = std::max(maximumRoughness, roughness);
+            maximumMetalness = std::max(maximumMetalness, metalness);
+            metalnessSum += metalness;
+            if (metalness >= 170U) {
+                ++clearlyMetallicPixels;
+            }
+            if (metalness < 128U) {
+                ++nonMetallicPixels;
+            }
+        }
+        const float averageMetalness = static_cast<float>(metalnessSum)
+            / static_cast<float>(pixelCount * 255U);
+        expect(averageMetalness >= 0.68F
+                && clearlyMetallicPixels * 4U >= pixelCount * 3U
+                && nonMetallicPixels * 8U < pixelCount,
+            "ceiling remains predominantly and measurably metallic instead of plastic");
+        expect(maximumMetalness >= 240U,
+            "exposed ceiling edges and fasteners reach bare-metal response");
+        expect(maximumRoughness >= minimumRoughness + 90U,
+            "ceiling RMA separates brushed steel, recessed joints and grime");
+        expect(perturbedNormals >= 12'000U,
+            "ceiling normal map carries beams, hatches, vents and fastener relief");
+        expect(exactColorCount(images->albedo, recipe.accentColor) == 0U,
+            "ceiling albedo contains no fixture-like or emissive accent pixels");
+
+        const IndustrialRoomMaterialSet approved
+            = generateIndustrialRoomMaterials(approvedSeeds[index]);
+        expect(approved.condition == conditions[index],
+            "approved ceiling seeds preserve Maintained, Used and Worn ordering");
+    }
+    expect(albedoHashes[0] != albedoHashes[1]
+            && albedoHashes[1] != albedoHashes[2]
+            && albedoHashes[0] != albedoHashes[2],
+        "three approved ceiling conditions remain visually distinct");
+}
+
 void testApprovedIndustrialWallDirection()
 {
     using namespace gdp::procedural;
@@ -434,7 +515,7 @@ void testRoomMaterialSeedBatch()
             break;
         }
         for (const IndustrialSurfaceRecipe& recipe : materials.surfaces) {
-            if (recipe.surface == IndustrialSurface::Wall) {
+            if (recipe.surface != IndustrialSurface::Floor) {
                 continue;
             }
             const auto image = generateIndustrialSurfaceAlbedo(recipe);
@@ -448,7 +529,7 @@ void testRoomMaterialSeedBatch()
         hashes.insert(materials.materialHash);
     }
     expect(allValid,
-        "1,000 room seeds validate every recipe and preserve legacy floor/ceiling albedos");
+        "1,000 room seeds validate every recipe while sampling only the legacy floor albedo");
     expect(hashes.size() == 1'000U,
         "1,000 room seeds produce unique canonical material hashes");
     expect(std::all_of(conditions.begin(), conditions.end(), [](const bool used) { return used; }),
@@ -1779,6 +1860,7 @@ int main()
     testRepresentativeMaterialSet();
     testStructuredSurfaceAlbedos();
     testIndustrialHdMaterialMaps();
+    testApprovedIndustrialCeilingDirection();
     testApprovedIndustrialWallDirection();
     testValidationFailures();
     testRoomMaterialSeedBatch();

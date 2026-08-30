@@ -79,6 +79,35 @@ resultado final:
 
 ## Propostas ativas
 
+### Industrial Corridor/Ceiling — v1 HD
+
+```text
+unidade visual: Industrial Corridor/Ceiling
+versão da proposta: v1 HD
+arquivo/prancha: visual/proposals/industrial_corridor_ceiling_proposal_v1_hd.png
+seeds mostradas: 2 Maintained; 3 Used; 1 Worn
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO, com aparência metálica
+                    obrigatória ("aprovado com a observação de textura que tem
+                    que estar metalica")
+data: 2026-08-30
+commit de implementação: `feat: implement metallic HD Industrial ceiling`
+capturas no jogo: visual/validation/industrial_corridor_ceiling_v1_hd_maintained_seed2_gameplay.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_maintained_seed2_close.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_used_seed3_gameplay.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_used_seed3_close.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_worn_seed1_gameplay.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_worn_seed1_close.png;
+                  visual/validation/industrial_corridor_ceiling_v1_hd_comparison.png
+resultado final: ACEITA NO JOGO ("pode fazer o commit que eu faço o push")
+```
+
+A implementação usa material `1024×1024`, Albedo/Normal/RMA, UV por dimensão
+física e três níveis de desgaste. As chapas, vigas, bordas e fixadores têm
+metalness explícito e testado. O albedo é deliberadamente neutro e não contém
+lâmpada, brilho ou emissão; `Lighting/CeilingFixture` continua sendo geometria
+independente. Contrato e prompt estão em
+[`proposals/industrial_corridor_ceiling_proposal_v1_hd.md`](proposals/industrial_corridor_ceiling_proposal_v1_hd.md).
+
 ### Lighting/CeilingFixture — v1 HD
 
 ```text
@@ -156,7 +185,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 
 | Ambiente | Wall | Floor | Ceiling |
 |---|---|---|---|
-| Industrial Corridor | V2 HD aceita no jogo | Não revisada | Não revisada |
+| Industrial Corridor | V2 HD aceita no jogo | Não revisada | V1 HD aceita no jogo |
 | Storage | Não revisada | Não revisada | Não revisada |
 | Combat Room | Não revisada | Não revisada | Não revisada |
 | Cafeteria | Não revisada | Não revisada | Não revisada |

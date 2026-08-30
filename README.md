@@ -97,8 +97,11 @@ especializados das pastas numeradas.
   não desenham mais lâmpadas e não recebem emissão. A proposta
   `Lighting/CeilingFixture v1 HD` foi aprovada e implementada com carcaça, aro,
   junta, lente e fixadores, além de Albedo/Normal/RMA/Emission `1024×1024`.
-- **Próxima atualização:** preparar `Industrial Corridor/Ceiling v1 HD` como
-  superfície arquitetônica neutra, sem luminárias ou emissão pintadas.
+- **Fase 24 — Teto HD do corredor:** concluída e aceita no jogo; a
+  superfície usa Albedo/Normal/RMA `1024×1024`, UV físico e metalness
+  predominante, com vigas, hatches, ventilação e três níveis de desgaste. Não
+  existem luminárias ou emissão pintadas. As capturas Maintained, Used e Worn
+  foram aprovadas antes do commit da fase.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

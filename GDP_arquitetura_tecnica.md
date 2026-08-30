@@ -3696,8 +3696,18 @@ usa vermelho controlado no mesmo material.
 
 As capturas `ON`, `OFF` e `ALERT` foram aceitas no jogo em 2026-08-30.
 
-**Próximo marco:** proposta `Industrial Corridor/Ceiling v1 HD`, mantendo o
-teto arquitetônico neutro e a luminária como asset independente já aprovado.
+## Fase 24 — Teto HD do corredor industrial
+
+A proposta `Industrial Corridor/Ceiling v1 HD` foi aprovada com a condição de
+que a textura permaneça claramente metálica. A implementação usa três
+arquétipos HD compartilhados por condição, material `1024×1024`, UV por
+dimensão física, filtragem trilinear e mapas Albedo/Normal/RMA. Metalness é
+predominante nas chapas e aumenta em vigas, bordas expostas e fixadores; testes
+quantitativos impedem regressão para aparência plástica.
+
+Não existe canal de emissão nem representação de lâmpada no albedo; a
+luminária permanece como asset físico independente já aprovado. As seis
+capturas de gameplay/aproximação foram aceitas no jogo em 2026-08-30.
 
 ---
 

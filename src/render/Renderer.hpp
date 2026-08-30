@@ -280,8 +280,11 @@ private:
         std::array<Texture,
             static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
         std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
+        std::optional<gdp::procedural::IndustrialCondition> industrialCeilingCondition;
         gdp::core::Vec2 wallUvOffset{};
+        gdp::core::Vec2 ceilingUvOffset{};
         float wallTone{1.0F};
+        float ceilingTone{1.0F};
     };
 
     GlApi gl_{};
@@ -301,6 +304,9 @@ private:
     std::array<std::optional<IndustrialWallGpuMaterial>,
         static_cast<std::size_t>(gdp::procedural::IndustrialCondition::Count)>
         industrialWallMaterials_{};
+    std::array<std::optional<IndustrialWallGpuMaterial>,
+        static_cast<std::size_t>(gdp::procedural::IndustrialCondition::Count)>
+        industrialCeilingMaterials_{};
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};
