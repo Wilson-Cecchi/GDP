@@ -109,6 +109,9 @@ especializados das pastas numeradas.
 - **Fase 26 — Contrato inicial de dependências:** o CMake agora declara
   explicitamente `gameplay -> world`, e uma regressão arquitetural impede que a
   aplicação retorne a `core` ou que `core` inclua módulos superiores do GDP.
+- **Fase 27 — Input de plataforma:** o processamento de eventos SDL saiu de
+  `core` e passou ao target `gdp_platform`, com teste próprio. `gdp_core` não
+  publica mais SDL, e consumidores gráficos declaram essa dependência diretamente.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

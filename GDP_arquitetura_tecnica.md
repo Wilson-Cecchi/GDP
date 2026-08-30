@@ -647,6 +647,10 @@ As dependências entre targets devem ser declaradas no CMake. O diretório `core
 só pode incluir seus próprios contratos; uma regressão automatizada protege essa
 fronteira enquanto os demais subsistemas são separados incrementalmente.
 
+`platform/Input` concentra o snapshot de teclado/mouse e a tradução de eventos
+SDL. Assim, `core` permanece independente do backend de plataforma; ocultar os
+tipos SDL da interface pública de input continua como uma extração posterior.
+
 ---
 
 # 8. Sistema de seed

@@ -28,10 +28,10 @@
 
 namespace gdp::game {
 
-using gdp::core::Input;
 using gdp::core::LogLevel;
 using gdp::core::Vec2;
 using gdp::core::log;
+using gdp::platform::Input;
 namespace {
 
 std::string sdlError(const std::string_view operation)

@@ -1,10 +1,10 @@
-#include "core/Input.hpp"
+#include "platform/Input.hpp"
 
 #include <SDL3/SDL_events.h>
 
 #include <cstddef>
 
-namespace gdp::core {
+namespace gdp::platform {
 
 void Input::beginFrame() noexcept
 {
@@ -34,7 +34,8 @@ void Input::handleEvent(const SDL_Event& event) noexcept
     }
 
     if (event.type == SDL_EVENT_MOUSE_MOTION) {
-        mouseDelta_ = mouseDelta_ + Vec2{event.motion.xrel, event.motion.yrel};
+        mouseDelta_ = mouseDelta_
+            + gdp::core::Vec2{event.motion.xrel, event.motion.yrel};
         mousePosition_ = {event.motion.x, event.motion.y};
         return;
     }
@@ -101,12 +102,12 @@ bool Input::wasMouseButtonReleased(const unsigned int button) const noexcept
         && mouseButtonsReleased_[static_cast<std::size_t>(button)];
 }
 
-Vec2 Input::mouseDelta() const noexcept
+gdp::core::Vec2 Input::mouseDelta() const noexcept
 {
     return mouseDelta_;
 }
 
-Vec2 Input::mousePosition() const noexcept
+gdp::core::Vec2 Input::mousePosition() const noexcept
 {
     return mousePosition_;
 }
@@ -121,4 +122,4 @@ bool Input::isValidMouseButton(const unsigned int button) noexcept
     return button > 0U && button < mouseButtonCount;
 }
 
-} // namespace gdp::core
+} // namespace gdp::platform

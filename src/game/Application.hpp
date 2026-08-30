@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/Input.hpp"
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
@@ -13,6 +12,7 @@
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/Progression.hpp"
+#include "platform/Input.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldGenerator.hpp"
 
@@ -65,7 +65,7 @@ private:
     void setPaused(bool paused);
 
     ApplicationConfig config_;
-    gdp::core::Input input_;
+    gdp::platform::Input input_;
     gdp::core::FixedStepClock clock_;
     gameplay::CollisionWorld baseCollisionWorld_;
     gameplay::CollisionWorld collisionWorld_;

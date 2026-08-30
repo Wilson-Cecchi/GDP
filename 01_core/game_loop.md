@@ -46,10 +46,11 @@ Limitar acumulador após travamentos para evitar spiral of death.
 ## Implementação da Fase 1
 
 `FixedStepClock` centraliza o passo de `1/60 s`, limita cada frame acumulado a
-`0,25 s`, expõe o alfa de interpolação e conta updates executados. `Input`
-mantém estados held/pressed/released de teclado e mouse e acumula movimento do
-mouse; as transições e deltas são limpos no começo de cada frame, antes da fila
-SDL ser processada. Repetição automática de tecla não cria um novo pressed.
+`0,25 s`, expõe o alfa de interpolação e conta updates executados.
+`platform/Input` mantém estados held/pressed/released de teclado e mouse e
+acumula movimento do mouse; as transições e deltas são limpos no começo de cada
+frame, antes da fila SDL ser processada. Repetição automática de tecla não cria
+um novo pressed. SDL não é mais uma dependência pública de `gdp_core`.
 
 ## Ordem lógica
 

@@ -25,6 +25,12 @@ file(GLOB core_sources
 )
 foreach(source IN LISTS core_sources)
     file(READ "${source}" contents)
+    if(contents MATCHES "#include[ \t]*<SDL3/")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "Core must not include SDL directly: ${relative_source}"
+        )
+    endif()
     string(REGEX MATCHALL "#include[ \t]+\"[^\"]+\"" local_includes "${contents}")
     foreach(include IN LISTS local_includes)
         if(NOT include MATCHES "\"core/[^\"]+\"")

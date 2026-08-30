@@ -68,7 +68,6 @@ add_library(
     gdp_core
     STATIC
     src/core/Hash.cpp
-    src/core/Input.cpp
     src/core/Log.cpp
     src/core/Random.cpp
     src/core/Seed.cpp
@@ -77,9 +76,20 @@ add_library(
 
 target_compile_features(gdp_core PUBLIC cxx_std_20)
 target_include_directories(gdp_core PUBLIC src)
-target_link_libraries(gdp_core PUBLIC SDL3::SDL3)
 gdp_enable_warnings(gdp_core)
 gdp_enable_sanitizers(gdp_core)
+
+add_library(
+    gdp_platform
+    STATIC
+    src/platform/Input.cpp
+)
+
+target_compile_features(gdp_platform PUBLIC cxx_std_20)
+target_include_directories(gdp_platform PUBLIC src)
+target_link_libraries(gdp_platform PUBLIC gdp_core SDL3::SDL3)
+gdp_enable_warnings(gdp_platform)
+gdp_enable_sanitizers(gdp_platform)
 
 add_library(
     gdp_entities
@@ -151,7 +161,7 @@ add_library(
 
 target_compile_features(gdp_renderer PUBLIC cxx_std_20)
 target_include_directories(gdp_renderer PUBLIC src)
-target_link_libraries(gdp_renderer PUBLIC gdp_core OpenGL::GL)
+target_link_libraries(gdp_renderer PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
 gdp_enable_warnings(gdp_renderer)
 gdp_enable_sanitizers(gdp_renderer)
 
@@ -186,7 +196,18 @@ add_executable(
     src/game/Application.cpp
 )
 
-target_link_libraries(gdp PRIVATE gdp_audio gdp_core gdp_entities gdp_gameplay gdp_renderer gdp_world)
+target_link_libraries(
+    gdp
+    PRIVATE
+    gdp_audio
+    gdp_core
+    gdp_entities
+    gdp_gameplay
+    gdp_platform
+    gdp_renderer
+    gdp_world
+    SDL3::SDL3
+)
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
 
@@ -208,6 +229,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME core_systems COMMAND gdp_core_tests)
     set_tests_properties(core_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_input_tests tests/test_input.cpp)
+    target_link_libraries(gdp_input_tests PRIVATE gdp_platform)
+    gdp_enable_warnings(gdp_input_tests)
+    gdp_enable_sanitizers(gdp_input_tests)
+
+    add_test(NAME platform_input_systems COMMAND gdp_input_tests)
+    set_tests_properties(platform_input_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_audio_tests tests/test_audio.cpp)
     target_link_libraries(gdp_audio_tests PRIVATE gdp_audio)

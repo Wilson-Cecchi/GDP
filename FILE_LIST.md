@@ -56,8 +56,6 @@
 - `architecture.md`
 - `src/core/Hash.cpp`
 - `src/core/Hash.hpp`
-- `src/core/Input.cpp`
-- `src/core/Input.hpp`
 - `src/core/Log.cpp`
 - `src/core/Log.hpp`
 - `src/core/Math.hpp`
@@ -69,6 +67,8 @@
 - `src/core/Time.hpp`
 - `src/game/Application.cpp`
 - `src/game/Application.hpp`
+- `src/platform/Input.cpp`
+- `src/platform/Input.hpp`
 - `src/entities/EntityManager.cpp`
 - `src/entities/EntityManager.hpp`
 - `src/gameplay/Collision.cpp`
@@ -138,6 +138,7 @@
 - `tests/test_enemy_generation.cpp`
 - `tests/test_entities.cpp`
 - `tests/test_gameplay.cpp`
+- `tests/test_input.cpp`
 - `tests/test_main_menu.cpp`
 - `tests/test_renderer.cpp`
 - `tests/test_renderer_gl.cpp`
