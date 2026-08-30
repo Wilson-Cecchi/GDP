@@ -68,6 +68,8 @@
 - `src/game/Application.cpp`
 - `src/game/Application.hpp`
 - `src/game/SeedDomains.hpp`
+- `src/game/VisualAssets.cpp`
+- `src/game/VisualAssets.hpp`
 - `src/platform/Input.cpp`
 - `src/platform/Input.hpp`
 - `src/platform/SdlInput.cpp`

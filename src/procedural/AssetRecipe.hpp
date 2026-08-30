@@ -133,7 +133,5 @@ struct MaterialProperties {
 [[nodiscard]] MaterialProperties materialProperties(MaterialFamily family) noexcept;
 [[nodiscard]] std::uint64_t meshRecipeHash(const MeshRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept;
-[[nodiscard]] MeshRecipe makeWorkerFoundationMeshRecipe(gdp::core::Seed seed = 0);
-[[nodiscard]] TextureRecipe makeWorkerFoundationTextureRecipe(gdp::core::Seed seed = 0);
 
 } // namespace gdp::procedural

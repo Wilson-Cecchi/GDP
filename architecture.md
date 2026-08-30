@@ -435,7 +435,9 @@ gdp/
 │   ├── game/
 │   │   ├── Application.cpp
 │   │   ├── Application.hpp
-│   │   └── SeedDomains.hpp
+│   │   ├── SeedDomains.hpp
+│   │   ├── VisualAssets.cpp
+│   │   └── VisualAssets.hpp
 │   │
 │   ├── core/
 │   │   ├── Time.cpp
@@ -581,6 +583,14 @@ testados e substituídos independentemente.
 sem conhecer os sistemas do GDP. O catálogo tipado `game/SeedDomains` pertence
 ao jogo; seus IDs explícitos 1–17 são parte do contrato determinístico e não
 podem mudar sem uma alteração deliberada da versão de geração.
+
+A fronteira visual intermediária possui quatro targets: `gdp_render_foundation`
+contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
+`gdp_procedural_assets` contém receitas, hashing e geradores genéricos;
+`gdp_visual_content` contém Worker, materiais de sala e `game/VisualAssets`; e
+`gdp_renderer` compõe a apresentação concreta do GDP. Esses nomes permanecem
+temporários até a fronteira estabilizar; não representam ainda o rename para
+WKC Forge.
 
 ---
 
@@ -3201,7 +3211,7 @@ Math
 
 ## Fase 2 — Renderer mínimo
 
-**Estado atual:** implementada e validada. `gdp_renderer` carrega a API OpenGL
+**Estado atual:** implementada e validada. `gdp_render_foundation` carrega a API OpenGL
 3.3, compila/linka um shader básico iluminado, envia uma box indexada com hard
 edges para VAO/VBO/EBO, cria textura RGBA determinística, câmera perspectiva,
 depth test e framebuffer redimensionável com color texture e depth buffer. A
@@ -3350,6 +3360,10 @@ mesh de seis partes e a textura do Worker antes do upload; nenhuma geração
 ocorre durante draw. Testes cobrem validação, transforms, bounds, semântica,
 regras materiais, hashes dourados, cache e 1.000 seeds visuais. O fingerprint
 estrutural do World permanece inalterado.
+
+Na Fase 30, os contratos e geradores reutilizáveis passaram ao target
+`gdp_procedural_assets`; construtores Worker e outros dados visuais do GDP não
+fazem mais parte de `AssetRecipe` e são compilados em `gdp_visual_content`.
 
 ```text
 MeshRecipe

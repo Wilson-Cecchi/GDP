@@ -119,6 +119,10 @@ especializados das pastas numeradas.
   mecanismo genérico e versionado de derivação; o catálogo específico do jogo
   passou para `game/SeedDomains`. Os IDs 1–17 e os hashes dourados permanecem
   explicitamente protegidos por regressão.
+- **Fase 30 — Fundação visual separada:** primitivas OpenGL e assets
+  procedurais genéricos agora possuem targets próprios; receitas Worker,
+  fallback industrial, luminária e demais geradores visuais do GDP ficam em
+  `gdp_visual_content`. O renderer concreto apenas compõe essas camadas.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

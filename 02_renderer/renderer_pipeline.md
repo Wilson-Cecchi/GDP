@@ -7,6 +7,8 @@
 > materiais/decor multissala e overlay bitmap integrados na Fase 14. Filas completas,
 > culling, transparência, HUD final e pós-processamento
 > permanecem planejados.
+> A Fase 30 separou os targets de fundação gráfica, assets procedurais, conteúdo
+> visual GDP e renderer concreto sem alterar a imagem produzida.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -60,6 +62,10 @@ room transforms + corridor paths + per-room material keys + lighting plan
 
 O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
 OpenGL encerram o frame com log e recursos GPU são destruídos antes do contexto.
+Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
+`gdp_render_foundation`. Receitas e geradores reutilizáveis ficam em
+`gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
+do GDP ficam em `gdp_visual_content`; `gdp_renderer` realiza a composição final.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

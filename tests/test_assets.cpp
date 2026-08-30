@@ -1,4 +1,5 @@
 #include "core/Math.hpp"
+#include "game/VisualAssets.hpp"
 #include "procedural/AssetCache.hpp"
 #include "procedural/AssetRecipe.hpp"
 #include "procedural/MeshGenerator.hpp"
@@ -34,11 +35,12 @@ void testRecipeValidationAndHashing()
 {
     using namespace gdp::procedural;
 
-    const MeshRecipe worker = makeWorkerFoundationMeshRecipe(12345);
+    const MeshRecipe worker = gdp::game::makeWorkerFoundationMeshRecipe(12345);
     expect(validateMeshRecipe(worker).isValid(), "Worker foundation mesh recipe validates");
     expect(worker.primitives.size() == 6U,
         "Worker foundation recipe preserves its six readable body regions");
-    expect(meshRecipeHash(worker) == meshRecipeHash(makeWorkerFoundationMeshRecipe(12345)),
+    expect(meshRecipeHash(worker)
+            == meshRecipeHash(gdp::game::makeWorkerFoundationMeshRecipe(12345)),
         "equivalent mesh recipes have the same canonical hash");
     expect(meshRecipeHash(worker) == 0x8AD8E9BAACB817BCULL,
         "golden Worker mesh recipe hash remains stable across builds");
@@ -65,11 +67,11 @@ void testRecipeValidationAndHashing()
     expect(containsError(validateMeshRecipe(changed), RecipeValidationError::InvalidDimensions),
         "non-positive primitive dimensions are rejected");
 
-    const TextureRecipe texture = makeWorkerFoundationTextureRecipe(54321);
+    const TextureRecipe texture = gdp::game::makeWorkerFoundationTextureRecipe(54321);
     expect(validateTextureRecipe(texture).isValid(),
         "Worker foundation texture recipe validates");
     expect(textureRecipeHash(texture)
-            == textureRecipeHash(makeWorkerFoundationTextureRecipe(54321)),
+            == textureRecipeHash(gdp::game::makeWorkerFoundationTextureRecipe(54321)),
         "equivalent texture recipes have the same canonical hash");
     expect(textureRecipeHash(texture) == 0x409FFD1A4CA6BCAFULL,
         "golden Worker texture recipe hash remains stable across builds");
@@ -94,7 +96,7 @@ void testMeshGeneration()
 {
     using namespace gdp::procedural;
 
-    const auto worker = generateMesh(makeWorkerFoundationMeshRecipe(12345));
+    const auto worker = generateMesh(gdp::game::makeWorkerFoundationMeshRecipe(12345));
     expect(worker.has_value(), "valid Worker recipe generates CPU mesh data");
     if (!worker) {
         return;
@@ -157,7 +159,7 @@ void testTextureGeneration()
 {
     using namespace gdp::procedural;
 
-    TextureRecipe recipe = makeWorkerFoundationTextureRecipe(12345);
+    TextureRecipe recipe = gdp::game::makeWorkerFoundationTextureRecipe(12345);
     const auto first = generateAlbedo(recipe);
     const auto repeated = generateAlbedo(recipe);
     expect(first && repeated && gdp::render::validateImageData(*first),

@@ -13,15 +13,6 @@ struct ImageData {
     std::vector<std::uint8_t> rgba;
 };
 
-struct CeilingFixtureMaterialImages {
-    ImageData albedo;
-    ImageData normal;
-    ImageData properties;
-    ImageData emission;
-};
-
-[[nodiscard]] ImageData makeIndustrialCheckerImage(int width = 8, int height = 8);
-[[nodiscard]] CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages();
 [[nodiscard]] bool validateImageData(const ImageData& image) noexcept;
 
 enum class TextureSampling : std::uint8_t {

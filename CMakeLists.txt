@@ -155,25 +155,65 @@ gdp_enable_warnings(gdp_gameplay)
 gdp_enable_sanitizers(gdp_gameplay)
 
 add_library(
-    gdp_renderer
+    gdp_render_foundation
     STATIC
-    src/procedural/AssetRecipe.cpp
-    src/procedural/EnemyGenerator.cpp
-    src/procedural/MeshGenerator.cpp
-    src/procedural/RoomMaterialGenerator.cpp
-    src/procedural/TextureGenerator.cpp
     src/render/Camera.cpp
     src/render/Framebuffer.cpp
     src/render/GlApi.cpp
     src/render/Mesh.cpp
-    src/render/Renderer.cpp
     src/render/Shader.cpp
     src/render/Texture.cpp
 )
 
+target_compile_features(gdp_render_foundation PUBLIC cxx_std_20)
+target_include_directories(gdp_render_foundation PUBLIC src)
+target_link_libraries(gdp_render_foundation PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
+gdp_enable_warnings(gdp_render_foundation)
+gdp_enable_sanitizers(gdp_render_foundation)
+
+add_library(
+    gdp_procedural_assets
+    STATIC
+    src/procedural/AssetRecipe.cpp
+    src/procedural/MeshGenerator.cpp
+    src/procedural/TextureGenerator.cpp
+)
+
+target_compile_features(gdp_procedural_assets PUBLIC cxx_std_20)
+target_include_directories(gdp_procedural_assets PUBLIC src)
+target_link_libraries(gdp_procedural_assets PUBLIC gdp_core gdp_render_foundation)
+gdp_enable_warnings(gdp_procedural_assets)
+gdp_enable_sanitizers(gdp_procedural_assets)
+
+add_library(
+    gdp_visual_content
+    STATIC
+    src/game/VisualAssets.cpp
+    src/procedural/EnemyGenerator.cpp
+    src/procedural/RoomMaterialGenerator.cpp
+)
+
+target_compile_features(gdp_visual_content PUBLIC cxx_std_20)
+target_include_directories(gdp_visual_content PUBLIC src)
+target_link_libraries(
+    gdp_visual_content
+    PUBLIC gdp_core gdp_procedural_assets gdp_render_foundation
+)
+gdp_enable_warnings(gdp_visual_content)
+gdp_enable_sanitizers(gdp_visual_content)
+
+add_library(
+    gdp_renderer
+    STATIC
+    src/render/Renderer.cpp
+)
+
 target_compile_features(gdp_renderer PUBLIC cxx_std_20)
 target_include_directories(gdp_renderer PUBLIC src)
-target_link_libraries(gdp_renderer PUBLIC gdp_core SDL3::SDL3 OpenGL::GL)
+target_link_libraries(
+    gdp_renderer
+    PUBLIC gdp_core gdp_procedural_assets gdp_render_foundation gdp_visual_content
+)
 gdp_enable_warnings(gdp_renderer)
 gdp_enable_sanitizers(gdp_renderer)
 
@@ -284,7 +324,10 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(renderer_cpu_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_asset_tests tests/test_assets.cpp)
-    target_link_libraries(gdp_asset_tests PRIVATE gdp_renderer)
+    target_link_libraries(
+        gdp_asset_tests
+        PRIVATE gdp_procedural_assets gdp_visual_content
+    )
     gdp_enable_warnings(gdp_asset_tests)
     gdp_enable_sanitizers(gdp_asset_tests)
 
@@ -292,7 +335,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(procedural_asset_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_enemy_generation_tests tests/test_enemy_generation.cpp)
-    target_link_libraries(gdp_enemy_generation_tests PRIVATE gdp_renderer)
+    target_link_libraries(gdp_enemy_generation_tests PRIVATE gdp_visual_content)
     gdp_enable_warnings(gdp_enemy_generation_tests)
     gdp_enable_sanitizers(gdp_enemy_generation_tests)
 
@@ -300,7 +343,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(enemy_generation_systems PROPERTIES TIMEOUT 60)
 
     add_executable(gdp_room_material_tests tests/test_room_materials.cpp)
-    target_link_libraries(gdp_room_material_tests PRIVATE gdp_renderer)
+    target_link_libraries(gdp_room_material_tests PRIVATE gdp_visual_content)
     gdp_enable_warnings(gdp_room_material_tests)
     gdp_enable_sanitizers(gdp_room_material_tests)
 

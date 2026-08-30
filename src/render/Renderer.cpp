@@ -2,6 +2,7 @@
 
 #include "core/Log.hpp"
 #include "core/Math.hpp"
+#include "game/VisualAssets.hpp"
 #include "procedural/EnemyGenerator.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/RoomMaterialGenerator.hpp"
@@ -318,11 +319,11 @@ bool Renderer::initialize(const int width, const int height)
     if (!box_.upload(gl_, makeBoxMesh())) {
         return false;
     }
-    if (!fallbackTexture_.upload(gl_, makeIndustrialCheckerImage())) {
+    if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
         return false;
     }
-    const CeilingFixtureMaterialImages fixtureImages
-        = makeCeilingFixtureMaterialImages();
+    const gdp::game::CeilingFixtureMaterialImages fixtureImages
+        = gdp::game::makeCeilingFixtureMaterialImages();
     if (!ceilingFixtureMaterial_.albedo.upload(
             gl_, fixtureImages.albedo, TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.normal.upload(

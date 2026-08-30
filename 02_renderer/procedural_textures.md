@@ -6,6 +6,9 @@
 > máscaras completas permanecem planejados. Albedos estruturados dos primeiros
 > ambientes Industrial, Storage, Combat Room, Cafeteria, Laboratory, Technical
 > Area, Security e Central Hub integrados na Fase 10.
+> Na Fase 30, contratos e geração reutilizáveis passaram a
+> `gdp_procedural_assets`; receitas Worker, fallback industrial, luminária e
+> materiais de salas permanecem como conteúdo visual do GDP.
 > Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
 > gate pré-implementação de `visual/TEXTURE_APPROVALS.md`.
 >
@@ -51,6 +54,10 @@ emissive, normal, roughness e metallic já participam ou estão reservados no
 contrato, mas ainda não possuem todos os mapas autoritativos descritos abaixo.
 A Fase 9 deriva a receita do material e desgaste de cada `WorkerVisual`; renderer
 e `AssetCache` preparam cada variante por `visualSeed` antes do draw.
+A API genérica `AssetRecipe` não oferece construtores nomeados por Worker ou
+ambiente. Esses construtores vivem em `game/VisualAssets` e
+`gdp_visual_content`, enquanto `Texture` mantém apenas `ImageData`, validação e
+upload reutilizáveis.
 A Fase 10 acrescenta receitas específicas de superfície: placas e juntas não
 dependem de noise puro; parede reserva amarelo/preto apenas na base, piso recebe
 desgaste direcional no centro do fluxo e teto distribui luminárias lineares.

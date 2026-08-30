@@ -1,4 +1,5 @@
 #include "core/Math.hpp"
+#include "game/VisualAssets.hpp"
 #include "render/Camera.hpp"
 #include "render/Mesh.hpp"
 #include "render/Renderer.hpp"
@@ -61,16 +62,17 @@ void testTextureData()
 {
     using namespace gdp::render;
 
-    const ImageData first = makeIndustrialCheckerImage(8, 8);
-    const ImageData second = makeIndustrialCheckerImage(8, 8);
+    const ImageData first = gdp::game::makeIndustrialCheckerImage(8, 8);
+    const ImageData second = gdp::game::makeIndustrialCheckerImage(8, 8);
     expect(validateImageData(first), "generated RGBA image validates");
     expect(first.rgba == second.rgba, "procedural texture pixels are deterministic");
     expect(first.rgba.size() == 8U * 8U * 4U, "texture contains four channels per pixel");
     expect(first.rgba[0] != first.rgba[(2U * 4U)], "checker pattern contains two tones");
 
-    const CeilingFixtureMaterialImages fixture = makeCeilingFixtureMaterialImages();
-    const CeilingFixtureMaterialImages repeatedFixture
-        = makeCeilingFixtureMaterialImages();
+    const gdp::game::CeilingFixtureMaterialImages fixture
+        = gdp::game::makeCeilingFixtureMaterialImages();
+    const gdp::game::CeilingFixtureMaterialImages repeatedFixture
+        = gdp::game::makeCeilingFixtureMaterialImages();
     expect(validateImageData(fixture.albedo) && validateImageData(fixture.normal)
             && validateImageData(fixture.properties) && validateImageData(fixture.emission)
             && fixture.albedo.width == 1024 && fixture.albedo.height == 1024,

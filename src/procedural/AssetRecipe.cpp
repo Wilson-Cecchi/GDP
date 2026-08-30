@@ -175,45 +175,4 @@ std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept
     return gdp::core::hashCombine(hash, recipe.resolution);
 }
 
-MeshRecipe makeWorkerFoundationMeshRecipe(const gdp::core::Seed seed)
-{
-    MeshRecipe recipe;
-    recipe.seed = seed;
-    recipe.primitives = {
-        {PrimitiveType::Box, {.position = {0.0F, 1.05F, 0.0F}}, {0.72F, 0.85F, 0.48F},
-            MaterialSlot::Armor, SemanticRegion::ArmorPlate},
-        {PrimitiveType::Box, {.position = {0.0F, 1.62F, 0.0F}}, {0.42F, 0.34F, 0.40F},
-            MaterialSlot::Primary, SemanticRegion::MechanicalCore},
-        {PrimitiveType::Box, {.position = {-0.48F, 1.05F, 0.0F}}, {0.22F, 0.78F, 0.24F},
-            MaterialSlot::Secondary, SemanticRegion::Tool},
-        {PrimitiveType::Box, {.position = {0.48F, 1.05F, 0.0F}}, {0.22F, 0.78F, 0.24F},
-            MaterialSlot::Secondary, SemanticRegion::Tool},
-        {PrimitiveType::Box, {.position = {-0.22F, 0.38F, 0.0F}}, {0.24F, 0.76F, 0.28F},
-            MaterialSlot::Primary, SemanticRegion::FootContact},
-        {PrimitiveType::Box, {.position = {0.22F, 0.38F, 0.0F}}, {0.24F, 0.76F, 0.28F},
-            MaterialSlot::Primary, SemanticRegion::FootContact},
-    };
-    return recipe;
-}
-
-TextureRecipe makeWorkerFoundationTextureRecipe(const gdp::core::Seed seed)
-{
-    return {
-        .version = 1,
-        .seed = seed,
-        .family = MaterialFamily::PaintedSteel,
-        .baseColor = {0.72F, 0.38F, 0.12F},
-        .secondaryColor = {0.34F, 0.20F, 0.10F},
-        .macroVariation = 0.28F,
-        .microVariation = 0.16F,
-        .wearAmount = 0.22F,
-        .dirtAmount = 0.18F,
-        .scratchAmount = 0.12F,
-        .oxidationAmount = 0.08F,
-        .emissiveAmount = 0.0F,
-        .region = SemanticRegion::ArmorPlate,
-        .resolution = 64,
-    };
-}
-
 } // namespace gdp::procedural

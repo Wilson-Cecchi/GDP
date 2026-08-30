@@ -28,6 +28,48 @@ if(NOT EXISTS "${GDP_SOURCE_DIR}/src/game/SeedDomains.hpp")
     message(FATAL_ERROR "GDP seed domain catalog is missing from src/game")
 endif()
 
+set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/VisualAssets.hpp")
+if(NOT EXISTS "${game_visual_assets}")
+    message(FATAL_ERROR "GDP visual content is missing from src/game")
+endif()
+
+foreach(generic_visual_api IN ITEMS
+    "${GDP_SOURCE_DIR}/src/procedural/AssetRecipe.hpp"
+    "${GDP_SOURCE_DIR}/src/render/Texture.hpp"
+)
+    file(READ "${generic_visual_api}" generic_visual_contents)
+    if(generic_visual_contents MATCHES "Worker|Industrial|CeilingFixture")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${generic_visual_api}")
+        message(FATAL_ERROR
+            "Generic visual API owns GDP content: ${relative_source}"
+        )
+    endif()
+endforeach()
+
+set(render_foundation_sources
+    "${GDP_SOURCE_DIR}/src/render/Camera.cpp"
+    "${GDP_SOURCE_DIR}/src/render/Camera.hpp"
+    "${GDP_SOURCE_DIR}/src/render/Framebuffer.cpp"
+    "${GDP_SOURCE_DIR}/src/render/Framebuffer.hpp"
+    "${GDP_SOURCE_DIR}/src/render/GlApi.cpp"
+    "${GDP_SOURCE_DIR}/src/render/GlApi.hpp"
+    "${GDP_SOURCE_DIR}/src/render/Mesh.cpp"
+    "${GDP_SOURCE_DIR}/src/render/Mesh.hpp"
+    "${GDP_SOURCE_DIR}/src/render/Shader.cpp"
+    "${GDP_SOURCE_DIR}/src/render/Shader.hpp"
+    "${GDP_SOURCE_DIR}/src/render/Texture.cpp"
+    "${GDP_SOURCE_DIR}/src/render/Texture.hpp"
+)
+foreach(source IN LISTS render_foundation_sources)
+    file(READ "${source}" contents)
+    if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities|audio|procedural)/")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "Render foundation depends on GDP content: ${relative_source}"
+        )
+    endif()
+endforeach()
+
 file(READ "${game_application}" application_header)
 if(NOT application_header MATCHES "namespace[ \t]+gdp::game")
     message(FATAL_ERROR "GDP Application must use the gdp::game namespace")
