@@ -129,6 +129,7 @@
 - `src/world/WorldGenerator.hpp`
 - `src/world/WorldValidation.cpp`
 - `src/world/WorldValidation.hpp`
+- `tests/check_architecture_boundaries.cmake`
 - `tests/check_main_menu_bootstrap.cmake`
 - `tests/capture_industrial_wall.cpp`
 - `tests/test_assets.cpp`

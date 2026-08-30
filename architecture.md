@@ -565,6 +565,10 @@ da Technical Bible e deve acompanhar a evolução dos subsistemas implementados.
 gameplay, mundo, áudio e renderização. Ela pode depender da infraestrutura, mas
 não integra o núcleo reutilizável nem pode ser uma dependência dele.
 
+As dependências entre targets devem ser declaradas no CMake. O diretório `core`
+só pode incluir seus próprios contratos; uma regressão automatizada protege essa
+fronteira enquanto os demais subsistemas são separados incrementalmente.
+
 ---
 
 # 8. Sistema de seed

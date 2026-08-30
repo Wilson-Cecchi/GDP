@@ -178,6 +178,8 @@ target_link_libraries(gdp_world PUBLIC gdp_core gdp_entities)
 gdp_enable_warnings(gdp_world)
 gdp_enable_sanitizers(gdp_world)
 
+target_link_libraries(gdp_gameplay PUBLIC gdp_world)
+
 add_executable(
     gdp
     src/main.cpp
@@ -190,6 +192,14 @@ gdp_enable_sanitizers(gdp)
 
 if(GDP_BUILD_TESTS)
     include(CTest)
+
+    add_test(
+        NAME architecture_boundaries
+        COMMAND ${CMAKE_COMMAND}
+            -DGDP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_architecture_boundaries.cmake
+    )
+    set_tests_properties(architecture_boundaries PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_core_tests tests/test_core.cpp)
     target_link_libraries(gdp_core_tests PRIVATE gdp_core)

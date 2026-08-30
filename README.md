@@ -106,6 +106,9 @@ especializados das pastas numeradas.
   aplicação foi retirada de `core` e passou para `game`, inclusive no namespace
   e no target executável. A mudança preserva gameplay, geração procedural,
   hashes e renderização enquanto inicia a separação incremental da infraestrutura.
+- **Fase 26 — Contrato inicial de dependências:** o CMake agora declara
+  explicitamente `gameplay -> world`, e uma regressão arquitetural impede que a
+  aplicação retorne a `core` ou que `core` inclua módulos superiores do GDP.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
