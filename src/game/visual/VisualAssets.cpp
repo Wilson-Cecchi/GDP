@@ -1,4 +1,4 @@
-#include "game/VisualAssets.hpp"
+#include "game/visual/VisualAssets.hpp"
 
 #include <algorithm>
 #include <array>

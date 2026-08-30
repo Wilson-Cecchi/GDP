@@ -9,6 +9,8 @@
 > permanecem planejados.
 > A Fase 30 separou os targets de fundação gráfica, assets procedurais, conteúdo
 > visual GDP e renderer concreto sem alterar a imagem produzida.
+> A Fase 31 alinhou a estrutura física, movendo o conteúdo visual concreto para
+> `src/game/visual` e reservando `src/procedural` à fundação reutilizável.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

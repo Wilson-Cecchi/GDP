@@ -514,8 +514,13 @@ gdp/
 │   │   ├── Application.cpp
 │   │   ├── Application.hpp
 │   │   ├── SeedDomains.hpp
-│   │   ├── VisualAssets.cpp
-│   │   └── VisualAssets.hpp
+│   │   └── visual/
+│   │       ├── EnemyGenerator.cpp
+│   │       ├── EnemyGenerator.hpp
+│   │       ├── RoomMaterialGenerator.cpp
+│   │       ├── RoomMaterialGenerator.hpp
+│   │       ├── VisualAssets.cpp
+│   │       └── VisualAssets.hpp
 │   │
 │   ├── core/
 │   │   ├── Time.cpp
@@ -563,20 +568,13 @@ gdp/
 │   │   └── MapGraph.hpp
 │   │
 │   ├── procedural/
-│   │   ├── Seed.cpp
-│   │   ├── Seed.hpp
-│   │   ├── WorldGenerator.cpp
-│   │   ├── WorldGenerator.hpp
-│   │   ├── RoomGenerator.cpp
-│   │   ├── RoomGenerator.hpp
-│   │   ├── EnemyGenerator.cpp
-│   │   ├── EnemyGenerator.hpp
+│   │   ├── AssetCache.hpp
+│   │   ├── AssetRecipe.cpp
+│   │   ├── AssetRecipe.hpp
 │   │   ├── MeshGenerator.cpp
 │   │   ├── MeshGenerator.hpp
 │   │   ├── TextureGenerator.cpp
-│   │   ├── TextureGenerator.hpp
-│   │   ├── MaterialGenerator.cpp
-│   │   └── MaterialGenerator.hpp
+│   │   └── TextureGenerator.hpp
 │   │
 │   ├── gameplay/
 │   │   ├── Game.cpp
@@ -665,10 +663,15 @@ podem mudar sem uma alteração deliberada da versão de geração.
 A fronteira visual intermediária possui quatro targets: `gdp_render_foundation`
 contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
 `gdp_procedural_assets` contém receitas, hashing e geradores genéricos;
-`gdp_visual_content` contém Worker, materiais de sala e `game/VisualAssets`; e
+`gdp_visual_content` contém Worker, materiais de sala e `game/visual`; e
 `gdp_renderer` compõe a apresentação concreta do GDP. Esses nomes permanecem
 temporários até a fronteira estabilizar; não representam ainda o rename para
 WKC Forge.
+
+Na Fase 31, todo o conteúdo desse target foi agrupado fisicamente em
+`src/game/visual`, e `src/procedural` ficou restrito à fundação reutilizável.
+Os namespaces anteriores foram preservados temporariamente para que a mudança
+de localização não seja misturada a um rename amplo.
 
 ---
 

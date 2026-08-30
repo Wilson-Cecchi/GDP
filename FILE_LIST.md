@@ -68,8 +68,12 @@
 - `src/game/Application.cpp`
 - `src/game/Application.hpp`
 - `src/game/SeedDomains.hpp`
-- `src/game/VisualAssets.cpp`
-- `src/game/VisualAssets.hpp`
+- `src/game/visual/EnemyGenerator.cpp`
+- `src/game/visual/EnemyGenerator.hpp`
+- `src/game/visual/RoomMaterialGenerator.cpp`
+- `src/game/visual/RoomMaterialGenerator.hpp`
+- `src/game/visual/VisualAssets.cpp`
+- `src/game/visual/VisualAssets.hpp`
 - `src/platform/Input.cpp`
 - `src/platform/Input.hpp`
 - `src/platform/SdlInput.cpp`
@@ -96,12 +100,8 @@
 - `src/procedural/AssetCache.hpp`
 - `src/procedural/AssetRecipe.cpp`
 - `src/procedural/AssetRecipe.hpp`
-- `src/procedural/EnemyGenerator.cpp`
-- `src/procedural/EnemyGenerator.hpp`
 - `src/procedural/MeshGenerator.cpp`
 - `src/procedural/MeshGenerator.hpp`
-- `src/procedural/RoomMaterialGenerator.cpp`
-- `src/procedural/RoomMaterialGenerator.hpp`
 - `src/procedural/TextureGenerator.cpp`
 - `src/procedural/TextureGenerator.hpp`
 - `src/render/Camera.cpp`

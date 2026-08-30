@@ -1,8 +1,8 @@
 #pragma once
 
+#include "game/visual/EnemyGenerator.hpp"
+#include "game/visual/RoomMaterialGenerator.hpp"
 #include "procedural/AssetCache.hpp"
-#include "procedural/EnemyGenerator.hpp"
-#include "procedural/RoomMaterialGenerator.hpp"
 #include "render/Camera.hpp"
 #include "render/Framebuffer.hpp"
 #include "render/GlApi.hpp"

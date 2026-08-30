@@ -123,6 +123,10 @@ especializados das pastas numeradas.
   procedurais genéricos agora possuem targets próprios; receitas Worker,
   fallback industrial, luminária e demais geradores visuais do GDP ficam em
   `gdp_visual_content`. O renderer concreto apenas compõe essas camadas.
+- **Fase 31 — Conteúdo visual agrupado:** os geradores de inimigos, materiais
+  de sala e assets concretos passaram fisicamente para `src/game/visual`.
+  `src/procedural` contém somente a fundação reutilizável, protegida por uma
+  regressão arquitetural; namespaces permanecem compatíveis nesta etapa.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

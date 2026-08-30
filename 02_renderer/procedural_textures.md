@@ -9,6 +9,8 @@
 > Na Fase 30, contratos e geração reutilizáveis passaram a
 > `gdp_procedural_assets`; receitas Worker, fallback industrial, luminária e
 > materiais de salas permanecem como conteúdo visual do GDP.
+> Na Fase 31, esse conteúdo foi agrupado fisicamente em `src/game/visual`, sem
+> alterar namespaces, receitas ou hashes.
 > Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
 > gate pré-implementação de `visual/TEXTURE_APPROVALS.md`.
 >
@@ -55,7 +57,7 @@ contrato, mas ainda não possuem todos os mapas autoritativos descritos abaixo.
 A Fase 9 deriva a receita do material e desgaste de cada `WorkerVisual`; renderer
 e `AssetCache` preparam cada variante por `visualSeed` antes do draw.
 A API genérica `AssetRecipe` não oferece construtores nomeados por Worker ou
-ambiente. Esses construtores vivem em `game/VisualAssets` e
+ambiente. Esses construtores vivem em `game/visual/VisualAssets` e
 `gdp_visual_content`, enquanto `Texture` mantém apenas `ImageData`, validação e
 upload reutilizáveis.
 A Fase 10 acrescenta receitas específicas de superfície: placas e juntas não

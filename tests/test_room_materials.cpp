@@ -1,4 +1,4 @@
-#include "procedural/RoomMaterialGenerator.hpp"
+#include "game/visual/RoomMaterialGenerator.hpp"
 #include "render/Texture.hpp"
 
 #include <algorithm>

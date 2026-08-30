@@ -28,7 +28,7 @@ if(NOT EXISTS "${GDP_SOURCE_DIR}/src/game/SeedDomains.hpp")
     message(FATAL_ERROR "GDP seed domain catalog is missing from src/game")
 endif()
 
-set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/VisualAssets.hpp")
+set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/visual/VisualAssets.hpp")
 if(NOT EXISTS "${game_visual_assets}")
     message(FATAL_ERROR "GDP visual content is missing from src/game")
 endif()
@@ -42,6 +42,22 @@ foreach(generic_visual_api IN ITEMS
         file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${generic_visual_api}")
         message(FATAL_ERROR
             "Generic visual API owns GDP content: ${relative_source}"
+        )
+    endif()
+endforeach()
+
+file(GLOB procedural_foundation_sources
+    "${GDP_SOURCE_DIR}/src/procedural/*.cpp"
+    "${GDP_SOURCE_DIR}/src/procedural/*.hpp"
+)
+foreach(source IN LISTS procedural_foundation_sources)
+    file(READ "${source}" contents)
+    if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities|audio)/"
+        OR contents MATCHES
+            "Worker|Guard|Officer|Engineer|IndustrialRobot|RoomMaterial")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "Procedural foundation owns GDP visual content: ${relative_source}"
         )
     endif()
 endforeach()

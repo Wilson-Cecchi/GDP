@@ -1,4 +1,4 @@
-#include "procedural/RoomMaterialGenerator.hpp"
+#include "game/visual/RoomMaterialGenerator.hpp"
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"

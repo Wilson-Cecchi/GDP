@@ -1,4 +1,4 @@
-#include "procedural/EnemyGenerator.hpp"
+#include "game/visual/EnemyGenerator.hpp"
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"

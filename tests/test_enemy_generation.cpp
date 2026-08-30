@@ -1,4 +1,4 @@
-#include "procedural/EnemyGenerator.hpp"
+#include "game/visual/EnemyGenerator.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 #include "render/Mesh.hpp"

@@ -2,10 +2,10 @@
 
 #include "core/Log.hpp"
 #include "core/Math.hpp"
-#include "game/VisualAssets.hpp"
-#include "procedural/EnemyGenerator.hpp"
+#include "game/visual/EnemyGenerator.hpp"
+#include "game/visual/RoomMaterialGenerator.hpp"
+#include "game/visual/VisualAssets.hpp"
 #include "procedural/MeshGenerator.hpp"
-#include "procedural/RoomMaterialGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 
 #include <SDL3/SDL_opengl.h>

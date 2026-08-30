@@ -188,9 +188,9 @@ gdp_enable_sanitizers(gdp_procedural_assets)
 add_library(
     gdp_visual_content
     STATIC
-    src/game/VisualAssets.cpp
-    src/procedural/EnemyGenerator.cpp
-    src/procedural/RoomMaterialGenerator.cpp
+    src/game/visual/EnemyGenerator.cpp
+    src/game/visual/RoomMaterialGenerator.cpp
+    src/game/visual/VisualAssets.cpp
 )
 
 target_compile_features(gdp_visual_content PUBLIC cxx_std_20)

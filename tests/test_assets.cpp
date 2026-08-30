@@ -1,5 +1,5 @@
 #include "core/Math.hpp"
-#include "game/VisualAssets.hpp"
+#include "game/visual/VisualAssets.hpp"
 #include "procedural/AssetCache.hpp"
 #include "procedural/AssetRecipe.hpp"
 #include "procedural/MeshGenerator.hpp"
