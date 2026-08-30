@@ -19,6 +19,8 @@
 > de ser proprietário de tipos específicos de HUD, entidades e salas do GDP.
 > A Fase 36 moveu a própria classe `GdpRenderer` para `gdp::game::visual`,
 > mantendo as primitivas reutilizáveis qualificadas em `gdp::render`.
+> A Fase 37 renomeou o target concreto para `gdp_visual_renderer`, distinguindo
+> a composição GDP de `gdp_render_foundation`.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -75,7 +77,8 @@ OpenGL encerram o frame com log e recursos GPU são destruídos antes do context
 Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `gdp_render_foundation`. Receitas e geradores reutilizáveis ficam em
 `gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
-do GDP ficam em `gdp_visual_content`; `gdp_renderer` realiza a composição final.
+do GDP ficam em `gdp_visual_content`; `gdp_visual_renderer` realiza a composição
+final.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
 passou a `gdp::render::GdpRenderer` na Fase 33. Na Fase 34, os DTOs de
 apresentação passaram ao contrato `game/visual/GdpRenderData.*`; seus nomes e

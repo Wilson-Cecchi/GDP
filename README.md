@@ -146,6 +146,10 @@ especializados das pastas numeradas.
   para `gdp::game::visual` e agora referencia explicitamente as primitivas de
   `gdp::render`. O namespace gráfico reutilizável deixou de possuir classes ou
   dados de apresentação específicos do GDP.
+- **Fase 37 — Identidade do target visual:** o target concreto passou de
+  `gdp_renderer` para `gdp_visual_renderer`. O nome agora o diferencia de
+  `gdp_render_foundation`, sem antecipar o futuro rename da fundação para WKC
+  Forge ou alterar nomes dos executáveis de teste.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

@@ -2,6 +2,16 @@ if(NOT DEFINED GDP_SOURCE_DIR)
     message(FATAL_ERROR "GDP_SOURCE_DIR was not provided")
 endif()
 
+file(READ "${GDP_SOURCE_DIR}/CMakeLists.txt" root_cmake_contents)
+if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_visual_renderer[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP concrete renderer target must be named gdp_visual_renderer")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_renderer[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Ambiguous gdp_renderer target must not return")
+endif()
+
 set(core_directory "${GDP_SOURCE_DIR}/src/core")
 set(game_application "${GDP_SOURCE_DIR}/src/game/Application.hpp")
 

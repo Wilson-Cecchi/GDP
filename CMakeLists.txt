@@ -203,20 +203,20 @@ gdp_enable_warnings(gdp_visual_content)
 gdp_enable_sanitizers(gdp_visual_content)
 
 add_library(
-    gdp_renderer
+    gdp_visual_renderer
     STATIC
     src/game/visual/GdpRenderData.cpp
     src/game/visual/GdpRenderer.cpp
 )
 
-target_compile_features(gdp_renderer PUBLIC cxx_std_20)
-target_include_directories(gdp_renderer PUBLIC src)
+target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)
+target_include_directories(gdp_visual_renderer PUBLIC src)
 target_link_libraries(
-    gdp_renderer
+    gdp_visual_renderer
     PUBLIC gdp_core gdp_procedural_assets gdp_render_foundation gdp_visual_content
 )
-gdp_enable_warnings(gdp_renderer)
-gdp_enable_sanitizers(gdp_renderer)
+gdp_enable_warnings(gdp_visual_renderer)
+gdp_enable_sanitizers(gdp_visual_renderer)
 
 add_library(
     gdp_world
@@ -258,7 +258,7 @@ target_link_libraries(
     gdp_gameplay
     gdp_platform
     gdp_platform_sdl
-    gdp_renderer
+    gdp_visual_renderer
     gdp_world
     SDL3::SDL3
 )
@@ -317,7 +317,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(procedural_audio_systems PROPERTIES TIMEOUT 15)
 
     add_executable(gdp_renderer_tests tests/test_renderer.cpp)
-    target_link_libraries(gdp_renderer_tests PRIVATE gdp_renderer)
+    target_link_libraries(gdp_renderer_tests PRIVATE gdp_visual_renderer)
     gdp_enable_warnings(gdp_renderer_tests)
     gdp_enable_sanitizers(gdp_renderer_tests)
 
@@ -482,11 +482,11 @@ if(GDP_BUILD_TESTS)
 
     if(UNIX AND NOT APPLE)
         add_executable(gdp_capture_industrial_wall tests/capture_industrial_wall.cpp)
-        target_link_libraries(gdp_capture_industrial_wall PRIVATE gdp_renderer)
+        target_link_libraries(gdp_capture_industrial_wall PRIVATE gdp_visual_renderer)
         gdp_enable_warnings(gdp_capture_industrial_wall)
 
         add_executable(gdp_renderer_gl_tests tests/test_renderer_gl.cpp)
-        target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_renderer)
+        target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_visual_renderer)
         gdp_enable_warnings(gdp_renderer_gl_tests)
         gdp_enable_sanitizers(gdp_renderer_gl_tests)
 

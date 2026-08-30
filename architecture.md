@@ -588,9 +588,9 @@ A fronteira visual intermediária possui quatro targets: `gdp_render_foundation`
 contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
 `gdp_procedural_assets` contém receitas, hashing e geradores genéricos;
 `gdp_visual_content` contém Worker, materiais de sala e `game/visual`; e
-`gdp_renderer` compõe a apresentação concreta do GDP. Esses nomes permanecem
-temporários até a fronteira estabilizar; não representam ainda o rename para
-WKC Forge.
+`gdp_visual_renderer` compõe a apresentação concreta do GDP. Esses nomes
+permanecem temporários até a fronteira estabilizar; não representam ainda o
+rename para WKC Forge.
 
 Na Fase 31, todo o conteúdo desse target foi agrupado fisicamente em
 `src/game/visual`, e `src/procedural` ficou restrito à fundação reutilizável.
@@ -619,6 +619,11 @@ Na Fase 36, `GdpRenderer` também passou para `gdp::game::visual`. A composiçã
 concreta referencia `gdp::render::Camera`, `Framebuffer`, `Mesh`, `Shader` e
 `Texture` explicitamente, estabelecendo no código a direção
 `GDP visual -> fundação gráfica` sem renomear targets prematuramente.
+
+Na Fase 37, o target concreto passou de `gdp_renderer` para
+`gdp_visual_renderer`. O nome separa a composição específica do jogo de
+`gdp_render_foundation`; a regressão arquitetural impede que o target ambíguo
+retorne antes da futura adoção dos nomes WKC Forge pela fundação.
 
 ---
 
