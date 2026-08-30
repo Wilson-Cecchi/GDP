@@ -615,6 +615,11 @@ Na Fase 35, esse contrato passou de `gdp::render` para
 concreto apenas os consome; as primitivas da fundação continuam em
 `gdp::render`, sem conhecer HUD, objetivos, inimigos ou salas do GDP.
 
+Na Fase 36, `GdpRenderer` também passou para `gdp::game::visual`. A composição
+concreta referencia `gdp::render::Camera`, `Framebuffer`, `Mesh`, `Shader` e
+`Texture` explicitamente, estabelecendo no código a direção
+`GDP visual -> fundação gráfica` sem renomear targets prematuramente.
+
 ---
 
 # 8. Sistema de seed

@@ -76,7 +76,7 @@ int main(const int argc, char* argv[])
 
     bool passed = true;
     {
-        gdp::render::GdpRenderer renderer;
+        gdp::game::visual::GdpRenderer renderer;
         if (!renderer.initialize(width, height)) {
             std::cerr << "Renderer initialization failed\n";
             passed = false;

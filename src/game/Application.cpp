@@ -209,7 +209,7 @@ const char* progressionRewardName(const gameplay::ProgressionReward reward) noex
 }
 
 bool prepareRoomMaterials(
-    gdp::render::GdpRenderer& renderer,
+    visual::GdpRenderer& renderer,
     const world::RoomInstance& room)
 {
     if (room.role == world::RoomRole::Hub) {
@@ -430,7 +430,7 @@ bool Application::initialize()
         log(LogLevel::Error, sdlError("SDL_GetWindowSizeInPixels failed"));
         return false;
     }
-    renderer_ = std::make_unique<gdp::render::GdpRenderer>();
+    renderer_ = std::make_unique<visual::GdpRenderer>();
     if (!renderer_->initialize(drawableWidth, drawableHeight)) {
         log(LogLevel::Error, "Renderer initialization failed");
         return false;

@@ -17,7 +17,7 @@
 #include <optional>
 #include <unordered_map>
 
-namespace gdp::render {
+namespace gdp::game::visual {
 
 class GdpRenderer {
 public:
@@ -50,39 +50,39 @@ public:
     [[nodiscard]] bool render(
         int width,
         int height,
-        gdp::game::visual::CameraData camera = {},
-        std::span<const gdp::game::visual::EnemyRenderData> enemies = {},
-        std::span<const gdp::game::visual::PickupRenderData> pickups = {},
-        std::span<const gdp::game::visual::PropRenderData> props = {},
-        gdp::game::visual::RoomLightingRenderData lighting = {},
-        gdp::game::visual::RoomRenderData room = {},
-        std::span<const gdp::game::visual::DoorRenderData> doors = {},
-        std::span<const gdp::game::visual::CorridorRenderData> corridors = {},
-        std::span<const gdp::game::visual::RoomRenderData> connectedRooms = {},
-        gdp::game::visual::HudRenderData hud = {});
+        CameraData camera = {},
+        std::span<const EnemyRenderData> enemies = {},
+        std::span<const PickupRenderData> pickups = {},
+        std::span<const PropRenderData> props = {},
+        RoomLightingRenderData lighting = {},
+        RoomRenderData room = {},
+        std::span<const DoorRenderData> doors = {},
+        std::span<const CorridorRenderData> corridors = {},
+        std::span<const RoomRenderData> connectedRooms = {},
+        HudRenderData hud = {});
 
 private:
     struct EnemyGpuVisual {
-        Mesh mesh;
-        Texture texture;
+        gdp::render::Mesh mesh;
+        gdp::render::Texture texture;
         float emissiveStrength{0.0F};
     };
 
     struct IndustrialWallGpuMaterial {
-        Texture albedo;
-        Texture normal;
-        Texture properties;
+        gdp::render::Texture albedo;
+        gdp::render::Texture normal;
+        gdp::render::Texture properties;
     };
 
     struct CeilingFixtureGpuMaterial {
-        Texture albedo;
-        Texture normal;
-        Texture properties;
-        Texture emission;
+        gdp::render::Texture albedo;
+        gdp::render::Texture normal;
+        gdp::render::Texture properties;
+        gdp::render::Texture emission;
     };
 
     struct RoomGpuMaterials {
-        std::array<Texture,
+        std::array<gdp::render::Texture,
             static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
         std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
         std::optional<gdp::procedural::IndustrialCondition> industrialCeilingCondition;
@@ -92,15 +92,15 @@ private:
         float ceilingTone{1.0F};
     };
 
-    GlApi gl_{};
-    Camera camera_{};
-    Framebuffer framebuffer_{};
-    Shader shader_{};
-    Mesh box_{};
-    Texture fallbackTexture_{};
+    gdp::render::GlApi gl_{};
+    gdp::render::Camera camera_{};
+    gdp::render::Framebuffer framebuffer_{};
+    gdp::render::Shader shader_{};
+    gdp::render::Mesh box_{};
+    gdp::render::Texture fallbackTexture_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
-    gdp::procedural::AssetCache<MeshData> meshCache_{};
-    gdp::procedural::AssetCache<ImageData> textureCache_{};
+    gdp::procedural::AssetCache<gdp::render::MeshData> meshCache_{};
+    gdp::procedural::AssetCache<gdp::render::ImageData> textureCache_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> workerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> guardVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> officerVisuals_{};
@@ -118,4 +118,4 @@ private:
     bool initialized_{false};
 };
 
-} // namespace gdp::render
+} // namespace gdp::game::visual

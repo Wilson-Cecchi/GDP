@@ -18,34 +18,7 @@
 #include <string_view>
 #include <utility>
 
-namespace gdp::render {
-
-using gdp::game::visual::CameraData;
-using gdp::game::visual::CorridorRenderData;
-using gdp::game::visual::DoorRenderData;
-using gdp::game::visual::EnemyRenderData;
-using gdp::game::visual::EnemyVisualRole;
-using gdp::game::visual::HudEventState;
-using gdp::game::visual::HudHitFeedback;
-using gdp::game::visual::HudMainMenuSelection;
-using gdp::game::visual::HudNotice;
-using gdp::game::visual::HudPauseSelection;
-using gdp::game::visual::HudPrompt;
-using gdp::game::visual::HudRenderData;
-using gdp::game::visual::MainMenuLayout;
-using gdp::game::visual::ObjectiveRenderState;
-using gdp::game::visual::PickupRenderData;
-using gdp::game::visual::PickupVisualRole;
-using gdp::game::visual::PointLightRenderData;
-using gdp::game::visual::PropRenderData;
-using gdp::game::visual::PropVisualRole;
-using gdp::game::visual::PropVisualState;
-using gdp::game::visual::RoomLightingRenderData;
-using gdp::game::visual::RoomRenderData;
-using gdp::game::visual::UiRect;
-using gdp::game::visual::makeMainMenuLayout;
-using gdp::game::visual::maxRenderedRoomLights;
-
+namespace gdp::game::visual {
 namespace {
 
 constexpr std::string_view vertexShaderSource = R"glsl(#version 330 core
@@ -289,7 +262,7 @@ bool GdpRenderer::initialize(const int width, const int height)
     if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)) {
         return false;
     }
-    if (!box_.upload(gl_, makeBoxMesh())) {
+    if (!box_.upload(gl_, gdp::render::makeBoxMesh())) {
         return false;
     }
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
@@ -298,13 +271,13 @@ bool GdpRenderer::initialize(const int width, const int height)
     const gdp::game::CeilingFixtureMaterialImages fixtureImages
         = gdp::game::makeCeilingFixtureMaterialImages();
     if (!ceilingFixtureMaterial_.albedo.upload(
-            gl_, fixtureImages.albedo, TextureSampling::Trilinear)
+            gl_, fixtureImages.albedo, gdp::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.normal.upload(
-            gl_, fixtureImages.normal, TextureSampling::Trilinear)
+            gl_, fixtureImages.normal, gdp::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.properties.upload(
-            gl_, fixtureImages.properties, TextureSampling::Trilinear)
+            gl_, fixtureImages.properties, gdp::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.emission.upload(
-            gl_, fixtureImages.emission, TextureSampling::Trilinear)) {
+            gl_, fixtureImages.emission, gdp::render::TextureSampling::Trilinear)) {
         return false;
     }
     if (!framebuffer_.resize(gl_, width, height)) {
@@ -354,11 +327,11 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         }
         IndustrialWallGpuMaterial wallMaterial;
         if (!wallMaterial.albedo.upload(
-                gl_, images->albedo, TextureSampling::Trilinear)
+                gl_, images->albedo, gdp::render::TextureSampling::Trilinear)
             || !wallMaterial.normal.upload(
-                gl_, images->normal, TextureSampling::Trilinear)
+                gl_, images->normal, gdp::render::TextureSampling::Trilinear)
             || !wallMaterial.properties.upload(
-                gl_, images->properties, TextureSampling::Trilinear)) {
+                gl_, images->properties, gdp::render::TextureSampling::Trilinear)) {
             return false;
         }
         sharedWall.emplace(std::move(wallMaterial));
@@ -375,11 +348,11 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         }
         IndustrialWallGpuMaterial ceilingMaterial;
         if (!ceilingMaterial.albedo.upload(
-                gl_, images->albedo, TextureSampling::Trilinear)
+                gl_, images->albedo, gdp::render::TextureSampling::Trilinear)
             || !ceilingMaterial.normal.upload(
-                gl_, images->normal, TextureSampling::Trilinear)
+                gl_, images->normal, gdp::render::TextureSampling::Trilinear)
             || !ceilingMaterial.properties.upload(
-                gl_, images->properties, TextureSampling::Trilinear)) {
+                gl_, images->properties, gdp::render::TextureSampling::Trilinear)) {
             return false;
         }
         sharedCeiling.emplace(std::move(ceilingMaterial));
@@ -1835,4 +1808,4 @@ bool GdpRenderer::render(
     return true;
 }
 
-} // namespace gdp::render
+} // namespace gdp::game::visual

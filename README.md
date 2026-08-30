@@ -142,6 +142,10 @@ especializados das pastas numeradas.
   passou de `gdp::render` para `gdp::game::visual`. Os DTOs específicos do GDP
   não ocupam mais o namespace das primitivas gráficas reutilizáveis; nomes,
   valores e representação permanecem inalterados.
+- **Fase 36 — Propriedade do renderer concreto:** `GdpRenderer` também passou
+  para `gdp::game::visual` e agora referencia explicitamente as primitivas de
+  `gdp::render`. O namespace gráfico reutilizável deixou de possuir classes ou
+  dados de apresentação específicos do GDP.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

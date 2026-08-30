@@ -17,6 +17,8 @@
 > contrato de apresentação independente da classe concreta.
 > A Fase 35 moveu esse contrato para `gdp::game::visual`; `gdp::render` deixa
 > de ser proprietário de tipos específicos de HUD, entidades e salas do GDP.
+> A Fase 36 moveu a própria classe `GdpRenderer` para `gdp::game::visual`,
+> mantendo as primitivas reutilizáveis qualificadas em `gdp::render`.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -79,7 +81,9 @@ passou a `gdp::render::GdpRenderer` na Fase 33. Na Fase 34, os DTOs de
 apresentação passaram ao contrato `game/visual/GdpRenderData.*`; seus nomes e
 representação permanecem compatíveis. Na Fase 35, o namespace do contrato
 passou a `gdp::game::visual`, enquanto as primitivas reutilizáveis continuam em
-`gdp::render`.
+`gdp::render`. Na Fase 36, a classe concreta também passou a
+`gdp::game::visual::GdpRenderer`, consumindo a fundação gráfica por nomes
+qualificados.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

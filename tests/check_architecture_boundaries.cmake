@@ -46,11 +46,17 @@ if(NOT gdp_renderer_contents MATCHES "class[ \t]+GdpRenderer[ \t{:]"
     message(FATAL_ERROR "GDP concrete renderer must use the explicit GdpRenderer name")
 endif()
 if(NOT gdp_renderer_contents MATCHES
+        "namespace[ \t]+gdp::game::visual[ \t{]"
+    OR gdp_renderer_contents MATCHES
+        "namespace[ \t]+gdp::render[ \t{]")
+    message(FATAL_ERROR "GDP concrete renderer must be owned by gdp::game::visual")
+endif()
+if(NOT gdp_renderer_contents MATCHES
         "#include[ \t]+\"game/visual/GdpRenderData.hpp\"")
     message(FATAL_ERROR "GDP renderer must consume the render data contract")
 endif()
-if(NOT gdp_renderer_contents MATCHES "gdp::game::visual::HudRenderData")
-    message(FATAL_ERROR "GDP renderer must consume game-owned presentation DTOs")
+if(NOT gdp_renderer_contents MATCHES "gdp::render::Texture")
+    message(FATAL_ERROR "GDP renderer must consume qualified render foundation types")
 endif()
 if(gdp_renderer_contents MATCHES "struct[ \t]+HudRenderData"
     OR gdp_renderer_contents MATCHES "enum[ \t]+class[ \t]+EnemyVisualRole")
