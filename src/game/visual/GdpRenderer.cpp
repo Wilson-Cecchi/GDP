@@ -1,4 +1,4 @@
-#include "render/Renderer.hpp"
+#include "game/visual/GdpRenderer.hpp"
 
 #include "core/Log.hpp"
 #include "core/Math.hpp"

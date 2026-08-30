@@ -127,6 +127,10 @@ especializados das pastas numeradas.
   de sala e assets concretos passaram fisicamente para `src/game/visual`.
   `src/procedural` contém somente a fundação reutilizável, protegida por uma
   regressão arquitetural; namespaces permanecem compatíveis nesta etapa.
+- **Fase 32 — Renderer concreto no jogo:** a implementação que conhece HUD,
+  salas, inimigos e materiais GDP passou para `game/visual/GdpRenderer`.
+  `src/render` contém apenas primitivas gráficas reutilizáveis e é protegido
+  integralmente contra dependências de conteúdo do jogo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

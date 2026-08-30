@@ -32,6 +32,13 @@ set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/visual/VisualAssets.hpp")
 if(NOT EXISTS "${game_visual_assets}")
     message(FATAL_ERROR "GDP visual content is missing from src/game")
 endif()
+if(NOT EXISTS "${GDP_SOURCE_DIR}/src/game/visual/GdpRenderer.hpp")
+    message(FATAL_ERROR "GDP concrete renderer is missing from src/game/visual")
+endif()
+if(EXISTS "${GDP_SOURCE_DIR}/src/render/Renderer.cpp"
+    OR EXISTS "${GDP_SOURCE_DIR}/src/render/Renderer.hpp")
+    message(FATAL_ERROR "Generic render directory must not own the GDP renderer")
+endif()
 
 foreach(generic_visual_api IN ITEMS
     "${GDP_SOURCE_DIR}/src/procedural/AssetRecipe.hpp"
@@ -62,19 +69,9 @@ foreach(source IN LISTS procedural_foundation_sources)
     endif()
 endforeach()
 
-set(render_foundation_sources
-    "${GDP_SOURCE_DIR}/src/render/Camera.cpp"
-    "${GDP_SOURCE_DIR}/src/render/Camera.hpp"
-    "${GDP_SOURCE_DIR}/src/render/Framebuffer.cpp"
-    "${GDP_SOURCE_DIR}/src/render/Framebuffer.hpp"
-    "${GDP_SOURCE_DIR}/src/render/GlApi.cpp"
-    "${GDP_SOURCE_DIR}/src/render/GlApi.hpp"
-    "${GDP_SOURCE_DIR}/src/render/Mesh.cpp"
-    "${GDP_SOURCE_DIR}/src/render/Mesh.hpp"
-    "${GDP_SOURCE_DIR}/src/render/Shader.cpp"
-    "${GDP_SOURCE_DIR}/src/render/Shader.hpp"
-    "${GDP_SOURCE_DIR}/src/render/Texture.cpp"
-    "${GDP_SOURCE_DIR}/src/render/Texture.hpp"
+file(GLOB render_foundation_sources
+    "${GDP_SOURCE_DIR}/src/render/*.cpp"
+    "${GDP_SOURCE_DIR}/src/render/*.hpp"
 )
 foreach(source IN LISTS render_foundation_sources)
     file(READ "${source}" contents)

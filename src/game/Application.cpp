@@ -10,7 +10,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "platform/SdlInput.hpp"
-#include "render/Renderer.hpp"
+#include "game/visual/GdpRenderer.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldEntities.hpp"

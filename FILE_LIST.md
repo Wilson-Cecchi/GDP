@@ -70,6 +70,8 @@
 - `src/game/SeedDomains.hpp`
 - `src/game/visual/EnemyGenerator.cpp`
 - `src/game/visual/EnemyGenerator.hpp`
+- `src/game/visual/GdpRenderer.cpp`
+- `src/game/visual/GdpRenderer.hpp`
 - `src/game/visual/RoomMaterialGenerator.cpp`
 - `src/game/visual/RoomMaterialGenerator.hpp`
 - `src/game/visual/VisualAssets.cpp`
@@ -112,8 +114,6 @@
 - `src/render/GlApi.hpp`
 - `src/render/Mesh.cpp`
 - `src/render/Mesh.hpp`
-- `src/render/Renderer.cpp`
-- `src/render/Renderer.hpp`
 - `src/render/Shader.cpp`
 - `src/render/Shader.hpp`
 - `src/render/Texture.cpp`

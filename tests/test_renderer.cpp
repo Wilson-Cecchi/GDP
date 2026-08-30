@@ -2,7 +2,7 @@
 #include "game/visual/VisualAssets.hpp"
 #include "render/Camera.hpp"
 #include "render/Mesh.hpp"
-#include "render/Renderer.hpp"
+#include "game/visual/GdpRenderer.hpp"
 #include "render/Texture.hpp"
 
 #include <cmath>

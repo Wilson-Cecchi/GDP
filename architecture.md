@@ -439,6 +439,8 @@ gdp/
 │   │   └── visual/
 │   │       ├── EnemyGenerator.cpp
 │   │       ├── EnemyGenerator.hpp
+│   │       ├── GdpRenderer.cpp
+│   │       ├── GdpRenderer.hpp
 │   │       ├── RoomMaterialGenerator.cpp
 │   │       ├── RoomMaterialGenerator.hpp
 │   │       ├── VisualAssets.cpp
@@ -463,8 +465,6 @@ gdp/
 │   │   └── SdlInput.hpp
 │   │
 │   ├── render/
-│   │   ├── Renderer.cpp
-│   │   ├── Renderer.hpp
 │   │   ├── Camera.cpp
 │   │   ├── Camera.hpp
 │   │   ├── Mesh.cpp
@@ -594,6 +594,12 @@ Na Fase 31, todo o conteúdo desse target foi agrupado fisicamente em
 `src/game/visual`, e `src/procedural` ficou restrito à fundação reutilizável.
 Os namespaces anteriores foram preservados temporariamente para que a mudança
 de localização não seja misturada a um rename amplo.
+
+Na Fase 32, o renderer concreto também passou para
+`src/game/visual/GdpRenderer.*`. Ele continua expondo temporariamente
+`gdp::render::Renderer`, mas `src/render` agora contém somente Camera,
+Framebuffer, GlApi, Mesh, Shader e Texture. A regressão arquitetural cobre toda
+a pasta, inclusive arquivos adicionados no futuro.
 
 ---
 

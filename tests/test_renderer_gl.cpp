@@ -1,4 +1,4 @@
-#include "render/Renderer.hpp"
+#include "game/visual/GdpRenderer.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>

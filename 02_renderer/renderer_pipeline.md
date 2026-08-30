@@ -11,6 +11,8 @@
 > visual GDP e renderer concreto sem alterar a imagem produzida.
 > A Fase 31 alinhou a estrutura física, movendo o conteúdo visual concreto para
 > `src/game/visual` e reservando `src/procedural` à fundação reutilizável.
+> A Fase 32 moveu o renderer concreto para `game/visual/GdpRenderer`; a pasta
+> `src/render` ficou restrita às primitivas gráficas reutilizáveis.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -68,6 +70,9 @@ Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `gdp_render_foundation`. Receitas e geradores reutilizáveis ficam em
 `gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
 do GDP ficam em `gdp_visual_content`; `gdp_renderer` realiza a composição final.
+Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
+`gdp::render::Renderer` permanece temporariamente por compatibilidade e será
+avaliado apenas depois da estabilização dessa fronteira.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e
