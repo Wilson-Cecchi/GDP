@@ -70,6 +70,8 @@
 - `src/game/SeedDomains.hpp`
 - `src/game/visual/EnemyGenerator.cpp`
 - `src/game/visual/EnemyGenerator.hpp`
+- `src/game/visual/GdpRenderData.cpp`
+- `src/game/visual/GdpRenderData.hpp`
 - `src/game/visual/GdpRenderer.cpp`
 - `src/game/visual/GdpRenderer.hpp`
 - `src/game/visual/RoomMaterialGenerator.cpp`

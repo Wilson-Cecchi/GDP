@@ -33,13 +33,32 @@ if(NOT EXISTS "${game_visual_assets}")
     message(FATAL_ERROR "GDP visual content is missing from src/game")
 endif()
 set(gdp_renderer_header "${GDP_SOURCE_DIR}/src/game/visual/GdpRenderer.hpp")
+set(gdp_render_data_header "${GDP_SOURCE_DIR}/src/game/visual/GdpRenderData.hpp")
 if(NOT EXISTS "${gdp_renderer_header}")
     message(FATAL_ERROR "GDP concrete renderer is missing from src/game/visual")
+endif()
+if(NOT EXISTS "${gdp_render_data_header}")
+    message(FATAL_ERROR "GDP render data contract is missing from src/game/visual")
 endif()
 file(READ "${gdp_renderer_header}" gdp_renderer_contents)
 if(NOT gdp_renderer_contents MATCHES "class[ \t]+GdpRenderer[ \t{:]"
     OR gdp_renderer_contents MATCHES "class[ \t]+Renderer[ \t{:]" )
     message(FATAL_ERROR "GDP concrete renderer must use the explicit GdpRenderer name")
+endif()
+if(NOT gdp_renderer_contents MATCHES
+        "#include[ \t]+\"game/visual/GdpRenderData.hpp\"")
+    message(FATAL_ERROR "GDP renderer must consume the render data contract")
+endif()
+if(gdp_renderer_contents MATCHES "struct[ \t]+HudRenderData"
+    OR gdp_renderer_contents MATCHES "enum[ \t]+class[ \t]+EnemyVisualRole")
+    message(FATAL_ERROR "GDP renderer class header must not own presentation DTOs")
+endif()
+file(READ "${gdp_render_data_header}" gdp_render_data_contents)
+if(NOT gdp_render_data_contents MATCHES "struct[ \t]+HudRenderData"
+    OR NOT gdp_render_data_contents MATCHES "struct[ \t]+RoomRenderData"
+    OR NOT gdp_render_data_contents MATCHES
+        "enum[ \t]+class[ \t]+EnemyVisualRole")
+    message(FATAL_ERROR "GDP render data contract is incomplete")
 endif()
 if(EXISTS "${GDP_SOURCE_DIR}/src/render/Renderer.cpp"
     OR EXISTS "${GDP_SOURCE_DIR}/src/render/Renderer.hpp")

@@ -13,6 +13,8 @@
 > `src/game/visual` e reservando `src/procedural` à fundação reutilizável.
 > A Fase 32 moveu o renderer concreto para `game/visual/GdpRenderer`; a pasta
 > `src/render` ficou restrita às primitivas gráficas reutilizáveis.
+> A Fase 34 extraiu seus DTOs para `game/visual/GdpRenderData`, formando um
+> contrato de apresentação independente da classe concreta.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -54,7 +56,7 @@ GAME STATE
 
 ## Implementação da Fase 2
 
-`Renderer` recebe dimensões do alvo e `CameraData` pronto do gameplay e mantém
+`GdpRenderer` recebe dimensões do alvo e `CameraData` pronto do gameplay e mantém
 shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
 
 ```text
@@ -71,9 +73,10 @@ Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
 do GDP ficam em `gdp_visual_content`; `gdp_renderer` realiza a composição final.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
-passou a `gdp::render::GdpRenderer` na Fase 33. Os DTOs de apresentação ainda
-permanecem no namespace atual para não misturar esse rename com as primitivas
-reutilizáveis.
+passou a `gdp::render::GdpRenderer` na Fase 33. Na Fase 34, os DTOs de
+apresentação passaram ao contrato `game/visual/GdpRenderData.*`; seus nomes e
+namespace permanecem compatíveis enquanto a separação das primitivas
+reutilizáveis continua incrementalmente.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

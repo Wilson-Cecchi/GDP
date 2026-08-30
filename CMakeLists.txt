@@ -205,6 +205,7 @@ gdp_enable_sanitizers(gdp_visual_content)
 add_library(
     gdp_renderer
     STATIC
+    src/game/visual/GdpRenderData.cpp
     src/game/visual/GdpRenderer.cpp
 )
 

@@ -1,4 +1,5 @@
 #include "core/Math.hpp"
+#include "game/visual/GdpRenderData.hpp"
 #include "game/visual/VisualAssets.hpp"
 #include "render/Camera.hpp"
 #include "render/Mesh.hpp"

@@ -134,6 +134,10 @@ especializados das pastas numeradas.
 - **Fase 33 — Nome explícito do renderer GDP:** a classe concreta agora se
   chama `gdp::render::GdpRenderer`, eliminando a aparência de renderer genérico
   sem renomear indiscriminadamente DTOs ou primitivas gráficas.
+- **Fase 34 — Contrato de apresentação do GDP:** DTOs de câmera, salas,
+  entidades, HUD e iluminação passaram para `game/visual/GdpRenderData`.
+  `GdpRenderer` agora consome esse contrato separado, sem alterar tipos,
+  namespaces, gameplay ou pixels renderizados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

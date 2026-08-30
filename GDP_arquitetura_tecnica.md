@@ -517,6 +517,8 @@ gdp/
 │   │   └── visual/
 │   │       ├── EnemyGenerator.cpp
 │   │       ├── EnemyGenerator.hpp
+│   │       ├── GdpRenderData.cpp
+│   │       ├── GdpRenderData.hpp
 │   │       ├── GdpRenderer.cpp
 │   │       ├── GdpRenderer.hpp
 │   │       ├── RoomMaterialGenerator.cpp
@@ -679,8 +681,11 @@ Framebuffer, GlApi, Mesh, Shader e Texture. A regressão arquitetural cobre toda
 a pasta, inclusive arquivos adicionados no futuro.
 
 Na Fase 33, a classe concreta passou de `gdp::render::Renderer` para
-`gdp::render::GdpRenderer`. Os DTOs de apresentação permanecem temporariamente
-no namespace atual para que sua futura separação seja guiada por contratos, sem
+`gdp::render::GdpRenderer`, removendo o nome genérico da composição do jogo.
+
+Na Fase 34, os DTOs de câmera, sala, entidades, HUD e iluminação foram extraídos
+para o contrato `src/game/visual/GdpRenderData.*`. O namespace foi preservado
+temporariamente para separar essa mudança estrutural de um futuro rename e não
 confundir tipos GDP com `Camera`, `ImageData`, `Mesh` e `Texture` reutilizáveis.
 
 ---
