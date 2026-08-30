@@ -214,15 +214,15 @@ struct RoomLightingRenderData {
     bool alert{false};
 };
 
-class Renderer {
+class GdpRenderer {
 public:
-    Renderer() = default;
-    ~Renderer() = default;
+    GdpRenderer() = default;
+    ~GdpRenderer() = default;
 
-    Renderer(const Renderer&) = delete;
-    Renderer& operator=(const Renderer&) = delete;
-    Renderer(Renderer&&) = delete;
-    Renderer& operator=(Renderer&&) = delete;
+    GdpRenderer(const GdpRenderer&) = delete;
+    GdpRenderer& operator=(const GdpRenderer&) = delete;
+    GdpRenderer(GdpRenderer&&) = delete;
+    GdpRenderer& operator=(GdpRenderer&&) = delete;
 
     [[nodiscard]] bool initialize(int width, int height);
     [[nodiscard]] bool prepareIndustrialRoomMaterials(gdp::core::Seed roomSeed);

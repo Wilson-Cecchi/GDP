@@ -52,7 +52,7 @@ int main()
 
     bool passed = false;
     {
-        gdp::render::Renderer renderer;
+        gdp::render::GdpRenderer renderer;
         constexpr std::array enemies{
             gdp::render::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
             gdp::render::EnemyRenderData{{-1.5F, 0.0F, -1.0F}, false, 222},

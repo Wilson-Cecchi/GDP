@@ -71,8 +71,9 @@ Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
 do GDP ficam em `gdp_visual_content`; `gdp_renderer` realiza a composição final.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
-`gdp::render::Renderer` permanece temporariamente por compatibilidade e será
-avaliado apenas depois da estabilização dessa fronteira.
+passou a `gdp::render::GdpRenderer` na Fase 33. Os DTOs de apresentação ainda
+permanecem no namespace atual para não misturar esse rename com as primitivas
+reutilizáveis.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

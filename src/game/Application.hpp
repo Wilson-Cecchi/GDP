@@ -30,7 +30,7 @@ class AudioSystem;
 }
 
 namespace gdp::render {
-class Renderer;
+class GdpRenderer;
 }
 
 namespace gdp::game {
@@ -88,7 +88,7 @@ private:
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
-    std::unique_ptr<gdp::render::Renderer> renderer_;
+    std::unique_ptr<gdp::render::GdpRenderer> renderer_;
     SDL_Window* window_{nullptr};
     SDL_GLContextState* glContext_{nullptr};
     bool sdlInitialized_{false};

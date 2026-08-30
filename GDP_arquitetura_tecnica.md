@@ -674,10 +674,14 @@ Os namespaces anteriores foram preservados temporariamente para que a mudança
 de localização não seja misturada a um rename amplo.
 
 Na Fase 32, o renderer concreto também passou para
-`src/game/visual/GdpRenderer.*`. Ele continua expondo temporariamente
-`gdp::render::Renderer`, mas `src/render` agora contém somente Camera,
+`src/game/visual/GdpRenderer.*`. `src/render` agora contém somente Camera,
 Framebuffer, GlApi, Mesh, Shader e Texture. A regressão arquitetural cobre toda
 a pasta, inclusive arquivos adicionados no futuro.
+
+Na Fase 33, a classe concreta passou de `gdp::render::Renderer` para
+`gdp::render::GdpRenderer`. Os DTOs de apresentação permanecem temporariamente
+no namespace atual para que sua futura separação seja guiada por contratos, sem
+confundir tipos GDP com `Camera`, `ImageData`, `Mesh` e `Texture` reutilizáveis.
 
 ---
 

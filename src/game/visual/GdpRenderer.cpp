@@ -308,7 +308,7 @@ std::optional<HudMainMenuSelection> mainMenuSelectionAt(
     return std::nullopt;
 }
 
-bool Renderer::initialize(const int width, const int height)
+bool GdpRenderer::initialize(const int width, const int height)
 {
     if (!loadGlApi(gl_)) {
         return false;
@@ -353,7 +353,7 @@ bool Renderer::initialize(const int width, const int height)
     return true;
 }
 
-bool Renderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -454,7 +454,7 @@ bool Renderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -488,7 +488,7 @@ bool Renderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -522,7 +522,7 @@ bool Renderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -556,7 +556,7 @@ bool Renderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -590,7 +590,7 @@ bool Renderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -624,7 +624,7 @@ bool Renderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -658,7 +658,7 @@ bool Renderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -692,7 +692,7 @@ bool Renderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool Renderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -727,7 +727,7 @@ bool Renderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool Renderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -762,7 +762,7 @@ bool Renderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool Renderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -797,7 +797,7 @@ bool Renderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool Renderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -833,7 +833,7 @@ bool Renderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool Renderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -868,7 +868,7 @@ bool Renderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool Renderer::render(
+bool GdpRenderer::render(
     const int width,
     const int height,
     const CameraData camera,
