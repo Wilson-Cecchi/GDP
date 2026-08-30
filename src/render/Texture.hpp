@@ -16,6 +16,11 @@ struct ImageData {
 [[nodiscard]] ImageData makeIndustrialCheckerImage(int width = 8, int height = 8);
 [[nodiscard]] bool validateImageData(const ImageData& image) noexcept;
 
+enum class TextureSampling : std::uint8_t {
+    Pixelated,
+    Trilinear,
+};
+
 class Texture {
 public:
     Texture() = default;
@@ -26,7 +31,10 @@ public:
     Texture(Texture&& other) noexcept;
     Texture& operator=(Texture&& other) noexcept;
 
-    [[nodiscard]] bool upload(const GlApi& gl, const ImageData& image);
+    [[nodiscard]] bool upload(
+        const GlApi& gl,
+        const ImageData& image,
+        TextureSampling sampling = TextureSampling::Pixelated);
     void bind(const GlApi& gl, unsigned int unit = 0) const noexcept;
     void reset() noexcept;
 

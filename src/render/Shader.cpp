@@ -131,6 +131,17 @@ void Shader::setVec3(
     }
 }
 
+void Shader::setVec2(
+    const GlApi& gl,
+    const char* const name,
+    const gdp::core::Vec2 value) const noexcept
+{
+    const GLint location = gl.getUniformLocation(program_, name);
+    if (location >= 0) {
+        gl.uniform2f(location, value.x, value.y);
+    }
+}
+
 void Shader::setInt(
     const GlApi& gl,
     const char* const name,

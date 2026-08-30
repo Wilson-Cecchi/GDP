@@ -58,6 +58,261 @@ gdp::core::Vec3 mix(
     };
 }
 
+float scalarMix(const float first, const float second, const float amount) noexcept
+{
+    return first + ((second - first) * amount);
+}
+
+float smoothNoise(
+    const gdp::core::Seed seed,
+    const std::uint32_t x,
+    const std::uint32_t y,
+    const std::uint32_t cellSize) noexcept
+{
+    const std::uint32_t gridX = x / cellSize;
+    const std::uint32_t gridY = y / cellSize;
+    const float localX = static_cast<float>(x % cellSize) / static_cast<float>(cellSize);
+    const float localY = static_cast<float>(y % cellSize) / static_cast<float>(cellSize);
+    const float blendX = localX * localX * (3.0F - (2.0F * localX));
+    const float blendY = localY * localY * (3.0F - (2.0F * localY));
+    const auto sample = [seed](const std::uint32_t sampleX, const std::uint32_t sampleY) {
+        const std::uint64_t id = (static_cast<std::uint64_t>(sampleY) << 32U) | sampleX;
+        return unitNoise(gdp::core::hashCombine(seed, id));
+    };
+    const float top = scalarMix(sample(gridX, gridY), sample(gridX + 1U, gridY), blendX);
+    const float bottom = scalarMix(
+        sample(gridX, gridY + 1U), sample(gridX + 1U, gridY + 1U), blendX);
+    return scalarMix(top, bottom, blendY);
+}
+
+struct IndustrialWallSample {
+    gdp::core::Vec3 albedo{};
+    float height{0.5F};
+    float roughness{0.62F};
+    float metalness{0.06F};
+    float ambientOcclusion{1.0F};
+    bool exposed{false};
+};
+
+IndustrialWallSample industrialWallSample(
+    const IndustrialSurfaceRecipe& recipe,
+    const std::uint32_t x,
+    const std::uint32_t y,
+    const std::uint32_t cellWidth,
+    const std::uint32_t cellHeight,
+    const std::uint32_t stripeHeight) noexcept
+{
+    constexpr gdp::core::Vec3 jointColor{21.0F / 255.0F, 26.0F / 255.0F, 28.0F / 255.0F};
+    constexpr gdp::core::Vec3 exposedSteel{
+        139.0F / 255.0F, 144.0F / 255.0F, 145.0F / 255.0F};
+    constexpr gdp::core::Vec3 grimeColor{73.0F / 255.0F, 56.0F / 255.0F, 43.0F / 255.0F};
+    constexpr gdp::core::Vec3 stripeBlack{0.055F, 0.060F, 0.065F};
+
+    IndustrialWallSample sample;
+    const std::uint32_t panelX = x % cellWidth;
+    const std::uint32_t panelY = y % cellHeight;
+    const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+        | (x / cellWidth);
+    const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+
+    const std::uint32_t edgeX = std::min(panelX, cellWidth - 1U - panelX);
+    const std::uint32_t edgeY = std::min(panelY, cellHeight - 1U - panelY);
+    const std::uint32_t edge = std::min(edgeX, edgeY);
+    const std::uint32_t gasketWidth = std::max(4U, recipe.resolution / 256U);
+    const std::uint32_t frameWidth = std::max(18U, recipe.resolution / 48U);
+    const std::uint32_t bevelWidth = frameWidth + std::max(10U, recipe.resolution / 96U);
+    const bool seam = edge <= gasketWidth;
+    const bool frame = !seam && edge <= frameWidth;
+    const bool bevel = !seam && !frame && edge <= bevelWidth;
+
+    const float panelBlend = 0.08F + unitNoise(
+        gdp::core::hashCombine(recipe.seed, panelId)) * 0.10F;
+    sample.albedo = mix(recipe.baseColor, recipe.secondaryColor, panelBlend);
+    const float macro = (smoothNoise(recipe.seed ^ 0x4D414352U, x, y, 128U) - 0.5F)
+        * 0.055F;
+    const float orangePeel = (smoothNoise(recipe.seed ^ 0x5041494EU, x, y, 12U) - 0.5F)
+        * 0.024F;
+    const std::uint32_t brushBand = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(x) + (recipe.seed & 15U)) % 17U);
+    const float brush = (static_cast<float>(brushBand) - 8.0F) * 0.00035F;
+    const float grain = (unitNoise(gdp::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
+        * 0.009F;
+    sample.albedo = add(sample.albedo, macro + orangePeel + brush + grain);
+    sample.height = 0.50F + orangePeel * 0.42F + grain * 0.12F;
+    sample.roughness = 0.61F + orangePeel * 1.4F;
+
+    if (seam) {
+        sample.albedo = jointColor;
+        sample.height = 0.20F;
+        sample.roughness = 0.76F;
+        sample.metalness = 0.16F;
+        sample.ambientOcclusion = 0.54F;
+    } else if (frame) {
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.62F);
+        sample.height = 0.59F;
+        sample.roughness = 0.48F;
+        sample.metalness = 0.30F;
+    } else if (bevel) {
+        const float bevelAmount = static_cast<float>(bevelWidth - edge)
+            / static_cast<float>(bevelWidth - frameWidth);
+        sample.albedo = mix(sample.albedo, exposedSteel, bevelAmount * 0.13F);
+        sample.height = 0.50F + bevelAmount * 0.08F;
+        sample.roughness -= bevelAmount * 0.06F;
+    }
+
+    const bool insetRib = edge >= bevelWidth + 14U && edge <= bevelWidth + 23U;
+    if (insetRib) {
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.28F);
+        sample.height = 0.535F;
+        sample.roughness = 0.54F;
+        sample.metalness = 0.16F;
+    }
+
+    const bool reinforcedCorner = !seam && !frame
+        && edgeX < 82U && edgeY < 82U && edgeX + edgeY < 104U;
+    if (reinforcedCorner) {
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.48F);
+        sample.height = 0.585F;
+        sample.roughness = 0.46F;
+        sample.metalness = 0.32F;
+    }
+
+    const bool baseRail = y >= stripeHeight && y < stripeHeight + 44U;
+    const bool topRail = y + 70U >= recipe.resolution;
+    if (baseRail || topRail) {
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.68F);
+        sample.height = 0.61F;
+        sample.roughness = 0.47F;
+        sample.metalness = 0.34F;
+    }
+
+    const std::uint32_t plateLeft = cellWidth * 64U / 100U;
+    const std::uint32_t plateRight = cellWidth * 88U / 100U;
+    const std::uint32_t plateBottom = cellHeight * 34U / 100U;
+    const std::uint32_t plateTop = cellHeight * 58U / 100U;
+    const bool platePanel = ((x / cellWidth) % 2U) == 1U && (y / cellHeight) == 0U;
+    const bool onPlate = platePanel && panelX >= plateLeft && panelX <= plateRight
+        && panelY >= plateBottom && panelY <= plateTop;
+    if (onPlate) {
+        const std::uint32_t plateEdge = std::min({
+            panelX - plateLeft, plateRight - panelX,
+            panelY - plateBottom, plateTop - panelY});
+        sample.albedo = mix(sample.albedo, recipe.secondaryColor,
+            plateEdge < 8U ? 0.72F : 0.24F);
+        sample.height = plateEdge < 8U ? 0.63F : 0.60F;
+        sample.roughness = 0.52F;
+        sample.metalness = 0.20F;
+    }
+
+    const bool stencil = panelX >= bevelWidth + 38U && panelX <= bevelWidth + 142U
+        && panelY + 78U >= cellHeight && panelY + 64U <= cellHeight
+        && ((panelId ^ recipe.seed) & 1U) == 0U;
+    if (stencil) {
+        const bool dash = ((panelX - bevelWidth) / 18U) % 2U == 0U;
+        sample.albedo = dash
+            ? mix(sample.albedo, jointColor, 0.62F)
+            : mix(sample.albedo, recipe.accentColor, 0.30F);
+        sample.roughness = 0.68F;
+        sample.metalness = 0.04F;
+    }
+
+    if (onPlate) {
+        const std::array plateHoles{
+            std::pair{plateLeft + (plateRight - plateLeft) * 38U / 100U,
+                plateBottom + (plateTop - plateBottom) / 2U},
+            std::pair{plateLeft + (plateRight - plateLeft) * 66U / 100U,
+                plateBottom + (plateTop - plateBottom) / 2U},
+        };
+        const std::uint32_t holeRadius = std::max(8U, recipe.resolution / 128U);
+        for (const auto& [holeX, holeY] : plateHoles) {
+            const int deltaX = static_cast<int>(panelX) - static_cast<int>(holeX);
+            const int deltaY = static_cast<int>(panelY) - static_cast<int>(holeY);
+            const std::uint32_t distanceSquared = static_cast<std::uint32_t>(
+                (deltaX * deltaX) + (deltaY * deltaY));
+            if (distanceSquared <= holeRadius * holeRadius) {
+                const bool core = distanceSquared
+                    <= (holeRadius / 2U) * (holeRadius / 2U);
+                sample.albedo = core ? jointColor : exposedSteel;
+                sample.height = core ? 0.42F : 0.66F;
+                sample.roughness = core ? 0.50F : 0.27F;
+                sample.metalness = core ? 0.58F : 0.92F;
+                sample.ambientOcclusion = core ? 0.58F : 0.90F;
+            }
+        }
+    }
+
+    const std::uint32_t boltInset = frameWidth + 12U;
+    const std::array boltCenters{
+        std::pair{boltInset, boltInset},
+        std::pair{cellWidth - 1U - boltInset, boltInset},
+        std::pair{boltInset, cellHeight - 1U - boltInset},
+        std::pair{cellWidth - 1U - boltInset, cellHeight - 1U - boltInset},
+    };
+    const std::uint32_t boltRadius = std::max(6U, recipe.resolution / 150U);
+    for (const auto& [boltX, boltY] : boltCenters) {
+        const int deltaX = static_cast<int>(panelX) - static_cast<int>(boltX);
+        const int deltaY = static_cast<int>(panelY) - static_cast<int>(boltY);
+        const std::uint32_t distanceSquared = static_cast<std::uint32_t>(
+            (deltaX * deltaX) + (deltaY * deltaY));
+        if (distanceSquared <= boltRadius * boltRadius) {
+            const bool core = distanceSquared <= (boltRadius / 2U) * (boltRadius / 2U);
+            sample.albedo = core ? jointColor : exposedSteel;
+            sample.height = core ? 0.48F : 0.67F;
+            sample.roughness = core ? 0.42F : 0.28F;
+            sample.metalness = core ? 0.68F : 0.90F;
+            sample.ambientOcclusion = core ? 0.70F : 0.94F;
+        }
+    }
+
+    const float dirtNoise = smoothNoise(recipe.seed ^ 0xD17D17U, x, y, 42U);
+    const bool lowerContactZone = y < recipe.resolution / 3U;
+    const float dirtAffinity = seam ? 0.58F : (lowerContactZone ? 0.26F : 0.028F);
+    if (dirtNoise < recipe.dirtAmount * dirtAffinity) {
+        const float dirtStrength = seam ? 0.54F : 0.34F;
+        sample.albedo = mix(sample.albedo, grimeColor, dirtStrength);
+        sample.roughness = std::max(sample.roughness, 0.82F);
+        sample.metalness *= 0.30F;
+        sample.ambientOcclusion *= 0.78F;
+    }
+
+    if (recipe.safetyStripe && y < stripeHeight) {
+        const std::uint32_t stripePeriod = std::max(72U, recipe.resolution / 12U);
+        const bool yellow = ((x + (y * 2U)) / stripePeriod) % 2U == 0U;
+        sample.albedo = yellow ? recipe.accentColor : stripeBlack;
+        sample.height = 0.57F + orangePeel * 0.28F;
+        sample.roughness = yellow ? 0.64F : 0.70F;
+        sample.metalness = 0.10F;
+        sample.ambientOcclusion = 0.92F;
+    }
+
+    const bool edgeWearZone = bevel || frame || (y < stripeHeight);
+    const float chipNoise = smoothNoise(recipe.seed ^ 0xAEA412U, x, y, 10U);
+    const float chipThreshold = (bevel ? 0.34F : 0.16F) * recipe.wearAmount;
+    if (edgeWearZone && !seam && chipNoise < chipThreshold) {
+        sample.albedo = exposedSteel;
+        sample.height -= 0.025F;
+        sample.roughness = 0.31F;
+        sample.metalness = 0.88F;
+        sample.exposed = true;
+    }
+
+    const float scratchNoise = unitNoise(gdp::core::hashCombine(
+        recipe.seed ^ 0x53435241U, pixelId));
+    const bool hairlineScratch = !seam && !frame
+        && (x % 113U == 0U || (x + (y * 3U)) % 257U == 0U)
+        && scratchNoise < recipe.wearAmount * 0.48F;
+    if (hairlineScratch) {
+        sample.albedo = mix(sample.albedo, exposedSteel, 0.34F);
+        sample.height -= 0.014F;
+        sample.roughness = std::max(0.34F, sample.roughness - 0.10F);
+    }
+
+    sample.roughness = std::clamp(sample.roughness, 0.08F, 1.0F);
+    sample.metalness = std::clamp(sample.metalness, 0.0F, 1.0F);
+    sample.ambientOcclusion = std::clamp(sample.ambientOcclusion, 0.0F, 1.0F);
+    return sample;
+}
+
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
     return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
@@ -122,6 +377,8 @@ IndustrialSurfaceRecipe makeSurfaceRecipe(
     const float tone = random.rangeFloat(0.94F, 1.06F);
     switch (surface) {
     case IndustrialSurface::Wall:
+        recipe.version = 2;
+        recipe.resolution = 1024;
         recipe.family = MaterialFamily::PaintedSteel;
         recipe.baseColor = multiply({0.33F, 0.35F, 0.36F}, tone);
         recipe.secondaryColor = multiply({0.20F, 0.21F, 0.22F}, tone);
@@ -876,6 +1133,42 @@ IndustrialRoomMaterialSet generateIndustrialRoomMaterials(const gdp::core::Seed 
     return materials;
 }
 
+IndustrialSurfaceRecipe makeIndustrialWallArchetypeRecipe(
+    const IndustrialCondition condition)
+{
+    IndustrialSurfaceRecipe recipe;
+    recipe.version = 2;
+    recipe.seed = 0x48445F57414C4C00ULL + static_cast<std::uint64_t>(condition);
+    recipe.surface = IndustrialSurface::Wall;
+    recipe.family = MaterialFamily::PaintedSteel;
+    recipe.baseColor = {0.33F, 0.35F, 0.36F};
+    recipe.secondaryColor = {0.20F, 0.21F, 0.22F};
+    recipe.accentColor = {0.83F, 0.60F, 0.0F};
+    recipe.panelColumns = 2U;
+    recipe.panelRows = 2U;
+    recipe.safetyStripe = true;
+    recipe.resolution = 1024U;
+    switch (condition) {
+    case IndustrialCondition::Maintained:
+        recipe.wearAmount = 0.09F;
+        recipe.dirtAmount = 0.07F;
+        break;
+    case IndustrialCondition::Used:
+        recipe.wearAmount = 0.29F;
+        recipe.dirtAmount = 0.24F;
+        break;
+    case IndustrialCondition::Worn:
+        recipe.wearAmount = 0.56F;
+        recipe.dirtAmount = 0.48F;
+        break;
+    case IndustrialCondition::Count:
+        recipe.wearAmount = 0.29F;
+        recipe.dirtAmount = 0.24F;
+        break;
+    }
+    return recipe;
+}
+
 IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     const IndustrialSurfaceRecipe& recipe)
 {
@@ -902,7 +1195,11 @@ IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     }
     const bool powerOfTwo = recipe.resolution != 0U
         && (recipe.resolution & (recipe.resolution - 1U)) == 0U;
-    if (!powerOfTwo || recipe.resolution < 32U || recipe.resolution > 256U) {
+    const bool hdWall = recipe.surface == IndustrialSurface::Wall
+        && recipe.version == 2U && recipe.resolution == 1024U;
+    const bool legacySurface = recipe.surface != IndustrialSurface::Wall
+        && recipe.resolution >= 32U && recipe.resolution <= 256U;
+    if (!powerOfTwo || (!hdWall && !legacySurface)) {
         result.errors.push_back(IndustrialMaterialValidationError::InvalidResolution);
     }
     if (recipe.surface < IndustrialSurface::Count) {
@@ -989,10 +1286,16 @@ std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
         * static_cast<std::size_t>(recipe.resolution) * 4U);
     const std::uint32_t cellWidth = recipe.resolution / recipe.panelColumns;
     const std::uint32_t cellHeight = recipe.resolution / recipe.panelRows;
-    const std::uint32_t stripeHeight = std::max(3U, recipe.resolution / 16U);
+    const std::uint32_t stripeHeight = std::max(4U, recipe.resolution / 12U);
 
     for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
         for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            if (recipe.surface == IndustrialSurface::Wall) {
+                writePixel(image, x, y,
+                    industrialWallSample(
+                        recipe, x, y, cellWidth, cellHeight, stripeHeight).albedo);
+                continue;
+            }
             const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
@@ -1040,15 +1343,68 @@ std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
                 if (linearLight) {
                     color = recipe.accentColor;
                 }
-            } else if (recipe.safetyStripe && y < stripeHeight) {
-                const bool yellow = ((x + (y * 2U)) / 6U) % 2U == 0U;
-                color = yellow ? recipe.accentColor : gdp::core::Vec3{0.055F, 0.06F, 0.065F};
             }
 
             writePixel(image, x, y, color);
         }
     }
     return image;
+}
+
+std::optional<IndustrialWallMaterialImages> generateIndustrialWallMaterialImages(
+    const IndustrialSurfaceRecipe& recipe)
+{
+    if (!validateIndustrialSurfaceRecipe(recipe).isValid()
+        || recipe.surface != IndustrialSurface::Wall) {
+        return std::nullopt;
+    }
+
+    IndustrialWallMaterialImages images;
+    for (gdp::render::ImageData* const image
+        : {&images.albedo, &images.normal, &images.properties}) {
+        image->width = static_cast<int>(recipe.resolution);
+        image->height = static_cast<int>(recipe.resolution);
+        image->rgba.resize(static_cast<std::size_t>(recipe.resolution)
+            * static_cast<std::size_t>(recipe.resolution) * 4U);
+    }
+    const std::uint32_t cellWidth = recipe.resolution / recipe.panelColumns;
+    const std::uint32_t cellHeight = recipe.resolution / recipe.panelRows;
+    const std::uint32_t stripeHeight = std::max(4U, recipe.resolution / 12U);
+    std::vector<float> heightMap(static_cast<std::size_t>(recipe.resolution)
+        * static_cast<std::size_t>(recipe.resolution));
+
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const IndustrialWallSample sample = industrialWallSample(
+                recipe, x, y, cellWidth, cellHeight, stripeHeight);
+            writePixel(images.albedo, x, y, sample.albedo);
+            writePixel(images.properties, x, y,
+                {sample.roughness, sample.metalness, sample.ambientOcclusion});
+            heightMap[static_cast<std::size_t>(y) * recipe.resolution + x] = sample.height;
+        }
+    }
+    const auto heightAt = [&](const std::uint32_t sampleX, const std::uint32_t sampleY) {
+        return heightMap[static_cast<std::size_t>(sampleY) * recipe.resolution + sampleX];
+    };
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const std::uint32_t left = x == 0U ? x : x - 1U;
+            const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
+            const std::uint32_t down = y == 0U ? y : y - 1U;
+            const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
+            const gdp::core::Vec3 normal = gdp::core::normalized({
+                (heightAt(left, y) - heightAt(right, y)) * 2.8F,
+                (heightAt(x, down) - heightAt(x, up)) * 2.8F,
+                1.0F,
+            });
+            writePixel(images.normal, x, y, {
+                normal.x * 0.5F + 0.5F,
+                normal.y * 0.5F + 0.5F,
+                normal.z * 0.5F + 0.5F,
+            });
+        }
+    }
+    return images;
 }
 
 StorageRoomMaterialSet generateStorageRoomMaterials(const gdp::core::Seed roomSeed)

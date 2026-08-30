@@ -47,6 +47,12 @@ struct IndustrialSurfaceRecipe {
     constexpr bool operator==(const IndustrialSurfaceRecipe&) const noexcept = default;
 };
 
+struct IndustrialWallMaterialImages {
+    gdp::render::ImageData albedo;
+    gdp::render::ImageData normal;
+    gdp::render::ImageData properties;
+};
+
 enum class StorageCondition : std::uint8_t {
     Orderly,
     Dusty,
@@ -492,6 +498,10 @@ struct CentralHubMaterialValidationResult {
     const IndustrialRoomMaterialSet& materials) noexcept;
 [[nodiscard]] std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
     const IndustrialSurfaceRecipe& recipe);
+[[nodiscard]] IndustrialSurfaceRecipe makeIndustrialWallArchetypeRecipe(
+    IndustrialCondition condition);
+[[nodiscard]] std::optional<IndustrialWallMaterialImages>
+generateIndustrialWallMaterialImages(const IndustrialSurfaceRecipe& recipe);
 
 [[nodiscard]] StorageRoomMaterialSet generateStorageRoomMaterials(
     gdp::core::Seed roomSeed);

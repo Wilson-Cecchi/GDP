@@ -263,9 +263,18 @@ private:
         float emissiveStrength{0.0F};
     };
 
+    struct IndustrialWallGpuMaterial {
+        Texture albedo;
+        Texture normal;
+        Texture properties;
+    };
+
     struct RoomGpuMaterials {
         std::array<Texture,
             static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
+        std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
+        gdp::core::Vec2 wallUvOffset{};
+        float wallTone{1.0F};
         float ceilingEmissive{0.0F};
     };
 
@@ -282,6 +291,9 @@ private:
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> officerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> engineerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> industrialRobotVisuals_{};
+    std::array<std::optional<IndustrialWallGpuMaterial>,
+        static_cast<std::size_t>(gdp::procedural::IndustrialCondition::Count)>
+        industrialWallMaterials_{};
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};

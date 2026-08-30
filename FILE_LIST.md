@@ -130,6 +130,7 @@
 - `src/world/WorldValidation.cpp`
 - `src/world/WorldValidation.hpp`
 - `tests/check_main_menu_bootstrap.cmake`
+- `tests/capture_industrial_wall.cpp`
 - `tests/test_assets.cpp`
 - `tests/test_combat.cpp`
 - `tests/test_core.cpp`
@@ -143,4 +144,17 @@
 - `tests/test_session.cpp`
 - `tests/test_world.cpp`
 - `visual/TEXTURE_APPROVALS.md`
+- `visual/proposals/industrial_corridor_wall_proposal_v1.md`
+- `visual/proposals/industrial_corridor_wall_proposal_v1.png`
+- `visual/proposals/industrial_corridor_wall_proposal_v2_hd.md`
+- `visual/proposals/industrial_corridor_wall_proposal_v2_hd.png`
 - `visual/reference_sheet_rooms_enemies.png`
+- `visual/validation/industrial_corridor_wall_v1_maintained_seed2.png`
+- `visual/validation/industrial_corridor_wall_v1_used_seed3.png`
+- `visual/validation/industrial_corridor_wall_v1_worn_seed1.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_maintained_seed2_close.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_maintained_seed2_gameplay.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_used_seed3_close.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_used_seed3_gameplay.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_close.png`
+- `visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_gameplay.png`

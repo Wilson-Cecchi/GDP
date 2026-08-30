@@ -90,10 +90,12 @@ especializados das pastas numeradas.
   Secret usando dimensões próprias e placement derivado dos bounds reais.
 - **Fase 21 — Menu principal:** implementada e validada; `START RUN` cria a
   dungeon somente após confirmação e `EXIT GAME` encerra pelo fluxo principal.
-- **Fase 22 — Revisão visual aprovada:** planejada; revisar texturas por unidade
-  visual somente após aprovação explícita de uma prancha anterior à implementação.
-- **Próxima atualização:** preparar a primeira proposta visual versionada da
-  Fase 22 e aguardar aprovação explícita antes de alterar qualquer textura.
+- **Fase 22 — Revisão visual aprovada:** concluída; a proposta
+  `Industrial Corridor/Wall v1` foi recusada e substituída pela v2 HD, aceita no
+  jogo com mapas `1024×1024`, Albedo/Normal/RMA, UV físico e filtragem trilinear.
+- **Próxima atualização:** separar definitivamente tetos e luminárias: todo teto
+  revisado será neutro, enquanto `Lighting/CeilingFixture` terá modelo, textura
+  e emissão próprios, submetidos a aprovação visual independente.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

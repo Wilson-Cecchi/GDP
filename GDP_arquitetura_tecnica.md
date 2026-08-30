@@ -3654,8 +3654,31 @@ capturas in-engine e regressões técnicas depois da implementação
 registro em visual/TEXTURE_APPROVALS.md
 ```
 
-**Próximo marco:** preparar a primeira prancha versionada da Fase 22; nenhuma
-textura muda em código sem aprovação visual prévia da unidade correspondente.
+`Industrial Corridor/Wall v1` retornou para `REVISÃO SOLICITADA` depois das
+capturas in-engine: a geração de `64×64`, o filtro nearest e o UV único por vão
+produziram uma parede simples, ampliada e sem profundidade material suficiente.
+Floor, Ceiling, Door e demais unidades não foram alteradas.
+
+`Industrial Corridor/Wall v2 HD` foi proposta com material `1024×1024`, 256
+texels por metro, UV por dimensão física, mipmaps trilineares e canais Albedo,
+Normal e Roughness/Metalness/AO. A base HD será compartilhada e a variação por
+sala usará masks/offsets leves para conter a VRAM.
+
+A implementação v2 usa três arquétipos HD compartilhados por condição, gera os
+três mapas em uma única passagem estrutural, aplica normal mapping por TBN no
+fragment shader e mantém a faixa de segurança ancorada somente à base mesmo em
+spans sobre portas. Somente a parede Industrial ativa esse pipeline; os demais
+materiais preservam filtro e UV anteriores.
+
+A v2 foi aceita no jogo em 2026-08-30 após a revisão das capturas `1280×720`.
+Tetos e luminárias passam a obedecer um contrato global de separação: a textura
+do teto contém apenas a superfície arquitetônica neutra, sem lâmpadas, lentes,
+faixas emissivas ou brilho pintado; `Lighting/CeilingFixture` é uma unidade
+visual própria, ligada ao modelo físico e ao material emissivo independente.
+Todo prompt futuro de teto deve declarar explicitamente essa exclusão.
+
+**Próximo marco:** remover as luminárias gravadas nos baselines de teto e
+submeter `Lighting/CeilingFixture` a uma aprovação visual própria.
 
 ---
 

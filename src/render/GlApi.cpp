@@ -50,6 +50,7 @@ bool loadGlApi(GlApi& api) noexcept
     GDP_LOAD_GL(useProgram, "glUseProgram");
     GDP_LOAD_GL(getUniformLocation, "glGetUniformLocation");
     GDP_LOAD_GL(uniformMatrix4fv, "glUniformMatrix4fv");
+    GDP_LOAD_GL(uniform2f, "glUniform2f");
     GDP_LOAD_GL(uniform3f, "glUniform3f");
     GDP_LOAD_GL(uniform1f, "glUniform1f");
     GDP_LOAD_GL(uniform1i, "glUniform1i");

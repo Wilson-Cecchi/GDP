@@ -120,6 +120,29 @@ float averageRedRow(
     return static_cast<float>(total) / static_cast<float>(maximumX - minimumX);
 }
 
+std::uint64_t imageHash(const gdp::render::ImageData& image) noexcept
+{
+    std::uint64_t hash = 1'469'598'103'934'665'603ULL;
+    for (const std::uint8_t channel : image.rgba) {
+        hash ^= channel;
+        hash *= 1'099'511'628'211ULL;
+    }
+    return hash;
+}
+
+bool pixelMatches(
+    const gdp::render::ImageData& image,
+    const int x,
+    const int y,
+    const std::array<std::uint8_t, 3>& color) noexcept
+{
+    const std::size_t pixel = (static_cast<std::size_t>(y)
+        * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(x)) * 4U;
+    return image.rgba[pixel] == color[0]
+        && image.rgba[pixel + 1U] == color[1]
+        && image.rgba[pixel + 2U] == color[2];
+}
+
 void testRepresentativeMaterialSet()
 {
     using namespace gdp::procedural;
@@ -134,7 +157,7 @@ void testRepresentativeMaterialSet()
         "same room seed reproduces the complete material set exactly");
     expect(first.materialHash != different.materialHash,
         "different room seed changes the room material hash");
-    expect(first.materialHash == 0x7A8B018C5215AA35ULL,
+    expect(first.materialHash == 0x18131E4CBD3FEC4FULL,
         "golden Industrial Corridor material hash remains stable across builds");
 
     const auto& wall = first.surfaces[static_cast<std::size_t>(IndustrialSurface::Wall)];
@@ -178,7 +201,7 @@ void testStructuredSurfaceAlbedos()
     };
     std::size_t stripePixels = 0;
     std::size_t yellowAboveBase = 0;
-    const int stripeHeight = std::max(3, wall->height / 16);
+    const int stripeHeight = std::max(4, wall->height / 12);
     for (int y = 0; y < wall->height; ++y) {
         for (int x = 0; x < wall->width; ++x) {
             const std::size_t pixel = (static_cast<std::size_t>(y)
@@ -211,6 +234,133 @@ void testStructuredSurfaceAlbedos()
     }
     expect(brightestRed > darkestRed + 80U,
         "ceiling albedo contains high-contrast regular luminaires");
+
+    expect(imageHash(*floor) == 0x2C3178D13AB6A494ULL,
+        "Industrial floor albedo stays unchanged by the approved wall revision");
+    expect(imageHash(*ceiling) == 0x785F4097723681BDULL,
+        "Industrial ceiling albedo stays unchanged by the approved wall revision");
+}
+
+void testIndustrialHdMaterialMaps()
+{
+    using namespace gdp::procedural;
+
+    constexpr std::array conditions{
+        IndustrialCondition::Maintained,
+        IndustrialCondition::Used,
+        IndustrialCondition::Worn,
+    };
+    std::array<std::size_t, conditions.size()> metallicPixels{};
+    for (std::size_t index = 0; index < conditions.size(); ++index) {
+        const IndustrialSurfaceRecipe recipe = makeIndustrialWallArchetypeRecipe(
+            conditions[index]);
+        const auto images = generateIndustrialWallMaterialImages(recipe);
+        expect(recipe.version == 2U && recipe.resolution == 1024U,
+            "approved Industrial wall archetypes use the versioned 1024 HD contract");
+        expect(images && images->albedo.width == 1024 && images->normal.width == 1024
+                && images->properties.width == 1024
+                && gdp::render::validateImageData(images->albedo)
+                && gdp::render::validateImageData(images->normal)
+                && gdp::render::validateImageData(images->properties),
+            "HD wall produces renderer-valid Albedo, Normal and RMA maps");
+        if (!images) {
+            continue;
+        }
+
+        std::size_t perturbedNormals = 0U;
+        std::uint8_t minimumRoughness = 255U;
+        std::uint8_t maximumRoughness = 0U;
+        std::uint8_t minimumOcclusion = 255U;
+        for (std::size_t pixel = 0; pixel < images->normal.rgba.size(); pixel += 4U) {
+            const int normalX = static_cast<int>(images->normal.rgba[pixel]) - 128;
+            const int normalY = static_cast<int>(images->normal.rgba[pixel + 1U]) - 128;
+            if (std::abs(normalX) + std::abs(normalY) >= 3) {
+                ++perturbedNormals;
+            }
+            const std::uint8_t roughness = images->properties.rgba[pixel];
+            const std::uint8_t metalness = images->properties.rgba[pixel + 1U];
+            const std::uint8_t occlusion = images->properties.rgba[pixel + 2U];
+            minimumRoughness = std::min(minimumRoughness, roughness);
+            maximumRoughness = std::max(maximumRoughness, roughness);
+            minimumOcclusion = std::min(minimumOcclusion, occlusion);
+            if (metalness >= 180U) {
+                ++metallicPixels[index];
+            }
+        }
+        expect(perturbedNormals >= 20'000U,
+            "HD normal map carries bevel, gasket, fastener and micro-surface depth");
+        expect(maximumRoughness >= minimumRoughness + 70U,
+            "RMA map separates painted steel, grime and exposed metal response");
+        expect(minimumOcclusion <= 150U,
+            "RMA map darkens physically recessed gasket joints");
+    }
+    expect(metallicPixels[0] < metallicPixels[1]
+            && metallicPixels[1] < metallicPixels[2],
+        "HD material maps increase exposed metal strictly across approved conditions");
+}
+
+void testApprovedIndustrialWallDirection()
+{
+    using namespace gdp::procedural;
+
+    constexpr std::array<gdp::core::Seed, 3> seeds{2U, 3U, 1U};
+    constexpr std::array expectedConditions{
+        IndustrialCondition::Maintained,
+        IndustrialCondition::Used,
+        IndustrialCondition::Worn,
+    };
+    constexpr std::array<std::uint8_t, 3> exposedSteel{139U, 144U, 145U};
+    constexpr std::array<std::uint8_t, 3> jointColor{21U, 26U, 28U};
+    std::array<std::size_t, 3> exposedCounts{};
+
+    for (std::size_t index = 0; index < seeds.size(); ++index) {
+        const IndustrialRoomMaterialSet materials = generateIndustrialRoomMaterials(seeds[index]);
+        expect(materials.condition == expectedConditions[index],
+            "approved Industrial wall seeds preserve Maintained, Used and Worn ordering");
+        const IndustrialSurfaceRecipe& recipe
+            = materials.surfaces[static_cast<std::size_t>(IndustrialSurface::Wall)];
+        const auto wall = generateIndustrialSurfaceAlbedo(recipe);
+        const auto repeated = generateIndustrialSurfaceAlbedo(recipe);
+        expect(wall && repeated && wall->rgba == repeated->rgba,
+            "approved Industrial wall is byte-exact for a repeated seed");
+        if (!wall) {
+            continue;
+        }
+
+        const int cellWidth = wall->width / static_cast<int>(recipe.panelColumns);
+        const int cellHeight = wall->height / static_cast<int>(recipe.panelRows);
+        const int stripeHeight = std::max(4, wall->height / 12);
+        std::size_t exposedInterior = 0U;
+        std::size_t jointPixels = 0U;
+        for (int y = 0; y < wall->height; ++y) {
+            for (int x = 0; x < wall->width; ++x) {
+                const int panelX = x % cellWidth;
+                const int panelY = y % cellHeight;
+                const int structuralWidth = std::max(32, wall->width / 32);
+                const bool structuralEdge = panelX <= structuralWidth
+                    || panelY <= structuralWidth
+                    || panelX + structuralWidth >= cellWidth
+                    || panelY + structuralWidth >= cellHeight
+                    || y < stripeHeight;
+                if (pixelMatches(*wall, x, y, exposedSteel)) {
+                    ++exposedCounts[index];
+                    if (!structuralEdge) {
+                        ++exposedInterior;
+                    }
+                }
+                if (pixelMatches(*wall, x, y, jointColor)) {
+                    ++jointPixels;
+                }
+            }
+        }
+        expect(exposedInterior <= 2'000U,
+            "interior exposed steel stays limited to intentional countersunk fasteners");
+        expect(jointPixels >= 100U,
+            "recessed dark joints and restrained fasteners remain structurally readable");
+    }
+
+    expect(exposedCounts[0] < exposedCounts[1] && exposedCounts[1] < exposedCounts[2],
+        "approved seeds show strictly increasing edge wear from Maintained to Worn");
 }
 
 void testValidationFailures()
@@ -268,6 +418,9 @@ void testRoomMaterialSeedBatch()
             break;
         }
         for (const IndustrialSurfaceRecipe& recipe : materials.surfaces) {
+            if (recipe.surface == IndustrialSurface::Wall) {
+                continue;
+            }
             const auto image = generateIndustrialSurfaceAlbedo(recipe);
             if (!image || !gdp::render::validateImageData(*image)) {
                 std::cerr << "Industrial albedo generation failed at room seed " << seed << '\n';
@@ -278,7 +431,8 @@ void testRoomMaterialSeedBatch()
         conditions[static_cast<std::size_t>(materials.condition)] = true;
         hashes.insert(materials.materialHash);
     }
-    expect(allValid, "1,000 room seeds pass every industrial material and albedo gate");
+    expect(allValid,
+        "1,000 room seeds validate every recipe and preserve legacy floor/ceiling albedos");
     expect(hashes.size() == 1'000U,
         "1,000 room seeds produce unique canonical material hashes");
     expect(std::all_of(conditions.begin(), conditions.end(), [](const bool used) { return used; }),
@@ -1659,6 +1813,8 @@ int main()
 {
     testRepresentativeMaterialSet();
     testStructuredSurfaceAlbedos();
+    testIndustrialHdMaterialMaps();
+    testApprovedIndustrialWallDirection();
     testValidationFailures();
     testRoomMaterialSeedBatch();
     testRepresentativeStorageMaterialSet();

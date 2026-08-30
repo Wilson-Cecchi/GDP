@@ -12,6 +12,14 @@ gerador procedural ou HUD antes de uma aprovação visual explícita do usuário
 Alterações de gameplay, correções de cobertura e diagnósticos podem continuar,
 desde que não sejam apresentados como aprovação artística da textura.
 
+Texturas de teto devem representar somente a superfície arquitetônica neutra:
+painéis, juntas, vigas, dutos e desgaste podem existir, mas nenhuma lâmpada,
+lente luminosa, faixa emissiva ou brilho de luminária pode ser desenhado ou
+gravado no albedo. A luminária é sempre a unidade independente
+`Lighting/CeilingFixture`, aplicada ao modelo próprio e com material emissivo
+separado. Essa restrição deve aparecer literalmente em todo prompt futuro de
+teto e impede a sobreposição entre iluminação pintada e geometria real.
+
 Como cada receita procedural pode gerar infinitas variantes, a unidade de
 aprovação é uma superfície ou família visual identificável, por exemplo
 `Storage/Wall`, `Security/Ceiling`, `Worker/PaintedSteel` ou `Door/Panel`.
@@ -69,13 +77,64 @@ capturas no jogo:
 resultado final:
 ```
 
+## Propostas ativas
+
+### Industrial Corridor/Wall — v2 HD
+
+```text
+unidade visual: Industrial Corridor/Wall
+versão da proposta: v2 HD
+arquivo/prancha: visual/proposals/industrial_corridor_wall_proposal_v2_hd.png
+seeds mostradas: 2 Maintained; 3 Used; 1 Worn
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO CONDICIONAL
+                    ("se a textura for parecida com a que vc me mostrou pode prosseguir")
+data: 2026-08-30
+commit de implementação: `feat: implement Industrial Corridor wall v2 HD`
+capturas no jogo: visual/validation/industrial_corridor_wall_v2_hd_maintained_seed2_gameplay.png;
+                  visual/validation/industrial_corridor_wall_v2_hd_maintained_seed2_close.png;
+                  visual/validation/industrial_corridor_wall_v2_hd_used_seed3_gameplay.png;
+                  visual/validation/industrial_corridor_wall_v2_hd_used_seed3_close.png;
+                  visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_gameplay.png;
+                  visual/validation/industrial_corridor_wall_v2_hd_worn_seed1_close.png
+resultado final: ACEITA NO JOGO
+                 ("As texturas estão muito bonitas")
+```
+
+A v2 propõe material `1024×1024`, densidade UV física, filtragem trilinear e
+mapas de Albedo, Normal e Roughness/Metalness/AO. O contrato completo está em
+[`proposals/industrial_corridor_wall_proposal_v2_hd.md`](proposals/industrial_corridor_wall_proposal_v2_hd.md).
+
+## Histórico de revisões
+
+### Industrial Corridor/Wall — v1
+
+```text
+unidade visual: Industrial Corridor/Wall
+versão da proposta: v1
+arquivo/prancha: visual/proposals/industrial_corridor_wall_proposal_v1.png
+seeds mostradas: 2 Maintained; 3 Used; 1 Worn
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO (resposta: "aprovado")
+data: 2026-08-30
+commit de implementação: —
+capturas no jogo: visual/validation/industrial_corridor_wall_v1_maintained_seed2.png;
+                  visual/validation/industrial_corridor_wall_v1_used_seed3.png;
+                  visual/validation/industrial_corridor_wall_v1_worn_seed1.png
+resultado final: REVISÃO SOLICITADA; capturas consideradas simples e de baixa
+                 qualidade, com pedido de solução mais complexa e ao menos HD
+```
+
+Objetivo, direção, paleta, regras e prompt reproduzível estão no arquivo
+[`proposals/industrial_corridor_wall_proposal_v1.md`](proposals/industrial_corridor_wall_proposal_v1.md).
+A eventual aprovação desta proposta não se estende a Floor, Ceiling, Door ou
+outro ambiente.
+
 ## Inventário inicial de ambientes
 
 Todas as superfícies abaixo começam como `NÃO REVISADA`.
 
 | Ambiente | Wall | Floor | Ceiling |
 |---|---|---|---|
-| Industrial Corridor | Não revisada | Não revisada | Não revisada |
+| Industrial Corridor | V2 HD aceita no jogo | Não revisada | Não revisada |
 | Storage | Não revisada | Não revisada | Não revisada |
 | Combat Room | Não revisada | Não revisada | Não revisada |
 | Cafeteria | Não revisada | Não revisada | Não revisada |
@@ -98,6 +157,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Weapon/first-person presentation | Não revisada |
 | Player presentation | Não revisada |
 | HUD/map visual language | Não revisada |
+| Lighting/CeilingFixture | Não revisada; asset e material independentes do teto |
 
 ## Relação com os testes
 

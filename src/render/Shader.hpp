@@ -23,6 +23,7 @@ public:
         std::string_view fragmentSource);
     void use(const GlApi& gl) const noexcept;
     void setMat4(const GlApi& gl, const char* name, const gdp::core::Mat4& value) const noexcept;
+    void setVec2(const GlApi& gl, const char* name, gdp::core::Vec2 value) const noexcept;
     void setVec3(const GlApi& gl, const char* name, gdp::core::Vec3 value) const noexcept;
     void setInt(const GlApi& gl, const char* name, int value) const noexcept;
     void setFloat(const GlApi& gl, const char* name, float value) const noexcept;

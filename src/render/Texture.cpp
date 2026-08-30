@@ -64,7 +64,10 @@ Texture& Texture::operator=(Texture&& other) noexcept
     return *this;
 }
 
-bool Texture::upload(const GlApi& gl, const ImageData& image)
+bool Texture::upload(
+    const GlApi& gl,
+    const ImageData& image,
+    const TextureSampling sampling)
 {
     if (!validateImageData(image)) {
         gdp::core::log(gdp::core::LogLevel::Error, "Texture upload rejected invalid image data");
@@ -75,8 +78,11 @@ bool Texture::upload(const GlApi& gl, const ImageData& image)
     gl_ = &gl;
     glGenTextures(1, &texture_);
     glBindTexture(GL_TEXTURE_2D, texture_);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    const bool smooth = sampling == TextureSampling::Trilinear;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+        smooth ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+        smooth ? GL_LINEAR : GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(

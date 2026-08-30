@@ -49,7 +49,10 @@ in vec3 vNormal;
 in vec2 vUv;
 
 uniform sampler2D uAlbedo;
+uniform sampler2D uNormalMap;
+uniform sampler2D uMaterialMap;
 uniform vec3 uTint;
+uniform vec3 uCameraPosition;
 const int MAX_LIGHTS = 8;
 uniform int uLightCount;
 uniform vec3 uLightPositions[MAX_LIGHTS];
@@ -58,30 +61,69 @@ uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
 uniform vec3 uAmbientColor;
 uniform float uAmbientIntensity;
-uniform float uUvScale;
+uniform vec2 uUvScale;
+uniform vec2 uUvOffset;
 uniform float uEmissiveStrength;
+uniform int uDetailedMaterial;
 
 out vec4 fragmentColor;
 
+mat3 cotangentFrame(vec3 normal, vec3 position, vec2 uv)
+{
+    vec3 positionX = dFdx(position);
+    vec3 positionY = dFdy(position);
+    vec2 uvX = dFdx(uv);
+    vec2 uvY = dFdy(uv);
+    vec3 perpendicularX = cross(positionY, normal);
+    vec3 perpendicularY = cross(normal, positionX);
+    vec3 tangent = perpendicularX * uvX.x + perpendicularY * uvY.x;
+    vec3 bitangent = perpendicularX * uvX.y + perpendicularY * uvY.y;
+    float scale = inversesqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1.0e-8));
+    return mat3(tangent * scale, bitangent * scale, normal);
+}
+
 void main()
 {
+    vec2 materialUv = (vUv * uUvScale) + uUvOffset;
     vec3 normal = normalize(vNormal);
-    vec3 albedo = texture(uAlbedo, vUv * uUvScale).rgb * uTint;
-    vec3 light = uAmbientColor * uAmbientIntensity;
+    vec3 albedo = texture(uAlbedo, materialUv).rgb * uTint;
+    float roughness = 0.72;
+    float metalness = 0.0;
+    float ambientOcclusion = 1.0;
+    if (uDetailedMaterial != 0) {
+        vec3 tangentNormal = texture(uNormalMap, materialUv).xyz * 2.0 - 1.0;
+        normal = normalize(cotangentFrame(normal, vWorldPosition, materialUv) * tangentNormal);
+        vec3 material = texture(uMaterialMap, materialUv).rgb;
+        roughness = clamp(material.r, 0.08, 1.0);
+        metalness = clamp(material.g, 0.0, 1.0);
+        ambientOcclusion = clamp(material.b, 0.0, 1.0);
+    }
+    vec3 result = albedo * uAmbientColor * uAmbientIntensity * ambientOcclusion;
+    vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
     for (int index = 0; index < MAX_LIGHTS; ++index) {
         if (index >= uLightCount) {
             break;
         }
         vec3 toLight = uLightPositions[index] - vWorldPosition;
         float distanceToLight = length(toLight);
-        float diffuse = max(dot(normal, normalize(toLight)), 0.0);
+        vec3 lightDirection = normalize(toLight);
+        float diffuse = max(dot(normal, lightDirection), 0.0);
         float normalizedDistance = distanceToLight / max(uLightRanges[index], 0.001);
         float attenuation = 1.0 / (1.0 + 2.2 * normalizedDistance * normalizedDistance);
-        light += uLightColors[index] * diffuse * attenuation
+        vec3 radiance = uLightColors[index] * attenuation
             * uLightIntensities[index] * 1.9;
+        result += albedo * (1.0 - metalness) * diffuse * radiance;
+        if (uDetailedMaterial != 0 && diffuse > 0.0) {
+            vec3 halfway = normalize(lightDirection + viewDirection);
+            float exponent = mix(96.0, 8.0, roughness);
+            float highlight = pow(max(dot(normal, halfway), 0.0), exponent)
+                * mix(0.90, 0.12, roughness);
+            vec3 reflectance = mix(vec3(0.035), albedo, metalness);
+            result += reflectance * highlight * diffuse * radiance;
+        }
     }
     float emissiveMask = smoothstep(0.62, 0.82, max(albedo.r, max(albedo.g, albedo.b)));
-    fragmentColor = vec4((albedo * light) + (albedo * emissiveMask * uEmissiveStrength), 1.0);
+    fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength), 1.0);
 }
 )glsl";
 
@@ -311,9 +353,41 @@ bool Renderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         return true;
     }
 
+    const std::size_t conditionIndex = static_cast<std::size_t>(materials.condition);
+    auto& sharedWall = industrialWallMaterials_[conditionIndex];
+    if (!sharedWall) {
+        const gdp::procedural::IndustrialSurfaceRecipe archetype
+            = gdp::procedural::makeIndustrialWallArchetypeRecipe(materials.condition);
+        const auto images = gdp::procedural::generateIndustrialWallMaterialImages(archetype);
+        if (!images) {
+            return false;
+        }
+        IndustrialWallGpuMaterial wallMaterial;
+        if (!wallMaterial.albedo.upload(
+                gl_, images->albedo, TextureSampling::Trilinear)
+            || !wallMaterial.normal.upload(
+                gl_, images->normal, TextureSampling::Trilinear)
+            || !wallMaterial.properties.upload(
+                gl_, images->properties, TextureSampling::Trilinear)) {
+            return false;
+        }
+        sharedWall.emplace(std::move(wallMaterial));
+    }
+
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.industrialWallCondition = materials.condition;
+    gpuMaterials.wallUvOffset = {
+        static_cast<float>((roomSeed >> 8U) & 1U) * 0.5F,
+        0.0F,
+    };
+    const auto& wallRecipe = materials.surfaces[static_cast<std::size_t>(
+        gdp::procedural::IndustrialSurface::Wall)];
+    gpuMaterials.wallTone = std::clamp(wallRecipe.baseColor.x / 0.33F, 0.94F, 1.06F);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const gdp::procedural::IndustrialSurfaceRecipe& recipe = materials.surfaces[index];
+        if (recipe.surface == gdp::procedural::IndustrialSurface::Wall) {
+            continue;
+        }
         const auto textureData = textureCache_.acquire(
             gdp::procedural::industrialSurfaceRecipeHash(recipe),
             [&recipe] {
@@ -793,6 +867,9 @@ bool Renderer::render(
     camera_.setPerspective(camera.verticalFieldOfViewDegrees, 0.05F, 100.0F);
     camera_.lookAt(camera.position, camera.position + camera.forward);
     shader_.setInt(gl_, "uAlbedo", 0);
+    shader_.setInt(gl_, "uNormalMap", 1);
+    shader_.setInt(gl_, "uMaterialMap", 2);
+    shader_.setVec3(gl_, "uCameraPosition", camera.position);
     shader_.setMat4(gl_, "uView", camera_.viewMatrix());
     shader_.setMat4(
         gl_,
@@ -863,12 +940,30 @@ bool Renderer::render(
         const gdp::core::Vec3 scale,
         const RoomMaterialChannel material,
         const float uvScale = 1.0F,
-        const gdp::core::Vec3 tint = {1.0F, 1.0F, 1.0F}) {
+        const gdp::core::Vec3 tint = {1.0F, 1.0F, 1.0F},
+        const gdp::core::Vec2 detailedUvScale = {},
+        const gdp::core::Vec2 detailedUvOffset = {}) {
         float emissiveStrength = 0.0F;
+        bool detailedMaterial = false;
+        gdp::core::Vec3 resolvedTint = tint;
         switch (material) {
         case RoomMaterialChannel::Wall:
-            roomMaterials.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
+            if (roomMaterials.industrialWallCondition) {
+                const std::size_t conditionIndex = static_cast<std::size_t>(
+                    *roomMaterials.industrialWallCondition);
+                const auto& wallMaterial = industrialWallMaterials_[conditionIndex];
+                if (wallMaterial) {
+                    wallMaterial->albedo.bind(gl_, 0U);
+                    wallMaterial->normal.bind(gl_, 1U);
+                    wallMaterial->properties.bind(gl_, 2U);
+                    detailedMaterial = true;
+                    resolvedTint = tint * roomMaterials.wallTone;
+                }
+            }
+            if (!detailedMaterial) {
+                roomMaterials.textures[static_cast<std::size_t>(
+                    gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
+            }
             break;
         case RoomMaterialChannel::Floor:
             roomMaterials.textures[static_cast<std::size_t>(
@@ -885,8 +980,16 @@ bool Renderer::render(
         }
         shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
                 * gdp::core::scaleMatrix(scale));
-        shader_.setVec3(gl_, "uTint", tint);
-        shader_.setFloat(gl_, "uUvScale", uvScale);
+        shader_.setVec3(gl_, "uTint", resolvedTint);
+        shader_.setInt(gl_, "uDetailedMaterial", detailedMaterial ? 1 : 0);
+        const bool customUv = detailedMaterial
+            && detailedUvScale.x > 0.0F && detailedUvScale.y > 0.0F;
+        shader_.setVec2(gl_, "uUvScale",
+            customUv ? detailedUvScale : gdp::core::Vec2{uvScale, uvScale});
+        shader_.setVec2(gl_, "uUvOffset",
+            customUv
+                ? detailedUvOffset + roomMaterials.wallUvOffset
+                : gdp::core::Vec2{});
         shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
         box_.draw(gl_);
     };
@@ -955,7 +1058,10 @@ bool Renderer::render(
                         shellThickness, top - bottom, maximum - minimum}
                     : gdp::core::Vec3{
                         maximum - minimum, top - bottom, shellThickness};
-                drawSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall);
+                drawSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall,
+                    1.0F, {1.0F, 1.0F, 1.0F},
+                    {(maximum - minimum) / 4.0F, (top - bottom) / roomHeight},
+                    {minimum / 4.0F, bottom / roomHeight});
             };
             if (door == doors.end()) {
                 drawWallSpan(transverseMinimum, transverseMaximum, 0.0F, roomHeight);
@@ -1066,7 +1172,11 @@ bool Renderer::render(
                     + side * corridorHalfWidth
                     + gdp::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
                 drawSurface(roomMaterials, wallCenter,
-                    wallScale, RoomMaterialChannel::Wall);
+                    wallScale, RoomMaterialChannel::Wall,
+                    1.0F, {1.0F, 1.0F, 1.0F},
+                    {wallLength / 4.0F, 1.0F},
+                    {(alongX ? std::min(wallStart.x, wallEnd.x)
+                             : std::min(wallStart.z, wallEnd.z)) / 4.0F, 0.0F});
             }
         }
     }
@@ -1102,7 +1212,9 @@ bool Renderer::render(
             shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
                     * gdp::core::scaleMatrix(scale));
             shader_.setVec3(gl_, "uTint", tint);
-            shader_.setFloat(gl_, "uUvScale", 2.0F);
+            shader_.setInt(gl_, "uDetailedMaterial", 0);
+            shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
+            shader_.setVec2(gl_, "uUvOffset", {});
             shader_.setFloat(gl_, "uEmissiveStrength", emissive);
             box_.draw(gl_);
         };
@@ -1160,7 +1272,9 @@ bool Renderer::render(
             * gdp::core::scaleMatrix({0.62F, 0.08F, 0.24F});
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", fixtureColor);
-        shader_.setFloat(gl_, "uUvScale", 1.0F);
+        shader_.setInt(gl_, "uDetailedMaterial", 0);
+        shader_.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+        shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength",
             lighting.alert ? lighting.fixtureEmissive * 1.35F : lighting.fixtureEmissive);
         box_.draw(gl_);
@@ -1199,7 +1313,9 @@ bool Renderer::render(
                 : enemy.active
                 ? gdp::core::Vec3{1.0F, 1.0F, 1.0F}
                 : gdp::core::Vec3{0.68F, 0.72F, 0.78F});
-        shader_.setFloat(gl_, "uUvScale", 4.0F);
+        shader_.setInt(gl_, "uDetailedMaterial", 0);
+        shader_.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
+        shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength",
             enemy.alive
                 ? visual->second.emissiveStrength * (enemy.active ? 1.0F : 0.25F)
@@ -1224,7 +1340,9 @@ bool Renderer::render(
             * gdp::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", tint);
-        shader_.setFloat(gl_, "uUvScale", 2.0F);
+        shader_.setInt(gl_, "uDetailedMaterial", 0);
+        shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
+        shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength", 0.16F);
         box_.draw(gl_);
     }
@@ -1255,7 +1373,9 @@ bool Renderer::render(
             * gdp::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", tint);
-        shader_.setFloat(gl_, "uUvScale", 3.0F);
+        shader_.setInt(gl_, "uDetailedMaterial", 0);
+        shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
         box_.draw(gl_);
     }

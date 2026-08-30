@@ -31,6 +31,7 @@ struct GlApi {
     PFNGLUSEPROGRAMPROC useProgram{};
     PFNGLGETUNIFORMLOCATIONPROC getUniformLocation{};
     PFNGLUNIFORMMATRIX4FVPROC uniformMatrix4fv{};
+    PFNGLUNIFORM2FPROC uniform2f{};
     PFNGLUNIFORM3FPROC uniform3f{};
     PFNGLUNIFORM1FPROC uniform1f{};
     PFNGLUNIFORM1IPROC uniform1i{};
