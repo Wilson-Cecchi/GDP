@@ -1,4 +1,5 @@
 #include "core/Seed.hpp"
+#include "game/SeedDomains.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/World.hpp"
 #include "world/WorldGenerator.hpp"
@@ -45,7 +46,7 @@ void testDeterministicPlan()
         seed, RoomRole::Start, RoomTheme::Industrial, roomBounds);
     expect(first.planHash == repeated.planHash && first.lights == repeated.lights,
         "same room seed reproduces the complete lighting plan");
-    expect(first.seed == gdp::core::deriveSeed(seed, gdp::core::SeedDomain::Lighting, 0U),
+    expect(first.seed == gdp::core::deriveSeed(seed, gdp::game::SeedDomain::Lighting, 0U),
         "lighting plan starts from the isolated Lighting seed domain");
     expect(first.supportsAlert && first.lights.size() == 3U,
         "START lighting is readable and can react to lockdown");

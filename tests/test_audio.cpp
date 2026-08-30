@@ -1,6 +1,7 @@
 #include "audio/AudioSystem.hpp"
 #include "audio/ProceduralAudio.hpp"
 #include "core/Seed.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -40,7 +41,7 @@ void testDeterministicRecipeAndClip()
     const AudioClip repeatedClip = synthesizeAudioClip(repeated);
     expect(first.recipeHash == repeated.recipeHash && firstClip.samples == repeatedClip.samples,
         "same seed, kind and counter reproduce the complete waveform");
-    expect(first.seed == gdp::core::deriveSeed(seed, gdp::core::SeedDomain::Audio,
+    expect(first.seed == gdp::core::deriveSeed(seed, gdp::game::SeedDomain::Audio,
                (static_cast<std::uint64_t>(AudioEventKind::WeaponFire) << 56U) ^ 7U),
         "audio recipes start from the isolated Audio seed domain");
     expect(validateAudioRecipe(first).isValid()

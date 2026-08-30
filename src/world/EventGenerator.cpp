@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -23,7 +24,7 @@ gdp::core::Vec3 choosePosition(
     const std::span<const SpawnZone> zones)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::Events, 100U + ordinal)};
+        seed, gdp::game::SeedDomain::Events, 100U + ordinal)};
     const SpawnZone& zone = zones[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)))];
     constexpr std::array anchors{
@@ -64,7 +65,7 @@ void addSpawn(
         choosePosition(plan.seed, ordinal, zones),
         baseHealth * difficulty,
         gdp::core::deriveSeed(
-            plan.seed, gdp::core::SeedDomain::EnemyVisual, 500U + ordinal),
+            plan.seed, gdp::game::SeedDomain::EnemyVisual, 500U + ordinal),
         wave,
     });
 }
@@ -105,13 +106,13 @@ RoomEventPlan generateRoomEventPlan(
     using gdp::entities::EnemyArchetype;
     using gdp::entities::ItemType;
     RoomEventPlan plan;
-    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::core::SeedDomain::Events, 0);
+    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Events, 0);
     plan.role = role;
     plan.theme = theme;
     plan.depth = depth;
     const float safeDifficulty = std::clamp(difficulty, 0.5F, 2.0F);
     gdp::core::RandomStream selection{gdp::core::deriveSeed(
-        plan.seed, gdp::core::SeedDomain::Events, 1)};
+        plan.seed, gdp::game::SeedDomain::Events, 1)};
 
     switch (role) {
     case RoomRole::Start:

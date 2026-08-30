@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 #include "procedural/MeshGenerator.hpp"
 
 #include <algorithm>
@@ -501,7 +502,7 @@ const WorkerPartDefinition* selectPart(
         return nullptr;
     }
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyParts, localId)};
+        seed, gdp::game::SeedDomain::EnemyParts, localId)};
     std::uint32_t choice = static_cast<std::uint32_t>(random.rangeInt(
         0, static_cast<int>(totalWeight - 1U)));
     for (std::size_t index = 0; index < candidateCount; ++index) {
@@ -533,7 +534,7 @@ const GuardPartDefinition* selectGuardPart(
         return nullptr;
     }
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyParts, localId)};
+        seed, gdp::game::SeedDomain::EnemyParts, localId)};
     std::uint32_t choice = static_cast<std::uint32_t>(random.rangeInt(
         0, static_cast<int>(totalWeight - 1U)));
     for (std::size_t index = 0; index < candidateCount; ++index) {
@@ -565,7 +566,7 @@ const OfficerPartDefinition* selectOfficerPart(
         return nullptr;
     }
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyParts, localId)};
+        seed, gdp::game::SeedDomain::EnemyParts, localId)};
     std::uint32_t choice = static_cast<std::uint32_t>(random.rangeInt(
         0, static_cast<int>(totalWeight - 1U)));
     for (std::size_t index = 0; index < candidateCount; ++index) {
@@ -597,7 +598,7 @@ const EngineerPartDefinition* selectEngineerPart(
         return nullptr;
     }
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyParts, localId)};
+        seed, gdp::game::SeedDomain::EnemyParts, localId)};
     std::uint32_t choice = static_cast<std::uint32_t>(random.rangeInt(
         0, static_cast<int>(totalWeight - 1U)));
     for (std::size_t index = 0; index < candidateCount; ++index) {
@@ -629,7 +630,7 @@ const IndustrialRobotPartDefinition* selectIndustrialRobotPart(
         return nullptr;
     }
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyParts, localId)};
+        seed, gdp::game::SeedDomain::EnemyParts, localId)};
     std::uint32_t choice = static_cast<std::uint32_t>(random.rangeInt(
         0, static_cast<int>(totalWeight - 1U)));
     for (std::size_t index = 0; index < candidateCount; ++index) {
@@ -661,7 +662,7 @@ PrimitiveRecipe makePrimitive(
 WearProfile generateWear(const gdp::core::Seed seed)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyWear, 0)};
+        seed, gdp::game::SeedDomain::EnemyWear, 0)};
     const int roll = random.rangeInt(0, 99);
     WearProfile wear;
     if (roll < 12) {
@@ -702,7 +703,7 @@ WorkerMaterialSet generateMaterials(const gdp::core::Seed seed)
         gdp::core::Vec3{0.52F, 0.16F, 0.12F},
     };
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyMaterial, 0)};
+        seed, gdp::game::SeedDomain::EnemyMaterial, 0)};
     WorkerMaterialSet materials;
     materials.family = families[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(families.size() - 1U)))];
@@ -716,7 +717,7 @@ WorkerMaterialSet generateMaterials(const gdp::core::Seed seed)
 WearProfile generateGuardWear(const gdp::core::Seed seed)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyWear, 100)};
+        seed, gdp::game::SeedDomain::EnemyWear, 100)};
     const int roll = random.rangeInt(0, 99);
     WearProfile wear;
     if (roll < 20) {
@@ -757,7 +758,7 @@ WorkerMaterialSet generateGuardMaterials(const gdp::core::Seed seed)
         gdp::core::Vec3{0.20F, 0.20F, 0.22F},
     };
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyMaterial, 100)};
+        seed, gdp::game::SeedDomain::EnemyMaterial, 100)};
     WorkerMaterialSet materials;
     materials.family = families[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(families.size() - 1U)))];
@@ -770,7 +771,7 @@ WorkerMaterialSet generateGuardMaterials(const gdp::core::Seed seed)
 WearProfile generateOfficerWear(const gdp::core::Seed seed)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyWear, 200)};
+        seed, gdp::game::SeedDomain::EnemyWear, 200)};
     const int roll = random.rangeInt(0, 99);
     WearProfile wear;
     if (roll < 28) {
@@ -811,7 +812,7 @@ WorkerMaterialSet generateOfficerMaterials(const gdp::core::Seed seed)
         gdp::core::Vec3{0.17F, 0.22F, 0.15F},
     };
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyMaterial, 200)};
+        seed, gdp::game::SeedDomain::EnemyMaterial, 200)};
     WorkerMaterialSet materials;
     materials.family = families[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(families.size() - 1U)))];
@@ -824,7 +825,7 @@ WorkerMaterialSet generateOfficerMaterials(const gdp::core::Seed seed)
 WearProfile generateEngineerWear(const gdp::core::Seed seed)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyWear, 300)};
+        seed, gdp::game::SeedDomain::EnemyWear, 300)};
     const int roll = random.rangeInt(0, 99);
     WearProfile wear;
     if (roll < 18) {
@@ -865,7 +866,7 @@ WorkerMaterialSet generateEngineerMaterials(const gdp::core::Seed seed)
         gdp::core::Vec3{0.42F, 0.44F, 0.38F},
     };
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyMaterial, 300)};
+        seed, gdp::game::SeedDomain::EnemyMaterial, 300)};
     WorkerMaterialSet materials;
     materials.family = families[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(families.size() - 1U)))];
@@ -878,7 +879,7 @@ WorkerMaterialSet generateEngineerMaterials(const gdp::core::Seed seed)
 WearProfile generateIndustrialRobotWear(const gdp::core::Seed seed)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyWear, 400)};
+        seed, gdp::game::SeedDomain::EnemyWear, 400)};
     const int roll = random.rangeInt(0, 99);
     WearProfile wear;
     if (roll < 8) {
@@ -919,7 +920,7 @@ WorkerMaterialSet generateIndustrialRobotMaterials(const gdp::core::Seed seed)
         gdp::core::Vec3{0.30F, 0.12F, 0.10F},
     };
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::EnemyMaterial, 400)};
+        seed, gdp::game::SeedDomain::EnemyMaterial, 400)};
     WorkerMaterialSet materials;
     materials.family = families[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(families.size() - 1U)))];
@@ -1086,7 +1087,7 @@ WorkerVisual generateWorkerVisual(const gdp::core::Seed visualSeed)
     WorkerVisual visual;
     visual.genome.seed = visualSeed;
     gdp::core::RandomStream bodyRandom{gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyBody, 0)};
+        visualSeed, gdp::game::SeedDomain::EnemyBody, 0)};
     visual.genome.bodyProfile = static_cast<WorkerBodyProfileId>(bodyRandom.rangeInt(0, 3));
     visual.body = makeBodyProfile(visual.genome.bodyProfile);
 
@@ -1167,7 +1168,7 @@ WorkerVisual generateWorkerVisual(const gdp::core::Seed visualSeed)
     visual.textureRecipe = {
         .version = 1,
         .seed = gdp::core::deriveSeed(
-            visualSeed, gdp::core::SeedDomain::EnemyMaterial, 1),
+            visualSeed, gdp::game::SeedDomain::EnemyMaterial, 1),
         .family = visual.materials.family,
         .baseColor = visual.materials.primaryColor,
         .secondaryColor = visual.materials.secondaryColor,
@@ -1270,7 +1271,7 @@ GuardVisual generateGuardVisual(const gdp::core::Seed visualSeed)
     GuardVisual visual;
     visual.genome.seed = visualSeed;
     gdp::core::RandomStream bodyRandom{gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyBody, 100)};
+        visualSeed, gdp::game::SeedDomain::EnemyBody, 100)};
     visual.genome.bodyProfile = static_cast<GuardBodyProfileId>(bodyRandom.rangeInt(0, 2));
     visual.body = makeBodyProfile(guardBaseProfile(visual.genome.bodyProfile));
 
@@ -1323,7 +1324,7 @@ GuardVisual generateGuardVisual(const gdp::core::Seed visualSeed)
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
 
     visual.meshRecipe.seed = gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyParts, 199);
+        visualSeed, gdp::game::SeedDomain::EnemyParts, 199);
     visual.meshRecipe.primitives = {
         makePrimitive(*torso, {0.0F, legHeight + (torsoHeight * 0.5F), 0.0F},
             {torsoWidth, torsoHeight, torsoDepth}),
@@ -1354,7 +1355,7 @@ GuardVisual generateGuardVisual(const gdp::core::Seed visualSeed)
     visual.textureRecipe = {
         .version = 1,
         .seed = gdp::core::deriveSeed(
-            visualSeed, gdp::core::SeedDomain::EnemyMaterial, 101),
+            visualSeed, gdp::game::SeedDomain::EnemyMaterial, 101),
         .family = visual.materials.family,
         .baseColor = visual.materials.primaryColor,
         .secondaryColor = visual.materials.secondaryColor,
@@ -1462,7 +1463,7 @@ OfficerVisual generateOfficerVisual(const gdp::core::Seed visualSeed)
     OfficerVisual visual;
     visual.genome.seed = visualSeed;
     gdp::core::RandomStream bodyRandom{gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyBody, 200)};
+        visualSeed, gdp::game::SeedDomain::EnemyBody, 200)};
     visual.genome.bodyProfile
         = static_cast<OfficerBodyProfileId>(bodyRandom.rangeInt(0, 2));
     visual.body = makeBodyProfile(officerBaseProfile(visual.genome.bodyProfile));
@@ -1516,7 +1517,7 @@ OfficerVisual generateOfficerVisual(const gdp::core::Seed visualSeed)
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
 
     visual.meshRecipe.seed = gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyParts, 299);
+        visualSeed, gdp::game::SeedDomain::EnemyParts, 299);
     visual.meshRecipe.primitives = {
         makePrimitive(*torso, {0.0F, legHeight + (torsoHeight * 0.5F), 0.0F},
             {torsoWidth, torsoHeight, torsoDepth}),
@@ -1547,7 +1548,7 @@ OfficerVisual generateOfficerVisual(const gdp::core::Seed visualSeed)
     visual.textureRecipe = {
         .version = 1,
         .seed = gdp::core::deriveSeed(
-            visualSeed, gdp::core::SeedDomain::EnemyMaterial, 201),
+            visualSeed, gdp::game::SeedDomain::EnemyMaterial, 201),
         .family = visual.materials.family,
         .baseColor = visual.materials.primaryColor,
         .secondaryColor = visual.materials.secondaryColor,
@@ -1664,7 +1665,7 @@ EngineerVisual generateEngineerVisual(const gdp::core::Seed visualSeed)
     EngineerVisual visual;
     visual.genome.seed = visualSeed;
     gdp::core::RandomStream bodyRandom{gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyBody, 300)};
+        visualSeed, gdp::game::SeedDomain::EnemyBody, 300)};
     visual.genome.bodyProfile
         = static_cast<EngineerBodyProfileId>(bodyRandom.rangeInt(0, 2));
     visual.body = makeBodyProfile(engineerBaseProfile(visual.genome.bodyProfile));
@@ -1718,7 +1719,7 @@ EngineerVisual generateEngineerVisual(const gdp::core::Seed visualSeed)
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
 
     visual.meshRecipe.seed = gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyParts, 399);
+        visualSeed, gdp::game::SeedDomain::EnemyParts, 399);
     visual.meshRecipe.primitives = {
         makePrimitive(*torso, {0.0F, legHeight + (torsoHeight * 0.5F), 0.0F},
             {torsoWidth, torsoHeight, torsoDepth}, {3.0F, 0.0F, 0.0F}),
@@ -1749,7 +1750,7 @@ EngineerVisual generateEngineerVisual(const gdp::core::Seed visualSeed)
     visual.textureRecipe = {
         .version = 1,
         .seed = gdp::core::deriveSeed(
-            visualSeed, gdp::core::SeedDomain::EnemyMaterial, 301),
+            visualSeed, gdp::game::SeedDomain::EnemyMaterial, 301),
         .family = visual.materials.family,
         .baseColor = visual.materials.primaryColor,
         .secondaryColor = visual.materials.secondaryColor,
@@ -1866,7 +1867,7 @@ IndustrialRobotVisual generateIndustrialRobotVisual(const gdp::core::Seed visual
     IndustrialRobotVisual visual;
     visual.genome.seed = visualSeed;
     gdp::core::RandomStream bodyRandom{gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyBody, 400)};
+        visualSeed, gdp::game::SeedDomain::EnemyBody, 400)};
     visual.genome.bodyProfile
         = static_cast<IndustrialRobotBodyProfileId>(bodyRandom.rangeInt(0, 2));
     visual.body = makeBodyProfile(industrialRobotBaseProfile(visual.genome.bodyProfile));
@@ -1922,7 +1923,7 @@ IndustrialRobotVisual generateIndustrialRobotVisual(const gdp::core::Seed visual
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
 
     visual.meshRecipe.seed = gdp::core::deriveSeed(
-        visualSeed, gdp::core::SeedDomain::EnemyParts, 499);
+        visualSeed, gdp::game::SeedDomain::EnemyParts, 499);
     visual.meshRecipe.primitives = {
         makePrimitive(*torso, {0.0F, legHeight + (torsoHeight * 0.5F), 0.0F},
             {torsoWidth, torsoHeight, torsoDepth}),
@@ -1956,7 +1957,7 @@ IndustrialRobotVisual generateIndustrialRobotVisual(const gdp::core::Seed visual
     visual.textureRecipe = {
         .version = 1,
         .seed = gdp::core::deriveSeed(
-            visualSeed, gdp::core::SeedDomain::EnemyMaterial, 401),
+            visualSeed, gdp::game::SeedDomain::EnemyMaterial, 401),
         .family = visual.materials.family,
         .baseColor = visual.materials.primaryColor,
         .secondaryColor = visual.materials.secondaryColor,

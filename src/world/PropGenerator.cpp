@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -102,7 +103,7 @@ gdp::core::Vec3 choosePosition(
     const std::span<const SpawnZone> zones)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::Props, 200U + ordinal)};
+        seed, gdp::game::SeedDomain::Props, 200U + ordinal)};
     const SpawnZone& zone = zones[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)))];
     constexpr std::array<float, 3> lanes{0.06F, 0.50F, 0.94F};
@@ -163,7 +164,7 @@ void addProp(
     const std::uint64_t ordinal = layout.props.size();
     const gdp::core::Vec3 scale = scaleFor(type);
     gdp::core::RandomStream stateRandom{gdp::core::deriveSeed(
-        layout.seed, gdp::core::SeedDomain::Props, 100U + ordinal)};
+        layout.seed, gdp::game::SeedDomain::Props, 100U + ordinal)};
     const float maximumHealth = healthFor(type);
     const bool initiallyDamaged = layout.depth >= 2U && stateRandom.chance(0.18F);
     const PropState state = initiallyDamaged ? PropState::Damaged : PropState::Intact;
@@ -184,7 +185,7 @@ void addProp(
         dropType,
         dropQuantity,
         gdp::core::deriveSeed(
-            layout.seed, gdp::core::SeedDomain::Props, 300U + ordinal),
+            layout.seed, gdp::game::SeedDomain::Props, 300U + ordinal),
     });
     ++layout.spent;
 }
@@ -211,7 +212,7 @@ PropLayout generatePropLayout(
 {
     using gdp::entities::PropType;
     PropLayout layout;
-    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::core::SeedDomain::Props, 0);
+    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Props, 0);
     layout.role = role;
     layout.theme = theme;
     layout.depth = depth;
@@ -233,7 +234,7 @@ PropLayout generatePropLayout(
     }
 
     gdp::core::RandomStream selection{gdp::core::deriveSeed(
-        layout.seed, gdp::core::SeedDomain::Props, 1)};
+        layout.seed, gdp::game::SeedDomain::Props, 1)};
     while (layout.spent < layout.budget && layout.props.size() < 3U) {
         addProp(layout, selectType(theme, selection), propZones);
     }

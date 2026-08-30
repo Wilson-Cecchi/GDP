@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -499,7 +500,7 @@ std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
 IndustrialCondition selectCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 0)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 0)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 20) {
         return IndustrialCondition::Maintained;
@@ -534,7 +535,7 @@ IndustrialSurfaceRecipe makeSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 1U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const auto [wear, dirt] = conditionAmounts(condition, random);
 
@@ -588,7 +589,7 @@ IndustrialSurfaceRecipe makeSurfaceRecipe(
 StorageCondition selectStorageCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 100)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 100)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 18) {
         return StorageCondition::Orderly;
@@ -632,7 +633,7 @@ StorageSurfaceRecipe makeStorageSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 101U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const StorageConditionAmounts amounts = storageConditionAmounts(condition, random);
 
@@ -682,7 +683,7 @@ StorageSurfaceRecipe makeStorageSurfaceRecipe(
 CombatCondition selectCombatCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 200)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 200)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 18) {
         return CombatCondition::Ready;
@@ -717,7 +718,7 @@ CombatSurfaceRecipe makeCombatSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 201U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const auto [wear, impacts] = combatConditionAmounts(condition, random);
 
@@ -769,7 +770,7 @@ CombatSurfaceRecipe makeCombatSurfaceRecipe(
 CafeteriaCondition selectCafeteriaCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 300)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 300)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 22) {
         return CafeteriaCondition::Clean;
@@ -804,7 +805,7 @@ CafeteriaSurfaceRecipe makeCafeteriaSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 301U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const auto [wear, stain] = cafeteriaConditionAmounts(condition, random);
 
@@ -856,7 +857,7 @@ CafeteriaSurfaceRecipe makeCafeteriaSurfaceRecipe(
 LaboratoryCondition selectLaboratoryCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 400)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 400)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 24) {
         return LaboratoryCondition::Sterile;
@@ -891,7 +892,7 @@ LaboratorySurfaceRecipe makeLaboratorySurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 401U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const auto [wear, contamination] = laboratoryConditionAmounts(condition, random);
 
@@ -942,7 +943,7 @@ LaboratorySurfaceRecipe makeLaboratorySurfaceRecipe(
 TechnicalCondition selectTechnicalCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 500)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 500)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 20) {
         return TechnicalCondition::Serviced;
@@ -986,7 +987,7 @@ TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 501U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const TechnicalConditionAmounts amounts = technicalConditionAmounts(condition, random);
 
@@ -1042,7 +1043,7 @@ TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
 SecurityCondition selectSecurityCondition(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 600)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 600)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 24) {
         return SecurityCondition::Secured;
@@ -1077,7 +1078,7 @@ SecuritySurfaceRecipe makeSecuritySurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 601U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const auto [wear, alert] = securityConditionAmounts(condition, random);
 
@@ -1138,7 +1139,7 @@ struct CentralHubSelection {
 CentralHubSelection selectCentralHubState(const gdp::core::Seed roomSeed) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, 700)};
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, 700)};
     const int roll = random.rangeInt(0, 99);
     CentralHubCondition condition = CentralHubCondition::Active;
     if (roll < 28) {
@@ -1185,7 +1186,7 @@ CentralHubSurfaceRecipe makeCentralHubSurfaceRecipe(
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 701U;
     const gdp::core::Seed seed = gdp::core::deriveSeed(
-        roomSeed, gdp::core::SeedDomain::RoomMaterial, localId);
+        roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
     gdp::core::RandomStream random{seed};
     const CentralHubConditionAmounts amounts = centralHubConditionAmounts(condition, random);
 
@@ -1442,7 +1443,7 @@ IndustrialMaterialValidationResult validateIndustrialRoomMaterials(
             result.errors.push_back(IndustrialMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 1U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 1U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(IndustrialMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -1751,7 +1752,7 @@ StorageMaterialValidationResult validateStorageRoomMaterials(
             result.errors.push_back(StorageMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 101U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 101U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(StorageMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -1963,7 +1964,7 @@ CombatMaterialValidationResult validateCombatRoomMaterials(
             result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 201U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 201U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -2190,7 +2191,7 @@ CafeteriaMaterialValidationResult validateCafeteriaRoomMaterials(
             result.errors.push_back(CafeteriaMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 301U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 301U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CafeteriaMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -2406,7 +2407,7 @@ LaboratoryMaterialValidationResult validateLaboratoryRoomMaterials(
             result.errors.push_back(LaboratoryMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 401U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 401U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(LaboratoryMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -2622,7 +2623,7 @@ TechnicalMaterialValidationResult validateTechnicalRoomMaterials(
             result.errors.push_back(TechnicalMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 501U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 501U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(TechnicalMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -2895,7 +2896,7 @@ SecurityMaterialValidationResult validateSecurityRoomMaterials(
             result.errors.push_back(SecurityMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 601U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 601U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(SecurityMaterialValidationError::InvalidSurfaceOrder);
         }
@@ -3161,7 +3162,7 @@ CentralHubMaterialValidationResult validateCentralHubRoomMaterials(
             result.errors.push_back(CentralHubMaterialValidationError::InvalidSurfaceOrder);
         }
         const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
-            materials.roomSeed, gdp::core::SeedDomain::RoomMaterial, index + 701U);
+            materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 701U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CentralHubMaterialValidationError::InvalidSurfaceOrder);
         }

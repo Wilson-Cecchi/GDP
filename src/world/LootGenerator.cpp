@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -74,7 +75,7 @@ std::uint32_t quantityFor(
     const std::uint64_t ordinal) noexcept
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::Loot, 100U + ordinal)};
+        seed, gdp::game::SeedDomain::Loot, 100U + ordinal)};
     switch (type) {
     case gdp::entities::ItemType::Health:
         return 15U + (5U * static_cast<std::uint32_t>(random.rangeInt(
@@ -110,7 +111,7 @@ gdp::core::Vec3 choosePosition(
     const std::span<const SpawnZone> zones)
 {
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        seed, gdp::core::SeedDomain::Loot, 200U + ordinal)};
+        seed, gdp::game::SeedDomain::Loot, 200U + ordinal)};
     const std::size_t zoneIndex = static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)));
     const SpawnZone& zone = zones[zoneIndex];
@@ -172,7 +173,7 @@ LootLayout generateLootLayout(
     const float difficulty)
 {
     LootLayout layout;
-    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::core::SeedDomain::Loot, 0);
+    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Loot, 0);
     layout.role = role;
     layout.theme = theme;
     layout.depth = depth;
@@ -210,7 +211,7 @@ LootLayout generateLootLayout(
     }
 
     gdp::core::RandomStream selection{gdp::core::deriveSeed(
-        layout.seed, gdp::core::SeedDomain::Loot, 1)};
+        layout.seed, gdp::game::SeedDomain::Loot, 1)};
     while (layout.drops.size() < 3U && layout.spent < layout.budget) {
         const std::uint32_t remaining = layout.budget - layout.spent;
         const bool chooseHealth = remaining >= itemCost(gdp::entities::ItemType::Health)

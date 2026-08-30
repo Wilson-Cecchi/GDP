@@ -1,6 +1,7 @@
 #include "world/WorldGenerator.hpp"
 
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 #include "world/Corridor.hpp"
 #include "world/MapGraph.hpp"
 
@@ -182,7 +183,7 @@ CandidateOutcome generateCandidate(
     candidate.generationVersion = gdp::core::currentGenerationVersion;
     candidate.acceptedAttempt = attempt;
     candidate.graph = generateMapGraph(
-        gdp::core::deriveSeed(attemptSeed, gdp::core::SeedDomain::Graph, 0),
+        gdp::core::deriveSeed(attemptSeed, gdp::game::SeedDomain::Graph, 0),
         {config.roomCount, config.loopBudget});
     if (!validateMapGraph(candidate.graph).isValid()) {
         return {std::nullopt, GenerationFailure::GraphInvalid};
@@ -191,9 +192,9 @@ CandidateOutcome generateCandidate(
     candidate.rooms.reserve(candidate.graph.nodes.size());
     for (const RoomNode& node : candidate.graph.nodes) {
         const gdp::core::Seed roomSeed = gdp::core::deriveSeed(
-            attemptSeed, gdp::core::SeedDomain::Room, node.id);
+            attemptSeed, gdp::game::SeedDomain::Room, node.id);
         gdp::core::RandomStream random{gdp::core::deriveSeed(
-            roomSeed, gdp::core::SeedDomain::RoomModule, node.id)};
+            roomSeed, gdp::game::SeedDomain::RoomModule, node.id)};
         const RoomModule* module = selectModule(library, node, random);
         if (module == nullptr) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
@@ -266,7 +267,7 @@ WorldGenerationResult generateWorld(
     for (std::uint32_t attempt = 0; attempt < config.maximumAttempts; ++attempt) {
         ++result.attempts;
         const gdp::core::Seed attemptSeed = gdp::core::deriveSeed(
-            masterSeed, gdp::core::SeedDomain::World, attempt);
+            masterSeed, gdp::game::SeedDomain::World, attempt);
         CandidateOutcome candidate = generateCandidate(
             masterSeed, attemptSeed, attempt, config, library);
         if (!candidate.world) {

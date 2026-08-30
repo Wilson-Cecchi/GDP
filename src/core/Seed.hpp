@@ -1,30 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace gdp::core {
 
 using Seed = std::uint64_t;
-
-enum class SeedDomain : std::uint64_t {
-    World = 1,
-    Graph = 2,
-    Room = 3,
-    RoomModule = 4,
-    Corridor = 5,
-    Props = 6,
-    Lighting = 7,
-    EnemySpawn = 8,
-    EnemyVisual = 9,
-    EnemyBody = 10,
-    EnemyParts = 11,
-    EnemyMaterial = 12,
-    EnemyWear = 13,
-    Loot = 14,
-    Events = 15,
-    Audio = 16,
-    RoomMaterial = 17,
-};
+using SeedDomainId = std::uint64_t;
 
 struct GenerationVersion {
     std::uint32_t major{1};
@@ -37,8 +19,23 @@ inline constexpr GenerationVersion currentGenerationVersion{1, 0};
 
 [[nodiscard]] Seed deriveSeed(
     Seed parent,
-    SeedDomain domain,
+    SeedDomainId domain,
     std::uint64_t localId,
     GenerationVersion version = currentGenerationVersion) noexcept;
+
+template<typename Domain>
+    requires std::is_enum_v<Domain>
+[[nodiscard]] Seed deriveSeed(
+    const Seed parent,
+    const Domain domain,
+    const std::uint64_t localId,
+    const GenerationVersion version = currentGenerationVersion) noexcept
+{
+    return deriveSeed(
+        parent,
+        static_cast<SeedDomainId>(domain),
+        localId,
+        version);
+}
 
 } // namespace gdp::core

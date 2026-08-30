@@ -512,7 +512,8 @@ gdp/
 │   │
 │   ├── game/
 │   │   ├── Application.cpp
-│   │   └── Application.hpp
+│   │   ├── Application.hpp
+│   │   └── SeedDomains.hpp
 │   │
 │   ├── core/
 │   │   ├── Time.cpp
@@ -654,6 +655,11 @@ SDL. `platform/SdlInput` é um adaptador separado que traduz eventos do backend
 para esse contrato. Assim, estado de input e integração de plataforma podem ser
 testados e substituídos independentemente.
 
+`core/Seed` fornece a derivação genérica e versionada a partir de um ID numérico,
+sem conhecer os sistemas do GDP. O catálogo tipado `game/SeedDomains` pertence
+ao jogo; seus IDs explícitos 1–17 são parte do contrato determinístico e não
+podem mudar sem uma alteração deliberada da versão de geração.
+
 ---
 
 # 8. Sistema de seed
@@ -720,30 +726,38 @@ Proposta:
 
 ```cpp
 using Seed = std::uint64_t;
-
-enum class SeedDomain : std::uint64_t
-{
-    World,
-    Graph,
-    Room,
-    RoomMaterial,
-    EnemySpawn,
-    EnemyVisual,
-    EnemyBody,
-    EnemyParts,
-    EnemyMaterial,
-    EnemyWear,
-    Loot,
-    Props,
-    Lighting,
-    Audio
-};
+using SeedDomainId = std::uint64_t;
 
 Seed deriveSeed(
     Seed parent,
-    SeedDomain domain,
+    SeedDomainId domain,
     std::uint64_t localId
 );
+```
+
+O GDP define separadamente:
+
+```cpp
+enum class SeedDomain : std::uint64_t
+{
+    World = 1,
+    Graph = 2,
+    Room = 3,
+    RoomModule = 4,
+    Corridor = 5,
+    Props = 6,
+    Lighting = 7,
+    EnemySpawn = 8,
+    EnemyVisual = 9,
+    EnemyBody = 10,
+    EnemyParts = 11,
+    EnemyMaterial = 12,
+    EnemyWear = 13,
+    Loot = 14,
+    Events = 15,
+    Audio = 16,
+    RoomMaterial = 17
+};
 ```
 
 Exemplo:

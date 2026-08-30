@@ -115,11 +115,16 @@ especializados das pastas numeradas.
 - **Fase 28 — Input independente de backend:** `platform/Input` agora expõe
   teclas, botões e transições neutros; `platform/SdlInput` traduz os eventos SDL
   em target separado. Estado e adaptador possuem regressões independentes.
+- **Fase 29 — Domínios de seed do GDP:** `core/Seed` preserva somente o
+  mecanismo genérico e versionado de derivação; o catálogo específico do jogo
+  passou para `game/SeedDomains`. Os IDs 1–17 e os hashes dourados permanecem
+  explicitamente protegidos por regressão.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
-testes. O núcleo inclui streams aleatórios determinísticos e independentes por
-domínio, geração versionada de seeds e tipos matemáticos básicos. Quando SDL3
+testes. O núcleo inclui streams aleatórios determinísticos, derivação genérica e
+versionada de seeds e tipos matemáticos básicos; os domínios usados pelo GDP
+pertencem à camada do jogo. Quando SDL3
 não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 

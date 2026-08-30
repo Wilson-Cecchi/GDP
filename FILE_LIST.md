@@ -67,6 +67,7 @@
 - `src/core/Time.hpp`
 - `src/game/Application.cpp`
 - `src/game/Application.hpp`
+- `src/game/SeedDomains.hpp`
 - `src/platform/Input.cpp`
 - `src/platform/Input.hpp`
 - `src/platform/SdlInput.cpp`
@@ -145,6 +146,7 @@
 - `tests/test_renderer.cpp`
 - `tests/test_renderer_gl.cpp`
 - `tests/test_room_materials.cpp`
+- `tests/test_seed_domains.cpp`
 - `tests/test_sdl_input.cpp`
 - `tests/test_session.cpp`
 - `tests/test_world.cpp`

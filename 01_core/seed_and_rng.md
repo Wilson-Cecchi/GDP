@@ -1,6 +1,7 @@
 # Core — Seed, RNG e determinismo
 
-> **Estado:** contrato inicial implementado e validado na Fase 1.
+> **Estado:** contrato inicial implementado na Fase 1; fronteira Engine × GDP
+> separada e validada na Fase 29.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -29,18 +30,18 @@ MASTER
 
 ```cpp
 using Seed = std::uint64_t;
+using SeedDomainId = std::uint64_t;
 
-enum class SeedDomain : std::uint64_t {
-    World, Graph, Room, RoomModule, Corridor,
-    Props, Lighting, EnemySpawn, EnemyVisual,
-    EnemyBody, EnemyParts, EnemyMaterial, EnemyWear,
-    Loot, Events, Audio, RoomMaterial
-};
-
-Seed deriveSeed(Seed parent, SeedDomain domain, std::uint64_t localId);
+Seed deriveSeed(Seed parent, SeedDomainId domain, std::uint64_t localId);
 ```
 
 `deriveSeed` deve ser determinística, independente da ordem de chamadas e versionada. `localId` representa identidade estável (`roomId`, `edgeId`, `spawnIndex`, `partSlot`), nunca apenas quantas vezes uma função foi chamada.
+
+O núcleo aceita IDs numéricos e enums tipados sem conhecer o significado de
+seus valores. O catálogo `game::SeedDomain` pertence ao GDP e contém os domínios
+World, Graph, Room, RoomModule, Corridor, Props, Lighting, EnemySpawn,
+EnemyVisual, EnemyBody, EnemyParts, EnemyMaterial, EnemyWear, Loot, Events,
+Audio e RoomMaterial.
 
 ## RandomStream
 
@@ -64,8 +65,17 @@ public:
 - `rangeInt()` é inclusivo e usa rejeição para evitar viés de módulo;
 - `deriveSeed()` combina parent, domínio, identidade local e versão de geração
   exclusivamente com aritmética inteira de 64 bits;
-- os 17 domínios têm IDs numéricos explícitos e estáveis;
+- os 17 domínios do GDP têm IDs numéricos explícitos e estáveis em
+  `game/SeedDomains.hpp`;
 - a versão corrente da geração é `1.0`.
+
+## Fronteira da Fase 29
+
+- `core/Seed` possui apenas `Seed`, `SeedDomainId`, `GenerationVersion` e o
+  algoritmo genérico `deriveSeed`;
+- `game/SeedDomains` possui o vocabulário procedural específico do GDP;
+- os IDs serializados 1–17 e o golden de derivação de sala continuam iguais;
+- a regressão arquitetural impede que o enum específico retorne ao núcleo.
 
 ## Árvore de sala
 

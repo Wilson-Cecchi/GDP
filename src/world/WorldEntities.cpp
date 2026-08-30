@@ -1,5 +1,6 @@
 #include "world/WorldEntities.hpp"
 
+#include "game/SeedDomains.hpp"
 #include "world/LootGenerator.hpp"
 #include "world/PropGenerator.hpp"
 
@@ -107,7 +108,7 @@ InitialEntitySet populateInitialEntities(
                 .archetype = EnemyArchetype::Worker,
                 .health = 68.0F,
                 .visualSeed = gdp::core::deriveSeed(
-                    room.seed, gdp::core::SeedDomain::EnemyVisual, 0),
+                    room.seed, gdp::game::SeedDomain::EnemyVisual, 0),
             }));
             addProps();
             addLoot();
@@ -125,7 +126,7 @@ InitialEntitySet populateInitialEntities(
                 .health = health,
                 .visualSeed = gdp::core::deriveSeed(
                     room.seed,
-                    gdp::core::SeedDomain::EnemyVisual,
+                    gdp::game::SeedDomain::EnemyVisual,
                     enemyVisualOrdinal++),
             }));
         };

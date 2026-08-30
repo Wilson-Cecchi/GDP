@@ -31,17 +31,19 @@ void testHashAndSeed()
     expect(fnv1a64("GDP") != fnv1a64("gdp"), "string hashes distinguish content");
 
     constexpr Seed root = 0x123456789ABCDEF0ULL;
-    const Seed roomA = deriveSeed(root, SeedDomain::Room, 42);
-    const Seed roomARepeat = deriveSeed(root, SeedDomain::Room, 42);
-    const Seed roomB = deriveSeed(root, SeedDomain::Room, 43);
-    const Seed lootA = deriveSeed(root, SeedDomain::Loot, 42);
+    constexpr SeedDomainId roomDomain = 3U;
+    constexpr SeedDomainId lootDomain = 14U;
+    const Seed roomA = deriveSeed(root, roomDomain, 42);
+    const Seed roomARepeat = deriveSeed(root, roomDomain, 42);
+    const Seed roomB = deriveSeed(root, roomDomain, 43);
+    const Seed lootA = deriveSeed(root, lootDomain, 42);
 
     expect(roomA == roomARepeat, "derived seeds are repeatable");
     expect(roomA == 0x75247D92702F490EULL, "derived seed golden value is stable");
     expect(roomA != roomB, "local IDs create independent seeds");
     expect(roomA != lootA, "domains create independent seeds");
     expect(
-        roomA != deriveSeed(root, SeedDomain::Room, 42, GenerationVersion{2, 0}),
+        roomA != deriveSeed(root, roomDomain, 42, GenerationVersion{2, 0}),
         "generation versions change derived seeds");
 }
 

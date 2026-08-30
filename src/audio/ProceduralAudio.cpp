@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -152,7 +153,7 @@ AudioRecipe generateAudioRecipe(
     recipe.kind = kind;
     const std::uint64_t localId = (static_cast<std::uint64_t>(kind) << 56U)
         ^ eventCounter;
-    recipe.seed = gdp::core::deriveSeed(sourceSeed, gdp::core::SeedDomain::Audio, localId);
+    recipe.seed = gdp::core::deriveSeed(sourceSeed, gdp::game::SeedDomain::Audio, localId);
     configureRecipe(recipe);
 
     if (kind == AudioEventKind::Ambient) {
@@ -178,7 +179,7 @@ AudioRecipe generateAudioRecipe(
 
     if (kind < AudioEventKind::Count) {
         gdp::core::RandomStream random{gdp::core::deriveSeed(
-            recipe.seed, gdp::core::SeedDomain::Audio, 1U)};
+            recipe.seed, gdp::game::SeedDomain::Audio, 1U)};
         const float pitchVariation = random.rangeFloat(0.94F, 1.06F);
         recipe.baseFrequency *= pitchVariation;
         recipe.secondaryFrequency *= pitchVariation;
@@ -242,7 +243,7 @@ AudioClip synthesizeAudioClip(const AudioRecipe& recipe, const int sampleRate)
         1.0F, std::round(recipe.durationSeconds * static_cast<float>(sampleRate))));
     clip.samples.resize(sampleCount);
     gdp::core::RandomStream noise{gdp::core::deriveSeed(
-        recipe.seed, gdp::core::SeedDomain::Audio, 2U)};
+        recipe.seed, gdp::game::SeedDomain::Audio, 2U)};
     constexpr float twoPi = 2.0F * std::numbers::pi_v<float>;
     for (std::size_t index = 0; index < sampleCount; ++index) {
         const float time = static_cast<float>(index) / static_cast<float>(sampleRate);

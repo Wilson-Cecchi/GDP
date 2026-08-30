@@ -243,6 +243,14 @@ if(GDP_BUILD_TESTS)
     add_test(NAME core_systems COMMAND gdp_core_tests)
     set_tests_properties(core_systems PROPERTIES TIMEOUT 10)
 
+    add_executable(gdp_seed_domain_tests tests/test_seed_domains.cpp)
+    target_link_libraries(gdp_seed_domain_tests PRIVATE gdp_core)
+    gdp_enable_warnings(gdp_seed_domain_tests)
+    gdp_enable_sanitizers(gdp_seed_domain_tests)
+
+    add_test(NAME gdp_seed_domain_systems COMMAND gdp_seed_domain_tests)
+    set_tests_properties(gdp_seed_domain_systems PROPERTIES TIMEOUT 10)
+
     add_executable(gdp_input_tests tests/test_input.cpp)
     target_link_libraries(gdp_input_tests PRIVATE gdp_platform)
     gdp_enable_warnings(gdp_input_tests)

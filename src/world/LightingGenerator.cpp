@@ -2,6 +2,7 @@
 
 #include "core/Hash.hpp"
 #include "core/Random.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <array>
@@ -94,7 +95,7 @@ RoomLightingPlan generateRoomLightingPlan(
     const gdp::core::Aabb roomBounds)
 {
     RoomLightingPlan plan;
-    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::core::SeedDomain::Lighting, 0U);
+    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Lighting, 0U);
     plan.role = role;
     plan.theme = theme;
     const LightingPalette palette = paletteFor(role, theme);
@@ -104,7 +105,7 @@ RoomLightingPlan generateRoomLightingPlan(
         || role == RoomRole::Boss || theme == RoomTheme::Security;
 
     gdp::core::RandomStream random{gdp::core::deriveSeed(
-        plan.seed, gdp::core::SeedDomain::Lighting, 1U)};
+        plan.seed, gdp::game::SeedDomain::Lighting, 1U)};
     const float roleAmbient = role == RoomRole::Secret ? 0.115F
         : role == RoomRole::Boss ? 0.14F
         : role == RoomRole::Arena ? 0.17F : 0.19F;

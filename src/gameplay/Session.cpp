@@ -1,5 +1,7 @@
 #include "gameplay/Session.hpp"
 
+#include "game/SeedDomains.hpp"
+
 namespace gdp::gameplay {
 
 SessionSystem::SessionSystem(const gdp::core::Seed initialSeed) noexcept
@@ -55,7 +57,7 @@ gdp::core::Seed seedForRun(
         return initialSeed;
     }
     return gdp::core::deriveSeed(
-        initialSeed, gdp::core::SeedDomain::World, runIndex);
+        initialSeed, gdp::game::SeedDomain::World, runIndex);
 }
 
 const char* sessionPhaseName(const SessionPhase phase) noexcept
