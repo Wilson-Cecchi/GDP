@@ -1,11 +1,11 @@
 #include "core/Math.hpp"
 #include "game/visual/VisualAssets.hpp"
-#include "procedural/AssetCache.hpp"
 #include "procedural/AssetRecipe.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 #include "render/Mesh.hpp"
 #include "render/Texture.hpp"
+#include "resources/AssetCache.hpp"
 
 #include <algorithm>
 #include <cstdint>

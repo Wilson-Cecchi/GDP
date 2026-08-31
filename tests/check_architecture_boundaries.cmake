@@ -32,6 +32,10 @@ if(root_cmake_contents MATCHES
     message(FATAL_ERROR "GDP-prefixed procedural foundation target must not return")
 endif()
 if(NOT root_cmake_contents MATCHES
+        "add_library\\(wkc_forge_resources[ \t]+INTERFACE\\)")
+    message(FATAL_ERROR "Generic resource cache must belong to WKC Forge")
+endif()
+if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_visual_renderer[ \t\r\n]+STATIC")
     message(FATAL_ERROR "GDP concrete renderer target must be named gdp_visual_renderer")
 endif()
@@ -62,6 +66,10 @@ endif()
 if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\(wkc_forge_procedural[ \t]+PUBLIC[ \t]+wkc_forge_core[ \t]+wkc_forge_render")
     message(FATAL_ERROR "WKC Forge procedural must depend only on Forge foundations")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "target_link_libraries\\([ \t\r\n]+gdp_visual_renderer[^\\)]*wkc_forge_resources")
+    message(FATAL_ERROR "GDP visual renderer must declare its resource cache dependency")
 endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")
@@ -170,6 +178,21 @@ foreach(source IN LISTS procedural_foundation_sources)
         )
     endif()
 endforeach()
+
+if(EXISTS "${GDP_SOURCE_DIR}/src/procedural/AssetCache.hpp")
+    message(FATAL_ERROR "Generic resource cache must not return to procedural")
+endif()
+set(resource_cache "${GDP_SOURCE_DIR}/src/resources/AssetCache.hpp")
+if(NOT EXISTS "${resource_cache}")
+    message(FATAL_ERROR "WKC Forge resource cache is missing from src/resources")
+endif()
+file(READ "${resource_cache}" resource_cache_contents)
+if(resource_cache_contents MATCHES
+        "#include[ \t]+\"(game|gameplay|world|entities|audio|procedural|render)/"
+    OR resource_cache_contents MATCHES
+        "Worker|Guard|Officer|Engineer|IndustrialRobot|RoomMaterial")
+    message(FATAL_ERROR "WKC Forge resource cache depends on GDP content")
+endif()
 
 file(GLOB render_foundation_sources
     "${GDP_SOURCE_DIR}/src/render/*.cpp"

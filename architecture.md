@@ -492,7 +492,6 @@ gdp/
 │   │   └── MapGraph.hpp
 │   │
 │   ├── procedural/
-│   │   ├── AssetCache.hpp
 │   │   ├── AssetRecipe.cpp
 │   │   ├── AssetRecipe.hpp
 │   │   ├── MeshGenerator.cpp
@@ -584,9 +583,10 @@ sem conhecer os sistemas do GDP. O catálogo tipado `game/SeedDomains` pertence
 ao jogo; seus IDs explícitos 1–17 são parte do contrato determinístico e não
 podem mudar sem uma alteração deliberada da versão de geração.
 
-A fronteira visual intermediária possui quatro targets: `wkc_forge_render`
+A fronteira visual intermediária possui cinco targets: `wkc_forge_render`
 contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
 `wkc_forge_procedural` contém receitas, hashing e geradores genéricos;
+`wkc_forge_resources` publica o cache genérico header-only;
 `gdp_visual_content` contém Worker, materiais de sala e `game/visual`; e
 `gdp_visual_renderer` compõe a apresentação concreta do GDP. Esses nomes
 de target GDP permanecem temporários até suas fronteiras estabilizarem;
@@ -641,9 +641,14 @@ formam agora a cadeia `wkc_forge_core -> wkc_forge_platform -> SDL`, ainda com
 namespace público `gdp::platform` para manter o rename incremental.
 
 Na Fase 41, `gdp_procedural_assets` passou para `wkc_forge_procedural`.
-Receitas, hashing, cache e geração de mesh/textura dependem apenas de
+Receitas, hashing e geração de mesh/textura dependem apenas de
 `wkc_forge_core` e `wkc_forge_render`; conteúdo Worker, salas e luminária segue
 nos targets GDP. O namespace público `gdp::procedural` permanece compatível.
+
+Na Fase 42, `AssetCache.hpp` saiu de `src/procedural` para `src/resources` e
+passou a ser publicado pelo target header-only `wkc_forge_resources`. O cache
+continua agnóstico ao tipo do recurso e o renderer GDP declara a dependência
+explicitamente. API, métricas e namespace permanecem inalterados nesta etapa.
 
 ---
 
@@ -3415,9 +3420,10 @@ regras materiais, hashes dourados, cache e 1.000 seeds visuais. O fingerprint
 estrutural do World permanece inalterado.
 
 Na Fase 30, os contratos e geradores reutilizáveis foram isolados no target
-depois renomeado, na Fase 41, para `wkc_forge_procedural`; construtores Worker e
-outros dados visuais do GDP não fazem mais parte de `AssetRecipe` e são
-compilados em `gdp_visual_content`.
+depois renomeado, na Fase 41, para `wkc_forge_procedural`; na Fase 42, o cache
+foi extraído para `wkc_forge_resources`. Construtores Worker e outros dados
+visuais do GDP não fazem mais parte de `AssetRecipe` e são compilados em
+`gdp_visual_content`.
 
 ```text
 MeshRecipe

@@ -12,6 +12,8 @@
 > do GDP.
 > Na Fase 31, esse conteúdo foi agrupado fisicamente em `src/game/visual`, sem
 > alterar namespaces, receitas ou hashes.
+> Na Fase 42, o `AssetCache` genérico passou para `src/resources` e para o target
+> header-only `wkc_forge_resources`, preservando API e métricas.
 > Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
 > gate pré-implementação de `visual/TEXTURE_APPROVALS.md`.
 >

@@ -162,10 +162,14 @@ especializados das pastas numeradas.
   SDL passaram para `wkc_forge_platform` e `wkc_forge_platform_sdl`. A cadeia
   agora é `wkc_forge_core -> wkc_forge_platform -> SDL`, mantendo
   temporariamente o namespace `gdp::platform`.
-- **Fase 41 — Procedural WKC Forge:** receitas, hashing, cache e geradores de
+- **Fase 41 — Procedural WKC Forge:** receitas, hashing e geradores de
   mesh/textura reutilizáveis passaram de `gdp_procedural_assets` para
   `wkc_forge_procedural`. O conteúdo Worker, salas e luminária permanece nos
   targets GDP, enquanto o namespace `gdp::procedural` segue compatível.
+- **Fase 42 — Resources WKC Forge:** o `AssetCache` genérico saiu de
+  `src/procedural` para `src/resources` e passou a ser publicado pelo target
+  header-only `wkc_forge_resources`. O renderer GDP declara esse consumo
+  explicitamente; API, métricas e namespace permanecem compatíveis.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

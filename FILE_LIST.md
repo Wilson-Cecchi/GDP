@@ -101,7 +101,6 @@
 - `src/gameplay/Weapon.cpp`
 - `src/gameplay/Weapon.hpp`
 - `src/main.cpp`
-- `src/procedural/AssetCache.hpp`
 - `src/procedural/AssetRecipe.cpp`
 - `src/procedural/AssetRecipe.hpp`
 - `src/procedural/MeshGenerator.cpp`
@@ -120,6 +119,7 @@
 - `src/render/Shader.hpp`
 - `src/render/Texture.cpp`
 - `src/render/Texture.hpp`
+- `src/resources/AssetCache.hpp`
 - `src/world/Connector.cpp`
 - `src/world/Connector.hpp`
 - `src/world/Corridor.cpp`
