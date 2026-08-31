@@ -37,7 +37,7 @@ bool isFinite(const gdp::core::Mat4& matrix)
 
 void testMesh()
 {
-    using namespace gdp::render;
+    using namespace wkc::render;
 
     const MeshData box = makeBoxMesh();
     std::string reason;
@@ -61,7 +61,7 @@ void testMesh()
 
 void testTextureData()
 {
-    using namespace gdp::render;
+    using namespace wkc::render;
 
     const ImageData first = gdp::game::makeIndustrialCheckerImage(8, 8);
     const ImageData second = gdp::game::makeIndustrialCheckerImage(8, 8);
@@ -106,7 +106,7 @@ void testTextureData()
 void testCameraAndMatrices()
 {
     using namespace gdp::core;
-    using gdp::render::Camera;
+    using wkc::render::Camera;
 
     expect(nearlyEqual(length(Vec3{3.0F, 4.0F, 0.0F}), 5.0F), "vector length is correct");
     expect(cross({1.0F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F}) == Vec3{0.0F, 0.0F, 1.0F},

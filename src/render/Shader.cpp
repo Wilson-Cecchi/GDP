@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace gdp::render {
+namespace wkc::render {
 namespace {
 
 GLuint compileStage(
@@ -178,4 +178,4 @@ bool Shader::isValid() const noexcept
     return program_ != 0;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

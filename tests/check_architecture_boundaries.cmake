@@ -155,7 +155,7 @@ if(NOT gdp_renderer_contents MATCHES
         "#include[ \t]+\"game/visual/GdpRenderData.hpp\"")
     message(FATAL_ERROR "GDP renderer must consume the render data contract")
 endif()
-if(NOT gdp_renderer_contents MATCHES "gdp::render::Texture")
+if(NOT gdp_renderer_contents MATCHES "wkc::render::Texture")
     message(FATAL_ERROR "GDP renderer must consume qualified render foundation types")
 endif()
 if(gdp_renderer_contents MATCHES "struct[ \t]+HudRenderData"
@@ -239,6 +239,13 @@ file(GLOB render_foundation_sources
 )
 foreach(source IN LISTS render_foundation_sources)
     file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+wkc::render[ \t{]"
+        OR contents MATCHES "namespace[ \t]+gdp::render[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "WKC Forge render API must use wkc::render: ${relative_source}"
+        )
+    endif()
     if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities|audio|procedural)/")
         file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
         message(FATAL_ERROR

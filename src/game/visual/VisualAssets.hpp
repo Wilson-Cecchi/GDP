@@ -6,13 +6,13 @@
 namespace gdp::game {
 
 struct CeilingFixtureMaterialImages {
-    gdp::render::ImageData albedo;
-    gdp::render::ImageData normal;
-    gdp::render::ImageData properties;
-    gdp::render::ImageData emission;
+    wkc::render::ImageData albedo;
+    wkc::render::ImageData normal;
+    wkc::render::ImageData properties;
+    wkc::render::ImageData emission;
 };
 
-[[nodiscard]] gdp::render::ImageData makeIndustrialCheckerImage(
+[[nodiscard]] wkc::render::ImageData makeIndustrialCheckerImage(
     int width = 8,
     int height = 8);
 [[nodiscard]] CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages();

@@ -20,13 +20,13 @@ std::uint8_t channelToByte(const float value) noexcept
 
 } // namespace
 
-std::optional<gdp::render::ImageData> generateAlbedo(const TextureRecipe& recipe)
+std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe)
 {
     if (!validateTextureRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     const std::size_t pixelCount = static_cast<std::size_t>(recipe.resolution)

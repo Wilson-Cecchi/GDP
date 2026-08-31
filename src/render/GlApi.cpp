@@ -6,7 +6,7 @@
 
 #include <string>
 
-namespace gdp::render {
+namespace wkc::render {
 namespace {
 
 template<typename Function>
@@ -71,4 +71,4 @@ bool loadGlApi(GlApi& api) noexcept
     return loaded;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

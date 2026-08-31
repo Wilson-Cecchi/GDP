@@ -4,7 +4,7 @@
 
 #include <utility>
 
-namespace gdp::render {
+namespace wkc::render {
 
 Framebuffer::~Framebuffer()
 {
@@ -158,4 +158,4 @@ int Framebuffer::height() const noexcept
     return height_;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

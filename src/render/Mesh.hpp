@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace gdp::render {
+namespace wkc::render {
 
 struct Vertex {
     gdp::core::Vec3 position{};
@@ -50,4 +50,4 @@ private:
     std::uint32_t indexCount_{0};
 };
 
-} // namespace gdp::render
+} // namespace wkc::render

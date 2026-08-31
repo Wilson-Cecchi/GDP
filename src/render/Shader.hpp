@@ -5,7 +5,7 @@
 
 #include <string_view>
 
-namespace gdp::render {
+namespace wkc::render {
 
 class Shader {
 public:
@@ -36,4 +36,4 @@ private:
     GLuint program_{0};
 };
 
-} // namespace gdp::render
+} // namespace wkc::render

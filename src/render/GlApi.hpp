@@ -3,7 +3,7 @@
 #include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_opengl_glext.h>
 
-namespace gdp::render {
+namespace wkc::render {
 
 struct GlApi {
     PFNGLGENVERTEXARRAYSPROC genVertexArrays{};
@@ -54,4 +54,4 @@ struct GlApi {
 
 [[nodiscard]] bool loadGlApi(GlApi& api) noexcept;
 
-} // namespace gdp::render
+} // namespace wkc::render

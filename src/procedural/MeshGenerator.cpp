@@ -51,13 +51,13 @@ void expandBounds(gdp::core::Aabb& bounds, const gdp::core::Vec3 point) noexcept
     bounds.maximum.z = std::max(bounds.maximum.z, point.z);
 }
 
-gdp::render::MeshData makeCylinderMesh()
+wkc::render::MeshData makeCylinderMesh()
 {
     constexpr std::uint32_t segments = 12;
     constexpr float radius = 0.5F;
     constexpr float halfHeight = 0.5F;
     constexpr float fullCircle = std::numbers::pi_v<float> * 2.0F;
-    gdp::render::MeshData mesh;
+    wkc::render::MeshData mesh;
 
     for (std::uint32_t segment = 0; segment <= segments; ++segment) {
         const float fraction = static_cast<float>(segment) / static_cast<float>(segments);
@@ -127,11 +127,11 @@ gdp::render::MeshData makeCylinderMesh()
     return mesh;
 }
 
-gdp::render::MeshData primitiveMesh(const PrimitiveType type)
+wkc::render::MeshData primitiveMesh(const PrimitiveType type)
 {
     return type == PrimitiveType::Cylinder
         ? makeCylinderMesh()
-        : gdp::render::makeBoxMesh();
+        : wkc::render::makeBoxMesh();
 }
 
 } // namespace
@@ -148,13 +148,13 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
     result.ranges.reserve(recipe.primitives.size());
 
     for (const PrimitiveRecipe& primitive : recipe.primitives) {
-        const gdp::render::MeshData baseMesh = primitiveMesh(primitive.type);
+        const wkc::render::MeshData baseMesh = primitiveMesh(primitive.type);
         const std::uint32_t vertexOffset = static_cast<std::uint32_t>(result.mesh.vertices.size());
         const std::uint32_t firstIndex = static_cast<std::uint32_t>(result.mesh.indices.size());
         const gdp::core::Vec3 dimensions = componentMultiply(
             primitive.dimensions,
             primitive.localTransform.scale);
-        for (gdp::render::Vertex vertex : baseMesh.vertices) {
+        for (wkc::render::Vertex vertex : baseMesh.vertices) {
             vertex.position = componentMultiply(vertex.position, dimensions);
             vertex.position = rotateEuler(
                 vertex.position,
@@ -177,7 +177,7 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
             primitive.semantic,
         });
     }
-    if (!gdp::render::validateMeshData(result.mesh)) {
+    if (!wkc::render::validateMeshData(result.mesh)) {
         return std::nullopt;
     }
     return result;

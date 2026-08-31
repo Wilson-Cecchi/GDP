@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <numbers>
 
-namespace gdp::render {
+namespace wkc::render {
 
 void Camera::setPerspective(
     const float verticalFieldOfViewDegrees,
@@ -41,4 +41,4 @@ gdp::core::Vec3 Camera::position() const noexcept
     return position_;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

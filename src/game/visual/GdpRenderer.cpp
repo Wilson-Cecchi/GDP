@@ -262,7 +262,7 @@ bool GdpRenderer::initialize(const int width, const int height)
     if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)) {
         return false;
     }
-    if (!box_.upload(gl_, gdp::render::makeBoxMesh())) {
+    if (!box_.upload(gl_, wkc::render::makeBoxMesh())) {
         return false;
     }
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
@@ -271,13 +271,13 @@ bool GdpRenderer::initialize(const int width, const int height)
     const gdp::game::CeilingFixtureMaterialImages fixtureImages
         = gdp::game::makeCeilingFixtureMaterialImages();
     if (!ceilingFixtureMaterial_.albedo.upload(
-            gl_, fixtureImages.albedo, gdp::render::TextureSampling::Trilinear)
+            gl_, fixtureImages.albedo, wkc::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.normal.upload(
-            gl_, fixtureImages.normal, gdp::render::TextureSampling::Trilinear)
+            gl_, fixtureImages.normal, wkc::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.properties.upload(
-            gl_, fixtureImages.properties, gdp::render::TextureSampling::Trilinear)
+            gl_, fixtureImages.properties, wkc::render::TextureSampling::Trilinear)
         || !ceilingFixtureMaterial_.emission.upload(
-            gl_, fixtureImages.emission, gdp::render::TextureSampling::Trilinear)) {
+            gl_, fixtureImages.emission, wkc::render::TextureSampling::Trilinear)) {
         return false;
     }
     if (!framebuffer_.resize(gl_, width, height)) {
@@ -327,11 +327,11 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         }
         IndustrialWallGpuMaterial wallMaterial;
         if (!wallMaterial.albedo.upload(
-                gl_, images->albedo, gdp::render::TextureSampling::Trilinear)
+                gl_, images->albedo, wkc::render::TextureSampling::Trilinear)
             || !wallMaterial.normal.upload(
-                gl_, images->normal, gdp::render::TextureSampling::Trilinear)
+                gl_, images->normal, wkc::render::TextureSampling::Trilinear)
             || !wallMaterial.properties.upload(
-                gl_, images->properties, gdp::render::TextureSampling::Trilinear)) {
+                gl_, images->properties, wkc::render::TextureSampling::Trilinear)) {
             return false;
         }
         sharedWall.emplace(std::move(wallMaterial));
@@ -348,11 +348,11 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         }
         IndustrialWallGpuMaterial ceilingMaterial;
         if (!ceilingMaterial.albedo.upload(
-                gl_, images->albedo, gdp::render::TextureSampling::Trilinear)
+                gl_, images->albedo, wkc::render::TextureSampling::Trilinear)
             || !ceilingMaterial.normal.upload(
-                gl_, images->normal, gdp::render::TextureSampling::Trilinear)
+                gl_, images->normal, wkc::render::TextureSampling::Trilinear)
             || !ceilingMaterial.properties.upload(
-                gl_, images->properties, gdp::render::TextureSampling::Trilinear)) {
+                gl_, images->properties, wkc::render::TextureSampling::Trilinear)) {
             return false;
         }
         sharedCeiling.emplace(std::move(ceilingMaterial));

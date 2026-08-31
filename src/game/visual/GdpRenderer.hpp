@@ -63,26 +63,26 @@ public:
 
 private:
     struct EnemyGpuVisual {
-        gdp::render::Mesh mesh;
-        gdp::render::Texture texture;
+        wkc::render::Mesh mesh;
+        wkc::render::Texture texture;
         float emissiveStrength{0.0F};
     };
 
     struct IndustrialWallGpuMaterial {
-        gdp::render::Texture albedo;
-        gdp::render::Texture normal;
-        gdp::render::Texture properties;
+        wkc::render::Texture albedo;
+        wkc::render::Texture normal;
+        wkc::render::Texture properties;
     };
 
     struct CeilingFixtureGpuMaterial {
-        gdp::render::Texture albedo;
-        gdp::render::Texture normal;
-        gdp::render::Texture properties;
-        gdp::render::Texture emission;
+        wkc::render::Texture albedo;
+        wkc::render::Texture normal;
+        wkc::render::Texture properties;
+        wkc::render::Texture emission;
     };
 
     struct RoomGpuMaterials {
-        std::array<gdp::render::Texture,
+        std::array<wkc::render::Texture,
             static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
         std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
         std::optional<gdp::procedural::IndustrialCondition> industrialCeilingCondition;
@@ -92,15 +92,15 @@ private:
         float ceilingTone{1.0F};
     };
 
-    gdp::render::GlApi gl_{};
-    gdp::render::Camera camera_{};
-    gdp::render::Framebuffer framebuffer_{};
-    gdp::render::Shader shader_{};
-    gdp::render::Mesh box_{};
-    gdp::render::Texture fallbackTexture_{};
+    wkc::render::GlApi gl_{};
+    wkc::render::Camera camera_{};
+    wkc::render::Framebuffer framebuffer_{};
+    wkc::render::Shader shader_{};
+    wkc::render::Mesh box_{};
+    wkc::render::Texture fallbackTexture_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
-    wkc::resources::AssetCache<gdp::render::MeshData> meshCache_{};
-    wkc::resources::AssetCache<gdp::render::ImageData> textureCache_{};
+    wkc::resources::AssetCache<wkc::render::MeshData> meshCache_{};
+    wkc::resources::AssetCache<wkc::render::ImageData> textureCache_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> workerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> guardVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> officerVisuals_{};

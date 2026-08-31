@@ -7,7 +7,7 @@
 
 namespace gdp::procedural {
 
-[[nodiscard]] std::optional<gdp::render::ImageData> generateAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateAlbedo(
     const TextureRecipe& recipe);
 
 } // namespace gdp::procedural

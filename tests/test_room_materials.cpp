@@ -86,7 +86,7 @@ bool containsError(
 }
 
 float averageRed(
-    const gdp::render::ImageData& image,
+    const wkc::render::ImageData& image,
     const int minimumX,
     const int maximumX)
 {
@@ -105,7 +105,7 @@ float averageRed(
 }
 
 float averageRedRow(
-    const gdp::render::ImageData& image,
+    const wkc::render::ImageData& image,
     const int y,
     const int minimumX,
     const int maximumX)
@@ -120,7 +120,7 @@ float averageRedRow(
     return static_cast<float>(total) / static_cast<float>(maximumX - minimumX);
 }
 
-std::uint64_t imageHash(const gdp::render::ImageData& image) noexcept
+std::uint64_t imageHash(const wkc::render::ImageData& image) noexcept
 {
     std::uint64_t hash = 1'469'598'103'934'665'603ULL;
     for (const std::uint8_t channel : image.rgba) {
@@ -131,7 +131,7 @@ std::uint64_t imageHash(const gdp::render::ImageData& image) noexcept
 }
 
 bool pixelMatches(
-    const gdp::render::ImageData& image,
+    const wkc::render::ImageData& image,
     const int x,
     const int y,
     const std::array<std::uint8_t, 3>& color) noexcept
@@ -144,7 +144,7 @@ bool pixelMatches(
 }
 
 std::size_t exactColorCount(
-    const gdp::render::ImageData& image,
+    const wkc::render::ImageData& image,
     const gdp::core::Vec3 color) noexcept
 {
     const std::array<std::uint8_t, 3> expected{
@@ -203,9 +203,9 @@ void testStructuredSurfaceAlbedos()
         materials.surfaces[static_cast<std::size_t>(IndustrialSurface::Floor)]);
     const auto ceiling = generateIndustrialSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(IndustrialSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every industrial surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -275,9 +275,9 @@ void testIndustrialHdMaterialMaps()
             "approved Industrial wall archetypes use the versioned 1024 HD contract");
         expect(images && images->albedo.width == 1024 && images->normal.width == 1024
                 && images->properties.width == 1024
-                && gdp::render::validateImageData(images->albedo)
-                && gdp::render::validateImageData(images->normal)
-                && gdp::render::validateImageData(images->properties),
+                && wkc::render::validateImageData(images->albedo)
+                && wkc::render::validateImageData(images->normal)
+                && wkc::render::validateImageData(images->properties),
             "HD wall produces renderer-valid Albedo, Normal and RMA maps");
         if (!images) {
             continue;
@@ -334,9 +334,9 @@ void testApprovedIndustrialCeilingDirection()
                 && recipe.surface == IndustrialSurface::Ceiling
                 && recipe.family == MaterialFamily::BareSteel,
             "approved Industrial ceiling uses the versioned 1024 metallic-steel contract");
-        expect(images && gdp::render::validateImageData(images->albedo)
-                && gdp::render::validateImageData(images->normal)
-                && gdp::render::validateImageData(images->properties),
+        expect(images && wkc::render::validateImageData(images->albedo)
+                && wkc::render::validateImageData(images->normal)
+                && wkc::render::validateImageData(images->properties),
             "HD ceiling produces renderer-valid Albedo, Normal and RMA maps");
         if (!images) {
             continue;
@@ -519,7 +519,7 @@ void testRoomMaterialSeedBatch()
                 continue;
             }
             const auto image = generateIndustrialSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Industrial albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -577,9 +577,9 @@ void testStructuredStorageAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateStorageSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Storage surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -664,7 +664,7 @@ void testStorageSeedBatch()
         }
         for (const StorageSurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateStorageSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Storage albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -724,9 +724,9 @@ void testStructuredCombatAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateCombatSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Combat Room surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -822,7 +822,7 @@ void testCombatSeedBatch()
         }
         for (const CombatSurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateCombatSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Combat albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -882,9 +882,9 @@ void testStructuredCafeteriaAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateCafeteriaSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Cafeteria surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -1006,7 +1006,7 @@ void testCafeteriaSeedBatch()
         }
         for (const CafeteriaSurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateCafeteriaSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Cafeteria albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -1067,9 +1067,9 @@ void testStructuredLaboratoryAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateLaboratorySurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Laboratory surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -1179,7 +1179,7 @@ void testLaboratorySeedBatch()
         }
         for (const LaboratorySurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateLaboratorySurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Laboratory albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -1239,9 +1239,9 @@ void testStructuredTechnicalAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateTechnicalSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Technical Area surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -1372,7 +1372,7 @@ void testTechnicalSeedBatch()
         }
         for (const TechnicalSurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateTechnicalSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Technical albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -1432,9 +1432,9 @@ void testStructuredSecurityAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateSecuritySurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Security surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -1579,7 +1579,7 @@ void testSecuritySeedBatch()
         }
         for (const SecuritySurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateSecuritySurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Security albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;
@@ -1642,9 +1642,9 @@ void testStructuredCentralHubAlbedos()
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
     const auto ceiling = generateCentralHubSurfaceAlbedo(
         materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)]);
-    expect(wall && floor && ceiling && gdp::render::validateImageData(*wall)
-            && gdp::render::validateImageData(*floor)
-            && gdp::render::validateImageData(*ceiling),
+    expect(wall && floor && ceiling && wkc::render::validateImageData(*wall)
+            && wkc::render::validateImageData(*floor)
+            && wkc::render::validateImageData(*ceiling),
         "every Central Hub surface generates renderer-valid RGBA data");
     if (!wall || !floor || !ceiling) {
         return;
@@ -1773,7 +1773,7 @@ void testCentralHubSeedBatch()
         }
         for (const CentralHubSurfaceRecipe& recipe : materials.surfaces) {
             const auto image = generateCentralHubSurfaceAlbedo(recipe);
-            if (!image || !gdp::render::validateImageData(*image)) {
+            if (!image || !wkc::render::validateImageData(*image)) {
                 std::cerr << "Central Hub albedo generation failed at room seed " << seed << '\n';
                 allValid = false;
                 break;

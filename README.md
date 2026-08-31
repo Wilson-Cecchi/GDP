@@ -190,6 +190,10 @@ especializados das pastas numeradas.
   `handleSdlInputEvent` passaram de `gdp::platform` para `wkc::platform`. A
   aplicação GDP agora consome a API WKC explicitamente; snapshots, transições,
   mapeamentos e processamento de eventos SDL permanecem inalterados.
+- **Fase 48 — Namespace de Render:** `Camera`, `Framebuffer`, `GlApi`, `Mesh`,
+  `Shader`, `Texture` e seus dados auxiliares passaram de `gdp::render` para
+  `wkc::render`. Renderer, conteúdo visual e procedural do GDP consomem agora a
+  fundação WKC explicitamente, sem aliases ou alteração de pixels.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

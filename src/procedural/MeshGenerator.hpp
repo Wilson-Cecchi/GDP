@@ -17,7 +17,7 @@ struct MeshPrimitiveRange {
 };
 
 struct MeshBuildResult {
-    gdp::render::MeshData mesh;
+    wkc::render::MeshData mesh;
     std::vector<MeshPrimitiveRange> ranges;
 };
 

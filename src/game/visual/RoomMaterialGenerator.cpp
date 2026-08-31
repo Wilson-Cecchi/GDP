@@ -1238,7 +1238,7 @@ CentralHubSurfaceRecipe makeCentralHubSurfaceRecipe(
 }
 
 void writePixel(
-    gdp::render::ImageData& image,
+    wkc::render::ImageData& image,
     const std::uint32_t x,
     const std::uint32_t y,
     const gdp::core::Vec3 color)
@@ -1485,14 +1485,14 @@ std::uint64_t industrialRoomMaterialHash(
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateIndustrialSurfaceAlbedo(
     const IndustrialSurfaceRecipe& recipe)
 {
     if (!validateIndustrialSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -1572,7 +1572,7 @@ std::optional<IndustrialWallMaterialImages> generateIndustrialWallMaterialImages
     }
 
     IndustrialWallMaterialImages images;
-    for (gdp::render::ImageData* const image
+    for (wkc::render::ImageData* const image
         : {&images.albedo, &images.normal, &images.properties}) {
         image->width = static_cast<int>(recipe.resolution);
         image->height = static_cast<int>(recipe.resolution);
@@ -1628,7 +1628,7 @@ std::optional<IndustrialCeilingMaterialImages> generateIndustrialCeilingMaterial
     }
 
     IndustrialCeilingMaterialImages images;
-    for (gdp::render::ImageData* const image
+    for (wkc::render::ImageData* const image
         : {&images.albedo, &images.normal, &images.properties}) {
         image->width = static_cast<int>(recipe.resolution);
         image->height = static_cast<int>(recipe.resolution);
@@ -1794,14 +1794,14 @@ std::uint64_t storageRoomMaterialHash(const StorageRoomMaterialSet& materials) n
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateStorageSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
     const StorageSurfaceRecipe& recipe)
 {
     if (!validateStorageSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -2006,14 +2006,14 @@ std::uint64_t combatRoomMaterialHash(const CombatRoomMaterialSet& materials) noe
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateCombatSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     const CombatSurfaceRecipe& recipe)
 {
     if (!validateCombatSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -2233,14 +2233,14 @@ std::uint64_t cafeteriaRoomMaterialHash(const CafeteriaRoomMaterialSet& material
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateCafeteriaSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
     const CafeteriaSurfaceRecipe& recipe)
 {
     if (!validateCafeteriaSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -2449,14 +2449,14 @@ std::uint64_t laboratoryRoomMaterialHash(const LaboratoryRoomMaterialSet& materi
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateLaboratorySurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
     const LaboratorySurfaceRecipe& recipe)
 {
     if (!validateLaboratorySurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -2666,14 +2666,14 @@ std::uint64_t technicalRoomMaterialHash(const TechnicalRoomMaterialSet& material
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateTechnicalSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
     const TechnicalSurfaceRecipe& recipe)
 {
     if (!validateTechnicalSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -2939,14 +2939,14 @@ std::uint64_t securityRoomMaterialHash(const SecurityRoomMaterialSet& materials)
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateSecuritySurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
     const SecuritySurfaceRecipe& recipe)
 {
     if (!validateSecuritySurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)
@@ -3206,14 +3206,14 @@ std::uint64_t centralHubRoomMaterialHash(const CentralHubRoomMaterialSet& materi
     return hash;
 }
 
-std::optional<gdp::render::ImageData> generateCentralHubSurfaceAlbedo(
+std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
     const CentralHubSurfaceRecipe& recipe)
 {
     if (!validateCentralHubSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
     }
 
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
     image.rgba.resize(static_cast<std::size_t>(recipe.resolution)

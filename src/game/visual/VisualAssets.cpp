@@ -6,9 +6,9 @@
 
 namespace gdp::game {
 
-gdp::render::ImageData makeIndustrialCheckerImage(const int width, const int height)
+wkc::render::ImageData makeIndustrialCheckerImage(const int width, const int height)
 {
-    gdp::render::ImageData image;
+    wkc::render::ImageData image;
     image.width = std::max(width, 1);
     image.height = std::max(height, 1);
     const auto pixelCount = static_cast<std::size_t>(image.width)
@@ -35,14 +35,14 @@ CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages()
 {
     constexpr int resolution = 1024;
     CeilingFixtureMaterialImages images;
-    for (gdp::render::ImageData* const image
+    for (wkc::render::ImageData* const image
         : {&images.albedo, &images.normal, &images.properties, &images.emission}) {
         image->width = resolution;
         image->height = resolution;
         image->rgba.resize(
             static_cast<std::size_t>(resolution) * resolution * 4U);
     }
-    const auto write = [](gdp::render::ImageData& image, const int x, const int y,
+    const auto write = [](wkc::render::ImageData& image, const int x, const int y,
                            const std::array<std::uint8_t, 4> color) {
         const std::size_t pixel = (static_cast<std::size_t>(y)
             * static_cast<std::size_t>(image.width)

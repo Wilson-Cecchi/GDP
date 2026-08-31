@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <utility>
 
-namespace gdp::render {
+namespace wkc::render {
 
 bool validateImageData(const ImageData& image) noexcept
 {
@@ -95,4 +95,4 @@ bool Texture::isValid() const noexcept
     return texture_ != 0;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

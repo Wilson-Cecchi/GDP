@@ -2,7 +2,7 @@
 
 #include "core/Math.hpp"
 
-namespace gdp::render {
+namespace wkc::render {
 
 class Camera {
 public:
@@ -21,4 +21,4 @@ private:
     float farPlane_{100.0F};
 };
 
-} // namespace gdp::render
+} // namespace wkc::render

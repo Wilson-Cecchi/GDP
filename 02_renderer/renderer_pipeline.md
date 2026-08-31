@@ -23,6 +23,8 @@
 > a composição GDP de `gdp_render_foundation`.
 > A Fase 38 renomeou a fundação para `wkc_forge_render`; o namespace
 > `gdp::render` permanece temporariamente compatível.
+> A Fase 48 concluiu essa migração: a API da fundação passou para
+> `wkc::render`, sem aliases reversos ou mudança de pixels.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -82,12 +84,13 @@ Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 definições Worker, materiais de sala e assets concretos do GDP ficam em
 `gdp_visual_content`; `gdp_visual_renderer` realiza a composição final.
 Desde a Fase 46, o cache é exposto como `wkc::resources::AssetCache`.
+Desde a Fase 48, as primitivas gráficas são expostas em `wkc::render`.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
 passou a `gdp::render::GdpRenderer` na Fase 33. Na Fase 34, os DTOs de
 apresentação passaram ao contrato `game/visual/GdpRenderData.*`; seus nomes e
 representação permanecem compatíveis. Na Fase 35, o namespace do contrato
 passou a `gdp::game::visual`, enquanto as primitivas reutilizáveis continuam em
-`gdp::render`. Na Fase 36, a classe concreta também passou a
+`wkc::render` desde a Fase 48. Na Fase 36, a classe concreta também passou a
 `gdp::game::visual::GdpRenderer`, consumindo a fundação gráfica por nomes
 qualificados.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e

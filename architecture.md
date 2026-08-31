@@ -683,6 +683,12 @@ Na Fase 47, `Input`, `Key`, `MouseButton` e `handleSdlInputEvent` passaram de
 plataforma da WKC Forge de forma explícita, sem aliases reversos e sem mudança
 nos snapshots, transições, mapeamentos ou eventos SDL.
 
+Na Fase 48, `Camera`, `Framebuffer`, `GlApi`, `Mesh`, `Shader`, `Texture` e os
+tipos auxiliares da fundação gráfica passaram de `gdp::render` para
+`wkc::render`. O renderer concreto, o conteúdo visual GDP e os geradores
+procedurais consomem a API WKC Forge explicitamente; não há aliases reversos,
+mudança de dados ou alteração intencional de pixels.
+
 ---
 
 # 8. Sistema de seed

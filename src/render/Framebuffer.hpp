@@ -2,7 +2,7 @@
 
 #include "render/GlApi.hpp"
 
-namespace gdp::render {
+namespace wkc::render {
 
 class Framebuffer {
 public:
@@ -32,4 +32,4 @@ private:
     int height_{0};
 };
 
-} // namespace gdp::render
+} // namespace wkc::render

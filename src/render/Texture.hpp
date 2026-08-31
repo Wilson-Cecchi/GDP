@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace gdp::render {
+namespace wkc::render {
 
 struct ImageData {
     int width{0};
@@ -44,4 +44,4 @@ private:
     GLuint texture_{0};
 };
 
-} // namespace gdp::render
+} // namespace wkc::render

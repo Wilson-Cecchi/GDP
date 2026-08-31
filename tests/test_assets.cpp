@@ -101,7 +101,7 @@ void testMeshGeneration()
     if (!worker) {
         return;
     }
-    expect(gdp::render::validateMeshData(worker->mesh),
+    expect(wkc::render::validateMeshData(worker->mesh),
         "generated Worker mesh passes renderer validation");
     expect(worker->mesh.vertices.size() == 144U && worker->mesh.indices.size() == 216U,
         "six boxes combine into exact vertex and index counts");
@@ -139,7 +139,7 @@ void testMeshGeneration()
         .semantic = SemanticRegion::Piston,
     });
     const auto builtCylinder = generateMesh(cylinder);
-    expect(builtCylinder && gdp::render::validateMeshData(builtCylinder->mesh)
+    expect(builtCylinder && wkc::render::validateMeshData(builtCylinder->mesh)
             && builtCylinder->mesh.vertices.size() == 54U
             && builtCylinder->mesh.indices.size() == 144U,
         "twelve-segment Cylinder generates valid side and cap geometry");
@@ -162,7 +162,7 @@ void testTextureGeneration()
     TextureRecipe recipe = gdp::game::makeWorkerFoundationTextureRecipe(12345);
     const auto first = generateAlbedo(recipe);
     const auto repeated = generateAlbedo(recipe);
-    expect(first && repeated && gdp::render::validateImageData(*first),
+    expect(first && repeated && wkc::render::validateImageData(*first),
         "valid texture recipe generates valid RGBA data");
     expect(first && repeated && first->rgba == repeated->rgba,
         "same texture recipe produces identical pixels");
@@ -196,7 +196,7 @@ void testTextureGeneration()
     for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
         recipe.seed = seed;
         const auto image = generateAlbedo(recipe);
-        if (!image || !gdp::render::validateImageData(*image)) {
+        if (!image || !wkc::render::validateImageData(*image)) {
             batchValid = false;
             break;
         }

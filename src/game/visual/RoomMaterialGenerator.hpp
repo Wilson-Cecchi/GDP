@@ -48,9 +48,9 @@ struct IndustrialSurfaceRecipe {
 };
 
 struct IndustrialWallMaterialImages {
-    gdp::render::ImageData albedo;
-    gdp::render::ImageData normal;
-    gdp::render::ImageData properties;
+    wkc::render::ImageData albedo;
+    wkc::render::ImageData normal;
+    wkc::render::ImageData properties;
 };
 
 using IndustrialCeilingMaterialImages = IndustrialWallMaterialImages;
@@ -498,7 +498,7 @@ struct CentralHubMaterialValidationResult {
     const IndustrialSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t industrialRoomMaterialHash(
     const IndustrialRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateIndustrialSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateIndustrialSurfaceAlbedo(
     const IndustrialSurfaceRecipe& recipe);
 [[nodiscard]] IndustrialSurfaceRecipe makeIndustrialWallArchetypeRecipe(
     IndustrialCondition condition);
@@ -519,7 +519,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const StorageSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t storageRoomMaterialHash(
     const StorageRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateStorageSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
     const StorageSurfaceRecipe& recipe);
 
 [[nodiscard]] CombatRoomMaterialSet generateCombatRoomMaterials(
@@ -532,7 +532,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CombatSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t combatRoomMaterialHash(
     const CombatRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateCombatSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     const CombatSurfaceRecipe& recipe);
 
 [[nodiscard]] CafeteriaRoomMaterialSet generateCafeteriaRoomMaterials(
@@ -545,7 +545,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CafeteriaSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t cafeteriaRoomMaterialHash(
     const CafeteriaRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateCafeteriaSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
     const CafeteriaSurfaceRecipe& recipe);
 
 [[nodiscard]] LaboratoryRoomMaterialSet generateLaboratoryRoomMaterials(
@@ -558,7 +558,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const LaboratorySurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t laboratoryRoomMaterialHash(
     const LaboratoryRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateLaboratorySurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
     const LaboratorySurfaceRecipe& recipe);
 
 [[nodiscard]] TechnicalRoomMaterialSet generateTechnicalRoomMaterials(
@@ -571,7 +571,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const TechnicalSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t technicalRoomMaterialHash(
     const TechnicalRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateTechnicalSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
     const TechnicalSurfaceRecipe& recipe);
 
 [[nodiscard]] SecurityRoomMaterialSet generateSecurityRoomMaterials(
@@ -584,7 +584,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const SecuritySurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t securityRoomMaterialHash(
     const SecurityRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateSecuritySurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
     const SecuritySurfaceRecipe& recipe);
 
 [[nodiscard]] CentralHubRoomMaterialSet generateCentralHubRoomMaterials(
@@ -597,7 +597,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CentralHubSurfaceRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t centralHubRoomMaterialHash(
     const CentralHubRoomMaterialSet& materials) noexcept;
-[[nodiscard]] std::optional<gdp::render::ImageData> generateCentralHubSurfaceAlbedo(
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
     const CentralHubSurfaceRecipe& recipe);
 
 } // namespace gdp::procedural

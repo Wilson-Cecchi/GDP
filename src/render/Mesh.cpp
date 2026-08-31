@@ -7,7 +7,7 @@
 #include <limits>
 #include <utility>
 
-namespace gdp::render {
+namespace wkc::render {
 namespace {
 
 bool isFinite(const gdp::core::Vec3 value) noexcept
@@ -215,4 +215,4 @@ std::uint32_t Mesh::indexCount() const noexcept
     return indexCount_;
 }
 
-} // namespace gdp::render
+} // namespace wkc::render

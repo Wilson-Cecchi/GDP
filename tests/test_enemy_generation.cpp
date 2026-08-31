@@ -128,9 +128,9 @@ void testDeterministicWorker()
 
     const auto mesh = generateMesh(first.meshRecipe);
     const auto albedo = generateAlbedo(first.textureRecipe);
-    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+    expect(mesh && wkc::render::validateMeshData(mesh->mesh),
         "complete Worker genome produces renderer-valid mesh data");
-    expect(albedo && gdp::render::validateImageData(*albedo),
+    expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Worker genome produces renderer-valid albedo data");
     expect(first.genome.visualHash == 0x47FC8A2095B5F922ULL,
         "golden Worker visual hash remains stable across builds");
@@ -169,8 +169,8 @@ void testWorkerSeedBatch()
         const auto validation = validateWorkerVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
         const auto albedo = generateAlbedo(visual.textureRecipe);
-        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
-            || !albedo || !gdp::render::validateImageData(*albedo)) {
+        if (!validation.isValid() || !mesh || !wkc::render::validateMeshData(mesh->mesh)
+            || !albedo || !wkc::render::validateImageData(*albedo)) {
             allValid = false;
             std::cerr << "Worker generation failed at visual seed " << seed << '\n';
             break;
@@ -268,9 +268,9 @@ void testDeterministicGuard()
 
     const auto mesh = generateMesh(first.meshRecipe);
     const auto albedo = generateAlbedo(first.textureRecipe);
-    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+    expect(mesh && wkc::render::validateMeshData(mesh->mesh),
         "complete Guard genome produces renderer-valid mesh data");
-    expect(albedo && gdp::render::validateImageData(*albedo),
+    expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Guard genome produces renderer-valid albedo data");
     expect(first.genome.visualHash == 0x77FA12AE04FC63C8ULL,
         "golden Guard visual hash remains stable across builds");
@@ -314,8 +314,8 @@ void testGuardSeedBatch()
         const auto validation = validateGuardVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
         const auto albedo = generateAlbedo(visual.textureRecipe);
-        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
-            || !albedo || !gdp::render::validateImageData(*albedo)) {
+        if (!validation.isValid() || !mesh || !wkc::render::validateMeshData(mesh->mesh)
+            || !albedo || !wkc::render::validateImageData(*albedo)) {
             allValid = false;
             std::cerr << "Guard generation failed at visual seed " << seed << '\n';
             break;
@@ -420,9 +420,9 @@ void testDeterministicOfficer()
 
     const auto mesh = generateMesh(first.meshRecipe);
     const auto albedo = generateAlbedo(first.textureRecipe);
-    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+    expect(mesh && wkc::render::validateMeshData(mesh->mesh),
         "complete Officer genome produces renderer-valid mesh data");
-    expect(albedo && gdp::render::validateImageData(*albedo),
+    expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Officer genome produces renderer-valid albedo data");
     constexpr std::uint64_t goldenHash = 0x6C70CF22F1AE4F61ULL;
     expect(first.genome.visualHash == goldenHash,
@@ -474,8 +474,8 @@ void testOfficerSeedBatch()
         const auto validation = validateOfficerVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
         const auto albedo = generateAlbedo(visual.textureRecipe);
-        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
-            || !albedo || !gdp::render::validateImageData(*albedo)) {
+        if (!validation.isValid() || !mesh || !wkc::render::validateMeshData(mesh->mesh)
+            || !albedo || !wkc::render::validateImageData(*albedo)) {
             allValid = false;
             std::cerr << "Officer generation failed at visual seed " << seed << '\n';
             break;
@@ -583,9 +583,9 @@ void testDeterministicEngineer()
         "built-in library generates representative Engineer without fallback");
     const auto mesh = generateMesh(first.meshRecipe);
     const auto albedo = generateAlbedo(first.textureRecipe);
-    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+    expect(mesh && wkc::render::validateMeshData(mesh->mesh),
         "complete Engineer genome produces renderer-valid mesh data");
-    expect(albedo && gdp::render::validateImageData(*albedo),
+    expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Engineer genome produces renderer-valid albedo data");
     constexpr std::uint64_t goldenHash = 0x9E65A4A016966EB0ULL;
     expect(first.genome.visualHash == goldenHash,
@@ -635,8 +635,8 @@ void testEngineerSeedBatch()
         const auto validation = validateEngineerVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
         const auto albedo = generateAlbedo(visual.textureRecipe);
-        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
-            || !albedo || !gdp::render::validateImageData(*albedo)) {
+        if (!validation.isValid() || !mesh || !wkc::render::validateMeshData(mesh->mesh)
+            || !albedo || !wkc::render::validateImageData(*albedo)) {
             allValid = false;
             std::cerr << "Engineer generation failed at visual seed " << seed << '\n';
             break;
@@ -735,9 +735,9 @@ void testDeterministicIndustrialRobot()
         "built-in library generates representative IndustrialRobot without fallback");
     const auto mesh = generateMesh(first.meshRecipe);
     const auto albedo = generateAlbedo(first.textureRecipe);
-    expect(mesh && gdp::render::validateMeshData(mesh->mesh),
+    expect(mesh && wkc::render::validateMeshData(mesh->mesh),
         "complete IndustrialRobot genome produces renderer-valid mesh data");
-    expect(albedo && gdp::render::validateImageData(*albedo),
+    expect(albedo && wkc::render::validateImageData(*albedo),
         "complete IndustrialRobot genome produces renderer-valid albedo data");
     constexpr std::uint64_t goldenHash = 0x5D654A79E5B31648ULL;
     expect(first.genome.visualHash == goldenHash,
@@ -782,8 +782,8 @@ void testIndustrialRobotSeedBatch()
         const auto validation = validateIndustrialRobotVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
         const auto albedo = generateAlbedo(visual.textureRecipe);
-        if (!validation.isValid() || !mesh || !gdp::render::validateMeshData(mesh->mesh)
-            || !albedo || !gdp::render::validateImageData(*albedo)) {
+        if (!validation.isValid() || !mesh || !wkc::render::validateMeshData(mesh->mesh)
+            || !albedo || !wkc::render::validateImageData(*albedo)) {
             allValid = false;
             std::cerr << "IndustrialRobot generation failed at visual seed " << seed << '\n';
             break;
