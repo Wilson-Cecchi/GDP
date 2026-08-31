@@ -7,14 +7,14 @@
 namespace gdp::gameplay {
 namespace {
 
-gdp::core::Aabb combinedBounds(
-    const std::vector<gdp::core::Aabb>& volumes) noexcept
+wkc::core::Aabb combinedBounds(
+    const std::vector<wkc::core::Aabb>& volumes) noexcept
 {
     if (volumes.empty()) {
         return {};
     }
-    gdp::core::Aabb bounds = volumes.front();
-    for (const gdp::core::Aabb volume : volumes) {
+    wkc::core::Aabb bounds = volumes.front();
+    for (const wkc::core::Aabb volume : volumes) {
         bounds.minimum.x = std::min(bounds.minimum.x, volume.minimum.x);
         bounds.minimum.y = std::min(bounds.minimum.y, volume.minimum.y);
         bounds.minimum.z = std::min(bounds.minimum.z, volume.minimum.z);
@@ -25,27 +25,27 @@ gdp::core::Aabb combinedBounds(
     return bounds;
 }
 
-gdp::core::Aabb transformBounds(
-    const gdp::core::Aabb localBounds,
-    const gdp::core::Vec3 origin,
-    const gdp::core::QuarterTurn rotation) noexcept
+wkc::core::Aabb transformBounds(
+    const wkc::core::Aabb localBounds,
+    const wkc::core::Vec3 origin,
+    const wkc::core::QuarterTurn rotation) noexcept
 {
     const std::array corners{
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.maximum.z},
     };
-    gdp::core::Vec3 minimum
-        = origin + gdp::core::rotateQuarterTurns(corners.front(), rotation);
-    gdp::core::Vec3 maximum = minimum;
-    for (const gdp::core::Vec3 corner : corners) {
-        const gdp::core::Vec3 transformed
-            = origin + gdp::core::rotateQuarterTurns(corner, rotation);
+    wkc::core::Vec3 minimum
+        = origin + wkc::core::rotateQuarterTurns(corners.front(), rotation);
+    wkc::core::Vec3 maximum = minimum;
+    for (const wkc::core::Vec3 corner : corners) {
+        const wkc::core::Vec3 transformed
+            = origin + wkc::core::rotateQuarterTurns(corner, rotation);
         minimum.x = std::min(minimum.x, transformed.x);
         minimum.y = std::min(minimum.y, transformed.y);
         minimum.z = std::min(minimum.z, transformed.z);
@@ -59,8 +59,8 @@ gdp::core::Aabb transformBounds(
 } // namespace
 
 CollisionWorld::CollisionWorld(
-    const gdp::core::Aabb roomBounds,
-    std::vector<gdp::core::Aabb> solids)
+    const wkc::core::Aabb roomBounds,
+    std::vector<wkc::core::Aabb> solids)
     : roomBounds_(roomBounds)
     , walkableVolumes_{roomBounds}
     , solids_(std::move(solids))
@@ -69,8 +69,8 @@ CollisionWorld::CollisionWorld(
 
 CollisionWorld::CollisionWorld(
     const WalkableVolumesTag,
-    std::vector<gdp::core::Aabb> walkableVolumes,
-    std::vector<gdp::core::Aabb> solids)
+    std::vector<wkc::core::Aabb> walkableVolumes,
+    std::vector<wkc::core::Aabb> solids)
     : roomBounds_(combinedBounds(walkableVolumes))
     , walkableVolumes_(std::move(walkableVolumes))
     , solids_(std::move(solids))
@@ -78,8 +78,8 @@ CollisionWorld::CollisionWorld(
 }
 
 CollisionWorld CollisionWorld::fromWalkableVolumes(
-    std::vector<gdp::core::Aabb> walkableVolumes,
-    std::vector<gdp::core::Aabb> solids)
+    std::vector<wkc::core::Aabb> walkableVolumes,
+    std::vector<wkc::core::Aabb> solids)
 {
     return {
         WalkableVolumesTag{},
@@ -89,28 +89,28 @@ CollisionWorld CollisionWorld::fromWalkableVolumes(
 }
 
 CollisionWorld CollisionWorld::fixedRoom(
-    const gdp::core::Vec3 worldOrigin,
-    const gdp::core::QuarterTurn rotation)
+    const wkc::core::Vec3 worldOrigin,
+    const wkc::core::QuarterTurn rotation)
 {
-    constexpr gdp::core::Aabb localRoom{
+    constexpr wkc::core::Aabb localRoom{
         {-3.85F, 0.0F, -4.85F}, {3.85F, 4.0F, 4.85F}};
     constexpr std::array localSolids{
-        gdp::core::Aabb{{-3.025F, 0.0F, -4.025F}, {-2.575F, 2.0F, -3.575F}},
-        gdp::core::Aabb{{2.575F, 0.0F, -4.025F}, {3.025F, 2.0F, -3.575F}},
-        gdp::core::Aabb{{-1.1F, 0.0F, -2.8F}, {1.1F, 0.7F, -1.6F}},
-        gdp::core::Aabb{{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}},
+        wkc::core::Aabb{{-3.025F, 0.0F, -4.025F}, {-2.575F, 2.0F, -3.575F}},
+        wkc::core::Aabb{{2.575F, 0.0F, -4.025F}, {3.025F, 2.0F, -3.575F}},
+        wkc::core::Aabb{{-1.1F, 0.0F, -2.8F}, {1.1F, 0.7F, -1.6F}},
+        wkc::core::Aabb{{-0.4F, 0.0F, 2.05F}, {0.4F, 2.0F, 2.35F}},
     };
-    std::vector<gdp::core::Aabb> solids;
+    std::vector<wkc::core::Aabb> solids;
     solids.reserve(localSolids.size());
-    for (const gdp::core::Aabb solid : localSolids) {
+    for (const wkc::core::Aabb solid : localSolids) {
         solids.push_back(transformBounds(solid, worldOrigin, rotation));
     }
     return {transformBounds(localRoom, worldOrigin, rotation), std::move(solids)};
 }
 
 CharacterMotionResult CollisionWorld::moveCharacter(
-    gdp::core::Vec3 position,
-    gdp::core::Vec3 velocity,
+    wkc::core::Vec3 position,
+    wkc::core::Vec3 velocity,
     const float fixedStepSeconds,
     const CharacterCollider collider) const noexcept
 {
@@ -135,7 +135,7 @@ CharacterMotionResult CollisionWorld::moveCharacter(
     if (!canOccupy(result.position, collider)) {
         result.position.x = originalX;
     }
-    if (!gdp::core::nearlyEqual(
+    if (!wkc::core::nearlyEqual(
             result.position.x,
             originalX + (result.velocity.x * step))) {
         result.velocity.x = 0.0F;
@@ -147,7 +147,7 @@ CharacterMotionResult CollisionWorld::moveCharacter(
     if (!canOccupy(result.position, collider)) {
         result.position.z = originalZ;
     }
-    if (!gdp::core::nearlyEqual(
+    if (!wkc::core::nearlyEqual(
             result.position.z,
             originalZ + (result.velocity.z * step))) {
         result.velocity.z = 0.0F;
@@ -157,23 +157,23 @@ CharacterMotionResult CollisionWorld::moveCharacter(
     return result;
 }
 
-const gdp::core::Aabb& CollisionWorld::roomBounds() const noexcept
+const wkc::core::Aabb& CollisionWorld::roomBounds() const noexcept
 {
     return roomBounds_;
 }
 
-const std::vector<gdp::core::Aabb>& CollisionWorld::walkableVolumes() const noexcept
+const std::vector<wkc::core::Aabb>& CollisionWorld::walkableVolumes() const noexcept
 {
     return walkableVolumes_;
 }
 
-const std::vector<gdp::core::Aabb>& CollisionWorld::solids() const noexcept
+const std::vector<wkc::core::Aabb>& CollisionWorld::solids() const noexcept
 {
     return solids_;
 }
 
 bool CollisionWorld::canOccupy(
-    const gdp::core::Vec3 feetPosition,
+    const wkc::core::Vec3 feetPosition,
     const CharacterCollider collider) const noexcept
 {
     return insideWalkable(feetPosition, collider)
@@ -181,11 +181,11 @@ bool CollisionWorld::canOccupy(
 }
 
 bool CollisionWorld::insideWalkable(
-    const gdp::core::Vec3 feetPosition,
+    const wkc::core::Vec3 feetPosition,
     const CharacterCollider collider) const noexcept
 {
     const float top = feetPosition.y + collider.height;
-    for (const gdp::core::Aabb volume : walkableVolumes_) {
+    for (const wkc::core::Aabb volume : walkableVolumes_) {
         if (feetPosition.x >= volume.minimum.x + collider.radius
             && feetPosition.x <= volume.maximum.x - collider.radius
             && feetPosition.z >= volume.minimum.z + collider.radius
@@ -199,11 +199,11 @@ bool CollisionWorld::insideWalkable(
 }
 
 bool CollisionWorld::overlapsSolid(
-    const gdp::core::Vec3 feetPosition,
+    const wkc::core::Vec3 feetPosition,
     const CharacterCollider collider) const noexcept
 {
     const float characterTop = feetPosition.y + collider.height;
-    for (const gdp::core::Aabb& solid : solids_) {
+    for (const wkc::core::Aabb& solid : solids_) {
         if (characterTop <= solid.minimum.y || feetPosition.y >= solid.maximum.y) {
             continue;
         }

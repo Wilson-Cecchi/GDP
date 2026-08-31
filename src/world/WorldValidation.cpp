@@ -8,8 +8,8 @@ namespace gdp::world {
 namespace {
 
 bool overlapsWithGap(
-    const gdp::core::Aabb first,
-    const gdp::core::Aabb second,
+    const wkc::core::Aabb first,
+    const wkc::core::Aabb second,
     const float gap) noexcept
 {
     return first.minimum.x - gap < second.maximum.x
@@ -28,13 +28,13 @@ bool rangesOverlap(
 }
 
 bool segmentsIntersect(
-    const gdp::core::Vec3 firstStart,
-    const gdp::core::Vec3 firstEnd,
-    const gdp::core::Vec3 secondStart,
-    const gdp::core::Vec3 secondEnd) noexcept
+    const wkc::core::Vec3 firstStart,
+    const wkc::core::Vec3 firstEnd,
+    const wkc::core::Vec3 secondStart,
+    const wkc::core::Vec3 secondEnd) noexcept
 {
-    const bool firstVertical = gdp::core::nearlyEqual(firstStart.x, firstEnd.x);
-    const bool secondVertical = gdp::core::nearlyEqual(secondStart.x, secondEnd.x);
+    const bool firstVertical = wkc::core::nearlyEqual(firstStart.x, firstEnd.x);
+    const bool secondVertical = wkc::core::nearlyEqual(secondStart.x, secondEnd.x);
     const float firstMinX = std::min(firstStart.x, firstEnd.x);
     const float firstMaxX = std::max(firstStart.x, firstEnd.x);
     const float firstMinZ = std::min(firstStart.z, firstEnd.z);
@@ -45,10 +45,10 @@ bool segmentsIntersect(
     const float secondMaxZ = std::max(secondStart.z, secondEnd.z);
 
     if (firstVertical == secondVertical) {
-        if (firstVertical && !gdp::core::nearlyEqual(firstStart.x, secondStart.x)) {
+        if (firstVertical && !wkc::core::nearlyEqual(firstStart.x, secondStart.x)) {
             return false;
         }
-        if (!firstVertical && !gdp::core::nearlyEqual(firstStart.z, secondStart.z)) {
+        if (!firstVertical && !wkc::core::nearlyEqual(firstStart.z, secondStart.z)) {
             return false;
         }
         return rangesOverlap(firstMinX, firstMaxX, secondMinX, secondMaxX)

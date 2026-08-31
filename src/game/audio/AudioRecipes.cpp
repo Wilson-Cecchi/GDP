@@ -133,7 +133,7 @@ void configureRecipe(
 } // namespace
 
 wkc::audio::AudioRecipe generateAudioRecipe(
-    const gdp::core::Seed sourceSeed,
+    const wkc::core::Seed sourceSeed,
     const AudioEventKind kind,
     const std::uint64_t eventCounter)
 {
@@ -142,7 +142,7 @@ wkc::audio::AudioRecipe generateAudioRecipe(
     recipe.kindCount = static_cast<std::uint8_t>(AudioEventKind::Count);
     const std::uint64_t localId = (static_cast<std::uint64_t>(kind) << 56U)
         ^ eventCounter;
-    recipe.seed = gdp::core::deriveSeed(sourceSeed, gdp::game::SeedDomain::Audio, localId);
+    recipe.seed = wkc::core::deriveSeed(sourceSeed, gdp::game::SeedDomain::Audio, localId);
     configureRecipe(recipe, kind);
 
     if (kind == AudioEventKind::Ambient) {
@@ -167,7 +167,7 @@ wkc::audio::AudioRecipe generateAudioRecipe(
     }
 
     if (kind < AudioEventKind::Count) {
-        gdp::core::RandomStream random{gdp::core::deriveSeed(
+        wkc::core::RandomStream random{wkc::core::deriveSeed(
             recipe.seed, gdp::game::SeedDomain::Audio, 1U)};
         const float pitchVariation = random.rangeFloat(0.94F, 1.06F);
         recipe.baseFrequency *= pitchVariation;

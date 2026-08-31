@@ -27,14 +27,14 @@ ConnectorValidationError validateConnector(const ConnectorDefinition& connector)
 
 ConnectorInstance instantiateConnector(
     const ConnectorDefinition& definition,
-    const gdp::core::Vec3 roomOrigin,
-    const gdp::core::QuarterTurn rotation) noexcept
+    const wkc::core::Vec3 roomOrigin,
+    const wkc::core::QuarterTurn rotation) noexcept
 {
     return {
         definition.id,
         definition.type,
-        roomOrigin + gdp::core::rotateQuarterTurns(definition.position, rotation),
-        gdp::core::rotateQuarterTurns(definition.normal, rotation),
+        roomOrigin + wkc::core::rotateQuarterTurns(definition.position, rotation),
+        wkc::core::rotateQuarterTurns(definition.normal, rotation),
         definition.width,
         definition.height,
         definition.required,
@@ -69,10 +69,10 @@ bool canMate(
         return false;
     }
 
-    const gdp::core::Vec3 offset = first.worldPosition - second.worldPosition;
-    const float gap = gdp::core::length(offset);
+    const wkc::core::Vec3 offset = first.worldPosition - second.worldPosition;
+    const float gap = wkc::core::length(offset);
     return gap <= std::max(maximumGap, 0.0F)
-        && gdp::core::dot(first.worldNormal, second.worldNormal) <= -0.999F;
+        && wkc::core::dot(first.worldNormal, second.worldNormal) <= -0.999F;
 }
 
 bool assignEdge(ConnectorInstance& connector, const EdgeId edge) noexcept
@@ -94,20 +94,20 @@ bool sealConnector(ConnectorInstance& connector) noexcept
 }
 
 std::optional<Direction> directionFromNormal(
-    const gdp::core::Vec3 normal,
+    const wkc::core::Vec3 normal,
     const float epsilon) noexcept
 {
     const float tolerance = std::max(epsilon, 0.0F);
-    if (gdp::core::nearlyEqual(normal, {0.0F, 0.0F, 1.0F}, tolerance)) {
+    if (wkc::core::nearlyEqual(normal, {0.0F, 0.0F, 1.0F}, tolerance)) {
         return Direction::North;
     }
-    if (gdp::core::nearlyEqual(normal, {1.0F, 0.0F, 0.0F}, tolerance)) {
+    if (wkc::core::nearlyEqual(normal, {1.0F, 0.0F, 0.0F}, tolerance)) {
         return Direction::East;
     }
-    if (gdp::core::nearlyEqual(normal, {0.0F, 0.0F, -1.0F}, tolerance)) {
+    if (wkc::core::nearlyEqual(normal, {0.0F, 0.0F, -1.0F}, tolerance)) {
         return Direction::South;
     }
-    if (gdp::core::nearlyEqual(normal, {-1.0F, 0.0F, 0.0F}, tolerance)) {
+    if (wkc::core::nearlyEqual(normal, {-1.0F, 0.0F, 0.0F}, tolerance)) {
         return Direction::West;
     }
     return std::nullopt;

@@ -47,17 +47,17 @@ const gdp::world::ConnectorInstance* connectorForEdge(
 }
 
 float horizontalDistance(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second) noexcept
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second) noexcept
 {
     const float differenceX = first.x - second.x;
     const float differenceZ = first.z - second.z;
     return std::sqrt((differenceX * differenceX) + (differenceZ * differenceZ));
 }
 
-gdp::core::Aabb corridorSegmentVolume(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second,
+wkc::core::Aabb corridorSegmentVolume(
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second,
     const float width,
     const float height) noexcept
 {
@@ -67,7 +67,7 @@ gdp::core::Aabb corridorSegmentVolume(
     const float halfWidth = width * 0.5F;
     const float floor = std::min(first.y, second.y);
     const float ceiling = std::max(first.y, second.y) + height;
-    if (gdp::core::nearlyEqual(first.z, second.z)) {
+    if (wkc::core::nearlyEqual(first.z, second.z)) {
         return {
             {std::min(first.x, second.x) - endpointOverlap,
                 floor,
@@ -89,7 +89,7 @@ gdp::core::Aabb corridorSegmentVolume(
 
 void appendFixedRoomSolids(
     const gdp::world::RoomInstance& room,
-    std::vector<gdp::core::Aabb>& solids)
+    std::vector<wkc::core::Aabb>& solids)
 {
     const CollisionWorld fixed = CollisionWorld::fixedRoom(
         room.transform.position, room.rotation);
@@ -101,8 +101,8 @@ void appendFixedRoomSolids(
 std::optional<RoomTransition> findRoomTransition(
     const gdp::world::World& world,
     const gdp::world::RoomId currentRoom,
-    const gdp::core::Vec3 playerFeetPosition,
-    gdp::core::Vec3 playerForward,
+    const wkc::core::Vec3 playerFeetPosition,
+    wkc::core::Vec3 playerForward,
     const float maximumDistance,
     const float destinationInset) noexcept
 {
@@ -112,10 +112,10 @@ std::optional<RoomTransition> findRoomTransition(
         return std::nullopt;
     }
     playerForward.y = 0.0F;
-    if (gdp::core::length(playerForward) <= 1.0e-5F) {
+    if (wkc::core::length(playerForward) <= 1.0e-5F) {
         return std::nullopt;
     }
-    playerForward = gdp::core::normalized(playerForward);
+    playerForward = wkc::core::normalized(playerForward);
 
     const gdp::world::RoomInstance* source = findRoom(world, currentRoom);
     if (source == nullptr) {
@@ -128,7 +128,7 @@ std::optional<RoomTransition> findRoomTransition(
         if (connector.sealed || !connector.edge) {
             continue;
         }
-        gdp::core::Vec3 direction = connector.worldPosition - playerFeetPosition;
+        wkc::core::Vec3 direction = connector.worldPosition - playerFeetPosition;
         direction.y = 0.0F;
         const float distance = horizontalDistance(
             connector.worldPosition, playerFeetPosition);
@@ -136,7 +136,7 @@ std::optional<RoomTransition> findRoomTransition(
             continue;
         }
         direction = direction * (1.0F / distance);
-        if (gdp::core::dot(playerForward, direction) < 0.60F) {
+        if (wkc::core::dot(playerForward, direction) < 0.60F) {
             continue;
         }
         if (distance < selectedDistance) {
@@ -171,13 +171,13 @@ std::optional<RoomTransition> findRoomTransition(
         return std::nullopt;
     }
 
-    gdp::core::Vec3 destinationPosition
+    wkc::core::Vec3 destinationPosition
         = entry->worldPosition - (entry->worldNormal * destinationInset);
     destinationPosition.y = destination->worldBounds.minimum.y;
     if (!destination->worldBounds.contains(destinationPosition)) {
         return std::nullopt;
     }
-    const gdp::core::Vec3 inward = entry->worldNormal * -1.0F;
+    const wkc::core::Vec3 inward = entry->worldNormal * -1.0F;
     constexpr float radiansToDegrees = 180.0F / std::numbers::pi_v<float>;
     const float yaw = std::atan2(inward.z, inward.x) * radiansToDegrees;
     return RoomTransition{
@@ -200,8 +200,8 @@ CollisionWorld makeRoomNavigationCollision(
         return CollisionWorld{{}};
     }
 
-    std::vector<gdp::core::Aabb> volumes{source->worldBounds};
-    std::vector<gdp::core::Aabb> solids;
+    std::vector<wkc::core::Aabb> volumes{source->worldBounds};
+    std::vector<wkc::core::Aabb> solids;
     appendFixedRoomSolids(*source, solids);
     if (doorsLocked) {
         return CollisionWorld::fromWalkableVolumes(
@@ -240,7 +240,7 @@ CollisionWorld makeRoomNavigationCollision(
 
 std::optional<gdp::world::RoomId> roomContainingPosition(
     const gdp::world::World& world,
-    const gdp::core::Vec3 feetPosition) noexcept
+    const wkc::core::Vec3 feetPosition) noexcept
 {
     for (const gdp::world::RoomInstance& room : world.rooms) {
         if (room.worldBounds.contains(feetPosition)) {
@@ -252,7 +252,7 @@ std::optional<gdp::world::RoomId> roomContainingPosition(
 
 std::optional<gdp::world::RoomId> roomContainingCharacter(
     const gdp::world::World& world,
-    const gdp::core::Vec3 feetPosition,
+    const wkc::core::Vec3 feetPosition,
     const CharacterCollider collider) noexcept
 {
     if (!std::isfinite(collider.radius) || !std::isfinite(collider.height)
@@ -275,11 +275,11 @@ std::optional<gdp::world::RoomId> roomContainingCharacter(
 
 std::optional<float> corridorProgressAt(
     const gdp::world::CorridorPath& corridor,
-    const gdp::core::Vec3 feetPosition) noexcept
+    const wkc::core::Vec3 feetPosition) noexcept
 {
     float totalLength = 0.0F;
     for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
-        const gdp::core::Vec3 segment = corridor.points[index + 1U] - corridor.points[index];
+        const wkc::core::Vec3 segment = corridor.points[index + 1U] - corridor.points[index];
         totalLength += std::sqrt((segment.x * segment.x) + (segment.z * segment.z));
     }
     if (totalLength <= 1.0e-4F) {
@@ -290,14 +290,14 @@ std::optional<float> corridorProgressAt(
     float closestDistanceSquared = std::numeric_limits<float>::max();
     float closestProgress = 0.0F;
     for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
-        const gdp::core::Vec3 first = corridor.points[index];
-        const gdp::core::Vec3 segment = corridor.points[index + 1U] - first;
+        const wkc::core::Vec3 first = corridor.points[index];
+        const wkc::core::Vec3 segment = corridor.points[index + 1U] - first;
         const float lengthSquared = (segment.x * segment.x) + (segment.z * segment.z);
         const float length = std::sqrt(lengthSquared);
         if (length <= 1.0e-4F) {
             continue;
         }
-        const gdp::core::Vec3 relative = feetPosition - first;
+        const wkc::core::Vec3 relative = feetPosition - first;
         const float along = std::clamp(
             ((relative.x * segment.x) + (relative.z * segment.z)) / lengthSquared,
             0.0F, 1.0F);

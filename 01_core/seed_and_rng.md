@@ -4,6 +4,8 @@
 > separada e validada na Fase 29.
 > Na Fase 53, `mix64`, `hashCombine` e `fnv1a64` passaram para `wkc::core`,
 > preservando a derivação e todos os valores golden existentes.
+> Na Fase 54, `Seed`, `GenerationVersion`, `deriveSeed` e `RandomStream` também
+> passaram para `wkc::core`, concluindo a fronteira determinística da engine.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

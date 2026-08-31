@@ -88,8 +88,8 @@ void testSdlTranslation()
     event.motion.yrel = -2.0F;
     expect(wkc::platform::handleSdlInputEvent(input, event),
         "SDL mouse motion is handled");
-    expect(input.mousePosition() == gdp::core::Vec2{320.0F, 180.0F}
-            && input.mouseDelta() == gdp::core::Vec2{3.0F, -2.0F},
+    expect(input.mousePosition() == wkc::core::Vec2{320.0F, 180.0F}
+            && input.mouseDelta() == wkc::core::Vec2{3.0F, -2.0F},
         "SDL mouse motion maps position and delta");
 
     event = {};

@@ -82,8 +82,8 @@ int main(const int argc, char* argv[])
             passed = false;
         } else {
             constexpr std::array corridorPoints{
-                gdp::core::Vec3{0.0F, 0.0F, 4.0F},
-                gdp::core::Vec3{0.0F, 0.0F, -14.0F},
+                wkc::core::Vec3{0.0F, 0.0F, 4.0F},
+                wkc::core::Vec3{0.0F, 0.0F, -14.0F},
             };
             const std::array corridor{
                 gdp::game::visual::CorridorRenderData{corridorPoints, 2.8F, 3.2F},
@@ -94,11 +94,11 @@ int main(const int argc, char* argv[])
                     2.8F, 3.2F, false, 1.0F},
             };
             constexpr gdp::game::visual::RoomRenderData roomBehindCamera{
-                {0.0F, 0.0F, 10.0F}, gdp::core::QuarterTurn::Degrees0, 0U,
+                {0.0F, 0.0F, 10.0F}, wkc::core::QuarterTurn::Degrees0, 0U,
                 {{-4.0F, 0.0F, 5.0F}, {4.0F, 4.0F, 15.0F}}};
             constexpr std::array connectedRoom{
                 gdp::game::visual::RoomRenderData{
-                    {0.0F, 0.0F, -18.0F}, gdp::core::QuarterTurn::Degrees0, 0U,
+                    {0.0F, 0.0F, -18.0F}, wkc::core::QuarterTurn::Degrees0, 0U,
                     {{-4.8F, 0.0F, -22.0F}, {4.8F, 4.2F, -14.0F}}},
             };
             constexpr gdp::game::visual::CameraData gameplayCamera{
@@ -124,7 +124,7 @@ int main(const int argc, char* argv[])
                 {0.0F, 3.2F, -17.0F}, {0.92F, 0.96F, 1.0F}, 0.62F, 8.5F};
 
             struct CaptureCase {
-                gdp::core::Seed seed;
+                wkc::core::Seed seed;
                 const char* label;
             };
             constexpr std::array captures{

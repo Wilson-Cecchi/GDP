@@ -84,7 +84,7 @@ struct EnemyData {
     float maximumHealth{50.0F};
     EnemyBehaviorState behavior{EnemyBehaviorState::Idle};
     float attackCooldown{0.0F};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
     float supportCooldown{0.0F};
     bool active{true};
 };
@@ -102,7 +102,7 @@ struct PropData {
     float maximumHealth{0.0F};
     ItemType dropType{ItemType::Ammo};
     std::uint32_t dropQuantity{0};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
 };
 
 using EntityData = std::variant<PlayerData, EnemyData, ItemData, PropData>;
@@ -110,35 +110,35 @@ using EntityData = std::variant<PlayerData, EnemyData, ItemData, PropData>;
 struct Entity {
     EntityId id{};
     EntityKind kind{EntityKind::Prop};
-    gdp::core::Transform transform{};
+    wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     EntityData data{PropData{}};
 };
 
 struct PlayerCreateInfo {
-    gdp::core::Transform transform{};
+    wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     float health{100.0F};
 };
 
 struct EnemyCreateInfo {
-    gdp::core::Transform transform{};
+    wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     EnemyArchetype archetype{EnemyArchetype::Worker};
     float health{50.0F};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
     bool active{true};
 };
 
 struct ItemCreateInfo {
-    gdp::core::Transform transform{};
+    wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     ItemType type{ItemType::Health};
     std::uint32_t quantity{1};
 };
 
 struct PropCreateInfo {
-    gdp::core::Transform transform{};
+    wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     PropType type{PropType::Decoration};
     PropState state{PropState::Intact};
@@ -147,7 +147,7 @@ struct PropCreateInfo {
     float maximumHealth{0.0F};
     ItemType dropType{ItemType::Ammo};
     std::uint32_t dropQuantity{0};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
 };
 
 class EntityManager {
@@ -195,7 +195,7 @@ private:
 
     [[nodiscard]] EntityId create(
         EntityKind kind,
-        gdp::core::Transform transform,
+        wkc::core::Transform transform,
         std::uint32_t roomId,
         EntityData data);
     [[nodiscard]] Slot* findSlot(EntityId id) noexcept;

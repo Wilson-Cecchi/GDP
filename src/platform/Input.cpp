@@ -34,7 +34,7 @@ void Input::handleKey(const Key key, const bool down, const bool repeat) noexcep
 void Input::handleMouseButton(
     const MouseButton button,
     const bool down,
-    const gdp::core::Vec2 position) noexcept
+    const wkc::core::Vec2 position) noexcept
 {
     mousePosition_ = position;
     if (!isValidMouseButton(button)) {
@@ -54,8 +54,8 @@ void Input::handleMouseButton(
 }
 
 void Input::handleMouseMotion(
-    const gdp::core::Vec2 position,
-    const gdp::core::Vec2 delta) noexcept
+    const wkc::core::Vec2 position,
+    const wkc::core::Vec2 delta) noexcept
 {
     mouseDelta_ = mouseDelta_ + delta;
     mousePosition_ = position;
@@ -94,12 +94,12 @@ bool Input::wasMouseButtonReleased(const MouseButton button) const noexcept
         && mouseButtonsReleased_[static_cast<std::size_t>(button)];
 }
 
-gdp::core::Vec2 Input::mouseDelta() const noexcept
+wkc::core::Vec2 Input::mouseDelta() const noexcept
 {
     return mouseDelta_;
 }
 
-gdp::core::Vec2 Input::mousePosition() const noexcept
+wkc::core::Vec2 Input::mousePosition() const noexcept
 {
     return mousePosition_;
 }

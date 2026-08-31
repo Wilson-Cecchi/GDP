@@ -38,10 +38,10 @@ public:
     void handleMouseButton(
         MouseButton button,
         bool down,
-        gdp::core::Vec2 position) noexcept;
+        wkc::core::Vec2 position) noexcept;
     void handleMouseMotion(
-        gdp::core::Vec2 position,
-        gdp::core::Vec2 delta) noexcept;
+        wkc::core::Vec2 position,
+        wkc::core::Vec2 delta) noexcept;
 
     [[nodiscard]] bool isKeyDown(Key key) const noexcept;
     [[nodiscard]] bool wasKeyPressed(Key key) const noexcept;
@@ -49,8 +49,8 @@ public:
     [[nodiscard]] bool isMouseButtonDown(MouseButton button) const noexcept;
     [[nodiscard]] bool wasMouseButtonPressed(MouseButton button) const noexcept;
     [[nodiscard]] bool wasMouseButtonReleased(MouseButton button) const noexcept;
-    [[nodiscard]] gdp::core::Vec2 mouseDelta() const noexcept;
-    [[nodiscard]] gdp::core::Vec2 mousePosition() const noexcept;
+    [[nodiscard]] wkc::core::Vec2 mouseDelta() const noexcept;
+    [[nodiscard]] wkc::core::Vec2 mousePosition() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(Key::Count);
@@ -66,8 +66,8 @@ private:
     std::array<bool, mouseButtonCount> mouseButtonsDown_{};
     std::array<bool, mouseButtonCount> mouseButtonsPressed_{};
     std::array<bool, mouseButtonCount> mouseButtonsReleased_{};
-    gdp::core::Vec2 mouseDelta_{};
-    gdp::core::Vec2 mousePosition_{};
+    wkc::core::Vec2 mouseDelta_{};
+    wkc::core::Vec2 mousePosition_{};
 };
 
 } // namespace wkc::platform

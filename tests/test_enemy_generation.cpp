@@ -114,7 +114,7 @@ void testDeterministicWorker()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x123456789ABCDEF0ULL;
+    constexpr wkc::core::Seed seed = 0x123456789ABCDEF0ULL;
     const WorkerVisual first = generateWorkerVisual(seed);
     const WorkerVisual repeated = generateWorkerVisual(seed);
     const WorkerVisual different = generateWorkerVisual(seed + 1U);
@@ -167,7 +167,7 @@ void testWorkerSeedBatch()
     bool foundAsymmetry = false;
     std::uint32_t fallbackCount = 0;
 
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const WorkerVisual visual = generateWorkerVisual(seed);
         const auto validation = validateWorkerVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);
@@ -252,7 +252,7 @@ void testDeterministicGuard()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x47554152445F5631ULL;
+    constexpr wkc::core::Seed seed = 0x47554152445F5631ULL;
     const GuardVisual first = generateGuardVisual(seed);
     const GuardVisual repeated = generateGuardVisual(seed);
     const GuardVisual different = generateGuardVisual(seed + 1U);
@@ -314,7 +314,7 @@ void testGuardSeedBatch()
     bool foundAsymmetry = false;
     std::uint32_t fallbackCount = 0;
 
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const GuardVisual visual = generateGuardVisual(seed);
         const WorkerVisual worker = generateWorkerVisual(seed);
         const auto validation = validateGuardVisual(visual);
@@ -403,7 +403,7 @@ void testDeterministicOfficer()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x4F46464943455231ULL;
+    constexpr wkc::core::Seed seed = 0x4F46464943455231ULL;
     const OfficerVisual first = generateOfficerVisual(seed);
     const OfficerVisual repeated = generateOfficerVisual(seed);
     const OfficerVisual different = generateOfficerVisual(seed + 1U);
@@ -476,7 +476,7 @@ void testOfficerSeedBatch()
     bool foundAsymmetry = false;
     std::uint32_t fallbackCount = 0;
 
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const OfficerVisual visual = generateOfficerVisual(seed);
         const WorkerVisual worker = generateWorkerVisual(seed);
         const GuardVisual guard = generateGuardVisual(seed);
@@ -566,7 +566,7 @@ void testDeterministicEngineer()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x454E47494E454531ULL;
+    constexpr wkc::core::Seed seed = 0x454E47494E454531ULL;
     const EngineerVisual first = generateEngineerVisual(seed);
     const EngineerVisual repeated = generateEngineerVisual(seed);
     const EngineerVisual different = generateEngineerVisual(seed + 1U);
@@ -639,7 +639,7 @@ void testEngineerSeedBatch()
     bool foundAsymmetry = false;
     std::uint32_t fallbackCount = 0;
 
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const EngineerVisual visual = generateEngineerVisual(seed);
         const WorkerVisual worker = generateWorkerVisual(seed);
         const GuardVisual guard = generateGuardVisual(seed);
@@ -733,7 +733,7 @@ void testDeterministicIndustrialRobot()
 {
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
-    constexpr gdp::core::Seed seed = 0x494E44524F424F54ULL;
+    constexpr wkc::core::Seed seed = 0x494E44524F424F54ULL;
     const IndustrialRobotVisual first = generateIndustrialRobotVisual(seed);
     const IndustrialRobotVisual repeated = generateIndustrialRobotVisual(seed);
     const IndustrialRobotVisual different = generateIndustrialRobotVisual(seed + 1U);
@@ -792,7 +792,7 @@ void testIndustrialRobotSeedBatch()
     bool allValid = true;
     bool foundAsymmetry = false;
     std::uint32_t fallbackCount = 0;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const IndustrialRobotVisual visual = generateIndustrialRobotVisual(seed);
         const auto validation = validateIndustrialRobotVisual(visual);
         const auto mesh = generateMesh(visual.meshRecipe);

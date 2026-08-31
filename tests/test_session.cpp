@@ -98,8 +98,8 @@ void testBossStatusUsesArchetypeAndRoomOwnership()
 void testRestartSeedRegeneratesAReproducibleWorld()
 {
     using namespace gdp;
-    constexpr core::Seed initialSeed = 0x53455353494F4EULL;
-    const core::Seed restartSeed = gameplay::seedForRun(initialSeed, 1U);
+    constexpr wkc::core::Seed initialSeed = 0x53455353494F4EULL;
+    const wkc::core::Seed restartSeed = gameplay::seedForRun(initialSeed, 1U);
     const world::WorldGenerationResult initial = world::generateWorld(initialSeed);
     const world::WorldGenerationResult restarted = world::generateWorld(restartSeed);
     const world::WorldGenerationResult repeated = world::generateWorld(restartSeed);

@@ -23,8 +23,8 @@ enum class RoomLightingMood : std::uint8_t {
 };
 
 struct RoomPointLight {
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 color{1.0F, 1.0F, 1.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 color{1.0F, 1.0F, 1.0F};
     float intensity{1.0F};
     float range{6.0F};
 
@@ -32,11 +32,11 @@ struct RoomPointLight {
 };
 
 struct RoomLightingPlan {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomRole role{RoomRole::Normal};
     RoomTheme theme{RoomTheme::Industrial};
     RoomLightingMood mood{RoomLightingMood::Neutral};
-    gdp::core::Vec3 ambientColor{0.70F, 0.78F, 0.88F};
+    wkc::core::Vec3 ambientColor{0.70F, 0.78F, 0.88F};
     float ambientIntensity{0.18F};
     float fixtureEmissive{0.75F};
     bool supportsAlert{false};
@@ -64,14 +64,14 @@ struct LightingValidationResult {
 };
 
 [[nodiscard]] RoomLightingPlan generateRoomLightingPlan(
-    gdp::core::Seed roomSeed,
+    wkc::core::Seed roomSeed,
     RoomRole role,
     RoomTheme theme,
-    gdp::core::Aabb roomBounds);
+    wkc::core::Aabb roomBounds);
 
 [[nodiscard]] LightingValidationResult validateRoomLightingPlan(
     const RoomLightingPlan& plan,
-    gdp::core::Aabb roomBounds);
+    wkc::core::Aabb roomBounds);
 
 [[nodiscard]] std::uint64_t roomLightingPlanHash(
     const RoomLightingPlan& plan) noexcept;

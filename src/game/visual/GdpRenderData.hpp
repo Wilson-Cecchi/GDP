@@ -12,8 +12,8 @@
 namespace gdp::game::visual {
 
 struct CameraData {
-    gdp::core::Vec3 position{0.0F, 1.62F, 4.0F};
-    gdp::core::Vec3 forward{0.0F, 0.0F, -1.0F};
+    wkc::core::Vec3 position{0.0F, 1.62F, 4.0F};
+    wkc::core::Vec3 forward{0.0F, 0.0F, -1.0F};
     float verticalFieldOfViewDegrees{68.0F};
 };
 
@@ -44,39 +44,39 @@ enum class PropVisualState : std::uint8_t {
 };
 
 struct EnemyRenderData {
-    gdp::core::Vec3 position{};
+    wkc::core::Vec3 position{};
     bool alive{true};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
     EnemyVisualRole role{EnemyVisualRole::Worker};
     bool active{true};
 };
 
 struct PickupRenderData {
-    gdp::core::Vec3 position{};
+    wkc::core::Vec3 position{};
     PickupVisualRole role{PickupVisualRole::Health};
 };
 
 struct PropRenderData {
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 scale{1.0F, 1.0F, 1.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 scale{1.0F, 1.0F, 1.0F};
     PropVisualRole role{PropVisualRole::Crate};
     PropVisualState state{PropVisualState::Intact};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
 };
 
 struct RoomRenderData {
-    gdp::core::Vec3 origin{};
-    gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
+    wkc::core::Vec3 origin{};
+    wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
     std::uint64_t materialKey{0};
-    gdp::core::Aabb worldBounds{
+    wkc::core::Aabb worldBounds{
         {-3.85F, 0.0F, -4.85F},
         {3.85F, 4.0F, 4.85F},
     };
 };
 
 struct DoorRenderData {
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 outwardNormal{0.0F, 0.0F, 1.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 outwardNormal{0.0F, 0.0F, 1.0F};
     float width{1.2F};
     float height{2.2F};
     bool locked{false};
@@ -84,7 +84,7 @@ struct DoorRenderData {
 };
 
 struct CorridorRenderData {
-    std::span<const gdp::core::Vec3> points{};
+    std::span<const wkc::core::Vec3> points{};
     float width{1.2F};
     float height{2.2F};
     std::uint64_t materialKey{0};
@@ -190,14 +190,14 @@ struct HudRenderData {
 inline constexpr std::size_t maxRenderedRoomLights = 8U;
 
 struct PointLightRenderData {
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 color{1.0F, 1.0F, 1.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 color{1.0F, 1.0F, 1.0F};
     float intensity{1.0F};
     float range{6.0F};
 };
 
 struct RoomLightingRenderData {
-    gdp::core::Vec3 ambientColor{0.70F, 0.78F, 0.88F};
+    wkc::core::Vec3 ambientColor{0.70F, 0.78F, 0.88F};
     float ambientIntensity{0.24F};
     std::array<PointLightRenderData, maxRenderedRoomLights> lights{
         PointLightRenderData{{0.0F, 3.4F, 1.0F}, {0.78F, 0.88F, 1.0F}, 1.0F, 6.0F},

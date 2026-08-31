@@ -211,7 +211,7 @@ int main()
             constexpr gdp::game::visual::CameraData translatedCamera{
                 {18.0F, 1.62F, -14.0F}, {1.0F, 0.0F, 0.0F}, 68.0F};
             constexpr gdp::game::visual::RoomRenderData translatedRoom{
-                {14.0F, 0.0F, -14.0F}, gdp::core::QuarterTurn::Degrees90, 0U,
+                {14.0F, 0.0F, -14.0F}, wkc::core::QuarterTurn::Degrees90, 0U,
                 {{9.15F, 0.0F, -17.85F}, {18.85F, 4.0F, -10.15F}}};
             std::array translatedDoors{
                 gdp::game::visual::DoorRenderData{
@@ -257,15 +257,15 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 openDoorPixels.data());
             constexpr std::array corridorPoints{
-                gdp::core::Vec3{0.0F, 0.0F, -4.85F},
-                gdp::core::Vec3{0.0F, 0.0F, -10.0F},
+                wkc::core::Vec3{0.0F, 0.0F, -4.85F},
+                wkc::core::Vec3{0.0F, 0.0F, -10.0F},
             };
             const std::array corridorGeometry{
                 gdp::game::visual::CorridorRenderData{corridorPoints, 1.2F, 2.2F},
             };
             const std::array connectedRoomGeometry{
                 gdp::game::visual::RoomRenderData{
-                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
+                    {0.0F, 0.0F, -14.85F}, wkc::core::QuarterTurn::Degrees0,
                     storageMaterialKey,
                     {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
             };
@@ -277,7 +277,7 @@ int main()
                 corridorPixels.data());
             const std::array connectedRoomCentralHub{
                 gdp::game::visual::RoomRenderData{
-                    {0.0F, 0.0F, -14.85F}, gdp::core::QuarterTurn::Degrees0,
+                    {0.0F, 0.0F, -14.85F}, wkc::core::QuarterTurn::Degrees0,
                     centralHubMaterialKey,
                     {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
             };
@@ -289,9 +289,9 @@ int main()
                 connectedRoomMaterialPixels.data());
 
             constexpr std::array cornerPoints{
-                gdp::core::Vec3{0.0F, 0.0F, 0.0F},
-                gdp::core::Vec3{4.0F, 0.0F, 0.0F},
-                gdp::core::Vec3{4.0F, 0.0F, -5.0F},
+                wkc::core::Vec3{0.0F, 0.0F, 0.0F},
+                wkc::core::Vec3{4.0F, 0.0F, 0.0F},
+                wkc::core::Vec3{4.0F, 0.0F, -5.0F},
             };
             const std::array cornerCorridor{
                 gdp::game::visual::CorridorRenderData{
@@ -307,12 +307,12 @@ int main()
             };
             const std::array cornerConnectedRoom{
                 gdp::game::visual::RoomRenderData{
-                    {4.0F, 0.0F, -9.85F}, gdp::core::QuarterTurn::Degrees0,
+                    {4.0F, 0.0F, -9.85F}, wkc::core::QuarterTurn::Degrees0,
                     storageMaterialKey,
                     {{0.15F, 0.0F, -14.70F}, {7.85F, 4.0F, -5.0F}}},
             };
             const gdp::game::visual::RoomRenderData cornerRoom{
-                {-4.85F, 0.0F, 0.0F}, gdp::core::QuarterTurn::Degrees90,
+                {-4.85F, 0.0F, 0.0F}, wkc::core::QuarterTurn::Degrees90,
                 centralHubMaterialKey,
                 {{-9.70F, 0.0F, -3.85F}, {0.0F, 4.0F, 3.85F}}};
             constexpr gdp::game::visual::CameraData cornerCamera{

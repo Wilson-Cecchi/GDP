@@ -10,16 +10,16 @@
 namespace wkc::render {
 
 struct Vertex {
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 normal{};
-    gdp::core::Vec2 uv{};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 normal{};
+    wkc::core::Vec2 uv{};
     std::uint32_t semanticRegion{0};
 };
 
 struct MeshData {
     std::vector<Vertex> vertices;
     std::vector<std::uint32_t> indices;
-    gdp::core::Aabb bounds{};
+    wkc::core::Aabb bounds{};
 };
 
 [[nodiscard]] MeshData makeBoxMesh();

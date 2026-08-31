@@ -50,11 +50,11 @@ void testStableDomainIds()
 
 void testGenericDerivationCompatibility()
 {
-    constexpr gdp::core::Seed root = 0x123456789ABCDEF0ULL;
-    const gdp::core::Seed typed = gdp::core::deriveSeed(
+    constexpr wkc::core::Seed root = 0x123456789ABCDEF0ULL;
+    const wkc::core::Seed typed = wkc::core::deriveSeed(
         root, gdp::game::SeedDomain::Room, 42U);
-    const gdp::core::Seed numeric = gdp::core::deriveSeed(
-        root, gdp::core::SeedDomainId{3}, 42U);
+    const wkc::core::Seed numeric = wkc::core::deriveSeed(
+        root, wkc::core::SeedDomainId{3}, 42U);
 
     expect(typed == numeric,
         "typed GDP domain delegates to the generic seed mechanism");

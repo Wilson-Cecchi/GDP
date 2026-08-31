@@ -1,5 +1,8 @@
 # Core — Matemática e coordenadas
 
+> Na Fase 54, vetores, matrizes, transforms, AABBs e utilitários matemáticos
+> passaram para `wkc::core`, sem alterar convenções ou valores.
+
 > **Estado:** contrato matemático básico implementado e validado na Fase 1.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.

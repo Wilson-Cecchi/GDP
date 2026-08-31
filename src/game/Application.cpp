@@ -31,7 +31,7 @@
 namespace gdp::game {
 
 using wkc::core::LogLevel;
-using gdp::core::Vec2;
+using wkc::core::Vec2;
 using wkc::core::log;
 using wkc::platform::Input;
 using wkc::platform::Key;
@@ -110,7 +110,7 @@ void appendConnectedRoomLights(
     const gdp::world::World& world,
     const std::vector<gdp::world::RoomLightingPlan>& roomLighting,
     const gdp::world::RoomId currentRoomId,
-    const gdp::core::Vec3 observerPosition)
+    const wkc::core::Vec3 observerPosition)
 {
     struct Candidate {
         visual::PointLightRenderData light;
@@ -143,10 +143,10 @@ void appendConnectedRoomLights(
         const gdp::world::RoomLightingPlan& plan = roomLighting[roomIndex];
         for (std::size_t lightIndex = 0; lightIndex < plan.lights.size(); ++lightIndex) {
             const gdp::world::RoomPointLight& source = plan.lights[lightIndex];
-            const gdp::core::Vec3 offset = source.position - observerPosition;
+            const wkc::core::Vec3 offset = source.position - observerPosition;
             candidates.push_back({
                 {source.position, source.color, source.intensity, source.range},
-                gdp::core::dot(offset, offset),
+                wkc::core::dot(offset, offset),
                 roomId,
                 lightIndex,
             });
@@ -236,7 +236,7 @@ bool prepareRoomMaterials(
     return false;
 }
 
-float yawForDirection(const gdp::core::Vec3 direction) noexcept
+float yawForDirection(const wkc::core::Vec3 direction) noexcept
 {
     constexpr float radiansToDegrees = 57.29577951308232F;
     return std::atan2(direction.z, direction.x) * radiansToDegrees;
@@ -259,7 +259,7 @@ bool edgeTouchesRoom(
 bool playerNearDoor(
     const world::World& world,
     const world::EdgeId edge,
-    const gdp::core::Vec3 position) noexcept
+    const wkc::core::Vec3 position) noexcept
 {
     constexpr float occupancyDistance = 1.05F;
     for (const world::RoomInstance& room : world.rooms) {
@@ -457,10 +457,10 @@ bool Application::initializeRun()
         return false;
     }
 
-    const gdp::core::Vec3 startForward = gdp::core::rotateQuarterTurns(
+    const wkc::core::Vec3 startForward = wkc::core::rotateQuarterTurns(
         {0.0F, 0.0F, -1.0F}, startRoom->rotation);
-    const gdp::core::Vec3 startPosition = startRoom->transform.position
-        + gdp::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
+    const wkc::core::Vec3 startPosition = startRoom->transform.position
+        + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
     player_.spawn(startPosition, yawForDirection(startForward));
     const world::InitialEntitySet initialEntities = world::populateInitialEntities(
         *world_, entities_,
@@ -1070,7 +1070,7 @@ void Application::fixedUpdate(const double fixedStep)
     if (playerCommand_.interact) {
         const entities::Entity* terminal = entities_.find(terminalEntity_);
         if (terminal != nullptr && terminal->roomId == playerRoom) {
-            const gdp::core::Vec3 position = terminal->transform.position;
+            const wkc::core::Vec3 position = terminal->transform.position;
             const std::array targets{
                 gameplay::InteractionTarget{
                     terminalEntity_,
@@ -1491,7 +1491,7 @@ void Application::render()
                 }
                 visibleEdges.push_back(corridor.edge);
                 visibleCorridors.push_back({
-                    std::span<const gdp::core::Vec3>{corridor.points},
+                    std::span<const wkc::core::Vec3>{corridor.points},
                     corridor.width,
                     corridor.height,
                     roomMaterialKeys_.contains(corridor.firstRoom)
@@ -1642,7 +1642,7 @@ void Application::render()
             && activeEvent->plan.trigger == world::RoomEventTrigger::TerminalUse) {
             const entities::Entity* terminal = entities_.find(terminalEntity_);
             if (terminal != nullptr && terminal->roomId == playerRoom) {
-                const gdp::core::Vec3 position = terminal->transform.position;
+                const wkc::core::Vec3 position = terminal->transform.position;
                 const std::array targets{
                     gameplay::InteractionTarget{
                         terminalEntity_,

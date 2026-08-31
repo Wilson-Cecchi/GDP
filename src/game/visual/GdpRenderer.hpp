@@ -30,23 +30,23 @@ public:
     GdpRenderer& operator=(GdpRenderer&&) = delete;
 
     [[nodiscard]] bool initialize(int width, int height);
-    [[nodiscard]] bool prepareIndustrialRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareStorageRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareCombatRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareCafeteriaRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareLaboratoryRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareTechnicalRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareSecurityRoomMaterials(gdp::core::Seed roomSeed);
-    [[nodiscard]] bool prepareCentralHubRoomMaterials(gdp::core::Seed roomSeed);
+    [[nodiscard]] bool prepareIndustrialRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareStorageRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareCombatRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareCafeteriaRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareLaboratoryRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareTechnicalRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareSecurityRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareCentralHubRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] std::uint64_t activeRoomMaterialKey() const noexcept
     {
         return activeRoomMaterialKey_;
     }
-    [[nodiscard]] bool prepareWorkerVisual(gdp::core::Seed visualSeed);
-    [[nodiscard]] bool prepareGuardVisual(gdp::core::Seed visualSeed);
-    [[nodiscard]] bool prepareOfficerVisual(gdp::core::Seed visualSeed);
-    [[nodiscard]] bool prepareEngineerVisual(gdp::core::Seed visualSeed);
-    [[nodiscard]] bool prepareIndustrialRobotVisual(gdp::core::Seed visualSeed);
+    [[nodiscard]] bool prepareWorkerVisual(wkc::core::Seed visualSeed);
+    [[nodiscard]] bool prepareGuardVisual(wkc::core::Seed visualSeed);
+    [[nodiscard]] bool prepareOfficerVisual(wkc::core::Seed visualSeed);
+    [[nodiscard]] bool prepareEngineerVisual(wkc::core::Seed visualSeed);
+    [[nodiscard]] bool prepareIndustrialRobotVisual(wkc::core::Seed visualSeed);
     [[nodiscard]] bool render(
         int width,
         int height,
@@ -86,8 +86,8 @@ private:
             static_cast<std::size_t>(IndustrialSurface::Count)> textures;
         std::optional<IndustrialCondition> industrialWallCondition;
         std::optional<IndustrialCondition> industrialCeilingCondition;
-        gdp::core::Vec2 wallUvOffset{};
-        gdp::core::Vec2 ceilingUvOffset{};
+        wkc::core::Vec2 wallUvOffset{};
+        wkc::core::Vec2 ceilingUvOffset{};
         float wallTone{1.0F};
         float ceilingTone{1.0F};
     };
@@ -101,11 +101,11 @@ private:
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
     wkc::resources::AssetCache<wkc::render::MeshData> meshCache_{};
     wkc::resources::AssetCache<wkc::render::ImageData> textureCache_{};
-    std::unordered_map<gdp::core::Seed, EnemyGpuVisual> workerVisuals_{};
-    std::unordered_map<gdp::core::Seed, EnemyGpuVisual> guardVisuals_{};
-    std::unordered_map<gdp::core::Seed, EnemyGpuVisual> officerVisuals_{};
-    std::unordered_map<gdp::core::Seed, EnemyGpuVisual> engineerVisuals_{};
-    std::unordered_map<gdp::core::Seed, EnemyGpuVisual> industrialRobotVisuals_{};
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual> workerVisuals_{};
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual> guardVisuals_{};
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual> officerVisuals_{};
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual> engineerVisuals_{};
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual> industrialRobotVisuals_{};
     std::array<std::optional<IndustrialWallGpuMaterial>,
         static_cast<std::size_t>(IndustrialCondition::Count)>
         industrialWallMaterials_{};

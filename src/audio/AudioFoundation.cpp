@@ -13,7 +13,7 @@ namespace {
 
 // Versioned synthesis substream. Its numeric value preserves existing
 // waveforms while keeping the reusable foundation independent of game domains.
-inline constexpr gdp::core::SeedDomainId audioNoiseSeedDomain = 16U;
+inline constexpr wkc::core::SeedDomainId audioNoiseSeedDomain = 16U;
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
@@ -78,7 +78,7 @@ AudioClip synthesizeAudioClip(const AudioRecipe& recipe, const int sampleRate)
     const std::size_t sampleCount = static_cast<std::size_t>(std::max(
         1.0F, std::round(recipe.durationSeconds * static_cast<float>(sampleRate))));
     clip.samples.resize(sampleCount);
-    gdp::core::RandomStream noise{gdp::core::deriveSeed(
+    wkc::core::RandomStream noise{wkc::core::deriveSeed(
         recipe.seed, audioNoiseSeedDomain, 2U)};
     constexpr float twoPi = 2.0F * std::numbers::pi_v<float>;
     for (std::size_t index = 0; index < sampleCount; ++index) {

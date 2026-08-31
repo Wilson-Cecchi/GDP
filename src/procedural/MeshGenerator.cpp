@@ -8,9 +8,9 @@
 namespace wkc::procedural {
 namespace {
 
-gdp::core::Vec3 rotateEuler(
-    gdp::core::Vec3 value,
-    const gdp::core::Vec3 degrees) noexcept
+wkc::core::Vec3 rotateEuler(
+    wkc::core::Vec3 value,
+    const wkc::core::Vec3 degrees) noexcept
 {
     constexpr float toRadians = std::numbers::pi_v<float> / 180.0F;
     const float x = degrees.x * toRadians;
@@ -34,14 +34,14 @@ gdp::core::Vec3 rotateEuler(
     };
 }
 
-gdp::core::Vec3 componentMultiply(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second) noexcept
+wkc::core::Vec3 componentMultiply(
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second) noexcept
 {
     return {first.x * second.x, first.y * second.y, first.z * second.z};
 }
 
-void expandBounds(gdp::core::Aabb& bounds, const gdp::core::Vec3 point) noexcept
+void expandBounds(wkc::core::Aabb& bounds, const wkc::core::Vec3 point) noexcept
 {
     bounds.minimum.x = std::min(bounds.minimum.x, point.x);
     bounds.minimum.y = std::min(bounds.minimum.y, point.y);
@@ -64,7 +64,7 @@ wkc::render::MeshData makeCylinderMesh()
         const float angle = fraction * fullCircle;
         const float x = std::cos(angle) * radius;
         const float z = std::sin(angle) * radius;
-        const gdp::core::Vec3 normal = gdp::core::normalized({x, 0.0F, z});
+        const wkc::core::Vec3 normal = wkc::core::normalized({x, 0.0F, z});
         mesh.vertices.push_back({{x, -halfHeight, z}, normal, {fraction, 0.0F}, 0});
         mesh.vertices.push_back({{x, halfHeight, z}, normal, {fraction, 1.0F}, 0});
     }
@@ -151,7 +151,7 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
         const wkc::render::MeshData baseMesh = primitiveMesh(primitive.type);
         const std::uint32_t vertexOffset = static_cast<std::uint32_t>(result.mesh.vertices.size());
         const std::uint32_t firstIndex = static_cast<std::uint32_t>(result.mesh.indices.size());
-        const gdp::core::Vec3 dimensions = componentMultiply(
+        const wkc::core::Vec3 dimensions = componentMultiply(
             primitive.dimensions,
             primitive.localTransform.scale);
         for (wkc::render::Vertex vertex : baseMesh.vertices) {
@@ -160,7 +160,7 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
                 vertex.position,
                 primitive.localTransform.rotationDegrees);
             vertex.position = vertex.position + primitive.localTransform.position;
-            vertex.normal = gdp::core::normalized(rotateEuler(
+            vertex.normal = wkc::core::normalized(rotateEuler(
                 vertex.normal,
                 primitive.localTransform.rotationDegrees));
             vertex.semanticRegion = static_cast<std::uint32_t>(primitive.semantic);

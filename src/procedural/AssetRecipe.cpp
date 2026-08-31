@@ -8,12 +8,12 @@
 namespace wkc::procedural {
 namespace {
 
-bool isFinite(const gdp::core::Vec3 value) noexcept
+bool isFinite(const wkc::core::Vec3 value) noexcept
 {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 
-bool isUnitColor(const gdp::core::Vec3 color) noexcept
+bool isUnitColor(const wkc::core::Vec3 color) noexcept
 {
     return isFinite(color) && color.x >= 0.0F && color.x <= 1.0F
         && color.y >= 0.0F && color.y <= 1.0F
@@ -30,7 +30,7 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
     return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
-std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
+std::uint64_t addVec3(std::uint64_t hash, const wkc::core::Vec3 value) noexcept
 {
     hash = addFloat(hash, value.x);
     hash = addFloat(hash, value.y);

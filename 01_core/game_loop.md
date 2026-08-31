@@ -12,6 +12,8 @@
 > clamp de frames longos, interpolação e contagem de updates.
 > Na Fase 52, `LogLevel` e `log` também passaram para `wkc::core`, preservando
 > níveis, mensagens e saída de diagnóstico.
+> Na Fase 54, Math, Seed e Random concluíram o namespace `wkc::core`; não resta
+> API pública `gdp::core`.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

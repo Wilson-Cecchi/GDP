@@ -129,6 +129,11 @@ foreach(migrated_core_source IN ITEMS
     "${core_directory}/Hash.hpp"
     "${core_directory}/Log.cpp"
     "${core_directory}/Log.hpp"
+    "${core_directory}/Math.hpp"
+    "${core_directory}/Random.cpp"
+    "${core_directory}/Random.hpp"
+    "${core_directory}/Seed.cpp"
+    "${core_directory}/Seed.hpp"
     "${core_directory}/Time.cpp"
     "${core_directory}/Time.hpp"
 )

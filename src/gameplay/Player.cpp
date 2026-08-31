@@ -9,9 +9,9 @@ namespace gdp::gameplay {
 namespace {
 
 std::optional<float> rayAabbDistance(
-    const gdp::core::Vec3 origin,
-    const gdp::core::Vec3 direction,
-    const gdp::core::Aabb bounds,
+    const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction,
+    const wkc::core::Aabb bounds,
     const float maximumDistance) noexcept
 {
     float minimumDistance = 0.0F;
@@ -46,7 +46,7 @@ std::optional<float> rayAabbDistance(
 
 } // namespace
 
-void Player::spawn(const gdp::core::Vec3 feetPosition, const float yawDegrees) noexcept
+void Player::spawn(const wkc::core::Vec3 feetPosition, const float yawDegrees) noexcept
 {
     state_ = {};
     state_.position = feetPosition;
@@ -55,7 +55,7 @@ void Player::spawn(const gdp::core::Vec3 feetPosition, const float yawDegrees) n
 }
 
 bool Player::relocate(
-    const gdp::core::Vec3 feetPosition,
+    const wkc::core::Vec3 feetPosition,
     const float yawDegrees) noexcept
 {
     if (!state_.alive || !std::isfinite(feetPosition.x)
@@ -76,7 +76,7 @@ void Player::bindEntity(const gdp::entities::EntityId entity) noexcept
     entity_ = entity;
 }
 
-void Player::applyLook(const gdp::core::Vec2 mouseDelta) noexcept
+void Player::applyLook(const wkc::core::Vec2 mouseDelta) noexcept
 {
     if (!state_.alive) {
         return;
@@ -98,10 +98,10 @@ void Player::fixedUpdate(
         return;
     }
 
-    gdp::core::Vec3 desired = planarForwardDirection()
+    wkc::core::Vec3 desired = planarForwardDirection()
             * std::clamp(command.moveForward, -1.0F, 1.0F)
         + rightDirection() * std::clamp(command.moveRight, -1.0F, 1.0F);
-    const float desiredLength = gdp::core::length(desired);
+    const float desiredLength = wkc::core::length(desired);
     if (desiredLength > 1.0F) {
         desired = desired * (1.0F / desiredLength);
     }
@@ -196,33 +196,33 @@ gdp::entities::EntityId Player::entity() const noexcept
     return entity_;
 }
 
-gdp::core::Vec3 Player::forwardDirection() const noexcept
+wkc::core::Vec3 Player::forwardDirection() const noexcept
 {
     constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
     const float yaw = state_.yawDegrees * degreesToRadians;
     const float pitch = state_.pitchDegrees * degreesToRadians;
-    return gdp::core::normalized({
+    return wkc::core::normalized({
         std::cos(yaw) * std::cos(pitch),
         std::sin(pitch),
         std::sin(yaw) * std::cos(pitch),
     });
 }
 
-gdp::core::Vec3 Player::planarForwardDirection() const noexcept
+wkc::core::Vec3 Player::planarForwardDirection() const noexcept
 {
-    const gdp::core::Vec3 forward = forwardDirection();
-    return gdp::core::normalized({forward.x, 0.0F, forward.z});
+    const wkc::core::Vec3 forward = forwardDirection();
+    return wkc::core::normalized({forward.x, 0.0F, forward.z});
 }
 
-gdp::core::Vec3 Player::rightDirection() const noexcept
+wkc::core::Vec3 Player::rightDirection() const noexcept
 {
-    const gdp::core::Vec3 forward = planarForwardDirection();
+    const wkc::core::Vec3 forward = planarForwardDirection();
     return {-forward.z, 0.0F, forward.x};
 }
 
-gdp::core::Vec3 Player::cameraPosition() const noexcept
+wkc::core::Vec3 Player::cameraPosition() const noexcept
 {
-    return state_.position + gdp::core::Vec3{0.0F, eyeHeight_, 0.0F};
+    return state_.position + wkc::core::Vec3{0.0F, eyeHeight_, 0.0F};
 }
 
 } // namespace gdp::gameplay

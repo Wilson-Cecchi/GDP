@@ -36,14 +36,14 @@ void testDeterministicRecipeAndClip()
 {
     using namespace gdp::audio;
     using namespace wkc::audio;
-    constexpr gdp::core::Seed seed = 0x415544494F5F5631ULL;
+    constexpr wkc::core::Seed seed = 0x415544494F5F5631ULL;
     const AudioRecipe first = generateAudioRecipe(seed, AudioEventKind::WeaponFire, 7U);
     const AudioRecipe repeated = generateAudioRecipe(seed, AudioEventKind::WeaponFire, 7U);
     const AudioClip firstClip = synthesizeAudioClip(first);
     const AudioClip repeatedClip = synthesizeAudioClip(repeated);
     expect(first.recipeHash == repeated.recipeHash && firstClip.samples == repeatedClip.samples,
         "same seed, kind and counter reproduce the complete waveform");
-    expect(first.seed == gdp::core::deriveSeed(seed, gdp::game::SeedDomain::Audio,
+    expect(first.seed == wkc::core::deriveSeed(seed, gdp::game::SeedDomain::Audio,
                (static_cast<std::uint64_t>(AudioEventKind::WeaponFire) << 56U) ^ 7U),
         "audio recipes start from the isolated Audio seed domain");
     expect(validateAudioRecipe(first).isValid()

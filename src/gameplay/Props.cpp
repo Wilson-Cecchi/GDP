@@ -4,15 +4,15 @@
 
 namespace gdp::gameplay {
 
-gdp::core::Aabb propCollisionBounds(
+wkc::core::Aabb propCollisionBounds(
     const gdp::entities::Entity& entity,
     const gdp::entities::PropData& prop) noexcept
 {
-    gdp::core::Vec3 scale = entity.transform.scale;
+    wkc::core::Vec3 scale = entity.transform.scale;
     if (prop.state == gdp::entities::PropState::Destroyed) {
         scale.y = std::min(scale.y, 0.12F);
     }
-    const gdp::core::Vec3 half{scale.x * 0.5F, 0.0F, scale.z * 0.5F};
+    const wkc::core::Vec3 half{scale.x * 0.5F, 0.0F, scale.z * 0.5F};
     return {
         {entity.transform.position.x - half.x,
             entity.transform.position.y,
@@ -28,7 +28,7 @@ CollisionWorld collisionWorldWithProps(
     const gdp::entities::EntityManager& manager,
     const std::uint32_t roomId)
 {
-    std::vector<gdp::core::Aabb> solids = base.solids();
+    std::vector<wkc::core::Aabb> solids = base.solids();
     for (const gdp::entities::EntityId id : manager.query(gdp::entities::EntityKind::Prop)) {
         const gdp::entities::Entity* entity = manager.find(id);
         const gdp::entities::PropData* prop

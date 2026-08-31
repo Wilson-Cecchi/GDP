@@ -44,13 +44,13 @@ std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe
                 (static_cast<std::uint64_t>(y / 8U) << 32U) | (x / 8U)));
             const float micro = unitNoise(wkc::core::hashCombine(recipe.seed, pixelId));
             const float macroBlend = recipe.macroVariation * macro;
-            gdp::core::Vec3 color{
+            wkc::core::Vec3 color{
                 recipe.baseColor.x + ((recipe.secondaryColor.x - recipe.baseColor.x) * macroBlend),
                 recipe.baseColor.y + ((recipe.secondaryColor.y - recipe.baseColor.y) * macroBlend),
                 recipe.baseColor.z + ((recipe.secondaryColor.z - recipe.baseColor.z) * macroBlend),
             };
             const float grain = (micro - 0.5F) * recipe.microVariation;
-            color = color + gdp::core::Vec3{grain, grain, grain};
+            color = color + wkc::core::Vec3{grain, grain, grain};
 
             const float dirtNoise = unitNoise(wkc::core::hashCombine(pixelId, recipe.seed ^ 0xD17U));
             if (dirtNoise < recipe.dirtAmount * 0.22F) {
@@ -58,7 +58,7 @@ std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe
             }
             const float wearNoise = unitNoise(wkc::core::hashCombine(pixelId, recipe.seed ^ 0xA11U));
             if (wearNoise < recipe.wearAmount * 0.16F) {
-                color = color + gdp::core::Vec3{0.13F, 0.12F, 0.10F};
+                color = color + wkc::core::Vec3{0.13F, 0.12F, 0.10F};
             }
             if (properties.oxidationAllowed) {
                 const float oxidationNoise = unitNoise(wkc::core::hashCombine(

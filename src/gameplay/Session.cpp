@@ -4,7 +4,7 @@
 
 namespace gdp::gameplay {
 
-SessionSystem::SessionSystem(const gdp::core::Seed initialSeed) noexcept
+SessionSystem::SessionSystem(const wkc::core::Seed initialSeed) noexcept
     : state_{SessionPhase::Playing, initialSeed, initialSeed, 0U, false}
 {
 }
@@ -32,7 +32,7 @@ SessionUpdate SessionSystem::update(
     return update;
 }
 
-std::optional<gdp::core::Seed> SessionSystem::restart() noexcept
+std::optional<wkc::core::Seed> SessionSystem::restart() noexcept
 {
     if (state_.phase == SessionPhase::Playing) {
         return std::nullopt;
@@ -49,14 +49,14 @@ const SessionState& SessionSystem::state() const noexcept
     return state_;
 }
 
-gdp::core::Seed seedForRun(
-    const gdp::core::Seed initialSeed,
+wkc::core::Seed seedForRun(
+    const wkc::core::Seed initialSeed,
     const std::uint32_t runIndex) noexcept
 {
     if (runIndex == 0U) {
         return initialSeed;
     }
-    return gdp::core::deriveSeed(
+    return wkc::core::deriveSeed(
         initialSeed, gdp::game::SeedDomain::World, runIndex);
 }
 

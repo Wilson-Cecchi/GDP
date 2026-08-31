@@ -11,29 +11,29 @@
 namespace gdp::world {
 namespace {
 
-bool containsPlanar(const SpawnZone& zone, const gdp::core::Vec3 position) noexcept
+bool containsPlanar(const SpawnZone& zone, const wkc::core::Vec3 position) noexcept
 {
     return position.x >= zone.bounds.minimum.x && position.x <= zone.bounds.maximum.x
         && position.z >= zone.bounds.minimum.z && position.z <= zone.bounds.maximum.z
-        && gdp::core::nearlyEqual(position.y, zone.bounds.minimum.y, 1.0e-4F);
+        && wkc::core::nearlyEqual(position.y, zone.bounds.minimum.y, 1.0e-4F);
 }
 
-gdp::core::Vec3 choosePosition(
-    const gdp::core::Seed seed,
+wkc::core::Vec3 choosePosition(
+    const wkc::core::Seed seed,
     const std::uint64_t ordinal,
     const std::span<const SpawnZone> zones)
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         seed, gdp::game::SeedDomain::Events, 100U + ordinal)};
     const SpawnZone& zone = zones[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)))];
     constexpr std::array anchors{
-        gdp::core::Vec2{0.18F, 0.72F},
-        gdp::core::Vec2{0.82F, 0.28F},
-        gdp::core::Vec2{0.28F, 0.22F},
-        gdp::core::Vec2{0.72F, 0.78F},
+        wkc::core::Vec2{0.18F, 0.72F},
+        wkc::core::Vec2{0.82F, 0.28F},
+        wkc::core::Vec2{0.28F, 0.22F},
+        wkc::core::Vec2{0.72F, 0.78F},
     };
-    const gdp::core::Vec2 anchor = anchors[ordinal % anchors.size()];
+    const wkc::core::Vec2 anchor = anchors[ordinal % anchors.size()];
     const float normalizedX = std::clamp(
         anchor.x + random.rangeFloat(-0.035F, 0.035F), 0.10F, 0.90F);
     const float normalizedZ = std::clamp(
@@ -64,7 +64,7 @@ void addSpawn(
         archetype,
         choosePosition(plan.seed, ordinal, zones),
         baseHealth * difficulty,
-        gdp::core::deriveSeed(
+        wkc::core::deriveSeed(
             plan.seed, gdp::game::SeedDomain::EnemyVisual, 500U + ordinal),
         wave,
     });
@@ -96,7 +96,7 @@ bool EventValidationResult::isValid() const noexcept
 }
 
 RoomEventPlan generateRoomEventPlan(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const RoomRole role,
     const RoomTheme theme,
     const std::uint32_t depth,
@@ -106,12 +106,12 @@ RoomEventPlan generateRoomEventPlan(
     using gdp::entities::EnemyArchetype;
     using gdp::entities::ItemType;
     RoomEventPlan plan;
-    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Events, 0);
+    plan.seed = wkc::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Events, 0);
     plan.role = role;
     plan.theme = theme;
     plan.depth = depth;
     const float safeDifficulty = std::clamp(difficulty, 0.5F, 2.0F);
-    gdp::core::RandomStream selection{gdp::core::deriveSeed(
+    wkc::core::RandomStream selection{wkc::core::deriveSeed(
         plan.seed, gdp::game::SeedDomain::Events, 1)};
 
     switch (role) {

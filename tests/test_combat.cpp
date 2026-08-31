@@ -93,7 +93,7 @@ void testDormantEnemyIgnoresCombat()
         "hitscan passes over dormant event previews without changing their health");
     Player player;
     player.spawn({0.0F, 0.0F, 0.0F});
-    const gdp::core::Vec3 dormantPosition = manager.find(dormant)->transform.position;
+    const wkc::core::Vec3 dormantPosition = manager.find(dormant)->transform.position;
     const EnemyUpdateSummary update
         = updateWorkers(manager, player, 1, openRoom, 1.0F);
     expect(update.idle == 0U && update.chasing == 0U && update.attacking == 0U
@@ -229,7 +229,7 @@ void testWorkerBehavior()
             && player.state().health == 90.0F,
         "Worker in range attacks and applies damage to the player");
 
-    const gdp::core::Vec3 deathPosition = manager.find(worker)->transform.position;
+    const wkc::core::Vec3 deathPosition = manager.find(worker)->transform.position;
     expect(applyDamage(manager, worker, 500.0F) == DamageOutcome::Killed,
         "Worker can be killed through the shared damage pipeline");
     const float healthBeforeDeadUpdate = player.state().health;
@@ -298,25 +298,25 @@ void testGuardRangedBehavior()
 
     const EnemyUpdateSummary approach = updateGuards(manager, player, 1, room, 1.0F, config);
     expect(approach.chasing == 1U
-            && gdp::core::nearlyEqual(manager.find(guard)->transform.position.z, 8.0F),
+            && wkc::core::nearlyEqual(manager.find(guard)->transform.position.z, 8.0F),
         "Guard outside its firing envelope advances to medium range");
-    expect(manager.find(worker)->transform.position == gdp::core::Vec3{2.0F, 0.0F, 5.0F},
+    expect(manager.find(worker)->transform.position == wkc::core::Vec3{2.0F, 0.0F, 5.0F},
         "Guard update never moves a Worker archetype");
 
     const EnemyUpdateSummary shot = updateGuards(manager, player, 1, room, 0.1F, config);
     expect(shot.attacking == 1U && shot.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 93.0F),
+            && wkc::core::nearlyEqual(player.state().health, 93.0F),
         "Guard with line of sight fires from its preferred range");
 
     manager.find(guard)->transform.position = {0.0F, 0.0F, 2.0F};
     const float healthBeforeRetreat = player.state().health;
     const EnemyUpdateSummary retreat = updateGuards(manager, player, 1, room, 0.5F, config);
     expect(retreat.repositioning == 1U
-            && gdp::core::nearlyEqual(manager.find(guard)->transform.position.z, 3.0F)
+            && wkc::core::nearlyEqual(manager.find(guard)->transform.position.z, 3.0F)
             && player.state().health == healthBeforeRetreat,
         "Guard that is rushed retreats without firing inside its minimum range");
 
-    const gdp::core::Vec3 deathPosition = manager.find(guard)->transform.position;
+    const wkc::core::Vec3 deathPosition = manager.find(guard)->transform.position;
     expect(applyDamage(manager, guard, 500.0F) == DamageOutcome::Killed,
         "Guard uses the shared damage and death pipeline");
     const EnemyUpdateSummary dead = updateGuards(manager, player, 1, room, 2.0F, config);
@@ -402,21 +402,21 @@ void testOfficerCommandSupport()
 
     const EnemyUpdateSummary command = updateOfficers(manager, player, 1, room, 0.0F, config);
     expect(command.commandsIssued == 1U && command.alliesSupported == 2U
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 manager.findData<EnemyData>(worker)->attackCooldown, 0.6F)
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 manager.findData<EnemyData>(guard)->attackCooldown, 0.4F),
         "Officer command accelerates readying Worker and Guard allies in support range");
-    expect(gdp::core::nearlyEqual(
+    expect(wkc::core::nearlyEqual(
                manager.findData<EnemyData>(remoteWorker)->attackCooldown, 1.0F),
         "Officer command never crosses the active room boundary");
-    expect(gdp::core::nearlyEqual(
+    expect(wkc::core::nearlyEqual(
                manager.findData<EnemyData>(officer)->supportCooldown, 2.5F),
         "Officer command starts an independent support cooldown");
 
     const EnemyUpdateSummary repeated = updateOfficers(manager, player, 1, room, 0.1F, config);
     expect(repeated.commandsIssued == 0U && repeated.alliesSupported == 0U
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 manager.findData<EnemyData>(worker)->attackCooldown, 0.6F),
         "Officer cannot repeat a command before its support cooldown expires");
 }
@@ -446,18 +446,18 @@ void testOfficerRangedBehaviorAndLineOfSight()
 
     const EnemyUpdateSummary approach = updateOfficers(manager, player, 1, open, 1.0F, config);
     expect(approach.chasing == 1U
-            && gdp::core::nearlyEqual(manager.find(officer)->transform.position.z, 10.0F),
+            && wkc::core::nearlyEqual(manager.find(officer)->transform.position.z, 10.0F),
         "Officer advances to its longer command-range firing envelope");
     const EnemyUpdateSummary shot = updateOfficers(manager, player, 1, open, 0.1F, config);
     expect(shot.attacking == 1U && shot.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 94.0F),
+            && wkc::core::nearlyEqual(player.state().health, 94.0F),
         "Officer fires its sidearm only from the preferred range with line of sight");
 
     manager.find(officer)->transform.position = {0.0F, 0.0F, 3.0F};
     const float healthBeforeRetreat = player.state().health;
     const EnemyUpdateSummary retreat = updateOfficers(manager, player, 1, open, 0.5F, config);
     expect(retreat.repositioning == 1U
-            && gdp::core::nearlyEqual(manager.find(officer)->transform.position.z, 4.0F)
+            && wkc::core::nearlyEqual(manager.find(officer)->transform.position.z, 4.0F)
             && player.state().health == healthBeforeRetreat,
         "Officer retreats instead of firing when the player breaches minimum range");
 
@@ -473,7 +473,7 @@ void testOfficerRangedBehaviorAndLineOfSight()
 
     expect(applyDamage(manager, officer, 500.0F) == DamageOutcome::Killed,
         "Officer uses the shared damage and death pipeline");
-    expect(gdp::core::nearlyEqual(
+    expect(wkc::core::nearlyEqual(
                manager.findData<EnemyData>(officer)->supportCooldown, 0.0F),
         "Officer death clears command state together with attack state");
 }
@@ -526,13 +526,13 @@ void testEngineerRepairSystem()
         = updateEngineers(manager, player, 1, room, 0.0F, config);
     expect(allyRepair.repairsPerformed == 1U && allyRepair.alliesRepaired == 1U
             && allyRepair.propsRestored == 0U
-            && gdp::core::nearlyEqual(manager.findData<EnemyData>(worker)->health, 42.0F),
+            && wkc::core::nearlyEqual(manager.findData<EnemyData>(worker)->health, 42.0F),
         "Engineer repairs the nearest damaged living ally by the configured amount");
-    expect(gdp::core::nearlyEqual(
+    expect(wkc::core::nearlyEqual(
                manager.findData<EnemyData>(remoteWorker)->health, 30.0F),
         "Engineer repair never crosses the active room boundary");
     expect(manager.findData<PropData>(damagedProp)->state == PropState::Damaged
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 manager.findData<EnemyData>(engineer)->supportCooldown, 2.0F),
         "one Engineer repair starts an independent utility cooldown");
 
@@ -587,7 +587,7 @@ void testEngineerRangedBehaviorAndRepairOcclusion()
     const EnemyUpdateSummary occluded
         = updateEngineers(manager, player, 1, blocked, 0.0F, config);
     expect(occluded.repairsPerformed == 0U && occluded.attacksLanded == 0U
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 manager.findData<EnemyData>(damagedWorker)->health, 20.0F),
         "Engineer neither repairs nor attacks through blocking geometry");
 
@@ -596,12 +596,12 @@ void testEngineerRangedBehaviorAndRepairOcclusion()
     const EnemyUpdateSummary approach
         = updateEngineers(manager, player, 1, open, 1.0F, config);
     expect(approach.chasing == 1U
-            && gdp::core::nearlyEqual(manager.find(engineer)->transform.position.z, 6.0F),
+            && wkc::core::nearlyEqual(manager.find(engineer)->transform.position.z, 6.0F),
         "Engineer advances into its short technical-tool firing envelope");
     const EnemyUpdateSummary shot
         = updateEngineers(manager, player, 1, open, 0.1F, config);
     expect(shot.attacking == 1U && shot.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 95.0F),
+            && wkc::core::nearlyEqual(player.state().health, 95.0F),
         "Engineer attacks from preferred range only with line of sight");
 
     manager.find(engineer)->transform.position = {0.0F, 0.0F, 1.0F};
@@ -609,7 +609,7 @@ void testEngineerRangedBehaviorAndRepairOcclusion()
     const EnemyUpdateSummary retreat
         = updateEngineers(manager, player, 1, open, 0.5F, config);
     expect(retreat.repositioning == 1U
-            && gdp::core::nearlyEqual(manager.find(engineer)->transform.position.z, 2.0F)
+            && wkc::core::nearlyEqual(manager.find(engineer)->transform.position.z, 2.0F)
             && player.state().health == healthBeforeRetreat,
         "Engineer retreats without attacking inside minimum range");
     expect(applyDamage(manager, engineer, 500.0F) == DamageOutcome::Killed,
@@ -639,13 +639,13 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary longApproach
         = updateIndustrialRobots(manager, player, 7, room, 1.0F);
     expect(longApproach.bossLongRange == 1U && longApproach.chasing == 1U
-            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 13.25F),
+            && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 13.25F),
         "healthy IndustrialRobot advances slowly into its long-range envelope");
     manager.find(robot)->transform.position = {0.0F, 0.0F, 12.0F};
     const EnemyUpdateSummary longShot
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(longShot.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 88.0F),
+            && wkc::core::nearlyEqual(player.state().health, 88.0F),
         "phase-one IndustrialRobot fires a high-impact long-range attack");
 
     EnemyData* data = manager.findData<EnemyData>(robot);
@@ -655,8 +655,8 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary pressure
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(pressure.bossPressure == 1U && pressure.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 78.0F)
-            && gdp::core::nearlyEqual(data->attackCooldown, 0.9F),
+            && wkc::core::nearlyEqual(player.state().health, 78.0F)
+            && wkc::core::nearlyEqual(data->attackCooldown, 0.9F),
         "mid-health IndustrialRobot increases pressure and firing cadence");
 
     data->health = 50.0F;
@@ -665,13 +665,13 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary pursuit
         = updateIndustrialRobots(manager, player, 7, room, 1.5F);
     expect(pursuit.bossPursuit == 1U && pursuit.chasing == 1U
-            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 1.975F),
+            && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 1.975F),
         "critical IndustrialRobot commits to its fastest close pursuit");
     const EnemyUpdateSummary closeStrike
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(closeStrike.attacksLanded == 1U
-            && gdp::core::nearlyEqual(player.state().health, 62.0F)
-            && gdp::core::nearlyEqual(data->attackCooldown, 0.65F),
+            && wkc::core::nearlyEqual(player.state().health, 62.0F)
+            && wkc::core::nearlyEqual(data->attackCooldown, 0.65F),
         "critical IndustrialRobot delivers its strongest, fastest close attack");
 
     data->health = 250.0F;
@@ -681,11 +681,11 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary retreat
         = updateIndustrialRobots(manager, player, 7, room, 1.0F);
     expect(retreat.repositioning == 1U
-            && gdp::core::nearlyEqual(manager.find(robot)->transform.position.z, 2.75F)
+            && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 2.75F)
             && player.state().health == healthBeforeRetreat,
         "healthy IndustrialRobot repositions when the player breaches long range");
 
-    const gdp::core::Vec3 deathPosition = manager.find(robot)->transform.position;
+    const wkc::core::Vec3 deathPosition = manager.find(robot)->transform.position;
     expect(applyDamage(manager, robot, 500.0F) == DamageOutcome::Killed,
         "IndustrialRobot uses the shared damage and death pipeline");
     const EnemyUpdateSummary dead
@@ -720,7 +720,7 @@ void testIndustrialRobotLineOfSightAndRoomIsolation()
         {{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}},
         {{{-1.0F, 0.0F, 3.0F}, {1.0F, 3.0F, 3.5F}}},
     };
-    const gdp::core::Vec3 otherPosition = manager.find(otherRoomRobot)->transform.position;
+    const wkc::core::Vec3 otherPosition = manager.find(otherRoomRobot)->transform.position;
     const EnemyUpdateSummary update
         = updateIndustrialRobots(manager, player, 3, blocked, 0.5F);
     expect(update.chasing == 1U && update.attacksLanded == 0U

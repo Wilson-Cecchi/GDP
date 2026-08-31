@@ -10,7 +10,7 @@
 namespace wkc::render {
 namespace {
 
-bool isFinite(const gdp::core::Vec3 value) noexcept
+bool isFinite(const wkc::core::Vec3 value) noexcept
 {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }

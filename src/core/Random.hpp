@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace gdp::core {
+namespace wkc::core {
 
 class RandomStream {
 public:
@@ -21,4 +21,4 @@ private:
     std::uint64_t state_;
 };
 
-} // namespace gdp::core
+} // namespace wkc::core

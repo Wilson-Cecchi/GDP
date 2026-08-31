@@ -21,8 +21,8 @@ void expect(const bool condition, const std::string_view message)
 }
 
 float horizontalDistance(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second) noexcept
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second) noexcept
 {
     const float differenceX = first.x - second.x;
     const float differenceZ = first.z - second.z;
@@ -54,9 +54,9 @@ void testMovement()
     updateMany(diagonal, {.moveForward = 1.0F, .moveRight = 1.0F}, world, 15);
     const float cardinalDistance = horizontalDistance(cardinal.state().position, cardinalStart);
     const float diagonalDistance = horizontalDistance(diagonal.state().position, diagonalStart);
-    expect(gdp::core::nearlyEqual(cardinalDistance, diagonalDistance, 1.0e-4F),
+    expect(wkc::core::nearlyEqual(cardinalDistance, diagonalDistance, 1.0e-4F),
         "diagonal movement is normalized");
-    expect(gdp::core::nearlyEqual(cardinalDistance, 1.125F, 1.0e-4F),
+    expect(wkc::core::nearlyEqual(cardinalDistance, 1.125F, 1.0e-4F),
         "movement distance follows speed and fixed time");
 
     Player firstRun;
@@ -92,7 +92,7 @@ void testCollisionAndGravity()
     Player falling;
     falling.spawn({0.0F, 2.0F, 0.0F});
     updateMany(falling, {}, emptyRoom, 120);
-    expect(gdp::core::nearlyEqual(falling.state().position.y, 0.0F),
+    expect(wkc::core::nearlyEqual(falling.state().position.y, 0.0F),
         "gravity settles the player on the floor");
     expect(falling.state().grounded, "floor collision marks the player grounded");
 }
@@ -103,11 +103,11 @@ void testLookAndCamera()
 
     Player player;
     player.applyLook({750.0F, -10'000.0F});
-    expect(gdp::core::nearlyEqual(player.state().pitchDegrees, 89.0F),
+    expect(wkc::core::nearlyEqual(player.state().pitchDegrees, 89.0F),
         "pitch is clamped at the upper limit");
     expect(player.state().yawDegrees >= -180.0F && player.state().yawDegrees <= 180.0F,
         "yaw remains in a stable wrapped range");
-    expect(gdp::core::nearlyEqual(gdp::core::length(player.forwardDirection()), 1.0F),
+    expect(wkc::core::nearlyEqual(wkc::core::length(player.forwardDirection()), 1.0F),
         "camera forward direction is normalized");
 
     Player once;
@@ -115,9 +115,9 @@ void testLookAndCamera()
     once.applyLook({20.0F, 10.0F});
     manyUpdates.applyLook({20.0F, 10.0F});
     updateMany(manyUpdates, {}, CollisionWorld::fixedRoom(), 10);
-    expect(gdp::core::nearlyEqual(once.state().yawDegrees, manyUpdates.state().yawDegrees),
+    expect(wkc::core::nearlyEqual(once.state().yawDegrees, manyUpdates.state().yawDegrees),
         "fixed updates do not reapply mouse delta");
-    expect(gdp::core::nearlyEqual(once.state().pitchDegrees, manyUpdates.state().pitchDegrees),
+    expect(wkc::core::nearlyEqual(once.state().pitchDegrees, manyUpdates.state().pitchDegrees),
         "mouse sensitivity is independent of fixed-update count");
 }
 
@@ -139,17 +139,17 @@ void testInteractionAndLife()
         "interaction ray rejects targets beyond its range");
 
     player.applyDamage(35.0F);
-    expect(gdp::core::nearlyEqual(player.state().health, 65.0F),
+    expect(wkc::core::nearlyEqual(player.state().health, 65.0F),
         "damage reduces player health");
     player.heal(100.0F);
-    expect(gdp::core::nearlyEqual(player.state().health, 100.0F),
+    expect(wkc::core::nearlyEqual(player.state().health, 100.0F),
         "healing clamps to maximum health");
     player.applyDamage(500.0F);
-    expect(!player.state().alive && gdp::core::nearlyEqual(player.state().health, 0.0F),
+    expect(!player.state().alive && wkc::core::nearlyEqual(player.state().health, 0.0F),
         "lethal damage changes alive state once");
     player.applyDamage(10.0F);
     player.heal(10.0F);
-    expect(gdp::core::nearlyEqual(player.state().health, 0.0F),
+    expect(wkc::core::nearlyEqual(player.state().health, 0.0F),
         "dead player ignores repeated damage and healing");
 
     const auto deadPosition = player.state().position;

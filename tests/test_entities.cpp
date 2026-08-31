@@ -52,7 +52,7 @@ void testCreationAndTypedData()
         "creation updates active count and slot capacity");
     expect(manager.find(player) != nullptr
             && manager.find(player)->kind == EntityKind::Player
-            && manager.find(player)->transform.position == gdp::core::Vec3{1.0F, 2.0F, 3.0F},
+            && manager.find(player)->transform.position == wkc::core::Vec3{1.0F, 2.0F, 3.0F},
         "created entity preserves kind and transform");
 
     const PlayerData* playerData = manager.findData<PlayerData>(player);

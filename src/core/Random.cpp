@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 
-namespace gdp::core {
+namespace wkc::core {
 
 RandomStream::RandomStream(const Seed seed) noexcept
     : state_(seed)
@@ -68,4 +68,4 @@ bool RandomStream::chance(const float probability) noexcept
     return uniform01() < probability;
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

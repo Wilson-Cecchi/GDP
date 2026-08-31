@@ -41,9 +41,9 @@ void testInputState()
     input.beginFrame();
     input.handleMouseMotion({120.0F, 90.0F}, {2.5F, -1.0F});
     input.handleMouseMotion({124.0F, 92.0F}, {1.5F, 3.0F});
-    expect(input.mouseDelta() == gdp::core::Vec2{4.0F, 2.0F},
+    expect(input.mouseDelta() == wkc::core::Vec2{4.0F, 2.0F},
         "mouse motion accumulates during a frame");
-    expect(input.mousePosition() == gdp::core::Vec2{124.0F, 92.0F},
+    expect(input.mousePosition() == wkc::core::Vec2{124.0F, 92.0F},
         "mouse motion keeps the latest absolute position");
 
     input.handleMouseButton(MouseButton::Primary, true, {124.0F, 92.0F});
@@ -57,9 +57,9 @@ void testInputState()
         "beginFrame preserves held state");
     expect(!input.wasMouseButtonPressed(MouseButton::Primary),
         "beginFrame clears transitions");
-    expect(input.mouseDelta() == gdp::core::Vec2{},
+    expect(input.mouseDelta() == wkc::core::Vec2{},
         "beginFrame clears mouse delta");
-    expect(input.mousePosition() == gdp::core::Vec2{124.0F, 92.0F},
+    expect(input.mousePosition() == wkc::core::Vec2{124.0F, 92.0F},
         "beginFrame preserves absolute mouse position");
 
     input.handleMouseButton(MouseButton::Primary, false, {124.0F, 92.0F});

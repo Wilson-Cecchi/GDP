@@ -26,16 +26,16 @@ enum class RoomEventTrigger : std::uint8_t {
 
 struct EventEnemySpawn {
     gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
-    gdp::core::Vec3 position{};
+    wkc::core::Vec3 position{};
     float health{50.0F};
-    gdp::core::Seed visualSeed{0};
+    wkc::core::Seed visualSeed{0};
     std::uint32_t wave{0};
 
     constexpr bool operator==(const EventEnemySpawn&) const noexcept = default;
 };
 
 struct RoomEventPlan {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomRole role{RoomRole::Normal};
     RoomTheme theme{RoomTheme::Industrial};
     std::uint32_t depth{0};
@@ -48,7 +48,7 @@ struct RoomEventPlan {
     std::vector<EventEnemySpawn> spawns;
     gdp::entities::ItemType rewardType{gdp::entities::ItemType::Ammo};
     std::uint32_t rewardQuantity{0};
-    gdp::core::Vec3 rewardPosition{};
+    wkc::core::Vec3 rewardPosition{};
     std::uint64_t planHash{0};
 };
 
@@ -72,7 +72,7 @@ struct EventValidationResult {
 };
 
 [[nodiscard]] RoomEventPlan generateRoomEventPlan(
-    gdp::core::Seed roomSeed,
+    wkc::core::Seed roomSeed,
     RoomRole role,
     RoomTheme theme,
     std::uint32_t depth,

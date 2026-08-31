@@ -52,24 +52,24 @@ const gdp::world::ConnectorInstance* connectorForEdge(
 
 bool moveToWaypoint(
     const gdp::gameplay::CollisionWorld& collision,
-    gdp::core::Vec3& position,
-    const gdp::core::Vec3 target)
+    wkc::core::Vec3& position,
+    const wkc::core::Vec3 target)
 {
     constexpr float fixedStep = 1.0F / 120.0F;
     constexpr float speed = 4.5F;
     constexpr int maximumSteps = 2400;
-    gdp::core::Vec3 velocity{};
+    wkc::core::Vec3 velocity{};
     for (int step = 0; step < maximumSteps; ++step) {
-        gdp::core::Vec3 offset = target - position;
+        wkc::core::Vec3 offset = target - position;
         offset.y = 0.0F;
-        const float distance = gdp::core::length(offset);
+        const float distance = wkc::core::length(offset);
         if (distance <= 0.06F) {
             return true;
         }
         velocity = offset * (speed / distance);
         const gdp::gameplay::CharacterMotionResult motion
             = collision.moveCharacter(position, velocity, fixedStep, {});
-        if (gdp::core::nearlyEqual(position, motion.position, 1.0e-6F)) {
+        if (wkc::core::nearlyEqual(position, motion.position, 1.0e-6F)) {
             return false;
         }
         position = motion.position;
@@ -98,15 +98,15 @@ bool everyCorridorTraversesBothWays(const gdp::world::World& world)
 
             const gameplay::CollisionWorld navigation
                 = gameplay::makeRoomNavigationCollision(world, sourceId, false);
-            std::vector<core::Vec3> waypoints = corridor.points;
+            std::vector<wkc::core::Vec3> waypoints = corridor.points;
             if (sourceId == corridor.secondRoom) {
                 std::reverse(waypoints.begin(), waypoints.end());
             }
             waypoints.push_back(destinationDoor->worldPosition
                 - (destinationDoor->worldNormal * 0.75F));
-            core::Vec3 position = sourceDoor->worldPosition
+            wkc::core::Vec3 position = sourceDoor->worldPosition
                 - (sourceDoor->worldNormal * 0.55F);
-            for (const core::Vec3 waypoint : waypoints) {
+            for (const wkc::core::Vec3 waypoint : waypoints) {
                 if (!moveToWaypoint(navigation, position, waypoint)) {
                     return false;
                 }
@@ -139,7 +139,7 @@ void testEveryGeneratedConnectionTraversesBothWays()
             if (source == nullptr || door == nullptr) {
                 continue;
             }
-            const core::Vec3 feet = door->worldPosition - (door->worldNormal * 0.55F);
+            const wkc::core::Vec3 feet = door->worldPosition - (door->worldNormal * 0.55F);
             const auto transition = gameplay::findRoomTransition(
                 *generated.world, sourceId, feet, door->worldNormal);
             const world::RoomId expectedDestination = sourceId == corridor.firstRoom
@@ -192,13 +192,13 @@ void testRangeInvalidInputAndPlayerRelocation()
     const float health = player.state().health;
     expect(player.relocate({14.0F, 0.0F, -7.0F}, 180.0F),
         "living player accepts a finite room relocation");
-    expect(core::nearlyEqual(player.state().position, {14.0F, 0.0F, -7.0F})
-            && core::nearlyEqual(std::abs(player.state().yawDegrees), 180.0F)
-            && core::nearlyEqual(player.state().health, health)
-            && core::nearlyEqual(player.state().maximumHealth, 115.0F)
+    expect(wkc::core::nearlyEqual(player.state().position, {14.0F, 0.0F, -7.0F})
+            && wkc::core::nearlyEqual(std::abs(player.state().yawDegrees), 180.0F)
+            && wkc::core::nearlyEqual(player.state().health, health)
+            && wkc::core::nearlyEqual(player.state().maximumHealth, 115.0F)
             && player.state().keys == 2U,
         "relocation preserves health upgrades and inventory");
-    const core::Vec3 stablePosition = player.state().position;
+    const wkc::core::Vec3 stablePosition = player.state().position;
     expect(!player.relocate(
             {std::numeric_limits<float>::infinity(), 0.0F, 0.0F}, 0.0F)
             && player.state().position == stablePosition,
@@ -210,15 +210,15 @@ void testCharacterRoomAdoptionRequiresFullClearance()
     using namespace gdp;
     const auto room = world::instantiateRoom(
         world::makeFixedRoomModule(), 1U, world::RoomRole::Normal,
-        99U, {}, core::QuarterTurn::Degrees0);
+        99U, {}, wkc::core::QuarterTurn::Degrees0);
     expect(room.has_value(), "fixed room instantiates for adoption clearance test");
     if (!room) {
         return;
     }
     world::World generated;
     generated.rooms.push_back(*room);
-    const core::Vec3 thresholdPosition{0.0F, 0.0F, 4.75F};
-    const core::Vec3 safePosition{0.0F, 0.0F, 4.50F};
+    const wkc::core::Vec3 thresholdPosition{0.0F, 0.0F, 4.75F};
+    const wkc::core::Vec3 safePosition{0.0F, 0.0F, 4.50F};
     expect(gameplay::roomContainingPosition(generated, thresholdPosition) == 1U
             && !gameplay::roomContainingCharacter(generated, thresholdPosition),
         "a point across the threshold does not adopt the room before collider clearance");
@@ -233,12 +233,12 @@ void testRotatedRoomCollisionMatchesModuleBounds()
 {
     using namespace gdp;
     const world::RoomModule module = world::makeFixedRoomModule();
-    constexpr core::Vec3 origin{14.0F, 0.0F, -28.0F};
-    for (const core::QuarterTurn rotation : {
-             core::QuarterTurn::Degrees0,
-             core::QuarterTurn::Degrees90,
-             core::QuarterTurn::Degrees180,
-             core::QuarterTurn::Degrees270}) {
+    constexpr wkc::core::Vec3 origin{14.0F, 0.0F, -28.0F};
+    for (const wkc::core::QuarterTurn rotation : {
+             wkc::core::QuarterTurn::Degrees0,
+             wkc::core::QuarterTurn::Degrees90,
+             wkc::core::QuarterTurn::Degrees180,
+             wkc::core::QuarterTurn::Degrees270}) {
         const auto room = world::instantiateRoom(
             module, 9U, world::RoomRole::Normal, 99U, origin, rotation);
         expect(room.has_value(), "fixed room instantiates for collision rotation test");
@@ -295,11 +295,11 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
 void testPreviouslyBrokenCorridorSeedsTraverseBothWays()
 {
     using namespace gdp;
-    constexpr std::array<core::Seed, 9> regressionSeeds{
+    constexpr std::array<wkc::core::Seed, 9> regressionSeeds{
         9U, 48U, 49U, 52U, 102U, 147U, 152U, 180U,
         17'590'678'094'381'256'222ULL,
     };
-    for (const core::Seed seed : regressionSeeds) {
+    for (const wkc::core::Seed seed : regressionSeeds) {
         const world::WorldGenerationResult generated = world::generateWorld(seed);
         expect(generated.succeeded() && generated.world
                 && everyCorridorTraversesBothWays(*generated.world),
@@ -311,7 +311,7 @@ void testCorridorTraversalSeedBatch()
 {
     using namespace gdp;
     bool allTraversable = true;
-    for (core::Seed seed = 0; seed < 500U; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 500U; ++seed) {
         const world::WorldGenerationResult generated = world::generateWorld(seed);
         if (!generated.world || !everyCorridorTraversesBothWays(*generated.world)) {
             std::cerr << "Corridor traversal batch failed at seed " << seed << '\n';
@@ -367,8 +367,8 @@ void testLockdownEntryKeepsPlayerMobile()
 
     const gameplay::CollisionWorld openNavigation
         = gameplay::makeRoomNavigationCollision(*generated.world, source->id, false);
-    core::Vec3 position = entry->worldPosition + (entry->worldNormal * 0.50F);
-    const core::Vec3 inward = entry->worldNormal * -1.0F;
+    wkc::core::Vec3 position = entry->worldPosition + (entry->worldNormal * 0.50F);
+    const wkc::core::Vec3 inward = entry->worldNormal * -1.0F;
     for (int step = 0; step < 120
          && gameplay::roomContainingCharacter(*generated.world, position)
             != destination->id;
@@ -392,12 +392,12 @@ void testLockdownEntryKeepsPlayerMobile()
         = gameplay::makeRoomNavigationCollision(*generated.world, destination->id, false);
     expect(lockedNavigation.canOccupy(position),
         "newly adopted lockdown position remains valid navigation space");
-    const core::Vec3 beforeMove = position;
+    const wkc::core::Vec3 beforeMove = position;
     for (int step = 0; step < 30; ++step) {
         position = lockedNavigation.moveCharacter(
             position, inward * 4.5F, 1.0F / 120.0F, {}).position;
     }
-    expect(!core::nearlyEqual(position, beforeMove, 1.0e-5F),
+    expect(!wkc::core::nearlyEqual(position, beforeMove, 1.0e-5F),
         "player can continue into the lockdown room instead of becoming immobilized");
 }
 
@@ -434,17 +434,17 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
             const gameplay::CollisionWorld navigation
                 = gameplay::makeRoomNavigationCollision(
                     *generated.world, sourceId, false);
-            std::vector<core::Vec3> waypoints = corridor.points;
+            std::vector<wkc::core::Vec3> waypoints = corridor.points;
             if (sourceId == corridor.secondRoom) {
                 std::reverse(waypoints.begin(), waypoints.end());
             }
             waypoints.push_back(destinationDoor->worldPosition
                 - (destinationDoor->worldNormal * 0.75F));
 
-            core::Vec3 position = sourceDoor->worldPosition
+            wkc::core::Vec3 position = sourceDoor->worldPosition
                 - (sourceDoor->worldNormal * 0.55F);
             bool completed = true;
-            for (const core::Vec3 waypoint : waypoints) {
+            for (const wkc::core::Vec3 waypoint : waypoints) {
                 if (!moveToWaypoint(navigation, position, waypoint)) {
                     completed = false;
                     break;
@@ -467,7 +467,7 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
             const gameplay::CollisionWorld closedDoorNavigation
                 = gameplay::makeRoomNavigationCollision(
                     *generated.world, sourceId, false, blockedEdge);
-            core::Vec3 closedDoorPosition = sourceDoor->worldPosition
+            wkc::core::Vec3 closedDoorPosition = sourceDoor->worldPosition
                 - (sourceDoor->worldNormal * 0.55F);
             for (int step = 0; step < 120; ++step) {
                 const gameplay::CharacterMotionResult motion
@@ -483,7 +483,7 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
             const gameplay::CollisionWorld lockedNavigation
                 = gameplay::makeRoomNavigationCollision(
                     *generated.world, sourceId, true);
-            core::Vec3 lockedPosition = sourceDoor->worldPosition
+            wkc::core::Vec3 lockedPosition = sourceDoor->worldPosition
                 - (sourceDoor->worldNormal * 0.55F);
             for (int step = 0; step < 120; ++step) {
                 const gameplay::CharacterMotionResult motion

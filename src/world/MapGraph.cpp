@@ -19,7 +19,7 @@ std::uint64_t connectionKey(RoomNodeId first, RoomNodeId second) noexcept
     return (static_cast<std::uint64_t>(first) << 32U) | second;
 }
 
-RoomTheme chooseTheme(const RoomRole role, gdp::core::RandomStream& random)
+RoomTheme chooseTheme(const RoomRole role, wkc::core::RandomStream& random)
 {
     switch (role) {
     case RoomRole::Start:
@@ -98,10 +98,10 @@ bool GraphValidationResult::isValid() const noexcept
     return errors.empty();
 }
 
-MapGraph generateMapGraph(const gdp::core::Seed seed, MapGraphConfig config)
+MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
 {
     config.roomCount = std::clamp(config.roomCount, 4U, 32U);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     MapGraph graph;
     graph.nodes.reserve(config.roomCount);
 

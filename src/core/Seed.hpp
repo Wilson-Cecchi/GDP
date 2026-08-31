@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace gdp::core {
+namespace wkc::core {
 
 using Seed = std::uint64_t;
 using SeedDomainId = std::uint64_t;
@@ -38,4 +38,4 @@ template<typename Domain>
         version);
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

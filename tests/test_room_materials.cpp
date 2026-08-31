@@ -145,7 +145,7 @@ bool pixelMatches(
 
 std::size_t exactColorCount(
     const wkc::render::ImageData& image,
-    const gdp::core::Vec3 color) noexcept
+    const wkc::core::Vec3 color) noexcept
 {
     const std::array<std::uint8_t, 3> expected{
         static_cast<std::uint8_t>(color.x * 255.0F + 0.5F),
@@ -167,7 +167,7 @@ void testRepresentativeMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x494E445553545259ULL;
+    constexpr wkc::core::Seed seed = 0x494E445553545259ULL;
     const IndustrialRoomMaterialSet first = generateIndustrialRoomMaterials(seed);
     const IndustrialRoomMaterialSet repeated = generateIndustrialRoomMaterials(seed);
     const IndustrialRoomMaterialSet different = generateIndustrialRoomMaterials(seed + 1U);
@@ -328,7 +328,7 @@ void testApprovedIndustrialCeilingDirection()
         IndustrialCondition::Used,
         IndustrialCondition::Worn,
     };
-    constexpr std::array<gdp::core::Seed, 3> approvedSeeds{2U, 3U, 1U};
+    constexpr std::array<wkc::core::Seed, 3> approvedSeeds{2U, 3U, 1U};
     std::array<std::uint64_t, conditions.size()> albedoHashes{};
     for (std::size_t index = 0; index < conditions.size(); ++index) {
         const IndustrialSurfaceRecipe recipe = makeIndustrialCeilingArchetypeRecipe(
@@ -405,7 +405,7 @@ void testApprovedIndustrialWallDirection()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr std::array<gdp::core::Seed, 3> seeds{2U, 3U, 1U};
+    constexpr std::array<wkc::core::Seed, 3> seeds{2U, 3U, 1U};
     constexpr std::array expectedConditions{
         IndustrialCondition::Maintained,
         IndustrialCondition::Used,
@@ -514,7 +514,7 @@ void testRoomMaterialSeedBatch()
     std::array<bool, static_cast<std::size_t>(IndustrialCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const IndustrialRoomMaterialSet materials = generateIndustrialRoomMaterials(seed);
         if (!validateIndustrialRoomMaterials(materials).isValid()) {
             std::cerr << "Industrial material validation failed at room seed " << seed << '\n';
@@ -548,7 +548,7 @@ void testRepresentativeStorageMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x53544F524147455FULL;
+    constexpr wkc::core::Seed seed = 0x53544F524147455FULL;
     const StorageRoomMaterialSet first = generateStorageRoomMaterials(seed);
     const StorageRoomMaterialSet repeated = generateStorageRoomMaterials(seed);
     const StorageRoomMaterialSet different = generateStorageRoomMaterials(seed + 1U);
@@ -666,7 +666,7 @@ void testStorageSeedBatch()
     std::array<bool, static_cast<std::size_t>(StorageCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const StorageRoomMaterialSet materials = generateStorageRoomMaterials(seed);
         if (!validateStorageRoomMaterials(materials).isValid()) {
             std::cerr << "Storage material validation failed at room seed " << seed << '\n';
@@ -696,7 +696,7 @@ void testRepresentativeCombatMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x434F4D4241545F52ULL;
+    constexpr wkc::core::Seed seed = 0x434F4D4241545F52ULL;
     const CombatRoomMaterialSet first = generateCombatRoomMaterials(seed);
     const CombatRoomMaterialSet repeated = generateCombatRoomMaterials(seed);
     const CombatRoomMaterialSet different = generateCombatRoomMaterials(seed + 1U);
@@ -828,7 +828,7 @@ void testCombatSeedBatch()
     std::array<bool, static_cast<std::size_t>(CombatCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const CombatRoomMaterialSet materials = generateCombatRoomMaterials(seed);
         if (!validateCombatRoomMaterials(materials).isValid()) {
             std::cerr << "Combat material validation failed at room seed " << seed << '\n';
@@ -858,7 +858,7 @@ void testRepresentativeCafeteriaMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x4341464554455249ULL;
+    constexpr wkc::core::Seed seed = 0x4341464554455249ULL;
     const CafeteriaRoomMaterialSet first = generateCafeteriaRoomMaterials(seed);
     const CafeteriaRoomMaterialSet repeated = generateCafeteriaRoomMaterials(seed);
     const CafeteriaRoomMaterialSet different = generateCafeteriaRoomMaterials(seed + 1U);
@@ -1016,7 +1016,7 @@ void testCafeteriaSeedBatch()
     std::array<bool, static_cast<std::size_t>(CafeteriaCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const CafeteriaRoomMaterialSet materials = generateCafeteriaRoomMaterials(seed);
         if (!validateCafeteriaRoomMaterials(materials).isValid()) {
             std::cerr << "Cafeteria validation failed at room seed " << seed << '\n';
@@ -1046,7 +1046,7 @@ void testRepresentativeLaboratoryMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x4C41424F5241544FULL;
+    constexpr wkc::core::Seed seed = 0x4C41424F5241544FULL;
     const LaboratoryRoomMaterialSet first = generateLaboratoryRoomMaterials(seed);
     const LaboratoryRoomMaterialSet repeated = generateLaboratoryRoomMaterials(seed);
     const LaboratoryRoomMaterialSet different = generateLaboratoryRoomMaterials(seed + 1U);
@@ -1114,7 +1114,7 @@ void testStructuredLaboratoryAlbedos()
             < averageRedRow(*floor, cellHeight / 2, 0, floor->width),
         "Laboratory floor preserves thin, precise modular seams");
 
-    gdp::core::Seed containedSeed = 0;
+    wkc::core::Seed containedSeed = 0;
     LaboratoryRoomMaterialSet contained;
     for (; containedSeed < 1'000; ++containedSeed) {
         contained = generateLaboratoryRoomMaterials(containedSeed);
@@ -1193,7 +1193,7 @@ void testLaboratorySeedBatch()
     std::array<bool, static_cast<std::size_t>(LaboratoryCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const LaboratoryRoomMaterialSet materials = generateLaboratoryRoomMaterials(seed);
         if (!validateLaboratoryRoomMaterials(materials).isValid()) {
             std::cerr << "Laboratory validation failed at room seed " << seed << '\n';
@@ -1223,7 +1223,7 @@ void testRepresentativeTechnicalMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x544543484E494341ULL;
+    constexpr wkc::core::Seed seed = 0x544543484E494341ULL;
     const TechnicalRoomMaterialSet first = generateTechnicalRoomMaterials(seed);
     const TechnicalRoomMaterialSet repeated = generateTechnicalRoomMaterials(seed);
     const TechnicalRoomMaterialSet different = generateTechnicalRoomMaterials(seed + 1U);
@@ -1296,7 +1296,7 @@ void testStructuredTechnicalAlbedos()
     expect(oilPixels >= 15U && oilPixels <= 220U,
         "Technical floor keeps one bounded non-black oil core");
 
-    gdp::core::Seed grateSeed = 0;
+    wkc::core::Seed grateSeed = 0;
     TechnicalRoomMaterialSet grateMaterials;
     for (; grateSeed < 1'000; ++grateSeed) {
         grateMaterials = generateTechnicalRoomMaterials(grateSeed);
@@ -1390,7 +1390,7 @@ void testTechnicalSeedBatch()
     std::array<bool, static_cast<std::size_t>(TechnicalCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const TechnicalRoomMaterialSet materials = generateTechnicalRoomMaterials(seed);
         if (!validateTechnicalRoomMaterials(materials).isValid()) {
             std::cerr << "Technical validation failed at room seed " << seed << '\n';
@@ -1420,7 +1420,7 @@ void testRepresentativeSecurityMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x5345435552495459ULL;
+    constexpr wkc::core::Seed seed = 0x5345435552495459ULL;
     const SecurityRoomMaterialSet first = generateSecurityRoomMaterials(seed);
     const SecurityRoomMaterialSet repeated = generateSecurityRoomMaterials(seed);
     const SecurityRoomMaterialSet different = generateSecurityRoomMaterials(seed + 1U);
@@ -1481,7 +1481,7 @@ void testStructuredSecurityAlbedos()
     expect(greenPixels == 12U || greenPixels == 16U,
         "Security wall keeps exactly four grouped indicators, with alert override allowed");
 
-    gdp::core::Seed alertSeed = 0;
+    wkc::core::Seed alertSeed = 0;
     SecurityRoomMaterialSet alertMaterials;
     for (; alertSeed < 1'000; ++alertSeed) {
         alertMaterials = generateSecurityRoomMaterials(alertSeed);
@@ -1601,7 +1601,7 @@ void testSecuritySeedBatch()
     std::array<bool, static_cast<std::size_t>(SecurityCondition::Count)> conditions{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const SecurityRoomMaterialSet materials = generateSecurityRoomMaterials(seed);
         if (!validateSecurityRoomMaterials(materials).isValid()) {
             std::cerr << "Security validation failed at room seed " << seed << '\n';
@@ -1631,7 +1631,7 @@ void testRepresentativeCentralHubMaterialSet()
     using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
-    constexpr gdp::core::Seed seed = 0x43454E5452414CULL;
+    constexpr wkc::core::Seed seed = 0x43454E5452414CULL;
     const CentralHubRoomMaterialSet first = generateCentralHubRoomMaterials(seed);
     const CentralHubRoomMaterialSet repeated = generateCentralHubRoomMaterials(seed);
     const CentralHubRoomMaterialSet different = generateCentralHubRoomMaterials(seed + 1U);
@@ -1729,7 +1729,7 @@ void testStructuredCentralHubAlbedos()
     expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
         "Central Hub ceiling albedo contains no route-aligned fixtures");
 
-    constexpr gdp::core::Vec3 forbiddenYellow{0.765F, 0.545F, 0.0F};
+    constexpr wkc::core::Vec3 forbiddenYellow{0.765F, 0.545F, 0.0F};
     expect(exactColorCount(*wall, forbiddenYellow) == 0U
             && exactColorCount(*floor, forbiddenYellow) == 0U
             && exactColorCount(*ceiling, forbiddenYellow) == 0U,
@@ -1799,7 +1799,7 @@ void testCentralHubSeedBatch()
     std::array<bool, static_cast<std::size_t>(CentralHubRouteAxis::Count)> routeAxes{};
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const CentralHubRoomMaterialSet materials = generateCentralHubRoomMaterials(seed);
         if (!validateCentralHubRoomMaterials(materials).isValid()) {
             std::cerr << "Central Hub validation failed at room seed " << seed << '\n';
@@ -1834,7 +1834,7 @@ void testRoomProfileHashIsolation()
 
     std::unordered_set<std::uint64_t> hashes;
     bool substreamsAreIsolated = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const IndustrialRoomMaterialSet industrial = generateIndustrialRoomMaterials(seed);
         const StorageRoomMaterialSet storage = generateStorageRoomMaterials(seed);
         const CombatRoomMaterialSet combat = generateCombatRoomMaterials(seed);

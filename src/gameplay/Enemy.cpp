@@ -41,9 +41,9 @@ EnemyUpdateSummary updateWorkers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
-        const gdp::core::Vec3 offset = player.state().position - entity->transform.position;
-        const gdp::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = gdp::core::length(planarOffset);
+        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
@@ -51,7 +51,7 @@ EnemyUpdateSummary updateWorkers(
         }
 
         const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + gdp::core::Vec3{0.0F, 1.0F, 0.0F},
+            entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
             player.cameraPosition(),
             collisionWorld);
         if (distance <= config.attackRange && lineOfSight) {
@@ -70,7 +70,7 @@ EnemyUpdateSummary updateWorkers(
         if (distance <= 1.0e-7F || step <= 0.0F) {
             continue;
         }
-        const gdp::core::Vec3 direction = planarOffset * (1.0F / distance);
+        const wkc::core::Vec3 direction = planarOffset * (1.0F / distance);
         const CharacterMotionResult motion = collisionWorld.moveCharacter(
             entity->transform.position,
             direction * config.moveSpeed,
@@ -118,9 +118,9 @@ EnemyUpdateSummary updateGuards(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
-        const gdp::core::Vec3 offset = player.state().position - entity->transform.position;
-        const gdp::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = gdp::core::length(planarOffset);
+        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
@@ -128,12 +128,12 @@ EnemyUpdateSummary updateGuards(
         }
 
         const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + gdp::core::Vec3{0.0F, 1.35F, 0.0F},
+            entity->transform.position + wkc::core::Vec3{0.0F, 1.35F, 0.0F},
             player.cameraPosition(),
             collisionWorld);
-        const gdp::core::Vec3 towardPlayer = distance > 1.0e-7F
+        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
-            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         if (lineOfSight && distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
@@ -214,9 +214,9 @@ EnemyUpdateSummary updateOfficers(
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
         enemy->supportCooldown = std::max(0.0F, enemy->supportCooldown - step);
-        const gdp::core::Vec3 offset = player.state().position - entity->transform.position;
-        const gdp::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = gdp::core::length(planarOffset);
+        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
@@ -239,10 +239,10 @@ EnemyUpdateSummary updateOfficers(
                     || ally->attackCooldown <= 0.0F) {
                     continue;
                 }
-                const gdp::core::Vec3 allyOffset
+                const wkc::core::Vec3 allyOffset
                     = allyEntity->transform.position - entity->transform.position;
-                const float allyDistance = gdp::core::length(
-                    gdp::core::Vec3{allyOffset.x, 0.0F, allyOffset.z});
+                const float allyDistance = wkc::core::length(
+                    wkc::core::Vec3{allyOffset.x, 0.0F, allyOffset.z});
                 if (allyDistance > config.supportRange) {
                     continue;
                 }
@@ -258,12 +258,12 @@ EnemyUpdateSummary updateOfficers(
         }
 
         const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + gdp::core::Vec3{0.0F, 1.4F, 0.0F},
+            entity->transform.position + wkc::core::Vec3{0.0F, 1.4F, 0.0F},
             player.cameraPosition(),
             collisionWorld);
-        const gdp::core::Vec3 towardPlayer = distance > 1.0e-7F
+        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
-            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         if (lineOfSight && distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
@@ -351,8 +351,8 @@ EnemyUpdateSummary updateEngineers(
             EntityId repairTarget;
             bool targetIsProp = false;
             float nearestDistance = std::numeric_limits<float>::max();
-            const gdp::core::Vec3 repairOrigin
-                = entity->transform.position + gdp::core::Vec3{0.0F, 1.0F, 0.0F};
+            const wkc::core::Vec3 repairOrigin
+                = entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F};
             for (const EntityId allyId : manager.query(EntityKind::Enemy)) {
                 if (allyId == id || config.repairAmount <= 0.0F) {
                     continue;
@@ -365,14 +365,14 @@ EnemyUpdateSummary updateEngineers(
                     || ally->health >= ally->maximumHealth) {
                     continue;
                 }
-                const gdp::core::Vec3 allyOffset
+                const wkc::core::Vec3 allyOffset
                     = allyEntity->transform.position - entity->transform.position;
-                const float distance = gdp::core::length(
-                    gdp::core::Vec3{allyOffset.x, 0.0F, allyOffset.z});
+                const float distance = wkc::core::length(
+                    wkc::core::Vec3{allyOffset.x, 0.0F, allyOffset.z});
                 if (distance > config.repairRange || distance >= nearestDistance
                     || !hasLineOfSight(
                         repairOrigin,
-                        allyEntity->transform.position + gdp::core::Vec3{0.0F, 0.9F, 0.0F},
+                        allyEntity->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F},
                         collisionWorld)) {
                     continue;
                 }
@@ -387,10 +387,10 @@ EnemyUpdateSummary updateEngineers(
                     || prop->state != PropState::Damaged) {
                     continue;
                 }
-                const gdp::core::Vec3 propOffset
+                const wkc::core::Vec3 propOffset
                     = propEntity->transform.position - entity->transform.position;
-                const float distance = gdp::core::length(
-                    gdp::core::Vec3{propOffset.x, 0.0F, propOffset.z});
+                const float distance = wkc::core::length(
+                    wkc::core::Vec3{propOffset.x, 0.0F, propOffset.z});
                 if (distance > config.repairRange || distance >= nearestDistance
                     || !hasLineOfSightToProp(
                         repairOrigin, manager, propId, collisionWorld)) {
@@ -418,9 +418,9 @@ EnemyUpdateSummary updateEngineers(
             }
         }
 
-        const gdp::core::Vec3 offset = player.state().position - entity->transform.position;
-        const gdp::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = gdp::core::length(planarOffset);
+        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
@@ -428,12 +428,12 @@ EnemyUpdateSummary updateEngineers(
         }
 
         const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + gdp::core::Vec3{0.0F, 1.25F, 0.0F},
+            entity->transform.position + wkc::core::Vec3{0.0F, 1.25F, 0.0F},
             player.cameraPosition(),
             collisionWorld);
-        const gdp::core::Vec3 towardPlayer = distance > 1.0e-7F
+        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
-            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         if (lineOfSight && distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
@@ -577,9 +577,9 @@ EnemyUpdateSummary updateIndustrialRobots(
             break;
         }
 
-        const gdp::core::Vec3 offset = player.state().position - entity->transform.position;
-        const gdp::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = gdp::core::length(planarOffset);
+        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
@@ -587,11 +587,11 @@ EnemyUpdateSummary updateIndustrialRobots(
         }
 
         const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + gdp::core::Vec3{0.0F, 1.45F, 0.0F},
+            entity->transform.position + wkc::core::Vec3{0.0F, 1.45F, 0.0F},
             player.cameraPosition(), collisionWorld);
-        const gdp::core::Vec3 towardPlayer = distance > 1.0e-7F
+        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
-            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         if (phase != IndustrialRobotPhase::Pursuit
             && lineOfSight && distance < minimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;

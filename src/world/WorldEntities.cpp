@@ -51,9 +51,9 @@ InitialEntitySet populateInitialEntities(
         }
         propLayouts.push_back(std::move(props));
     }
-    const auto positionInRoom = [](const RoomInstance& room, const gdp::core::Vec3 offset) {
+    const auto positionInRoom = [](const RoomInstance& room, const wkc::core::Vec3 offset) {
         return room.transform.position
-            + gdp::core::rotateQuarterTurns(offset, room.rotation);
+            + wkc::core::rotateQuarterTurns(offset, room.rotation);
     };
 
     for (std::size_t roomIndex = 0; roomIndex < world.rooms.size(); ++roomIndex) {
@@ -107,7 +107,7 @@ InitialEntitySet populateInitialEntities(
                 .roomId = room.id,
                 .archetype = EnemyArchetype::Worker,
                 .health = 68.0F,
-                .visualSeed = gdp::core::deriveSeed(
+                .visualSeed = wkc::core::deriveSeed(
                     room.seed, gdp::game::SeedDomain::EnemyVisual, 0),
             }));
             addProps();
@@ -117,21 +117,21 @@ InitialEntitySet populateInitialEntities(
 
         std::uint64_t enemyVisualOrdinal = 0;
         const auto addEnemy = [&](const EnemyArchetype archetype,
-                                  const gdp::core::Vec3 offset,
+                                  const wkc::core::Vec3 offset,
                                   const float health) {
             addToRoom(manager.createEnemy({
                 .transform = {.position = positionInRoom(room, offset)},
                 .roomId = room.id,
                 .archetype = archetype,
                 .health = health,
-                .visualSeed = gdp::core::deriveSeed(
+                .visualSeed = wkc::core::deriveSeed(
                     room.seed,
                     gdp::game::SeedDomain::EnemyVisual,
                     enemyVisualOrdinal++),
             }));
         };
         const auto addFixedProp = [&](const PropType type,
-                                      const gdp::core::Vec3 offset,
+                                      const wkc::core::Vec3 offset,
                                       const bool solid) {
             addToRoom(manager.createProp({
                 .transform = {.position = positionInRoom(room, offset)},

@@ -20,7 +20,7 @@ struct CandidateOutcome {
 const RoomModule* selectModule(
     const std::span<const RoomModule> library,
     const RoomNode& node,
-    gdp::core::RandomStream& random)
+    wkc::core::RandomStream& random)
 {
     std::vector<const RoomModule*> candidates;
     for (const RoomModule& module : library) {
@@ -46,16 +46,16 @@ const RoomInstance* findPlacedRoom(
     return room == rooms.end() ? nullptr : &*room;
 }
 
-gdp::core::Aabb translatedBounds(
-    const gdp::core::Aabb bounds,
-    const gdp::core::Vec3 translation) noexcept
+wkc::core::Aabb translatedBounds(
+    const wkc::core::Aabb bounds,
+    const wkc::core::Vec3 translation) noexcept
 {
     return {bounds.minimum + translation, bounds.maximum + translation};
 }
 
 bool overlapsWithGap(
-    const gdp::core::Aabb first,
-    const gdp::core::Aabb second,
+    const wkc::core::Aabb first,
+    const wkc::core::Aabb second,
     const float gap) noexcept
 {
     return first.minimum.x - gap < second.maximum.x
@@ -64,7 +64,7 @@ bool overlapsWithGap(
         && first.maximum.z + gap > second.minimum.z;
 }
 
-gdp::core::Vec3 placementForNode(
+wkc::core::Vec3 placementForNode(
     const MapGraph& graph,
     const RoomNodeId node,
     const float spacing,
@@ -129,7 +129,7 @@ gdp::core::Vec3 placementForNode(
     }
     averageZ /= static_cast<float>(neighbors.size());
 
-    gdp::core::Vec3 position{
+    wkc::core::Vec3 position{
         side < 0.0F
             ? sideBoundary - corridorClearance - prototype.worldBounds.maximum.x
             : sideBoundary + corridorClearance - prototype.worldBounds.minimum.x,
@@ -137,7 +137,7 @@ gdp::core::Vec3 placementForNode(
         averageZ,
     };
     for (int adjustment = 0; adjustment < 64; ++adjustment) {
-        const gdp::core::Aabb candidateBounds
+        const wkc::core::Aabb candidateBounds
             = translatedBounds(prototype.worldBounds, position);
         const bool overlaps = std::any_of(
             placedRooms.begin(), placedRooms.end(),
@@ -152,16 +152,16 @@ gdp::core::Vec3 placementForNode(
     return position;
 }
 
-ConnectorInstance* chooseConnector(RoomInstance& room, const gdp::core::Vec3 target)
+ConnectorInstance* chooseConnector(RoomInstance& room, const wkc::core::Vec3 target)
 {
-    const gdp::core::Vec3 direction = gdp::core::normalized(target - room.transform.position);
+    const wkc::core::Vec3 direction = wkc::core::normalized(target - room.transform.position);
     ConnectorInstance* best = nullptr;
     float bestAlignment = -2.0F;
     for (ConnectorInstance& connector : room.connectors) {
         if (!connector.isAvailable()) {
             continue;
         }
-        const float alignment = gdp::core::dot(connector.worldNormal, direction);
+        const float alignment = wkc::core::dot(connector.worldNormal, direction);
         if (alignment > bestAlignment) {
             bestAlignment = alignment;
             best = &connector;
@@ -171,8 +171,8 @@ ConnectorInstance* chooseConnector(RoomInstance& room, const gdp::core::Vec3 tar
 }
 
 CandidateOutcome generateCandidate(
-    const gdp::core::Seed masterSeed,
-    const gdp::core::Seed attemptSeed,
+    const wkc::core::Seed masterSeed,
+    const wkc::core::Seed attemptSeed,
     const std::uint32_t attempt,
     const WorldGenerationConfig config,
     const std::span<const RoomModule> library)
@@ -180,10 +180,10 @@ CandidateOutcome generateCandidate(
     World candidate;
     candidate.masterSeed = masterSeed;
     candidate.generationSeed = attemptSeed;
-    candidate.generationVersion = gdp::core::currentGenerationVersion;
+    candidate.generationVersion = wkc::core::currentGenerationVersion;
     candidate.acceptedAttempt = attempt;
     candidate.graph = generateMapGraph(
-        gdp::core::deriveSeed(attemptSeed, gdp::game::SeedDomain::Graph, 0),
+        wkc::core::deriveSeed(attemptSeed, gdp::game::SeedDomain::Graph, 0),
         {config.roomCount, config.loopBudget});
     if (!validateMapGraph(candidate.graph).isValid()) {
         return {std::nullopt, GenerationFailure::GraphInvalid};
@@ -191,21 +191,21 @@ CandidateOutcome generateCandidate(
 
     candidate.rooms.reserve(candidate.graph.nodes.size());
     for (const RoomNode& node : candidate.graph.nodes) {
-        const gdp::core::Seed roomSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed roomSeed = wkc::core::deriveSeed(
             attemptSeed, gdp::game::SeedDomain::Room, node.id);
-        gdp::core::RandomStream random{gdp::core::deriveSeed(
+        wkc::core::RandomStream random{wkc::core::deriveSeed(
             roomSeed, gdp::game::SeedDomain::RoomModule, node.id)};
         const RoomModule* module = selectModule(library, node, random);
         if (module == nullptr) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }
-        const auto rotation = static_cast<gdp::core::QuarterTurn>(random.rangeInt(0, 3));
+        const auto rotation = static_cast<wkc::core::QuarterTurn>(random.rangeInt(0, 3));
         const auto prototype = instantiateRoom(
             *module, node.id, node.role, roomSeed, {}, rotation);
         if (!prototype) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }
-        const gdp::core::Vec3 position = placementForNode(
+        const wkc::core::Vec3 position = placementForNode(
             candidate.graph, node.id, config.roomSpacing, *prototype, candidate.rooms);
         auto room = instantiateRoom(*module, node.id, node.role, roomSeed, position, rotation);
         if (!room) {
@@ -250,7 +250,7 @@ bool WorldGenerationResult::succeeded() const noexcept
 }
 
 WorldGenerationResult generateWorld(
-    const gdp::core::Seed masterSeed,
+    const wkc::core::Seed masterSeed,
     WorldGenerationConfig config,
     const std::span<const RoomModule> moduleLibrary)
 {
@@ -266,7 +266,7 @@ WorldGenerationResult generateWorld(
     WorldGenerationResult result;
     for (std::uint32_t attempt = 0; attempt < config.maximumAttempts; ++attempt) {
         ++result.attempts;
-        const gdp::core::Seed attemptSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed attemptSeed = wkc::core::deriveSeed(
             masterSeed, gdp::game::SeedDomain::World, attempt);
         CandidateOutcome candidate = generateCandidate(
             masterSeed, attemptSeed, attempt, config, library);

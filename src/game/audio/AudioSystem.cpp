@@ -14,7 +14,7 @@ void AudioSystem::shutdown() noexcept
 
 void AudioSystem::play(
     const AudioEventKind kind,
-    const gdp::core::Seed sourceSeed,
+    const wkc::core::Seed sourceSeed,
     const std::uint64_t eventCounter)
 {
     if (kind >= AudioEventKind::Count || kind == AudioEventKind::Ambient) {
@@ -25,11 +25,11 @@ void AudioSystem::play(
 
 void AudioSystem::playAt(
     const AudioEventKind kind,
-    const gdp::core::Seed sourceSeed,
+    const wkc::core::Seed sourceSeed,
     const std::uint64_t eventCounter,
-    const gdp::core::Vec3 sourcePosition,
-    const gdp::core::Vec3 listenerPosition,
-    const gdp::core::Vec3 listenerForward)
+    const wkc::core::Vec3 sourcePosition,
+    const wkc::core::Vec3 listenerPosition,
+    const wkc::core::Vec3 listenerForward)
 {
     if (kind >= AudioEventKind::Count || kind == AudioEventKind::Ambient) {
         return;
@@ -39,7 +39,7 @@ void AudioSystem::playAt(
 }
 
 void AudioSystem::setAmbience(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const std::uint64_t profileId)
 {
     mixer_.setAmbience(generateAudioRecipe(
@@ -47,9 +47,9 @@ void AudioSystem::setAmbience(
 }
 
 void AudioSystem::setAmbienceBlend(
-    const gdp::core::Seed firstRoomSeed,
+    const wkc::core::Seed firstRoomSeed,
     const std::uint64_t firstProfileId,
-    const gdp::core::Seed secondRoomSeed,
+    const wkc::core::Seed secondRoomSeed,
     const std::uint64_t secondProfileId,
     const float secondWeight)
 {

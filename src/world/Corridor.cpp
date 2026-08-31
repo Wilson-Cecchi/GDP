@@ -8,10 +8,10 @@ namespace gdp::world {
 namespace {
 
 bool segmentHitsRoom(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second,
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second,
     const float halfWidth,
-    const gdp::core::Aabb room) noexcept
+    const wkc::core::Aabb room) noexcept
 {
     const float minimumX = std::min(first.x, second.x) - halfWidth;
     const float maximumX = std::max(first.x, second.x) + halfWidth;
@@ -22,7 +22,7 @@ bool segmentHitsRoom(
 }
 
 bool pathIsClear(
-    const std::vector<gdp::core::Vec3>& points,
+    const std::vector<wkc::core::Vec3>& points,
     const float width,
     const std::span<const RoomInstance> rooms,
     const RoomId firstRoom,
@@ -45,18 +45,18 @@ bool pathIsClear(
     return true;
 }
 
-bool axisAligned(const gdp::core::Vec3 first, const gdp::core::Vec3 second) noexcept
+bool axisAligned(const wkc::core::Vec3 first, const wkc::core::Vec3 second) noexcept
 {
-    const bool sameX = gdp::core::nearlyEqual(first.x, second.x);
-    const bool sameZ = gdp::core::nearlyEqual(first.z, second.z);
+    const bool sameX = wkc::core::nearlyEqual(first.x, second.x);
+    const bool sameZ = wkc::core::nearlyEqual(first.z, second.z);
     return sameX != sameZ;
 }
 
-void removeRepeatedPoints(std::vector<gdp::core::Vec3>& points)
+void removeRepeatedPoints(std::vector<wkc::core::Vec3>& points)
 {
     points.erase(
         std::unique(points.begin(), points.end(), [](const auto first, const auto second) {
-            return gdp::core::nearlyEqual(first, second);
+            return wkc::core::nearlyEqual(first, second);
         }),
         points.end());
 }
@@ -77,14 +77,14 @@ std::optional<CorridorPath> routeCorridor(
     }
 
     const float stub = std::max(stubLength, 0.0F);
-    const gdp::core::Vec3 firstStub = first.worldPosition + (first.worldNormal * stub);
-    const gdp::core::Vec3 secondStub = second.worldPosition + (second.worldNormal * stub);
+    const wkc::core::Vec3 firstStub = first.worldPosition + (first.worldNormal * stub);
+    const wkc::core::Vec3 secondStub = second.worldPosition + (second.worldNormal * stub);
     const float width = std::min(first.width, second.width);
     const float height = std::min(first.height, second.height);
 
-    std::vector<std::pair<CorridorShape, std::vector<gdp::core::Vec3>>> candidates;
-    if (gdp::core::nearlyEqual(firstStub.x, secondStub.x)
-        || gdp::core::nearlyEqual(firstStub.z, secondStub.z)) {
+    std::vector<std::pair<CorridorShape, std::vector<wkc::core::Vec3>>> candidates;
+    if (wkc::core::nearlyEqual(firstStub.x, secondStub.x)
+        || wkc::core::nearlyEqual(firstStub.z, secondStub.z)) {
         candidates.push_back({CorridorShape::Straight,
             {first.worldPosition, firstStub, secondStub, second.worldPosition}});
     } else {

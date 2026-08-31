@@ -77,24 +77,24 @@ void AudioMixer::play(
 
 void AudioMixer::playAt(
     const AudioRecipe& recipe,
-    const gdp::core::Vec3 sourcePosition,
-    const gdp::core::Vec3 listenerPosition,
-    const gdp::core::Vec3 listenerForward)
+    const wkc::core::Vec3 sourcePosition,
+    const wkc::core::Vec3 listenerPosition,
+    const wkc::core::Vec3 listenerForward)
 {
     if (!initialized_) {
         return;
     }
-    const gdp::core::Vec3 offset = sourcePosition - listenerPosition;
-    const float distance = gdp::core::length(offset);
-    const gdp::core::Vec3 direction = distance > 1.0e-5F
-        ? offset * (1.0F / distance) : gdp::core::Vec3{};
-    gdp::core::Vec3 flatForward{listenerForward.x, 0.0F, listenerForward.z};
-    flatForward = gdp::core::normalized(flatForward);
-    if (gdp::core::length(flatForward) <= 1.0e-5F) {
+    const wkc::core::Vec3 offset = sourcePosition - listenerPosition;
+    const float distance = wkc::core::length(offset);
+    const wkc::core::Vec3 direction = distance > 1.0e-5F
+        ? offset * (1.0F / distance) : wkc::core::Vec3{};
+    wkc::core::Vec3 flatForward{listenerForward.x, 0.0F, listenerForward.z};
+    flatForward = wkc::core::normalized(flatForward);
+    if (wkc::core::length(flatForward) <= 1.0e-5F) {
         flatForward = {0.0F, 0.0F, -1.0F};
     }
-    const gdp::core::Vec3 right{-flatForward.z, 0.0F, flatForward.x};
-    const float pan = std::clamp(gdp::core::dot(direction, right), -1.0F, 1.0F);
+    const wkc::core::Vec3 right{-flatForward.z, 0.0F, flatForward.x};
+    const float pan = std::clamp(wkc::core::dot(direction, right), -1.0F, 1.0F);
     const float attenuation = 1.0F / (1.0F + (0.075F * distance * distance));
     const float left = std::sqrt(0.5F * (1.0F - pan));
     const float rightGain = std::sqrt(0.5F * (1.0F + pan));

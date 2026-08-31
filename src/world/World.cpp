@@ -12,7 +12,7 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
     return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
-std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
+std::uint64_t addVec3(std::uint64_t hash, const wkc::core::Vec3 value) noexcept
 {
     hash = addFloat(hash, value.x);
     hash = addFloat(hash, value.y);
@@ -59,7 +59,7 @@ std::uint64_t worldFingerprint(const World& world) noexcept
     for (const CorridorPath& corridor : world.corridors) {
         hash = wkc::core::hashCombine(hash, corridor.edge);
         hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(corridor.shape));
-        for (const gdp::core::Vec3 point : corridor.points) {
+        for (const wkc::core::Vec3 point : corridor.points) {
             hash = addVec3(hash, point);
         }
     }

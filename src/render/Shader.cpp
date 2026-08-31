@@ -112,7 +112,7 @@ void Shader::use(const GlApi& gl) const noexcept
 void Shader::setMat4(
     const GlApi& gl,
     const char* const name,
-    const gdp::core::Mat4& value) const noexcept
+    const wkc::core::Mat4& value) const noexcept
 {
     const GLint location = gl.getUniformLocation(program_, name);
     if (location >= 0) {
@@ -123,7 +123,7 @@ void Shader::setMat4(
 void Shader::setVec3(
     const GlApi& gl,
     const char* const name,
-    const gdp::core::Vec3 value) const noexcept
+    const wkc::core::Vec3 value) const noexcept
 {
     const GLint location = gl.getUniformLocation(program_, name);
     if (location >= 0) {
@@ -134,7 +134,7 @@ void Shader::setVec3(
 void Shader::setVec2(
     const GlApi& gl,
     const char* const name,
-    const gdp::core::Vec2 value) const noexcept
+    const wkc::core::Vec2 value) const noexcept
 {
     const GLint location = gl.getUniformLocation(program_, name);
     if (location >= 0) {

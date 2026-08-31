@@ -29,7 +29,7 @@ void testDamageAndHitTimers()
         "damage and hit signals start at full deterministic strength");
 
     updateFeedback(feedback, hitFeedbackSeconds * 0.5F);
-    expect(gdp::core::nearlyEqual(hitFeedbackStrength(feedback), 0.5F)
+    expect(wkc::core::nearlyEqual(hitFeedbackStrength(feedback), 0.5F)
             && feedback.hit == HitFeedbackKind::Hit,
         "hit feedback fades proportionally on the fixed timeline");
     signalHit(feedback, true);

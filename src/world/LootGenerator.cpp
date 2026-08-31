@@ -70,11 +70,11 @@ float healthProbability(const RoomTheme theme) noexcept
 
 std::uint32_t quantityFor(
     const gdp::entities::ItemType type,
-    const gdp::core::Seed seed,
+    const wkc::core::Seed seed,
     const std::uint32_t depth,
     const std::uint64_t ordinal) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         seed, gdp::game::SeedDomain::Loot, 100U + ordinal)};
     switch (type) {
     case gdp::entities::ItemType::Health:
@@ -89,38 +89,38 @@ std::uint32_t quantityFor(
     return 1U;
 }
 
-bool containsPlanar(const SpawnZone& zone, const gdp::core::Vec3 position) noexcept
+bool containsPlanar(const SpawnZone& zone, const wkc::core::Vec3 position) noexcept
 {
     return position.x >= zone.bounds.minimum.x && position.x <= zone.bounds.maximum.x
         && position.z >= zone.bounds.minimum.z && position.z <= zone.bounds.maximum.z
-        && gdp::core::nearlyEqual(position.y, zone.bounds.minimum.y, 1.0e-4F);
+        && wkc::core::nearlyEqual(position.y, zone.bounds.minimum.y, 1.0e-4F);
 }
 
 float planarDistance(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second) noexcept
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second) noexcept
 {
     const float x = first.x - second.x;
     const float z = first.z - second.z;
     return std::sqrt((x * x) + (z * z));
 }
 
-gdp::core::Vec3 choosePosition(
-    const gdp::core::Seed seed,
+wkc::core::Vec3 choosePosition(
+    const wkc::core::Seed seed,
     const std::uint64_t ordinal,
     const std::span<const SpawnZone> zones)
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         seed, gdp::game::SeedDomain::Loot, 200U + ordinal)};
     const std::size_t zoneIndex = static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)));
     const SpawnZone& zone = zones[zoneIndex];
     constexpr std::array anchors{
-        gdp::core::Vec3{0.18F, 0.0F, 0.18F},
-        gdp::core::Vec3{0.82F, 0.0F, 0.82F},
-        gdp::core::Vec3{0.18F, 0.0F, 0.82F},
+        wkc::core::Vec3{0.18F, 0.0F, 0.18F},
+        wkc::core::Vec3{0.82F, 0.0F, 0.82F},
+        wkc::core::Vec3{0.18F, 0.0F, 0.82F},
     };
-    const gdp::core::Vec3 anchor
+    const wkc::core::Vec3 anchor
         = anchors[static_cast<std::size_t>(ordinal % anchors.size())];
     const float normalizedX = std::clamp(
         anchor.x + random.rangeFloat(-0.035F, 0.035F), 0.10F, 0.90F);
@@ -165,7 +165,7 @@ bool LootValidationResult::isValid() const noexcept
 }
 
 LootLayout generateLootLayout(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const RoomRole role,
     const RoomTheme theme,
     const std::uint32_t depth,
@@ -173,7 +173,7 @@ LootLayout generateLootLayout(
     const float difficulty)
 {
     LootLayout layout;
-    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Loot, 0);
+    layout.seed = wkc::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Loot, 0);
     layout.role = role;
     layout.theme = theme;
     layout.depth = depth;
@@ -210,7 +210,7 @@ LootLayout generateLootLayout(
         break;
     }
 
-    gdp::core::RandomStream selection{gdp::core::deriveSeed(
+    wkc::core::RandomStream selection{wkc::core::deriveSeed(
         layout.seed, gdp::game::SeedDomain::Loot, 1)};
     while (layout.drops.size() < 3U && layout.spent < layout.budget) {
         const std::uint32_t remaining = layout.budget - layout.spent;

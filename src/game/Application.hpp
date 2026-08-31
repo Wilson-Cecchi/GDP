@@ -40,7 +40,7 @@ struct ApplicationConfig {
     std::optional<std::uint64_t> frameLimit;
     int windowWidth{1280};
     int windowHeight{720};
-    gdp::core::Seed worldSeed{0x4744505F574F524CULL};
+    wkc::core::Seed worldSeed{0x4744505F574F524CULL};
 };
 
 class Application {

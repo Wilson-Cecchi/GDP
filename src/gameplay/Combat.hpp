@@ -29,7 +29,7 @@ enum class ShotOutcome : std::uint8_t {
 
 struct HitResult {
     gdp::entities::EntityId target{};
-    gdp::core::Vec3 point{};
+    wkc::core::Vec3 point{};
     float distance{0.0F};
 };
 
@@ -46,19 +46,19 @@ struct ShotResult {
 
 [[nodiscard]] ShotResult fireHitscan(
     Weapon& weapon,
-    gdp::core::Vec3 origin,
-    gdp::core::Vec3 direction,
+    wkc::core::Vec3 origin,
+    wkc::core::Vec3 direction,
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager) noexcept;
 
 [[nodiscard]] bool hasLineOfSight(
-    gdp::core::Vec3 origin,
-    gdp::core::Vec3 target,
+    wkc::core::Vec3 origin,
+    wkc::core::Vec3 target,
     const CollisionWorld& collisionWorld) noexcept;
 
 [[nodiscard]] bool hasLineOfSightToProp(
-    gdp::core::Vec3 origin,
+    wkc::core::Vec3 origin,
     const gdp::entities::EntityManager& manager,
     gdp::entities::EntityId target,
     const CollisionWorld& collisionWorld) noexcept;

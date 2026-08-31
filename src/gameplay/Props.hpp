@@ -19,7 +19,7 @@ struct PropDamageResult {
     gdp::entities::EntityId spawnedDrop{};
 };
 
-[[nodiscard]] gdp::core::Aabb propCollisionBounds(
+[[nodiscard]] wkc::core::Aabb propCollisionBounds(
     const gdp::entities::Entity& entity,
     const gdp::entities::PropData& prop) noexcept;
 

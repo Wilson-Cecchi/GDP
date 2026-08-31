@@ -49,8 +49,8 @@ enum class SocketType : std::uint8_t {
 
 struct SocketDefinition {
     SocketType type{SocketType::Root};
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 direction{0.0F, 1.0F, 0.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 direction{0.0F, 1.0F, 0.0F};
     float radius{0.1F};
     CompatibilityMask compatibility{compatibilityStandard};
 };
@@ -77,7 +77,7 @@ struct WorkerPartDefinition {
     SocketType attachment{SocketType::Neck};
     CompatibilityMask compatibility{compatibilityStandard};
     wkc::procedural::PrimitiveType primitive{wkc::procedural::PrimitiveType::Box};
-    gdp::core::Vec3 dimensionScale{1.0F, 1.0F, 1.0F};
+    wkc::core::Vec3 dimensionScale{1.0F, 1.0F, 1.0F};
     wkc::procedural::MaterialSlot material{wkc::procedural::MaterialSlot::Primary};
     wkc::procedural::SemanticRegion semantic{wkc::procedural::SemanticRegion::Generic};
     std::uint32_t weight{1};
@@ -100,12 +100,12 @@ struct WearProfile {
 
 struct WorkerMaterialSet {
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 primaryColor{0.72F, 0.38F, 0.12F};
-    gdp::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
+    wkc::core::Vec3 primaryColor{0.72F, 0.38F, 0.12F};
+    wkc::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
 };
 
 struct WorkerVisualGenome {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     WorkerBodyProfileId bodyProfile{WorkerBodyProfileId::Standard};
     WorkerPartId torso{0};
     WorkerPartId head{0};
@@ -157,7 +157,7 @@ using GuardPartId = std::uint32_t;
 using GuardPartDefinition = WorkerPartDefinition;
 
 struct GuardVisualGenome {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     GuardBodyProfileId bodyProfile{GuardBodyProfileId::Patrol};
     GuardPartId torso{0};
     GuardPartId head{0};
@@ -210,7 +210,7 @@ using OfficerPartId = std::uint32_t;
 using OfficerPartDefinition = WorkerPartDefinition;
 
 struct OfficerVisualGenome {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     OfficerBodyProfileId bodyProfile{OfficerBodyProfileId::Field};
     OfficerPartId torso{0};
     OfficerPartId head{0};
@@ -264,7 +264,7 @@ using EngineerPartId = std::uint32_t;
 using EngineerPartDefinition = WorkerPartDefinition;
 
 struct EngineerVisualGenome {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     EngineerBodyProfileId bodyProfile{EngineerBodyProfileId::Maintenance};
     EngineerPartId torso{0};
     EngineerPartId head{0};
@@ -318,7 +318,7 @@ using IndustrialRobotPartId = std::uint32_t;
 using IndustrialRobotPartDefinition = WorkerPartDefinition;
 
 struct IndustrialRobotVisualGenome {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     IndustrialRobotBodyProfileId bodyProfile{IndustrialRobotBodyProfileId::Sentry};
     IndustrialRobotPartId torsoCore{0};
     IndustrialRobotPartId sensorHead{0};
@@ -367,24 +367,24 @@ struct IndustrialRobotVisualValidationResult {
 };
 
 [[nodiscard]] std::span<const WorkerPartDefinition> workerPartLibrary() noexcept;
-[[nodiscard]] WorkerVisual generateWorkerVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] WorkerVisual generateWorkerVisual(wkc::core::Seed visualSeed);
 [[nodiscard]] WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual);
 [[nodiscard]] std::uint64_t workerVisualHash(const WorkerVisual& visual) noexcept;
 [[nodiscard]] std::span<const GuardPartDefinition> guardPartLibrary() noexcept;
-[[nodiscard]] GuardVisual generateGuardVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] GuardVisual generateGuardVisual(wkc::core::Seed visualSeed);
 [[nodiscard]] GuardVisualValidationResult validateGuardVisual(const GuardVisual& visual);
 [[nodiscard]] std::uint64_t guardVisualHash(const GuardVisual& visual) noexcept;
 [[nodiscard]] std::span<const OfficerPartDefinition> officerPartLibrary() noexcept;
-[[nodiscard]] OfficerVisual generateOfficerVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] OfficerVisual generateOfficerVisual(wkc::core::Seed visualSeed);
 [[nodiscard]] OfficerVisualValidationResult validateOfficerVisual(const OfficerVisual& visual);
 [[nodiscard]] std::uint64_t officerVisualHash(const OfficerVisual& visual) noexcept;
 [[nodiscard]] std::span<const EngineerPartDefinition> engineerPartLibrary() noexcept;
-[[nodiscard]] EngineerVisual generateEngineerVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] EngineerVisual generateEngineerVisual(wkc::core::Seed visualSeed);
 [[nodiscard]] EngineerVisualValidationResult validateEngineerVisual(const EngineerVisual& visual);
 [[nodiscard]] std::uint64_t engineerVisualHash(const EngineerVisual& visual) noexcept;
 [[nodiscard]] std::span<const IndustrialRobotPartDefinition>
 industrialRobotPartLibrary() noexcept;
-[[nodiscard]] IndustrialRobotVisual generateIndustrialRobotVisual(gdp::core::Seed visualSeed);
+[[nodiscard]] IndustrialRobotVisual generateIndustrialRobotVisual(wkc::core::Seed visualSeed);
 [[nodiscard]] IndustrialRobotVisualValidationResult
 validateIndustrialRobotVisual(const IndustrialRobotVisual& visual);
 [[nodiscard]] std::uint64_t

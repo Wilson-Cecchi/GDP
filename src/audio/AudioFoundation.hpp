@@ -12,7 +12,7 @@ inline constexpr int proceduralAudioSampleRate = 48'000;
 struct AudioRecipe {
     std::uint8_t kind{0};
     std::uint8_t kindCount{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     float durationSeconds{0.1F};
     float baseFrequency{220.0F};
     float secondaryFrequency{220.0F};

@@ -2,7 +2,7 @@
 
 #include "core/Hash.hpp"
 
-namespace gdp::core {
+namespace wkc::core {
 
 Seed deriveSeed(
     const Seed parent,
@@ -18,4 +18,4 @@ Seed deriveSeed(
     return wkc::core::hashCombine(result, packedVersion);
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

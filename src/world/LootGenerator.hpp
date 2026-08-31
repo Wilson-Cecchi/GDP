@@ -13,13 +13,13 @@ namespace gdp::world {
 struct LootDrop {
     gdp::entities::ItemType type{gdp::entities::ItemType::Health};
     std::uint32_t quantity{1};
-    gdp::core::Vec3 position{};
+    wkc::core::Vec3 position{};
 
     constexpr bool operator==(const LootDrop&) const noexcept = default;
 };
 
 struct LootLayout {
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomRole role{RoomRole::Normal};
     RoomTheme theme{RoomTheme::Industrial};
     std::uint32_t depth{0};
@@ -48,7 +48,7 @@ struct LootValidationResult {
 };
 
 [[nodiscard]] LootLayout generateLootLayout(
-    gdp::core::Seed roomSeed,
+    wkc::core::Seed roomSeed,
     RoomRole role,
     RoomTheme theme,
     std::uint32_t depth,

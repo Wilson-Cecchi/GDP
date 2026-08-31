@@ -27,7 +27,7 @@ struct WorldGenerationResult {
 };
 
 [[nodiscard]] WorldGenerationResult generateWorld(
-    gdp::core::Seed masterSeed,
+    wkc::core::Seed masterSeed,
     WorldGenerationConfig config = {},
     std::span<const RoomModule> moduleLibrary = {});
 

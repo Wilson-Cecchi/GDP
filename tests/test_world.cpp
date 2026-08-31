@@ -84,7 +84,7 @@ void testModuleValidation()
 
 void testDefaultModuleStructuralVariety()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using namespace gdp::world;
 
     const std::vector<RoomModule> library = makeDefaultRoomModuleLibrary();
@@ -162,7 +162,7 @@ void testDefaultModuleStructuralVariety()
 
 void testInstantiationAndRotation()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using namespace gdp::world;
 
     const RoomModule module = makeFixedRoomModule();
@@ -229,7 +229,7 @@ void testInstantiationAndRotation()
 
 void testConnectorContracts()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using namespace gdp::world;
 
     const ConnectorDefinition north{
@@ -261,7 +261,7 @@ void testConnectorContracts()
 
 void testRequiredConnectorResolution()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using namespace gdp::world;
 
     RoomModule module = makeFixedRoomModule();
@@ -306,7 +306,7 @@ void testWorldGeneration()
 {
     using namespace gdp::world;
 
-    constexpr gdp::core::Seed goldenSeed = 0x123456789ABCDEF0ULL;
+    constexpr wkc::core::Seed goldenSeed = 0x123456789ABCDEF0ULL;
     const WorldGenerationResult first = generateWorld(goldenSeed);
     const WorldGenerationResult repeat = generateWorld(goldenSeed);
     const WorldGenerationResult different = generateWorld(goldenSeed + 1U);
@@ -340,7 +340,7 @@ void testWorldGeneration()
 
 void testCorridorRouting()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using namespace gdp::world;
 
     ConnectorDefinition east{1, ConnectorType::Door, {}, {1.0F, 0.0F, 0.0F}, 1.2F, 2.2F, false};
@@ -442,7 +442,7 @@ void testInitialEntityPopulation()
         "Boss population includes one healthy IndustrialRobot with an isolated visual seed");
 
     const auto collectEnemyVisualSeeds = [](const EntityManager& entities) {
-        std::vector<gdp::core::Seed> seeds;
+        std::vector<wkc::core::Seed> seeds;
         for (const EntityId id : entities.query(EntityKind::Enemy)) {
             const EnemyData* enemy = entities.findData<EnemyData>(id);
             if (enemy != nullptr) {
@@ -451,10 +451,10 @@ void testInitialEntityPopulation()
         }
         return seeds;
     };
-    const std::vector<gdp::core::Seed> visualSeeds = collectEnemyVisualSeeds(manager);
+    const std::vector<wkc::core::Seed> visualSeeds = collectEnemyVisualSeeds(manager);
     expect(!visualSeeds.empty()
             && std::all_of(visualSeeds.begin(), visualSeeds.end(),
-                [](const gdp::core::Seed seed) { return seed != 0; }),
+                [](const wkc::core::Seed seed) { return seed != 0; }),
         "every populated enemy receives a non-zero isolated visual seed");
 
     bool roomLinksValid = true;
@@ -607,7 +607,7 @@ void testWorldSeedBatch()
     bool sawMedium = false;
     bool sawLarge = false;
     bool roleSizesValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const WorldGenerationResult generated = generateWorld(seed);
         if (!generated.world || !validateWorld(*generated.world).isValid()) {
             allValid = false;

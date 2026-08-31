@@ -60,7 +60,7 @@ struct GraphValidationResult {
     [[nodiscard]] bool isValid() const noexcept;
 };
 
-[[nodiscard]] MapGraph generateMapGraph(gdp::core::Seed seed, MapGraphConfig config = {});
+[[nodiscard]] MapGraph generateMapGraph(wkc::core::Seed seed, MapGraphConfig config = {});
 [[nodiscard]] GraphValidationResult validateMapGraph(const MapGraph& graph);
 [[nodiscard]] std::string graphToDot(const MapGraph& graph);
 

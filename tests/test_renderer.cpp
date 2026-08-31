@@ -25,7 +25,7 @@ void expect(const bool condition, const std::string_view message)
     }
 }
 
-bool isFinite(const gdp::core::Mat4& matrix)
+bool isFinite(const wkc::core::Mat4& matrix)
 {
     for (const float element : matrix.elements) {
         if (!std::isfinite(element)) {
@@ -44,7 +44,7 @@ void testMesh()
     expect(validateMeshData(box, &reason), "box mesh validates");
     expect(box.vertices.size() == 24, "box has hard-edge vertices");
     expect(box.indices.size() == 36, "box has twelve indexed triangles");
-    expect(box.bounds == gdp::core::Aabb{{-0.5F, -0.5F, -0.5F}, {0.5F, 0.5F, 0.5F}},
+    expect(box.bounds == wkc::core::Aabb{{-0.5F, -0.5F, -0.5F}, {0.5F, 0.5F, 0.5F}},
         "box bounds are exact");
 
     MeshData invalidIndex = box;
@@ -105,7 +105,7 @@ void testTextureData()
 
 void testCameraAndMatrices()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using wkc::render::Camera;
 
     expect(nearlyEqual(length(Vec3{3.0F, 4.0F, 0.0F}), 5.0F), "vector length is correct");

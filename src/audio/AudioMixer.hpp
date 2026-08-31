@@ -31,9 +31,9 @@ public:
     void play(const AudioRecipe& recipe);
     void playAt(
         const AudioRecipe& recipe,
-        gdp::core::Vec3 sourcePosition,
-        gdp::core::Vec3 listenerPosition,
-        gdp::core::Vec3 listenerForward);
+        wkc::core::Vec3 sourcePosition,
+        wkc::core::Vec3 listenerPosition,
+        wkc::core::Vec3 listenerForward);
     void setAmbience(const AudioRecipe& recipe);
     void setAmbienceBlend(
         const AudioRecipe& firstRecipe,

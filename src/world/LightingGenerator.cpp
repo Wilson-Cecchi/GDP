@@ -14,8 +14,8 @@ namespace {
 
 struct LightingPalette {
     RoomLightingMood mood;
-    gdp::core::Vec3 ambient;
-    gdp::core::Vec3 light;
+    wkc::core::Vec3 ambient;
+    wkc::core::Vec3 light;
 };
 
 LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
@@ -43,7 +43,7 @@ LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
     return {RoomLightingMood::Neutral, {0.70F, 0.78F, 0.88F}, {0.82F, 0.90F, 1.0F}};
 }
 
-std::size_t lightCountFor(const RoomRole role, const gdp::core::Aabb bounds) noexcept
+std::size_t lightCountFor(const RoomRole role, const wkc::core::Aabb bounds) noexcept
 {
     if (role == RoomRole::Secret) {
         return 1U;
@@ -56,12 +56,12 @@ std::size_t lightCountFor(const RoomRole role, const gdp::core::Aabb bounds) noe
     return width * depth >= 72.0F ? 3U : 2U;
 }
 
-bool finiteVec3(const gdp::core::Vec3 value) noexcept
+bool finiteVec3(const wkc::core::Vec3 value) noexcept
 {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 
-bool validColor(const gdp::core::Vec3 value) noexcept
+bool validColor(const wkc::core::Vec3 value) noexcept
 {
     return finiteVec3(value)
         && value.x >= 0.0F && value.x <= 1.0F
@@ -74,7 +74,7 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
     return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
-std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
+std::uint64_t addVec3(std::uint64_t hash, const wkc::core::Vec3 value) noexcept
 {
     hash = addFloat(hash, value.x);
     hash = addFloat(hash, value.y);
@@ -89,13 +89,13 @@ bool LightingValidationResult::isValid() const noexcept
 }
 
 RoomLightingPlan generateRoomLightingPlan(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const RoomRole role,
     const RoomTheme theme,
-    const gdp::core::Aabb roomBounds)
+    const wkc::core::Aabb roomBounds)
 {
     RoomLightingPlan plan;
-    plan.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Lighting, 0U);
+    plan.seed = wkc::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Lighting, 0U);
     plan.role = role;
     plan.theme = theme;
     const LightingPalette palette = paletteFor(role, theme);
@@ -104,7 +104,7 @@ RoomLightingPlan generateRoomLightingPlan(
     plan.supportsAlert = role == RoomRole::Start || role == RoomRole::Arena
         || role == RoomRole::Boss || theme == RoomTheme::Security;
 
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         plan.seed, gdp::game::SeedDomain::Lighting, 1U)};
     const float roleAmbient = role == RoomRole::Secret ? 0.115F
         : role == RoomRole::Boss ? 0.14F
@@ -114,10 +114,10 @@ RoomLightingPlan generateRoomLightingPlan(
 
     if (roomBounds.isValid()) {
         constexpr std::array anchors{
-            gdp::core::Vec2{0.28F, 0.30F},
-            gdp::core::Vec2{0.72F, 0.70F},
-            gdp::core::Vec2{0.72F, 0.30F},
-            gdp::core::Vec2{0.28F, 0.70F},
+            wkc::core::Vec2{0.28F, 0.30F},
+            wkc::core::Vec2{0.72F, 0.70F},
+            wkc::core::Vec2{0.72F, 0.30F},
+            wkc::core::Vec2{0.28F, 0.70F},
         };
         const std::size_t count = lightCountFor(role, roomBounds);
         const float ceiling = roomBounds.maximum.y - 0.16F;
@@ -126,7 +126,7 @@ RoomLightingPlan generateRoomLightingPlan(
             const float jitterZ = random.rangeFloat(-0.025F, 0.025F);
             const float normalizedX = std::clamp(anchors[index].x + jitterX, 0.15F, 0.85F);
             const float normalizedZ = std::clamp(anchors[index].y + jitterZ, 0.15F, 0.85F);
-            gdp::core::Vec3 lightColor = palette.light;
+            wkc::core::Vec3 lightColor = palette.light;
             const float colorVariation = random.rangeFloat(-0.035F, 0.035F);
             lightColor.x = std::clamp(lightColor.x + colorVariation, 0.0F, 1.0F);
             lightColor.y = std::clamp(lightColor.y + colorVariation, 0.0F, 1.0F);
@@ -151,7 +151,7 @@ RoomLightingPlan generateRoomLightingPlan(
 
 LightingValidationResult validateRoomLightingPlan(
     const RoomLightingPlan& plan,
-    const gdp::core::Aabb roomBounds)
+    const wkc::core::Aabb roomBounds)
 {
     LightingValidationResult result;
     if (plan.role >= RoomRole::Count) {

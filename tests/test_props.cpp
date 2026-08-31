@@ -36,7 +36,7 @@ void testDeterministicPropLayout()
     constexpr std::array zones{
         SpawnZone{{{1.5F, 0.0F, -3.0F}, {3.0F, 0.0F, 1.5F}}},
     };
-    constexpr gdp::core::Seed seed = 0x50524F505F563031ULL;
+    constexpr wkc::core::Seed seed = 0x50524F505F563031ULL;
     const PropLayout first = generatePropLayout(
         seed, RoomRole::DeadEnd, RoomTheme::Storage, 4, zones);
     const PropLayout repeated = generatePropLayout(
@@ -84,7 +84,7 @@ void testPropSeedBatch()
     bool foundCrate = false;
     bool foundCanister = false;
     bool foundBarricade = false;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const RoomTheme theme = static_cast<RoomTheme>(seed % 7U);
         const PropLayout layout = generatePropLayout(
             seed, RoomRole::Normal, theme, 4, zones);
@@ -118,8 +118,8 @@ void testPropSeedBatch()
                validatePropLayout(missingZone, {}), PropValidationError::MissingZone),
         "positive prop budget requires an authored candidate zone");
 
-    for (const gdp::core::Seed worldSeed : {gdp::core::Seed{12345},
-             gdp::core::Seed{0x4744505F574F524CULL}}) {
+    for (const wkc::core::Seed worldSeed : {wkc::core::Seed{12345},
+             wkc::core::Seed{0x4744505F574F524CULL}}) {
         const WorldGenerationResult generated = generateWorld(worldSeed);
         bool worldPropsValid = generated.world.has_value();
         if (generated.world) {

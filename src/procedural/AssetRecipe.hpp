@@ -66,8 +66,8 @@ enum class MaterialSlot : std::uint8_t {
 
 struct PrimitiveRecipe {
     PrimitiveType type{PrimitiveType::Box};
-    gdp::core::Transform localTransform{};
-    gdp::core::Vec3 dimensions{1.0F, 1.0F, 1.0F};
+    wkc::core::Transform localTransform{};
+    wkc::core::Vec3 dimensions{1.0F, 1.0F, 1.0F};
     MaterialSlot material{MaterialSlot::Primary};
     SemanticRegion semantic{SemanticRegion::Generic};
 
@@ -76,7 +76,7 @@ struct PrimitiveRecipe {
 
 struct MeshRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     std::vector<PrimitiveRecipe> primitives;
 
     bool operator==(const MeshRecipe&) const noexcept = default;
@@ -84,10 +84,10 @@ struct MeshRecipe {
 
 struct TextureRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     MaterialFamily family{MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.5F, 0.5F, 0.5F};
-    gdp::core::Vec3 secondaryColor{0.25F, 0.25F, 0.25F};
+    wkc::core::Vec3 baseColor{0.5F, 0.5F, 0.5F};
+    wkc::core::Vec3 secondaryColor{0.25F, 0.25F, 0.25F};
     float macroVariation{0.2F};
     float microVariation{0.1F};
     float wearAmount{0.0F};

@@ -37,8 +37,8 @@ enum class DoorState : std::uint8_t {
 struct ConnectorDefinition {
     ConnectorId id{0};
     ConnectorType type{ConnectorType::Door};
-    gdp::core::Vec3 position{};
-    gdp::core::Vec3 normal{0.0F, 0.0F, 1.0F};
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 normal{0.0F, 0.0F, 1.0F};
     float width{1.2F};
     float height{2.2F};
     bool required{false};
@@ -47,8 +47,8 @@ struct ConnectorDefinition {
 struct ConnectorInstance {
     ConnectorId definitionId{0};
     ConnectorType type{ConnectorType::Door};
-    gdp::core::Vec3 worldPosition{};
-    gdp::core::Vec3 worldNormal{0.0F, 0.0F, 1.0F};
+    wkc::core::Vec3 worldPosition{};
+    wkc::core::Vec3 worldNormal{0.0F, 0.0F, 1.0F};
     float width{1.2F};
     float height{2.2F};
     bool required{false};
@@ -69,8 +69,8 @@ enum class ConnectorValidationError : std::uint8_t {
     const ConnectorDefinition& connector) noexcept;
 [[nodiscard]] ConnectorInstance instantiateConnector(
     const ConnectorDefinition& definition,
-    gdp::core::Vec3 roomOrigin,
-    gdp::core::QuarterTurn rotation) noexcept;
+    wkc::core::Vec3 roomOrigin,
+    wkc::core::QuarterTurn rotation) noexcept;
 [[nodiscard]] bool areConnectorDefinitionsCompatible(
     const ConnectorDefinition& first,
     const ConnectorDefinition& second,
@@ -82,7 +82,7 @@ enum class ConnectorValidationError : std::uint8_t {
 [[nodiscard]] bool assignEdge(ConnectorInstance& connector, EdgeId edge) noexcept;
 [[nodiscard]] bool sealConnector(ConnectorInstance& connector) noexcept;
 [[nodiscard]] std::optional<Direction> directionFromNormal(
-    gdp::core::Vec3 normal,
+    wkc::core::Vec3 normal,
     float epsilon = 1.0e-4F) noexcept;
 
 } // namespace gdp::world

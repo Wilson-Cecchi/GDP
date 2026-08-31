@@ -214,6 +214,10 @@ especializados das pastas numeradas.
 - **Fase 53 — Hash no Core WKC Forge:** `mix64`, `hashCombine` e `fnv1a64`
   passaram de `gdp::core` para `wkc::core`. Seeds, mundo, áudio e assets usam a
   API WKC explicitamente, preservando todos os fingerprints e goldens.
+- **Fase 54 — Namespace Core concluído:** Math, Seed e Random passaram para
+  `wkc::core`, concluindo a API pública de `wkc_forge_core`. Todos os
+  consumidores GDP/WKC foram atualizados sem aliases; coordenadas, RNG,
+  derivação de seeds, hashes e geração permanecem idênticos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

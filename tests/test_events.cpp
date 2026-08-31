@@ -37,7 +37,7 @@ constexpr std::array eventZones{
 void testDeterministicEventPlan()
 {
     using namespace gdp::world;
-    constexpr gdp::core::Seed seed = 0x4556454E545F5631ULL;
+    constexpr wkc::core::Seed seed = 0x4556454E545F5631ULL;
     const RoomEventPlan first = generateRoomEventPlan(
         seed, RoomRole::Start, RoomTheme::Industrial, 0, eventZones);
     const RoomEventPlan repeated = generateRoomEventPlan(
@@ -85,7 +85,7 @@ void testEventPlanBatchAndWorlds()
     std::unordered_set<std::uint64_t> hashes;
     std::array<bool, static_cast<std::size_t>(RoomEventType::Count)> found{};
     bool allValid = true;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const RoomRole role = static_cast<RoomRole>(seed % 7U);
         const RoomTheme theme = static_cast<RoomTheme>((seed / 7U) % 7U);
         const RoomEventPlan plan = generateRoomEventPlan(
@@ -114,8 +114,8 @@ void testEventPlanBatchAndWorlds()
                validateRoomEventPlan(missingZone, {}), EventValidationError::MissingZone),
         "functional event requires an authored candidate zone");
 
-    for (const gdp::core::Seed worldSeed : {gdp::core::Seed{12345},
-             gdp::core::Seed{0x4744505F574F524CULL}}) {
+    for (const wkc::core::Seed worldSeed : {wkc::core::Seed{12345},
+             wkc::core::Seed{0x4744505F574F524CULL}}) {
         const WorldGenerationResult generated = generateWorld(worldSeed);
         bool worldEventsValid = generated.world.has_value();
         if (generated.world) {
@@ -281,7 +281,7 @@ void testTwoWaveReinforcementRuntime()
     using namespace gdp::gameplay;
     using namespace gdp::world;
     RoomEventPlan plan;
-    for (gdp::core::Seed seed = 0; seed < 10'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 10'000; ++seed) {
         plan = generateRoomEventPlan(
             seed, RoomRole::Normal, RoomTheme::Security, 5, eventZones);
         if (plan.type == RoomEventType::Reinforcements && plan.waveCount == 2U) {

@@ -193,7 +193,7 @@ std::size_t EntityManager::capacity() const noexcept
 
 EntityId EntityManager::create(
     const EntityKind kind,
-    const gdp::core::Transform transform,
+    const wkc::core::Transform transform,
     const std::uint32_t roomId,
     EntityData data)
 {

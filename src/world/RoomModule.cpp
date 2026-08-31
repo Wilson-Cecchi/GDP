@@ -8,7 +8,7 @@
 namespace gdp::world {
 namespace {
 
-bool isZoneInside(const SpawnZone& zone, const gdp::core::Aabb bounds) noexcept
+bool isZoneInside(const SpawnZone& zone, const wkc::core::Aabb bounds) noexcept
 {
     return zone.bounds.isValid() && bounds.contains(zone.bounds.minimum)
         && bounds.contains(zone.bounds.maximum);
@@ -16,7 +16,7 @@ bool isZoneInside(const SpawnZone& zone, const gdp::core::Aabb bounds) noexcept
 
 bool isConnectorOnPerimeter(
     const ConnectorDefinition& connector,
-    const gdp::core::Aabb bounds) noexcept
+    const wkc::core::Aabb bounds) noexcept
 {
     if (connector.position.y < bounds.minimum.y
         || connector.position.y + connector.height > bounds.maximum.y) {
@@ -29,18 +29,18 @@ bool isConnectorOnPerimeter(
     }
     switch (*direction) {
     case Direction::North:
-        return gdp::core::nearlyEqual(connector.position.z, bounds.maximum.z);
+        return wkc::core::nearlyEqual(connector.position.z, bounds.maximum.z);
     case Direction::East:
-        return gdp::core::nearlyEqual(connector.position.x, bounds.maximum.x);
+        return wkc::core::nearlyEqual(connector.position.x, bounds.maximum.x);
     case Direction::South:
-        return gdp::core::nearlyEqual(connector.position.z, bounds.minimum.z);
+        return wkc::core::nearlyEqual(connector.position.z, bounds.minimum.z);
     case Direction::West:
-        return gdp::core::nearlyEqual(connector.position.x, bounds.minimum.x);
+        return wkc::core::nearlyEqual(connector.position.x, bounds.minimum.x);
     }
     return false;
 }
 
-gdp::core::Aabb connectorClearance(const ConnectorDefinition& connector) noexcept
+wkc::core::Aabb connectorClearance(const ConnectorDefinition& connector) noexcept
 {
     constexpr float sideMargin = 0.25F;
     constexpr float inwardDepth = 0.75F;
@@ -83,7 +83,7 @@ gdp::core::Aabb connectorClearance(const ConnectorDefinition& connector) noexcep
     return {};
 }
 
-bool overlaps(const gdp::core::Aabb first, const gdp::core::Aabb second) noexcept
+bool overlaps(const wkc::core::Aabb first, const wkc::core::Aabb second) noexcept
 {
     return first.minimum.x <= second.maximum.x && first.maximum.x >= second.minimum.x
         && first.minimum.y <= second.maximum.y && first.maximum.y >= second.minimum.y
@@ -135,27 +135,27 @@ RoomModule makeRectangularModule(
     return module;
 }
 
-gdp::core::Aabb transformBounds(
-    const gdp::core::Aabb localBounds,
-    const gdp::core::Vec3 origin,
-    const gdp::core::QuarterTurn rotation) noexcept
+wkc::core::Aabb transformBounds(
+    const wkc::core::Aabb localBounds,
+    const wkc::core::Vec3 origin,
+    const wkc::core::QuarterTurn rotation) noexcept
 {
     const std::array corners{
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.minimum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.maximum.z},
-        gdp::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.minimum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.minimum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.minimum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.minimum.x, localBounds.maximum.y, localBounds.maximum.z},
+        wkc::core::Vec3{localBounds.maximum.x, localBounds.maximum.y, localBounds.maximum.z},
     };
 
-    gdp::core::Vec3 minimum = origin + gdp::core::rotateQuarterTurns(corners[0], rotation);
-    gdp::core::Vec3 maximum = minimum;
-    for (const gdp::core::Vec3 corner : corners) {
-        const gdp::core::Vec3 transformed = origin
-            + gdp::core::rotateQuarterTurns(corner, rotation);
+    wkc::core::Vec3 minimum = origin + wkc::core::rotateQuarterTurns(corners[0], rotation);
+    wkc::core::Vec3 maximum = minimum;
+    for (const wkc::core::Vec3 corner : corners) {
+        const wkc::core::Vec3 transformed = origin
+            + wkc::core::rotateQuarterTurns(corner, rotation);
         minimum.x = std::min(minimum.x, transformed.x);
         minimum.y = std::min(minimum.y, transformed.y);
         minimum.z = std::min(minimum.z, transformed.z);
@@ -196,7 +196,7 @@ ModuleValidationResult validateRoomModule(const RoomModule& module)
     if (!module.localBounds.isValid()) {
         result.errors.push_back(ModuleValidationError::InvalidBounds);
     } else {
-        const gdp::core::Vec3 span = module.localBounds.maximum
+        const wkc::core::Vec3 span = module.localBounds.maximum
             - module.localBounds.minimum;
         constexpr float maximumInset = 1.0F;
         constexpr float tolerance = 1.0e-4F;
@@ -252,9 +252,9 @@ std::optional<RoomInstance> instantiateRoom(
     const RoomModule& module,
     const RoomId roomId,
     const RoomRole role,
-    const gdp::core::Seed seed,
-    const gdp::core::Vec3 worldOrigin,
-    const gdp::core::QuarterTurn rotation)
+    const wkc::core::Seed seed,
+    const wkc::core::Vec3 worldOrigin,
+    const wkc::core::QuarterTurn rotation)
 {
     if (roomId == 0 || !validateRoomModule(module).isValid() || !module.supportsRole(role)) {
         return std::nullopt;

@@ -16,9 +16,9 @@ struct RayInterval {
 };
 
 std::optional<RayInterval> rayAabbInterval(
-    const gdp::core::Vec3 origin,
-    const gdp::core::Vec3 direction,
-    const gdp::core::Aabb bounds,
+    const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction,
+    const wkc::core::Aabb bounds,
     const float maximumDistance) noexcept
 {
     float nearDistance = 0.0F;
@@ -53,9 +53,9 @@ std::optional<RayInterval> rayAabbInterval(
     return RayInterval{std::max(nearDistance, 0.0F), farDistance};
 }
 
-gdp::core::Aabb enemyBounds(const gdp::entities::Entity& enemy) noexcept
+wkc::core::Aabb enemyBounds(const gdp::entities::Entity& enemy) noexcept
 {
-    const gdp::core::Vec3 position = enemy.transform.position;
+    const wkc::core::Vec3 position = enemy.transform.position;
     return {
         {position.x - 0.38F, position.y, position.z - 0.30F},
         {position.x + 0.38F, position.y + 1.80F, position.z + 0.30F},
@@ -63,13 +63,13 @@ gdp::core::Aabb enemyBounds(const gdp::entities::Entity& enemy) noexcept
 }
 
 float firstWorldDistance(
-    const gdp::core::Vec3 origin,
-    const gdp::core::Vec3 direction,
+    const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction,
     const float maximumDistance,
     const CollisionWorld& collisionWorld) noexcept
 {
     float nearest = maximumDistance + 1.0F;
-    for (const gdp::core::Aabb solid : collisionWorld.solids()) {
+    for (const wkc::core::Aabb solid : collisionWorld.solids()) {
         if (const auto interval = rayAabbInterval(origin, direction, solid, maximumDistance)) {
             nearest = std::min(nearest, interval->nearDistance);
         }
@@ -77,7 +77,7 @@ float firstWorldDistance(
 
     std::vector<RayInterval> walkableIntervals;
     walkableIntervals.reserve(collisionWorld.walkableVolumes().size());
-    for (const gdp::core::Aabb volume : collisionWorld.walkableVolumes()) {
+    for (const wkc::core::Aabb volume : collisionWorld.walkableVolumes()) {
         if (const auto interval = rayAabbInterval(
                 origin, direction, volume, maximumDistance)) {
             walkableIntervals.push_back(*interval);
@@ -138,8 +138,8 @@ DamageOutcome applyDamage(
 
 ShotResult fireHitscan(
     Weapon& weapon,
-    const gdp::core::Vec3 origin,
-    gdp::core::Vec3 direction,
+    const wkc::core::Vec3 origin,
+    wkc::core::Vec3 direction,
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager) noexcept
@@ -152,9 +152,9 @@ ShotResult fireHitscan(
         return {ShotOutcome::Empty, std::nullopt};
     }
 
-    direction = gdp::core::normalized(direction);
+    direction = wkc::core::normalized(direction);
     const float range = weapon.definition().range;
-    if (gdp::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
+    if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
         return {ShotOutcome::Miss, std::nullopt};
     }
 
@@ -227,12 +227,12 @@ ShotResult fireHitscan(
 }
 
 bool hasLineOfSight(
-    const gdp::core::Vec3 origin,
-    const gdp::core::Vec3 target,
+    const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 target,
     const CollisionWorld& collisionWorld) noexcept
 {
-    const gdp::core::Vec3 offset = target - origin;
-    const float distance = gdp::core::length(offset);
+    const wkc::core::Vec3 offset = target - origin;
+    const float distance = wkc::core::length(offset);
     if (distance <= 1.0e-7F) {
         return true;
     }
@@ -244,7 +244,7 @@ bool hasLineOfSight(
 }
 
 bool hasLineOfSightToProp(
-    const gdp::core::Vec3 origin,
+    const wkc::core::Vec3 origin,
     const gdp::entities::EntityManager& manager,
     const gdp::entities::EntityId target,
     const CollisionWorld& collisionWorld) noexcept
@@ -256,14 +256,14 @@ bool hasLineOfSightToProp(
         || prop->state == gdp::entities::PropState::Destroyed) {
         return false;
     }
-    const gdp::core::Vec3 targetPoint = entity->transform.position
-        + gdp::core::Vec3{0.0F, entity->transform.scale.y * 0.5F, 0.0F};
-    const gdp::core::Vec3 offset = targetPoint - origin;
-    const float distance = gdp::core::length(offset);
+    const wkc::core::Vec3 targetPoint = entity->transform.position
+        + wkc::core::Vec3{0.0F, entity->transform.scale.y * 0.5F, 0.0F};
+    const wkc::core::Vec3 offset = targetPoint - origin;
+    const float distance = wkc::core::length(offset);
     if (distance <= 1.0e-7F) {
         return true;
     }
-    const gdp::core::Vec3 direction = offset * (1.0F / distance);
+    const wkc::core::Vec3 direction = offset * (1.0F / distance);
     const auto targetInterval = rayAabbInterval(
         origin, direction, propCollisionBounds(*entity, *prop), distance);
     return targetInterval

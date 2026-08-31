@@ -23,7 +23,7 @@ struct CorridorPath {
     CorridorShape shape{CorridorShape::Straight};
     float width{1.2F};
     float height{2.2F};
-    std::vector<gdp::core::Vec3> points;
+    std::vector<wkc::core::Vec3> points;
 };
 
 [[nodiscard]] std::optional<CorridorPath> routeCorridor(

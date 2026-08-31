@@ -22,7 +22,7 @@ bool isUnitValue(const float value) noexcept
     return std::isfinite(value) && value >= 0.0F && value <= 1.0F;
 }
 
-bool isUnitColor(const gdp::core::Vec3 color) noexcept
+bool isUnitColor(const wkc::core::Vec3 color) noexcept
 {
     return isUnitValue(color.x) && isUnitValue(color.y) && isUnitValue(color.z);
 }
@@ -38,19 +38,19 @@ std::uint8_t channelToByte(const float value) noexcept
         std::lround(std::clamp(value, 0.0F, 1.0F) * 255.0F));
 }
 
-gdp::core::Vec3 multiply(const gdp::core::Vec3 color, const float value) noexcept
+wkc::core::Vec3 multiply(const wkc::core::Vec3 color, const float value) noexcept
 {
     return {color.x * value, color.y * value, color.z * value};
 }
 
-gdp::core::Vec3 add(const gdp::core::Vec3 color, const float value) noexcept
+wkc::core::Vec3 add(const wkc::core::Vec3 color, const float value) noexcept
 {
     return {color.x + value, color.y + value, color.z + value};
 }
 
-gdp::core::Vec3 mix(
-    const gdp::core::Vec3 first,
-    const gdp::core::Vec3 second,
+wkc::core::Vec3 mix(
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second,
     const float amount) noexcept
 {
     return {
@@ -66,7 +66,7 @@ float scalarMix(const float first, const float second, const float amount) noexc
 }
 
 float smoothNoise(
-    const gdp::core::Seed seed,
+    const wkc::core::Seed seed,
     const std::uint32_t x,
     const std::uint32_t y,
     const std::uint32_t cellSize) noexcept
@@ -88,7 +88,7 @@ float smoothNoise(
 }
 
 struct IndustrialWallSample {
-    gdp::core::Vec3 albedo{};
+    wkc::core::Vec3 albedo{};
     float height{0.5F};
     float roughness{0.62F};
     float metalness{0.06F};
@@ -97,7 +97,7 @@ struct IndustrialWallSample {
 };
 
 struct IndustrialCeilingSample {
-    gdp::core::Vec3 albedo{};
+    wkc::core::Vec3 albedo{};
     float height{0.5F};
     float roughness{0.44F};
     float metalness{0.74F};
@@ -111,9 +111,9 @@ IndustrialCeilingSample industrialCeilingSample(
     const std::uint32_t cellWidth,
     const std::uint32_t cellHeight) noexcept
 {
-    constexpr gdp::core::Vec3 recessedJoint{0.055F, 0.063F, 0.068F};
-    constexpr gdp::core::Vec3 exposedSteel{0.48F, 0.51F, 0.52F};
-    constexpr gdp::core::Vec3 grime{0.16F, 0.15F, 0.14F};
+    constexpr wkc::core::Vec3 recessedJoint{0.055F, 0.063F, 0.068F};
+    constexpr wkc::core::Vec3 exposedSteel{0.48F, 0.51F, 0.52F};
+    constexpr wkc::core::Vec3 grime{0.16F, 0.15F, 0.14F};
 
     IndustrialCeilingSample sample;
     const std::uint32_t panelX = x % cellWidth;
@@ -275,11 +275,11 @@ IndustrialWallSample industrialWallSample(
     const std::uint32_t cellHeight,
     const std::uint32_t stripeHeight) noexcept
 {
-    constexpr gdp::core::Vec3 jointColor{21.0F / 255.0F, 26.0F / 255.0F, 28.0F / 255.0F};
-    constexpr gdp::core::Vec3 exposedSteel{
+    constexpr wkc::core::Vec3 jointColor{21.0F / 255.0F, 26.0F / 255.0F, 28.0F / 255.0F};
+    constexpr wkc::core::Vec3 exposedSteel{
         139.0F / 255.0F, 144.0F / 255.0F, 145.0F / 255.0F};
-    constexpr gdp::core::Vec3 grimeColor{73.0F / 255.0F, 56.0F / 255.0F, 43.0F / 255.0F};
-    constexpr gdp::core::Vec3 stripeBlack{0.055F, 0.060F, 0.065F};
+    constexpr wkc::core::Vec3 grimeColor{73.0F / 255.0F, 56.0F / 255.0F, 43.0F / 255.0F};
+    constexpr wkc::core::Vec3 stripeBlack{0.055F, 0.060F, 0.065F};
 
     IndustrialWallSample sample;
     const std::uint32_t panelX = x % cellWidth;
@@ -491,16 +491,16 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
     return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
-std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
+std::uint64_t addVec3(std::uint64_t hash, const wkc::core::Vec3 value) noexcept
 {
     hash = addFloat(hash, value.x);
     hash = addFloat(hash, value.y);
     return addFloat(hash, value.z);
 }
 
-IndustrialCondition selectCondition(const gdp::core::Seed roomSeed) noexcept
+IndustrialCondition selectCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 0)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 20) {
@@ -514,7 +514,7 @@ IndustrialCondition selectCondition(const gdp::core::Seed roomSeed) noexcept
 
 std::pair<float, float> conditionAmounts(
     const IndustrialCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case IndustrialCondition::Maintained:
@@ -530,14 +530,14 @@ std::pair<float, float> conditionAmounts(
 }
 
 IndustrialSurfaceRecipe makeSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const IndustrialCondition condition,
     const IndustrialSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 1U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const auto [wear, dirt] = conditionAmounts(condition, random);
 
     IndustrialSurfaceRecipe recipe;
@@ -587,9 +587,9 @@ IndustrialSurfaceRecipe makeSurfaceRecipe(
     return recipe;
 }
 
-StorageCondition selectStorageCondition(const gdp::core::Seed roomSeed) noexcept
+StorageCondition selectStorageCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 100)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 18) {
@@ -609,7 +609,7 @@ struct StorageConditionAmounts {
 
 StorageConditionAmounts storageConditionAmounts(
     const StorageCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case StorageCondition::Orderly:
@@ -628,14 +628,14 @@ StorageConditionAmounts storageConditionAmounts(
 }
 
 StorageSurfaceRecipe makeStorageSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const StorageCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 101U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const StorageConditionAmounts amounts = storageConditionAmounts(condition, random);
 
     StorageSurfaceRecipe recipe;
@@ -681,9 +681,9 @@ StorageSurfaceRecipe makeStorageSurfaceRecipe(
     return recipe;
 }
 
-CombatCondition selectCombatCondition(const gdp::core::Seed roomSeed) noexcept
+CombatCondition selectCombatCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 200)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 18) {
@@ -697,7 +697,7 @@ CombatCondition selectCombatCondition(const gdp::core::Seed roomSeed) noexcept
 
 std::pair<float, float> combatConditionAmounts(
     const CombatCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case CombatCondition::Ready:
@@ -713,14 +713,14 @@ std::pair<float, float> combatConditionAmounts(
 }
 
 CombatSurfaceRecipe makeCombatSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const CombatCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 201U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const auto [wear, impacts] = combatConditionAmounts(condition, random);
 
     CombatSurfaceRecipe recipe;
@@ -768,9 +768,9 @@ CombatSurfaceRecipe makeCombatSurfaceRecipe(
     return recipe;
 }
 
-CafeteriaCondition selectCafeteriaCondition(const gdp::core::Seed roomSeed) noexcept
+CafeteriaCondition selectCafeteriaCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 300)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 22) {
@@ -784,7 +784,7 @@ CafeteriaCondition selectCafeteriaCondition(const gdp::core::Seed roomSeed) noex
 
 std::pair<float, float> cafeteriaConditionAmounts(
     const CafeteriaCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case CafeteriaCondition::Clean:
@@ -800,14 +800,14 @@ std::pair<float, float> cafeteriaConditionAmounts(
 }
 
 CafeteriaSurfaceRecipe makeCafeteriaSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const CafeteriaCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 301U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const auto [wear, stain] = cafeteriaConditionAmounts(condition, random);
 
     CafeteriaSurfaceRecipe recipe;
@@ -855,9 +855,9 @@ CafeteriaSurfaceRecipe makeCafeteriaSurfaceRecipe(
     return recipe;
 }
 
-LaboratoryCondition selectLaboratoryCondition(const gdp::core::Seed roomSeed) noexcept
+LaboratoryCondition selectLaboratoryCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 400)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 24) {
@@ -871,7 +871,7 @@ LaboratoryCondition selectLaboratoryCondition(const gdp::core::Seed roomSeed) no
 
 std::pair<float, float> laboratoryConditionAmounts(
     const LaboratoryCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case LaboratoryCondition::Sterile:
@@ -887,14 +887,14 @@ std::pair<float, float> laboratoryConditionAmounts(
 }
 
 LaboratorySurfaceRecipe makeLaboratorySurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const LaboratoryCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 401U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const auto [wear, contamination] = laboratoryConditionAmounts(condition, random);
 
     LaboratorySurfaceRecipe recipe;
@@ -941,9 +941,9 @@ LaboratorySurfaceRecipe makeLaboratorySurfaceRecipe(
     return recipe;
 }
 
-TechnicalCondition selectTechnicalCondition(const gdp::core::Seed roomSeed) noexcept
+TechnicalCondition selectTechnicalCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 500)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 20) {
@@ -963,7 +963,7 @@ struct TechnicalConditionAmounts {
 
 TechnicalConditionAmounts technicalConditionAmounts(
     const TechnicalCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case TechnicalCondition::Serviced:
@@ -982,14 +982,14 @@ TechnicalConditionAmounts technicalConditionAmounts(
 }
 
 TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const TechnicalCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 501U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const TechnicalConditionAmounts amounts = technicalConditionAmounts(condition, random);
 
     TechnicalSurfaceRecipe recipe;
@@ -1041,9 +1041,9 @@ TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
     return recipe;
 }
 
-SecurityCondition selectSecurityCondition(const gdp::core::Seed roomSeed) noexcept
+SecurityCondition selectSecurityCondition(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 600)};
     const int roll = random.rangeInt(0, 99);
     if (roll < 24) {
@@ -1057,7 +1057,7 @@ SecurityCondition selectSecurityCondition(const gdp::core::Seed roomSeed) noexce
 
 std::pair<float, float> securityConditionAmounts(
     const SecurityCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case SecurityCondition::Secured:
@@ -1073,14 +1073,14 @@ std::pair<float, float> securityConditionAmounts(
 }
 
 SecuritySurfaceRecipe makeSecuritySurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const SecurityCondition condition,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 601U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const auto [wear, alert] = securityConditionAmounts(condition, random);
 
     SecuritySurfaceRecipe recipe;
@@ -1137,9 +1137,9 @@ struct CentralHubSelection {
     CentralHubRouteAxis routeAxis;
 };
 
-CentralHubSelection selectCentralHubState(const gdp::core::Seed roomSeed) noexcept
+CentralHubSelection selectCentralHubState(const wkc::core::Seed roomSeed) noexcept
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, 700)};
     const int roll = random.rangeInt(0, 99);
     CentralHubCondition condition = CentralHubCondition::Active;
@@ -1161,7 +1161,7 @@ struct CentralHubConditionAmounts {
 
 CentralHubConditionAmounts centralHubConditionAmounts(
     const CentralHubCondition condition,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     switch (condition) {
     case CentralHubCondition::Open:
@@ -1180,15 +1180,15 @@ CentralHubConditionAmounts centralHubConditionAmounts(
 }
 
 CentralHubSurfaceRecipe makeCentralHubSurfaceRecipe(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const CentralHubCondition condition,
     const CentralHubRouteAxis routeAxis,
     const RoomSurface surface)
 {
     const std::uint64_t localId = static_cast<std::uint64_t>(surface) + 701U;
-    const gdp::core::Seed seed = gdp::core::deriveSeed(
+    const wkc::core::Seed seed = wkc::core::deriveSeed(
         roomSeed, gdp::game::SeedDomain::RoomMaterial, localId);
-    gdp::core::RandomStream random{seed};
+    wkc::core::RandomStream random{seed};
     const CentralHubConditionAmounts amounts = centralHubConditionAmounts(condition, random);
 
     CentralHubSurfaceRecipe recipe;
@@ -1242,7 +1242,7 @@ void writePixel(
     wkc::render::ImageData& image,
     const std::uint32_t x,
     const std::uint32_t y,
-    const gdp::core::Vec3 color)
+    const wkc::core::Vec3 color)
 {
     const std::size_t index = (static_cast<std::size_t>(y)
         * static_cast<std::size_t>(image.width) + x) * 4U;
@@ -1294,7 +1294,7 @@ bool CentralHubMaterialValidationResult::isValid() const noexcept
     return errors.empty();
 }
 
-IndustrialRoomMaterialSet generateIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
+IndustrialRoomMaterialSet generateIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
 {
     IndustrialRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -1443,7 +1443,7 @@ IndustrialMaterialValidationResult validateIndustrialRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(IndustrialMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 1U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(IndustrialMaterialValidationError::InvalidSurfaceOrder);
@@ -1521,7 +1521,7 @@ std::optional<wkc::render::ImageData> generateIndustrialSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.12F + (unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.18F);
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const float grain = (unitNoise(
                 wkc::core::hashCombine(recipe.seed, pixelId)) - 0.5F) * 0.035F;
@@ -1605,7 +1605,7 @@ std::optional<IndustrialWallMaterialImages> generateIndustrialWallMaterialImages
             const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
             const std::uint32_t down = y == 0U ? y : y - 1U;
             const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
-            const gdp::core::Vec3 normal = gdp::core::normalized({
+            const wkc::core::Vec3 normal = wkc::core::normalized({
                 (heightAt(left, y) - heightAt(right, y)) * 2.8F,
                 (heightAt(x, down) - heightAt(x, up)) * 2.8F,
                 1.0F,
@@ -1661,7 +1661,7 @@ std::optional<IndustrialCeilingMaterialImages> generateIndustrialCeilingMaterial
             const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
             const std::uint32_t down = y == 0U ? y : y - 1U;
             const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
-            const gdp::core::Vec3 normal = gdp::core::normalized({
+            const wkc::core::Vec3 normal = wkc::core::normalized({
                 (heightAt(left, y) - heightAt(right, y)) * 3.2F,
                 (heightAt(x, down) - heightAt(x, up)) * 3.2F,
                 1.0F,
@@ -1676,7 +1676,7 @@ std::optional<IndustrialCeilingMaterialImages> generateIndustrialCeilingMaterial
     return images;
 }
 
-StorageRoomMaterialSet generateStorageRoomMaterials(const gdp::core::Seed roomSeed)
+StorageRoomMaterialSet generateStorageRoomMaterials(const wkc::core::Seed roomSeed)
 {
     StorageRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -1752,7 +1752,7 @@ StorageMaterialValidationResult validateStorageRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(StorageMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 101U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(StorageMaterialValidationError::InvalidSurfaceOrder);
@@ -1817,7 +1817,7 @@ std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelVariation = 0.10F + (unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.30F);
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelVariation);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -1881,7 +1881,7 @@ std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
     return image;
 }
 
-CombatRoomMaterialSet generateCombatRoomMaterials(const gdp::core::Seed roomSeed)
+CombatRoomMaterialSet generateCombatRoomMaterials(const wkc::core::Seed roomSeed)
 {
     CombatRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -1964,7 +1964,7 @@ CombatMaterialValidationResult validateCombatRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 201U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceOrder);
@@ -2032,7 +2032,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.08F + (unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.22F);
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -2071,8 +2071,8 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
                     const int distanceSquared = (dx * dx) + (dy * dy);
                     if (distanceSquared <= radius * radius) {
                         color = distanceSquared <= 1
-                            ? gdp::core::Vec3{0.045F, 0.05F, 0.04F}
-                            : gdp::core::Vec3{0.45F, 0.46F, 0.42F};
+                            ? wkc::core::Vec3{0.045F, 0.05F, 0.04F}
+                            : wkc::core::Vec3{0.45F, 0.46F, 0.42F};
                     }
                 }
                 const std::uint32_t markY = recipe.resolution * 3U / 4U;
@@ -2106,7 +2106,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     return image;
 }
 
-CafeteriaRoomMaterialSet generateCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
+CafeteriaRoomMaterialSet generateCafeteriaRoomMaterials(const wkc::core::Seed roomSeed)
 {
     CafeteriaRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -2191,7 +2191,7 @@ CafeteriaMaterialValidationResult validateCafeteriaRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(CafeteriaMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 301U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CafeteriaMaterialValidationError::InvalidSurfaceOrder);
@@ -2256,7 +2256,7 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.05F + unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -2321,7 +2321,7 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
     return image;
 }
 
-LaboratoryRoomMaterialSet generateLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
+LaboratoryRoomMaterialSet generateLaboratoryRoomMaterials(const wkc::core::Seed roomSeed)
 {
     LaboratoryRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -2407,7 +2407,7 @@ LaboratoryMaterialValidationResult validateLaboratoryRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(LaboratoryMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 401U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(LaboratoryMaterialValidationError::InvalidSurfaceOrder);
@@ -2472,7 +2472,7 @@ std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.025F + unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.05F;
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -2498,7 +2498,7 @@ std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
                     || y + 2U >= moduleTop);
                 if (module) {
                     color = moduleBorder ? recipe.accentColor
-                                         : gdp::core::Vec3{0.12F, 0.16F, 0.19F};
+                                         : wkc::core::Vec3{0.12F, 0.16F, 0.19F};
                 }
                 const bool indicatorA = x >= moduleLeft + 5U && x < moduleLeft + 7U
                     && y >= moduleBottom + 6U && y < moduleBottom + 8U;
@@ -2540,7 +2540,7 @@ std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
     return image;
 }
 
-TechnicalRoomMaterialSet generateTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
+TechnicalRoomMaterialSet generateTechnicalRoomMaterials(const wkc::core::Seed roomSeed)
 {
     TechnicalRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -2623,7 +2623,7 @@ TechnicalMaterialValidationResult validateTechnicalRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(TechnicalMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 501U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(TechnicalMaterialValidationError::InvalidSurfaceOrder);
@@ -2689,7 +2689,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.08F + unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.16F;
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -2732,8 +2732,8 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                 const bool box = x >= 44U && x < 59U && y >= 17U && y < 36U;
                 if (box) {
                     const bool border = x < 46U || x >= 57U || y < 19U || y >= 34U;
-                    color = border ? gdp::core::Vec3{0.32F, 0.33F, 0.31F}
-                                   : gdp::core::Vec3{0.15F, 0.16F, 0.15F};
+                    color = border ? wkc::core::Vec3{0.32F, 0.33F, 0.31F}
+                                   : wkc::core::Vec3{0.15F, 0.16F, 0.15F};
                 }
                 if (y < 7U && (x < 22U || (pipeCount == 2U && x > 27U && x < 42U))) {
                     const float dirt = unitNoise(wkc::core::hashCombine(
@@ -2755,8 +2755,8 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                     if (grate) {
                         const bool frame = x < 11U || x >= 26U || y < 39U || y >= 54U;
                         color = frame || (x % 4U <= 1U)
-                            ? gdp::core::Vec3{0.27F, 0.28F, 0.26F}
-                            : gdp::core::Vec3{0.07F, 0.08F, 0.07F};
+                            ? wkc::core::Vec3{0.27F, 0.28F, 0.26F}
+                            : wkc::core::Vec3{0.07F, 0.08F, 0.07F};
                     }
                 }
                 const int radiusX = 4 + static_cast<int>(recipe.oilAmount * 18.0F);
@@ -2768,7 +2768,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                 const int radiusSquared = radiusX * radiusX * radiusY * radiusY;
                 if (ellipse <= radiusSquared) {
                     color = ellipse < radiusSquared * 3 / 5
-                        ? gdp::core::Vec3{0.09F, 0.10F, 0.09F}
+                        ? wkc::core::Vec3{0.09F, 0.10F, 0.09F}
                         : mix(color, {0.09F, 0.10F, 0.09F}, 0.56F);
                 }
             } else {
@@ -2781,10 +2781,10 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                 if (category < 0.60F) {
                     if (panelY >= centerY - 3U && panelY <= centerY + 3U) {
                         color = panelY == centerY - 3U
-                            ? gdp::core::Vec3{0.08F, 0.09F, 0.08F}
+                            ? wkc::core::Vec3{0.08F, 0.09F, 0.08F}
                             : (panelY == centerY + 3U
-                                    ? gdp::core::Vec3{0.42F, 0.43F, 0.39F}
-                                    : gdp::core::Vec3{0.27F, 0.28F, 0.26F});
+                                    ? wkc::core::Vec3{0.42F, 0.43F, 0.39F}
+                                    : wkc::core::Vec3{0.27F, 0.28F, 0.26F});
                     }
                 } else if (category < 0.75F) {
                     const bool duct = panelX >= 7U && panelX + 7U < cellWidth
@@ -2792,8 +2792,8 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                     if (duct) {
                         const bool border = panelX < 10U || panelX + 10U >= cellWidth
                             || panelY == centerY - 6U || panelY == centerY + 6U;
-                        color = border ? gdp::core::Vec3{0.08F, 0.09F, 0.08F}
-                                       : gdp::core::Vec3{0.25F, 0.26F, 0.24F};
+                        color = border ? wkc::core::Vec3{0.08F, 0.09F, 0.08F}
+                                       : wkc::core::Vec3{0.25F, 0.26F, 0.24F};
                     }
                 } else if (category < 0.90F
                     && (panelX == centerX || panelX == centerX + 2U)) {
@@ -2806,7 +2806,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
     return image;
 }
 
-SecurityRoomMaterialSet generateSecurityRoomMaterials(const gdp::core::Seed roomSeed)
+SecurityRoomMaterialSet generateSecurityRoomMaterials(const wkc::core::Seed roomSeed)
 {
     SecurityRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -2896,7 +2896,7 @@ SecurityMaterialValidationResult validateSecurityRoomMaterials(
         if (surfaceIndex(recipe.surface) != index) {
             result.errors.push_back(SecurityMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 601U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(SecurityMaterialValidationError::InvalidSurfaceOrder);
@@ -2962,7 +2962,7 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.06F + unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
@@ -2980,8 +2980,8 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
                 const bool console = x >= 35U && x < 60U && y >= 12U && y < 45U;
                 if (console) {
                     const bool frame = x < 38U || x >= 57U || y < 15U || y >= 42U;
-                    color = frame ? gdp::core::Vec3{0.33F, 0.36F, 0.38F}
-                                  : gdp::core::Vec3{0.08F, 0.10F, 0.11F};
+                    color = frame ? wkc::core::Vec3{0.33F, 0.36F, 0.38F}
+                                  : wkc::core::Vec3{0.08F, 0.10F, 0.11F};
                 }
                 const bool screen = x >= 40U && x < 56U && y >= 18U && y < 31U;
                 if (screen) {
@@ -2998,8 +2998,8 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
                         color = {0.07F, 0.16F, 0.15F};
                     } else if (screenState < 0.95F) {
                         color = (x + y) % 5U == 0U
-                            ? gdp::core::Vec3{0.16F, 0.32F, 0.38F}
-                            : gdp::core::Vec3{0.06F, 0.12F, 0.15F};
+                            ? wkc::core::Vec3{0.16F, 0.32F, 0.38F}
+                            : wkc::core::Vec3{0.06F, 0.12F, 0.15F};
                     } else {
                         color = {0.49F, 0.31F, 0.08F};
                     }
@@ -3009,8 +3009,8 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
                     if (x >= indicatorX && x < indicatorX + 2U
                         && y >= 35U && y < 37U) {
                         color = recipe.alertAmount > 0.15F && indicator == 0U
-                            ? gdp::core::Vec3{0.66F, 0.20F, 0.20F}
-                            : gdp::core::Vec3{0.23F, 0.61F, 0.28F};
+                            ? wkc::core::Vec3{0.66F, 0.20F, 0.20F}
+                            : wkc::core::Vec3{0.23F, 0.61F, 0.28F};
                     }
                 }
                 if (x >= 47U && x < 49U && y >= 45U) {
@@ -3059,7 +3059,7 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
     return image;
 }
 
-CentralHubRoomMaterialSet generateCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
+CentralHubRoomMaterialSet generateCentralHubRoomMaterials(const wkc::core::Seed roomSeed)
 {
     const CentralHubSelection selection = selectCentralHubState(roomSeed);
     CentralHubRoomMaterialSet materials;
@@ -3162,7 +3162,7 @@ CentralHubMaterialValidationResult validateCentralHubRoomMaterials(
         if (surfaceIndex(recipe.surface) != index || recipe.routeAxis != materials.routeAxis) {
             result.errors.push_back(CentralHubMaterialValidationError::InvalidSurfaceOrder);
         }
-        const gdp::core::Seed expectedSeed = gdp::core::deriveSeed(
+        const wkc::core::Seed expectedSeed = wkc::core::deriveSeed(
             materials.roomSeed, gdp::game::SeedDomain::RoomMaterial, index + 701U);
         if (recipe.seed != expectedSeed) {
             result.errors.push_back(CentralHubMaterialValidationError::InvalidSurfaceOrder);
@@ -3229,7 +3229,7 @@ std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
                 | (x / cellWidth);
             const float panelBlend = 0.04F + unitNoise(
                 wkc::core::hashCombine(recipe.seed, panelId)) * 0.08F;
-            gdp::core::Vec3 color = mix(
+            wkc::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;

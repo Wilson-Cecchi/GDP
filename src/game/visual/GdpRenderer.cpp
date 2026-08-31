@@ -140,9 +140,9 @@ enum class RoomMaterialChannel : std::uint8_t {
 };
 
 struct RoomPart {
-    gdp::core::Vec3 position;
-    gdp::core::Vec3 scale;
-    gdp::core::Vec3 tint;
+    wkc::core::Vec3 position;
+    wkc::core::Vec3 scale;
+    wkc::core::Vec3 tint;
     RoomMaterialChannel material;
     float uvScale;
 };
@@ -216,7 +216,7 @@ void drawSolidRect(
     const int y,
     const int width,
     const int height,
-    const gdp::core::Vec3 color)
+    const wkc::core::Vec3 color)
 {
     if (width <= 0 || height <= 0) {
         return;
@@ -231,7 +231,7 @@ void drawBitmapText(
     const int y,
     const int scale,
     const std::string_view text,
-    const gdp::core::Vec3 color)
+    const wkc::core::Vec3 color)
 {
     glClearColor(color.x, color.y, color.z, 1.0F);
     int cursor = x;
@@ -299,7 +299,7 @@ bool GdpRenderer::initialize(const int width, const int height)
     return true;
 }
 
-bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -400,7 +400,7 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareStorageRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -434,7 +434,7 @@ bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCombatRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -468,7 +468,7 @@ bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCafeteriaRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -502,7 +502,7 @@ bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareLaboratoryRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -536,7 +536,7 @@ bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareTechnicalRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -570,7 +570,7 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareSecurityRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -604,7 +604,7 @@ bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
+bool GdpRenderer::prepareCentralHubRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
         return false;
@@ -638,7 +638,7 @@ bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareWorkerVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -673,7 +673,7 @@ bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareGuardVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -708,7 +708,7 @@ bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareOfficerVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -743,7 +743,7 @@ bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareEngineerVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -779,7 +779,7 @@ bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
     return true;
 }
 
-bool GdpRenderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
+bool GdpRenderer::prepareIndustrialRobotVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
@@ -857,8 +857,8 @@ bool GdpRenderer::render(
         camera_.projectionMatrix(static_cast<float>(width) / static_cast<float>(height)));
     const std::uint32_t lightCount = std::min<std::uint32_t>(
         lighting.lightCount, static_cast<std::uint32_t>(maxRenderedRoomLights));
-    const gdp::core::Vec3 alertColor{1.0F, 0.12F, 0.06F};
-    const gdp::core::Vec3 ambientColor = lighting.alert
+    const wkc::core::Vec3 alertColor{1.0F, 0.12F, 0.06F};
+    const wkc::core::Vec3 ambientColor = lighting.alert
         ? (lighting.ambientColor * 0.28F) + (alertColor * 0.72F)
         : lighting.ambientColor;
     shader_.setInt(gl_, "uLightCount", static_cast<int>(lightCount));
@@ -892,7 +892,7 @@ bool GdpRenderer::render(
     };
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
-        const gdp::core::Vec3 lightColor = lighting.alert
+        const wkc::core::Vec3 lightColor = lighting.alert
             ? (light.color * 0.24F) + (alertColor * 0.76F)
             : light.color;
         shader_.setVec3(gl_, positionUniforms[index], light.position);
@@ -916,17 +916,17 @@ bool GdpRenderer::render(
 
     const auto drawSurface = [this](
         const RoomGpuMaterials& roomMaterials,
-        const gdp::core::Vec3 position,
-        const gdp::core::Vec3 scale,
+        const wkc::core::Vec3 position,
+        const wkc::core::Vec3 scale,
         const RoomMaterialChannel material,
         const float uvScale = 1.0F,
-        const gdp::core::Vec3 tint = {1.0F, 1.0F, 1.0F},
-        const gdp::core::Vec2 detailedUvScale = {},
-        const gdp::core::Vec2 detailedUvOffset = {}) {
+        const wkc::core::Vec3 tint = {1.0F, 1.0F, 1.0F},
+        const wkc::core::Vec2 detailedUvScale = {},
+        const wkc::core::Vec2 detailedUvOffset = {}) {
         float emissiveStrength = 0.0F;
         bool detailedMaterial = false;
-        gdp::core::Vec3 resolvedTint = tint;
-        gdp::core::Vec2 materialUvOffset{};
+        wkc::core::Vec3 resolvedTint = tint;
+        wkc::core::Vec2 materialUvOffset{};
         switch (material) {
         case RoomMaterialChannel::Wall:
             if (roomMaterials.industrialWallCondition) {
@@ -974,49 +974,49 @@ bool GdpRenderer::render(
             fallbackTexture_.bind(gl_);
             break;
         }
-        shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
-                * gdp::core::scaleMatrix(scale));
+        shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
+                * wkc::core::scaleMatrix(scale));
         shader_.setVec3(gl_, "uTint", resolvedTint);
         shader_.setInt(gl_, "uDetailedMaterial", detailedMaterial ? 1 : 0);
         const bool customUv = detailedMaterial
             && detailedUvScale.x > 0.0F && detailedUvScale.y > 0.0F;
         shader_.setVec2(gl_, "uUvScale",
-            customUv ? detailedUvScale : gdp::core::Vec2{uvScale, uvScale});
+            customUv ? detailedUvScale : wkc::core::Vec2{uvScale, uvScale});
         shader_.setVec2(gl_, "uUvOffset",
             customUv
                 ? detailedUvOffset + materialUvOffset
-                : gdp::core::Vec2{});
+                : wkc::core::Vec2{});
         shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
         box_.draw(gl_);
     };
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
-        const gdp::core::Aabb bounds = renderedRoom.worldBounds;
+        const wkc::core::Aabb bounds = renderedRoom.worldBounds;
         const float roomWidth = bounds.maximum.x - bounds.minimum.x;
         const float roomDepth = bounds.maximum.z - bounds.minimum.z;
         const float roomHeight = bounds.maximum.y - bounds.minimum.y;
-        const gdp::core::Vec3 roomCenter{
+        const wkc::core::Vec3 roomCenter{
             (bounds.minimum.x + bounds.maximum.x) * 0.5F,
             bounds.minimum.y,
             (bounds.minimum.z + bounds.maximum.z) * 0.5F,
         };
         constexpr float shellThickness = 0.20F;
         drawSurface(roomMaterials,
-            roomCenter + gdp::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
+            roomCenter + wkc::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
             {roomWidth + shellThickness, shellThickness,
                 roomDepth + shellThickness},
             RoomMaterialChannel::Floor, 4.0F);
         drawSurface(roomMaterials,
             roomCenter
-                + gdp::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
+                + wkc::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
             {roomWidth + shellThickness, shellThickness,
                 roomDepth + shellThickness},
             RoomMaterialChannel::Ceiling, 1.0F, {1.0F, 1.0F, 1.0F},
             {roomWidth / 4.0F, roomDepth / 4.0F},
             {bounds.minimum.x / 4.0F, bounds.minimum.z / 4.0F});
 
-        const auto drawWall = [&](const gdp::core::Vec3 normal) {
+        const auto drawWall = [&](const wkc::core::Vec3 normal) {
             const bool facesX = std::abs(normal.x) > 0.5F;
             const float wallCenter = facesX
                 ? (normal.x > 0.0F ? bounds.maximum.x : bounds.minimum.x)
@@ -1033,7 +1033,7 @@ bool GdpRenderer::render(
                         = facesX ? candidate.position.x : candidate.position.z;
                     const float candidateTransverse
                         = facesX ? candidate.position.z : candidate.position.x;
-                    return gdp::core::dot(normal, candidate.outwardNormal) > 0.90F
+                    return wkc::core::dot(normal, candidate.outwardNormal) > 0.90F
                         && std::abs(candidatePlane - wallCenter) < 0.25F
                         && candidateTransverse >= transverseMinimum - 0.01F
                         && candidateTransverse <= transverseMaximum + 0.01F;
@@ -1044,17 +1044,17 @@ bool GdpRenderer::render(
                     return;
                 }
                 const float transverseCenter = (minimum + maximum) * 0.5F;
-                const gdp::core::Vec3 position = facesX
-                    ? gdp::core::Vec3{wallCenter,
+                const wkc::core::Vec3 position = facesX
+                    ? wkc::core::Vec3{wallCenter,
                         bounds.minimum.y + ((bottom + top) * 0.5F),
                         transverseCenter}
-                    : gdp::core::Vec3{transverseCenter,
+                    : wkc::core::Vec3{transverseCenter,
                         bounds.minimum.y + ((bottom + top) * 0.5F),
                         wallCenter};
-                const gdp::core::Vec3 scale = facesX
-                    ? gdp::core::Vec3{
+                const wkc::core::Vec3 scale = facesX
+                    ? wkc::core::Vec3{
                         shellThickness, top - bottom, maximum - minimum}
-                    : gdp::core::Vec3{
+                    : wkc::core::Vec3{
                         maximum - minimum, top - bottom, shellThickness};
                 drawSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall,
                     1.0F, {1.0F, 1.0F, 1.0F},
@@ -1092,22 +1092,22 @@ bool GdpRenderer::render(
         const RoomGpuMaterials& roomMaterials = resolveMaterials(corridor.materialKey);
         const float corridorHalfWidth = corridor.width * 0.5F;
         for (std::size_t index = 1U; index + 1U < corridor.points.size(); ++index) {
-            const gdp::core::Vec3 incoming = gdp::core::normalized(
+            const wkc::core::Vec3 incoming = wkc::core::normalized(
                 corridor.points[index] - corridor.points[index - 1U]);
-            const gdp::core::Vec3 outgoing = gdp::core::normalized(
+            const wkc::core::Vec3 outgoing = wkc::core::normalized(
                 corridor.points[index + 1U] - corridor.points[index]);
-            if (std::abs(gdp::core::dot(incoming, outgoing)) > 0.5F) {
+            if (std::abs(wkc::core::dot(incoming, outgoing)) > 0.5F) {
                 continue;
             }
-            const gdp::core::Vec3 corner = corridor.points[index];
-            const gdp::core::Vec3 cornerScale{
+            const wkc::core::Vec3 corner = corridor.points[index];
+            const wkc::core::Vec3 cornerScale{
                 corridor.width, corridorShellThickness, corridor.width};
             drawSurface(roomMaterials,
-                corner + gdp::core::Vec3{
+                corner + wkc::core::Vec3{
                     0.0F, -corridorShellThickness * 0.5F, 0.0F},
                 cornerScale, RoomMaterialChannel::Floor, 2.0F);
             drawSurface(roomMaterials,
-                corner + gdp::core::Vec3{
+                corner + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 cornerScale, RoomMaterialChannel::Ceiling, 1.0F,
                 {1.0F, 1.0F, 1.0F},
@@ -1115,49 +1115,49 @@ bool GdpRenderer::render(
                 {corner.x / 4.0F, corner.z / 4.0F});
         }
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
-            const gdp::core::Vec3 first = corridor.points[index];
-            const gdp::core::Vec3 second = corridor.points[index + 1U];
-            const bool alongX = gdp::core::nearlyEqual(first.z, second.z);
+            const wkc::core::Vec3 first = corridor.points[index];
+            const wkc::core::Vec3 second = corridor.points[index + 1U];
+            const bool alongX = wkc::core::nearlyEqual(first.z, second.z);
             const float length = alongX
                 ? std::abs(second.x - first.x) : std::abs(second.z - first.z);
             if (length <= 1.0e-4F) {
                 continue;
             }
-            const gdp::core::Vec3 center = (first + second) * 0.5F;
-            const gdp::core::Vec3 floorScale = alongX
-                ? gdp::core::Vec3{length, corridorShellThickness, corridor.width}
-                : gdp::core::Vec3{corridor.width, corridorShellThickness, length};
+            const wkc::core::Vec3 center = (first + second) * 0.5F;
+            const wkc::core::Vec3 floorScale = alongX
+                ? wkc::core::Vec3{length, corridorShellThickness, corridor.width}
+                : wkc::core::Vec3{corridor.width, corridorShellThickness, length};
             drawSurface(roomMaterials,
-                center + gdp::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
+                center + wkc::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Floor, 2.0F);
-            drawSurface(roomMaterials, center + gdp::core::Vec3{
+            drawSurface(roomMaterials, center + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Ceiling, 1.0F,
                 {1.0F, 1.0F, 1.0F},
                 {floorScale.x / 4.0F, floorScale.z / 4.0F},
                 {(alongX ? std::min(first.x, second.x) : center.x) / 4.0F,
                     (alongX ? center.z : std::min(first.z, second.z)) / 4.0F});
-            const gdp::core::Vec3 direction = gdp::core::normalized(second - first);
-            const gdp::core::Vec3 left{-direction.z, 0.0F, direction.x};
+            const wkc::core::Vec3 direction = wkc::core::normalized(second - first);
+            const wkc::core::Vec3 left{-direction.z, 0.0F, direction.x};
             for (const float sideSign : {-1.0F, 1.0F}) {
-                const gdp::core::Vec3 side = left * sideSign;
-                gdp::core::Vec3 wallStart = first;
-                gdp::core::Vec3 wallEnd = second;
+                const wkc::core::Vec3 side = left * sideSign;
+                wkc::core::Vec3 wallStart = first;
+                wkc::core::Vec3 wallEnd = second;
                 if (index > 0U) {
-                    const gdp::core::Vec3 previousDirection = gdp::core::normalized(
+                    const wkc::core::Vec3 previousDirection = wkc::core::normalized(
                         first - corridor.points[index - 1U]);
-                    if (std::abs(gdp::core::dot(previousDirection, direction)) < 0.5F) {
-                        const bool inner = gdp::core::dot(
+                    if (std::abs(wkc::core::dot(previousDirection, direction)) < 0.5F) {
+                        const bool inner = wkc::core::dot(
                             side, previousDirection * -1.0F) > 0.5F;
                         wallStart = wallStart
                             + direction * (inner ? corridorHalfWidth : -corridorHalfWidth);
                     }
                 }
                 if (index + 2U < corridor.points.size()) {
-                    const gdp::core::Vec3 nextDirection = gdp::core::normalized(
+                    const wkc::core::Vec3 nextDirection = wkc::core::normalized(
                         corridor.points[index + 2U] - second);
-                    if (std::abs(gdp::core::dot(direction, nextDirection)) < 0.5F) {
-                        const bool inner = gdp::core::dot(side, nextDirection) > 0.5F;
+                    if (std::abs(wkc::core::dot(direction, nextDirection)) < 0.5F) {
+                        const bool inner = wkc::core::dot(side, nextDirection) > 0.5F;
                         wallEnd = wallEnd
                             + direction * (inner ? -corridorHalfWidth : corridorHalfWidth);
                     }
@@ -1168,14 +1168,14 @@ bool GdpRenderer::render(
                 if (wallLength <= 1.0e-4F) {
                     continue;
                 }
-                const gdp::core::Vec3 wallScale = alongX
-                    ? gdp::core::Vec3{
+                const wkc::core::Vec3 wallScale = alongX
+                    ? wkc::core::Vec3{
                         wallLength, corridor.height, corridorShellThickness}
-                    : gdp::core::Vec3{
+                    : wkc::core::Vec3{
                         corridorShellThickness, corridor.height, wallLength};
-                const gdp::core::Vec3 wallCenter = (wallStart + wallEnd) * 0.5F
+                const wkc::core::Vec3 wallCenter = (wallStart + wallEnd) * 0.5F
                     + side * corridorHalfWidth
-                    + gdp::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
+                    + wkc::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
                 drawSurface(roomMaterials, wallCenter,
                     wallScale, RoomMaterialChannel::Wall,
                     1.0F, {1.0F, 1.0F, 1.0F},
@@ -1189,11 +1189,11 @@ bool GdpRenderer::render(
     const auto drawRoomParts = [&](const RoomRenderData& renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
         for (const RoomPart& part : roomParts) {
-            const gdp::core::Vec3 position = renderedRoom.origin
-                + gdp::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
-            gdp::core::Vec3 scale = part.scale;
-            if (renderedRoom.rotation == gdp::core::QuarterTurn::Degrees90
-                || renderedRoom.rotation == gdp::core::QuarterTurn::Degrees270) {
+            const wkc::core::Vec3 position = renderedRoom.origin
+                + wkc::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
+            wkc::core::Vec3 scale = part.scale;
+            if (renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
+                || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
                 std::swap(scale.x, scale.z);
             }
             drawSurface(roomMaterials, position, scale, part.material,
@@ -1208,14 +1208,14 @@ bool GdpRenderer::render(
     fallbackTexture_.bind(gl_);
     for (const DoorRenderData& door : doors) {
         const bool facesX = std::abs(door.outwardNormal.x) > 0.5F;
-        const gdp::core::Vec3 insetPosition
+        const wkc::core::Vec3 insetPosition
             = door.position - (door.outwardNormal * 0.12F);
-        const auto drawDoorPiece = [&](const gdp::core::Vec3 position,
-                                       const gdp::core::Vec3 scale,
-                                       const gdp::core::Vec3 tint,
+        const auto drawDoorPiece = [&](const wkc::core::Vec3 position,
+                                       const wkc::core::Vec3 scale,
+                                       const wkc::core::Vec3 tint,
                                        const float emissive) {
-            shader_.setMat4(gl_, "uModel", gdp::core::translationMatrix(position)
-                    * gdp::core::scaleMatrix(scale));
+            shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
+                    * wkc::core::scaleMatrix(scale));
             shader_.setVec3(gl_, "uTint", tint);
             shader_.setInt(gl_, "uDetailedMaterial", 0);
             shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
@@ -1224,43 +1224,43 @@ bool GdpRenderer::render(
             box_.draw(gl_);
         };
         constexpr float frameThickness = 0.14F;
-        const gdp::core::Vec3 frameColor = door.locked
-            ? gdp::core::Vec3{0.90F, 0.10F, 0.05F}
-            : gdp::core::Vec3{0.10F, 0.66F, 0.72F};
-        const gdp::core::Vec3 transverse = facesX
-            ? gdp::core::Vec3{0.0F, 0.0F, 1.0F}
-            : gdp::core::Vec3{1.0F, 0.0F, 0.0F};
-        const gdp::core::Vec3 postScale = facesX
-            ? gdp::core::Vec3{0.12F, door.height, frameThickness}
-            : gdp::core::Vec3{frameThickness, door.height, 0.12F};
+        const wkc::core::Vec3 frameColor = door.locked
+            ? wkc::core::Vec3{0.90F, 0.10F, 0.05F}
+            : wkc::core::Vec3{0.10F, 0.66F, 0.72F};
+        const wkc::core::Vec3 transverse = facesX
+            ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+        const wkc::core::Vec3 postScale = facesX
+            ? wkc::core::Vec3{0.12F, door.height, frameThickness}
+            : wkc::core::Vec3{frameThickness, door.height, 0.12F};
         const float postOffset = (door.width + frameThickness) * 0.5F;
-        const gdp::core::Vec3 postCenter
-            = insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
+        const wkc::core::Vec3 postCenter
+            = insetPosition + wkc::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
         drawDoorPiece(postCenter + (transverse * postOffset),
             postScale, frameColor, 0.28F);
         drawDoorPiece(postCenter - (transverse * postOffset),
             postScale, frameColor, 0.28F);
-        const gdp::core::Vec3 lintelScale = facesX
-            ? gdp::core::Vec3{0.12F, frameThickness,
+        const wkc::core::Vec3 lintelScale = facesX
+            ? wkc::core::Vec3{0.12F, frameThickness,
                 door.width + (frameThickness * 2.0F)}
-            : gdp::core::Vec3{door.width + (frameThickness * 2.0F),
+            : wkc::core::Vec3{door.width + (frameThickness * 2.0F),
                 frameThickness, 0.12F};
         drawDoorPiece(insetPosition
-                + gdp::core::Vec3{0.0F, door.height + (frameThickness * 0.5F), 0.0F},
+                + wkc::core::Vec3{0.0F, door.height + (frameThickness * 0.5F), 0.0F},
             lintelScale, frameColor, 0.28F);
 
         const float openFraction = std::isfinite(door.openFraction)
             ? std::clamp(door.openFraction, 0.0F, 1.0F) : 0.0F;
         const float panelWidth = std::max(0.05F, (door.width * 0.5F) - 0.02F);
         const float panelOffset = (panelWidth * 0.5F) + (panelWidth * openFraction);
-        const gdp::core::Vec3 panelScale = facesX
-            ? gdp::core::Vec3{0.10F, door.height - 0.10F, panelWidth}
-            : gdp::core::Vec3{panelWidth, door.height - 0.10F, 0.10F};
-        const gdp::core::Vec3 panelCenter
-            = insetPosition + gdp::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
-        const gdp::core::Vec3 panelColor = door.locked
-            ? gdp::core::Vec3{0.72F, 0.08F, 0.04F}
-            : gdp::core::Vec3{0.22F, 0.30F, 0.34F};
+        const wkc::core::Vec3 panelScale = facesX
+            ? wkc::core::Vec3{0.10F, door.height - 0.10F, panelWidth}
+            : wkc::core::Vec3{panelWidth, door.height - 0.10F, 0.10F};
+        const wkc::core::Vec3 panelCenter
+            = insetPosition + wkc::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
+        const wkc::core::Vec3 panelColor = door.locked
+            ? wkc::core::Vec3{0.72F, 0.08F, 0.04F}
+            : wkc::core::Vec3{0.22F, 0.30F, 0.34F};
         const float panelEmissive = door.locked ? 0.48F : 0.08F;
         drawDoorPiece(panelCenter + (transverse * panelOffset),
             panelScale, panelColor, panelEmissive);
@@ -1274,32 +1274,32 @@ bool GdpRenderer::render(
     ceilingFixtureMaterial_.emission.bind(gl_, 3U);
     shader_.setInt(gl_, "uDetailedMaterial", 1);
     shader_.setInt(gl_, "uUseEmissionMap", 1);
-    constexpr gdp::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
+    constexpr wkc::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
-        const gdp::core::Vec3 fixtureColor = lighting.alert
+        const wkc::core::Vec3 fixtureColor = lighting.alert
             ? fixtureAlertColor : light.color;
         const float lensEmission = lighting.alert
             ? lighting.fixtureEmissive * 1.35F : lighting.fixtureEmissive;
-        const gdp::core::Vec3 lensTint = lensEmission > 0.01F
-            ? fixtureColor : gdp::core::Vec3{0.42F, 0.44F, 0.43F};
+        const wkc::core::Vec3 lensTint = lensEmission > 0.01F
+            ? fixtureColor : wkc::core::Vec3{0.42F, 0.44F, 0.43F};
         const auto drawFixturePiece = [this, &light](
-            const gdp::core::Vec3 offset,
-            const gdp::core::Vec3 scale,
-            const gdp::core::Vec2 uvScale,
-            const gdp::core::Vec2 uvOffset,
-            const gdp::core::Vec3 tint,
+            const wkc::core::Vec3 offset,
+            const wkc::core::Vec3 scale,
+            const wkc::core::Vec2 uvScale,
+            const wkc::core::Vec2 uvOffset,
+            const wkc::core::Vec3 tint,
             const float emissiveStrength) {
             shader_.setMat4(gl_, "uModel",
-                gdp::core::translationMatrix(light.position + offset)
-                    * gdp::core::scaleMatrix(scale));
+                wkc::core::translationMatrix(light.position + offset)
+                    * wkc::core::scaleMatrix(scale));
             shader_.setVec3(gl_, "uTint", tint);
             shader_.setVec2(gl_, "uUvScale", uvScale);
             shader_.setVec2(gl_, "uUvOffset", uvOffset);
             shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
             box_.draw(gl_);
         };
-        constexpr gdp::core::Vec3 neutralTint{1.0F, 1.0F, 1.0F};
+        constexpr wkc::core::Vec3 neutralTint{1.0F, 1.0F, 1.0F};
         drawFixturePiece({0.0F, 0.095F, 0.0F}, {1.20F, 0.12F, 0.28F},
             {0.46F, 0.96F}, {0.02F, 0.02F}, neutralTint, 0.0F);
         drawFixturePiece({0.0F, 0.015F, 0.0F}, {1.17F, 0.055F, 0.255F},
@@ -1310,12 +1310,12 @@ bool GdpRenderer::render(
             {0.21F, 0.96F}, {0.77F, 0.02F}, lensTint, lensEmission);
 
         constexpr std::array fastenerOffsets{
-            gdp::core::Vec3{-0.525F, -0.041F, -0.105F},
-            gdp::core::Vec3{0.525F, -0.041F, -0.105F},
-            gdp::core::Vec3{-0.525F, -0.041F, 0.105F},
-            gdp::core::Vec3{0.525F, -0.041F, 0.105F},
+            wkc::core::Vec3{-0.525F, -0.041F, -0.105F},
+            wkc::core::Vec3{0.525F, -0.041F, -0.105F},
+            wkc::core::Vec3{-0.525F, -0.041F, 0.105F},
+            wkc::core::Vec3{0.525F, -0.041F, 0.105F},
         };
-        for (const gdp::core::Vec3 fastenerOffset : fastenerOffsets) {
+        for (const wkc::core::Vec3 fastenerOffset : fastenerOffsets) {
             drawFixturePiece(fastenerOffset, {0.045F, 0.018F, 0.045F},
                 {0.14F, 0.96F}, {0.52F, 0.02F}, neutralTint, 0.0F);
         }
@@ -1343,20 +1343,20 @@ bool GdpRenderer::render(
             return false;
         }
         visual->second.texture.bind(gl_);
-        const gdp::core::Vec3 position = enemy.position
-            + (enemy.alive ? gdp::core::Vec3{} : gdp::core::Vec3{0.0F, 0.04F, 0.0F});
-        const gdp::core::Vec3 scale = enemy.alive
-            ? gdp::core::Vec3{1.0F, 1.0F, 1.0F}
-            : gdp::core::Vec3{1.15F, 0.18F, 1.15F};
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(position)
-            * gdp::core::scaleMatrix(scale);
+        const wkc::core::Vec3 position = enemy.position
+            + (enemy.alive ? wkc::core::Vec3{} : wkc::core::Vec3{0.0F, 0.04F, 0.0F});
+        const wkc::core::Vec3 scale = enemy.alive
+            ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+            : wkc::core::Vec3{1.15F, 0.18F, 1.15F};
+        const wkc::core::Mat4 model = wkc::core::translationMatrix(position)
+            * wkc::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(
             gl_, "uTint", !enemy.alive
-                ? gdp::core::Vec3{0.30F, 0.24F, 0.20F}
+                ? wkc::core::Vec3{0.30F, 0.24F, 0.20F}
                 : enemy.active
-                ? gdp::core::Vec3{1.0F, 1.0F, 1.0F}
-                : gdp::core::Vec3{0.68F, 0.72F, 0.78F});
+                ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+                : wkc::core::Vec3{0.68F, 0.72F, 0.78F});
         shader_.setInt(gl_, "uDetailedMaterial", 0);
         shader_.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
         shader_.setVec2(gl_, "uUvOffset", {});
@@ -1369,8 +1369,8 @@ bool GdpRenderer::render(
 
     fallbackTexture_.bind(gl_);
     for (const PickupRenderData& pickup : pickups) {
-        gdp::core::Vec3 tint{0.20F, 0.85F, 0.32F};
-        gdp::core::Vec3 scale{0.30F, 0.22F, 0.30F};
+        wkc::core::Vec3 tint{0.20F, 0.85F, 0.32F};
+        wkc::core::Vec3 scale{0.30F, 0.22F, 0.30F};
         if (pickup.role == PickupVisualRole::Ammo) {
             tint = {0.92F, 0.68F, 0.16F};
             scale = {0.34F, 0.18F, 0.24F};
@@ -1378,10 +1378,10 @@ bool GdpRenderer::render(
             tint = {0.18F, 0.78F, 0.92F};
             scale = {0.38F, 0.12F, 0.16F};
         }
-        const gdp::core::Mat4 model
-            = gdp::core::translationMatrix(
-                pickup.position + gdp::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
-            * gdp::core::scaleMatrix(scale);
+        const wkc::core::Mat4 model
+            = wkc::core::translationMatrix(
+                pickup.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
+            * wkc::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", tint);
         shader_.setInt(gl_, "uDetailedMaterial", 0);
@@ -1392,7 +1392,7 @@ bool GdpRenderer::render(
     }
 
     for (const PropRenderData& prop : props) {
-        gdp::core::Vec3 tint{0.54F, 0.34F, 0.17F};
+        wkc::core::Vec3 tint{0.54F, 0.34F, 0.17F};
         if (prop.role == PropVisualRole::Canister) {
             tint = {0.68F, 0.18F, 0.10F};
         } else if (prop.role == PropVisualRole::Barricade) {
@@ -1403,7 +1403,7 @@ bool GdpRenderer::render(
         tint.x = std::clamp(tint.x + seedVariation, 0.08F, 1.0F);
         tint.y = std::clamp(tint.y + seedVariation, 0.08F, 1.0F);
         tint.z = std::clamp(tint.z + seedVariation, 0.08F, 1.0F);
-        gdp::core::Vec3 scale = prop.scale;
+        wkc::core::Vec3 scale = prop.scale;
         if (prop.state == PropVisualState::Damaged) {
             tint = tint * 0.62F;
         } else if (prop.state == PropVisualState::Destroyed) {
@@ -1412,9 +1412,9 @@ bool GdpRenderer::render(
             scale.x *= 1.12F;
             scale.z *= 1.12F;
         }
-        const gdp::core::Mat4 model = gdp::core::translationMatrix(
-            prop.position + gdp::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
-            * gdp::core::scaleMatrix(scale);
+        const wkc::core::Mat4 model = wkc::core::translationMatrix(
+            prop.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
+            * wkc::core::scaleMatrix(scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(gl_, "uTint", tint);
         shader_.setInt(gl_, "uDetailedMaterial", 0);
@@ -1431,9 +1431,9 @@ bool GdpRenderer::render(
     const int hudMargin = 6 * hudScale;
     const int hudPadding = 4 * hudScale;
     const int hudLineHeight = 9 * hudScale;
-    const gdp::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
-    const gdp::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
-    const gdp::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
+    const wkc::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
+    const wkc::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
+    const wkc::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
 
     if (hud.mainMenu) {
         const MainMenuLayout layout = makeMainMenuLayout(width, height);
@@ -1501,7 +1501,7 @@ bool GdpRenderer::render(
             const int edgeThickness = std::max(1,
                 static_cast<int>((2.0F + (4.0F * damageStrength))
                     * static_cast<float>(hudScale)));
-            const gdp::core::Vec3 damageColor{
+            const wkc::core::Vec3 damageColor{
                 0.16F + (0.78F * damageStrength),
                 0.012F + (0.045F * damageStrength),
                 0.008F,
@@ -1547,19 +1547,19 @@ bool GdpRenderer::render(
         const int healthBarY = healthTextY - (5 * hudScale);
         drawBitmapText(statusTextX, healthTextY, hudScale, healthText,
             healthRatio <= 0.25F
-                ? gdp::core::Vec3{0.98F, 0.20F, 0.12F} : textColor);
+                ? wkc::core::Vec3{0.98F, 0.20F, 0.12F} : textColor);
         drawSolidRect(statusTextX, healthBarY, barWidth, 3 * hudScale,
             {0.10F, 0.14F, 0.15F});
         drawSolidRect(statusTextX, healthBarY,
             static_cast<int>(static_cast<float>(barWidth) * healthRatio),
             3 * hudScale,
             healthRatio <= 0.25F
-                ? gdp::core::Vec3{0.94F, 0.16F, 0.10F}
-                : gdp::core::Vec3{0.24F, 0.88F, 0.52F});
+                ? wkc::core::Vec3{0.94F, 0.16F, 0.10F}
+                : wkc::core::Vec3{0.24F, 0.88F, 0.52F});
         drawBitmapText(statusTextX, healthTextY - hudLineHeight,
             hudScale, ammoText,
             hud.magazineAmmo == 0U
-                ? gdp::core::Vec3{0.98F, 0.42F, 0.14F} : textColor);
+                ? wkc::core::Vec3{0.98F, 0.42F, 0.14F} : textColor);
         drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 2),
             hudScale, keysText, cyanColor);
 
@@ -1604,7 +1604,7 @@ bool GdpRenderer::render(
             2 * hudScale, cyanColor);
 
         std::string_view eventText;
-        gdp::core::Vec3 eventColor{0.48F, 0.62F, 0.66F};
+        wkc::core::Vec3 eventColor{0.48F, 0.62F, 0.66F};
         if (hud.eventLocked) {
             eventText = "LOCKDOWN";
             eventColor = {0.98F, 0.18F, 0.10F};
@@ -1629,7 +1629,7 @@ bool GdpRenderer::render(
         }
 
         std::string_view promptText;
-        gdp::core::Vec3 promptColor{0.78F, 0.90F, 0.92F};
+        wkc::core::Vec3 promptColor{0.78F, 0.90F, 0.92F};
         if (hud.prompt == HudPrompt::OpenDoor) {
             promptText = "E OPEN DOOR";
         } else if (hud.prompt == HudPrompt::DoorLocked) {
@@ -1656,10 +1656,10 @@ bool GdpRenderer::render(
         if (!hud.paused && hud.hitFeedback != HudHitFeedback::None
             && hitStrength > 0.0F) {
             const bool killed = hud.hitFeedback == HudHitFeedback::Kill;
-            const gdp::core::Vec3 baseColor = killed
-                ? gdp::core::Vec3{1.0F, 0.26F, 0.10F}
-                : gdp::core::Vec3{0.82F, 0.94F, 0.96F};
-            const gdp::core::Vec3 markerColor = baseColor
+            const wkc::core::Vec3 baseColor = killed
+                ? wkc::core::Vec3{1.0F, 0.26F, 0.10F}
+                : wkc::core::Vec3{0.82F, 0.94F, 0.96F};
+            const wkc::core::Vec3 markerColor = baseColor
                 * (0.32F + (0.68F * hitStrength));
             const int centerX = width / 2;
             const int centerY = height / 2;
@@ -1680,7 +1680,7 @@ bool GdpRenderer::render(
         }
 
         std::string_view noticeText;
-        gdp::core::Vec3 noticeColor{0.72F, 0.90F, 0.92F};
+        wkc::core::Vec3 noticeColor{0.72F, 0.90F, 0.92F};
         if (hud.notice == HudNotice::Pickup) {
             noticeText = "SUPPLIES ACQUIRED";
             noticeColor = {0.28F, 0.92F, 0.56F};
@@ -1714,7 +1714,7 @@ bool GdpRenderer::render(
     }
 
     std::string_view objectiveText;
-    gdp::core::Vec3 objectiveColor{0.30F, 0.88F, 0.92F};
+    wkc::core::Vec3 objectiveColor{0.30F, 0.88F, 0.92F};
     if (hud.objective == ObjectiveRenderState::ReachBoss) {
         objectiveText = "REACH BOSS";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {
@@ -1739,9 +1739,9 @@ bool GdpRenderer::render(
         glClearColor(0.015F, 0.025F, 0.030F, 1.0F);
         glScissor(bannerX, bannerY, bannerWidth, bannerHeight);
         glClear(GL_COLOR_BUFFER_BIT);
-        const gdp::core::Vec3 resultColor = victory
-            ? gdp::core::Vec3{0.22F, 0.92F, 0.62F}
-            : gdp::core::Vec3{0.96F, 0.18F, 0.10F};
+        const wkc::core::Vec3 resultColor = victory
+            ? wkc::core::Vec3{0.22F, 0.92F, 0.62F}
+            : wkc::core::Vec3{0.96F, 0.18F, 0.10F};
         const int resultWidth = bitmapTextWidth(result, hudScale);
         const int promptWidth = bitmapTextWidth(prompt, 1);
         drawBitmapText((width - resultWidth) / 2, bannerY + 42,

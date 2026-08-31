@@ -23,20 +23,20 @@ public:
 
     void play(
         AudioEventKind kind,
-        gdp::core::Seed sourceSeed,
+        wkc::core::Seed sourceSeed,
         std::uint64_t eventCounter = 0U);
     void playAt(
         AudioEventKind kind,
-        gdp::core::Seed sourceSeed,
+        wkc::core::Seed sourceSeed,
         std::uint64_t eventCounter,
-        gdp::core::Vec3 sourcePosition,
-        gdp::core::Vec3 listenerPosition,
-        gdp::core::Vec3 listenerForward);
-    void setAmbience(gdp::core::Seed roomSeed, std::uint64_t profileId);
+        wkc::core::Vec3 sourcePosition,
+        wkc::core::Vec3 listenerPosition,
+        wkc::core::Vec3 listenerForward);
+    void setAmbience(wkc::core::Seed roomSeed, std::uint64_t profileId);
     void setAmbienceBlend(
-        gdp::core::Seed firstRoomSeed,
+        wkc::core::Seed firstRoomSeed,
         std::uint64_t firstProfileId,
-        gdp::core::Seed secondRoomSeed,
+        wkc::core::Seed secondRoomSeed,
         std::uint64_t secondProfileId,
         float secondWeight);
     void stopAmbience() noexcept;

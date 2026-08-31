@@ -11,9 +11,9 @@
 namespace gdp::world {
 
 struct World {
-    gdp::core::Seed masterSeed{0};
-    gdp::core::Seed generationSeed{0};
-    gdp::core::GenerationVersion generationVersion{};
+    wkc::core::Seed masterSeed{0};
+    wkc::core::Seed generationSeed{0};
+    wkc::core::GenerationVersion generationVersion{};
     std::uint32_t acceptedAttempt{0};
     MapGraph graph;
     std::vector<RoomInstance> rooms;

@@ -34,7 +34,7 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
 
 gdp::entities::PropType selectType(
     const RoomTheme theme,
-    gdp::core::RandomStream& random) noexcept
+    wkc::core::RandomStream& random) noexcept
 {
     using gdp::entities::PropType;
     const float roll = random.uniform01();
@@ -60,7 +60,7 @@ gdp::entities::PropType selectType(
     return PropType::Crate;
 }
 
-gdp::core::Vec3 scaleFor(const gdp::entities::PropType type) noexcept
+wkc::core::Vec3 scaleFor(const gdp::entities::PropType type) noexcept
 {
     using gdp::entities::PropType;
     switch (type) {
@@ -96,13 +96,13 @@ float healthFor(const gdp::entities::PropType type) noexcept
     return 0.0F;
 }
 
-gdp::core::Vec3 choosePosition(
-    const gdp::core::Seed seed,
+wkc::core::Vec3 choosePosition(
+    const wkc::core::Seed seed,
     const std::uint64_t ordinal,
-    const gdp::core::Vec3 scale,
+    const wkc::core::Vec3 scale,
     const std::span<const SpawnZone> zones)
 {
-    gdp::core::RandomStream random{gdp::core::deriveSeed(
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
         seed, gdp::game::SeedDomain::Props, 200U + ordinal)};
     const SpawnZone& zone = zones[static_cast<std::size_t>(random.rangeInt(
         0, static_cast<int>(zones.size() - 1U)))];
@@ -111,7 +111,7 @@ gdp::core::Vec3 choosePosition(
     const bool placeAlongX
         = (zone.bounds.maximum.x - zone.bounds.minimum.x)
         >= (zone.bounds.maximum.z - zone.bounds.minimum.z);
-    const gdp::core::Vec2 anchor{
+    const wkc::core::Vec2 anchor{
         placeAlongX ? lane : 0.50F,
         placeAlongX ? 0.50F : lane,
     };
@@ -138,7 +138,7 @@ bool footprintInside(const PropSpawn& prop, const SpawnZone& zone) noexcept
         && prop.position.x + halfX <= zone.bounds.maximum.x
         && prop.position.z - halfZ >= zone.bounds.minimum.z
         && prop.position.z + halfZ <= zone.bounds.maximum.z
-        && gdp::core::nearlyEqual(prop.position.y, zone.bounds.minimum.y, 1.0e-4F);
+        && wkc::core::nearlyEqual(prop.position.y, zone.bounds.minimum.y, 1.0e-4F);
 }
 
 bool footprintsOverlap(const PropSpawn& first, const PropSpawn& second) noexcept
@@ -162,8 +162,8 @@ void addProp(
         return;
     }
     const std::uint64_t ordinal = layout.props.size();
-    const gdp::core::Vec3 scale = scaleFor(type);
-    gdp::core::RandomStream stateRandom{gdp::core::deriveSeed(
+    const wkc::core::Vec3 scale = scaleFor(type);
+    wkc::core::RandomStream stateRandom{wkc::core::deriveSeed(
         layout.seed, gdp::game::SeedDomain::Props, 100U + ordinal)};
     const float maximumHealth = healthFor(type);
     const bool initiallyDamaged = layout.depth >= 2U && stateRandom.chance(0.18F);
@@ -184,7 +184,7 @@ void addProp(
         maximumHealth,
         dropType,
         dropQuantity,
-        gdp::core::deriveSeed(
+        wkc::core::deriveSeed(
             layout.seed, gdp::game::SeedDomain::Props, 300U + ordinal),
     });
     ++layout.spent;
@@ -203,7 +203,7 @@ bool PropValidationResult::isValid() const noexcept
 }
 
 PropLayout generatePropLayout(
-    const gdp::core::Seed roomSeed,
+    const wkc::core::Seed roomSeed,
     const RoomRole role,
     const RoomTheme theme,
     const std::uint32_t depth,
@@ -212,7 +212,7 @@ PropLayout generatePropLayout(
 {
     using gdp::entities::PropType;
     PropLayout layout;
-    layout.seed = gdp::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Props, 0);
+    layout.seed = wkc::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Props, 0);
     layout.role = role;
     layout.theme = theme;
     layout.depth = depth;
@@ -233,7 +233,7 @@ PropLayout generatePropLayout(
         addProp(layout, PropType::Barricade, propZones);
     }
 
-    gdp::core::RandomStream selection{gdp::core::deriveSeed(
+    wkc::core::RandomStream selection{wkc::core::deriveSeed(
         layout.seed, gdp::game::SeedDomain::Props, 1)};
     while (layout.spent < layout.budget && layout.props.size() < 3U) {
         addProp(layout, selectType(theme, selection), propZones);

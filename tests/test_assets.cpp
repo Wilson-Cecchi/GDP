@@ -109,8 +109,8 @@ void testMeshGeneration()
             && worker->ranges[0].material == MaterialSlot::Armor
             && worker->ranges[0].semantic == SemanticRegion::ArmorPlate,
         "generated primitive ranges preserve material and semantic metadata");
-    expect(gdp::core::nearlyEqual(worker->mesh.bounds.minimum, {-0.59F, 0.0F, -0.24F})
-            && gdp::core::nearlyEqual(worker->mesh.bounds.maximum, {0.59F, 1.79F, 0.24F}),
+    expect(wkc::core::nearlyEqual(worker->mesh.bounds.minimum, {-0.59F, 0.0F, -0.24F})
+            && wkc::core::nearlyEqual(worker->mesh.bounds.maximum, {0.59F, 1.79F, 0.24F}),
         "combined Worker bounds match all transformed primitives");
     expect(worker->mesh.vertices.front().semanticRegion
             == static_cast<std::uint32_t>(SemanticRegion::ArmorPlate),
@@ -128,8 +128,8 @@ void testMeshGeneration()
     });
     const auto builtRotated = generateMesh(rotated);
     expect(builtRotated
-            && gdp::core::nearlyEqual(builtRotated->mesh.bounds.minimum, {0.5F, -0.5F, -1.0F})
-            && gdp::core::nearlyEqual(builtRotated->mesh.bounds.maximum, {1.5F, 0.5F, 1.0F}),
+            && wkc::core::nearlyEqual(builtRotated->mesh.bounds.minimum, {0.5F, -0.5F, -1.0F})
+            && wkc::core::nearlyEqual(builtRotated->mesh.bounds.maximum, {1.5F, 0.5F, 1.0F}),
         "mesh generation applies local scale, rotation and translation");
 
     MeshRecipe cylinder;
@@ -144,9 +144,9 @@ void testMeshGeneration()
             && builtCylinder->mesh.indices.size() == 144U,
         "twelve-segment Cylinder generates valid side and cap geometry");
     expect(builtCylinder
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 builtCylinder->mesh.bounds.minimum, {-0.5F, -1.0F, -0.5F})
-            && gdp::core::nearlyEqual(
+            && wkc::core::nearlyEqual(
                 builtCylinder->mesh.bounds.maximum, {0.5F, 1.0F, 0.5F}),
         "generated Cylinder bounds follow requested dimensions");
 
@@ -193,7 +193,7 @@ void testTextureGeneration()
 
     bool batchValid = true;
     recipe.resolution = 8;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         recipe.seed = seed;
         const auto image = generateAlbedo(recipe);
         if (!image || !wkc::render::validateImageData(*image)) {

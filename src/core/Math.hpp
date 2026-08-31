@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace gdp::core {
+namespace wkc::core {
 
 struct Vec2 {
     float x{0.0F};
@@ -279,4 +279,4 @@ struct Mat4 {
     return result;
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

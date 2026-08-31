@@ -24,7 +24,7 @@ void expect(const bool condition, const std::string_view message)
 
 void testHashAndSeed()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
     using wkc::core::fnv1a64;
 
     expect(fnv1a64("") == 0xCBF29CE484222325ULL, "FNV-1a empty-string golden value");
@@ -50,7 +50,7 @@ void testHashAndSeed()
 
 void testRandom()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
 
     RandomStream golden{0};
     expect(golden.nextU64() == 0xE220A8397B1DCDAFULL, "SplitMix64 first golden value");
@@ -112,7 +112,7 @@ void testTime()
 
 void testMath()
 {
-    using namespace gdp::core;
+    using namespace wkc::core;
 
     constexpr std::array positions{
         GridPos{0, 0, 0},

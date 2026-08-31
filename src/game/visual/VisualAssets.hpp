@@ -18,8 +18,8 @@ struct CeilingFixtureMaterialImages {
 [[nodiscard]] CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages();
 
 [[nodiscard]] wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
-    gdp::core::Seed seed = 0);
+    wkc::core::Seed seed = 0);
 [[nodiscard]] wkc::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
-    gdp::core::Seed seed = 0);
+    wkc::core::Seed seed = 0);
 
 } // namespace gdp::game

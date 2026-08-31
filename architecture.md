@@ -714,6 +714,11 @@ Na Fase 53, `mix64`, `hashCombine` e `fnv1a64` passaram de `gdp::core` para
 visual consomem o hashing WKC Forge explicitamente, sem mudar fingerprints ou
 valores golden.
 
+Na Fase 54, os contratos matemáticos, `Seed`, `GenerationVersion`,
+`deriveSeed` e `RandomStream` passaram para `wkc::core`. Com Time, Log e Hash já
+migrados, `wkc_forge_core` não expõe mais `gdp::core`; todos os consumidores
+foram atualizados sem aliases e sem alterar coordenadas, RNG ou determinismo.
+
 ---
 
 # 8. Sistema de seed

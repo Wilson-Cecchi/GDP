@@ -106,7 +106,7 @@ CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages()
 }
 
 wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
-    const gdp::core::Seed seed)
+    const wkc::core::Seed seed)
 {
     using namespace wkc::procedural;
     MeshRecipe recipe;
@@ -129,7 +129,7 @@ wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
 }
 
 wkc::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
-    const gdp::core::Seed seed)
+    const wkc::core::Seed seed)
 {
     using namespace wkc::procedural;
     return {

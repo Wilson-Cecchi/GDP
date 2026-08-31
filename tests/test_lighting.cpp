@@ -31,7 +31,7 @@ bool containsError(
         != result.errors.end();
 }
 
-constexpr gdp::core::Aabb roomBounds{
+constexpr wkc::core::Aabb roomBounds{
     {-4.0F, 0.0F, -5.0F},
     {4.0F, 4.0F, 5.0F},
 };
@@ -39,14 +39,14 @@ constexpr gdp::core::Aabb roomBounds{
 void testDeterministicPlan()
 {
     using namespace gdp::world;
-    constexpr gdp::core::Seed seed = 0x4C494748545F5631ULL;
+    constexpr wkc::core::Seed seed = 0x4C494748545F5631ULL;
     const RoomLightingPlan first = generateRoomLightingPlan(
         seed, RoomRole::Start, RoomTheme::Industrial, roomBounds);
     const RoomLightingPlan repeated = generateRoomLightingPlan(
         seed, RoomRole::Start, RoomTheme::Industrial, roomBounds);
     expect(first.planHash == repeated.planHash && first.lights == repeated.lights,
         "same room seed reproduces the complete lighting plan");
-    expect(first.seed == gdp::core::deriveSeed(seed, gdp::game::SeedDomain::Lighting, 0U),
+    expect(first.seed == wkc::core::deriveSeed(seed, gdp::game::SeedDomain::Lighting, 0U),
         "lighting plan starts from the isolated Lighting seed domain");
     expect(first.supportsAlert && first.lights.size() == 3U,
         "START lighting is readable and can react to lockdown");
@@ -101,7 +101,7 @@ void testValidationFailures()
     expect(containsError(result, LightingValidationError::InvalidPlanHash),
         "validator detects mutated plans through their hash");
 
-    const gdp::core::Aabb flatBounds{{0.0F, 0.0F, 0.0F}, {1.0F, 0.2F, 1.0F}};
+    const wkc::core::Aabb flatBounds{{0.0F, 0.0F, 0.0F}, {1.0F, 0.2F, 1.0F}};
     const RoomLightingPlan flat = generateRoomLightingPlan(
         23, RoomRole::Normal, RoomTheme::Office, flatBounds);
     expect(containsError(validateRoomLightingPlan(flat, flatBounds),
@@ -129,8 +129,8 @@ void testSeedCoverageAndWorldIsolation()
     expect(std::all_of(moods.begin(), moods.end(), [](const bool seen) { return seen; }),
         "seed and role coverage reaches every lighting mood");
 
-    for (const gdp::core::Seed worldSeed : {gdp::core::Seed{12345},
-             gdp::core::Seed{0x4744505F574F524CULL}}) {
+    for (const wkc::core::Seed worldSeed : {wkc::core::Seed{12345},
+             wkc::core::Seed{0x4744505F574F524CULL}}) {
         const WorldGenerationResult generated = generateWorld(worldSeed);
         bool valid = generated.world.has_value();
         if (generated.world) {

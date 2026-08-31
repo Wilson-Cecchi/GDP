@@ -30,12 +30,12 @@ enum class IndustrialCondition : std::uint8_t {
 
 struct IndustrialSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     IndustrialSurface surface{IndustrialSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.33F, 0.35F, 0.36F};
-    gdp::core::Vec3 secondaryColor{0.20F, 0.21F, 0.22F};
-    gdp::core::Vec3 accentColor{0.83F, 0.60F, 0.0F};
+    wkc::core::Vec3 baseColor{0.33F, 0.35F, 0.36F};
+    wkc::core::Vec3 secondaryColor{0.20F, 0.21F, 0.22F};
+    wkc::core::Vec3 accentColor{0.83F, 0.60F, 0.0F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.2F};
@@ -64,12 +64,12 @@ enum class StorageCondition : std::uint8_t {
 
 struct StorageSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.36F, 0.32F, 0.27F};
-    gdp::core::Vec3 secondaryColor{0.22F, 0.21F, 0.20F};
-    gdp::core::Vec3 accentColor{0.45F, 0.28F, 0.18F};
+    wkc::core::Vec3 baseColor{0.36F, 0.32F, 0.27F};
+    wkc::core::Vec3 secondaryColor{0.22F, 0.21F, 0.20F};
+    wkc::core::Vec3 accentColor{0.45F, 0.28F, 0.18F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.35F};
@@ -83,7 +83,7 @@ struct StorageSurfaceRecipe {
 };
 
 struct StorageRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     StorageCondition condition{StorageCondition::Dusty};
     std::array<StorageSurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -101,12 +101,12 @@ enum class CombatCondition : std::uint8_t {
 
 struct CombatSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.31F, 0.35F, 0.24F};
-    gdp::core::Vec3 secondaryColor{0.22F, 0.24F, 0.17F};
-    gdp::core::Vec3 accentColor{0.71F, 0.51F, 0.07F};
+    wkc::core::Vec3 baseColor{0.31F, 0.35F, 0.24F};
+    wkc::core::Vec3 secondaryColor{0.22F, 0.24F, 0.17F};
+    wkc::core::Vec3 accentColor{0.71F, 0.51F, 0.07F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.38F};
@@ -120,7 +120,7 @@ struct CombatSurfaceRecipe {
 };
 
 struct CombatRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     CombatCondition condition{CombatCondition::Active};
     std::array<CombatSurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -138,12 +138,12 @@ enum class CafeteriaCondition : std::uint8_t {
 
 struct CafeteriaSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::Ceramic};
-    gdp::core::Vec3 baseColor{0.78F, 0.78F, 0.76F};
-    gdp::core::Vec3 secondaryColor{0.62F, 0.62F, 0.61F};
-    gdp::core::Vec3 accentColor{0.62F, 0.18F, 0.18F};
+    wkc::core::Vec3 baseColor{0.78F, 0.78F, 0.76F};
+    wkc::core::Vec3 secondaryColor{0.62F, 0.62F, 0.61F};
+    wkc::core::Vec3 accentColor{0.62F, 0.18F, 0.18F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.18F};
@@ -157,7 +157,7 @@ struct CafeteriaSurfaceRecipe {
 };
 
 struct CafeteriaRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     CafeteriaCondition condition{CafeteriaCondition::InUse};
     std::array<CafeteriaSurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -175,12 +175,12 @@ enum class LaboratoryCondition : std::uint8_t {
 
 struct LaboratorySurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::Ceramic};
-    gdp::core::Vec3 baseColor{0.78F, 0.80F, 0.80F};
-    gdp::core::Vec3 secondaryColor{0.66F, 0.68F, 0.68F};
-    gdp::core::Vec3 accentColor{0.27F, 0.41F, 0.54F};
+    wkc::core::Vec3 baseColor{0.78F, 0.80F, 0.80F};
+    wkc::core::Vec3 secondaryColor{0.66F, 0.68F, 0.68F};
+    wkc::core::Vec3 accentColor{0.27F, 0.41F, 0.54F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.10F};
@@ -194,7 +194,7 @@ struct LaboratorySurfaceRecipe {
 };
 
 struct LaboratoryRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     LaboratoryCondition condition{LaboratoryCondition::Operational};
     std::array<LaboratorySurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -212,12 +212,12 @@ enum class TechnicalCondition : std::uint8_t {
 
 struct TechnicalSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.23F, 0.23F, 0.22F};
-    gdp::core::Vec3 secondaryColor{0.13F, 0.14F, 0.13F};
-    gdp::core::Vec3 accentColor{0.71F, 0.48F, 0.0F};
+    wkc::core::Vec3 baseColor{0.23F, 0.23F, 0.22F};
+    wkc::core::Vec3 secondaryColor{0.13F, 0.14F, 0.13F};
+    wkc::core::Vec3 accentColor{0.71F, 0.48F, 0.0F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.36F};
@@ -232,7 +232,7 @@ struct TechnicalSurfaceRecipe {
 };
 
 struct TechnicalRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     TechnicalCondition condition{TechnicalCondition::Working};
     std::array<TechnicalSurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -250,12 +250,12 @@ enum class SecurityCondition : std::uint8_t {
 
 struct SecuritySurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.23F, 0.24F, 0.25F};
-    gdp::core::Vec3 secondaryColor{0.15F, 0.16F, 0.17F};
-    gdp::core::Vec3 accentColor{0.23F, 0.40F, 0.47F};
+    wkc::core::Vec3 baseColor{0.23F, 0.24F, 0.25F};
+    wkc::core::Vec3 secondaryColor{0.15F, 0.16F, 0.17F};
+    wkc::core::Vec3 accentColor{0.23F, 0.40F, 0.47F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.12F};
@@ -270,7 +270,7 @@ struct SecuritySurfaceRecipe {
 };
 
 struct SecurityRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     SecurityCondition condition{SecurityCondition::Monitored};
     std::array<SecuritySurfaceRecipe,
         static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
@@ -295,12 +295,12 @@ enum class CentralHubRouteAxis : std::uint8_t {
 
 struct CentralHubSurfaceRecipe {
     std::uint32_t version{1};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    gdp::core::Vec3 baseColor{0.27F, 0.29F, 0.30F};
-    gdp::core::Vec3 secondaryColor{0.17F, 0.19F, 0.20F};
-    gdp::core::Vec3 accentColor{0.17F, 0.54F, 0.58F};
+    wkc::core::Vec3 baseColor{0.27F, 0.29F, 0.30F};
+    wkc::core::Vec3 secondaryColor{0.17F, 0.19F, 0.20F};
+    wkc::core::Vec3 accentColor{0.17F, 0.54F, 0.58F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     CentralHubRouteAxis routeAxis{CentralHubRouteAxis::Horizontal};
@@ -315,7 +315,7 @@ struct CentralHubSurfaceRecipe {
 };
 
 struct CentralHubRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     CentralHubCondition condition{CentralHubCondition::Active};
     CentralHubRouteAxis routeAxis{CentralHubRouteAxis::Horizontal};
     std::array<CentralHubSurfaceRecipe,
@@ -326,7 +326,7 @@ struct CentralHubRoomMaterialSet {
 };
 
 struct IndustrialRoomMaterialSet {
-    gdp::core::Seed roomSeed{0};
+    wkc::core::Seed roomSeed{0};
     IndustrialCondition condition{IndustrialCondition::Used};
     std::array<IndustrialSurfaceRecipe,
         static_cast<std::size_t>(IndustrialSurface::Count)> surfaces{};
@@ -489,7 +489,7 @@ struct CentralHubMaterialValidationResult {
 };
 
 [[nodiscard]] IndustrialRoomMaterialSet generateIndustrialRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     const IndustrialSurfaceRecipe& recipe);
 [[nodiscard]] IndustrialMaterialValidationResult validateIndustrialRoomMaterials(
@@ -510,7 +510,7 @@ generateIndustrialWallMaterialImages(const IndustrialSurfaceRecipe& recipe);
 generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
 
 [[nodiscard]] StorageRoomMaterialSet generateStorageRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] StorageMaterialValidationResult validateStorageSurfaceRecipe(
     const StorageSurfaceRecipe& recipe);
 [[nodiscard]] StorageMaterialValidationResult validateStorageRoomMaterials(
@@ -523,7 +523,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const StorageSurfaceRecipe& recipe);
 
 [[nodiscard]] CombatRoomMaterialSet generateCombatRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] CombatMaterialValidationResult validateCombatSurfaceRecipe(
     const CombatSurfaceRecipe& recipe);
 [[nodiscard]] CombatMaterialValidationResult validateCombatRoomMaterials(
@@ -536,7 +536,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CombatSurfaceRecipe& recipe);
 
 [[nodiscard]] CafeteriaRoomMaterialSet generateCafeteriaRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] CafeteriaMaterialValidationResult validateCafeteriaSurfaceRecipe(
     const CafeteriaSurfaceRecipe& recipe);
 [[nodiscard]] CafeteriaMaterialValidationResult validateCafeteriaRoomMaterials(
@@ -549,7 +549,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CafeteriaSurfaceRecipe& recipe);
 
 [[nodiscard]] LaboratoryRoomMaterialSet generateLaboratoryRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] LaboratoryMaterialValidationResult validateLaboratorySurfaceRecipe(
     const LaboratorySurfaceRecipe& recipe);
 [[nodiscard]] LaboratoryMaterialValidationResult validateLaboratoryRoomMaterials(
@@ -562,7 +562,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const LaboratorySurfaceRecipe& recipe);
 
 [[nodiscard]] TechnicalRoomMaterialSet generateTechnicalRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] TechnicalMaterialValidationResult validateTechnicalSurfaceRecipe(
     const TechnicalSurfaceRecipe& recipe);
 [[nodiscard]] TechnicalMaterialValidationResult validateTechnicalRoomMaterials(
@@ -575,7 +575,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const TechnicalSurfaceRecipe& recipe);
 
 [[nodiscard]] SecurityRoomMaterialSet generateSecurityRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] SecurityMaterialValidationResult validateSecuritySurfaceRecipe(
     const SecuritySurfaceRecipe& recipe);
 [[nodiscard]] SecurityMaterialValidationResult validateSecurityRoomMaterials(
@@ -588,7 +588,7 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const SecuritySurfaceRecipe& recipe);
 
 [[nodiscard]] CentralHubRoomMaterialSet generateCentralHubRoomMaterials(
-    gdp::core::Seed roomSeed);
+    wkc::core::Seed roomSeed);
 [[nodiscard]] CentralHubMaterialValidationResult validateCentralHubSurfaceRecipe(
     const CentralHubSurfaceRecipe& recipe);
 [[nodiscard]] CentralHubMaterialValidationResult validateCentralHubRoomMaterials(

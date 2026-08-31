@@ -18,12 +18,12 @@ struct PlayerCommand {
 
 struct InteractionTarget {
     gdp::entities::EntityId id{};
-    gdp::core::Aabb bounds{};
+    wkc::core::Aabb bounds{};
 };
 
 struct PlayerState {
-    gdp::core::Vec3 position{0.0F, 0.0F, 4.0F};
-    gdp::core::Vec3 velocity{};
+    wkc::core::Vec3 position{0.0F, 0.0F, 4.0F};
+    wkc::core::Vec3 velocity{};
     float yawDegrees{-90.0F};
     float pitchDegrees{0.0F};
     float health{100.0F};
@@ -37,12 +37,12 @@ class Player {
 public:
     Player() = default;
 
-    void spawn(gdp::core::Vec3 feetPosition, float yawDegrees = -90.0F) noexcept;
+    void spawn(wkc::core::Vec3 feetPosition, float yawDegrees = -90.0F) noexcept;
     [[nodiscard]] bool relocate(
-        gdp::core::Vec3 feetPosition,
+        wkc::core::Vec3 feetPosition,
         float yawDegrees) noexcept;
     void bindEntity(gdp::entities::EntityId entity) noexcept;
-    void applyLook(gdp::core::Vec2 mouseDelta) noexcept;
+    void applyLook(wkc::core::Vec2 mouseDelta) noexcept;
     void fixedUpdate(
         const PlayerCommand& command,
         float fixedStepSeconds,
@@ -61,10 +61,10 @@ public:
 
     [[nodiscard]] const PlayerState& state() const noexcept;
     [[nodiscard]] gdp::entities::EntityId entity() const noexcept;
-    [[nodiscard]] gdp::core::Vec3 forwardDirection() const noexcept;
-    [[nodiscard]] gdp::core::Vec3 planarForwardDirection() const noexcept;
-    [[nodiscard]] gdp::core::Vec3 rightDirection() const noexcept;
-    [[nodiscard]] gdp::core::Vec3 cameraPosition() const noexcept;
+    [[nodiscard]] wkc::core::Vec3 forwardDirection() const noexcept;
+    [[nodiscard]] wkc::core::Vec3 planarForwardDirection() const noexcept;
+    [[nodiscard]] wkc::core::Vec3 rightDirection() const noexcept;
+    [[nodiscard]] wkc::core::Vec3 cameraPosition() const noexcept;
 
 private:
     PlayerState state_{};

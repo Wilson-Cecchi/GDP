@@ -56,7 +56,7 @@ struct GridSize {
 };
 
 struct SpawnZone {
-    gdp::core::Aabb bounds{};
+    wkc::core::Aabb bounds{};
 };
 
 struct RoomModule {
@@ -65,7 +65,7 @@ struct RoomModule {
     RoomTheme theme{RoomTheme::Industrial};
     RoomSizeClass sizeClass{RoomSizeClass::Medium};
     GridSize footprint{};
-    gdp::core::Aabb localBounds{};
+    wkc::core::Aabb localBounds{};
     RoomRoleMask roleCapabilities{0};
     std::vector<ConnectorDefinition> connectors;
     std::vector<SpawnZone> enemyZones;
@@ -101,11 +101,11 @@ struct RoomInstance {
     RoomRole role{RoomRole::Normal};
     RoomTheme theme{RoomTheme::Industrial};
     RoomSizeClass sizeClass{RoomSizeClass::Medium};
-    gdp::core::Seed seed{0};
+    wkc::core::Seed seed{0};
     RoomModuleId moduleId{0};
-    gdp::core::Transform transform{};
-    gdp::core::QuarterTurn rotation{gdp::core::QuarterTurn::Degrees0};
-    gdp::core::Aabb worldBounds{};
+    wkc::core::Transform transform{};
+    wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
+    wkc::core::Aabb worldBounds{};
     std::vector<ConnectorInstance> connectors;
     std::vector<SpawnZone> enemyZones;
     std::vector<SpawnZone> lootZones;
@@ -118,9 +118,9 @@ struct RoomInstance {
     const RoomModule& module,
     RoomId roomId,
     RoomRole role,
-    gdp::core::Seed seed,
-    gdp::core::Vec3 worldOrigin,
-    gdp::core::QuarterTurn rotation);
+    wkc::core::Seed seed,
+    wkc::core::Vec3 worldOrigin,
+    wkc::core::QuarterTurn rotation);
 [[nodiscard]] bool hasUnresolvedRequiredConnector(const RoomInstance& room) noexcept;
 [[nodiscard]] RoomModule makeFixedRoomModule();
 [[nodiscard]] std::vector<RoomModule> makeDefaultRoomModuleLibrary();

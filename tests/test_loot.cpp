@@ -35,7 +35,7 @@ void testDeterministicLootLayout()
     constexpr std::array zones{
         SpawnZone{{{-3.0F, 0.0F, -3.0F}, {-2.0F, 0.0F, -2.0F}}},
     };
-    constexpr gdp::core::Seed seed = 0x4C4F4F545F563031ULL;
+    constexpr wkc::core::Seed seed = 0x4C4F4F545F563031ULL;
     const LootLayout first = generateLootLayout(
         seed, RoomRole::Secret, RoomTheme::Laboratory, 4, zones);
     const LootLayout repeated = generateLootLayout(
@@ -103,7 +103,7 @@ void testRoleBudgetsAndBatch()
     bool allValid = true;
     bool foundHealth = false;
     bool foundAmmo = false;
-    for (gdp::core::Seed seed = 0; seed < 1'000; ++seed) {
+    for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const LootLayout layout = generateLootLayout(
             seed, RoomRole::Normal, RoomTheme::Industrial, 4, zones);
         if (!validateLootLayout(layout, zones).isValid()) {
