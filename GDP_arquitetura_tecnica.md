@@ -797,6 +797,12 @@ Na Fase 54, os contratos matemáticos, `Seed`, `GenerationVersion`,
 migrados, `wkc_forge_core` não expõe mais `gdp::core`; todos os consumidores
 foram atualizados sem aliases e sem alterar coordenadas, RNG ou determinismo.
 
+Na Fase 55, `Entities` e `World` foram confirmados como propriedade do jogo.
+Arquétipos de inimigo, itens, props, papéis e temas de sala, encontros e
+população codificam regras do GDP, portanto continuam em `gdp_entities`,
+`gdp_world`, `gdp::entities` e `gdp::world`. Gates impedem dependências da WKC
+Forge em alvos GDP e evitam abstrações prematuras `wkc_forge_entities/world`.
+
 ---
 
 # 8. Sistema de seed

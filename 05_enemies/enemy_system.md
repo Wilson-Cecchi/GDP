@@ -12,6 +12,14 @@
 ROLE ≠ STATS ≠ BEHAVIOR ≠ VISUAL GENOME
 ```
 
+## Propriedade arquitetural
+
+O catálogo de entidades pertence ao GDP. `EnemyArchetype`, os tipos de item e
+prop, estados de comportamento e dados de gameplay são linguagem específica do
+jogo, enquanto Math/Seed/Transform vêm da WKC Forge. Assim, o alvo permanece
+`gdp_entities` e a API, `gdp::entities`; não existe uma camada genérica de
+entidades na engine sem um caso real de reutilização.
+
 A função de gameplay permanece reconhecível mesmo quando aparência, materiais, dano e assimetria variam.
 
 ## Elenco

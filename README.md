@@ -218,6 +218,11 @@ especializados das pastas numeradas.
   `wkc::core`, concluindo a API pública de `wkc_forge_core`. Todos os
   consumidores GDP/WKC foram atualizados sem aliases; coordenadas, RNG,
   derivação de seeds, hashes e geração permanecem idênticos.
+- **Fase 55 — Propriedade de Entities e World:** a análise dos contratos
+  confirmou `gdp_entities` e `gdp_world` como camadas do jogo. Arquétipos,
+  itens, props, papéis, temas, encontros e regras de salas permanecem em
+  `gdp::entities`/`gdp::world`; a arquitetura agora impede que esses conceitos
+  sejam promovidos artificialmente à WKC Forge ou virem dependências da engine.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

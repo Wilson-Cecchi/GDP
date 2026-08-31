@@ -10,6 +10,15 @@
 - `architecture.md — World Generator`
 - `README(6).md — Room System/Grafo`
 
+## Propriedade arquitetural
+
+Este módulo pertence ao GDP, não à WKC Forge. Embora grafo e corredores tenham
+partes conceitualmente reutilizáveis, os contratos atuais dependem diretamente
+de `RoomRole`, `RoomTheme`, módulos, encontros, loot, props e população próprios
+do jogo. Uma extração só deve ocorrer quando existir um segundo consumidor e um
+contrato genérico comprovado; até lá, o alvo permanece `gdp_world` e a API,
+`gdp::world`.
+
 ## Pipeline
 
 ```text

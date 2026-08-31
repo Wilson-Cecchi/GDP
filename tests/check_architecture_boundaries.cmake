@@ -56,6 +56,37 @@ if(root_cmake_contents MATCHES
     message(FATAL_ERROR "GDP-prefixed render foundation target must not return")
 endif()
 if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_entities[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP entity catalog must remain owned by gdp_entities")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_entities[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP entity catalog must not move into WKC Forge")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_world[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP world generation must remain owned by gdp_world")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_world[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP world generation must not move into WKC Forge")
+endif()
+foreach(wkc_target IN ITEMS
+    wkc_forge_core
+    wkc_forge_platform
+    wkc_forge_platform_sdl
+    wkc_forge_audio
+    wkc_forge_render
+    wkc_forge_procedural
+)
+    if(root_cmake_contents MATCHES
+            "target_link_libraries\\(${wkc_target}[^\\)]*gdp_[A-Za-z0-9_]+")
+        message(FATAL_ERROR
+            "WKC Forge target must not depend on GDP target: ${wkc_target}"
+        )
+    endif()
+endforeach()
+if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\(wkc_forge_render[ \t]+PUBLIC[ \t]+wkc_forge_core")
     message(FATAL_ERROR "WKC Forge render must depend on WKC Forge core")
 endif()
@@ -149,6 +180,54 @@ foreach(migrated_core_source IN ITEMS
 endforeach()
 if(NOT EXISTS "${GDP_SOURCE_DIR}/src/game/SeedDomains.hpp")
     message(FATAL_ERROR "GDP seed domain catalog is missing from src/game")
+endif()
+
+file(GLOB entity_sources
+    "${GDP_SOURCE_DIR}/src/entities/*.cpp"
+    "${GDP_SOURCE_DIR}/src/entities/*.hpp"
+)
+foreach(source IN LISTS entity_sources)
+    file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+gdp::entities[ \t{]"
+        OR contents MATCHES "namespace[ \t]+wkc::entities[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "GDP entity catalog must use gdp::entities: ${relative_source}"
+        )
+    endif()
+endforeach()
+file(READ "${GDP_SOURCE_DIR}/src/entities/EntityManager.hpp"
+    entity_manager_header)
+if(NOT entity_manager_header MATCHES "enum[ \t]+class[ \t]+EnemyArchetype"
+    OR NOT entity_manager_header MATCHES "IndustrialRobot"
+    OR NOT entity_manager_header MATCHES "enum[ \t]+class[ \t]+PropType")
+    message(FATAL_ERROR
+        "GDP entity catalog must retain its game-specific enemy and prop contracts"
+    )
+endif()
+
+file(GLOB world_sources
+    "${GDP_SOURCE_DIR}/src/world/*.cpp"
+    "${GDP_SOURCE_DIR}/src/world/*.hpp"
+)
+foreach(source IN LISTS world_sources)
+    file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+gdp::world[ \t{]"
+        OR contents MATCHES "namespace[ \t]+wkc::world[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "GDP world generation must use gdp::world: ${relative_source}"
+        )
+    endif()
+endforeach()
+file(READ "${GDP_SOURCE_DIR}/src/world/RoomModule.hpp" room_module_header)
+if(NOT room_module_header MATCHES "enum[ \t]+class[ \t]+RoomRole"
+    OR NOT room_module_header MATCHES "Boss"
+    OR NOT room_module_header MATCHES "enum[ \t]+class[ \t]+RoomTheme"
+    OR NOT room_module_header MATCHES "Laboratory")
+    message(FATAL_ERROR
+        "GDP world must retain its game-specific room roles and themes"
+    )
 endif()
 
 set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/visual/VisualAssets.hpp")
