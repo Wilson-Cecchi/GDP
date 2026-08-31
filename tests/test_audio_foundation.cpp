@@ -1,4 +1,5 @@
 #include "audio/AudioFoundation.hpp"
+#include "audio/AudioMixer.hpp"
 
 #include <iostream>
 #include <string_view>
@@ -50,6 +51,16 @@ int main()
     expect(first.samples == repeated.samples,
         "generic synthesis remains deterministic");
 
+    AudioMixer mixer;
+    expect(mixer.initialize(false) && !mixer.isOutputActive(),
+        "generic mixer initializes without an output device");
+    mixer.playAt(recipe, {2.0F, 0.0F, 0.0F}, {}, {0.0F, 0.0F, -1.0F});
+    mixer.update(1.0F / 60.0F);
+    expect(mixer.activeVoiceCount() == 1U
+            && mixer.lastRightEnergy() > mixer.lastLeftEnergy(),
+        "generic mixer caches, spatializes and mixes a recipe");
+    mixer.clearVoices();
+
     AudioRecipe invalid = recipe;
     invalid.kind = invalid.kindCount;
     expect(!validateAudioRecipe(invalid).isValid(),
@@ -59,6 +70,6 @@ int main()
         std::cerr << failures << " audio foundation test(s) failed\n";
         return 1;
     }
-    std::cout << "WKC Forge audio foundation tests passed\n";
+    std::cout << "WKC Forge audio foundation and mixer tests passed\n";
     return 0;
 }

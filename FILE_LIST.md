@@ -56,6 +56,8 @@
 - `architecture.md`
 - `src/audio/AudioFoundation.cpp`
 - `src/audio/AudioFoundation.hpp`
+- `src/audio/AudioMixer.cpp`
+- `src/audio/AudioMixer.hpp`
 - `src/core/Hash.cpp`
 - `src/core/Hash.hpp`
 - `src/core/Log.cpp`

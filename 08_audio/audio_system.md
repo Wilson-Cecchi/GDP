@@ -5,8 +5,9 @@
 > ambiência por corredor implementado na Fase 15.
 > Na Fase 43, `wkc_forge_audio` passou a conter contratos, hash, validação e
 > síntese reutilizáveis. Eventos, receitas, perfis de ambiência e a fachada
-> concreta do GDP pertencem a `src/game/audio` e ao target `gdp_audio`. O mixer
-> SDL ainda será analisado separadamente antes de qualquer promoção à engine.
+> concreta do GDP pertencem a `src/game/audio` e ao target `gdp_audio`.
+> Na Fase 44, `AudioMixer` levou cache, vozes, buses, espacialização, crossfade e
+> backend SDL para `wkc_forge_audio`; a fachada GDP apenas fornece receitas.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -24,7 +25,7 @@ Gameplay Event → AudioEvent → AudioSystem → voice → spatialization → o
 
 ## Mixer e buses
 
-`AudioSystem` mistura até 16 vozes em estéreo float de 48 kHz. Master, Effects
+`AudioMixer` mistura até 16 vozes em estéreo float de 48 kHz. Master, Effects
 e Ambient possuem volumes independentes; UI permanece planejado. A mixagem
 limita a saída a `[-1, 1]`, descarta one-shots concluídos e reutiliza clips pelo
 hash integral da receita.

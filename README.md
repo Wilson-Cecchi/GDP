@@ -174,6 +174,10 @@ especializados das pastas numeradas.
   determinística de clips passaram para `wkc_forge_audio`. Os eventos
   `WeaponFire`, `EnemyDeath`, `Pickup`, perfis de ambiência e a fachada SDL
   permanecem em `gdp_audio`, agora agrupados fisicamente em `src/game/audio`.
+- **Fase 44 — Mixer WKC Forge:** cache de clips, orçamento de vozes, buses,
+  espacialização, crossfade e backend SDL passaram para `AudioMixer` em
+  `wkc_forge_audio`. `gdp_audio` não depende mais diretamente de SDL e apenas
+  converte eventos, seeds e perfis do jogo em receitas genéricas.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

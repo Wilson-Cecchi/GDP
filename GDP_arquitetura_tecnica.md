@@ -606,7 +606,9 @@ gdp/
 │   │
 │   ├── audio/
 │   │   ├── AudioFoundation.cpp
-│   │   └── AudioFoundation.hpp
+│   │   ├── AudioFoundation.hpp
+│   │   ├── AudioMixer.cpp
+│   │   └── AudioMixer.hpp
 │   │
 │   └── debug/
 │       ├── DebugDraw.cpp
@@ -738,6 +740,11 @@ isolados em `wkc_forge_audio`, sem dependências de eventos ou seeds do GDP. O
 catálogo `AudioEventKind`, as receitas, os perfis de ambiência e a fachada SDL
 orientada ao jogo passaram fisicamente para `src/game/audio` e permanecem em
 `gdp_audio`. Hashes, waveforms e namespace público foram preservados.
+
+Na Fase 44, cache de clips, vozes, buses, espacialização, crossfade e backend
+SDL foram extraídos para `AudioMixer`, dentro de `wkc_forge_audio`. A fachada
+`gdp_audio` preserva a API da aplicação, mas agora somente converte eventos,
+seeds e perfis do jogo em `AudioRecipe`; ela não depende diretamente de SDL.
 
 ---
 

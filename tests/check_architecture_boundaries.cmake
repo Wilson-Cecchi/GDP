@@ -76,12 +76,16 @@ if(NOT root_cmake_contents MATCHES
     message(FATAL_ERROR "GDP visual renderer must declare its resource cache dependency")
 endif()
 if(NOT root_cmake_contents MATCHES
-        "target_link_libraries\\(wkc_forge_audio[ \t]+PUBLIC[ \t]+wkc_forge_core")
-    message(FATAL_ERROR "WKC Forge audio must depend on WKC Forge core")
+        "target_link_libraries\\(wkc_forge_audio[ \t]+PUBLIC[ \t]+wkc_forge_core[ \t]+SDL3::SDL3")
+    message(FATAL_ERROR "WKC Forge audio must own its core and SDL dependencies")
 endif()
 if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\(gdp_audio[ \t]+PUBLIC[ \t]+wkc_forge_audio")
     message(FATAL_ERROR "GDP audio must consume the WKC Forge audio foundation")
+endif()
+if(root_cmake_contents MATCHES
+        "target_link_libraries\\(gdp_audio[^\\)]*SDL3::SDL3")
+    message(FATAL_ERROR "GDP audio facade must not depend directly on SDL")
 endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")
@@ -236,6 +240,16 @@ foreach(gdp_audio_source IN ITEMS
         message(FATAL_ERROR "GDP audio source is missing: ${gdp_audio_source}")
     endif()
 endforeach()
+if(NOT EXISTS "${GDP_SOURCE_DIR}/src/audio/AudioMixer.cpp"
+    OR NOT EXISTS "${GDP_SOURCE_DIR}/src/audio/AudioMixer.hpp")
+    message(FATAL_ERROR "WKC Forge generic audio mixer is missing")
+endif()
+file(READ "${GDP_SOURCE_DIR}/src/game/audio/AudioSystem.cpp" gdp_audio_system_source)
+file(READ "${GDP_SOURCE_DIR}/src/game/audio/AudioSystem.hpp" gdp_audio_system_header)
+if(gdp_audio_system_source MATCHES "SDL_"
+    OR gdp_audio_system_header MATCHES "SDL_")
+    message(FATAL_ERROR "GDP audio facade must delegate SDL to WKC Forge")
+endif()
 file(GLOB audio_foundation_sources
     "${GDP_SOURCE_DIR}/src/audio/*.cpp"
     "${GDP_SOURCE_DIR}/src/audio/*.hpp"

@@ -1,24 +1,17 @@
 #pragma once
 
-#include "core/Math.hpp"
+#include "audio/AudioMixer.hpp"
 #include "game/audio/AudioRecipes.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-
-struct SDL_AudioStream;
 
 namespace gdp::audio {
-
-inline constexpr std::size_t maximumAudioVoices = 16U;
 
 class AudioSystem {
 public:
     AudioSystem() = default;
-    ~AudioSystem();
+    ~AudioSystem() = default;
 
     AudioSystem(const AudioSystem&) = delete;
     AudioSystem& operator=(const AudioSystem&) = delete;
@@ -64,37 +57,7 @@ public:
     [[nodiscard]] float lastRightEnergy() const noexcept;
 
 private:
-    struct Voice {
-        std::shared_ptr<const AudioClip> clip;
-        std::size_t cursor{0};
-        float leftGain{1.0F};
-        float rightGain{1.0F};
-        bool loop{false};
-        bool ambient{false};
-    };
-
-    [[nodiscard]] std::shared_ptr<const AudioClip> acquireClip(
-        const AudioRecipe& recipe);
-    void addVoice(
-        std::shared_ptr<const AudioClip> clip,
-        float leftGain,
-        float rightGain,
-        bool loop,
-        bool ambient);
-    void disableOutput() noexcept;
-
-    std::unordered_map<std::uint64_t, std::shared_ptr<const AudioClip>> clips_;
-    std::vector<Voice> voices_;
-    SDL_AudioStream* stream_{nullptr};
-    bool initialized_{false};
-    bool audioSubsystemInitialized_{false};
-    bool outputActive_{false};
-    float masterVolume_{0.85F};
-    float effectsVolume_{0.90F};
-    float ambientVolume_{0.55F};
-    float lastMixPeak_{0.0F};
-    float lastLeftEnergy_{0.0F};
-    float lastRightEnergy_{0.0F};
+    AudioMixer mixer_{};
 };
 
 } // namespace gdp::audio

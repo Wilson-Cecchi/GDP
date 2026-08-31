@@ -119,11 +119,12 @@ add_library(
     wkc_forge_audio
     STATIC
     src/audio/AudioFoundation.cpp
+    src/audio/AudioMixer.cpp
 )
 
 target_compile_features(wkc_forge_audio PUBLIC cxx_std_20)
 target_include_directories(wkc_forge_audio PUBLIC src)
-target_link_libraries(wkc_forge_audio PUBLIC wkc_forge_core)
+target_link_libraries(wkc_forge_audio PUBLIC wkc_forge_core SDL3::SDL3)
 gdp_enable_warnings(wkc_forge_audio)
 gdp_enable_sanitizers(wkc_forge_audio)
 
@@ -136,7 +137,7 @@ add_library(
 
 target_compile_features(gdp_audio PUBLIC cxx_std_20)
 target_include_directories(gdp_audio PUBLIC src)
-target_link_libraries(gdp_audio PUBLIC wkc_forge_audio wkc_forge_core SDL3::SDL3)
+target_link_libraries(gdp_audio PUBLIC wkc_forge_audio wkc_forge_core)
 gdp_enable_warnings(gdp_audio)
 gdp_enable_sanitizers(gdp_audio)
 
