@@ -71,7 +71,7 @@ bool validColor(const gdp::core::Vec3 value) noexcept
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
@@ -199,15 +199,15 @@ LightingValidationResult validateRoomLightingPlan(
 
 std::uint64_t roomLightingPlanHash(const RoomLightingPlan& plan) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4C494748545F504CULL, plan.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.role));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.theme));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.mood));
+    std::uint64_t hash = wkc::core::hashCombine(0x4C494748545F504CULL, plan.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.role));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.theme));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.mood));
     hash = addVec3(hash, plan.ambientColor);
     hash = addFloat(hash, plan.ambientIntensity);
     hash = addFloat(hash, plan.fixtureEmissive);
-    hash = gdp::core::hashCombine(hash, plan.supportsAlert ? 1U : 0U);
-    hash = gdp::core::hashCombine(hash, plan.lights.size());
+    hash = wkc::core::hashCombine(hash, plan.supportsAlert ? 1U : 0U);
+    hash = wkc::core::hashCombine(hash, plan.lights.size());
     for (const RoomPointLight& light : plan.lights) {
         hash = addVec3(hash, light.position);
         hash = addVec3(hash, light.color);

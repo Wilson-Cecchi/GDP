@@ -10,7 +10,7 @@ namespace {
 
 float unitNoise(const std::uint64_t value) noexcept
 {
-    return static_cast<float>(gdp::core::mix64(value) & 0xFFFFU) / 65'535.0F;
+    return static_cast<float>(wkc::core::mix64(value) & 0xFFFFU) / 65'535.0F;
 }
 
 std::uint8_t channelToByte(const float value) noexcept
@@ -39,10 +39,10 @@ std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe
             const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
             const std::size_t pixelIndex = static_cast<std::size_t>(y)
                 * static_cast<std::size_t>(recipe.resolution) + x;
-            const float macro = unitNoise(gdp::core::hashCombine(
+            const float macro = unitNoise(wkc::core::hashCombine(
                 recipe.seed,
                 (static_cast<std::uint64_t>(y / 8U) << 32U) | (x / 8U)));
-            const float micro = unitNoise(gdp::core::hashCombine(recipe.seed, pixelId));
+            const float micro = unitNoise(wkc::core::hashCombine(recipe.seed, pixelId));
             const float macroBlend = recipe.macroVariation * macro;
             gdp::core::Vec3 color{
                 recipe.baseColor.x + ((recipe.secondaryColor.x - recipe.baseColor.x) * macroBlend),
@@ -52,16 +52,16 @@ std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe
             const float grain = (micro - 0.5F) * recipe.microVariation;
             color = color + gdp::core::Vec3{grain, grain, grain};
 
-            const float dirtNoise = unitNoise(gdp::core::hashCombine(pixelId, recipe.seed ^ 0xD17U));
+            const float dirtNoise = unitNoise(wkc::core::hashCombine(pixelId, recipe.seed ^ 0xD17U));
             if (dirtNoise < recipe.dirtAmount * 0.22F) {
                 color = color * 0.62F;
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(pixelId, recipe.seed ^ 0xA11U));
+            const float wearNoise = unitNoise(wkc::core::hashCombine(pixelId, recipe.seed ^ 0xA11U));
             if (wearNoise < recipe.wearAmount * 0.16F) {
                 color = color + gdp::core::Vec3{0.13F, 0.12F, 0.10F};
             }
             if (properties.oxidationAllowed) {
-                const float oxidationNoise = unitNoise(gdp::core::hashCombine(
+                const float oxidationNoise = unitNoise(wkc::core::hashCombine(
                     pixelId, recipe.seed ^ 0x0D1DA710U));
                 if (oxidationNoise < recipe.oxidationAmount * 0.12F) {
                     color = {color.x * 0.78F, color.y * 0.52F, color.z * 0.32F};

@@ -85,7 +85,7 @@ void configureReward(
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 } // namespace
@@ -264,28 +264,28 @@ EventValidationResult validateRoomEventPlan(
 
 std::uint64_t roomEventPlanHash(const RoomEventPlan& plan) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4556454E545F504CULL, plan.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.role));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.theme));
-    hash = gdp::core::hashCombine(hash, plan.depth);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.type));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.trigger));
-    hash = gdp::core::hashCombine(hash, plan.locksRoom ? 1U : 0U);
-    hash = gdp::core::hashCombine(hash, plan.requiresRoomClear ? 1U : 0U);
-    hash = gdp::core::hashCombine(hash, plan.waveCount);
+    std::uint64_t hash = wkc::core::hashCombine(0x4556454E545F504CULL, plan.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.role));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.theme));
+    hash = wkc::core::hashCombine(hash, plan.depth);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.type));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.trigger));
+    hash = wkc::core::hashCombine(hash, plan.locksRoom ? 1U : 0U);
+    hash = wkc::core::hashCombine(hash, plan.requiresRoomClear ? 1U : 0U);
+    hash = wkc::core::hashCombine(hash, plan.waveCount);
     hash = addFloat(hash, plan.interWaveDelay);
-    hash = gdp::core::hashCombine(hash, plan.spawns.size());
+    hash = wkc::core::hashCombine(hash, plan.spawns.size());
     for (const EventEnemySpawn& spawn : plan.spawns) {
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(spawn.archetype));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(spawn.archetype));
         hash = addFloat(hash, spawn.position.x);
         hash = addFloat(hash, spawn.position.y);
         hash = addFloat(hash, spawn.position.z);
         hash = addFloat(hash, spawn.health);
-        hash = gdp::core::hashCombine(hash, spawn.visualSeed);
-        hash = gdp::core::hashCombine(hash, spawn.wave);
+        hash = wkc::core::hashCombine(hash, spawn.visualSeed);
+        hash = wkc::core::hashCombine(hash, spawn.wave);
     }
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(plan.rewardType));
-    hash = gdp::core::hashCombine(hash, plan.rewardQuantity);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(plan.rewardType));
+    hash = wkc::core::hashCombine(hash, plan.rewardQuantity);
     hash = addFloat(hash, plan.rewardPosition.x);
     hash = addFloat(hash, plan.rewardPosition.y);
     hash = addFloat(hash, plan.rewardPosition.z);

@@ -27,7 +27,7 @@ bool isUnitParameter(const float value) noexcept
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
@@ -142,26 +142,26 @@ MaterialProperties materialProperties(const MaterialFamily family) noexcept
 
 std::uint64_t meshRecipeHash(const MeshRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4D4553485F524543ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, recipe.primitives.size());
+    std::uint64_t hash = wkc::core::hashCombine(0x4D4553485F524543ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, recipe.primitives.size());
     for (const PrimitiveRecipe& primitive : recipe.primitives) {
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.type));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.type));
         hash = addVec3(hash, primitive.localTransform.position);
         hash = addVec3(hash, primitive.localTransform.rotationDegrees);
         hash = addVec3(hash, primitive.localTransform.scale);
         hash = addVec3(hash, primitive.dimensions);
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.material));
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.semantic));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.material));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(primitive.semantic));
     }
     return hash;
 }
 
 std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x544558545F524543ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x544558545F524543ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addFloat(hash, recipe.macroVariation);
@@ -171,8 +171,8 @@ std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept
     hash = addFloat(hash, recipe.scratchAmount);
     hash = addFloat(hash, recipe.oxidationAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.region));
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.region));
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 } // namespace wkc::procedural

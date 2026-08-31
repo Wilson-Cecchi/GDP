@@ -29,7 +29,7 @@ bool isUnitColor(const gdp::core::Vec3 color) noexcept
 
 float unitNoise(const std::uint64_t value) noexcept
 {
-    return static_cast<float>(gdp::core::mix64(value) & 0xFFFFU) / 65'535.0F;
+    return static_cast<float>(wkc::core::mix64(value) & 0xFFFFU) / 65'535.0F;
 }
 
 std::uint8_t channelToByte(const float value) noexcept
@@ -79,7 +79,7 @@ float smoothNoise(
     const float blendY = localY * localY * (3.0F - (2.0F * localY));
     const auto sample = [seed](const std::uint32_t sampleX, const std::uint32_t sampleY) {
         const std::uint64_t id = (static_cast<std::uint64_t>(sampleY) << 32U) | sampleX;
-        return unitNoise(gdp::core::hashCombine(seed, id));
+        return unitNoise(wkc::core::hashCombine(seed, id));
     };
     const float top = scalarMix(sample(gridX, gridY), sample(gridX + 1U, gridY), blendX);
     const float bottom = scalarMix(
@@ -129,13 +129,13 @@ IndustrialCeilingSample industrialCeilingSample(
     const std::uint32_t bevelWidth = beamWidth + std::max(12U, recipe.resolution / 80U);
 
     const float panelVariation = 0.08F + unitNoise(
-        gdp::core::hashCombine(recipe.seed, panelId)) * 0.13F;
+        wkc::core::hashCombine(recipe.seed, panelId)) * 0.13F;
     sample.albedo = mix(recipe.baseColor, recipe.secondaryColor, panelVariation);
     const float macro = (smoothNoise(recipe.seed ^ 0x4345494CULL, x, y, 144U) - 0.5F)
         * 0.042F;
     const float brushed = (smoothNoise(recipe.seed ^ 0x42525553ULL, x, y, 9U) - 0.5F)
         * 0.018F;
-    const float grain = (unitNoise(gdp::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
+    const float grain = (unitNoise(wkc::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
         * 0.008F;
     sample.albedo = add(sample.albedo, macro + brushed + grain);
     sample.height = 0.50F + (brushed * 0.32F) + (grain * 0.10F);
@@ -249,7 +249,7 @@ IndustrialCeilingSample industrialCeilingSample(
         sample.metalness = 0.96F;
     }
 
-    const float scratchNoise = unitNoise(gdp::core::hashCombine(
+    const float scratchNoise = unitNoise(wkc::core::hashCombine(
         recipe.seed ^ 0x43534352ULL, pixelId));
     const bool hairlineScratch = !seam
         && ((x + y * 2U) % 241U == 0U || x % 173U == 0U)
@@ -299,7 +299,7 @@ IndustrialWallSample industrialWallSample(
     const bool bevel = !seam && !frame && edge <= bevelWidth;
 
     const float panelBlend = 0.08F + unitNoise(
-        gdp::core::hashCombine(recipe.seed, panelId)) * 0.10F;
+        wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
     sample.albedo = mix(recipe.baseColor, recipe.secondaryColor, panelBlend);
     const float macro = (smoothNoise(recipe.seed ^ 0x4D414352U, x, y, 128U) - 0.5F)
         * 0.055F;
@@ -308,7 +308,7 @@ IndustrialWallSample industrialWallSample(
     const std::uint32_t brushBand = static_cast<std::uint32_t>(
         (static_cast<std::uint64_t>(x) + (recipe.seed & 15U)) % 17U);
     const float brush = (static_cast<float>(brushBand) - 8.0F) * 0.00035F;
-    const float grain = (unitNoise(gdp::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
+    const float grain = (unitNoise(wkc::core::hashCombine(recipe.seed, pixelId)) - 0.5F)
         * 0.009F;
     sample.albedo = add(sample.albedo, macro + orangePeel + brush + grain);
     sample.height = 0.50F + orangePeel * 0.42F + grain * 0.12F;
@@ -469,7 +469,7 @@ IndustrialWallSample industrialWallSample(
         sample.exposed = true;
     }
 
-    const float scratchNoise = unitNoise(gdp::core::hashCombine(
+    const float scratchNoise = unitNoise(wkc::core::hashCombine(
         recipe.seed ^ 0x53435241U, pixelId));
     const bool hairlineScratch = !seam && !frame
         && (x % 113U == 0U || (x + (y * 3U)) % 257U == 0U)
@@ -488,7 +488,7 @@ IndustrialWallSample industrialWallSample(
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 std::uint64_t addVec3(std::uint64_t hash, const gdp::core::Vec3 value) noexcept
@@ -1458,30 +1458,30 @@ IndustrialMaterialValidationResult validateIndustrialRoomMaterials(
 
 std::uint64_t industrialSurfaceRecipeHash(const IndustrialSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x494E445F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x494E445F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.dirtAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    hash = gdp::core::hashCombine(hash, recipe.safetyStripe ? 1U : 0U);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    hash = wkc::core::hashCombine(hash, recipe.safetyStripe ? 1U : 0U);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t industrialRoomMaterialHash(
     const IndustrialRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x494E445F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const IndustrialSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, industrialSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, industrialSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -1520,11 +1520,11 @@ std::optional<wkc::render::ImageData> generateIndustrialSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.12F + (unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.18F);
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.18F);
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const float grain = (unitNoise(
-                gdp::core::hashCombine(recipe.seed, pixelId)) - 0.5F) * 0.035F;
+                wkc::core::hashCombine(recipe.seed, pixelId)) - 0.5F) * 0.035F;
             color = add(color, grain);
 
             const std::uint32_t panelX = x % cellWidth;
@@ -1537,12 +1537,12 @@ std::optional<wkc::render::ImageData> generateIndustrialSurfaceAlbedo(
                 color = add(color, 0.045F);
             }
 
-            const float dirtNoise = unitNoise(gdp::core::hashCombine(
+            const float dirtNoise = unitNoise(wkc::core::hashCombine(
                 pixelId, recipe.seed ^ 0xD17D17U));
             if (dirtNoise < recipe.dirtAmount * (seam ? 0.28F : 0.055F)) {
                 color = multiply(color, 0.62F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 pixelId, recipe.seed ^ 0xAEA412U));
             if (wearNoise < recipe.wearAmount * 0.055F) {
                 color = add(color, 0.10F);
@@ -1767,30 +1767,30 @@ StorageMaterialValidationResult validateStorageRoomMaterials(
 
 std::uint64_t storageSurfaceRecipeHash(const StorageSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x53544F5F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x53544F5F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.dirtAmount);
     hash = addFloat(hash, recipe.oxidationAmount);
     hash = addFloat(hash, recipe.detailAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t storageRoomMaterialHash(const StorageRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x53544F5F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const StorageSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, storageSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, storageSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -1816,7 +1816,7 @@ std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelVariation = 0.10F + (unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.30F);
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.30F);
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelVariation);
             const std::uint32_t panelX = x % cellWidth;
@@ -1828,19 +1828,19 @@ std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
 
             const std::uint64_t coarseId = (static_cast<std::uint64_t>(y / 8U) << 32U)
                 | (x / 8U);
-            const float coarseDirt = unitNoise(gdp::core::hashCombine(
+            const float coarseDirt = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x5702A6EULL, coarseId));
             if (coarseDirt < recipe.dirtAmount * 0.34F) {
                 color = multiply(color, 0.74F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x5C0FF5ULL, pixelId));
             if (wearNoise < recipe.wearAmount * 0.035F) {
                 color = add(color, 0.075F);
             }
 
             if (recipe.surface == RoomSurface::Wall) {
-                const float rustNoise = unitNoise(gdp::core::hashCombine(
+                const float rustNoise = unitNoise(wkc::core::hashCombine(
                     recipe.seed ^ 0x2A057ULL, pixelId));
                 if ((seam || y < recipe.resolution / 6U)
                     && rustNoise < recipe.oxidationAmount * 0.22F) {
@@ -1979,30 +1979,30 @@ CombatMaterialValidationResult validateCombatRoomMaterials(
 
 std::uint64_t combatSurfaceRecipeHash(const CombatSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x434D425F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x434D425F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.impactAmount);
     hash = addFloat(hash, recipe.reinforcementAmount);
     hash = addFloat(hash, recipe.markingAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t combatRoomMaterialHash(const CombatRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x434D425F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const CombatSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, combatSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, combatSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -2031,7 +2031,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.08F + (unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.22F);
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.22F);
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -2043,7 +2043,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
                 color = add(color, 0.055F);
             }
 
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0xBA771EULL, pixelId));
             if (wearNoise < recipe.wearAmount * 0.055F) {
                 color = mix(color, {0.41F, 0.42F, 0.39F}, 0.64F);
@@ -2061,7 +2061,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
                     color = multiply(color, 0.72F);
                 }
                 for (std::uint32_t impact = 0; impact < impactCount; ++impact) {
-                    const std::uint64_t impactSeed = gdp::core::hashCombine(
+                    const std::uint64_t impactSeed = wkc::core::hashCombine(
                         recipe.seed ^ 0x1A4AC7ULL, impact);
                     const int centerX = 8 + static_cast<int>(impactSeed % 48U);
                     const int centerY = 8 + static_cast<int>((impactSeed >> 16U) % 48U);
@@ -2089,7 +2089,7 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
                 if (arenaLine) {
                     color = recipe.accentColor;
                 }
-                const float scuffNoise = unitNoise(gdp::core::hashCombine(
+                const float scuffNoise = unitNoise(wkc::core::hashCombine(
                     recipe.seed ^ 0xF1002ULL, pixelId));
                 if (!arenaLine && scuffNoise < recipe.impactAmount * 0.028F) {
                     color = multiply(color, 0.62F);
@@ -2206,30 +2206,30 @@ CafeteriaMaterialValidationResult validateCafeteriaRoomMaterials(
 
 std::uint64_t cafeteriaSurfaceRecipeHash(const CafeteriaSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4341465F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x4341465F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.stainAmount);
     hash = addFloat(hash, recipe.stripeAmount);
     hash = addFloat(hash, recipe.furnitureMarkAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t cafeteriaRoomMaterialHash(const CafeteriaRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x4341465F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const CafeteriaSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, cafeteriaSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, cafeteriaSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -2255,7 +2255,7 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.05F + unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.10F;
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -2265,7 +2265,7 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
                 color = multiply(color, 0.72F);
             }
 
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0xCAFE71AULL, pixelId));
             if (!seam && wearNoise < recipe.wearAmount * 0.022F) {
                 color = mix(color, recipe.secondaryColor, 0.48F);
@@ -2281,7 +2281,7 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
                         ? mix(recipe.accentColor, recipe.secondaryColor, 0.38F)
                         : recipe.accentColor;
                 } else if (y < recipe.resolution / 10U) {
-                    const float baseDirt = unitNoise(gdp::core::hashCombine(
+                    const float baseDirt = unitNoise(wkc::core::hashCombine(
                         recipe.seed ^ 0xBA5ED17ULL, x / 4U));
                     if (baseDirt < recipe.stainAmount) {
                         color = multiply(color, 0.80F);
@@ -2295,12 +2295,12 @@ std::optional<wkc::render::ImageData> generateCafeteriaSurfaceAlbedo(
                 }
                 const std::uint64_t stainCell = (static_cast<std::uint64_t>(y / 8U) << 32U)
                     | (x / 8U);
-                if (!seam && unitNoise(gdp::core::hashCombine(
+                if (!seam && unitNoise(wkc::core::hashCombine(
                         recipe.seed ^ 0x57A1AULL, stainCell)) < recipe.stainAmount * 0.18F) {
                     color = multiply(color, 0.82F);
                 }
                 for (std::uint32_t mark = 0; mark < 4U; ++mark) {
-                    const std::uint64_t markSeed = gdp::core::hashCombine(
+                    const std::uint64_t markSeed = wkc::core::hashCombine(
                         recipe.seed ^ 0xF007ULL, mark);
                     const int baseX = (mark % 2U == 0U) ? 14 : 50;
                     const int baseY = (mark < 2U) ? 14 : 50;
@@ -2422,30 +2422,30 @@ LaboratoryMaterialValidationResult validateLaboratoryRoomMaterials(
 
 std::uint64_t laboratorySurfaceRecipeHash(const LaboratorySurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4C41425F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x4C41425F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.detailAmount);
     hash = addFloat(hash, recipe.contaminationAmount);
     hash = addFloat(hash, recipe.lightingCoverage);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t laboratoryRoomMaterialHash(const LaboratoryRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x4C41425F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const LaboratorySurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, laboratorySurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, laboratorySurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -2471,7 +2471,7 @@ std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.025F + unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.05F;
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.05F;
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -2480,7 +2480,7 @@ std::optional<wkc::render::ImageData> generateLaboratorySurfaceAlbedo(
             if (seam) {
                 color = multiply(color, 0.66F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x1AB71AULL, pixelId));
             if (!seam && wearNoise < recipe.wearAmount * 0.012F) {
                 color = mix(color, recipe.secondaryColor, 0.36F);
@@ -2638,31 +2638,31 @@ TechnicalMaterialValidationResult validateTechnicalRoomMaterials(
 
 std::uint64_t technicalSurfaceRecipeHash(const TechnicalSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x544543485F535552ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x544543485F535552ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.dirtAmount);
     hash = addFloat(hash, recipe.pipeAmount);
     hash = addFloat(hash, recipe.oilAmount);
     hash = addFloat(hash, recipe.mechanicalAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t technicalRoomMaterialHash(const TechnicalRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x544543485F524F4FULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const TechnicalSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, technicalSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, technicalSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -2688,7 +2688,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.08F + unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.16F;
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.16F;
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -2697,7 +2697,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
             if (seam) {
                 color = multiply(color, 0.48F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x7EC471AULL, pixelId));
             if (!seam && wearNoise < recipe.wearAmount * 0.035F) {
                 color = mix(color, {0.31F, 0.32F, 0.30F}, 0.58F);
@@ -2736,7 +2736,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
                                    : gdp::core::Vec3{0.15F, 0.16F, 0.15F};
                 }
                 if (y < 7U && (x < 22U || (pipeCount == 2U && x > 27U && x < 42U))) {
-                    const float dirt = unitNoise(gdp::core::hashCombine(
+                    const float dirt = unitNoise(wkc::core::hashCombine(
                         recipe.seed ^ 0xD127ULL, x / 2U));
                     if (dirt < recipe.dirtAmount) {
                         color = multiply(color, 0.62F);
@@ -2774,7 +2774,7 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
             } else {
                 const std::uint32_t panelLinear = (y / cellHeight) * recipe.panelColumns
                     + (x / cellWidth);
-                const float category = unitNoise(gdp::core::hashCombine(
+                const float category = unitNoise(wkc::core::hashCombine(
                     recipe.seed ^ 0xCE111A6ULL, panelLinear));
                 const std::uint32_t centerX = cellWidth / 2U;
                 const std::uint32_t centerY = cellHeight / 2U;
@@ -2911,31 +2911,31 @@ SecurityMaterialValidationResult validateSecurityRoomMaterials(
 
 std::uint64_t securitySurfaceRecipeHash(const SecuritySurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x5345435F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x5345435F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.monitorAmount);
     hash = addFloat(hash, recipe.statusAmount);
     hash = addFloat(hash, recipe.accessAmount);
     hash = addFloat(hash, recipe.alertAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t securityRoomMaterialHash(const SecurityRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x5345435F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
     for (const SecuritySurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, securitySurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, securitySurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -2961,7 +2961,7 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.06F + unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.10F;
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -2970,7 +2970,7 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
             if (seam) {
                 color = multiply(color, 0.56F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x5EC017ULL, pixelId));
             if (!seam && wearNoise < recipe.wearAmount * 0.015F) {
                 color = mix(color, {0.35F, 0.37F, 0.38F}, 0.42F);
@@ -2985,7 +2985,7 @@ std::optional<wkc::render::ImageData> generateSecuritySurfaceAlbedo(
                 }
                 const bool screen = x >= 40U && x < 56U && y >= 18U && y < 31U;
                 if (screen) {
-                    const float screenState = unitNoise(gdp::core::hashCombine(
+                    const float screenState = unitNoise(wkc::core::hashCombine(
                         recipe.seed ^ 0x5C2EEAULL, 0));
                     if (recipe.alertAmount > 0.15F) {
                         color = {0.35F, 0.07F, 0.07F};
@@ -3177,32 +3177,32 @@ CentralHubMaterialValidationResult validateCentralHubRoomMaterials(
 
 std::uint64_t centralHubSurfaceRecipeHash(const CentralHubSurfaceRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4855425F53555246ULL, recipe.version);
-    hash = gdp::core::hashCombine(hash, recipe.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    std::uint64_t hash = wkc::core::hashCombine(0x4855425F53555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
     hash = addVec3(hash, recipe.baseColor);
     hash = addVec3(hash, recipe.secondaryColor);
     hash = addVec3(hash, recipe.accentColor);
-    hash = gdp::core::hashCombine(hash, recipe.panelColumns);
-    hash = gdp::core::hashCombine(hash, recipe.panelRows);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.routeAxis));
+    hash = wkc::core::hashCombine(hash, recipe.panelColumns);
+    hash = wkc::core::hashCombine(hash, recipe.panelRows);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.routeAxis));
     hash = addFloat(hash, recipe.wearAmount);
     hash = addFloat(hash, recipe.structureAmount);
     hash = addFloat(hash, recipe.navigationAmount);
     hash = addFloat(hash, recipe.focalAmount);
     hash = addFloat(hash, recipe.emissiveAmount);
-    return gdp::core::hashCombine(hash, recipe.resolution);
+    return wkc::core::hashCombine(hash, recipe.resolution);
 }
 
 std::uint64_t centralHubRoomMaterialHash(const CentralHubRoomMaterialSet& materials) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x4855425F524F4F4DULL, materials.roomSeed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(materials.routeAxis));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.routeAxis));
     for (const CentralHubSurfaceRecipe& recipe : materials.surfaces) {
-        hash = gdp::core::hashCombine(hash, centralHubSurfaceRecipeHash(recipe));
+        hash = wkc::core::hashCombine(hash, centralHubSurfaceRecipeHash(recipe));
     }
     return hash;
 }
@@ -3228,7 +3228,7 @@ std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
             const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
                 | (x / cellWidth);
             const float panelBlend = 0.04F + unitNoise(
-                gdp::core::hashCombine(recipe.seed, panelId)) * 0.08F;
+                wkc::core::hashCombine(recipe.seed, panelId)) * 0.08F;
             gdp::core::Vec3 color = mix(
                 recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
@@ -3237,7 +3237,7 @@ std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
             if (seam) {
                 color = multiply(color, 0.55F);
             }
-            const float wearNoise = unitNoise(gdp::core::hashCombine(
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
                 recipe.seed ^ 0x48554217ULL, pixelId));
             if (!seam && wearNoise < recipe.wearAmount * 0.012F) {
                 color = mix(color, {0.35F, 0.38F, 0.39F}, 0.32F);

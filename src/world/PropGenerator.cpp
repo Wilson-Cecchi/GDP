@@ -192,7 +192,7 @@ void addProp(
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 } // namespace
@@ -292,16 +292,16 @@ PropValidationResult validatePropLayout(
 
 std::uint64_t propLayoutHash(const PropLayout& layout) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x50524F505F4C4159ULL, layout.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(layout.role));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(layout.theme));
-    hash = gdp::core::hashCombine(hash, layout.depth);
-    hash = gdp::core::hashCombine(hash, layout.budget);
-    hash = gdp::core::hashCombine(hash, layout.spent);
-    hash = gdp::core::hashCombine(hash, layout.props.size());
+    std::uint64_t hash = wkc::core::hashCombine(0x50524F505F4C4159ULL, layout.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(layout.role));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(layout.theme));
+    hash = wkc::core::hashCombine(hash, layout.depth);
+    hash = wkc::core::hashCombine(hash, layout.budget);
+    hash = wkc::core::hashCombine(hash, layout.spent);
+    hash = wkc::core::hashCombine(hash, layout.props.size());
     for (const PropSpawn& prop : layout.props) {
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(prop.type));
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(prop.state));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(prop.type));
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(prop.state));
         hash = addFloat(hash, prop.position.x);
         hash = addFloat(hash, prop.position.y);
         hash = addFloat(hash, prop.position.z);
@@ -310,9 +310,9 @@ std::uint64_t propLayoutHash(const PropLayout& layout) noexcept
         hash = addFloat(hash, prop.scale.z);
         hash = addFloat(hash, prop.health);
         hash = addFloat(hash, prop.maximumHealth);
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(prop.dropType));
-        hash = gdp::core::hashCombine(hash, prop.dropQuantity);
-        hash = gdp::core::hashCombine(hash, prop.visualSeed);
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(prop.dropType));
+        hash = wkc::core::hashCombine(hash, prop.dropQuantity);
+        hash = wkc::core::hashCombine(hash, prop.visualSeed);
     }
     return hash;
 }

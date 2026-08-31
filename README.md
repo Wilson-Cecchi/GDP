@@ -211,6 +211,9 @@ especializados das pastas numeradas.
   `gdp::core` para `wkc::core`. Plataforma gráfica, áudio, renderer e aplicação
   consomem agora o diagnóstico genérico explicitamente, sem mudar mensagens ou
   níveis emitidos.
+- **Fase 53 — Hash no Core WKC Forge:** `mix64`, `hashCombine` e `fnv1a64`
+  passaram de `gdp::core` para `wkc::core`. Seeds, mundo, áudio e assets usam a
+  API WKC explicitamente, preservando todos os fingerprints e goldens.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

@@ -2,6 +2,8 @@
 
 > **Estado:** contrato inicial implementado na Fase 1; fronteira Engine × GDP
 > separada e validada na Fase 29.
+> Na Fase 53, `mix64`, `hashCombine` e `fnv1a64` passaram para `wkc::core`,
+> preservando a derivação e todos os valores golden existentes.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

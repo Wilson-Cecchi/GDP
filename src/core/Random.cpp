@@ -15,7 +15,7 @@ RandomStream::RandomStream(const Seed seed) noexcept
 std::uint64_t RandomStream::nextU64() noexcept
 {
     state_ += 0x9E3779B97F4A7C15ULL;
-    return mix64(state_);
+    return wkc::core::mix64(state_);
 }
 
 std::uint32_t RandomStream::nextU32() noexcept

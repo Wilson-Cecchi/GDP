@@ -13,9 +13,9 @@ Seed deriveSeed(
     const auto packedVersion = (static_cast<std::uint64_t>(version.major) << 32U)
         | static_cast<std::uint64_t>(version.minor);
 
-    auto result = hashCombine(parent, domain);
-    result = hashCombine(result, localId);
-    return hashCombine(result, packedVersion);
+    auto result = wkc::core::hashCombine(parent, domain);
+    result = wkc::core::hashCombine(result, localId);
+    return wkc::core::hashCombine(result, packedVersion);
 }
 
 } // namespace gdp::core

@@ -1,6 +1,6 @@
 #include "core/Hash.hpp"
 
-namespace gdp::core {
+namespace wkc::core {
 
 std::uint64_t mix64(std::uint64_t value) noexcept
 {
@@ -25,4 +25,4 @@ std::uint64_t fnv1a64(const std::string_view text) noexcept
     return hash;
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

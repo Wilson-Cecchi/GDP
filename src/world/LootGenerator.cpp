@@ -154,7 +154,7 @@ void addDrop(
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 } // namespace
@@ -273,16 +273,16 @@ LootValidationResult validateLootLayout(
 
 std::uint64_t lootLayoutHash(const LootLayout& layout) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x4C4F4F545F4C4159ULL, layout.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(layout.role));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(layout.theme));
-    hash = gdp::core::hashCombine(hash, layout.depth);
-    hash = gdp::core::hashCombine(hash, layout.budget);
-    hash = gdp::core::hashCombine(hash, layout.spent);
-    hash = gdp::core::hashCombine(hash, layout.drops.size());
+    std::uint64_t hash = wkc::core::hashCombine(0x4C4F4F545F4C4159ULL, layout.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(layout.role));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(layout.theme));
+    hash = wkc::core::hashCombine(hash, layout.depth);
+    hash = wkc::core::hashCombine(hash, layout.budget);
+    hash = wkc::core::hashCombine(hash, layout.spent);
+    hash = wkc::core::hashCombine(hash, layout.drops.size());
     for (const LootDrop& drop : layout.drops) {
-        hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(drop.type));
-        hash = gdp::core::hashCombine(hash, drop.quantity);
+        hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(drop.type));
+        hash = wkc::core::hashCombine(hash, drop.quantity);
         hash = addFloat(hash, drop.position.x);
         hash = addFloat(hash, drop.position.y);
         hash = addFloat(hash, drop.position.z);

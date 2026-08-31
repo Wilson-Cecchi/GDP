@@ -17,7 +17,7 @@ inline constexpr gdp::core::SeedDomainId audioNoiseSeedDomain = 16U;
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 } // namespace
@@ -134,8 +134,8 @@ AudioValidationResult validateAudioClip(
 
 std::uint64_t audioRecipeHash(const AudioRecipe& recipe) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(0x415544494F5F5243ULL, recipe.seed);
-    hash = gdp::core::hashCombine(hash, recipe.kind);
+    std::uint64_t hash = wkc::core::hashCombine(0x415544494F5F5243ULL, recipe.seed);
+    hash = wkc::core::hashCombine(hash, recipe.kind);
     hash = addFloat(hash, recipe.durationSeconds);
     hash = addFloat(hash, recipe.baseFrequency);
     hash = addFloat(hash, recipe.secondaryFrequency);

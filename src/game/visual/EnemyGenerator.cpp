@@ -1058,7 +1058,7 @@ void addIndustrialRobotPartError(
 
 std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 {
-    return gdp::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
 } // namespace
@@ -1251,25 +1251,25 @@ WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual)
 
 std::uint64_t workerVisualHash(const WorkerVisual& visual) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x574F524B45525F56ULL, visual.genome.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
-    hash = gdp::core::hashCombine(hash, visual.genome.torso);
-    hash = gdp::core::hashCombine(hash, visual.genome.head);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.back);
-    hash = gdp::core::hashCombine(hash, visual.genome.tool);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
+    hash = wkc::core::hashCombine(hash, visual.genome.torso);
+    hash = wkc::core::hashCombine(hash, visual.genome.head);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.back);
+    hash = wkc::core::hashCombine(hash, visual.genome.tool);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);
     hash = addFloat(hash, visual.wear.dirt);
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
-    hash = gdp::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
+    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
 std::span<const GuardPartDefinition> guardPartLibrary() noexcept
@@ -1443,25 +1443,25 @@ GuardVisualValidationResult validateGuardVisual(const GuardVisual& visual)
 
 std::uint64_t guardVisualHash(const GuardVisual& visual) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x47554152445F5653ULL, visual.genome.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
-    hash = gdp::core::hashCombine(hash, visual.genome.torso);
-    hash = gdp::core::hashCombine(hash, visual.genome.head);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.back);
-    hash = gdp::core::hashCombine(hash, visual.genome.weapon);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
+    hash = wkc::core::hashCombine(hash, visual.genome.torso);
+    hash = wkc::core::hashCombine(hash, visual.genome.head);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.back);
+    hash = wkc::core::hashCombine(hash, visual.genome.weapon);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);
     hash = addFloat(hash, visual.wear.dirt);
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
-    hash = gdp::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
+    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
 std::span<const OfficerPartDefinition> officerPartLibrary() noexcept
@@ -1645,25 +1645,25 @@ OfficerVisualValidationResult validateOfficerVisual(const OfficerVisual& visual)
 
 std::uint64_t officerVisualHash(const OfficerVisual& visual) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x4F46464943455256ULL, visual.genome.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
-    hash = gdp::core::hashCombine(hash, visual.genome.torso);
-    hash = gdp::core::hashCombine(hash, visual.genome.head);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.commandModule);
-    hash = gdp::core::hashCombine(hash, visual.genome.sidearm);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
+    hash = wkc::core::hashCombine(hash, visual.genome.torso);
+    hash = wkc::core::hashCombine(hash, visual.genome.head);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.commandModule);
+    hash = wkc::core::hashCombine(hash, visual.genome.sidearm);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);
     hash = addFloat(hash, visual.wear.dirt);
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
-    hash = gdp::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
+    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
 std::span<const EngineerPartDefinition> engineerPartLibrary() noexcept
@@ -1847,25 +1847,25 @@ EngineerVisualValidationResult validateEngineerVisual(const EngineerVisual& visu
 
 std::uint64_t engineerVisualHash(const EngineerVisual& visual) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x454E47494E454552ULL, visual.genome.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
-    hash = gdp::core::hashCombine(hash, visual.genome.torso);
-    hash = gdp::core::hashCombine(hash, visual.genome.head);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.diagnosticPack);
-    hash = gdp::core::hashCombine(hash, visual.genome.repairTool);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
+    hash = wkc::core::hashCombine(hash, visual.genome.torso);
+    hash = wkc::core::hashCombine(hash, visual.genome.head);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.diagnosticPack);
+    hash = wkc::core::hashCombine(hash, visual.genome.repairTool);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);
     hash = addFloat(hash, visual.wear.dirt);
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
-    hash = gdp::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
+    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
 std::span<const IndustrialRobotPartDefinition> industrialRobotPartLibrary() noexcept
@@ -2087,26 +2087,26 @@ IndustrialRobotVisualValidationResult validateIndustrialRobotVisual(
 
 std::uint64_t industrialRobotVisualHash(const IndustrialRobotVisual& visual) noexcept
 {
-    std::uint64_t hash = gdp::core::hashCombine(
+    std::uint64_t hash = wkc::core::hashCombine(
         0x494E445F524F424FULL, visual.genome.seed);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
-    hash = gdp::core::hashCombine(hash, visual.genome.torsoCore);
-    hash = gdp::core::hashCombine(hash, visual.genome.sensorHead);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightArm);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightLeg);
-    hash = gdp::core::hashCombine(hash, visual.genome.leftReactor);
-    hash = gdp::core::hashCombine(hash, visual.genome.rightReactor);
-    hash = gdp::core::hashCombine(hash, visual.genome.heavyWeapon);
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
-    hash = gdp::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
+    hash = wkc::core::hashCombine(hash, visual.genome.torsoCore);
+    hash = wkc::core::hashCombine(hash, visual.genome.sensorHead);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightArm);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
+    hash = wkc::core::hashCombine(hash, visual.genome.leftReactor);
+    hash = wkc::core::hashCombine(hash, visual.genome.rightReactor);
+    hash = wkc::core::hashCombine(hash, visual.genome.heavyWeapon);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);
     hash = addFloat(hash, visual.wear.dirt);
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
-    hash = gdp::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
+    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
 } // namespace gdp::game::visual

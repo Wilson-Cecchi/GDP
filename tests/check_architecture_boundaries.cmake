@@ -125,6 +125,8 @@ if(core_seed_header MATCHES "enum[ \t]+class[ \t]+SeedDomain")
     message(FATAL_ERROR "core/Seed.hpp must not own GDP seed domains")
 endif()
 foreach(migrated_core_source IN ITEMS
+    "${core_directory}/Hash.cpp"
+    "${core_directory}/Hash.hpp"
     "${core_directory}/Log.cpp"
     "${core_directory}/Log.hpp"
     "${core_directory}/Time.cpp"

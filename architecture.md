@@ -709,6 +709,11 @@ Na Fase 52, `LogLevel` e `log` passaram de `gdp::core` para `wkc::core`.
 Aplicação, áudio e fundação gráfica consomem o diagnóstico WKC Forge por nomes
 qualificados; níveis, mensagens e destino de saída permanecem inalterados.
 
+Na Fase 53, `mix64`, `hashCombine` e `fnv1a64` passaram de `gdp::core` para
+`wkc::core`. Derivação de seeds, mundo, áudio, receitas procedurais e conteúdo
+visual consomem o hashing WKC Forge explicitamente, sem mudar fingerprints ou
+valores golden.
+
 ---
 
 # 8. Sistema de seed

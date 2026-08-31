@@ -25,6 +25,7 @@ void expect(const bool condition, const std::string_view message)
 void testHashAndSeed()
 {
     using namespace gdp::core;
+    using wkc::core::fnv1a64;
 
     expect(fnv1a64("") == 0xCBF29CE484222325ULL, "FNV-1a empty-string golden value");
     expect(fnv1a64("GDP") == 0xEA7B99199804A402ULL, "FNV-1a GDP golden value");
