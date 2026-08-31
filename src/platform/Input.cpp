@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace gdp::platform {
+namespace wkc::platform {
 
 void Input::beginFrame() noexcept
 {
@@ -114,4 +114,4 @@ bool Input::isValidMouseButton(const MouseButton button) noexcept
     return button < MouseButton::Count;
 }
 
-} // namespace gdp::platform
+} // namespace wkc::platform

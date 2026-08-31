@@ -186,6 +186,10 @@ especializados das pastas numeradas.
   passaram de `gdp::procedural` para `wkc::resources`. O renderer GDP consome a
   API WKC explicitamente, e um teste ligado somente a `wkc_forge_resources`
   protege reutilização, métricas e limpeza do cache header-only.
+- **Fase 47 — Namespace de Plataforma:** `Input`, `Key`, `MouseButton` e
+  `handleSdlInputEvent` passaram de `gdp::platform` para `wkc::platform`. A
+  aplicação GDP agora consome a API WKC explicitamente; snapshots, transições,
+  mapeamentos e processamento de eventos SDL permanecem inalterados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

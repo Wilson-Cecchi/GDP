@@ -65,7 +65,7 @@ private:
     void setPaused(bool paused);
 
     ApplicationConfig config_;
-    gdp::platform::Input input_;
+    wkc::platform::Input input_;
     gdp::core::FixedStepClock clock_;
     gameplay::CollisionWorld baseCollisionWorld_;
     gameplay::CollisionWorld collisionWorld_;

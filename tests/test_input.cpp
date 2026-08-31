@@ -17,10 +17,10 @@ void expect(const bool condition, const std::string_view message)
 
 void testInputState()
 {
-    using gdp::platform::Key;
-    using gdp::platform::MouseButton;
+    using wkc::platform::Key;
+    using wkc::platform::MouseButton;
 
-    gdp::platform::Input input;
+    wkc::platform::Input input;
     input.beginFrame();
 
     input.handleKey(Key::W, true);

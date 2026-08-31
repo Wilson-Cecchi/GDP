@@ -105,6 +105,20 @@ file(READ "${platform_input}" platform_input_header)
 if(platform_input_header MATCHES "SDL")
     message(FATAL_ERROR "platform/Input.hpp must not expose SDL types")
 endif()
+file(GLOB platform_sources
+    "${GDP_SOURCE_DIR}/src/platform/*.cpp"
+    "${GDP_SOURCE_DIR}/src/platform/*.hpp"
+)
+foreach(source IN LISTS platform_sources)
+    file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+wkc::platform[ \t{]"
+        OR contents MATCHES "namespace[ \t]+gdp::platform[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "WKC Forge platform API must use wkc::platform: ${relative_source}"
+        )
+    endif()
+endforeach()
 
 file(READ "${core_directory}/Seed.hpp" core_seed_header)
 if(core_seed_header MATCHES "enum[ \t]+class[ \t]+SeedDomain")
@@ -292,6 +306,10 @@ endif()
 file(READ "${game_application}" application_header)
 if(NOT application_header MATCHES "namespace[ \t]+gdp::game")
     message(FATAL_ERROR "GDP Application must use the gdp::game namespace")
+endif()
+if(NOT application_header MATCHES "wkc::platform::Input"
+    OR application_header MATCHES "gdp::platform::Input")
+    message(FATAL_ERROR "GDP Application must consume the WKC Forge input API")
 endif()
 
 file(GLOB core_sources

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace gdp::platform {
+namespace wkc::platform {
 
 enum class Key : std::uint8_t {
     W,
@@ -70,4 +70,4 @@ private:
     gdp::core::Vec2 mousePosition_{};
 };
 
-} // namespace gdp::platform
+} // namespace wkc::platform

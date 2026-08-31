@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace gdp::platform {
+namespace wkc::platform {
 namespace {
 
 std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
@@ -95,4 +95,4 @@ bool handleSdlInputEvent(Input& input, const SDL_Event& event) noexcept
     return false;
 }
 
-} // namespace gdp::platform
+} // namespace wkc::platform

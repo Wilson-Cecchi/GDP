@@ -4,10 +4,10 @@
 
 #include <SDL3/SDL_events.h>
 
-namespace gdp::platform {
+namespace wkc::platform {
 
 [[nodiscard]] bool handleSdlInputEvent(
     Input& input,
     const SDL_Event& event) noexcept;
 
-} // namespace gdp::platform
+} // namespace wkc::platform

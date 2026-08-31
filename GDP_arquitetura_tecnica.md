@@ -756,6 +756,11 @@ Na Fase 46, `AssetCache` e `AssetCacheStats` passaram de
 API WKC Forge, e uma regressão independente liga somente contra
 `wkc_forge_resources`. Semântica de ownership, chaves e métricas não mudou.
 
+Na Fase 47, `Input`, `Key`, `MouseButton` e `handleSdlInputEvent` passaram de
+`gdp::platform` para `wkc::platform`. A aplicação GDP consome agora a API de
+plataforma da WKC Forge de forma explícita, sem aliases reversos e sem mudança
+nos snapshots, transições, mapeamentos ou eventos SDL.
+
 ---
 
 # 8. Sistema de seed

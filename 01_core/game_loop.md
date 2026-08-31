@@ -6,6 +6,8 @@
 > target `wkc_forge_core`, ainda com namespace C++ compatível.
 > Na Fase 40, estado de input e adaptador SDL passaram para
 > `wkc_forge_platform` e `wkc_forge_platform_sdl`.
+> Na Fase 47, suas APIs públicas passaram de `gdp::platform` para
+> `wkc::platform`, preservando snapshots, transições e mapeamentos.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

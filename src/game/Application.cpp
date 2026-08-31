@@ -33,9 +33,9 @@ namespace gdp::game {
 using gdp::core::LogLevel;
 using gdp::core::Vec2;
 using gdp::core::log;
-using gdp::platform::Input;
-using gdp::platform::Key;
-using gdp::platform::MouseButton;
+using wkc::platform::Input;
+using wkc::platform::Key;
+using wkc::platform::MouseButton;
 namespace {
 
 std::string sdlError(const std::string_view operation)
@@ -590,7 +590,7 @@ void Application::processEvents()
 {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        (void)gdp::platform::handleSdlInputEvent(input_, event);
+        (void)wkc::platform::handleSdlInputEvent(input_, event);
         if (event.type == SDL_EVENT_QUIT) {
             running_ = false;
         }

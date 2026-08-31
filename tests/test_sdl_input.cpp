@@ -23,23 +23,23 @@ void expect(const bool condition, const std::string_view message)
 
 void testSdlTranslation()
 {
-    using gdp::platform::Key;
-    using gdp::platform::MouseButton;
+    using wkc::platform::Key;
+    using wkc::platform::MouseButton;
 
-    gdp::platform::Input input;
+    wkc::platform::Input input;
     input.beginFrame();
 
     SDL_Event event{};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.scancode = SDL_SCANCODE_W;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "mapped SDL key event is handled");
     expect(input.isKeyDown(Key::W) && input.wasKeyPressed(Key::W),
         "SDL W maps to the neutral W key");
 
     input.beginFrame();
     event.key.repeat = true;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "repeated SDL key event is handled");
     expect(input.isKeyDown(Key::W) && !input.wasKeyPressed(Key::W),
         "SDL repeat preserves neutral transition semantics");
@@ -47,7 +47,7 @@ void testSdlTranslation()
     input.beginFrame();
     event.type = SDL_EVENT_KEY_UP;
     event.key.repeat = false;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "SDL key release is handled");
     expect(!input.isKeyDown(Key::W) && input.wasKeyReleased(Key::W),
         "SDL key release maps to the neutral transition");
@@ -65,11 +65,11 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_DOWN, Key::Down},
     };
     for (const auto& [scancode, key] : controlMappings) {
-        gdp::platform::Input mappedInput;
+        wkc::platform::Input mappedInput;
         SDL_Event mappedEvent{};
         mappedEvent.type = SDL_EVENT_KEY_DOWN;
         mappedEvent.key.scancode = scancode;
-        expect(gdp::platform::handleSdlInputEvent(mappedInput, mappedEvent)
+        expect(wkc::platform::handleSdlInputEvent(mappedInput, mappedEvent)
                 && mappedInput.isKeyDown(key),
             "every GDP control has an SDL mapping");
     }
@@ -77,7 +77,7 @@ void testSdlTranslation()
     event = {};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.scancode = SDL_SCANCODE_F12;
-    expect(!gdp::platform::handleSdlInputEvent(input, event),
+    expect(!wkc::platform::handleSdlInputEvent(input, event),
         "unmapped SDL key is ignored");
 
     event = {};
@@ -86,7 +86,7 @@ void testSdlTranslation()
     event.motion.y = 180.0F;
     event.motion.xrel = 3.0F;
     event.motion.yrel = -2.0F;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "SDL mouse motion is handled");
     expect(input.mousePosition() == gdp::core::Vec2{320.0F, 180.0F}
             && input.mouseDelta() == gdp::core::Vec2{3.0F, -2.0F},
@@ -97,7 +97,7 @@ void testSdlTranslation()
     event.button.button = SDL_BUTTON_LEFT;
     event.button.x = 320.0F;
     event.button.y = 180.0F;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "SDL primary button is handled");
     expect(input.isMouseButtonDown(MouseButton::Primary)
             && input.wasMouseButtonPressed(MouseButton::Primary),
@@ -105,7 +105,7 @@ void testSdlTranslation()
 
     input.beginFrame();
     event.type = SDL_EVENT_MOUSE_BUTTON_UP;
-    expect(gdp::platform::handleSdlInputEvent(input, event),
+    expect(wkc::platform::handleSdlInputEvent(input, event),
         "SDL primary button release is handled");
     expect(!input.isMouseButtonDown(MouseButton::Primary)
             && input.wasMouseButtonReleased(MouseButton::Primary),
