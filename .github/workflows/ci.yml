@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 2
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [debug, release]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install native dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes
+          cmake ninja-build g++ pkg-config
+          libgl1-mesa-dev libegl1-mesa-dev
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev
+          libxfixes-dev libxss-dev libxtst-dev
+          libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
+          libasound2-dev libpulse-dev libudev-dev
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  sanitizers:
+    name: ASan + UBSan
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install native dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes
+          cmake ninja-build g++ pkg-config
+          libgl1-mesa-dev libegl1-mesa-dev
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev
+          libxfixes-dev libxss-dev libxtst-dev
+          libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
+          libasound2-dev libpulse-dev libudev-dev
+
+      - name: Configure
+        run: cmake --preset sanitizers
+
+      - name: Build
+        run: cmake --build --preset sanitizers
+
+      - name: Test
+        run: ctest --preset sanitizers --output-on-failure

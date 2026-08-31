@@ -2,7 +2,41 @@ if(NOT DEFINED GDP_SOURCE_DIR)
     message(FATAL_ERROR "GDP_SOURCE_DIR was not provided")
 endif()
 
+set(ci_workflow "${GDP_SOURCE_DIR}/.github/workflows/ci.yml")
+if(NOT EXISTS "${ci_workflow}")
+    message(FATAL_ERROR "GDP continuous integration workflow is missing")
+endif()
+file(READ "${ci_workflow}" ci_workflow_contents)
+foreach(required_ci_command IN ITEMS
+    "cmake --preset \${{ matrix.preset }}"
+    "cmake --build --preset \${{ matrix.preset }}"
+    "ctest --preset \${{ matrix.preset }} --output-on-failure"
+    "cmake --preset sanitizers"
+    "cmake --build --preset sanitizers"
+    "ctest --preset sanitizers --output-on-failure"
+)
+    string(FIND "${ci_workflow_contents}" "${required_ci_command}"
+        ci_command_position)
+    if(ci_command_position EQUAL -1)
+        message(FATAL_ERROR
+            "CI workflow is missing required command: ${required_ci_command}"
+        )
+    endif()
+endforeach()
+if(NOT ci_workflow_contents MATCHES "preset:[ \t]+\\[debug,[ \t]+release\\]")
+    message(FATAL_ERROR "CI workflow must validate Debug and Release presets")
+endif()
+if(ci_workflow_contents MATCHES "UPDATE_GOLDEN|update-golden|accept-golden")
+    message(FATAL_ERROR "CI workflow must never update golden references")
+endif()
+
 file(READ "${GDP_SOURCE_DIR}/CMakeLists.txt" root_cmake_contents)
+if(NOT root_cmake_contents MATCHES
+        "gdp_enable_sanitizers\\(gdp_capture_industrial_wall\\)")
+    message(FATAL_ERROR
+        "Visual capture target must link sanitizer runtimes in sanitizer builds"
+    )
+endif()
 if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+wkc_forge_core[ \t\r\n]+STATIC")
     message(FATAL_ERROR "Generic core must belong to WKC Forge")

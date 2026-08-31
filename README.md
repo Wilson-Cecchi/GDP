@@ -228,7 +228,14 @@ especializados das pastas numeradas.
   `wkc::{core,platform,render,resources,procedural,audio}` e gates impedem
   includes ou links WKC → GDP. Gameplay, Entities, World, áudio/visual concreto
   e Application permanecem GDP. A divisão em outro repositório continua
-  deliberadamente adiada; a fronteira atual já é verificável no monorepo.
+  deliberadamente adiada; a fronteira atual já é verificável no monorepo. A
+  validação manual posterior completou uma run até derrotar o boss sem regressão
+  visual ou funcional observada.
+- **Fase 57 — CI de regressão:** GitHub Actions configura, compila e executa a
+  suíte completa nos presets Debug e Release em Linux, incluindo headless e
+  OpenGL offscreen. Um job independente executa ASan + UBSan. O próprio gate
+  arquitetural verifica os comandos obrigatórios e proíbe atualização automática
+  de goldens.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -528,6 +535,11 @@ ctest --preset sanitizers
 Esse preset ativa AddressSanitizer e UndefinedBehaviorSanitizer em compiladores
 GCC/Clang. A detecção de leaks de bibliotecas gráficas externas fica desativada;
 acessos inválidos e comportamento indefinido encerram o teste imediatamente.
+
+Os mesmos três presets são executados automaticamente por
+`.github/workflows/ci.yml` em pushes, pull requests e disparos manuais. A CI não
+aceita nem regrava hashes ou imagens golden; qualquer divergência interrompe o
+job para investigação.
 
 Executar normalmente:
 

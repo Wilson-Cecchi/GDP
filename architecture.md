@@ -734,6 +734,12 @@ conteúdo visual/sonoro, Gameplay, Entities e World permanecem GDP. A separaçã
 física em outro repositório não faz parte desta etapa: o monorepo preserva o
 build funcional enquanto os gates tornam a fronteira executável e regressiva.
 
+Na Fase 57, a fronteira passou a ser protegida também no GitHub Actions. A
+matriz Linux executa configure, build e CTest completos em Debug e Release,
+incluindo os testes headless e OpenGL offscreen já registrados. ASan + UBSan
+rodam em job separado. O gate local verifica a presença desses comandos e
+rejeita qualquer tentativa de atualização automática de goldens pela CI.
+
 ---
 
 # 8. Sistema de seed

@@ -522,6 +522,7 @@ if(GDP_BUILD_TESTS)
         add_executable(gdp_capture_industrial_wall tests/capture_industrial_wall.cpp)
         target_link_libraries(gdp_capture_industrial_wall PRIVATE gdp_visual_renderer)
         gdp_enable_warnings(gdp_capture_industrial_wall)
+        gdp_enable_sanitizers(gdp_capture_industrial_wall)
 
         add_executable(gdp_renderer_gl_tests tests/test_renderer_gl.cpp)
         target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_visual_renderer)

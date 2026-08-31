@@ -811,6 +811,12 @@ exclusivos de Core e Platform também adotaram nomes WKC, sem renomear os testes
 CTest públicos. Application e todas as regras/conteúdos permanecem GDP. Uma
 eventual divisão de repositórios fica para uma decisão futura independente.
 
+Na Fase 57, GitHub Actions passou a executar a suíte em Linux nos presets Debug
+e Release, além de um job separado com ASan + UBSan. Como headless e OpenGL
+offscreen já pertencem ao CTest, ambos entram no gate automaticamente. A
+regressão arquitetural exige configure/build/test dos três presets e impede que
+a CI aceite ou atualize goldens automaticamente.
+
 ---
 
 # 8. Sistema de seed
