@@ -5,7 +5,7 @@
 #include <limits>
 #include <numbers>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 namespace {
 
 gdp::core::Vec3 rotateEuler(
@@ -183,4 +183,4 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
     return result;
 }
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

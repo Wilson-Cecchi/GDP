@@ -17,9 +17,9 @@ struct CeilingFixtureMaterialImages {
     int height = 8);
 [[nodiscard]] CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages();
 
-[[nodiscard]] gdp::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
+[[nodiscard]] wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
     gdp::core::Seed seed = 0);
-[[nodiscard]] gdp::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
+[[nodiscard]] wkc::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
     gdp::core::Seed seed = 0);
 
 } // namespace gdp::game

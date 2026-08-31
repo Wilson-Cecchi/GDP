@@ -773,6 +773,11 @@ Engineer, IndustrialRobot e receitas de ambientes agora pertencem
 explicitamente ao jogo; os contratos genéricos consumidos permanecem
 qualificados em `gdp::procedural`, sem alteração de hashes ou imagens.
 
+Na Fase 50, receitas, validação, hashing e geradores genéricos de mesh e textura
+passaram de `gdp::procedural` para `wkc::procedural`. O conteúdo visual GDP
+consome a fundação WKC Forge por nomes qualificados; não há aliases reversos,
+mudança de receitas, hashes, geometria ou pixels.
+
 ---
 
 # 8. Sistema de seed

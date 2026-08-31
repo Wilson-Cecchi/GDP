@@ -199,6 +199,10 @@ especializados das pastas numeradas.
   `gdp::game::visual`. As receitas e operações genéricas continuam
   explicitamente em `gdp::procedural`, preparando seu rename WKC sem misturar
   Worker, papéis de inimigo ou temas de sala à API reutilizável.
+- **Fase 50 — Namespace Procedural WKC Forge:** `PrimitiveRecipe`,
+  `MeshRecipe`, `TextureRecipe`, validação, hashing e geração passaram de
+  `gdp::procedural` para `wkc::procedural`. Conteúdo visual GDP consome essa API
+  explicitamente, sem aliases e com hashes, meshes e pixels preservados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

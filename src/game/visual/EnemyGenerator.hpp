@@ -76,10 +76,10 @@ struct WorkerPartDefinition {
     WorkerPartSlot slot{WorkerPartSlot::Torso};
     SocketType attachment{SocketType::Neck};
     CompatibilityMask compatibility{compatibilityStandard};
-    gdp::procedural::PrimitiveType primitive{gdp::procedural::PrimitiveType::Box};
+    wkc::procedural::PrimitiveType primitive{wkc::procedural::PrimitiveType::Box};
     gdp::core::Vec3 dimensionScale{1.0F, 1.0F, 1.0F};
-    gdp::procedural::MaterialSlot material{gdp::procedural::MaterialSlot::Primary};
-    gdp::procedural::SemanticRegion semantic{gdp::procedural::SemanticRegion::Generic};
+    wkc::procedural::MaterialSlot material{wkc::procedural::MaterialSlot::Primary};
+    wkc::procedural::SemanticRegion semantic{wkc::procedural::SemanticRegion::Generic};
     std::uint32_t weight{1};
 };
 
@@ -99,7 +99,7 @@ struct WearProfile {
 };
 
 struct WorkerMaterialSet {
-    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
+    wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 primaryColor{0.72F, 0.38F, 0.12F};
     gdp::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
 };
@@ -123,8 +123,8 @@ struct WorkerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    gdp::procedural::MeshRecipe meshRecipe;
-    gdp::procedural::TextureRecipe textureRecipe;
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -175,8 +175,8 @@ struct GuardVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    gdp::procedural::MeshRecipe meshRecipe;
-    gdp::procedural::TextureRecipe textureRecipe;
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -228,8 +228,8 @@ struct OfficerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    gdp::procedural::MeshRecipe meshRecipe;
-    gdp::procedural::TextureRecipe textureRecipe;
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -282,8 +282,8 @@ struct EngineerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    gdp::procedural::MeshRecipe meshRecipe;
-    gdp::procedural::TextureRecipe textureRecipe;
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -337,8 +337,8 @@ struct IndustrialRobotVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    gdp::procedural::MeshRecipe meshRecipe;
-    gdp::procedural::TextureRecipe textureRecipe;
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 

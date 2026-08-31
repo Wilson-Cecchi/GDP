@@ -25,15 +25,15 @@ void expect(const bool condition, const std::string_view message)
 }
 
 bool containsError(
-    const gdp::procedural::RecipeValidationResult& result,
-    const gdp::procedural::RecipeValidationError error)
+    const wkc::procedural::RecipeValidationResult& result,
+    const wkc::procedural::RecipeValidationError error)
 {
     return std::find(result.errors.begin(), result.errors.end(), error) != result.errors.end();
 }
 
 void testRecipeValidationAndHashing()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
 
     const MeshRecipe worker = gdp::game::makeWorkerFoundationMeshRecipe(12345);
     expect(validateMeshRecipe(worker).isValid(), "Worker foundation mesh recipe validates");
@@ -94,7 +94,7 @@ void testRecipeValidationAndHashing()
 
 void testMeshGeneration()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
 
     const auto worker = generateMesh(gdp::game::makeWorkerFoundationMeshRecipe(12345));
     expect(worker.has_value(), "valid Worker recipe generates CPU mesh data");
@@ -157,7 +157,7 @@ void testMeshGeneration()
 
 void testTextureGeneration()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
 
     TextureRecipe recipe = gdp::game::makeWorkerFoundationTextureRecipe(12345);
     const auto first = generateAlbedo(recipe);
@@ -209,7 +209,7 @@ void testTextureGeneration()
 
 void testMaterialRulesAndCache()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
 
     const MaterialProperties steel = materialProperties(MaterialFamily::BareSteel);
     const MaterialProperties fabric = materialProperties(MaterialFamily::Fabric);

@@ -4,6 +4,8 @@
 > Engineer e IndustrialRobot completos na Fase 11 sobre receita/hash/cache da Fase 8.
 > Na Fase 49, esses geradores passaram para `gdp::game::visual` e consomem a
 > fundação procedural por nomes qualificados.
+> Na Fase 50, essa fundação passou para `wkc::procedural`, preservando todas as
+> receitas e hashes visuais.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

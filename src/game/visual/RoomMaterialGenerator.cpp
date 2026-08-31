@@ -9,7 +9,7 @@
 #include <cmath>
 
 namespace gdp::game::visual {
-using gdp::procedural::MaterialFamily;
+using wkc::procedural::MaterialFamily;
 namespace {
 
 constexpr std::size_t surfaceIndex(const IndustrialSurface surface) noexcept

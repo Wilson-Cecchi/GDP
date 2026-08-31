@@ -12,17 +12,17 @@
 #include <optional>
 
 namespace gdp::game::visual {
-using gdp::procedural::MaterialFamily;
-using gdp::procedural::MaterialSlot;
-using gdp::procedural::PrimitiveRecipe;
-using gdp::procedural::PrimitiveType;
-using gdp::procedural::SemanticRegion;
-using gdp::procedural::generateMesh;
-using gdp::procedural::materialProperties;
-using gdp::procedural::meshRecipeHash;
-using gdp::procedural::textureRecipeHash;
-using gdp::procedural::validateMeshRecipe;
-using gdp::procedural::validateTextureRecipe;
+using wkc::procedural::MaterialFamily;
+using wkc::procedural::MaterialSlot;
+using wkc::procedural::PrimitiveRecipe;
+using wkc::procedural::PrimitiveType;
+using wkc::procedural::SemanticRegion;
+using wkc::procedural::generateMesh;
+using wkc::procedural::materialProperties;
+using wkc::procedural::meshRecipeHash;
+using wkc::procedural::textureRecipeHash;
+using wkc::procedural::validateMeshRecipe;
+using wkc::procedural::validateTextureRecipe;
 namespace {
 
 constexpr std::array parts{

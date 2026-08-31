@@ -85,7 +85,7 @@ bool containsError(
 
 void testPartLibrary()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const auto library = workerPartLibrary();
@@ -111,7 +111,7 @@ void testPartLibrary()
 
 void testDeterministicWorker()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x123456789ABCDEF0ULL;
@@ -155,7 +155,7 @@ void testDeterministicWorker()
 
 void testWorkerSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(WorkerBodyProfileId::Count)> profiles{};
@@ -221,7 +221,7 @@ void testWorkerSeedBatch()
 
 void testGuardPartLibrary()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const auto library = guardPartLibrary();
@@ -249,7 +249,7 @@ void testGuardPartLibrary()
 
 void testDeterministicGuard()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x47554152445F5631ULL;
@@ -301,7 +301,7 @@ void testDeterministicGuard()
 
 void testGuardSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(GuardBodyProfileId::Count)> profiles{};
@@ -367,7 +367,7 @@ void testGuardSeedBatch()
 
 void testOfficerPartLibrary()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const auto library = officerPartLibrary();
@@ -400,7 +400,7 @@ void testOfficerPartLibrary()
 
 void testDeterministicOfficer()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x4F46464943455231ULL;
@@ -463,7 +463,7 @@ void testDeterministicOfficer()
 
 void testOfficerSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(OfficerBodyProfileId::Count)> profiles{};
@@ -531,7 +531,7 @@ void testOfficerSeedBatch()
 
 void testEngineerPartLibrary()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const auto library = engineerPartLibrary();
@@ -563,7 +563,7 @@ void testEngineerPartLibrary()
 
 void testDeterministicEngineer()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x454E47494E454531ULL;
@@ -626,7 +626,7 @@ void testDeterministicEngineer()
 
 void testEngineerSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(EngineerBodyProfileId::Count)> profiles{};
@@ -696,7 +696,7 @@ void testEngineerSeedBatch()
 
 void testIndustrialRobotPartLibrary()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
     const auto library = industrialRobotPartLibrary();
     std::unordered_set<IndustrialRobotPartId> ids;
@@ -731,7 +731,7 @@ void testIndustrialRobotPartLibrary()
 
 void testDeterministicIndustrialRobot()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
     constexpr gdp::core::Seed seed = 0x494E44524F424F54ULL;
     const IndustrialRobotVisual first = generateIndustrialRobotVisual(seed);
@@ -781,7 +781,7 @@ void testDeterministicIndustrialRobot()
 
 void testIndustrialRobotSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
     std::array<bool, static_cast<std::size_t>(IndustrialRobotBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};

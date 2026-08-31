@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 
 struct MeshPrimitiveRange {
     std::uint32_t firstIndex{0};
@@ -23,4 +23,4 @@ struct MeshBuildResult {
 
 [[nodiscard]] std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe);
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

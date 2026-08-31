@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 namespace {
 
 float unitNoise(const std::uint64_t value) noexcept
@@ -78,4 +78,4 @@ std::optional<wkc::render::ImageData> generateAlbedo(const TextureRecipe& recipe
     return image;
 }
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

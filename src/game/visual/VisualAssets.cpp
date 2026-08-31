@@ -105,10 +105,10 @@ CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages()
     return images;
 }
 
-gdp::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
+wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
     const gdp::core::Seed seed)
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     MeshRecipe recipe;
     recipe.seed = seed;
     recipe.primitives = {
@@ -128,10 +128,10 @@ gdp::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
     return recipe;
 }
 
-gdp::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
+wkc::procedural::TextureRecipe makeWorkerFoundationTextureRecipe(
     const gdp::core::Seed seed)
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     return {
         .version = 1,
         .seed = seed,

@@ -8,6 +8,8 @@
 > específicos de ambiente e em `RoomMaterialGenerator`.
 > Desde a Fase 49, esse gerador pertence a `gdp::game::visual` e mantém os
 > contratos procedurais genéricos explicitamente separados.
+> Na Fase 50, esses contratos passaram para `wkc::procedural`, sem alterar os
+> perfis ou pixels aprovados.
 
 Este documento descreve, com o máximo de precisão prática, a aparência das **paredes, chão e teto** dos principais ambientes do GDP. O objetivo não é apenas definir uma direção artística, mas criar uma referência que possa ser convertida posteriormente em regras de **geração procedural em C**.
 

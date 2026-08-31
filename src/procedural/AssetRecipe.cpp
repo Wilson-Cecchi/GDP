@@ -5,7 +5,7 @@
 #include <bit>
 #include <cmath>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 namespace {
 
 bool isFinite(const gdp::core::Vec3 value) noexcept
@@ -175,4 +175,4 @@ std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept
     return gdp::core::hashCombine(hash, recipe.resolution);
 }
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

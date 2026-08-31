@@ -654,14 +654,14 @@ bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
         return false;
     }
     const auto meshData = meshCache_.acquire(
-        gdp::procedural::meshRecipeHash(visual.meshRecipe),
+        wkc::procedural::meshRecipeHash(visual.meshRecipe),
         [&visual] {
-            return std::move(gdp::procedural::generateMesh(visual.meshRecipe)->mesh);
+            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
         });
     const auto textureData = textureCache_.acquire(
-        gdp::procedural::textureRecipeHash(visual.textureRecipe),
+        wkc::procedural::textureRecipeHash(visual.textureRecipe),
         [&visual] {
-            return std::move(*gdp::procedural::generateAlbedo(visual.textureRecipe));
+            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
         });
     EnemyGpuVisual gpuVisual;
     if (!gpuVisual.mesh.upload(gl_, *meshData)
@@ -689,14 +689,14 @@ bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
         return false;
     }
     const auto meshData = meshCache_.acquire(
-        gdp::procedural::meshRecipeHash(visual.meshRecipe),
+        wkc::procedural::meshRecipeHash(visual.meshRecipe),
         [&visual] {
-            return std::move(gdp::procedural::generateMesh(visual.meshRecipe)->mesh);
+            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
         });
     const auto textureData = textureCache_.acquire(
-        gdp::procedural::textureRecipeHash(visual.textureRecipe),
+        wkc::procedural::textureRecipeHash(visual.textureRecipe),
         [&visual] {
-            return std::move(*gdp::procedural::generateAlbedo(visual.textureRecipe));
+            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
         });
     EnemyGpuVisual gpuVisual;
     if (!gpuVisual.mesh.upload(gl_, *meshData)
@@ -724,14 +724,14 @@ bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
         return false;
     }
     const auto meshData = meshCache_.acquire(
-        gdp::procedural::meshRecipeHash(visual.meshRecipe),
+        wkc::procedural::meshRecipeHash(visual.meshRecipe),
         [&visual] {
-            return std::move(gdp::procedural::generateMesh(visual.meshRecipe)->mesh);
+            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
         });
     const auto textureData = textureCache_.acquire(
-        gdp::procedural::textureRecipeHash(visual.textureRecipe),
+        wkc::procedural::textureRecipeHash(visual.textureRecipe),
         [&visual] {
-            return std::move(*gdp::procedural::generateAlbedo(visual.textureRecipe));
+            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
         });
     EnemyGpuVisual gpuVisual;
     if (!gpuVisual.mesh.upload(gl_, *meshData)
@@ -760,14 +760,14 @@ bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
         return false;
     }
     const auto meshData = meshCache_.acquire(
-        gdp::procedural::meshRecipeHash(visual.meshRecipe),
+        wkc::procedural::meshRecipeHash(visual.meshRecipe),
         [&visual] {
-            return std::move(gdp::procedural::generateMesh(visual.meshRecipe)->mesh);
+            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
         });
     const auto textureData = textureCache_.acquire(
-        gdp::procedural::textureRecipeHash(visual.textureRecipe),
+        wkc::procedural::textureRecipeHash(visual.textureRecipe),
         [&visual] {
-            return std::move(*gdp::procedural::generateAlbedo(visual.textureRecipe));
+            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
         });
     EnemyGpuVisual gpuVisual;
     if (!gpuVisual.mesh.upload(gl_, *meshData)
@@ -795,14 +795,14 @@ bool GdpRenderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
         return false;
     }
     const auto meshData = meshCache_.acquire(
-        gdp::procedural::meshRecipeHash(visual.meshRecipe),
+        wkc::procedural::meshRecipeHash(visual.meshRecipe),
         [&visual] {
-            return std::move(gdp::procedural::generateMesh(visual.meshRecipe)->mesh);
+            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
         });
     const auto textureData = textureCache_.acquire(
-        gdp::procedural::textureRecipeHash(visual.textureRecipe),
+        wkc::procedural::textureRecipeHash(visual.textureRecipe),
         [&visual] {
-            return std::move(*gdp::procedural::generateAlbedo(visual.textureRecipe));
+            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
         });
     EnemyGpuVisual gpuVisual;
     if (!gpuVisual.mesh.upload(gl_, *meshData)

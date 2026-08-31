@@ -154,9 +154,9 @@ file(READ "${GDP_SOURCE_DIR}/src/game/visual/EnemyGenerator.hpp"
     gdp_enemy_generator_header)
 file(READ "${GDP_SOURCE_DIR}/src/game/visual/RoomMaterialGenerator.hpp"
     gdp_room_material_generator_header)
-if(NOT gdp_enemy_generator_header MATCHES "gdp::procedural::MeshRecipe"
+if(NOT gdp_enemy_generator_header MATCHES "wkc::procedural::MeshRecipe"
     OR NOT gdp_room_material_generator_header MATCHES
-        "gdp::procedural::MaterialFamily")
+        "wkc::procedural::MaterialFamily")
     message(FATAL_ERROR
         "GDP visual generators must consume the qualified procedural foundation"
     )
@@ -228,6 +228,13 @@ file(GLOB procedural_foundation_sources
 )
 foreach(source IN LISTS procedural_foundation_sources)
     file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+wkc::procedural[ \t{]"
+        OR contents MATCHES "namespace[ \t]+gdp::procedural[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "WKC Forge procedural API must use wkc::procedural: ${relative_source}"
+        )
+    endif()
     if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities|audio)/"
         OR contents MATCHES
             "Worker|Guard|Officer|Engineer|IndustrialRobot|RoomMaterial")

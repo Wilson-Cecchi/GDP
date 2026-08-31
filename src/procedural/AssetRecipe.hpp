@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 
 enum class PrimitiveType : std::uint8_t {
     Box,
@@ -134,4 +134,4 @@ struct MaterialProperties {
 [[nodiscard]] std::uint64_t meshRecipeHash(const MeshRecipe& recipe) noexcept;
 [[nodiscard]] std::uint64_t textureRecipeHash(const TextureRecipe& recipe) noexcept;
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

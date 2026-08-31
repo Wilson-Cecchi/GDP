@@ -5,9 +5,9 @@
 
 #include <optional>
 
-namespace gdp::procedural {
+namespace wkc::procedural {
 
 [[nodiscard]] std::optional<wkc::render::ImageData> generateAlbedo(
     const TextureRecipe& recipe);
 
-} // namespace gdp::procedural
+} // namespace wkc::procedural

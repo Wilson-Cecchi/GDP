@@ -164,7 +164,7 @@ std::size_t exactColorCount(
 
 void testRepresentativeMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x494E445553545259ULL;
@@ -195,7 +195,7 @@ void testRepresentativeMaterialSet()
 
 void testStructuredSurfaceAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const IndustrialRoomMaterialSet materials = generateIndustrialRoomMaterials(12345);
@@ -261,7 +261,7 @@ void testStructuredSurfaceAlbedos()
 
 void testIndustrialHdMaterialMaps()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr std::array conditions{
@@ -320,7 +320,7 @@ void testIndustrialHdMaterialMaps()
 
 void testApprovedIndustrialCeilingDirection()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr std::array conditions{
@@ -402,7 +402,7 @@ void testApprovedIndustrialCeilingDirection()
 
 void testApprovedIndustrialWallDirection()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr std::array<gdp::core::Seed, 3> seeds{2U, 3U, 1U};
@@ -467,7 +467,7 @@ void testApprovedIndustrialWallDirection()
 
 void testValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const IndustrialRoomMaterialSet valid = generateIndustrialRoomMaterials(55);
@@ -508,7 +508,7 @@ void testValidationFailures()
 
 void testRoomMaterialSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(IndustrialCondition::Count)> conditions{};
@@ -545,7 +545,7 @@ void testRoomMaterialSeedBatch()
 
 void testRepresentativeStorageMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x53544F524147455FULL;
@@ -576,7 +576,7 @@ void testRepresentativeStorageMaterialSet()
 
 void testStructuredStorageAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const StorageRoomMaterialSet materials = generateStorageRoomMaterials(24680);
@@ -625,7 +625,7 @@ void testStructuredStorageAlbedos()
 
 void testStorageValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const StorageRoomMaterialSet valid = generateStorageRoomMaterials(77);
@@ -660,7 +660,7 @@ void testStorageValidationFailures()
 
 void testStorageSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(StorageCondition::Count)> conditions{};
@@ -693,7 +693,7 @@ void testStorageSeedBatch()
 
 void testRepresentativeCombatMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x434F4D4241545F52ULL;
@@ -727,7 +727,7 @@ void testRepresentativeCombatMaterialSet()
 
 void testStructuredCombatAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CombatRoomMaterialSet materials = generateCombatRoomMaterials(13579);
@@ -782,7 +782,7 @@ void testStructuredCombatAlbedos()
 
 void testCombatValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CombatRoomMaterialSet valid = generateCombatRoomMaterials(99);
@@ -822,7 +822,7 @@ void testCombatValidationFailures()
 
 void testCombatSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(CombatCondition::Count)> conditions{};
@@ -855,7 +855,7 @@ void testCombatSeedBatch()
 
 void testRepresentativeCafeteriaMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x4341464554455249ULL;
@@ -889,7 +889,7 @@ void testRepresentativeCafeteriaMaterialSet()
 
 void testStructuredCafeteriaAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CafeteriaRoomMaterialSet materials = generateCafeteriaRoomMaterials(97531);
@@ -970,7 +970,7 @@ void testStructuredCafeteriaAlbedos()
 
 void testCafeteriaValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CafeteriaRoomMaterialSet valid = generateCafeteriaRoomMaterials(123);
@@ -1010,7 +1010,7 @@ void testCafeteriaValidationFailures()
 
 void testCafeteriaSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(CafeteriaCondition::Count)> conditions{};
@@ -1043,7 +1043,7 @@ void testCafeteriaSeedBatch()
 
 void testRepresentativeLaboratoryMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x4C41424F5241544FULL;
@@ -1078,7 +1078,7 @@ void testRepresentativeLaboratoryMaterialSet()
 
 void testStructuredLaboratoryAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const LaboratoryRoomMaterialSet materials = generateLaboratoryRoomMaterials(86420);
@@ -1147,7 +1147,7 @@ void testStructuredLaboratoryAlbedos()
 
 void testLaboratoryValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const LaboratoryRoomMaterialSet valid = generateLaboratoryRoomMaterials(321);
@@ -1187,7 +1187,7 @@ void testLaboratoryValidationFailures()
 
 void testLaboratorySeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(LaboratoryCondition::Count)> conditions{};
@@ -1220,7 +1220,7 @@ void testLaboratorySeedBatch()
 
 void testRepresentativeTechnicalMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x544543484E494341ULL;
@@ -1254,7 +1254,7 @@ void testRepresentativeTechnicalMaterialSet()
 
 void testStructuredTechnicalAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const TechnicalRoomMaterialSet materials = generateTechnicalRoomMaterials(112233);
@@ -1344,7 +1344,7 @@ void testStructuredTechnicalAlbedos()
 
 void testTechnicalValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const TechnicalRoomMaterialSet valid = generateTechnicalRoomMaterials(654);
@@ -1384,7 +1384,7 @@ void testTechnicalValidationFailures()
 
 void testTechnicalSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(TechnicalCondition::Count)> conditions{};
@@ -1417,7 +1417,7 @@ void testTechnicalSeedBatch()
 
 void testRepresentativeSecurityMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x5345435552495459ULL;
@@ -1451,7 +1451,7 @@ void testRepresentativeSecurityMaterialSet()
 
 void testStructuredSecurityAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const SecurityRoomMaterialSet materials = generateSecurityRoomMaterials(778899);
@@ -1555,7 +1555,7 @@ void testStructuredSecurityAlbedos()
 
 void testSecurityValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const SecurityRoomMaterialSet valid = generateSecurityRoomMaterials(987);
@@ -1595,7 +1595,7 @@ void testSecurityValidationFailures()
 
 void testSecuritySeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(SecurityCondition::Count)> conditions{};
@@ -1628,7 +1628,7 @@ void testSecuritySeedBatch()
 
 void testRepresentativeCentralHubMaterialSet()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x43454E5452414CULL;
@@ -1665,7 +1665,7 @@ void testRepresentativeCentralHubMaterialSet()
 
 void testStructuredCentralHubAlbedos()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CentralHubRoomMaterialSet materials = generateCentralHubRoomMaterials(424242);
@@ -1738,7 +1738,7 @@ void testStructuredCentralHubAlbedos()
 
 void testCentralHubValidationFailures()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     const CentralHubRoomMaterialSet valid = generateCentralHubRoomMaterials(7654);
@@ -1792,7 +1792,7 @@ void testCentralHubValidationFailures()
 
 void testCentralHubSeedBatch()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(CentralHubCondition::Count)> conditions{};
@@ -1829,7 +1829,7 @@ void testCentralHubSeedBatch()
 
 void testRoomProfileHashIsolation()
 {
-    using namespace gdp::procedural;
+    using namespace wkc::procedural;
     using namespace gdp::game::visual;
 
     std::unordered_set<std::uint64_t> hashes;
