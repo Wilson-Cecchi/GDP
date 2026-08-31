@@ -1,7 +1,7 @@
 #pragma once
 
-#include "audio/ProceduralAudio.hpp"
 #include "core/Math.hpp"
+#include "game/audio/AudioRecipes.hpp"
 
 #include <cstddef>
 #include <cstdint>

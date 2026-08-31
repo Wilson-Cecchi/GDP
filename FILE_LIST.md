@@ -54,6 +54,8 @@
 - `MANIFEST.json`
 - `README.md`
 - `architecture.md`
+- `src/audio/AudioFoundation.cpp`
+- `src/audio/AudioFoundation.hpp`
 - `src/core/Hash.cpp`
 - `src/core/Hash.hpp`
 - `src/core/Log.cpp`
@@ -68,6 +70,10 @@
 - `src/game/Application.cpp`
 - `src/game/Application.hpp`
 - `src/game/SeedDomains.hpp`
+- `src/game/audio/AudioRecipes.cpp`
+- `src/game/audio/AudioRecipes.hpp`
+- `src/game/audio/AudioSystem.cpp`
+- `src/game/audio/AudioSystem.hpp`
 - `src/game/visual/EnemyGenerator.cpp`
 - `src/game/visual/EnemyGenerator.hpp`
 - `src/game/visual/GdpRenderData.cpp`
@@ -136,6 +142,7 @@
 - `src/world/WorldGenerator.hpp`
 - `src/world/WorldValidation.cpp`
 - `src/world/WorldValidation.hpp`
+- `tests/test_audio_foundation.cpp`
 - `tests/check_architecture_boundaries.cmake`
 - `tests/check_main_menu_bootstrap.cmake`
 - `tests/capture_industrial_wall.cpp`

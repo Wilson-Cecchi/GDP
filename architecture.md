@@ -436,6 +436,11 @@ gdp/
 │   │   ├── Application.cpp
 │   │   ├── Application.hpp
 │   │   ├── SeedDomains.hpp
+│   │   ├── audio/
+│   │   │   ├── AudioRecipes.cpp
+│   │   │   ├── AudioRecipes.hpp
+│   │   │   ├── AudioSystem.cpp
+│   │   │   └── AudioSystem.hpp
 │   │   └── visual/
 │   │       ├── EnemyGenerator.cpp
 │   │       ├── EnemyGenerator.hpp
@@ -522,8 +527,8 @@ gdp/
 │   │   └── AssetCache.hpp
 │   │
 │   ├── audio/
-│   │   ├── AudioSystem.cpp
-│   │   └── AudioSystem.hpp
+│   │   ├── AudioFoundation.cpp
+│   │   └── AudioFoundation.hpp
 │   │
 │   └── debug/
 │       ├── DebugDraw.cpp
@@ -649,6 +654,12 @@ Na Fase 42, `AssetCache.hpp` saiu de `src/procedural` para `src/resources` e
 passou a ser publicado pelo target header-only `wkc_forge_resources`. O cache
 continua agnóstico ao tipo do recurso e o renderer GDP declara a dependência
 explicitamente. API, métricas e namespace permanecem inalterados nesta etapa.
+
+Na Fase 43, contratos, hash, validação e síntese determinística de clips foram
+isolados em `wkc_forge_audio`, sem dependências de eventos ou seeds do GDP. O
+catálogo `AudioEventKind`, as receitas, os perfis de ambiência e a fachada SDL
+orientada ao jogo passaram fisicamente para `src/game/audio` e permanecem em
+`gdp_audio`. Hashes, waveforms e namespace público foram preservados.
 
 ---
 

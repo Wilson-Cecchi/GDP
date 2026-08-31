@@ -36,6 +36,10 @@ if(NOT root_cmake_contents MATCHES
     message(FATAL_ERROR "Generic resource cache must belong to WKC Forge")
 endif()
 if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_audio[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Generic audio foundation must belong to WKC Forge")
+endif()
+if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_visual_renderer[ \t\r\n]+STATIC")
     message(FATAL_ERROR "GDP concrete renderer target must be named gdp_visual_renderer")
 endif()
@@ -70,6 +74,14 @@ endif()
 if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\([ \t\r\n]+gdp_visual_renderer[^\\)]*wkc_forge_resources")
     message(FATAL_ERROR "GDP visual renderer must declare its resource cache dependency")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "target_link_libraries\\(wkc_forge_audio[ \t]+PUBLIC[ \t]+wkc_forge_core")
+    message(FATAL_ERROR "WKC Forge audio must depend on WKC Forge core")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "target_link_libraries\\(gdp_audio[ \t]+PUBLIC[ \t]+wkc_forge_audio")
+    message(FATAL_ERROR "GDP audio must consume the WKC Forge audio foundation")
 endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")
@@ -204,6 +216,38 @@ foreach(source IN LISTS render_foundation_sources)
         file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
         message(FATAL_ERROR
             "Render foundation depends on GDP content: ${relative_source}"
+        )
+    endif()
+endforeach()
+
+if(EXISTS "${GDP_SOURCE_DIR}/src/audio/AudioSystem.cpp"
+    OR EXISTS "${GDP_SOURCE_DIR}/src/audio/AudioSystem.hpp"
+    OR EXISTS "${GDP_SOURCE_DIR}/src/audio/ProceduralAudio.cpp"
+    OR EXISTS "${GDP_SOURCE_DIR}/src/audio/ProceduralAudio.hpp")
+    message(FATAL_ERROR "GDP audio recipes and facade must not return to src/audio")
+endif()
+foreach(gdp_audio_source IN ITEMS
+    "${GDP_SOURCE_DIR}/src/game/audio/AudioRecipes.cpp"
+    "${GDP_SOURCE_DIR}/src/game/audio/AudioRecipes.hpp"
+    "${GDP_SOURCE_DIR}/src/game/audio/AudioSystem.cpp"
+    "${GDP_SOURCE_DIR}/src/game/audio/AudioSystem.hpp"
+)
+    if(NOT EXISTS "${gdp_audio_source}")
+        message(FATAL_ERROR "GDP audio source is missing: ${gdp_audio_source}")
+    endif()
+endforeach()
+file(GLOB audio_foundation_sources
+    "${GDP_SOURCE_DIR}/src/audio/*.cpp"
+    "${GDP_SOURCE_DIR}/src/audio/*.hpp"
+)
+foreach(source IN LISTS audio_foundation_sources)
+    file(READ "${source}" contents)
+    if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities)/"
+        OR contents MATCHES
+            "WeaponFire|EnemyHit|EnemyDeath|PropDestroyed|Pickup|RoomMaterial")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "WKC Forge audio foundation owns GDP content: ${relative_source}"
         )
     endif()
 endforeach()

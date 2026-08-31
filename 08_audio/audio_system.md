@@ -3,6 +3,10 @@
 > **Estado:** síntese procedural, mixer estéreo, ambiência por tema, integração
 > de gameplay e fallback silencioso implementados na Fase 12; crossfade de
 > ambiência por corredor implementado na Fase 15.
+> Na Fase 43, `wkc_forge_audio` passou a conter contratos, hash, validação e
+> síntese reutilizáveis. Eventos, receitas, perfis de ambiência e a fachada
+> concreta do GDP pertencem a `src/game/audio` e ao target `gdp_audio`. O mixer
+> SDL ainda será analisado separadamente antes de qualquer promoção à engine.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

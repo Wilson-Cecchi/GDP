@@ -9,24 +9,9 @@ namespace gdp::audio {
 
 inline constexpr int proceduralAudioSampleRate = 48'000;
 
-enum class AudioEventKind : std::uint8_t {
-    WeaponFire,
-    DryFire,
-    Reload,
-    EnemyHit,
-    EnemyDeath,
-    PropImpact,
-    PropDestroyed,
-    Pickup,
-    EventStart,
-    EventComplete,
-    PlayerHurt,
-    Ambient,
-    Count,
-};
-
 struct AudioRecipe {
-    AudioEventKind kind{AudioEventKind::WeaponFire};
+    std::uint8_t kind{0};
+    std::uint8_t kindCount{1};
     gdp::core::Seed seed{0};
     float durationSeconds{0.1F};
     float baseFrequency{220.0F};
@@ -63,11 +48,6 @@ struct AudioValidationResult {
 
     [[nodiscard]] bool isValid() const noexcept;
 };
-
-[[nodiscard]] AudioRecipe generateAudioRecipe(
-    gdp::core::Seed sourceSeed,
-    AudioEventKind kind,
-    std::uint64_t eventCounter = 0U);
 
 [[nodiscard]] AudioValidationResult validateAudioRecipe(
     const AudioRecipe& recipe);

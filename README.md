@@ -170,6 +170,10 @@ especializados das pastas numeradas.
   `src/procedural` para `src/resources` e passou a ser publicado pelo target
   header-only `wkc_forge_resources`. O renderer GDP declara esse consumo
   explicitamente; API, métricas e namespace permanecem compatíveis.
+- **Fase 43 — Fundação de áudio WKC Forge:** contratos, hash, validação e síntese
+  determinística de clips passaram para `wkc_forge_audio`. Os eventos
+  `WeaponFire`, `EnemyDeath`, `Pickup`, perfis de ambiência e a fachada SDL
+  permanecem em `gdp_audio`, agora agrupados fisicamente em `src/game/audio`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

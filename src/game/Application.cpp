@@ -1,6 +1,6 @@
 #include "game/Application.hpp"
 
-#include "audio/AudioSystem.hpp"
+#include "game/audio/AudioSystem.hpp"
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"

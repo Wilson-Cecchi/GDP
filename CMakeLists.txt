@@ -116,15 +116,27 @@ gdp_enable_warnings(gdp_entities)
 gdp_enable_sanitizers(gdp_entities)
 
 add_library(
+    wkc_forge_audio
+    STATIC
+    src/audio/AudioFoundation.cpp
+)
+
+target_compile_features(wkc_forge_audio PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_audio PUBLIC src)
+target_link_libraries(wkc_forge_audio PUBLIC wkc_forge_core)
+gdp_enable_warnings(wkc_forge_audio)
+gdp_enable_sanitizers(wkc_forge_audio)
+
+add_library(
     gdp_audio
     STATIC
-    src/audio/AudioSystem.cpp
-    src/audio/ProceduralAudio.cpp
+    src/game/audio/AudioRecipes.cpp
+    src/game/audio/AudioSystem.cpp
 )
 
 target_compile_features(gdp_audio PUBLIC cxx_std_20)
 target_include_directories(gdp_audio PUBLIC src)
-target_link_libraries(gdp_audio PUBLIC wkc_forge_core SDL3::SDL3)
+target_link_libraries(gdp_audio PUBLIC wkc_forge_audio wkc_forge_core SDL3::SDL3)
 gdp_enable_warnings(gdp_audio)
 gdp_enable_sanitizers(gdp_audio)
 
@@ -324,6 +336,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME procedural_audio_systems COMMAND gdp_audio_tests)
     set_tests_properties(procedural_audio_systems PROPERTIES TIMEOUT 15)
+
+    add_executable(wkc_forge_audio_tests tests/test_audio_foundation.cpp)
+    target_link_libraries(wkc_forge_audio_tests PRIVATE wkc_forge_audio)
+    gdp_enable_warnings(wkc_forge_audio_tests)
+    gdp_enable_sanitizers(wkc_forge_audio_tests)
+
+    add_test(NAME audio_foundation_systems COMMAND wkc_forge_audio_tests)
+    set_tests_properties(audio_foundation_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_renderer_tests tests/test_renderer.cpp)
     target_link_libraries(gdp_renderer_tests PRIVATE gdp_visual_renderer)
