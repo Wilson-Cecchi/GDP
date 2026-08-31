@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <utility>
 
-namespace gdp::procedural {
+namespace wkc::resources {
 
 struct AssetCacheStats {
     std::size_t hits{0};
@@ -57,4 +57,4 @@ private:
     std::size_t misses_{0};
 };
 
-} // namespace gdp::procedural
+} // namespace wkc::resources

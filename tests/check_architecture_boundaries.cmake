@@ -203,11 +203,20 @@ if(NOT EXISTS "${resource_cache}")
     message(FATAL_ERROR "WKC Forge resource cache is missing from src/resources")
 endif()
 file(READ "${resource_cache}" resource_cache_contents)
+if(NOT resource_cache_contents MATCHES
+        "namespace[ \t]+wkc::resources[ \t{]"
+    OR resource_cache_contents MATCHES
+        "namespace[ \t]+gdp::procedural[ \t{]")
+    message(FATAL_ERROR "WKC Forge resource cache must use wkc::resources")
+endif()
 if(resource_cache_contents MATCHES
         "#include[ \t]+\"(game|gameplay|world|entities|audio|procedural|render)/"
     OR resource_cache_contents MATCHES
         "Worker|Guard|Officer|Engineer|IndustrialRobot|RoomMaterial")
     message(FATAL_ERROR "WKC Forge resource cache depends on GDP content")
+endif()
+if(NOT gdp_renderer_contents MATCHES "wkc::resources::AssetCache")
+    message(FATAL_ERROR "GDP renderer must consume the WKC Forge resource API")
 endif()
 
 file(GLOB render_foundation_sources

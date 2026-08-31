@@ -220,7 +220,7 @@ void testMaterialRulesAndCache()
         "fabric remains dielectric and cannot oxidize");
     expect(lens.emissiveAllowed, "polycarbonate can represent an emissive lens");
 
-    AssetCache<int> cache;
+    wkc::resources::AssetCache<int> cache;
     int factoryCalls = 0;
     const auto first = cache.acquire(77, [&factoryCalls] {
         ++factoryCalls;
@@ -234,7 +234,7 @@ void testMaterialRulesAndCache()
         ++factoryCalls;
         return 7;
     });
-    const AssetCacheStats stats = cache.stats();
+    const wkc::resources::AssetCacheStats stats = cache.stats();
     expect(first == reused && *reused == 42 && factoryCalls == 2,
         "cache reuses shared immutable asset without rerunning its factory");
     expect(*second == 7 && stats.hits == 1 && stats.misses == 2 && stats.entries == 2,

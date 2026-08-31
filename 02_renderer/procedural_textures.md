@@ -14,6 +14,7 @@
 > alterar namespaces, receitas ou hashes.
 > Na Fase 42, o `AssetCache` genérico passou para `src/resources` e para o target
 > header-only `wkc_forge_resources`, preservando API e métricas.
+> Na Fase 46, sua API passou para o namespace `wkc::resources`.
 > Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
 > gate pré-implementação de `visual/TEXTURE_APPROVALS.md`.
 >

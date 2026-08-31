@@ -182,6 +182,10 @@ especializados das pastas numeradas.
   validação, síntese e `AudioMixer` passaram de `gdp::audio` para `wkc::audio`.
   `AudioEventKind`, geração de receitas e `AudioSystem` permanecem em
   `gdp::audio`, tornando explícita a direção GDP → WKC Forge na API C++.
+- **Fase 46 — Namespace de Resources:** `AssetCache` e `AssetCacheStats`
+  passaram de `gdp::procedural` para `wkc::resources`. O renderer GDP consome a
+  API WKC explicitamente, e um teste ligado somente a `wkc_forge_resources`
+  protege reutilização, métricas e limpeza do cache header-only.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

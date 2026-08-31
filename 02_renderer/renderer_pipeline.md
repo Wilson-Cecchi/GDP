@@ -81,6 +81,7 @@ Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `wkc_forge_procedural`, enquanto `wkc_forge_resources` publica o `AssetCache`;
 definições Worker, materiais de sala e assets concretos do GDP ficam em
 `gdp_visual_content`; `gdp_visual_renderer` realiza a composição final.
+Desde a Fase 46, o cache é exposto como `wkc::resources::AssetCache`.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe
 passou a `gdp::render::GdpRenderer` na Fase 33. Na Fase 34, os DTOs de
 apresentação passaram ao contrato `game/visual/GdpRenderData.*`; seus nomes e

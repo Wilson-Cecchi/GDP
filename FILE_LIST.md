@@ -145,6 +145,7 @@
 - `src/world/WorldValidation.cpp`
 - `src/world/WorldValidation.hpp`
 - `tests/test_audio_foundation.cpp`
+- `tests/test_resources.cpp`
 - `tests/check_architecture_boundaries.cmake`
 - `tests/check_main_menu_bootstrap.cmake`
 - `tests/capture_industrial_wall.cpp`

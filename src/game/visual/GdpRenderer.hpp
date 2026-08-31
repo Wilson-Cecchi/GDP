@@ -99,8 +99,8 @@ private:
     gdp::render::Mesh box_{};
     gdp::render::Texture fallbackTexture_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
-    gdp::procedural::AssetCache<gdp::render::MeshData> meshCache_{};
-    gdp::procedural::AssetCache<gdp::render::ImageData> textureCache_{};
+    wkc::resources::AssetCache<gdp::render::MeshData> meshCache_{};
+    wkc::resources::AssetCache<gdp::render::ImageData> textureCache_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> workerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> guardVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> officerVisuals_{};

@@ -751,6 +751,11 @@ Na Fase 45, os contratos `AudioRecipe`/`AudioClip`, validação, síntese e
 `AudioSystem` permanecem em `gdp::audio`; a assinatura do catálogo retorna o
 contrato WKC Forge explicitamente, sem aliases reversos ou mudança de dados.
 
+Na Fase 46, `AssetCache` e `AssetCacheStats` passaram de
+`gdp::procedural` para `wkc::resources`. O renderer GDP qualifica o cache pela
+API WKC Forge, e uma regressão independente liga somente contra
+`wkc_forge_resources`. Semântica de ownership, chaves e métricas não mudou.
+
 ---
 
 # 8. Sistema de seed

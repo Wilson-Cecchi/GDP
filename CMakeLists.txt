@@ -346,6 +346,14 @@ if(GDP_BUILD_TESTS)
     add_test(NAME audio_foundation_systems COMMAND wkc_forge_audio_tests)
     set_tests_properties(audio_foundation_systems PROPERTIES TIMEOUT 10)
 
+    add_executable(wkc_forge_resources_tests tests/test_resources.cpp)
+    target_link_libraries(wkc_forge_resources_tests PRIVATE wkc_forge_resources)
+    gdp_enable_warnings(wkc_forge_resources_tests)
+    gdp_enable_sanitizers(wkc_forge_resources_tests)
+
+    add_test(NAME resource_cache_systems COMMAND wkc_forge_resources_tests)
+    set_tests_properties(resource_cache_systems PROPERTIES TIMEOUT 10)
+
     add_executable(gdp_renderer_tests tests/test_renderer.cpp)
     target_link_libraries(gdp_renderer_tests PRIVATE gdp_visual_renderer)
     gdp_enable_warnings(gdp_renderer_tests)
