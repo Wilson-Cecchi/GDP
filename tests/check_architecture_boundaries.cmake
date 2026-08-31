@@ -86,6 +86,24 @@ foreach(wkc_target IN ITEMS
         )
     endif()
 endforeach()
+foreach(wkc_test_target IN ITEMS
+    wkc_forge_core_tests
+    wkc_forge_platform_tests
+    wkc_forge_platform_sdl_tests
+)
+    if(NOT root_cmake_contents MATCHES
+            "add_executable\\(${wkc_test_target}[ \t]+tests/")
+        message(FATAL_ERROR
+            "WKC Forge foundation test must use WKC identity: ${wkc_test_target}"
+        )
+    endif()
+endforeach()
+if(root_cmake_contents MATCHES
+        "add_executable\\(gdp_(core|input|sdl_input)_tests")
+    message(FATAL_ERROR
+        "Engine-only test executables must not retain a GDP identity"
+    )
+endif()
 if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\(wkc_forge_render[ \t]+PUBLIC[ \t]+wkc_forge_core")
     message(FATAL_ERROR "WKC Forge render must depend on WKC Forge core")
@@ -482,4 +500,43 @@ foreach(source IN LISTS core_sources)
             )
         endif()
     endforeach()
+endforeach()
+
+foreach(generic_directory IN ITEMS
+    core
+    platform
+    render
+    procedural
+    resources
+    audio
+)
+    file(GLOB generic_sources
+        "${GDP_SOURCE_DIR}/src/${generic_directory}/*.cpp"
+        "${GDP_SOURCE_DIR}/src/${generic_directory}/*.hpp"
+    )
+    foreach(source IN LISTS generic_sources)
+        file(READ "${source}" contents)
+        if(contents MATCHES
+                "#include[ \t]+\"(game|gameplay|world|entities)/")
+            file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+            message(FATAL_ERROR
+                "WKC Forge source depends on GDP layer: ${relative_source}"
+            )
+        endif()
+    endforeach()
+endforeach()
+
+file(GLOB gameplay_sources
+    "${GDP_SOURCE_DIR}/src/gameplay/*.cpp"
+    "${GDP_SOURCE_DIR}/src/gameplay/*.hpp"
+)
+foreach(source IN LISTS gameplay_sources)
+    file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+gdp::gameplay[ \t{]"
+        OR contents MATCHES "namespace[ \t]+wkc::gameplay[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "GDP gameplay must remain in gdp::gameplay: ${relative_source}"
+        )
+    endif()
 endforeach()

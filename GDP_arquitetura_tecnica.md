@@ -803,6 +803,14 @@ população codificam regras do GDP, portanto continuam em `gdp_entities`,
 `gdp_world`, `gdp::entities` e `gdp::world`. Gates impedem dependências da WKC
 Forge em alvos GDP e evitam abstrações prematuras `wkc_forge_entities/world`.
 
+Na Fase 56, a auditoria final concluiu a separação arquitetural dentro do
+monorepo. Core, Platform, Render, Resources, Procedural e a fundação de Audio
+possuem identidade WKC completa; seus targets não podem ligar `gdp_*` nem seus
+arquivos-fonte incluir Game, Gameplay, World ou Entities. Os executáveis de teste
+exclusivos de Core e Platform também adotaram nomes WKC, sem renomear os testes
+CTest públicos. Application e todas as regras/conteúdos permanecem GDP. Uma
+eventual divisão de repositórios fica para uma decisão futura independente.
+
 ---
 
 # 8. Sistema de seed

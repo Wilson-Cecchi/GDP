@@ -726,6 +726,14 @@ por isso permanecem em `gdp_entities`/`gdp_world` e nos namespaces
 `gdp::entities`/`gdp::world`. Gates de arquitetura impedem dependência WKC → GDP
 e também a criação especulativa de `wkc_forge_entities` ou `wkc_forge_world`.
 
+Na Fase 56, a auditoria final consolidou a direção única `GDP → WKC Forge`.
+Core, Platform, Render, Resources, Procedural e a fundação de Audio usam targets,
+namespaces e testes com identidade WKC; nenhum deles pode incluir as camadas
+Game, Gameplay, World ou Entities, nem ligar targets `gdp_*`. Application,
+conteúdo visual/sonoro, Gameplay, Entities e World permanecem GDP. A separação
+física em outro repositório não faz parte desta etapa: o monorepo preserva o
+build funcional enquanto os gates tornam a fronteira executável e regressiva.
+
 ---
 
 # 8. Sistema de seed

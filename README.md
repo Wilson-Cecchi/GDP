@@ -223,6 +223,12 @@ especializados das pastas numeradas.
   itens, props, papéis, temas, encontros e regras de salas permanecem em
   `gdp::entities`/`gdp::world`; a arquitetura agora impede que esses conceitos
   sejam promovidos artificialmente à WKC Forge ou virem dependências da engine.
+- **Fase 56 — Fronteira WKC Forge × GDP concluída:** targets e testes exclusivos
+  da engine usam identidade WKC, os namespaces reutilizáveis são
+  `wkc::{core,platform,render,resources,procedural,audio}` e gates impedem
+  includes ou links WKC → GDP. Gameplay, Entities, World, áudio/visual concreto
+  e Application permanecem GDP. A divisão em outro repositório continua
+  deliberadamente adiada; a fronteira atual já é verificável no monorepo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

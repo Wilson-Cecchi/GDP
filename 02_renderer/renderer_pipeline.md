@@ -29,6 +29,9 @@
 > `gdp::game::visual`, deixando `gdp::procedural` restrito à fundação genérica.
 > A Fase 50 concluiu a fronteira: receitas, hashing e geração genérica passaram
 > para `wkc::procedural`, sem aliases ou mudança de saída.
+> A Fase 56 auditou a direção final de dependências: a fundação gráfica WKC não
+> inclui camadas GDP, enquanto o renderer e o conteúdo concretos continuam no
+> jogo. A separação permanece no monorepo e é protegida por regressão própria.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
