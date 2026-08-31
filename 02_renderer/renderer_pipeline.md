@@ -78,7 +78,7 @@ O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
 OpenGL encerram o frame com log e recursos GPU são destruídos antes do contexto.
 Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
 `wkc_forge_render`. Receitas e geradores reutilizáveis ficam em
-`gdp_procedural_assets`; definições Worker, materiais de sala e assets concretos
+`wkc_forge_procedural`; definições Worker, materiais de sala e assets concretos
 do GDP ficam em `gdp_visual_content`; `gdp_visual_renderer` realiza a composição
 final.
 Sua implementação está em `game/visual/GdpRenderer.*`; o nome de classe

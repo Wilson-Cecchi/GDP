@@ -172,18 +172,18 @@ gdp_enable_warnings(wkc_forge_render)
 gdp_enable_sanitizers(wkc_forge_render)
 
 add_library(
-    gdp_procedural_assets
+    wkc_forge_procedural
     STATIC
     src/procedural/AssetRecipe.cpp
     src/procedural/MeshGenerator.cpp
     src/procedural/TextureGenerator.cpp
 )
 
-target_compile_features(gdp_procedural_assets PUBLIC cxx_std_20)
-target_include_directories(gdp_procedural_assets PUBLIC src)
-target_link_libraries(gdp_procedural_assets PUBLIC wkc_forge_core wkc_forge_render)
-gdp_enable_warnings(gdp_procedural_assets)
-gdp_enable_sanitizers(gdp_procedural_assets)
+target_compile_features(wkc_forge_procedural PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_procedural PUBLIC src)
+target_link_libraries(wkc_forge_procedural PUBLIC wkc_forge_core wkc_forge_render)
+gdp_enable_warnings(wkc_forge_procedural)
+gdp_enable_sanitizers(wkc_forge_procedural)
 
 add_library(
     gdp_visual_content
@@ -197,7 +197,7 @@ target_compile_features(gdp_visual_content PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_content PUBLIC src)
 target_link_libraries(
     gdp_visual_content
-    PUBLIC wkc_forge_core gdp_procedural_assets wkc_forge_render
+    PUBLIC wkc_forge_core wkc_forge_procedural wkc_forge_render
 )
 gdp_enable_warnings(gdp_visual_content)
 gdp_enable_sanitizers(gdp_visual_content)
@@ -213,7 +213,7 @@ target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)
 target_include_directories(gdp_visual_renderer PUBLIC src)
 target_link_libraries(
     gdp_visual_renderer
-    PUBLIC wkc_forge_core gdp_procedural_assets wkc_forge_render gdp_visual_content
+    PUBLIC wkc_forge_core wkc_forge_procedural wkc_forge_render gdp_visual_content
 )
 gdp_enable_warnings(gdp_visual_renderer)
 gdp_enable_sanitizers(gdp_visual_renderer)
@@ -327,7 +327,7 @@ if(GDP_BUILD_TESTS)
     add_executable(gdp_asset_tests tests/test_assets.cpp)
     target_link_libraries(
         gdp_asset_tests
-        PRIVATE gdp_procedural_assets gdp_visual_content
+        PRIVATE wkc_forge_procedural gdp_visual_content
     )
     gdp_enable_warnings(gdp_asset_tests)
     gdp_enable_sanitizers(gdp_asset_tests)

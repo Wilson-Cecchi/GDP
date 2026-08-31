@@ -664,7 +664,7 @@ podem mudar sem uma alteração deliberada da versão de geração.
 
 A fronteira visual intermediária possui quatro targets: `wkc_forge_render`
 contém Camera, Framebuffer, OpenGL, Mesh, Shader e Texture;
-`gdp_procedural_assets` contém receitas, hashing e geradores genéricos;
+`wkc_forge_procedural` contém receitas, hashing e geradores genéricos;
 `gdp_visual_content` contém Worker, materiais de sala e `game/visual`; e
 `gdp_visual_renderer` compõe a apresentação concreta do GDP. Esses nomes
 de target GDP permanecem temporários até suas fronteiras estabilizarem;
@@ -717,6 +717,11 @@ Na Fase 40, `gdp_platform` e `gdp_platform_sdl` passaram para
 `wkc_forge_platform` e `wkc_forge_platform_sdl`. Estado de input e tradução SDL
 formam agora a cadeia `wkc_forge_core -> wkc_forge_platform -> SDL`, ainda com
 namespace público `gdp::platform` para manter o rename incremental.
+
+Na Fase 41, `gdp_procedural_assets` passou para `wkc_forge_procedural`.
+Receitas, hashing, cache e geração de mesh/textura dependem apenas de
+`wkc_forge_core` e `wkc_forge_render`; conteúdo Worker, salas e luminária segue
+nos targets GDP. O namespace público `gdp::procedural` permanece compatível.
 
 ---
 
@@ -3487,9 +3492,10 @@ ocorre durante draw. Testes cobrem validação, transforms, bounds, semântica,
 regras materiais, hashes dourados, cache e 1.000 seeds visuais. O fingerprint
 estrutural do World permanece inalterado.
 
-Na Fase 30, os contratos e geradores reutilizáveis passaram ao target
-`gdp_procedural_assets`; construtores Worker e outros dados visuais do GDP não
-fazem mais parte de `AssetRecipe` e são compilados em `gdp_visual_content`.
+Na Fase 30, os contratos e geradores reutilizáveis foram isolados no target
+depois renomeado, na Fase 41, para `wkc_forge_procedural`; construtores Worker e
+outros dados visuais do GDP não fazem mais parte de `AssetRecipe` e são
+compilados em `gdp_visual_content`.
 
 ```text
 MeshRecipe

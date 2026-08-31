@@ -162,6 +162,10 @@ especializados das pastas numeradas.
   SDL passaram para `wkc_forge_platform` e `wkc_forge_platform_sdl`. A cadeia
   agora é `wkc_forge_core -> wkc_forge_platform -> SDL`, mantendo
   temporariamente o namespace `gdp::platform`.
+- **Fase 41 — Procedural WKC Forge:** receitas, hashing, cache e geradores de
+  mesh/textura reutilizáveis passaram de `gdp_procedural_assets` para
+  `wkc_forge_procedural`. O conteúdo Worker, salas e luminária permanece nos
+  targets GDP, enquanto o namespace `gdp::procedural` segue compatível.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

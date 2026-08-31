@@ -24,6 +24,14 @@ if(root_cmake_contents MATCHES
     message(FATAL_ERROR "GDP-prefixed platform targets must not return")
 endif()
 if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_procedural[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Generic procedural foundation must belong to WKC Forge")
+endif()
+if(root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+gdp_procedural_assets[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "GDP-prefixed procedural foundation target must not return")
+endif()
+if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+gdp_visual_renderer[ \t\r\n]+STATIC")
     message(FATAL_ERROR "GDP concrete renderer target must be named gdp_visual_renderer")
 endif()
@@ -50,6 +58,10 @@ endif()
 if(NOT root_cmake_contents MATCHES
         "target_link_libraries\\(wkc_forge_platform_sdl[ \t]+PUBLIC[ \t]+wkc_forge_platform")
     message(FATAL_ERROR "SDL adapter must depend on the generic WKC Forge platform")
+endif()
+if(NOT root_cmake_contents MATCHES
+        "target_link_libraries\\(wkc_forge_procedural[ \t]+PUBLIC[ \t]+wkc_forge_core[ \t]+wkc_forge_render")
+    message(FATAL_ERROR "WKC Forge procedural must depend only on Forge foundations")
 endif()
 
 set(core_directory "${GDP_SOURCE_DIR}/src/core")

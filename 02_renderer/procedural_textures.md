@@ -6,9 +6,10 @@
 > máscaras completas permanecem planejados. Albedos estruturados dos primeiros
 > ambientes Industrial, Storage, Combat Room, Cafeteria, Laboratory, Technical
 > Area, Security e Central Hub integrados na Fase 10.
-> Na Fase 30, contratos e geração reutilizáveis passaram a
-> `gdp_procedural_assets`; receitas Worker, fallback industrial, luminária e
-> materiais de salas permanecem como conteúdo visual do GDP.
+> Na Fase 30, contratos e geração reutilizáveis foram isolados no target
+> renomeado na Fase 41 para `wkc_forge_procedural`; receitas Worker, fallback
+> industrial, luminária e materiais de salas permanecem como conteúdo visual
+> do GDP.
 > Na Fase 31, esse conteúdo foi agrupado fisicamente em `src/game/visual`, sem
 > alterar namespaces, receitas ou hashes.
 > Esses albedos são baseline técnico. Qualquer revisão artística deve cumprir o
