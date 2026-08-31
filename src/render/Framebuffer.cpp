@@ -89,7 +89,7 @@ bool Framebuffer::resize(const GlApi& gl, const int width, const int height)
     glBindTexture(GL_TEXTURE_2D, 0);
     gl.bindRenderbuffer(GL_RENDERBUFFER, 0);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        gdp::core::log(gdp::core::LogLevel::Error, "OpenGL framebuffer is incomplete");
+        wkc::core::log(wkc::core::LogLevel::Error, "OpenGL framebuffer is incomplete");
         reset();
         return false;
     }

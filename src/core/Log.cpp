@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-namespace gdp::core {
+namespace wkc::core {
 namespace {
 
 constexpr std::string_view label(const LogLevel level)
@@ -26,4 +26,4 @@ void log(const LogLevel level, const std::string_view message)
     std::clog << '[' << label(level) << "] " << message << '\n';
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

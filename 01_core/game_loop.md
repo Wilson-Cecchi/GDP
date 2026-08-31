@@ -10,6 +10,8 @@
 > `wkc::platform`, preservando snapshots, transições e mapeamentos.
 > Na Fase 51, `FixedStepClock` passou para `wkc::core`, preservando passo fixo,
 > clamp de frames longos, interpolação e contagem de updates.
+> Na Fase 52, `LogLevel` e `log` também passaram para `wkc::core`, preservando
+> níveis, mensagens e saída de diagnóstico.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

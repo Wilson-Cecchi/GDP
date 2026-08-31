@@ -25,7 +25,7 @@ bool AudioMixer::initialize(const bool enableOutput)
     }
 
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-        gdp::core::log(gdp::core::LogLevel::Warning,
+        wkc::core::log(wkc::core::LogLevel::Warning,
             std::string{"Audio subsystem unavailable; continuing silently: "}
                 + SDL_GetError());
         return true;
@@ -36,21 +36,21 @@ bool AudioMixer::initialize(const bool enableOutput)
     stream_ = SDL_OpenAudioDeviceStream(
         SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &specification, nullptr, nullptr);
     if (stream_ == nullptr) {
-        gdp::core::log(gdp::core::LogLevel::Warning,
+        wkc::core::log(wkc::core::LogLevel::Warning,
             std::string{"Audio device unavailable; continuing silently: "}
                 + SDL_GetError());
         disableOutput();
         return true;
     }
     if (!SDL_ResumeAudioStreamDevice(stream_)) {
-        gdp::core::log(gdp::core::LogLevel::Warning,
+        wkc::core::log(wkc::core::LogLevel::Warning,
             std::string{"Audio device could not start; continuing silently: "}
                 + SDL_GetError());
         disableOutput();
         return true;
     }
     outputActive_ = true;
-    gdp::core::log(gdp::core::LogLevel::Info,
+    wkc::core::log(wkc::core::LogLevel::Info,
         "Procedural audio initialized at 48 kHz stereo");
     return true;
 }
@@ -253,7 +253,7 @@ void AudioMixer::update(const float fixedStepSeconds)
             && byteCount <= static_cast<std::size_t>(std::numeric_limits<int>::max())
             && !SDL_PutAudioStreamData(
                 stream_, mix.data(), static_cast<int>(byteCount))) {
-            gdp::core::log(gdp::core::LogLevel::Warning,
+            wkc::core::log(wkc::core::LogLevel::Warning,
                 std::string{"Audio stream failed; continuing silently: "} + SDL_GetError());
             disableOutput();
         }

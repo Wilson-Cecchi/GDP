@@ -295,7 +295,7 @@ bool GdpRenderer::initialize(const int width, const int height)
         initialized_ = false;
         return false;
     }
-    gdp::core::log(gdp::core::LogLevel::Info, "Renderer initialized with fixed-room scene");
+    wkc::core::log(wkc::core::LogLevel::Info, "Renderer initialized with fixed-room scene");
     return true;
 }
 
@@ -307,8 +307,8 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
     const IndustrialRoomMaterialSet materials
         = generateIndustrialRoomMaterials(roomSeed);
     if (!validateIndustrialRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Industrial room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Industrial room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -408,8 +408,8 @@ bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
     const StorageRoomMaterialSet materials
         = generateStorageRoomMaterials(roomSeed);
     if (!validateStorageRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Storage room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Storage room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -442,8 +442,8 @@ bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
     const CombatRoomMaterialSet materials
         = generateCombatRoomMaterials(roomSeed);
     if (!validateCombatRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Combat room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Combat room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -476,8 +476,8 @@ bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
     const CafeteriaRoomMaterialSet materials
         = generateCafeteriaRoomMaterials(roomSeed);
     if (!validateCafeteriaRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Cafeteria room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Cafeteria room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -510,8 +510,8 @@ bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
     const LaboratoryRoomMaterialSet materials
         = generateLaboratoryRoomMaterials(roomSeed);
     if (!validateLaboratoryRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Laboratory room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Laboratory room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -544,8 +544,8 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
     const TechnicalRoomMaterialSet materials
         = generateTechnicalRoomMaterials(roomSeed);
     if (!validateTechnicalRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Technical room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Technical room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -578,8 +578,8 @@ bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
     const SecurityRoomMaterialSet materials
         = generateSecurityRoomMaterials(roomSeed);
     if (!validateSecurityRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Security room material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Security room material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -612,8 +612,8 @@ bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
     const CentralHubRoomMaterialSet materials
         = generateCentralHubRoomMaterials(roomSeed);
     if (!validateCentralHubRoomMaterials(materials).isValid()) {
-        gdp::core::log(
-            gdp::core::LogLevel::Error, "Central Hub material generation failed validation");
+        wkc::core::log(
+            wkc::core::LogLevel::Error, "Central Hub material generation failed validation");
         return false;
     }
     if (roomMaterials_.contains(materials.materialHash)) {
@@ -650,7 +650,7 @@ bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
     const WorkerVisual visual
         = generateWorkerVisual(visualSeed);
     if (!validateWorkerVisual(visual).isValid()) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Worker visual generation failed validation");
+        wkc::core::log(wkc::core::LogLevel::Error, "Worker visual generation failed validation");
         return false;
     }
     const auto meshData = meshCache_.acquire(
@@ -685,7 +685,7 @@ bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
     const GuardVisual visual
         = generateGuardVisual(visualSeed);
     if (!validateGuardVisual(visual).isValid()) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Guard visual generation failed validation");
+        wkc::core::log(wkc::core::LogLevel::Error, "Guard visual generation failed validation");
         return false;
     }
     const auto meshData = meshCache_.acquire(
@@ -720,7 +720,7 @@ bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
     const OfficerVisual visual
         = generateOfficerVisual(visualSeed);
     if (!validateOfficerVisual(visual).isValid()) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Officer visual generation failed validation");
+        wkc::core::log(wkc::core::LogLevel::Error, "Officer visual generation failed validation");
         return false;
     }
     const auto meshData = meshCache_.acquire(
@@ -755,7 +755,7 @@ bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
     const EngineerVisual visual
         = generateEngineerVisual(visualSeed);
     if (!validateEngineerVisual(visual).isValid()) {
-        gdp::core::log(gdp::core::LogLevel::Error,
+        wkc::core::log(wkc::core::LogLevel::Error,
             "Engineer visual generation failed validation");
         return false;
     }
@@ -790,7 +790,7 @@ bool GdpRenderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
     const IndustrialRobotVisual visual
         = generateIndustrialRobotVisual(visualSeed);
     if (!validateIndustrialRobotVisual(visual).isValid()) {
-        gdp::core::log(gdp::core::LogLevel::Error,
+        wkc::core::log(wkc::core::LogLevel::Error,
             "IndustrialRobot visual generation failed validation");
         return false;
     }
@@ -1489,7 +1489,7 @@ bool GdpRenderer::render(
         if (error != GL_NO_ERROR) {
             std::ostringstream message;
             message << "OpenGL main menu render error: 0x" << std::hex << error;
-            gdp::core::log(gdp::core::LogLevel::Error, message.str());
+            wkc::core::log(wkc::core::LogLevel::Error, message.str());
             return false;
         }
         return true;
@@ -1802,7 +1802,7 @@ bool GdpRenderer::render(
     if (error != GL_NO_ERROR) {
         std::ostringstream message;
         message << "OpenGL render error: 0x" << std::hex << error;
-        gdp::core::log(gdp::core::LogLevel::Error, message.str());
+        wkc::core::log(wkc::core::LogLevel::Error, message.str());
         return false;
     }
     return true;

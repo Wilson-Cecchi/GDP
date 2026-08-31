@@ -32,8 +32,8 @@ GLuint compileStage(
     gl.getShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
     std::vector<char> buffer(static_cast<std::size_t>(std::max(logLength, 1)));
     gl.getShaderInfoLog(shader, logLength, nullptr, buffer.data());
-    gdp::core::log(
-        gdp::core::LogLevel::Error,
+    wkc::core::log(
+        wkc::core::LogLevel::Error,
         std::string{label} + " shader compilation failed: " + buffer.data());
     gl.deleteShader(shader);
     return 0;
@@ -92,8 +92,8 @@ bool Shader::compile(
         gl.getProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
         std::vector<char> buffer(static_cast<std::size_t>(std::max(logLength, 1)));
         gl.getProgramInfoLog(program, logLength, nullptr, buffer.data());
-        gdp::core::log(
-            gdp::core::LogLevel::Error,
+        wkc::core::log(
+            wkc::core::LogLevel::Error,
             std::string{"Shader link failed: "} + buffer.data());
         gl.deleteProgram(program);
         return false;

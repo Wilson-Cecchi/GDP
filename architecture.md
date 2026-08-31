@@ -705,6 +705,10 @@ GDP referencia agora o contrato de tempo da WKC Forge explicitamente; passo
 fixo, limite de delta, acumulador, interpolação e contagem total permanecem
 inalterados. Hash, Log, Math, Random e Seed seguem compatíveis nesta etapa.
 
+Na Fase 52, `LogLevel` e `log` passaram de `gdp::core` para `wkc::core`.
+Aplicação, áudio e fundação gráfica consomem o diagnóstico WKC Forge por nomes
+qualificados; níveis, mensagens e destino de saída permanecem inalterados.
+
 ---
 
 # 8. Sistema de seed

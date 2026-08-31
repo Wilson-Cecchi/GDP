@@ -207,6 +207,10 @@ especializados das pastas numeradas.
   `gdp::core` para `wkc::core`. A aplicação consome o relógio WKC explicitamente
   e mantém passo fixo, clamp de frames longos e interpolação inalterados; os
   demais contratos de Core continuam compatíveis para migração incremental.
+- **Fase 52 — Log no Core WKC Forge:** `LogLevel` e `log` passaram de
+  `gdp::core` para `wkc::core`. Plataforma gráfica, áudio, renderer e aplicação
+  consomem agora o diagnóstico genérico explicitamente, sem mudar mensagens ou
+  níveis emitidos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

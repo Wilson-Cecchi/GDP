@@ -133,11 +133,11 @@ bool Mesh::upload(const GlApi& gl, const MeshData& data)
 {
     std::string reason;
     if (!validateMeshData(data, &reason)) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Mesh upload rejected: " + reason);
+        wkc::core::log(wkc::core::LogLevel::Error, "Mesh upload rejected: " + reason);
         return false;
     }
     if (data.indices.size() > std::numeric_limits<std::uint32_t>::max()) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Mesh index count exceeds 32-bit range");
+        wkc::core::log(wkc::core::LogLevel::Error, "Mesh index count exceeds 32-bit range");
         return false;
     }
 

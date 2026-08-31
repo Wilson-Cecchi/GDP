@@ -124,17 +124,19 @@ file(READ "${core_directory}/Seed.hpp" core_seed_header)
 if(core_seed_header MATCHES "enum[ \t]+class[ \t]+SeedDomain")
     message(FATAL_ERROR "core/Seed.hpp must not own GDP seed domains")
 endif()
-foreach(core_time_source IN ITEMS
+foreach(migrated_core_source IN ITEMS
+    "${core_directory}/Log.cpp"
+    "${core_directory}/Log.hpp"
     "${core_directory}/Time.cpp"
     "${core_directory}/Time.hpp"
 )
-    file(READ "${core_time_source}" core_time_contents)
-    if(NOT core_time_contents MATCHES "namespace[ \t]+wkc::core[ \t{]"
-        OR core_time_contents MATCHES "namespace[ \t]+gdp::core[ \t{]")
+    file(READ "${migrated_core_source}" migrated_core_contents)
+    if(NOT migrated_core_contents MATCHES "namespace[ \t]+wkc::core[ \t{]"
+        OR migrated_core_contents MATCHES "namespace[ \t]+gdp::core[ \t{]")
         file(RELATIVE_PATH relative_source
-            "${GDP_SOURCE_DIR}" "${core_time_source}")
+            "${GDP_SOURCE_DIR}" "${migrated_core_source}")
         message(FATAL_ERROR
-            "WKC Forge Time API must use wkc::core: ${relative_source}"
+            "Migrated WKC Forge Core API must use wkc::core: ${relative_source}"
         )
     endif()
 endforeach()

@@ -14,7 +14,7 @@ bool loadFunction(Function& destination, const char* const name) noexcept
 {
     destination = reinterpret_cast<Function>(SDL_GL_GetProcAddress(name));
     if (destination == nullptr) {
-        gdp::core::log(gdp::core::LogLevel::Error, std::string{"Missing OpenGL function: "} + name);
+        wkc::core::log(wkc::core::LogLevel::Error, std::string{"Missing OpenGL function: "} + name);
         return false;
     }
     return true;

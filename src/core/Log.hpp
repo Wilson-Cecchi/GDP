@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace gdp::core {
+namespace wkc::core {
 
 enum class LogLevel {
     Info,
@@ -12,4 +12,4 @@ enum class LogLevel {
 
 void log(LogLevel level, std::string_view message);
 
-} // namespace gdp::core
+} // namespace wkc::core

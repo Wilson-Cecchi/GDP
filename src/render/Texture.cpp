@@ -45,7 +45,7 @@ bool Texture::upload(
     const TextureSampling sampling)
 {
     if (!validateImageData(image)) {
-        gdp::core::log(gdp::core::LogLevel::Error, "Texture upload rejected invalid image data");
+        wkc::core::log(wkc::core::LogLevel::Error, "Texture upload rejected invalid image data");
         return false;
     }
 

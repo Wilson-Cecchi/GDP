@@ -30,9 +30,9 @@
 
 namespace gdp::game {
 
-using gdp::core::LogLevel;
+using wkc::core::LogLevel;
 using gdp::core::Vec2;
-using gdp::core::log;
+using wkc::core::log;
 using wkc::platform::Input;
 using wkc::platform::Key;
 using wkc::platform::MouseButton;
