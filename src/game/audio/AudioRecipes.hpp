@@ -23,7 +23,7 @@ enum class AudioEventKind : std::uint8_t {
     Count,
 };
 
-[[nodiscard]] AudioRecipe generateAudioRecipe(
+[[nodiscard]] wkc::audio::AudioRecipe generateAudioRecipe(
     gdp::core::Seed sourceSeed,
     AudioEventKind kind,
     std::uint64_t eventCounter = 0U);

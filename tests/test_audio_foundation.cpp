@@ -16,9 +16,9 @@ void expect(const bool condition, const std::string_view message)
     }
 }
 
-gdp::audio::AudioRecipe makeGenericRecipe()
+wkc::audio::AudioRecipe makeGenericRecipe()
 {
-    gdp::audio::AudioRecipe recipe;
+    wkc::audio::AudioRecipe recipe;
     recipe.kind = 2U;
     recipe.kindCount = 4U;
     recipe.seed = 0x574B435F41554449ULL;
@@ -30,7 +30,7 @@ gdp::audio::AudioRecipe makeGenericRecipe()
     recipe.noiseMix = 0.16F;
     recipe.pulseRate = 2.5F;
     recipe.gain = 0.4F;
-    recipe.recipeHash = gdp::audio::audioRecipeHash(recipe);
+    recipe.recipeHash = wkc::audio::audioRecipeHash(recipe);
     return recipe;
 }
 
@@ -38,7 +38,7 @@ gdp::audio::AudioRecipe makeGenericRecipe()
 
 int main()
 {
-    using namespace gdp::audio;
+    using namespace wkc::audio;
 
     const AudioRecipe recipe = makeGenericRecipe();
     expect(validateAudioRecipe(recipe).isValid(),

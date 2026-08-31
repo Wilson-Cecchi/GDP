@@ -8,7 +8,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace gdp::audio {
+namespace wkc::audio {
 namespace {
 
 // Versioned synthesis substream. Its numeric value preserves existing
@@ -146,4 +146,4 @@ std::uint64_t audioRecipeHash(const AudioRecipe& recipe) noexcept
     return addFloat(hash, recipe.gain);
 }
 
-} // namespace gdp::audio
+} // namespace wkc::audio

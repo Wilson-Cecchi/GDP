@@ -57,7 +57,7 @@ public:
     [[nodiscard]] float lastRightEnergy() const noexcept;
 
 private:
-    AudioMixer mixer_{};
+    wkc::audio::AudioMixer mixer_{};
 };
 
 } // namespace gdp::audio

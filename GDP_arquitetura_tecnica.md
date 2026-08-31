@@ -746,6 +746,11 @@ SDL foram extraídos para `AudioMixer`, dentro de `wkc_forge_audio`. A fachada
 `gdp_audio` preserva a API da aplicação, mas agora somente converte eventos,
 seeds e perfis do jogo em `AudioRecipe`; ela não depende diretamente de SDL.
 
+Na Fase 45, os contratos `AudioRecipe`/`AudioClip`, validação, síntese e
+`AudioMixer` passaram para `wkc::audio`. `AudioEventKind`, geração de receitas e
+`AudioSystem` permanecem em `gdp::audio`; a assinatura do catálogo retorna o
+contrato WKC Forge explicitamente, sem aliases reversos ou mudança de dados.
+
 ---
 
 # 8. Sistema de seed

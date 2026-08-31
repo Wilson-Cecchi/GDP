@@ -178,6 +178,10 @@ especializados das pastas numeradas.
   espacialização, crossfade e backend SDL passaram para `AudioMixer` em
   `wkc_forge_audio`. `gdp_audio` não depende mais diretamente de SDL e apenas
   converte eventos, seeds e perfis do jogo em receitas genéricas.
+- **Fase 45 — Namespace de áudio WKC Forge:** `AudioRecipe`, `AudioClip`,
+  validação, síntese e `AudioMixer` passaram de `gdp::audio` para `wkc::audio`.
+  `AudioEventKind`, geração de receitas e `AudioSystem` permanecem em
+  `gdp::audio`, tornando explícita a direção GDP → WKC Forge na API C++.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

@@ -11,7 +11,7 @@
 
 struct SDL_AudioStream;
 
-namespace gdp::audio {
+namespace wkc::audio {
 
 inline constexpr std::size_t maximumAudioVoices = 16U;
 
@@ -90,4 +90,4 @@ private:
     float lastRightEnergy_{0.0F};
 };
 
-} // namespace gdp::audio
+} // namespace wkc::audio

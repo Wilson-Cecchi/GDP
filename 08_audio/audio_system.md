@@ -8,6 +8,8 @@
 > concreta do GDP pertencem a `src/game/audio` e ao target `gdp_audio`.
 > Na Fase 44, `AudioMixer` levou cache, vozes, buses, espacialização, crossfade e
 > backend SDL para `wkc_forge_audio`; a fachada GDP apenas fornece receitas.
+> Na Fase 45, esses contratos e o mixer passaram para `wkc::audio`; eventos,
+> catálogo de receitas e `AudioSystem` permanecem em `gdp::audio`.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

@@ -9,7 +9,7 @@
 #include <limits>
 #include <string>
 
-namespace gdp::audio {
+namespace wkc::audio {
 
 AudioMixer::~AudioMixer()
 {
@@ -375,4 +375,4 @@ void AudioMixer::disableOutput() noexcept
     }
 }
 
-} // namespace gdp::audio
+} // namespace wkc::audio

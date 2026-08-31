@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace gdp::audio {
+namespace wkc::audio {
 
 inline constexpr int proceduralAudioSampleRate = 48'000;
 
@@ -63,4 +63,4 @@ struct AudioValidationResult {
 [[nodiscard]] std::uint64_t audioRecipeHash(
     const AudioRecipe& recipe) noexcept;
 
-} // namespace gdp::audio
+} // namespace wkc::audio

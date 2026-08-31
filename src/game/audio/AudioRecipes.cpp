@@ -9,7 +9,9 @@
 namespace gdp::audio {
 namespace {
 
-void configureRecipe(AudioRecipe& recipe, const AudioEventKind kind) noexcept
+void configureRecipe(
+    wkc::audio::AudioRecipe& recipe,
+    const AudioEventKind kind) noexcept
 {
     switch (kind) {
     case AudioEventKind::WeaponFire:
@@ -130,12 +132,12 @@ void configureRecipe(AudioRecipe& recipe, const AudioEventKind kind) noexcept
 
 } // namespace
 
-AudioRecipe generateAudioRecipe(
+wkc::audio::AudioRecipe generateAudioRecipe(
     const gdp::core::Seed sourceSeed,
     const AudioEventKind kind,
     const std::uint64_t eventCounter)
 {
-    AudioRecipe recipe;
+    wkc::audio::AudioRecipe recipe;
     recipe.kind = static_cast<std::uint8_t>(kind);
     recipe.kindCount = static_cast<std::uint8_t>(AudioEventKind::Count);
     const std::uint64_t localId = (static_cast<std::uint64_t>(kind) << 56U)
@@ -174,7 +176,7 @@ AudioRecipe generateAudioRecipe(
         recipe.noiseMix = std::clamp(
             recipe.noiseMix + random.rangeFloat(-0.018F, 0.018F), 0.0F, 1.0F);
     }
-    recipe.recipeHash = audioRecipeHash(recipe);
+    recipe.recipeHash = wkc::audio::audioRecipeHash(recipe);
     return recipe;
 }
 

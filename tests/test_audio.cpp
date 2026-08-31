@@ -25,8 +25,8 @@ void expect(const bool condition, const std::string_view message)
 }
 
 bool containsError(
-    const gdp::audio::AudioValidationResult& result,
-    const gdp::audio::AudioValidationError error)
+    const wkc::audio::AudioValidationResult& result,
+    const wkc::audio::AudioValidationError error)
 {
     return std::find(result.errors.begin(), result.errors.end(), error)
         != result.errors.end();
@@ -35,6 +35,7 @@ bool containsError(
 void testDeterministicRecipeAndClip()
 {
     using namespace gdp::audio;
+    using namespace wkc::audio;
     constexpr gdp::core::Seed seed = 0x415544494F5F5631ULL;
     const AudioRecipe first = generateAudioRecipe(seed, AudioEventKind::WeaponFire, 7U);
     const AudioRecipe repeated = generateAudioRecipe(seed, AudioEventKind::WeaponFire, 7U);
@@ -56,6 +57,7 @@ void testDeterministicRecipeAndClip()
 void testCueCoverageAndClipping()
 {
     using namespace gdp::audio;
+    using namespace wkc::audio;
     std::array<bool, static_cast<std::size_t>(AudioEventKind::Count)> covered{};
     for (std::size_t index = 0; index < covered.size(); ++index) {
         const AudioEventKind kind = static_cast<AudioEventKind>(index);
@@ -93,6 +95,7 @@ void testCueCoverageAndClipping()
 void testValidationFailures()
 {
     using namespace gdp::audio;
+    using namespace wkc::audio;
     AudioRecipe invalid = generateAudioRecipe(77U, AudioEventKind::Pickup, 2U);
     invalid.durationSeconds = 0.0F;
     invalid.noiseMix = 2.0F;
@@ -108,6 +111,7 @@ void testValidationFailures()
 void testSilentMixerAndSpatialization()
 {
     using namespace gdp::audio;
+    using namespace wkc::audio;
     AudioSystem audio;
     expect(audio.initialize(false) && audio.isInitialized() && !audio.isOutputActive(),
         "audio system initializes silently without opening a device");

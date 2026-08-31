@@ -256,6 +256,13 @@ file(GLOB audio_foundation_sources
 )
 foreach(source IN LISTS audio_foundation_sources)
     file(READ "${source}" contents)
+    if(NOT contents MATCHES "namespace[ \t]+wkc::audio[ \t{]"
+        OR contents MATCHES "namespace[ \t]+gdp::audio[ \t{]")
+        file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
+        message(FATAL_ERROR
+            "WKC Forge audio API must use the wkc::audio namespace: ${relative_source}"
+        )
+    endif()
     if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities)/"
         OR contents MATCHES
             "WeaponFire|EnemyHit|EnemyDeath|PropDestroyed|Pickup|RoomMaterial")
@@ -265,6 +272,13 @@ foreach(source IN LISTS audio_foundation_sources)
         )
     endif()
 endforeach()
+file(READ "${GDP_SOURCE_DIR}/src/game/audio/AudioRecipes.hpp" gdp_audio_recipes_header)
+if(NOT gdp_audio_recipes_header MATCHES "wkc::audio::AudioRecipe")
+    message(FATAL_ERROR "GDP audio recipes must produce the WKC Forge recipe contract")
+endif()
+if(NOT gdp_audio_system_header MATCHES "wkc::audio::AudioMixer")
+    message(FATAL_ERROR "GDP audio facade must own the WKC Forge mixer")
+endif()
 
 file(READ "${game_application}" application_header)
 if(NOT application_header MATCHES "namespace[ \t]+gdp::game")
