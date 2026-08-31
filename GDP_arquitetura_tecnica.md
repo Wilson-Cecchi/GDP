@@ -713,6 +713,11 @@ Hash, Log, Math, Random, Seed e Time, e `wkc_forge_render` agora depende dessa
 base sem atravessar um target identificado como GDP. O namespace `gdp::core`
 permanece temporariamente compatível.
 
+Na Fase 40, `gdp_platform` e `gdp_platform_sdl` passaram para
+`wkc_forge_platform` e `wkc_forge_platform_sdl`. Estado de input e tradução SDL
+formam agora a cadeia `wkc_forge_core -> wkc_forge_platform -> SDL`, ainda com
+namespace público `gdp::platform` para manter o rename incremental.
+
 ---
 
 # 8. Sistema de seed

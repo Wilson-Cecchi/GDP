@@ -158,6 +158,10 @@ especializados das pastas numeradas.
   `wkc_forge_core`. Hash, Log, Math, Random, Seed e Time permanecem
   compatíveis em `gdp::core`, enquanto `wkc_forge_render` deixa de depender de
   qualquer target com identidade GDP.
+- **Fase 40 — Plataforma WKC Forge:** input independente de backend e tradução
+  SDL passaram para `wkc_forge_platform` e `wkc_forge_platform_sdl`. A cadeia
+  agora é `wkc_forge_core -> wkc_forge_platform -> SDL`, mantendo
+  temporariamente o namespace `gdp::platform`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

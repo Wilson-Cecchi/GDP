@@ -4,6 +4,8 @@
 > de jogo permanecem planejados para as fases de gameplay/interface.
 > Na Fase 39, Hash, Log, Math, Random, Seed e Time passaram a ser compilados no
 > target `wkc_forge_core`, ainda com namespace C++ compatível.
+> Na Fase 40, estado de input e adaptador SDL passaram para
+> `wkc_forge_platform` e `wkc_forge_platform_sdl`.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -54,7 +56,7 @@ independentes de backend e acumula movimento do mouse; as transições e deltas
 são limpos no começo de cada frame, antes da fila SDL ser processada.
 `platform/SdlInput` traduz somente os eventos usados pelo GDP para esse contrato.
 Repetição automática de tecla não cria um novo pressed. SDL não é dependência
-pública de `wkc_forge_core` nem de `gdp_platform`.
+pública de `wkc_forge_core` nem de `wkc_forge_platform`.
 
 ## Ordem lógica
 

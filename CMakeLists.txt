@@ -80,28 +80,28 @@ gdp_enable_warnings(wkc_forge_core)
 gdp_enable_sanitizers(wkc_forge_core)
 
 add_library(
-    gdp_platform
+    wkc_forge_platform
     STATIC
     src/platform/Input.cpp
 )
 
-target_compile_features(gdp_platform PUBLIC cxx_std_20)
-target_include_directories(gdp_platform PUBLIC src)
-target_link_libraries(gdp_platform PUBLIC wkc_forge_core)
-gdp_enable_warnings(gdp_platform)
-gdp_enable_sanitizers(gdp_platform)
+target_compile_features(wkc_forge_platform PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_platform PUBLIC src)
+target_link_libraries(wkc_forge_platform PUBLIC wkc_forge_core)
+gdp_enable_warnings(wkc_forge_platform)
+gdp_enable_sanitizers(wkc_forge_platform)
 
 add_library(
-    gdp_platform_sdl
+    wkc_forge_platform_sdl
     STATIC
     src/platform/SdlInput.cpp
 )
 
-target_compile_features(gdp_platform_sdl PUBLIC cxx_std_20)
-target_include_directories(gdp_platform_sdl PUBLIC src)
-target_link_libraries(gdp_platform_sdl PUBLIC gdp_platform SDL3::SDL3)
-gdp_enable_warnings(gdp_platform_sdl)
-gdp_enable_sanitizers(gdp_platform_sdl)
+target_compile_features(wkc_forge_platform_sdl PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_platform_sdl PUBLIC src)
+target_link_libraries(wkc_forge_platform_sdl PUBLIC wkc_forge_platform SDL3::SDL3)
+gdp_enable_warnings(wkc_forge_platform_sdl)
+gdp_enable_sanitizers(wkc_forge_platform_sdl)
 
 add_library(
     gdp_entities
@@ -256,8 +256,8 @@ target_link_libraries(
     wkc_forge_core
     gdp_entities
     gdp_gameplay
-    gdp_platform
-    gdp_platform_sdl
+    wkc_forge_platform
+    wkc_forge_platform_sdl
     gdp_visual_renderer
     gdp_world
     SDL3::SDL3
@@ -293,7 +293,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(gdp_seed_domain_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_input_tests tests/test_input.cpp)
-    target_link_libraries(gdp_input_tests PRIVATE gdp_platform)
+    target_link_libraries(gdp_input_tests PRIVATE wkc_forge_platform)
     gdp_enable_warnings(gdp_input_tests)
     gdp_enable_sanitizers(gdp_input_tests)
 
@@ -301,7 +301,7 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(platform_input_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_sdl_input_tests tests/test_sdl_input.cpp)
-    target_link_libraries(gdp_sdl_input_tests PRIVATE gdp_platform_sdl)
+    target_link_libraries(gdp_sdl_input_tests PRIVATE wkc_forge_platform_sdl)
     gdp_enable_warnings(gdp_sdl_input_tests)
     gdp_enable_sanitizers(gdp_sdl_input_tests)
 
