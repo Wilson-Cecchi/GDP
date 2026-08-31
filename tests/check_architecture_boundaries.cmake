@@ -124,6 +124,20 @@ file(READ "${core_directory}/Seed.hpp" core_seed_header)
 if(core_seed_header MATCHES "enum[ \t]+class[ \t]+SeedDomain")
     message(FATAL_ERROR "core/Seed.hpp must not own GDP seed domains")
 endif()
+foreach(core_time_source IN ITEMS
+    "${core_directory}/Time.cpp"
+    "${core_directory}/Time.hpp"
+)
+    file(READ "${core_time_source}" core_time_contents)
+    if(NOT core_time_contents MATCHES "namespace[ \t]+wkc::core[ \t{]"
+        OR core_time_contents MATCHES "namespace[ \t]+gdp::core[ \t{]")
+        file(RELATIVE_PATH relative_source
+            "${GDP_SOURCE_DIR}" "${core_time_source}")
+        message(FATAL_ERROR
+            "WKC Forge Time API must use wkc::core: ${relative_source}"
+        )
+    endif()
+endforeach()
 if(NOT EXISTS "${GDP_SOURCE_DIR}/src/game/SeedDomains.hpp")
     message(FATAL_ERROR "GDP seed domain catalog is missing from src/game")
 endif()
@@ -353,6 +367,10 @@ endif()
 if(NOT application_header MATCHES "wkc::platform::Input"
     OR application_header MATCHES "gdp::platform::Input")
     message(FATAL_ERROR "GDP Application must consume the WKC Forge input API")
+endif()
+if(NOT application_header MATCHES "wkc::core::FixedStepClock"
+    OR application_header MATCHES "gdp::core::FixedStepClock")
+    message(FATAL_ERROR "GDP Application must consume the WKC Forge Time API")
 endif()
 
 file(GLOB core_sources

@@ -66,7 +66,7 @@ private:
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
-    gdp::core::FixedStepClock clock_;
+    wkc::core::FixedStepClock clock_;
     gameplay::CollisionWorld baseCollisionWorld_;
     gameplay::CollisionWorld collisionWorld_;
     gameplay::Player player_;

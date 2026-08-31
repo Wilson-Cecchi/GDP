@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace gdp::core {
+namespace wkc::core {
 
 class FixedStepClock {
 public:
@@ -25,4 +25,4 @@ private:
     std::uint64_t totalSteps_{0};
 };
 
-} // namespace gdp::core
+} // namespace wkc::core

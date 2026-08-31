@@ -78,7 +78,7 @@ void testRandom()
 
 std::uint64_t simulateTenSeconds(const int renderRate)
 {
-    gdp::core::FixedStepClock clock;
+    wkc::core::FixedStepClock clock;
     for (int frame = 0; frame < renderRate * 10; ++frame) {
         clock.advanceBy(1.0 / static_cast<double>(renderRate));
         while (clock.consumeFixedStep()) {
@@ -89,7 +89,7 @@ std::uint64_t simulateTenSeconds(const int renderRate)
 
 void testTime()
 {
-    using gdp::core::FixedStepClock;
+    using wkc::core::FixedStepClock;
 
     expect(simulateTenSeconds(30) == 600, "30 FPS rendering preserves 60 Hz simulation");
     expect(simulateTenSeconds(60) == 600, "60 FPS rendering preserves 60 Hz simulation");

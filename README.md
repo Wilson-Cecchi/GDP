@@ -203,6 +203,10 @@ especializados das pastas numeradas.
   `MeshRecipe`, `TextureRecipe`, validação, hashing e geração passaram de
   `gdp::procedural` para `wkc::procedural`. Conteúdo visual GDP consome essa API
   explicitamente, sem aliases e com hashes, meshes e pixels preservados.
+- **Fase 51 — Time no Core WKC Forge:** `FixedStepClock` passou de
+  `gdp::core` para `wkc::core`. A aplicação consome o relógio WKC explicitamente
+  e mantém passo fixo, clamp de frames longos e interpolação inalterados; os
+  demais contratos de Core continuam compatíveis para migração incremental.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

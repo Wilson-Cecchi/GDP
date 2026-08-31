@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace gdp::core {
+namespace wkc::core {
 
 FixedStepClock::FixedStepClock(
     const double fixedStepSeconds,
@@ -57,4 +57,4 @@ std::uint64_t FixedStepClock::totalSteps() const noexcept
     return totalSteps_;
 }
 
-} // namespace gdp::core
+} // namespace wkc::core

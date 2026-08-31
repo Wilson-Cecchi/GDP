@@ -778,6 +778,11 @@ passaram de `gdp::procedural` para `wkc::procedural`. O conteúdo visual GDP
 consome a fundação WKC Forge por nomes qualificados; não há aliases reversos,
 mudança de receitas, hashes, geometria ou pixels.
 
+Na Fase 51, `FixedStepClock` passou de `gdp::core` para `wkc::core`. A aplicação
+GDP referencia agora o contrato de tempo da WKC Forge explicitamente; passo
+fixo, limite de delta, acumulador, interpolação e contagem total permanecem
+inalterados. Hash, Log, Math, Random e Seed seguem compatíveis nesta etapa.
+
 ---
 
 # 8. Sistema de seed
