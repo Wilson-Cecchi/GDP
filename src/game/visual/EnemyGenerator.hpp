@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-namespace gdp::procedural {
+namespace gdp::game::visual {
 
 using WorkerPartId = std::uint32_t;
 using CompatibilityMask = std::uint32_t;
@@ -76,10 +76,10 @@ struct WorkerPartDefinition {
     WorkerPartSlot slot{WorkerPartSlot::Torso};
     SocketType attachment{SocketType::Neck};
     CompatibilityMask compatibility{compatibilityStandard};
-    PrimitiveType primitive{PrimitiveType::Box};
+    gdp::procedural::PrimitiveType primitive{gdp::procedural::PrimitiveType::Box};
     gdp::core::Vec3 dimensionScale{1.0F, 1.0F, 1.0F};
-    MaterialSlot material{MaterialSlot::Primary};
-    SemanticRegion semantic{SemanticRegion::Generic};
+    gdp::procedural::MaterialSlot material{gdp::procedural::MaterialSlot::Primary};
+    gdp::procedural::SemanticRegion semantic{gdp::procedural::SemanticRegion::Generic};
     std::uint32_t weight{1};
 };
 
@@ -99,7 +99,7 @@ struct WearProfile {
 };
 
 struct WorkerMaterialSet {
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 primaryColor{0.72F, 0.38F, 0.12F};
     gdp::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
 };
@@ -123,8 +123,8 @@ struct WorkerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    MeshRecipe meshRecipe;
-    TextureRecipe textureRecipe;
+    gdp::procedural::MeshRecipe meshRecipe;
+    gdp::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -175,8 +175,8 @@ struct GuardVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    MeshRecipe meshRecipe;
-    TextureRecipe textureRecipe;
+    gdp::procedural::MeshRecipe meshRecipe;
+    gdp::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -228,8 +228,8 @@ struct OfficerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    MeshRecipe meshRecipe;
-    TextureRecipe textureRecipe;
+    gdp::procedural::MeshRecipe meshRecipe;
+    gdp::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -282,8 +282,8 @@ struct EngineerVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    MeshRecipe meshRecipe;
-    TextureRecipe textureRecipe;
+    gdp::procedural::MeshRecipe meshRecipe;
+    gdp::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -337,8 +337,8 @@ struct IndustrialRobotVisual {
     BodyProfile body;
     WorkerMaterialSet materials;
     WearProfile wear;
-    MeshRecipe meshRecipe;
-    TextureRecipe textureRecipe;
+    gdp::procedural::MeshRecipe meshRecipe;
+    gdp::procedural::TextureRecipe textureRecipe;
     std::uint32_t fallbackCount{0};
 };
 
@@ -390,4 +390,4 @@ validateIndustrialRobotVisual(const IndustrialRobotVisual& visual);
 [[nodiscard]] std::uint64_t
 industrialRobotVisualHash(const IndustrialRobotVisual& visual) noexcept;
 
-} // namespace gdp::procedural
+} // namespace gdp::game::visual

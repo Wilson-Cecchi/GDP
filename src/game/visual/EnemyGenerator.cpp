@@ -11,7 +11,18 @@
 #include <cmath>
 #include <optional>
 
-namespace gdp::procedural {
+namespace gdp::game::visual {
+using gdp::procedural::MaterialFamily;
+using gdp::procedural::MaterialSlot;
+using gdp::procedural::PrimitiveRecipe;
+using gdp::procedural::PrimitiveType;
+using gdp::procedural::SemanticRegion;
+using gdp::procedural::generateMesh;
+using gdp::procedural::materialProperties;
+using gdp::procedural::meshRecipeHash;
+using gdp::procedural::textureRecipeHash;
+using gdp::procedural::validateMeshRecipe;
+using gdp::procedural::validateTextureRecipe;
 namespace {
 
 constexpr std::array parts{
@@ -2098,4 +2109,4 @@ std::uint64_t industrialRobotVisualHash(const IndustrialRobotVisual& visual) noe
     return gdp::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
 }
 
-} // namespace gdp::procedural
+} // namespace gdp::game::visual

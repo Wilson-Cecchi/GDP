@@ -304,9 +304,9 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::IndustrialRoomMaterialSet materials
-        = gdp::procedural::generateIndustrialRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateIndustrialRoomMaterials(materials).isValid()) {
+    const IndustrialRoomMaterialSet materials
+        = generateIndustrialRoomMaterials(roomSeed);
+    if (!validateIndustrialRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Industrial room material generation failed validation");
         return false;
@@ -319,9 +319,9 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
     const std::size_t conditionIndex = static_cast<std::size_t>(materials.condition);
     auto& sharedWall = industrialWallMaterials_[conditionIndex];
     if (!sharedWall) {
-        const gdp::procedural::IndustrialSurfaceRecipe archetype
-            = gdp::procedural::makeIndustrialWallArchetypeRecipe(materials.condition);
-        const auto images = gdp::procedural::generateIndustrialWallMaterialImages(archetype);
+        const IndustrialSurfaceRecipe archetype
+            = makeIndustrialWallArchetypeRecipe(materials.condition);
+        const auto images = generateIndustrialWallMaterialImages(archetype);
         if (!images) {
             return false;
         }
@@ -339,9 +339,9 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
 
     auto& sharedCeiling = industrialCeilingMaterials_[conditionIndex];
     if (!sharedCeiling) {
-        const gdp::procedural::IndustrialSurfaceRecipe archetype
-            = gdp::procedural::makeIndustrialCeilingArchetypeRecipe(materials.condition);
-        const auto images = gdp::procedural::generateIndustrialCeilingMaterialImages(
+        const IndustrialSurfaceRecipe archetype
+            = makeIndustrialCeilingArchetypeRecipe(materials.condition);
+        const auto images = generateIndustrialCeilingMaterialImages(
             archetype);
         if (!images) {
             return false;
@@ -370,23 +370,23 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const gdp::core::Seed roomSeed)
         static_cast<float>((roomSeed >> 11U) & 1U) * 0.5F,
     };
     const auto& wallRecipe = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::IndustrialSurface::Wall)];
+        IndustrialSurface::Wall)];
     gpuMaterials.wallTone = std::clamp(wallRecipe.baseColor.x / 0.33F, 0.94F, 1.06F);
     const auto& ceilingRecipe = materials.surfaces[static_cast<std::size_t>(
-        gdp::procedural::IndustrialSurface::Ceiling)];
+        IndustrialSurface::Ceiling)];
     gpuMaterials.ceilingTone = std::clamp(
         ceilingRecipe.baseColor.x / 0.38F, 0.94F, 1.06F);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::IndustrialSurfaceRecipe& recipe = materials.surfaces[index];
-        if (recipe.surface == gdp::procedural::IndustrialSurface::Wall
-            || recipe.surface == gdp::procedural::IndustrialSurface::Ceiling) {
+        const IndustrialSurfaceRecipe& recipe = materials.surfaces[index];
+        if (recipe.surface == IndustrialSurface::Wall
+            || recipe.surface == IndustrialSurface::Ceiling) {
             continue;
         }
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::industrialSurfaceRecipeHash(recipe),
+            industrialSurfaceRecipeHash(recipe),
             [&recipe] {
                 return std::move(
-                    *gdp::procedural::generateIndustrialSurfaceAlbedo(recipe));
+                    *generateIndustrialSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -405,9 +405,9 @@ bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::StorageRoomMaterialSet materials
-        = gdp::procedural::generateStorageRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateStorageRoomMaterials(materials).isValid()) {
+    const StorageRoomMaterialSet materials
+        = generateStorageRoomMaterials(roomSeed);
+    if (!validateStorageRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Storage room material generation failed validation");
         return false;
@@ -419,11 +419,11 @@ bool GdpRenderer::prepareStorageRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::StorageSurfaceRecipe& recipe = materials.surfaces[index];
+        const StorageSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::storageSurfaceRecipeHash(recipe),
+            storageSurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateStorageSurfaceAlbedo(recipe));
+                return std::move(*generateStorageSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -439,9 +439,9 @@ bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::CombatRoomMaterialSet materials
-        = gdp::procedural::generateCombatRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateCombatRoomMaterials(materials).isValid()) {
+    const CombatRoomMaterialSet materials
+        = generateCombatRoomMaterials(roomSeed);
+    if (!validateCombatRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Combat room material generation failed validation");
         return false;
@@ -453,11 +453,11 @@ bool GdpRenderer::prepareCombatRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::CombatSurfaceRecipe& recipe = materials.surfaces[index];
+        const CombatSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::combatSurfaceRecipeHash(recipe),
+            combatSurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateCombatSurfaceAlbedo(recipe));
+                return std::move(*generateCombatSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -473,9 +473,9 @@ bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::CafeteriaRoomMaterialSet materials
-        = gdp::procedural::generateCafeteriaRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateCafeteriaRoomMaterials(materials).isValid()) {
+    const CafeteriaRoomMaterialSet materials
+        = generateCafeteriaRoomMaterials(roomSeed);
+    if (!validateCafeteriaRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Cafeteria room material generation failed validation");
         return false;
@@ -487,11 +487,11 @@ bool GdpRenderer::prepareCafeteriaRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::CafeteriaSurfaceRecipe& recipe = materials.surfaces[index];
+        const CafeteriaSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::cafeteriaSurfaceRecipeHash(recipe),
+            cafeteriaSurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateCafeteriaSurfaceAlbedo(recipe));
+                return std::move(*generateCafeteriaSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -507,9 +507,9 @@ bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::LaboratoryRoomMaterialSet materials
-        = gdp::procedural::generateLaboratoryRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateLaboratoryRoomMaterials(materials).isValid()) {
+    const LaboratoryRoomMaterialSet materials
+        = generateLaboratoryRoomMaterials(roomSeed);
+    if (!validateLaboratoryRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Laboratory room material generation failed validation");
         return false;
@@ -521,11 +521,11 @@ bool GdpRenderer::prepareLaboratoryRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::LaboratorySurfaceRecipe& recipe = materials.surfaces[index];
+        const LaboratorySurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::laboratorySurfaceRecipeHash(recipe),
+            laboratorySurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateLaboratorySurfaceAlbedo(recipe));
+                return std::move(*generateLaboratorySurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -541,9 +541,9 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::TechnicalRoomMaterialSet materials
-        = gdp::procedural::generateTechnicalRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateTechnicalRoomMaterials(materials).isValid()) {
+    const TechnicalRoomMaterialSet materials
+        = generateTechnicalRoomMaterials(roomSeed);
+    if (!validateTechnicalRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Technical room material generation failed validation");
         return false;
@@ -555,11 +555,11 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::TechnicalSurfaceRecipe& recipe = materials.surfaces[index];
+        const TechnicalSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::technicalSurfaceRecipeHash(recipe),
+            technicalSurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateTechnicalSurfaceAlbedo(recipe));
+                return std::move(*generateTechnicalSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -575,9 +575,9 @@ bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::SecurityRoomMaterialSet materials
-        = gdp::procedural::generateSecurityRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateSecurityRoomMaterials(materials).isValid()) {
+    const SecurityRoomMaterialSet materials
+        = generateSecurityRoomMaterials(roomSeed);
+    if (!validateSecurityRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Security room material generation failed validation");
         return false;
@@ -589,11 +589,11 @@ bool GdpRenderer::prepareSecurityRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::SecuritySurfaceRecipe& recipe = materials.surfaces[index];
+        const SecuritySurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::securitySurfaceRecipeHash(recipe),
+            securitySurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateSecuritySurfaceAlbedo(recipe));
+                return std::move(*generateSecuritySurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -609,9 +609,9 @@ bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
     if (!initialized_) {
         return false;
     }
-    const gdp::procedural::CentralHubRoomMaterialSet materials
-        = gdp::procedural::generateCentralHubRoomMaterials(roomSeed);
-    if (!gdp::procedural::validateCentralHubRoomMaterials(materials).isValid()) {
+    const CentralHubRoomMaterialSet materials
+        = generateCentralHubRoomMaterials(roomSeed);
+    if (!validateCentralHubRoomMaterials(materials).isValid()) {
         gdp::core::log(
             gdp::core::LogLevel::Error, "Central Hub material generation failed validation");
         return false;
@@ -623,11 +623,11 @@ bool GdpRenderer::prepareCentralHubRoomMaterials(const gdp::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const gdp::procedural::CentralHubSurfaceRecipe& recipe = materials.surfaces[index];
+        const CentralHubSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
-            gdp::procedural::centralHubSurfaceRecipeHash(recipe),
+            centralHubSurfaceRecipeHash(recipe),
             [&recipe] {
-                return std::move(*gdp::procedural::generateCentralHubSurfaceAlbedo(recipe));
+                return std::move(*generateCentralHubSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
             return false;
@@ -647,9 +647,9 @@ bool GdpRenderer::prepareWorkerVisual(const gdp::core::Seed visualSeed)
         return true;
     }
 
-    const gdp::procedural::WorkerVisual visual
-        = gdp::procedural::generateWorkerVisual(visualSeed);
-    if (!gdp::procedural::validateWorkerVisual(visual).isValid()) {
+    const WorkerVisual visual
+        = generateWorkerVisual(visualSeed);
+    if (!validateWorkerVisual(visual).isValid()) {
         gdp::core::log(gdp::core::LogLevel::Error, "Worker visual generation failed validation");
         return false;
     }
@@ -682,9 +682,9 @@ bool GdpRenderer::prepareGuardVisual(const gdp::core::Seed visualSeed)
         return true;
     }
 
-    const gdp::procedural::GuardVisual visual
-        = gdp::procedural::generateGuardVisual(visualSeed);
-    if (!gdp::procedural::validateGuardVisual(visual).isValid()) {
+    const GuardVisual visual
+        = generateGuardVisual(visualSeed);
+    if (!validateGuardVisual(visual).isValid()) {
         gdp::core::log(gdp::core::LogLevel::Error, "Guard visual generation failed validation");
         return false;
     }
@@ -717,9 +717,9 @@ bool GdpRenderer::prepareOfficerVisual(const gdp::core::Seed visualSeed)
         return true;
     }
 
-    const gdp::procedural::OfficerVisual visual
-        = gdp::procedural::generateOfficerVisual(visualSeed);
-    if (!gdp::procedural::validateOfficerVisual(visual).isValid()) {
+    const OfficerVisual visual
+        = generateOfficerVisual(visualSeed);
+    if (!validateOfficerVisual(visual).isValid()) {
         gdp::core::log(gdp::core::LogLevel::Error, "Officer visual generation failed validation");
         return false;
     }
@@ -752,9 +752,9 @@ bool GdpRenderer::prepareEngineerVisual(const gdp::core::Seed visualSeed)
         return true;
     }
 
-    const gdp::procedural::EngineerVisual visual
-        = gdp::procedural::generateEngineerVisual(visualSeed);
-    if (!gdp::procedural::validateEngineerVisual(visual).isValid()) {
+    const EngineerVisual visual
+        = generateEngineerVisual(visualSeed);
+    if (!validateEngineerVisual(visual).isValid()) {
         gdp::core::log(gdp::core::LogLevel::Error,
             "Engineer visual generation failed validation");
         return false;
@@ -787,9 +787,9 @@ bool GdpRenderer::prepareIndustrialRobotVisual(const gdp::core::Seed visualSeed)
     if (industrialRobotVisuals_.contains(visualSeed)) {
         return true;
     }
-    const gdp::procedural::IndustrialRobotVisual visual
-        = gdp::procedural::generateIndustrialRobotVisual(visualSeed);
-    if (!gdp::procedural::validateIndustrialRobotVisual(visual).isValid()) {
+    const IndustrialRobotVisual visual
+        = generateIndustrialRobotVisual(visualSeed);
+    if (!validateIndustrialRobotVisual(visual).isValid()) {
         gdp::core::log(gdp::core::LogLevel::Error,
             "IndustrialRobot visual generation failed validation");
         return false;
@@ -944,12 +944,12 @@ bool GdpRenderer::render(
             }
             if (!detailedMaterial) {
                 roomMaterials.textures[static_cast<std::size_t>(
-                    gdp::procedural::IndustrialSurface::Wall)].bind(gl_);
+                    IndustrialSurface::Wall)].bind(gl_);
             }
             break;
         case RoomMaterialChannel::Floor:
             roomMaterials.textures[static_cast<std::size_t>(
-                gdp::procedural::IndustrialSurface::Floor)].bind(gl_);
+                IndustrialSurface::Floor)].bind(gl_);
             break;
         case RoomMaterialChannel::Ceiling:
             if (roomMaterials.industrialCeilingCondition) {
@@ -967,7 +967,7 @@ bool GdpRenderer::render(
             }
             if (!detailedMaterial) {
                 roomMaterials.textures[static_cast<std::size_t>(
-                    gdp::procedural::IndustrialSurface::Ceiling)].bind(gl_);
+                    IndustrialSurface::Ceiling)].bind(gl_);
             }
             break;
         case RoomMaterialChannel::Generic:

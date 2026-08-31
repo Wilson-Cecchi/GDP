@@ -83,9 +83,9 @@ private:
 
     struct RoomGpuMaterials {
         std::array<wkc::render::Texture,
-            static_cast<std::size_t>(gdp::procedural::IndustrialSurface::Count)> textures;
-        std::optional<gdp::procedural::IndustrialCondition> industrialWallCondition;
-        std::optional<gdp::procedural::IndustrialCondition> industrialCeilingCondition;
+            static_cast<std::size_t>(IndustrialSurface::Count)> textures;
+        std::optional<IndustrialCondition> industrialWallCondition;
+        std::optional<IndustrialCondition> industrialCeilingCondition;
         gdp::core::Vec2 wallUvOffset{};
         gdp::core::Vec2 ceilingUvOffset{};
         float wallTone{1.0F};
@@ -107,10 +107,10 @@ private:
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> engineerVisuals_{};
     std::unordered_map<gdp::core::Seed, EnemyGpuVisual> industrialRobotVisuals_{};
     std::array<std::optional<IndustrialWallGpuMaterial>,
-        static_cast<std::size_t>(gdp::procedural::IndustrialCondition::Count)>
+        static_cast<std::size_t>(IndustrialCondition::Count)>
         industrialWallMaterials_{};
     std::array<std::optional<IndustrialWallGpuMaterial>,
-        static_cast<std::size_t>(gdp::procedural::IndustrialCondition::Count)>
+        static_cast<std::size_t>(IndustrialCondition::Count)>
         industrialCeilingMaterials_{};
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};

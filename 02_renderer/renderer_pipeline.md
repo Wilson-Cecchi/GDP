@@ -25,6 +25,8 @@
 > `gdp::render` permanece temporariamente compatível.
 > A Fase 48 concluiu essa migração: a API da fundação passou para
 > `wkc::render`, sem aliases reversos ou mudança de pixels.
+> A Fase 49 moveu geradores de inimigos e materiais de sala para
+> `gdp::game::visual`, deixando `gdp::procedural` restrito à fundação genérica.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 

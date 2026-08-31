@@ -194,6 +194,11 @@ especializados das pastas numeradas.
   `Shader`, `Texture` e seus dados auxiliares passaram de `gdp::render` para
   `wkc::render`. Renderer, conteúdo visual e procedural do GDP consomem agora a
   fundação WKC explicitamente, sem aliases ou alteração de pixels.
+- **Fase 49 — Propriedade dos geradores visuais:** `EnemyGenerator` e
+  `RoomMaterialGenerator` passaram de `gdp::procedural` para
+  `gdp::game::visual`. As receitas e operações genéricas continuam
+  explicitamente em `gdp::procedural`, preparando seu rename WKC sem misturar
+  Worker, papéis de inimigo ou temas de sala à API reutilizável.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

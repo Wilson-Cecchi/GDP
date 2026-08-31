@@ -8,7 +8,8 @@
 #include <bit>
 #include <cmath>
 
-namespace gdp::procedural {
+namespace gdp::game::visual {
+using gdp::procedural::MaterialFamily;
 namespace {
 
 constexpr std::size_t surfaceIndex(const IndustrialSurface surface) noexcept
@@ -3272,4 +3273,4 @@ std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
     return image;
 }
 
-} // namespace gdp::procedural
+} // namespace gdp::game::visual

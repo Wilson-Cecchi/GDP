@@ -10,7 +10,7 @@
 #include <optional>
 #include <vector>
 
-namespace gdp::procedural {
+namespace gdp::game::visual {
 
 enum class RoomSurface : std::uint8_t {
     Wall,
@@ -32,7 +32,7 @@ struct IndustrialSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     IndustrialSurface surface{IndustrialSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.33F, 0.35F, 0.36F};
     gdp::core::Vec3 secondaryColor{0.20F, 0.21F, 0.22F};
     gdp::core::Vec3 accentColor{0.83F, 0.60F, 0.0F};
@@ -66,7 +66,7 @@ struct StorageSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.36F, 0.32F, 0.27F};
     gdp::core::Vec3 secondaryColor{0.22F, 0.21F, 0.20F};
     gdp::core::Vec3 accentColor{0.45F, 0.28F, 0.18F};
@@ -103,7 +103,7 @@ struct CombatSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.31F, 0.35F, 0.24F};
     gdp::core::Vec3 secondaryColor{0.22F, 0.24F, 0.17F};
     gdp::core::Vec3 accentColor{0.71F, 0.51F, 0.07F};
@@ -140,7 +140,7 @@ struct CafeteriaSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::Ceramic};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::Ceramic};
     gdp::core::Vec3 baseColor{0.78F, 0.78F, 0.76F};
     gdp::core::Vec3 secondaryColor{0.62F, 0.62F, 0.61F};
     gdp::core::Vec3 accentColor{0.62F, 0.18F, 0.18F};
@@ -177,7 +177,7 @@ struct LaboratorySurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::Ceramic};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::Ceramic};
     gdp::core::Vec3 baseColor{0.78F, 0.80F, 0.80F};
     gdp::core::Vec3 secondaryColor{0.66F, 0.68F, 0.68F};
     gdp::core::Vec3 accentColor{0.27F, 0.41F, 0.54F};
@@ -214,7 +214,7 @@ struct TechnicalSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.23F, 0.23F, 0.22F};
     gdp::core::Vec3 secondaryColor{0.13F, 0.14F, 0.13F};
     gdp::core::Vec3 accentColor{0.71F, 0.48F, 0.0F};
@@ -252,7 +252,7 @@ struct SecuritySurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.23F, 0.24F, 0.25F};
     gdp::core::Vec3 secondaryColor{0.15F, 0.16F, 0.17F};
     gdp::core::Vec3 accentColor{0.23F, 0.40F, 0.47F};
@@ -297,7 +297,7 @@ struct CentralHubSurfaceRecipe {
     std::uint32_t version{1};
     gdp::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
-    MaterialFamily family{MaterialFamily::PaintedSteel};
+    gdp::procedural::MaterialFamily family{gdp::procedural::MaterialFamily::PaintedSteel};
     gdp::core::Vec3 baseColor{0.27F, 0.29F, 0.30F};
     gdp::core::Vec3 secondaryColor{0.17F, 0.19F, 0.20F};
     gdp::core::Vec3 accentColor{0.17F, 0.54F, 0.58F};
@@ -600,4 +600,4 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
 [[nodiscard]] std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
     const CentralHubSurfaceRecipe& recipe);
 
-} // namespace gdp::procedural
+} // namespace gdp::game::visual

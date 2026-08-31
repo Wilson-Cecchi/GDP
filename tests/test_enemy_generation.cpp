@@ -24,8 +24,8 @@ void expect(const bool condition, const std::string_view message)
 }
 
 bool containsError(
-    const gdp::procedural::WorkerVisualValidationResult& result,
-    const gdp::procedural::WorkerVisualValidationError error)
+    const gdp::game::visual::WorkerVisualValidationResult& result,
+    const gdp::game::visual::WorkerVisualValidationError error)
 {
     for (const auto candidate : result.errors) {
         if (candidate == error) {
@@ -36,8 +36,8 @@ bool containsError(
 }
 
 bool containsError(
-    const gdp::procedural::GuardVisualValidationResult& result,
-    const gdp::procedural::GuardVisualValidationError error)
+    const gdp::game::visual::GuardVisualValidationResult& result,
+    const gdp::game::visual::GuardVisualValidationError error)
 {
     for (const auto candidate : result.errors) {
         if (candidate == error) {
@@ -48,8 +48,8 @@ bool containsError(
 }
 
 bool containsError(
-    const gdp::procedural::OfficerVisualValidationResult& result,
-    const gdp::procedural::OfficerVisualValidationError error)
+    const gdp::game::visual::OfficerVisualValidationResult& result,
+    const gdp::game::visual::OfficerVisualValidationError error)
 {
     for (const auto candidate : result.errors) {
         if (candidate == error) {
@@ -60,8 +60,8 @@ bool containsError(
 }
 
 bool containsError(
-    const gdp::procedural::EngineerVisualValidationResult& result,
-    const gdp::procedural::EngineerVisualValidationError error)
+    const gdp::game::visual::EngineerVisualValidationResult& result,
+    const gdp::game::visual::EngineerVisualValidationError error)
 {
     for (const auto candidate : result.errors) {
         if (candidate == error) {
@@ -72,8 +72,8 @@ bool containsError(
 }
 
 bool containsError(
-    const gdp::procedural::IndustrialRobotVisualValidationResult& result,
-    const gdp::procedural::IndustrialRobotVisualValidationError error)
+    const gdp::game::visual::IndustrialRobotVisualValidationResult& result,
+    const gdp::game::visual::IndustrialRobotVisualValidationError error)
 {
     for (const auto candidate : result.errors) {
         if (candidate == error) {
@@ -86,6 +86,7 @@ bool containsError(
 void testPartLibrary()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     const auto library = workerPartLibrary();
     std::unordered_set<WorkerPartId> ids;
@@ -111,6 +112,7 @@ void testPartLibrary()
 void testDeterministicWorker()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x123456789ABCDEF0ULL;
     const WorkerVisual first = generateWorkerVisual(seed);
@@ -154,6 +156,7 @@ void testDeterministicWorker()
 void testWorkerSeedBatch()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(WorkerBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
@@ -219,6 +222,7 @@ void testWorkerSeedBatch()
 void testGuardPartLibrary()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     const auto library = guardPartLibrary();
     std::unordered_set<GuardPartId> ids;
@@ -246,6 +250,7 @@ void testGuardPartLibrary()
 void testDeterministicGuard()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x47554152445F5631ULL;
     const GuardVisual first = generateGuardVisual(seed);
@@ -297,6 +302,7 @@ void testDeterministicGuard()
 void testGuardSeedBatch()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(GuardBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
@@ -362,6 +368,7 @@ void testGuardSeedBatch()
 void testOfficerPartLibrary()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     const auto library = officerPartLibrary();
     std::unordered_set<OfficerPartId> ids;
@@ -394,6 +401,7 @@ void testOfficerPartLibrary()
 void testDeterministicOfficer()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x4F46464943455231ULL;
     const OfficerVisual first = generateOfficerVisual(seed);
@@ -456,6 +464,7 @@ void testDeterministicOfficer()
 void testOfficerSeedBatch()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(OfficerBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
@@ -523,6 +532,7 @@ void testOfficerSeedBatch()
 void testEngineerPartLibrary()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     const auto library = engineerPartLibrary();
     std::unordered_set<EngineerPartId> ids;
@@ -554,6 +564,7 @@ void testEngineerPartLibrary()
 void testDeterministicEngineer()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     constexpr gdp::core::Seed seed = 0x454E47494E454531ULL;
     const EngineerVisual first = generateEngineerVisual(seed);
@@ -616,6 +627,7 @@ void testDeterministicEngineer()
 void testEngineerSeedBatch()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
 
     std::array<bool, static_cast<std::size_t>(EngineerBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
@@ -685,6 +697,7 @@ void testEngineerSeedBatch()
 void testIndustrialRobotPartLibrary()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
     const auto library = industrialRobotPartLibrary();
     std::unordered_set<IndustrialRobotPartId> ids;
     std::array<bool, static_cast<std::size_t>(WorkerPartSlot::Count)> slots{};
@@ -719,6 +732,7 @@ void testIndustrialRobotPartLibrary()
 void testDeterministicIndustrialRobot()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
     constexpr gdp::core::Seed seed = 0x494E44524F424F54ULL;
     const IndustrialRobotVisual first = generateIndustrialRobotVisual(seed);
     const IndustrialRobotVisual repeated = generateIndustrialRobotVisual(seed);
@@ -768,6 +782,7 @@ void testDeterministicIndustrialRobot()
 void testIndustrialRobotSeedBatch()
 {
     using namespace gdp::procedural;
+    using namespace gdp::game::visual;
     std::array<bool, static_cast<std::size_t>(IndustrialRobotBodyProfileId::Count)> profiles{};
     std::array<bool, static_cast<std::size_t>(WearCondition::Damaged) + 1U> wearConditions{};
     std::array<bool, static_cast<std::size_t>(MaterialFamily::Count)> materials{};

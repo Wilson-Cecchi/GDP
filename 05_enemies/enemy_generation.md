@@ -2,6 +2,8 @@
 
 > **Estado:** Worker completo por partes implementado na Fase 9; Guard, Officer,
 > Engineer e IndustrialRobot completos na Fase 11 sobre receita/hash/cache da Fase 8.
+> Na Fase 49, esses geradores passaram para `gdp::game::visual` e consomem a
+> fundação procedural por nomes qualificados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

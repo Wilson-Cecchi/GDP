@@ -132,6 +132,35 @@ set(game_visual_assets "${GDP_SOURCE_DIR}/src/game/visual/VisualAssets.hpp")
 if(NOT EXISTS "${game_visual_assets}")
     message(FATAL_ERROR "GDP visual content is missing from src/game")
 endif()
+foreach(gdp_visual_generator IN ITEMS
+    "${GDP_SOURCE_DIR}/src/game/visual/EnemyGenerator.cpp"
+    "${GDP_SOURCE_DIR}/src/game/visual/EnemyGenerator.hpp"
+    "${GDP_SOURCE_DIR}/src/game/visual/RoomMaterialGenerator.cpp"
+    "${GDP_SOURCE_DIR}/src/game/visual/RoomMaterialGenerator.hpp"
+)
+    file(READ "${gdp_visual_generator}" gdp_visual_generator_contents)
+    if(NOT gdp_visual_generator_contents MATCHES
+            "namespace[ \t]+gdp::game::visual[ \t{]"
+        OR gdp_visual_generator_contents MATCHES
+            "namespace[ \t]+gdp::procedural[ \t{]")
+        file(RELATIVE_PATH relative_source
+            "${GDP_SOURCE_DIR}" "${gdp_visual_generator}")
+        message(FATAL_ERROR
+            "GDP visual generators must be owned by gdp::game::visual: ${relative_source}"
+        )
+    endif()
+endforeach()
+file(READ "${GDP_SOURCE_DIR}/src/game/visual/EnemyGenerator.hpp"
+    gdp_enemy_generator_header)
+file(READ "${GDP_SOURCE_DIR}/src/game/visual/RoomMaterialGenerator.hpp"
+    gdp_room_material_generator_header)
+if(NOT gdp_enemy_generator_header MATCHES "gdp::procedural::MeshRecipe"
+    OR NOT gdp_room_material_generator_header MATCHES
+        "gdp::procedural::MaterialFamily")
+    message(FATAL_ERROR
+        "GDP visual generators must consume the qualified procedural foundation"
+    )
+endif()
 set(gdp_renderer_header "${GDP_SOURCE_DIR}/src/game/visual/GdpRenderer.hpp")
 set(gdp_render_data_header "${GDP_SOURCE_DIR}/src/game/visual/GdpRenderData.hpp")
 if(NOT EXISTS "${gdp_renderer_header}")

@@ -689,6 +689,12 @@ tipos auxiliares da fundação gráfica passaram de `gdp::render` para
 procedurais consomem a API WKC Forge explicitamente; não há aliases reversos,
 mudança de dados ou alteração intencional de pixels.
 
+Na Fase 49, `EnemyGenerator` e `RoomMaterialGenerator` passaram de
+`gdp::procedural` para `gdp::game::visual`. Tipos Worker, Guard, Officer,
+Engineer, IndustrialRobot e receitas de ambientes agora pertencem
+explicitamente ao jogo; os contratos genéricos consumidos permanecem
+qualificados em `gdp::procedural`, sem alteração de hashes ou imagens.
+
 ---
 
 # 8. Sistema de seed
