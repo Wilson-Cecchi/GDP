@@ -726,10 +726,80 @@ void Application::processEvents()
         firePending_ = false;
         reloadPending_ = false;
         if (input_.wasKeyPressed(Key::Escape)) {
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
+            log(LogLevel::Info, "Result menu requested game exit");
+            restartRequested_ = false;
             running_ = false;
+            return;
         }
+
+        std::optional<visual::HudResultMenuSelection> pointedSelection;
+        if (window_ != nullptr) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableWidth = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                pointedSelection = visual::resultMenuSelectionAt(
+                    drawableWidth, drawableHeight,
+                    pointer.x * static_cast<float>(drawableWidth)
+                        / static_cast<float>(windowWidth),
+                    pointer.y * static_cast<float>(drawableHeight)
+                        / static_cast<float>(windowHeight));
+            }
+        }
+        const auto resultOptionFor
+            = [](const visual::HudResultMenuSelection selection) {
+                  return selection == visual::HudResultMenuSelection::ExitGame
+                      ? gameplay::ResultMenuOption::ExitGame
+                      : gameplay::ResultMenuOption::PlayAgain;
+              };
+        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            const gameplay::ResultMenuOption previousSelection
+                = resultMenu_.selection;
+            gameplay::selectResultMenuOption(
+                resultMenu_, resultOptionFor(*pointedSelection));
+            if (resultMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
+        const bool moveUp = input_.wasKeyPressed(Key::Up)
+            || input_.wasKeyPressed(Key::W);
+        const bool moveDown = input_.wasKeyPressed(Key::Down)
+            || input_.wasKeyPressed(Key::S);
+        if (moveUp != moveDown) {
+            const gameplay::ResultMenuOption previousSelection
+                = resultMenu_.selection;
+            gameplay::moveResultMenuSelection(
+                resultMenu_, moveUp ? -1 : 1);
+            if (resultMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
+        gameplay::ResultMenuCommand command = gameplay::ResultMenuCommand::None;
         if (input_.wasKeyPressed(Key::Enter)) {
+            command = gameplay::activateResultMenuSelection(resultMenu_);
+        } else if (pointedSelection
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+            gameplay::selectResultMenuOption(
+                resultMenu_, resultOptionFor(*pointedSelection));
+            command = gameplay::activateResultMenuSelection(resultMenu_);
+        }
+        if (command != gameplay::ResultMenuCommand::None) {
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
+        }
+        if (command == gameplay::ResultMenuCommand::PlayAgain) {
+            log(LogLevel::Info, "Result menu requested another run");
             restartRequested_ = true;
+            running_ = false;
+        } else if (command == gameplay::ResultMenuCommand::ExitGame) {
+            log(LogLevel::Info, "Result menu requested game exit");
+            restartRequested_ = false;
             running_ = false;
         }
         return;
@@ -1348,6 +1418,11 @@ void Application::fixedUpdate(const double fixedStep)
             audio_->play(gdp::audio::AudioEventKind::EventComplete,
                 session_.state().currentSeed, audioEventCounter_++);
         }
+        gameplay::openResultMenu(resultMenu_);
+        if (!config_.headless && window_ != nullptr
+            && !SDL_SetWindowRelativeMouseMode(window_, false)) {
+            log(LogLevel::Warning, sdlError("Result mouse mode update failed"));
+        }
     }
     if (audio_) {
         bool ambienceSelected = false;
@@ -1748,6 +1823,10 @@ void Application::render()
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
         hud.pauseSelection = visual::HudPauseSelection::ExitGame;
     }
+    hud.resultMenuSelection
+        = resultMenu_.selection == gameplay::ResultMenuOption::ExitGame
+        ? visual::HudResultMenuSelection::ExitGame
+        : visual::HudResultMenuSelection::PlayAgain;
     switch (feedback_.notice) {
     case gameplay::NoticeFeedbackKind::Pickup:
         hud.notice = visual::HudNotice::Pickup;
@@ -1858,6 +1937,7 @@ void Application::shutdown()
     gameplay::resetViewMotion(viewMotion_);
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
+    gameplay::closeResultMenu(resultMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};

@@ -175,6 +175,11 @@ resoluções ampla, compacta e mínima. Os centros dos botões são consultados 
 coordenadas SDL com origem superior, enquanto o renderer usa os mesmos retângulos
 em coordenadas OpenGL; pontos externos não produzem seleção.
 
+O menu de resultado possui gate próprio para estado inativo, opção segura,
+wrap, seleção direta, comandos e reset. O teste CPU cobre `ResultMenuLayout` e
+seus dois hit targets nas mesmas classes de resolução; a regressão OpenGL exige
+mudança de pixels ao alternar a seleção entre jogar novamente e sair.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

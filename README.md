@@ -262,6 +262,9 @@ especializados das pastas numeradas.
   aceitam hover e clique sem remover `W/S`, setas, `Enter` ou `Esc`. O menu de
   pausa compartilha o layout responsivo entre desenho e hit test, inclusive em
   framebuffer high-DPI.
+- **Fase 64 — Menu funcional de resultado:** Victory e Defeat agora oferecem
+  `NEW RUN/RETRY` e `EXIT GAME` com teclado e mouse. O término libera o ponteiro,
+  congela a simulação e preserva o reinício pela próxima seed determinística.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -290,8 +293,8 @@ mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
 run; `W/S` ou setas navegam, `Enter` confirma, o mouse seleciona/clica e `Esc`
 retorna ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
 
-Em Victory ou Defeat, a simulação congela, o título mostra o resultado e
-`Enter` inicia uma nova run; `Esc` continua encerrando o jogo.
+Em Victory ou Defeat, a simulação congela e o menu de resultado oferece
+`NEW RUN/RETRY` e `EXIT GAME`; teclado e mouse usam a mesma navegação.
 
 Na inicialização, uma seed gera um mundo navegável validado com START, BOSS,
 branches, loop controlado, salas e corredores. Cada sala recebe IDs de entidades
@@ -449,6 +452,13 @@ menu principal. Hover escolhe `RESUME`, `RESTART RUN` ou `EXIT GAME`; o clique
 primário confirma somente quando aponta para um botão. `PauseMenuLayout` é a
 fonte única para desenho e hit test, e a Application converte coordenadas da
 janela para o framebuffer antes da consulta, preservando escala high-DPI.
+
+Na Fase 64, o banner terminal foi promovido a menu funcional. Victory seleciona
+`NEW RUN` e Defeat seleciona `RETRY` como ação segura; a alternativa é
+`EXIT GAME`. `W/S`, setas, `Enter`, `Esc`, hover e clique usam o mesmo estado
+puro, e `ResultMenuLayout` mantém desenho e hit test alinhados. A transição de
+sessão libera imediatamente o mouse sem alterar a regra determinística de
+`SessionSystem::restart`.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -781,6 +781,12 @@ converte hover/clique nos mesmos comandos de teclado e mantém a WKC Forge alhei
 a opções de menu. O menu principal já seguia esse contrato; ambos os menus
 funcionais agora aceitam teclado e mouse.
 
+Na Fase 64, Victory/Defeat passaram a abrir `ResultMenuState`, com ação segura
+de jogar novamente e saída explícita. A transição terminal libera o ponteiro;
+teclado e mouse produzem os mesmos comandos, enquanto `SessionSystem` permanece
+dono do resultado e da próxima seed. `ResultMenuLayout` compartilha desenho e
+hit test sem introduzir regras do GDP na WKC Forge.
+
 ---
 
 # 8. Sistema de seed

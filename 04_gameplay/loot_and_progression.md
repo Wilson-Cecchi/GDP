@@ -84,7 +84,8 @@ Segredos são opcionais e nunca bloqueiam o caminho principal.
 
 `SessionSystem` é independente do loop visual. Ele recebe vida do jogador,
 papel da sala e status do Boss, mantém um estado terminal idempotente e expõe a
-seed da run. `Enter` só reinicia após Victory/Defeat. O índice começa em zero;
+seed da run. A ação `NEW RUN/RETRY`, confirmada por teclado ou mouse no menu de
+resultado, é o único comando que solicita reinício. O índice começa em zero;
 a primeira run preserva a seed fornecida e as seguintes usam
 `deriveSeed(initialSeed, SeedDomain::World, runIndex)`. O restart limpa mundo,
 entidades, Player, Weapon, progressão, eventos, iluminação, áudio e renderer

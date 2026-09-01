@@ -1753,23 +1753,49 @@ bool GdpRenderer::render(
         || hud.objective == ObjectiveRenderState::Defeat) {
         const bool victory = hud.objective == ObjectiveRenderState::Victory;
         const std::string_view result = victory ? "VICTORY" : "DEFEAT";
-        const std::string_view prompt = victory ? "ENTER NEW RUN" : "ENTER RETRY";
-        const int bannerWidth = std::max(1, std::min(width - 16, 260));
-        const int bannerHeight = std::max(1, std::min(height - 16, 72));
-        const int bannerX = (width - bannerWidth) / 2;
-        const int bannerY = (height - bannerHeight) / 2;
-        glClearColor(0.015F, 0.025F, 0.030F, 1.0F);
-        glScissor(bannerX, bannerY, bannerWidth, bannerHeight);
-        glClear(GL_COLOR_BUFFER_BIT);
+        const ResultMenuLayout layout = makeResultMenuLayout(width, height);
+        const int scale = layout.scale;
+        drawSolidRect(layout.panel.x, layout.panel.y,
+            layout.panel.width, layout.panel.height,
+            {0.015F, 0.025F, 0.030F});
         const wkc::core::Vec3 resultColor = victory
             ? wkc::core::Vec3{0.22F, 0.92F, 0.62F}
             : wkc::core::Vec3{0.96F, 0.18F, 0.10F};
-        const int resultWidth = bitmapTextWidth(result, hudScale);
-        const int promptWidth = bitmapTextWidth(prompt, 1);
-        drawBitmapText((width - resultWidth) / 2, bannerY + 42,
-            hudScale, result, resultColor);
-        drawBitmapText((width - promptWidth) / 2, bannerY + 16,
-            1, prompt, {0.76F, 0.84F, 0.88F});
+        drawSolidRect(layout.panel.x,
+            layout.panel.y + layout.panel.height - (2 * scale),
+            layout.panel.width, 2 * scale, resultColor);
+        drawBitmapText((width - bitmapTextWidth(result, 2 * scale)) / 2,
+            layout.panel.y + layout.panel.height - (24 * scale),
+            2 * scale, result, resultColor);
+
+        const std::array<std::string_view, 2> options{
+            victory ? "NEW RUN" : "RETRY", "EXIT GAME",
+        };
+        const std::array<UiRect, 2> buttons{
+            layout.playAgainButton, layout.exitButton,
+        };
+        const std::size_t selected
+            = hud.resultMenuSelection == HudResultMenuSelection::ExitGame
+            ? 1U : 0U;
+        for (std::size_t index = 0; index < buttons.size(); ++index) {
+            const UiRect button = buttons[index];
+            if (index == selected) {
+                drawSolidRect(button.x, button.y, button.width, button.height,
+                    {0.06F, 0.18F, 0.21F});
+                drawSolidRect(button.x, button.y, 2 * scale,
+                    button.height, resultColor);
+            }
+            const int optionWidth = bitmapTextWidth(options[index], scale);
+            drawBitmapText((width - optionWidth) / 2,
+                button.y + (3 * scale), scale, options[index],
+                index == selected ? resultColor : textColor);
+        }
+        const std::string_view controls = width >= 480
+            ? "W S  ENTER  MOUSE  ESC"
+            : "W S  ENTER  MOUSE";
+        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
+            layout.panel.y + (7 * scale), 1, controls,
+            {0.48F, 0.62F, 0.66F});
     }
     if (hud.paused) {
         const PauseMenuLayout layout = makePauseMenuLayout(width, height);

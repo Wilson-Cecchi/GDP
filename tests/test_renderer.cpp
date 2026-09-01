@@ -227,6 +227,54 @@ void testPauseMenuLayout()
         "tiny pause menu clamps all hit targets inside the framebuffer");
 }
 
+void testResultMenuLayout()
+{
+    using namespace gdp::game::visual;
+
+    const ResultMenuLayout wide = makeResultMenuLayout(1280, 720);
+    expect(wide.scale == 2, "wide result menu uses doubled bitmap scale");
+    expect(wide.panel.x >= 0 && wide.panel.y >= 0
+            && wide.panel.x + wide.panel.width <= 1280
+            && wide.panel.y + wide.panel.height <= 720,
+        "wide result menu panel stays within the framebuffer");
+    expect(wide.panel.contains(
+               wide.playAgainButton.x, wide.playAgainButton.y)
+            && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
+        "result menu hit targets stay inside the panel");
+
+    const auto pointerX = [](const UiRect& button) {
+        return static_cast<float>(button.x + button.width / 2);
+    };
+    const auto pointerY = [](const UiRect& button) {
+        return static_cast<float>(
+            720 - 1 - (button.y + button.height / 2));
+    };
+    expect(resultMenuSelectionAt(1280, 720,
+               pointerX(wide.playAgainButton), pointerY(wide.playAgainButton))
+            == HudResultMenuSelection::PlayAgain,
+        "top-origin pointer maps to Play Again");
+    expect(resultMenuSelectionAt(1280, 720,
+               pointerX(wide.exitButton), pointerY(wide.exitButton))
+            == HudResultMenuSelection::ExitGame,
+        "top-origin pointer maps to result Exit Game");
+    expect(!resultMenuSelectionAt(1280, 720, 0.0F, 0.0F),
+        "pointer outside result buttons has no selection");
+
+    const ResultMenuLayout compact = makeResultMenuLayout(320, 200);
+    expect(compact.scale == 1,
+        "compact result menu uses base bitmap scale");
+    expect(compact.panel.x >= 0 && compact.panel.y >= 0
+            && compact.panel.x + compact.panel.width <= 320
+            && compact.panel.y + compact.panel.height <= 200,
+        "compact result menu remains within the framebuffer");
+
+    const ResultMenuLayout tiny = makeResultMenuLayout(12, 12);
+    expect(tiny.panel.contains(
+               tiny.playAgainButton.x, tiny.playAgainButton.y)
+            && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
+        "tiny result menu clamps all hit targets inside the framebuffer");
+}
+
 } // namespace
 
 int main()
@@ -236,6 +284,7 @@ int main()
     testCameraAndMatrices();
     testMainMenuLayout();
     testPauseMenuLayout();
+    testResultMenuLayout();
 
     if (failures != 0) {
         std::cerr << failures << " renderer test(s) failed\n";

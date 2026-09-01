@@ -1,8 +1,8 @@
 # Interface — Menus e configurações
 
-> **Estado:** menu principal funcional implementado na Fase 21 e pausa in-game
-> funcional desde a Fase 19. Configurações permanecem especificadas;
-> Victory/Defeat já usam banner no viewport e `Enter` para reconstruir a run.
+> **Estado:** menu principal funcional implementado na Fase 21, pausa in-game
+> funcional desde a Fase 19 e menu de resultado integrado na Fase 64.
+> Configurações permanecem especificadas.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 >
@@ -42,12 +42,17 @@ O desenho e o hit test usam o mesmo `PauseMenuLayout`. A posição lógica do
 ponteiro é convertida para as dimensões reais do framebuffer antes da consulta,
 mantendo os botões alinhados em escalas high-DPI e após redimensionamento.
 
-## Resultado provisório
+## Menu de resultado
 
-Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e mostram
-`ENTER NEW RUN/RETRY` no viewport. `Enter` reconstrói uma run com seed derivada;
-`Esc` encerra. A futura tela de resultado deve representar o mesmo
-`SessionPhase`, sem duplicar a regra de vitória ou restart na UI.
+Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e abrem um
+menu sobre o viewport. A opção segura é `NEW RUN` após vitória ou `RETRY` após
+derrota; `EXIT GAME` encerra a aplicação. `W/S`, setas, `Enter`, hover e clique
+seguem o mesmo contrato dos demais menus, enquanto `Esc` preserva a saída direta.
+
+O mouse relativo é liberado na transição terminal. `ResultMenuLayout` é usado
+simultaneamente pelo renderer e pelo hit test high-DPI. Confirmar a primeira
+opção apenas solicita o reinício existente; `SessionSystem` continua sendo o
+dono da fase e da derivação da próxima seed.
 
 ## Navegação
 

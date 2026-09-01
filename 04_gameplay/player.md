@@ -66,8 +66,9 @@ que conduz ao estado `GameOver`.
 
 Na implementação atual, dano e cura respeitam clamp e morte idempotente.
 `SessionSystem` transforma a primeira morte em `Defeat`, congela todos os
-updates de gameplay e aceita `Enter` para uma nova run determinística. O estado
-terminal não pode ser sobrescrito por eventos posteriores do mesmo frame.
+updates de gameplay e abre o menu de resultado para retry determinístico ou
+saída. O estado terminal não pode ser sobrescrito por eventos posteriores do
+mesmo frame.
 
 ## Testes
 

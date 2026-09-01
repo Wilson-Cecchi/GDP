@@ -14,6 +14,7 @@
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/Progression.hpp"
+#include "gameplay/ResultMenu.hpp"
 #include "platform/Input.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldGenerator.hpp"
@@ -80,6 +81,7 @@ private:
     gameplay::ViewMotionState viewMotion_;
     gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
+    gameplay::ResultMenuState resultMenu_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};

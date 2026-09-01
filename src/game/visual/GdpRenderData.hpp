@@ -140,6 +140,11 @@ enum class HudMainMenuSelection : std::uint8_t {
     ExitGame,
 };
 
+enum class HudResultMenuSelection : std::uint8_t {
+    PlayAgain,
+    ExitGame,
+};
+
 struct UiRect {
     int x{0};
     int y{0};
@@ -164,6 +169,13 @@ struct PauseMenuLayout {
     UiRect exitButton{};
 };
 
+struct ResultMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    UiRect playAgainButton{};
+    UiRect exitButton{};
+};
+
 [[nodiscard]] MainMenuLayout makeMainMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudMainMenuSelection> mainMenuSelectionAt(
     int width,
@@ -172,6 +184,12 @@ struct PauseMenuLayout {
     float pointerY) noexcept;
 [[nodiscard]] PauseMenuLayout makePauseMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudPauseSelection> pauseMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+[[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height) noexcept;
+[[nodiscard]] std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     int width,
     int height,
     float pointerX,
@@ -202,6 +220,7 @@ struct HudRenderData {
     HudPauseSelection pauseSelection{HudPauseSelection::Resume};
     bool mainMenu{false};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
+    HudResultMenuSelection resultMenuSelection{HudResultMenuSelection::PlayAgain};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

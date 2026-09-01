@@ -336,6 +336,16 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 hudPixels.data());
 
+            gdp::game::visual::HudRenderData resultExitHud{
+                gdp::game::visual::ObjectiveRenderState::Victory};
+            resultExitHud.resultMenuSelection
+                = gdp::game::visual::HudResultMenuSelection::ExitGame;
+            const bool renderedResultExit = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, resultExitHud);
+            std::vector<std::uint8_t> resultExitPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                resultExitPixels.data());
+
             const gdp::game::visual::HudRenderData functionalHud{
                 .objective = gdp::game::visual::ObjectiveRenderState::ReachBoss,
                 .visible = true,
@@ -457,6 +467,7 @@ int main()
             std::size_t connectedRoomMaterialChangedChannels = 0;
             std::size_t cornerCyanPixels = 0;
             std::size_t hudChangedChannels = 0;
+            std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
@@ -532,6 +543,10 @@ int main()
                         != centralHubPixels[index + channel]) {
                         ++hudChangedChannels;
                     }
+                    if (resultExitPixels[index + channel]
+                        != hudPixels[index + channel]) {
+                        ++resultSelectionChangedChannels;
+                    }
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
@@ -595,6 +610,7 @@ int main()
                 && connectedRoomMaterialChangedChannels > 100U
                 && renderedCornerCorridor && cornerCyanPixels > 20U
                 && renderedHud && hudChangedChannels > 100U
+                && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
