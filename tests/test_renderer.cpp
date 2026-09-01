@@ -187,6 +187,7 @@ void testPauseMenuLayout()
         "wide pause menu panel stays within the framebuffer");
     expect(wide.panel.contains(wide.resumeButton.x, wide.resumeButton.y)
             && wide.panel.contains(wide.restartButton.x, wide.restartButton.y)
+            && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
             && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "pause menu hit targets stay inside the panel");
 
@@ -206,6 +207,10 @@ void testPauseMenuLayout()
             == HudPauseSelection::RestartRun,
         "top-origin pointer maps to Restart Run");
     expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
+            == HudPauseSelection::MainMenu,
+        "top-origin pointer maps to pause Main Menu");
+    expect(pauseMenuSelectionAt(1280, 720,
                pointerX(wide.exitButton), pointerY(wide.exitButton))
             == HudPauseSelection::ExitGame,
         "top-origin pointer maps to Exit Game");
@@ -223,6 +228,7 @@ void testPauseMenuLayout()
     const PauseMenuLayout tiny = makePauseMenuLayout(12, 12);
     expect(tiny.panel.contains(tiny.resumeButton.x, tiny.resumeButton.y)
             && tiny.panel.contains(tiny.restartButton.x, tiny.restartButton.y)
+            && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny pause menu clamps all hit targets inside the framebuffer");
 }
@@ -239,6 +245,7 @@ void testResultMenuLayout()
         "wide result menu panel stays within the framebuffer");
     expect(wide.panel.contains(
                wide.playAgainButton.x, wide.playAgainButton.y)
+            && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
             && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "result menu hit targets stay inside the panel");
 
@@ -253,6 +260,10 @@ void testResultMenuLayout()
                pointerX(wide.playAgainButton), pointerY(wide.playAgainButton))
             == HudResultMenuSelection::PlayAgain,
         "top-origin pointer maps to Play Again");
+    expect(resultMenuSelectionAt(1280, 720,
+               pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
+            == HudResultMenuSelection::MainMenu,
+        "top-origin pointer maps to result Main Menu");
     expect(resultMenuSelectionAt(1280, 720,
                pointerX(wide.exitButton), pointerY(wide.exitButton))
             == HudResultMenuSelection::ExitGame,
@@ -271,6 +282,7 @@ void testResultMenuLayout()
     const ResultMenuLayout tiny = makeResultMenuLayout(12, 12);
     expect(tiny.panel.contains(
                tiny.playAgainButton.x, tiny.playAgainButton.y)
+            && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny result menu clamps all hit targets inside the framebuffer");
 }

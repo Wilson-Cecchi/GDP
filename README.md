@@ -80,8 +80,8 @@ especializados das pastas numeradas.
   acertos e eliminações confirmam na mira, e coleta, ondas, eventos e level-up
   geram avisos temporários determinísticos.
 - **Fase 19 — Pausa funcional:** concluída; `Esc` congela a simulação e abre um
-  menu responsivo com `RESUME`, `RESTART RUN` e `EXIT GAME`, liberando o mouse
-  até o retorno ao gameplay.
+  menu responsivo com `RESUME`, `RESTART RUN`, `MAIN MENU` e `EXIT GAME`,
+  liberando o mouse até o retorno ao gameplay.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
   próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
   abertas e lockdown aguarda o collider liberar o vão antes de bloquear a rota.
@@ -265,6 +265,9 @@ especializados das pastas numeradas.
 - **Fase 64 — Menu funcional de resultado:** Victory e Defeat agora oferecem
   `NEW RUN/RETRY` e `EXIT GAME` com teclado e mouse. O término libera o ponteiro,
   congela a simulação e preserva o reinício pela próxima seed determinística.
+- **Fase 65 — Retorno ao menu principal:** pausa e resultado agora oferecem
+  `MAIN MENU`. A run ativa é encerrada, a próxima seed é preparada e todos os
+  recursos da run são limpos sem fechar ou recriar a janela.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -294,7 +297,7 @@ run; `W/S` ou setas navegam, `Enter` confirma, o mouse seleciona/clica e `Esc`
 retorna ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
 
 Em Victory ou Defeat, a simulação congela e o menu de resultado oferece
-`NEW RUN/RETRY` e `EXIT GAME`; teclado e mouse usam a mesma navegação.
+`NEW RUN/RETRY`, `MAIN MENU` e `EXIT GAME`; teclado e mouse usam a mesma navegação.
 
 Na inicialização, uma seed gera um mundo navegável validado com START, BOSS,
 branches, loop controlado, salas e corredores. Cada sala recebe IDs de entidades
@@ -459,6 +462,12 @@ Na Fase 64, o banner terminal foi promovido a menu funcional. Victory seleciona
 puro, e `ResultMenuLayout` mantém desenho e hit test alinhados. A transição de
 sessão libera imediatamente o mouse sem alterar a regra determinística de
 `SessionSystem::restart`.
+
+Na Fase 65, pausa e resultado ganharam `MAIN MENU`. Ao confirmar, uma run em
+andamento é encerrada antes de `SessionSystem::restart` preparar a próxima seed.
+Entidades, mundo, eventos, colisão, feedback, áudio e caches gráficos da run são
+limpos; o renderer é reinicializado no contexto OpenGL existente e a janela
+permanece aberta. Iniciar novamente pelo título usa a seed já preparada.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

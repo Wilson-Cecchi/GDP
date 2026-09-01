@@ -132,6 +132,7 @@ enum class HudNotice : std::uint8_t {
 enum class HudPauseSelection : std::uint8_t {
     Resume,
     RestartRun,
+    MainMenu,
     ExitGame,
 };
 
@@ -142,6 +143,7 @@ enum class HudMainMenuSelection : std::uint8_t {
 
 enum class HudResultMenuSelection : std::uint8_t {
     PlayAgain,
+    MainMenu,
     ExitGame,
 };
 
@@ -166,6 +168,7 @@ struct PauseMenuLayout {
     UiRect panel{};
     UiRect resumeButton{};
     UiRect restartButton{};
+    UiRect mainMenuButton{};
     UiRect exitButton{};
 };
 
@@ -173,6 +176,7 @@ struct ResultMenuLayout {
     int scale{1};
     UiRect panel{};
     UiRect playAgainButton{};
+    UiRect mainMenuButton{};
     UiRect exitButton{};
 };
 

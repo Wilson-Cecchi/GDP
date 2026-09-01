@@ -7,6 +7,7 @@ namespace gdp::gameplay {
 enum class PauseMenuOption : std::uint8_t {
     Resume,
     RestartRun,
+    MainMenu,
     ExitGame,
     Count,
 };
@@ -15,6 +16,7 @@ enum class PauseMenuCommand : std::uint8_t {
     None,
     Resume,
     RestartRun,
+    MainMenu,
     ExitGame,
 };
 

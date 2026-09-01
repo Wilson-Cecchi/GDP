@@ -66,6 +66,7 @@ private:
     void render();
     void shutdown();
     void setPaused(bool paused);
+    [[nodiscard]] bool returnToMainMenu();
 
     ApplicationConfig config_;
     wkc::platform::Input input_;

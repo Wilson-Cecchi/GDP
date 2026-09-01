@@ -787,6 +787,12 @@ teclado e mouse produzem os mesmos comandos, enquanto `SessionSystem` permanece
 dono do resultado e da próxima seed. `ResultMenuLayout` compartilha desenho e
 hit test sem introduzir regras do GDP na WKC Forge.
 
+Na Fase 65, pausa e resultado passaram a emitir `MainMenu`. A Application
+encerra a run ativa, solicita a próxima seed ao `SessionSystem` e limpa todos os
+recursos concretos da run. O renderer é reconstruído no contexto OpenGL já
+ativo, preservando janela e processo; nenhum conceito de fluxo GDP foi movido
+para as fundações WKC Forge.
+
 ---
 
 # 8. Sistema de seed

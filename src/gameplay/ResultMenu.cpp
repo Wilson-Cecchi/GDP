@@ -50,6 +50,9 @@ ResultMenuCommand activateResultMenuSelection(ResultMenuState& state) noexcept
     case ResultMenuOption::PlayAgain:
         closeResultMenu(state);
         return ResultMenuCommand::PlayAgain;
+    case ResultMenuOption::MainMenu:
+        closeResultMenu(state);
+        return ResultMenuCommand::MainMenu;
     case ResultMenuOption::ExitGame:
         return ResultMenuCommand::ExitGame;
     case ResultMenuOption::Count:

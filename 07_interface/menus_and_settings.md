@@ -27,8 +27,8 @@ mesmo estado, sem antecipar sistemas ainda não implementados.
 ## Pausa in-game
 
 `Esc` abre e fecha a pausa, sempre selecionando `RESUME` como opção segura.
-`W/S` ou setas navegam com wrap e `Enter` confirma `RESUME`, `RESTART RUN` ou
-`EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
+`W/S` ou setas navegam com wrap e `Enter` confirma `RESUME`, `RESTART RUN`,
+`MAIN MENU` ou `EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
 cliques fora dos botões não executam comandos. O mouse relativo é liberado no
 menu e restaurado no retorno.
 Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
@@ -46,13 +46,23 @@ mantendo os botões alinhados em escalas high-DPI e após redimensionamento.
 
 Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e abrem um
 menu sobre o viewport. A opção segura é `NEW RUN` após vitória ou `RETRY` após
-derrota; `EXIT GAME` encerra a aplicação. `W/S`, setas, `Enter`, hover e clique
-seguem o mesmo contrato dos demais menus, enquanto `Esc` preserva a saída direta.
+derrota; `MAIN MENU` retorna ao título e `EXIT GAME` encerra a aplicação. `W/S`,
+setas, `Enter`, hover e clique seguem o mesmo contrato dos demais menus, enquanto
+`Esc` preserva a saída direta.
 
 O mouse relativo é liberado na transição terminal. `ResultMenuLayout` é usado
 simultaneamente pelo renderer e pelo hit test high-DPI. Confirmar a primeira
 opção apenas solicita o reinício existente; `SessionSystem` continua sendo o
 dono da fase e da derivação da próxima seed.
+
+## Retorno ao título
+
+`MAIN MENU` na pausa encerra primeiro a run ativa; no resultado, reutiliza o
+estado terminal já registrado. Nos dois casos, `SessionSystem::restart` prepara
+a próxima seed antes da limpeza. Mundo, entidades, eventos, colisão, feedback,
+vozes e recursos gráficos da run são descartados, mas janela, contexto OpenGL e
+processo permanecem ativos. O título reaparece com `START RUN` selecionado e
+mouse livre.
 
 ## Navegação
 

@@ -30,11 +30,14 @@ void testResultMenuNavigation()
     expect(state.active && state.selection == ResultMenuOption::PlayAgain,
         "opening result menu selects the safe Play Again option");
     moveResultMenuSelection(state, 1);
-    expect(state.selection == ResultMenuOption::ExitGame,
-        "down navigation selects Exit Game");
+    expect(state.selection == ResultMenuOption::MainMenu,
+        "down navigation selects Main Menu");
     moveResultMenuSelection(state, 8);
-    expect(state.selection == ResultMenuOption::PlayAgain,
+    expect(state.selection == ResultMenuOption::ExitGame,
         "positive navigation wraps by one deterministic step");
+    moveResultMenuSelection(state, 1);
+    expect(state.selection == ResultMenuOption::PlayAgain,
+        "down navigation wraps from Exit Game to Play Again");
     moveResultMenuSelection(state, -1);
     expect(state.selection == ResultMenuOption::ExitGame,
         "up navigation wraps from Play Again to Exit Game");
@@ -52,6 +55,12 @@ void testResultMenuCommands()
     expect(activateResultMenuSelection(state) == ResultMenuCommand::PlayAgain
             && state == ResultMenuState{},
         "Play Again closes and resets the result menu");
+
+    openResultMenu(state);
+    selectResultMenuOption(state, ResultMenuOption::MainMenu);
+    expect(activateResultMenuSelection(state) == ResultMenuCommand::MainMenu
+            && state == ResultMenuState{},
+        "Main Menu closes and resets the result menu");
 
     openResultMenu(state);
     selectResultMenuOption(state, ResultMenuOption::ExitGame);

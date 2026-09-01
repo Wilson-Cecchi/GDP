@@ -141,9 +141,9 @@ ao trocar somente a chave de material da sala adjacente.
 
 Após o blit, `HudRenderData` seleciona overlays bitmap independentes de FOV:
 objetivo no topo e menu central para Victory/Defeat. O estado terminal oferece
-jogar novamente ou sair, compartilhando `ResultMenuLayout` entre desenho e hit
-test. A regressão OpenGL exige alteração de pixels para o estado terminal e ao
-trocar sua seleção.
+jogar novamente, retornar ao título ou sair, compartilhando `ResultMenuLayout`
+entre desenho e hit test. A regressão OpenGL exige alteração de pixels para o
+estado terminal e ao trocar sua seleção.
 
 ## Separação
 

@@ -67,7 +67,7 @@ PauseMenuLayout makePauseMenuLayout(const int width, const int height) noexcept
     const int panelWidth = std::max(1,
         std::min(safeWidth - 16, 180 * scale));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 95 * scale));
+        std::min(safeHeight - 16, 109 * scale));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
@@ -80,13 +80,16 @@ PauseMenuLayout makePauseMenuLayout(const int width, const int height) noexcept
         panelY + panelHeight - (36 * scale), panelY, maximumButtonY);
     const int restartY = std::clamp(
         resumeY - (14 * scale), panelY, maximumButtonY);
-    const int exitY = std::clamp(
+    const int mainMenuY = std::clamp(
         resumeY - (28 * scale), panelY, maximumButtonY);
+    const int exitY = std::clamp(
+        resumeY - (42 * scale), panelY, maximumButtonY);
     return {
         scale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, resumeY, buttonWidth, buttonHeight},
         {buttonX, restartY, buttonWidth, buttonHeight},
+        {buttonX, mainMenuY, buttonWidth, buttonHeight},
         {buttonX, exitY, buttonWidth, buttonHeight},
     };
 }
@@ -110,6 +113,9 @@ std::optional<HudPauseSelection> pauseMenuSelectionAt(
     if (layout.restartButton.contains(pixelX, pixelY)) {
         return HudPauseSelection::RestartRun;
     }
+    if (layout.mainMenuButton.contains(pixelX, pixelY)) {
+        return HudPauseSelection::MainMenu;
+    }
     if (layout.exitButton.contains(pixelX, pixelY)) {
         return HudPauseSelection::ExitGame;
     }
@@ -124,7 +130,7 @@ ResultMenuLayout makeResultMenuLayout(const int width, const int height) noexcep
     const int panelWidth = std::max(1,
         std::min(safeWidth - 16, 220 * scale));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 108 * scale));
+        std::min(safeHeight - 16, 122 * scale));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
@@ -134,13 +140,16 @@ ResultMenuLayout makeResultMenuLayout(const int width, const int height) noexcep
     const int buttonX = (safeWidth - buttonWidth) / 2;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
     const int playAgainY = std::clamp(
-        panelY + (42 * scale), panelY, maximumButtonY);
-    const int exitY = std::clamp(
+        panelY + (54 * scale), panelY, maximumButtonY);
+    const int mainMenuY = std::clamp(
         playAgainY - (18 * scale), panelY, maximumButtonY);
+    const int exitY = std::clamp(
+        playAgainY - (36 * scale), panelY, maximumButtonY);
     return {
         scale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, playAgainY, buttonWidth, buttonHeight},
+        {buttonX, mainMenuY, buttonWidth, buttonHeight},
         {buttonX, exitY, buttonWidth, buttonHeight},
     };
 }
@@ -160,6 +169,9 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     const ResultMenuLayout layout = makeResultMenuLayout(width, height);
     if (layout.playAgainButton.contains(pixelX, pixelY)) {
         return HudResultMenuSelection::PlayAgain;
+    }
+    if (layout.mainMenuButton.contains(pixelX, pixelY)) {
+        return HudResultMenuSelection::MainMenu;
     }
     if (layout.exitButton.contains(pixelX, pixelY)) {
         return HudResultMenuSelection::ExitGame;

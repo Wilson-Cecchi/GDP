@@ -6,6 +6,7 @@ namespace gdp::gameplay {
 
 enum class ResultMenuOption : std::uint8_t {
     PlayAgain,
+    MainMenu,
     ExitGame,
     Count,
 };
@@ -13,6 +14,7 @@ enum class ResultMenuOption : std::uint8_t {
 enum class ResultMenuCommand : std::uint8_t {
     None,
     PlayAgain,
+    MainMenu,
     ExitGame,
 };
 

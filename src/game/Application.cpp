@@ -753,6 +753,9 @@ void Application::processEvents()
         }
         const auto resultOptionFor
             = [](const visual::HudResultMenuSelection selection) {
+                  if (selection == visual::HudResultMenuSelection::MainMenu) {
+                      return gameplay::ResultMenuOption::MainMenu;
+                  }
                   return selection == visual::HudResultMenuSelection::ExitGame
                       ? gameplay::ResultMenuOption::ExitGame
                       : gameplay::ResultMenuOption::PlayAgain;
@@ -797,6 +800,12 @@ void Application::processEvents()
             log(LogLevel::Info, "Result menu requested another run");
             restartRequested_ = true;
             running_ = false;
+        } else if (command == gameplay::ResultMenuCommand::MainMenu) {
+            log(LogLevel::Info, "Result menu requested main menu");
+            if (!returnToMainMenu()) {
+                fatalError_ = true;
+                running_ = false;
+            }
         } else if (command == gameplay::ResultMenuCommand::ExitGame) {
             log(LogLevel::Info, "Result menu requested game exit");
             restartRequested_ = false;
@@ -841,6 +850,8 @@ void Application::processEvents()
             switch (selection) {
             case visual::HudPauseSelection::RestartRun:
                 return gameplay::PauseMenuOption::RestartRun;
+            case visual::HudPauseSelection::MainMenu:
+                return gameplay::PauseMenuOption::MainMenu;
             case visual::HudPauseSelection::ExitGame:
                 return gameplay::PauseMenuOption::ExitGame;
             case visual::HudPauseSelection::Resume:
@@ -891,6 +902,12 @@ void Application::processEvents()
                 false, world::RoomRole::Count, false, false);
             restartRequested_ = true;
             running_ = false;
+        } else if (command == gameplay::PauseMenuCommand::MainMenu) {
+            log(LogLevel::Info, "Pause menu requested main menu");
+            if (!returnToMainMenu()) {
+                fatalError_ = true;
+                running_ = false;
+            }
         } else if (command == gameplay::PauseMenuCommand::ExitGame) {
             log(LogLevel::Info, "Pause menu requested game exit");
             restartRequested_ = false;
@@ -926,6 +943,74 @@ void Application::setPaused(const bool paused)
         log(LogLevel::Warning, sdlError("Pause mouse mode update failed"));
     }
     log(LogLevel::Info, paused ? "Game paused" : "Game resumed");
+}
+
+bool Application::returnToMainMenu()
+{
+    if (session_.state().phase == gameplay::SessionPhase::Playing) {
+        (void)session_.update(
+            false, world::RoomRole::Count, false, false);
+    }
+    const std::optional<wkc::core::Seed> nextSeed = session_.restart();
+    if (!nextSeed) {
+        log(LogLevel::Error, "Session rejected return to main menu");
+        return false;
+    }
+    config_.worldSeed = *nextSeed;
+
+    if (audio_) {
+        audio_->stopAmbience();
+        audio_->clearVoices();
+    }
+    renderer_.reset();
+    entities_.clear();
+    roomEvents_.clear();
+    roomLighting_.clear();
+    roomMaterialKeys_.clear();
+    doorRuntimes_.clear();
+    doorAudioEventCounters_.clear();
+    input_ = Input{};
+    player_ = gameplay::Player{};
+    weapon_ = gameplay::Weapon{};
+    progression_ = gameplay::ProgressionSystem{};
+    gameplay::clearFeedback(feedback_);
+    gameplay::resetFootsteps(footsteps_);
+    gameplay::resetViewMotion(viewMotion_);
+    gameplay::openMainMenu(mainMenu_);
+    gameplay::closePauseMenu(pauseMenu_);
+    gameplay::closeResultMenu(resultMenu_);
+    baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
+    collisionWorld_ = baseCollisionWorld_;
+    playerCommand_ = {};
+    interactionPending_ = false;
+    firePending_ = false;
+    reloadPending_ = false;
+    restartRequested_ = false;
+    audioEventCounter_ = 0U;
+    uiAudioEventCounter_ = 0U;
+    terminalEntity_ = {};
+    world_.reset();
+    clock_.reset();
+
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    if (window_ == nullptr
+        || !SDL_GetWindowSizeInPixels(
+            window_, &drawableWidth, &drawableHeight)) {
+        log(LogLevel::Error,
+            sdlError("Main menu framebuffer size query failed"));
+        return false;
+    }
+    renderer_ = std::make_unique<visual::GdpRenderer>();
+    if (!renderer_->initialize(drawableWidth, drawableHeight)) {
+        log(LogLevel::Error, "Main menu renderer reinitialization failed");
+        return false;
+    }
+    if (!SDL_SetWindowRelativeMouseMode(window_, false)) {
+        log(LogLevel::Warning, sdlError("Main menu mouse mode update failed"));
+    }
+    log(LogLevel::Info, "Returned to main menu with the next deterministic seed");
+    return true;
 }
 
 void Application::fixedUpdate(const double fixedStep)
@@ -1820,13 +1905,16 @@ void Application::render()
     hud.paused = pauseMenu_.paused;
     if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
         hud.pauseSelection = visual::HudPauseSelection::RestartRun;
+    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::MainMenu) {
+        hud.pauseSelection = visual::HudPauseSelection::MainMenu;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
         hud.pauseSelection = visual::HudPauseSelection::ExitGame;
     }
-    hud.resultMenuSelection
-        = resultMenu_.selection == gameplay::ResultMenuOption::ExitGame
-        ? visual::HudResultMenuSelection::ExitGame
-        : visual::HudResultMenuSelection::PlayAgain;
+    if (resultMenu_.selection == gameplay::ResultMenuOption::MainMenu) {
+        hud.resultMenuSelection = visual::HudResultMenuSelection::MainMenu;
+    } else if (resultMenu_.selection == gameplay::ResultMenuOption::ExitGame) {
+        hud.resultMenuSelection = visual::HudResultMenuSelection::ExitGame;
+    }
     switch (feedback_.notice) {
     case gameplay::NoticeFeedbackKind::Pickup:
         hud.notice = visual::HudNotice::Pickup;

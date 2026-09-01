@@ -1768,15 +1768,19 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (24 * scale),
             2 * scale, result, resultColor);
 
-        const std::array<std::string_view, 2> options{
-            victory ? "NEW RUN" : "RETRY", "EXIT GAME",
+        const std::array<std::string_view, 3> options{
+            victory ? "NEW RUN" : "RETRY", "MAIN MENU", "EXIT GAME",
         };
-        const std::array<UiRect, 2> buttons{
-            layout.playAgainButton, layout.exitButton,
+        const std::array<UiRect, 3> buttons{
+            layout.playAgainButton, layout.mainMenuButton, layout.exitButton,
         };
-        const std::size_t selected
-            = hud.resultMenuSelection == HudResultMenuSelection::ExitGame
-            ? 1U : 0U;
+        std::size_t selected = 0U;
+        if (hud.resultMenuSelection == HudResultMenuSelection::MainMenu) {
+            selected = 1U;
+        } else if (hud.resultMenuSelection
+            == HudResultMenuSelection::ExitGame) {
+            selected = 2U;
+        }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
             if (index == selected) {
@@ -1812,13 +1816,20 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (14 * scale), scale,
             pauseTitle, cyanColor);
 
-        constexpr std::array<std::string_view, 3> options{
-            "RESUME", "RESTART RUN", "EXIT GAME",
+        constexpr std::array<std::string_view, 4> options{
+            "RESUME", "RESTART RUN", "MAIN MENU", "EXIT GAME",
         };
-        const std::size_t selected = hud.pauseSelection == HudPauseSelection::RestartRun
-            ? 1U : hud.pauseSelection == HudPauseSelection::ExitGame ? 2U : 0U;
-        const std::array<UiRect, 3> buttons{
-            layout.resumeButton, layout.restartButton, layout.exitButton,
+        std::size_t selected = 0U;
+        if (hud.pauseSelection == HudPauseSelection::RestartRun) {
+            selected = 1U;
+        } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
+            selected = 2U;
+        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
+            selected = 3U;
+        }
+        const std::array<UiRect, 4> buttons{
+            layout.resumeButton, layout.restartButton,
+            layout.mainMenuButton, layout.exitButton,
         };
         for (std::size_t index = 0; index < options.size(); ++index) {
             const UiRect button = buttons[index];
