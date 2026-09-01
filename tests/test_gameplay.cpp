@@ -144,8 +144,22 @@ void testInteractionAndLife()
     player.heal(100.0F);
     expect(wkc::core::nearlyEqual(player.state().health, 100.0F),
         "healing clamps to maximum health");
+    player.addArmor(30.0F);
+    player.applyDamage(20.0F);
+    expect(wkc::core::nearlyEqual(player.state().armor, 10.0F)
+            && wkc::core::nearlyEqual(player.state().health, 100.0F),
+        "armor is consumed before damage reaches health");
+    player.applyDamage(25.0F);
+    expect(wkc::core::nearlyEqual(player.state().armor, 0.0F)
+            && wkc::core::nearlyEqual(player.state().health, 85.0F),
+        "damage overflow consumes remaining armor and reaches health");
+    player.heal(100.0F);
+    player.addArmor(500.0F);
+    expect(wkc::core::nearlyEqual(player.state().armor, 50.0F),
+        "armor pickups clamp to maximum armor");
     player.applyDamage(500.0F);
-    expect(!player.state().alive && wkc::core::nearlyEqual(player.state().health, 0.0F),
+    expect(!player.state().alive && wkc::core::nearlyEqual(player.state().health, 0.0F)
+            && wkc::core::nearlyEqual(player.state().armor, 0.0F),
         "lethal damage changes alive state once");
     player.applyDamage(10.0F);
     player.heal(10.0F);

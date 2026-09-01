@@ -246,7 +246,7 @@ EventValidationResult validateRoomEventPlan(
     }
     if ((plan.type == RoomEventType::None && plan.rewardQuantity != 0U)
         || (plan.type != RoomEventType::None && plan.rewardQuantity == 0U)
-        || plan.rewardType > gdp::entities::ItemType::Key) {
+        || plan.rewardType > gdp::entities::ItemType::Armor) {
         result.errors.push_back(EventValidationError::InvalidReward);
     }
     if (plan.type != RoomEventType::None

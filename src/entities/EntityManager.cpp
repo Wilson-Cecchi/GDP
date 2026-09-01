@@ -1,6 +1,7 @@
 #include "entities/EntityManager.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -29,7 +30,16 @@ float defaultPropHealth(const PropType type) noexcept
 
 EntityId EntityManager::createPlayer(const PlayerCreateInfo& info)
 {
-    return create(EntityKind::Player, info.transform, info.roomId, PlayerData{info.health});
+    const float maximumArmor = std::isfinite(info.maximumArmor)
+        ? std::max(info.maximumArmor, 0.0F) : 0.0F;
+    const float armor = std::isfinite(info.armor)
+        ? std::clamp(info.armor, 0.0F, maximumArmor) : 0.0F;
+    return create(EntityKind::Player, info.transform, info.roomId,
+        PlayerData{
+            std::isfinite(info.health) ? std::max(info.health, 1.0F) : 100.0F,
+            armor,
+            maximumArmor,
+        });
 }
 
 EntityId EntityManager::createEnemy(const EnemyCreateInfo& info)

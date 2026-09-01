@@ -4,9 +4,9 @@
 > implementados e validados na Fase 7; Guard armado de média distância validado
 > na Fase 11, junto do Officer de suporte, Engineer de reparo e IndustrialRobot
 > de três fases. Props destrutíveis e cobertura dinâmica foram validados na
-> Fase 12. Eventos procedurais de sala estão funcionais; a fila desacoplada de
-> sinais de combate, armadura,
-> spread e weak points permanecem
+> Fase 12. Eventos procedurais de sala estão funcionais; Armor do Player foi
+> integrada na Fase 58. A fila desacoplada de sinais de combate, além de spread
+> e weak points, permanece
 > para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -54,8 +54,13 @@ necessária da reserva para o pente. Progressão pode aumentar dano em blocos de
 `applyDamage()` opera sobre Enemy ou Prop destrutível, ignora IDs inválidos,
 dano não positivo e alvos terminais, faz clamp de HP em zero e produz uma única
 transição terminal. Props passam por `Damaged`, perdem colisão em `Destroyed` e
-um crate cria somente seu drop controlado. Armadura e weak points entram quando
-forem visualmente legíveis.
+um crate cria somente seu drop controlado. Weak points entram quando forem
+visualmente legíveis.
+
+Na Fase 58, a defesa do Player passou a consumir Armor ponto a ponto antes do
+HP. O excedente do mesmo ataque alcança HP, Armor nunca fica negativo e zerar
+somente Armor não mata. A regra independe do arquétipo atacante e não altera o
+pipeline de dano de Enemy/Prop.
 
 ## Eventos
 

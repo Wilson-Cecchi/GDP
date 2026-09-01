@@ -236,6 +236,12 @@ especializados das pastas numeradas.
   OpenGL offscreen. Um job independente executa ASan + UBSan. O próprio gate
   arquitetural verifica os comandos obrigatórios e proíbe atualização automática
   de goldens.
+- **Fase 58 — Armadura funcional:** o Player possui Armor/Maximum Armor,
+  absorve dano ponto a ponto antes do HP e preserva o estado entre salas. Cada
+  recompensa Vitality aumenta HP máximo em 15, Armor máximo em 10 e restaura
+  ambos. O runtime coleta pickups Armor respeitando capacidade, o Entity Manager
+  sincroniza o estado e o HUD exibe valor/barra azul. A geração procedural
+  existente não foi alterada, preservando os hashes de loot e eventos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

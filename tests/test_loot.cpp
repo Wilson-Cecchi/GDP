@@ -170,6 +170,12 @@ void testAutomaticLootCollection()
         .type = ItemType::Key,
         .quantity = 1,
     });
+    const EntityId armor = manager.createItem({
+        .transform = {.position = {0.50F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Armor,
+        .quantity = 15,
+    });
     const EntityId otherRoom = manager.createItem({
         .transform = {.position = {0.10F, 0.0F, 0.0F}},
         .roomId = 3,
@@ -184,21 +190,23 @@ void testAutomaticLootCollection()
     });
     const LootCollectionSummary collected
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(collected.itemsInRange == 3U && collected.collected == 3U
+    expect(collected.itemsInRange == 4U && collected.collected == 4U
             && collected.healthRestored == 25.0F && collected.ammoAdded == 2U
-            && collected.keysAdded == 1U,
-        "nearby loot applies health, available ammo capacity and objective key");
+            && collected.keysAdded == 1U && collected.armorAdded == 15.0F,
+        "nearby loot applies health, armor, available ammo and objective key");
     expect(player.state().health == 85.0F && weapon.reserveAmmo() == 10U
-            && player.state().keys == 1U,
+            && player.state().keys == 1U && player.state().armor == 15.0F,
         "collected resources update the authoritative player and weapon state");
     expect(manager.find(health) == nullptr && manager.find(ammo) == nullptr
-            && manager.find(key) == nullptr && manager.find(otherRoom) != nullptr
+            && manager.find(key) == nullptr && manager.find(armor) == nullptr
+            && manager.find(otherRoom) != nullptr
             && manager.find(farAway) != nullptr,
         "collection consumes only applied pickups in range and in the active room");
-    expect(manager.flushDestroyed() == 3U,
+    expect(manager.flushDestroyed() == 4U,
         "collected pickups complete the deferred entity lifecycle cleanly");
 
     player.heal(100.0F);
+    player.addArmor(100.0F);
     const EntityId fullHealth = manager.createItem({
         .transform = {.position = {0.10F, 0.0F, 0.0F}},
         .roomId = 2,
@@ -211,11 +219,18 @@ void testAutomaticLootCollection()
         .type = ItemType::Ammo,
         .quantity = 6,
     });
+    const EntityId fullArmor = manager.createItem({
+        .transform = {.position = {0.30F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Armor,
+        .quantity = 20,
+    });
     const LootCollectionSummary blocked
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(blocked.collected == 0U && blocked.blockedByCapacity == 2U
-            && manager.find(fullHealth) != nullptr && manager.find(fullAmmo) != nullptr,
-        "full health and ammo leave pickups available instead of wasting them");
+    expect(blocked.collected == 0U && blocked.blockedByCapacity == 3U
+            && manager.find(fullHealth) != nullptr && manager.find(fullAmmo) != nullptr
+            && manager.find(fullArmor) != nullptr,
+        "full health, armor and ammo leave pickups available instead of wasting them");
 
     player.applyDamage(500.0F);
     expect(collectNearbyLoot(manager, player, weapon, 2, 0.85F).itemsInRange == 0U,

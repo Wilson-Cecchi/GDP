@@ -65,6 +65,7 @@ void applyReward(
     if (reward == ProgressionReward::Vitality) {
         ++state.vitalityRank;
         (void)player.increaseMaximumHealth(15.0F, 15.0F);
+        (void)player.increaseMaximumArmor(10.0F, 10.0F);
     } else if (reward == ProgressionReward::Firepower) {
         ++state.firepowerRank;
         (void)weapon.increaseDamage(4.0F);

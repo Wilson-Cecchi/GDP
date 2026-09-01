@@ -56,6 +56,7 @@ enum class ItemType : std::uint8_t {
     Health,
     Ammo,
     Key,
+    Armor,
 };
 
 enum class PropType : std::uint8_t {
@@ -75,6 +76,8 @@ enum class PropState : std::uint8_t {
 
 struct PlayerData {
     float health{100.0F};
+    float armor{0.0F};
+    float maximumArmor{50.0F};
     std::uint32_t keys{0};
 };
 
@@ -119,6 +122,8 @@ struct PlayerCreateInfo {
     wkc::core::Transform transform{};
     std::uint32_t roomId{0};
     float health{100.0F};
+    float armor{0.0F};
+    float maximumArmor{50.0F};
 };
 
 struct EnemyCreateInfo {

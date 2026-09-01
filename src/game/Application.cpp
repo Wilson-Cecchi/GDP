@@ -199,7 +199,7 @@ const char* progressionRewardName(const gameplay::ProgressionReward reward) noex
 {
     switch (reward) {
     case gameplay::ProgressionReward::Vitality:
-        return "Vitality +15 HP";
+        return "Vitality +15 HP +10 armor";
     case gameplay::ProgressionReward::Firepower:
         return "Firepower +4 damage";
     case gameplay::ProgressionReward::Capacity:
@@ -467,6 +467,8 @@ bool Application::initializeRun()
         {
             .transform = {.position = player_.state().position},
             .health = player_.state().health,
+            .armor = player_.state().armor,
+            .maximumArmor = player_.state().maximumArmor,
         });
     if (!initialEntities.isValid()) {
         log(LogLevel::Error, "Initial entity population did not find a START room");
@@ -921,6 +923,7 @@ void Application::fixedUpdate(const double fixedStep)
         std::ostringstream message;
         message << "Loot collected: " << loot.collected
                 << " | health +" << static_cast<int>(loot.healthRestored)
+                << " | armor +" << static_cast<int>(loot.armorAdded)
                 << " | ammo +" << loot.ammoAdded
                 << " | keys +" << loot.keysAdded;
         log(LogLevel::Info, message.str());
@@ -1063,6 +1066,8 @@ void Application::fixedUpdate(const double fixedStep)
         playerEntity->transform.position = player_.state().position;
         if (entities::PlayerData* data = std::get_if<entities::PlayerData>(&playerEntity->data)) {
             data->health = player_.state().health;
+            data->armor = player_.state().armor;
+            data->maximumArmor = player_.state().maximumArmor;
             data->keys = player_.state().keys;
         }
     }
@@ -1330,6 +1335,8 @@ void Application::render()
             role = visual::PickupVisualRole::Ammo;
         } else if (item->type == entities::ItemType::Key) {
             role = visual::PickupVisualRole::Key;
+        } else if (item->type == entities::ItemType::Armor) {
+            role = visual::PickupVisualRole::Armor;
         }
         visiblePickups.push_back({entity->transform.position, role});
     }
@@ -1365,6 +1372,7 @@ void Application::render()
     std::ostringstream title;
     title << "GDP | Run " << (session_.state().runIndex + 1U)
           << " | HP " << static_cast<int>(player_.state().health)
+          << " | Armor " << static_cast<int>(player_.state().armor)
           << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
     title << " | Keys " << player_.state().keys;
     const gameplay::ProgressionState& progress = progression_.state();
@@ -1563,6 +1571,8 @@ void Application::render()
     hud.visible = true;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
+    hud.armor = player_.state().armor;
+    hud.maximumArmor = player_.state().maximumArmor;
     hud.magazineAmmo = weapon_.magazineAmmo();
     hud.reserveAmmo = weapon_.reserveAmmo();
     hud.keys = player_.state().keys;

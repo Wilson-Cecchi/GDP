@@ -26,6 +26,8 @@ void testCreationAndTypedData()
         .transform = {.position = {1.0F, 2.0F, 3.0F}},
         .roomId = 10,
         .health = 82.0F,
+        .armor = 24.0F,
+        .maximumArmor = 60.0F,
     });
     const EntityId enemy = manager.createEnemy({
         .roomId = 20,
@@ -59,8 +61,9 @@ void testCreationAndTypedData()
     const EnemyData* enemyData = manager.findData<EnemyData>(enemy);
     const ItemData* itemData = manager.findData<ItemData>(item);
     const PropData* propData = manager.findData<PropData>(prop);
-    expect(playerData != nullptr && playerData->health == 82.0F,
-        "player payload is available through typed lookup");
+    expect(playerData != nullptr && playerData->health == 82.0F
+            && playerData->armor == 24.0F && playerData->maximumArmor == 60.0F,
+        "player payload preserves health and armor through typed lookup");
     expect(enemyData != nullptr && enemyData->archetype == EnemyArchetype::Guard
             && enemyData->health == 75.0F && enemyData->maximumHealth == 75.0F
             && enemyData->behavior == EnemyBehaviorState::Idle

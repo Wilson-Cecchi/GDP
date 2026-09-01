@@ -29,6 +29,7 @@ enum class PickupVisualRole : std::uint8_t {
     Health,
     Ammo,
     Key,
+    Armor,
 };
 
 enum class PropVisualRole : std::uint8_t {
@@ -167,6 +168,8 @@ struct HudRenderData {
     bool visible{false};
     float health{100.0F};
     float maximumHealth{100.0F};
+    float armor{0.0F};
+    float maximumArmor{50.0F};
     std::uint32_t magazineAmmo{0};
     std::uint32_t reserveAmmo{0};
     std::uint32_t keys{0};

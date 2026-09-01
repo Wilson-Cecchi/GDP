@@ -189,6 +189,7 @@ void testRangeInvalidInputAndPlayerRelocation()
     player.applyDamage(35.0F);
     player.addKeys(2U);
     (void)player.increaseMaximumHealth(15.0F, 10.0F);
+    (void)player.increaseMaximumArmor(10.0F, 25.0F);
     const float health = player.state().health;
     expect(player.relocate({14.0F, 0.0F, -7.0F}, 180.0F),
         "living player accepts a finite room relocation");
@@ -196,8 +197,10 @@ void testRangeInvalidInputAndPlayerRelocation()
             && wkc::core::nearlyEqual(std::abs(player.state().yawDegrees), 180.0F)
             && wkc::core::nearlyEqual(player.state().health, health)
             && wkc::core::nearlyEqual(player.state().maximumHealth, 115.0F)
+            && wkc::core::nearlyEqual(player.state().armor, 25.0F)
+            && wkc::core::nearlyEqual(player.state().maximumArmor, 60.0F)
             && player.state().keys == 2U,
-        "relocation preserves health upgrades and inventory");
+        "relocation preserves health, armor upgrades and inventory");
     const wkc::core::Vec3 stablePosition = player.state().position;
     expect(!player.relocate(
             {std::numeric_limits<float>::infinity(), 0.0F, 0.0F}, 0.0F)

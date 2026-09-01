@@ -740,6 +740,13 @@ incluindo os testes headless e OpenGL offscreen já registrados. ASan + UBSan
 rodam em job separado. O gate local verifica a presença desses comandos e
 rejeita qualquer tentativa de atualização automática de goldens pela CI.
 
+Na Fase 58, Armor entrou como estado funcional do Player. A capacidade inicial
+é 50, a reserva começa vazia e cada ponto absorve um ponto de dano antes do HP.
+Vitality aumenta HP máximo/restaura 15 e aumenta Armor máximo/restaura 10. O
+runtime de loot aceita `ItemType::Armor`, o estado é espelhado no Entity Manager
+e o HUD mostra valor e barra próprios. Nenhuma tabela procedural passou a sortear
+Armor nesta fase, mantendo hashes, budgets e distribuições existentes.
+
 ---
 
 # 8. Sistema de seed

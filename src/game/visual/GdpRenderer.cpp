@@ -1377,6 +1377,9 @@ bool GdpRenderer::render(
         } else if (pickup.role == PickupVisualRole::Key) {
             tint = {0.18F, 0.78F, 0.92F};
             scale = {0.38F, 0.12F, 0.16F};
+        } else if (pickup.role == PickupVisualRole::Armor) {
+            tint = {0.18F, 0.42F, 0.96F};
+            scale = {0.36F, 0.26F, 0.30F};
         }
         const wkc::core::Mat4 model
             = wkc::core::translationMatrix(
@@ -1519,21 +1522,28 @@ bool GdpRenderer::render(
             std::max(hud.maximumHealth, 1.0F)));
         std::ostringstream healthStream;
         healthStream << "HP " << health << '/' << maximumHealth;
+        const int armor = static_cast<int>(std::round(std::max(hud.armor, 0.0F)));
+        const int maximumArmor = static_cast<int>(std::round(
+            std::max(hud.maximumArmor, 1.0F)));
+        std::ostringstream armorStream;
+        armorStream << "ARMOR " << armor << '/' << maximumArmor;
         std::ostringstream ammoStream;
         ammoStream << "AMMO " << hud.magazineAmmo << '/' << hud.reserveAmmo;
         std::ostringstream keysStream;
         keysStream << "KEYS " << hud.keys;
         const std::string healthText = healthStream.str();
+        const std::string armorText = armorStream.str();
         const std::string ammoText = ammoStream.str();
         const std::string keysText = keysStream.str();
         const int statusTextWidth = std::max({
             bitmapTextWidth(healthText, hudScale),
+            bitmapTextWidth(armorText, hudScale),
             bitmapTextWidth(ammoText, hudScale),
             bitmapTextWidth(keysText, hudScale),
         });
         const int statusWidth = statusTextWidth + (hudPadding * 2);
-        const int statusHeight = (hudPadding * 2) + (hudLineHeight * 3)
-            + (4 * hudScale);
+        const int statusHeight = (hudPadding * 2) + (hudLineHeight * 4)
+            + (8 * hudScale);
         const int statusX = hudMargin;
         const int statusY = hudMargin;
         drawSolidRect(statusX, statusY, statusWidth, statusHeight, panelColor);
@@ -1556,11 +1566,23 @@ bool GdpRenderer::render(
             healthRatio <= 0.25F
                 ? wkc::core::Vec3{0.94F, 0.16F, 0.10F}
                 : wkc::core::Vec3{0.24F, 0.88F, 0.52F});
-        drawBitmapText(statusTextX, healthTextY - hudLineHeight,
+        const int armorTextY = healthTextY - hudLineHeight;
+        const int armorBarY = armorTextY - (5 * hudScale);
+        const float armorRatio = std::clamp(
+            std::max(hud.armor, 0.0F) / std::max(hud.maximumArmor, 1.0F),
+            0.0F, 1.0F);
+        drawBitmapText(statusTextX, armorTextY, hudScale, armorText,
+            armor > 0 ? wkc::core::Vec3{0.36F, 0.68F, 1.0F} : textColor);
+        drawSolidRect(statusTextX, armorBarY, barWidth, 3 * hudScale,
+            {0.10F, 0.14F, 0.15F});
+        drawSolidRect(statusTextX, armorBarY,
+            static_cast<int>(static_cast<float>(barWidth) * armorRatio),
+            3 * hudScale, {0.16F, 0.48F, 0.98F});
+        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 2),
             hudScale, ammoText,
             hud.magazineAmmo == 0U
                 ? wkc::core::Vec3{0.98F, 0.42F, 0.14F} : textColor);
-        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 2),
+        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 3),
             hudScale, keysText, cyanColor);
 
         std::ostringstream levelStream;

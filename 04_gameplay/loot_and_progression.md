@@ -2,7 +2,8 @@
 
 > **Estado:** loot procedural, coleta automática e progressão de sessão até o
 > nível 10 implementados na Fase 12; Victory, Defeat e nova run determinística
-> implementados na Fase 13. Armor, Weapon pickup, Special e persistência entre
+> implementados na Fase 13. O runtime de Armor e sua recompensa por Vitality
+> foram integrados na Fase 58; Weapon pickup, Special e persistência entre
 > execuções permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -26,20 +27,23 @@ permitir overspend e cada layout possui hash canônico.
 
 ## Categorias
 
-Health, Ammo e Key/Objective estão implementados. Armor, Weapon e Special
-permanecem no contrato. Pickups são posicionados nas `lootZones`, mantêm
+Health, Ammo, Key/Objective e Armor estão implementados no contrato de coleta.
+Weapon e Special permanecem planejados. Pickups são posicionados nas `lootZones`, mantêm
 separação mínima e não bloqueiam connectors.
 
 ## Coleta
 
 `collectNearbyLoot()` opera automaticamente no fixed update, somente no
 `roomId` atual e em raio de `0,85 m`. Health respeita HP máximo, Ammo respeita a
-reserva máxima e Key incrementa o estado persistente do Player. Recurso já
+reserva máxima, Armor respeita sua capacidade e Key incrementa o estado do Player. Recurso já
 cheio mantém a entidade no chão; coleta válida usa destruição adiada, remove o
 handle da sala e só então faz flush. Jogador morto não coleta.
 
-O renderer usa formas mínimas emissivas verdes, amarelas e ciano para Health,
-Ammo e Key. Assets procedurais específicos permanecem para uma etapa visual posterior.
+O renderer usa formas mínimas emissivas verdes, amarelas, ciano e azul para
+Health, Ammo, Key e Armor. Assets procedurais específicos permanecem para uma
+etapa visual posterior. Nesta fase as tabelas procedurais continuam sorteando
+somente Health/Ammo/Key, preservando hashes e distribuição; Armor chega ao fluxo
+jogável pela recompensa Vitality.
 
 ## Progressão de sessão
 

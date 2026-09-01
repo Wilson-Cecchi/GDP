@@ -2,7 +2,8 @@
 
 > **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,
 > XP, objetivo, evento, resultado e prompts contextuais aparecem no viewport;
-> a Fase 18 acrescenta feedback temporário de combate e eventos. O título
+> a Fase 18 acrescenta feedback temporário de combate e eventos e a Fase 58
+> integra Armor. O título
 > permanece somente como apoio de diagnóstico.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -11,6 +12,10 @@
 
 Interface militar/industrial. Em widescreen, o centro preserva uma área de gameplay
 conceitualmente 4:3 e as laterais recebem informação.
+
+O painel esquerdo apresenta HP e Armor em linhas e barras independentes. Armor
+usa azul técnico, é exibida mesmo vazia e permite perceber exatamente quando o
+dano começou a alcançar o HP.
 
 ## Layout
 

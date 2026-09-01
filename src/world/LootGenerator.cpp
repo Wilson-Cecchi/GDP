@@ -45,6 +45,8 @@ std::uint32_t itemCost(const gdp::entities::ItemType type) noexcept
         return 1U;
     case gdp::entities::ItemType::Key:
         return 0U;
+    case gdp::entities::ItemType::Armor:
+        return 2U;
     }
     return 0U;
 }
@@ -85,6 +87,8 @@ std::uint32_t quantityFor(
             + (2U * static_cast<std::uint32_t>(random.rangeInt(0, 2)));
     case gdp::entities::ItemType::Key:
         return 1U;
+    case gdp::entities::ItemType::Armor:
+        return 10U + (5U * std::min(depth, 4U));
     }
     return 1U;
 }
@@ -245,7 +249,7 @@ LootValidationResult validateLootLayout(
     std::size_t keyCount = 0;
     for (std::size_t index = 0; index < layout.drops.size(); ++index) {
         const LootDrop& drop = layout.drops[index];
-        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Key) {
+        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Armor) {
             result.errors.push_back(LootValidationError::InvalidDrop);
         }
         keyCount += drop.type == gdp::entities::ItemType::Key ? 1U : 0U;

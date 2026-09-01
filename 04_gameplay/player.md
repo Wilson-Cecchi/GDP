@@ -3,8 +3,8 @@
 > **Estado:** estado lógico, spawn, vida e interação inicial implementados na
 > Fase 3; binding geracional e sincronização com Entity Manager validados na
 > Fase 6; chaves, coleta automática e upgrade de HP validados na Fase 12.
-> Victory/Defeat e restart estão integrados na Fase 13. Armadura permanece
-> planejada.
+> Victory/Defeat e restart estão integrados na Fase 13. Armor funcional foi
+> integrada na Fase 58.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -47,9 +47,17 @@ não perder o comando em frames sem update. O retorno agora é um `EntityId`
 geracional do terminal, portanto uma referência stale não seleciona outra
 entidade que reutilize o mesmo slot.
 
-O Player guarda seu próprio `EntityId`; a aplicação sincroniza posição, HP e
-chaves no registro central a cada fixed update. Pickups próximos são coletados
+O Player guarda seu próprio `EntityId`; a aplicação sincroniza posição, HP,
+Armor, capacidade e chaves no registro central a cada fixed update. Pickups próximos são coletados
 sem interromper movimento; Health e Ammo cheios permanecem disponíveis.
+
+## Armadura
+
+O Player nasce com `0/50` de Armor. Cada ponto absorve um ponto de dano antes
+do HP; excedente atravessa no mesmo update e morte continua dependente apenas de
+HP zerado. `addArmor()` respeita a capacidade, valores inválidos não alteram o
+estado e Armor permanece entre travessias. Vitality acrescenta 10 à capacidade
+e restaura 10, além do bônus de HP já existente.
 
 ## Morte
 
@@ -63,5 +71,6 @@ terminal não pode ser sobrescrito por eventos posteriores do mesmo frame.
 
 ## Testes
 
-Spawn válido; clamp de HP/armadura; morte idempotente; interação por alcance; troca de sala;
+Spawn válido; clamp de HP/armadura; absorção e overflow; morte idempotente;
+interação por alcance; troca de sala;
 nenhum update de Player durante menu/pausa.

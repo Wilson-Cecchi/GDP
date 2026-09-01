@@ -146,10 +146,13 @@ std::optional<gdp::entities::EntityId> Player::findInteraction(
 
 void Player::applyDamage(const float amount) noexcept
 {
-    if (!state_.alive || amount <= 0.0F) {
+    if (!state_.alive || !std::isfinite(amount) || amount <= 0.0F) {
         return;
     }
-    state_.health = std::max(0.0F, state_.health - amount);
+    const float absorbed = std::min(state_.armor, amount);
+    state_.armor -= absorbed;
+    const float healthDamage = amount - absorbed;
+    state_.health = std::max(0.0F, state_.health - healthDamage);
     if (state_.health <= 0.0F) {
         state_.alive = false;
         state_.velocity = {};
@@ -158,10 +161,18 @@ void Player::applyDamage(const float amount) noexcept
 
 void Player::heal(const float amount) noexcept
 {
-    if (!state_.alive || amount <= 0.0F) {
+    if (!state_.alive || !std::isfinite(amount) || amount <= 0.0F) {
         return;
     }
     state_.health = std::min(state_.maximumHealth, state_.health + amount);
+}
+
+void Player::addArmor(const float amount) noexcept
+{
+    if (!state_.alive || !std::isfinite(amount) || amount <= 0.0F) {
+        return;
+    }
+    state_.armor = std::min(state_.maximumArmor, state_.armor + amount);
 }
 
 void Player::addKeys(const std::uint32_t amount) noexcept
@@ -182,6 +193,20 @@ bool Player::increaseMaximumHealth(
     state_.maximumHealth += amount;
     if (state_.alive && healing > 0.0F) {
         state_.health = std::min(state_.maximumHealth, state_.health + healing);
+    }
+    return true;
+}
+
+bool Player::increaseMaximumArmor(
+    const float amount,
+    const float armor) noexcept
+{
+    if (!std::isfinite(amount) || !std::isfinite(armor) || amount <= 0.0F) {
+        return false;
+    }
+    state_.maximumArmor += amount;
+    if (state_.alive && armor > 0.0F) {
+        state_.armor = std::min(state_.maximumArmor, state_.armor + armor);
     }
     return true;
 }

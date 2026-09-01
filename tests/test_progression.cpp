@@ -55,8 +55,10 @@ void testFunctionalProgression()
             && progression.state().score == 1'250U,
         "progression state keeps level, current XP, total XP and score");
     expect(std::abs(player.state().maximumHealth - 115.0F) < 1.0e-5F
-            && std::abs(player.state().health - 65.0F) < 1.0e-5F,
-        "vitality increases maximum health and immediately heals");
+            && std::abs(player.state().health - 65.0F) < 1.0e-5F
+            && std::abs(player.state().maximumArmor - 60.0F) < 1.0e-5F
+            && std::abs(player.state().armor - 10.0F) < 1.0e-5F,
+        "vitality increases health and armor capacity and restores both");
 
     const ProgressionUpdate robots = progression.record(
         ProgressionEvent::IndustrialRobotKilled, 2U, player, weapon);
@@ -98,6 +100,8 @@ void testCapCountersAndInvalidEvents()
             && progression.state().lootCollected == 3U,
         "source counters retain their own progression telemetry");
     expect(std::abs(player.state().maximumHealth - 145.0F) < 1.0e-5F
+            && std::abs(player.state().maximumArmor - 80.0F) < 1.0e-5F
+            && std::abs(player.state().armor - 30.0F) < 1.0e-5F
             && std::abs(weapon.definition().damage - 46.0F) < 1.0e-5F
             && weapon.reserveCapacity() == 44U,
         "all nine level rewards are applied to real player and weapon stats");

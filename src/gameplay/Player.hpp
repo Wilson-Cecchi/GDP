@@ -28,6 +28,8 @@ struct PlayerState {
     float pitchDegrees{0.0F};
     float health{100.0F};
     float maximumHealth{100.0F};
+    float armor{0.0F};
+    float maximumArmor{50.0F};
     std::uint32_t keys{0};
     bool grounded{true};
     bool alive{true};
@@ -54,10 +56,14 @@ public:
 
     void applyDamage(float amount) noexcept;
     void heal(float amount) noexcept;
+    void addArmor(float amount) noexcept;
     void addKeys(std::uint32_t amount) noexcept;
     [[nodiscard]] bool increaseMaximumHealth(
         float amount,
         float healing = 0.0F) noexcept;
+    [[nodiscard]] bool increaseMaximumArmor(
+        float amount,
+        float armor = 0.0F) noexcept;
 
     [[nodiscard]] const PlayerState& state() const noexcept;
     [[nodiscard]] gdp::entities::EntityId entity() const noexcept;

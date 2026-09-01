@@ -59,6 +59,16 @@ LootCollectionSummary collectNearbyLoot(
             summary.keysAdded += item->quantity;
             applied = item->quantity > 0U;
             break;
+        case ItemType::Armor: {
+            const float before = player.state().armor;
+            player.addArmor(static_cast<float>(item->quantity));
+            const float added = player.state().armor - before;
+            if (added > 0.0F) {
+                summary.armorAdded += added;
+                applied = true;
+            }
+            break;
+        }
         }
         if (!applied) {
             ++summary.blockedByCapacity;

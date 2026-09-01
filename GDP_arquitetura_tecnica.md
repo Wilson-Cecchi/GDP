@@ -817,6 +817,13 @@ offscreen já pertencem ao CTest, ambos entram no gate automaticamente. A
 regressão arquitetural exige configure/build/test dos três presets e impede que
 a CI aceite ou atualize goldens automaticamente.
 
+Na Fase 58, o Player ganhou Armor funcional com capacidade inicial 50 e reserva
+vazia. Dano consome Armor ponto a ponto antes do HP; Vitality aumenta/restaura
+15 de HP e 10 de Armor. Coleta, Entity Manager, travessia, HUD e apresentação
+técnica do pickup suportam `ItemType::Armor`. A geração procedural de loot e
+eventos continua selecionando somente as categorias anteriores para preservar
+hashes, budgets e distribuições até uma futura etapa de balanceamento.
+
 ---
 
 # 8. Sistema de seed

@@ -15,6 +15,7 @@ struct LootCollectionSummary {
     std::size_t collected{0};
     std::size_t blockedByCapacity{0};
     float healthRestored{0.0F};
+    float armorAdded{0.0F};
     std::uint32_t ammoAdded{0};
     std::uint32_t keysAdded{0};
     std::vector<gdp::entities::EntityId> collectedItems;

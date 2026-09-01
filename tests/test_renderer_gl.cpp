@@ -96,6 +96,8 @@ int main()
                 {0.0F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Ammo},
             gdp::game::visual::PickupRenderData{
                 {0.60F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Key},
+            gdp::game::visual::PickupRenderData{
+                {1.20F, 0.0F, -0.5F}, gdp::game::visual::PickupVisualRole::Armor},
         };
         constexpr std::array props{
             gdp::game::visual::PropRenderData{
@@ -339,6 +341,8 @@ int main()
                 .visible = true,
                 .health = 24.0F,
                 .maximumHealth = 115.0F,
+                .armor = 18.0F,
+                .maximumArmor = 60.0F,
                 .magazineAmmo = 0U,
                 .reserveAmmo = 28U,
                 .keys = 2U,
