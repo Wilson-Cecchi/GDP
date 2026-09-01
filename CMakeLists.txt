@@ -149,6 +149,7 @@ add_library(
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
     src/gameplay/Feedback.cpp
+    src/gameplay/Footstep.cpp
     src/gameplay/Loot.cpp
     src/gameplay/MainMenu.cpp
     src/gameplay/Pause.cpp

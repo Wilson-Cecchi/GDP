@@ -884,7 +884,17 @@ void Application::fixedUpdate(const double fixedStep)
     }
     collisionWorld_ = gameplay::collisionWorldWithProps(
         baseCollisionWorld_, entities_, playerRoom);
+    const wkc::core::Vec3 previousPlayerPosition = player_.state().position;
     player_.fixedUpdate(playerCommand_, step, collisionWorld_);
+    const std::optional<std::uint64_t> footstepEvent = gameplay::updateFootsteps(
+        footsteps_, previousPlayerPosition, player_.state().position,
+        player_.state().grounded, player_.state().alive);
+    if (footstepEvent && audio_) {
+        audio_->playAt(gdp::audio::AudioEventKind::Footstep,
+            session_.state().currentSeed, *footstepEvent,
+            player_.state().position, player_.state().position,
+            player_.planarForwardDirection());
+    }
 
     const auto adoptRoom = [this, &playerEntity, &playerRoom](
         const world::RoomInstance& destination,
@@ -1758,6 +1768,7 @@ void Application::shutdown()
     weapon_ = gameplay::Weapon{};
     progression_ = gameplay::ProgressionSystem{};
     gameplay::clearFeedback(feedback_);
+    gameplay::resetFootsteps(footsteps_);
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();

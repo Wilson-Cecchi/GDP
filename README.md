@@ -246,6 +246,10 @@ especializados das pastas numeradas.
   receitas procedurais distintas e espacializadas na posição física da porta.
   Os sons são emitidos somente quando o estado realmente transita; cada edge
   mantém sua própria sequência determinística, inclusive durante lockdown.
+- **Fase 60 — Passos funcionais do Player:** o deslocamento horizontal real e
+  grounded acumula uma passada a cada 1,60 m. Parado, no ar, morto ou após salto
+  anormal de posição não emite áudio. `Footstep` usa impacto metálico procedural,
+  variação por índice e sequência própria reiniciada a cada run.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -406,6 +410,13 @@ e reversão disparam `DoorOpen`, fechamento automático ou por lockdown dispara
 espacializada no connector da edge mais próximo do jogador e usa um contador
 por porta, preservando determinismo mesmo quando várias edges mudam no mesmo
 fixed update.
+
+Na Fase 60, `FootstepState` passou a acumular somente a distância horizontal
+realmente resolvida pela colisão. Cada 1,60 m grounded emite um `Footstep`
+procedural curto e metálico na posição do Player. Movimento bloqueado, estado
+aéreo/morto e segmentos acima de 0,50 m não produzem passos; o último caso evita
+rajadas falsas após reposicionamento. O índice dedicado dá variação reproduzível
+sem consumir a sequência dos demais eventos de áudio.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

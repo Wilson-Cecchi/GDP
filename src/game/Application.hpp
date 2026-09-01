@@ -5,6 +5,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Feedback.hpp"
+#include "gameplay/Footstep.hpp"
 #include "gameplay/MainMenu.hpp"
 #include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
@@ -74,6 +75,7 @@ private:
     gameplay::ProgressionSystem progression_;
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
+    gameplay::FootstepState footsteps_;
     gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
     entities::EntityManager entities_;

@@ -23,6 +23,7 @@ enum class AudioEventKind : std::uint8_t {
     DoorOpen,
     DoorClose,
     DoorLock,
+    Footstep,
     Count,
 };
 

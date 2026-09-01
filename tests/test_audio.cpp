@@ -118,6 +118,30 @@ void testDoorCueIdentity()
         "door cues encode rising open, falling close and short lock signatures");
 }
 
+void testFootstepCueIdentity()
+{
+    using namespace gdp::audio;
+    using namespace wkc::audio;
+    constexpr wkc::core::Seed seed = 0x464F4F5453544550ULL;
+    const AudioRecipe first
+        = generateAudioRecipe(seed, AudioEventKind::Footstep, 0U);
+    const AudioRecipe repeated
+        = generateAudioRecipe(seed, AudioEventKind::Footstep, 0U);
+    const AudioRecipe next
+        = generateAudioRecipe(seed, AudioEventKind::Footstep, 1U);
+
+    expect(validateAudioRecipe(first).isValid()
+            && validateAudioClip(synthesizeAudioClip(first), first).isValid(),
+        "metallic footstep recipe and waveform validate");
+    expect(first.recipeHash == repeated.recipeHash
+            && first.recipeHash != next.recipeHash,
+        "step index reproduces one cue and varies the following footstep");
+    expect(first.durationSeconds < 0.13F
+            && first.secondaryFrequency < first.baseFrequency
+            && first.noiseMix > 0.40F,
+        "footstep keeps a short low metallic impact signature");
+}
+
 void testValidationFailures()
 {
     using namespace gdp::audio;
@@ -214,6 +238,7 @@ int main()
     testDeterministicRecipeAndClip();
     testCueCoverageAndClipping();
     testDoorCueIdentity();
+    testFootstepCueIdentity();
     testValidationFailures();
     testSilentMixerAndSpatialization();
 

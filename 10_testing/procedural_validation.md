@@ -34,11 +34,13 @@ contrato; seeds padrão/12345 validam todas as salas sem alterar o fingerprint
 estrutural. O OpenGL compara pixels de luz padrão, procedural e alerta.
 
 O gate de áudio percorre 1.000 combinações de seed/kind/counter, exige hashes
-únicos e cobre todas as quinze categorias e os sete perfis ambientes. O hash
+únicos e cobre todas as dezesseis categorias e os sete perfis ambientes. O hash
 dourado `0xEAD1C1A48BF9FF7F` protege a receita; waveform, envelope, duração,
 clipping, cache, 16 vozes, pan, distância, loop e as três assinaturas de porta,
-além de dispositivo dummy e fallback sem device, são regressões dedicadas. A
-substream `Audio` não participa do fingerprint estrutural.
+além do impacto metálico de passo, dispositivo dummy e fallback sem device, são
+regressões dedicadas. O gameplay valida passada por distância real, grounded,
+segmento de teleporte e reset. A substream `Audio` não participa do fingerprint
+estrutural.
 
 O gate de progressão valida a curva 100 + 75 por nível, cap 10, XP restante,
 score, contadores por fonte, eventos inválidos e ciclo fixo de nove upgrades.

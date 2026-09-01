@@ -831,6 +831,12 @@ para não depender da ordem de iteração quando várias portas mudam juntas. A
 fundação WKC Forge continua sem conhecer portas; IDs e golden anteriores foram
 preservados.
 
+Na Fase 60, `FootstepState` passou a medir o deslocamento horizontal efetivo do
+Player após colisão e emitir uma passada a cada 1,60 m, somente grounded e vivo.
+Segmentos acima de 0,50 m são relocação e não geram áudio. O cue metálico
+`Footstep` usa índice local reiniciado por run, sem acoplar sua ordem aos demais
+efeitos. A WKC Forge permanece genérica e IDs/golden anteriores foram preservados.
+
 ---
 
 # 8. Sistema de seed

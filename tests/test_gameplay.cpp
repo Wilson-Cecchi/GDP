@@ -1,11 +1,13 @@
 #include "core/Math.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Footstep.hpp"
 #include "gameplay/Player.hpp"
 
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -65,6 +67,61 @@ void testMovement()
     updateMany(secondRun, {.moveRight = -1.0F}, world, 24);
     expect(firstRun.state().position == secondRun.state().position,
         "fixed movement is deterministic");
+}
+
+void testFootstepCadence()
+{
+    using namespace gdp::gameplay;
+    FootstepState state;
+    wkc::core::Vec3 previous{};
+    std::optional<std::uint64_t> emitted;
+    for (int segment = 0; segment < 4; ++segment) {
+        const wkc::core::Vec3 current
+            = previous + wkc::core::Vec3{0.40F, 0.0F, 0.0F};
+        emitted = updateFootsteps(state, previous, current, true, true);
+        previous = current;
+    }
+    expect(emitted && *emitted == 0U
+            && wkc::core::nearlyEqual(state.accumulatedDistance, 0.0F),
+        "grounded horizontal travel emits one step at the configured stride");
+
+    const auto second = updateFootsteps(
+        state, previous, previous + wkc::core::Vec3{0.40F, 0.0F, 0.0F}, true, true,
+        {.stepDistance = 0.40F, .maximumSegmentDistance = 0.30F});
+    expect(!second && state.nextEventIndex == 1U,
+        "segments above the safety limit do not create teleport footsteps");
+
+    state.accumulatedDistance = 1.2F;
+    expect(!updateFootsteps(state, previous, previous, false, true)
+            && state.accumulatedDistance == 0.0F,
+        "airborne movement clears cadence and emits no footsteps");
+    expect(!updateFootsteps(state, previous, previous, true, false)
+            && state.accumulatedDistance == 0.0F,
+        "dead or stationary players emit no footsteps");
+
+    state.accumulatedDistance = std::numeric_limits<float>::quiet_NaN();
+    expect(!updateFootsteps(state, previous, previous, true, true)
+            && state.accumulatedDistance == 0.0F,
+        "invalid accumulated distance recovers without emitting audio");
+
+    resetFootsteps(state);
+    expect(state.accumulatedDistance == 0.0F && state.nextEventIndex == 0U,
+        "run reset restores the deterministic footstep sequence");
+
+    Player walker;
+    const CollisionWorld openRoom{
+        {{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    std::uint32_t stepCount = 0U;
+    for (int update = 0; update < 60; ++update) {
+        const wkc::core::Vec3 before = walker.state().position;
+        walker.fixedUpdate({.moveRight = 1.0F}, 1.0F / 60.0F, openRoom);
+        if (updateFootsteps(state, before, walker.state().position,
+                walker.state().grounded, walker.state().alive)) {
+            ++stepCount;
+        }
+    }
+    expect(stepCount == 2U && state.nextEventIndex == 2U,
+        "one second of real Player movement emits distance-based cadence");
 }
 
 void testCollisionAndGravity()
@@ -176,6 +233,7 @@ void testInteractionAndLife()
 int main()
 {
     testMovement();
+    testFootstepCadence();
     testCollisionAndGravity();
     testLookAndCamera();
     testInteractionAndLife();

@@ -154,6 +154,16 @@ void configureRecipe(
         recipe.noiseMix = 0.22F;
         recipe.gain = 0.38F;
         break;
+    case AudioEventKind::Footstep:
+        recipe.durationSeconds = 0.115F;
+        recipe.baseFrequency = 145.0F;
+        recipe.secondaryFrequency = 58.0F;
+        recipe.attackSeconds = 0.001F;
+        recipe.releaseSeconds = 0.095F;
+        recipe.noiseMix = 0.48F;
+        recipe.pulseRate = 13.0F;
+        recipe.gain = 0.26F;
+        break;
     case AudioEventKind::Count:
         break;
     }

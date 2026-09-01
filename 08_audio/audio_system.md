@@ -12,6 +12,7 @@
 > catálogo de receitas e `AudioSystem` permanecem em `gdp::audio`.
 > Na Fase 59, portas receberam cues procedurais e espacializados para abertura,
 > fechamento e trava.
+> Na Fase 60, o Player recebeu passos metálicos procedurais guiados por distância.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -25,8 +26,8 @@ Gameplay Event → AudioEvent → AudioSystem → voice → spatialization → o
 
 `WeaponFire`, `DryFire`, `Reload`, `EnemyHit`, `EnemyDeath`, `PropImpact`,
 `PropDestroyed`, `Pickup`, `EventStart`, `EventComplete`, `PlayerHurt` e
-`Ambient`, além de `DoorOpen`, `DoorClose` e `DoorLock`. Footstep e UI dedicada
-permanecem planejados.
+`Ambient`, além de `DoorOpen`, `DoorClose`, `DoorLock` e `Footstep`. UI dedicada
+permanece planejada.
 
 ## Mixer e buses
 
@@ -56,6 +57,12 @@ reverter fechamento emite `DoorOpen`; iniciar fechamento emite `DoorClose`; a
 passagem efetiva para `Locked` emite `DoorLock`. Repetir `E` em uma porta que já
 abre ou está aberta não duplica o cue.
 
+`FootstepState` mede deslocamento horizontal depois da resolução de colisão e
+emite uma passada a cada 1,60 m. Grounded é obrigatório; parado, no ar ou morto
+não toca. Segmentos acima de 0,50 m zeram o acúmulo para que relocação não soe
+como caminhada. O índice de passada pertence a esse estado e reinicia com a
+run, mantendo variação procedural independente dos demais efeitos.
+
 ## Ambiência
 
 Os sete `RoomTheme` fornecem fundações distintas de frequência, modulação e
@@ -76,9 +83,10 @@ encerrar SDL.
 
 ## Testes
 
-O gate cobre 1.000 receitas/hash únicos, todas as quinze categorias, sete perfis
+O gate cobre 1.000 receitas/hash únicos, todas as dezesseis categorias, sete perfis
 ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
 cache, limite de vozes, ciclo de one-shot/loop, crossfade de duas ambiências,
 pan, distância, assinaturas distintas das três transições de porta, dispositivo
-dummy e dispositivo ausente. Pause, Footstep e UI dedicada permanecem
+dummy e dispositivo ausente. A cadência de passos testa distância real,
+grounded, bloqueio de teleporte e reset. Pause e UI dedicada permanecem
 planejados.

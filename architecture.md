@@ -754,6 +754,13 @@ espacializados no connector mais próximo. A identidade combina edge e sequênci
 local, portanto mudanças simultâneas em portas diferentes não dependem da ordem
 de iteração. IDs e o golden das receitas anteriores permanecem inalterados.
 
+Na Fase 60, `FootstepState` passou a derivar cadência da distância horizontal
+realmente resolvida pelo Player: 1,60 m por passada, somente grounded e vivo.
+Segmentos acima de 0,50 m são tratados como relocação, evitando áudio falso. O
+cue `Footstep` pertence ao catálogo concreto GDP, usa assinatura metálica e
+índice próprio por run; a WKC Forge continua responsável apenas por receita,
+síntese, espacialização e mixer genéricos. IDs e golden anteriores permanecem.
+
 ---
 
 # 8. Sistema de seed

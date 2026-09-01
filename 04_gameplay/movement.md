@@ -3,7 +3,8 @@
 > **Estado:** movimento, mouse look, gravidade e colisão básica implementados na
 > Fase 3; corredores contínuos implementados na Fase 13; portas físicas
 > animadas e sem teleporte implementadas na Fase 15; áudio dedicado de portas
-> implementado na Fase 59. Head bob permanece planejado.
+> implementado na Fase 59; passos por distância implementados na Fase 60. Head
+> bob permanece planejado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -29,6 +30,12 @@ Na implementação atual, velocidade é `4,5 m/s`, gravidade é `-20 m/s²` e a
 entrada diagonal é normalizada. O mouse usa sensibilidade inicial de `0,12°`
 por unidade e é consumido uma única vez por frame, enquanto movimento e
 gravidade executam a `60 Hz`.
+
+Depois do collision solve, `FootstepState` compara as posições anterior/final e
+acumula apenas XZ grounded. A passada ocorre a cada `1,60 m`, portanto a cadência
+não depende da taxa de frames nem do input quando uma parede bloqueia movimento.
+Estado aéreo/morto zera a distância parcial; deslocamento único acima de `0,50 m`
+é tratado como relocação e também não emite.
 
 ## Colisão
 
@@ -65,4 +72,5 @@ porta nos dois sentidos para cada corredor; estados e limiar de abertura;
 caminhada segmentada contínua; bloqueio individual; lockdown físico;
 distância/orientação da interação; preservação de estado;
 quatro rotações; sinais únicos de abrir/fechar/travar; pitch clamp;
+cadência de passos por deslocamento real, silêncio parado/aéreo e reset;
 sensibilidade independente do FPS.
