@@ -824,6 +824,13 @@ técnica do pickup suportam `ItemType::Armor`. A geração procedural de loot e
 eventos continua selecionando somente as categorias anteriores para preservar
 hashes, budgets e distribuições até uma futura etapa de balanceamento.
 
+Na Fase 59, o catálogo concreto de áudio GDP ganhou `DoorOpen`, `DoorClose` e
+`DoorLock`. A Application traduz somente transições reais de `DoorRuntime` em
+cues espacializados no connector mais próximo, usando sequência local por edge
+para não depender da ordem de iteração quando várias portas mudam juntas. A
+fundação WKC Forge continua sem conhecer portas; IDs e golden anteriores foram
+preservados.
+
 ---
 
 # 8. Sistema de seed

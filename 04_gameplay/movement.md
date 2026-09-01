@@ -2,7 +2,8 @@
 
 > **Estado:** movimento, mouse look, gravidade e colisão básica implementados na
 > Fase 3; corredores contínuos implementados na Fase 13; portas físicas
-> animadas e sem teleporte implementadas na Fase 15. Head bob permanece planejado.
+> animadas e sem teleporte implementadas na Fase 15; áudio dedicado de portas
+> implementado na Fase 59. Head bob permanece planejado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -43,6 +44,9 @@ abertura. A porta permanece aberta enquanto o jogador ocupa o vão/corredor,
 aguarda 1,6 s após a saída e então fecha. Cruzar os bounds do destino troca o
 `roomId` automaticamente sem zerar velocidade; HP, inventário, progressão e arma
 são preservados. Lockdown bloqueia imediatamente a rota e força `Closing/Locked`.
+As transições reais para abrir, fechar e concluir a trava emitem cues
+espacializados distintos; interagir repetidamente durante `Opening/Open` não
+duplica o som.
 
 Na Fase 14, a união visual acompanha a união navegável: conteúdo e decoração da
 sala diretamente conectada são enviados ao renderer antes da entrada, cada sala
@@ -60,4 +64,5 @@ Distância equivalente em diferentes FPS; diagonal normalizada; colisão em cant
 porta nos dois sentidos para cada corredor; estados e limiar de abertura;
 caminhada segmentada contínua; bloqueio individual; lockdown físico;
 distância/orientação da interação; preservação de estado;
-quatro rotações; pitch clamp; sensibilidade independente do FPS.
+quatro rotações; sinais únicos de abrir/fechar/travar; pitch clamp;
+sensibilidade independente do FPS.

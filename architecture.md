@@ -747,6 +747,13 @@ runtime de loot aceita `ItemType::Armor`, o estado é espelhado no Entity Manage
 e o HUD mostra valor e barra próprios. Nenhuma tabela procedural passou a sortear
 Armor nesta fase, mantendo hashes, budgets e distribuições existentes.
 
+Na Fase 59, `DoorOpen`, `DoorClose` e `DoorLock` ampliaram o catálogo de áudio
+concreto do GDP sem mover conceitos de porta para a fundação WKC Forge. A
+Application converte apenas transições reais de `DoorRuntime` em cues
+espacializados no connector mais próximo. A identidade combina edge e sequência
+local, portanto mudanças simultâneas em portas diferentes não dependem da ordem
+de iteração. IDs e o golden das receitas anteriores permanecem inalterados.
+
 ---
 
 # 8. Sistema de seed

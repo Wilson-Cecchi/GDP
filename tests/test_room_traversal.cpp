@@ -276,8 +276,10 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
     (void)gameplay::updateDoor(door, 5.0F, false, true);
     expect(door.state == world::DoorState::Open,
         "occupied door cannot close on a player in its threshold or corridor");
-    (void)gameplay::updateDoor(door, 2.0F, false, false);
-    expect(door.state == world::DoorState::Closing,
+    const gameplay::DoorUpdate closing
+        = gameplay::updateDoor(door, 2.0F, false, false);
+    expect(door.state == world::DoorState::Closing && closing.startedClosing
+            && !closing.fullyClosed,
         "unoccupied door starts closing after its hold interval");
     expect(gameplay::requestDoorOpen(door, false),
         "interaction reverses a closing door safely");
@@ -288,11 +290,13 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
     expect(door.state == world::DoorState::Open
             && gameplay::isDoorPassable(door),
         "lockdown holds an occupied passable door open until the player clears it");
-    (void)gameplay::updateDoor(door, 1.0F, true, false);
+    const gameplay::DoorUpdate locking
+        = gameplay::updateDoor(door, 1.0F, true, false);
     expect(door.state == world::DoorState::Locked
+            && locking.startedClosing && locking.fullyClosed
             && !gameplay::isDoorPassable(door)
             && !gameplay::requestDoorOpen(door, true),
-        "lockdown closes a cleared door and rejects interaction");
+        "lockdown reports close and lock transitions then rejects interaction");
 }
 
 void testPreviouslyBrokenCorridorSeedsTraverseBothWays()

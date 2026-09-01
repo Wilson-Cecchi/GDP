@@ -92,6 +92,32 @@ void testCueCoverageAndClipping()
         "1,000 event counters produce 1,000 distinct deterministic recipes");
 }
 
+void testDoorCueIdentity()
+{
+    using namespace gdp::audio;
+    using namespace wkc::audio;
+    constexpr wkc::core::Seed seed = 0x444F4F525F415544ULL;
+    const AudioRecipe opening
+        = generateAudioRecipe(seed, AudioEventKind::DoorOpen, 3U);
+    const AudioRecipe closing
+        = generateAudioRecipe(seed, AudioEventKind::DoorClose, 3U);
+    const AudioRecipe locking
+        = generateAudioRecipe(seed, AudioEventKind::DoorLock, 3U);
+
+    expect(validateAudioRecipe(opening).isValid()
+            && validateAudioRecipe(closing).isValid()
+            && validateAudioRecipe(locking).isValid(),
+        "door transition cues produce valid procedural recipes");
+    expect(opening.recipeHash != closing.recipeHash
+            && opening.recipeHash != locking.recipeHash
+            && closing.recipeHash != locking.recipeHash,
+        "opening, closing and locking have distinct deterministic identities");
+    expect(opening.secondaryFrequency > opening.baseFrequency
+            && closing.secondaryFrequency < closing.baseFrequency
+            && locking.durationSeconds < opening.durationSeconds,
+        "door cues encode rising open, falling close and short lock signatures");
+}
+
 void testValidationFailures()
 {
     using namespace gdp::audio;
@@ -187,6 +213,7 @@ int main()
 {
     testDeterministicRecipeAndClip();
     testCueCoverageAndClipping();
+    testDoorCueIdentity();
     testValidationFailures();
     testSilentMixerAndSpatialization();
 

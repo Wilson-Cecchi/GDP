@@ -125,6 +125,35 @@ void configureRecipe(
         recipe.pulseRate = 0.42F;
         recipe.gain = 0.12F;
         break;
+    case AudioEventKind::DoorOpen:
+        recipe.durationSeconds = 0.46F;
+        recipe.baseFrequency = 86.0F;
+        recipe.secondaryFrequency = 174.0F;
+        recipe.attackSeconds = 0.008F;
+        recipe.releaseSeconds = 0.36F;
+        recipe.noiseMix = 0.20F;
+        recipe.pulseRate = 6.5F;
+        recipe.gain = 0.30F;
+        break;
+    case AudioEventKind::DoorClose:
+        recipe.durationSeconds = 0.60F;
+        recipe.baseFrequency = 118.0F;
+        recipe.secondaryFrequency = 72.0F;
+        recipe.attackSeconds = 0.006F;
+        recipe.releaseSeconds = 0.50F;
+        recipe.noiseMix = 0.28F;
+        recipe.pulseRate = 5.0F;
+        recipe.gain = 0.34F;
+        break;
+    case AudioEventKind::DoorLock:
+        recipe.durationSeconds = 0.12F;
+        recipe.baseFrequency = 310.0F;
+        recipe.secondaryFrequency = 92.0F;
+        recipe.attackSeconds = 0.001F;
+        recipe.releaseSeconds = 0.10F;
+        recipe.noiseMix = 0.22F;
+        recipe.gain = 0.38F;
+        break;
     case AudioEventKind::Count:
         break;
     }

@@ -20,6 +20,9 @@ enum class AudioEventKind : std::uint8_t {
     EventComplete,
     PlayerHurt,
     Ambient,
+    DoorOpen,
+    DoorClose,
+    DoorLock,
     Count,
 };
 

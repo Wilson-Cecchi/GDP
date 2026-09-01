@@ -87,6 +87,7 @@ private:
     std::vector<world::RoomLightingPlan> roomLighting_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
+    std::unordered_map<world::EdgeId, std::uint64_t> doorAudioEventCounters_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<visual::GdpRenderer> renderer_;
     SDL_Window* window_{nullptr};

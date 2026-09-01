@@ -10,6 +10,8 @@
 > backend SDL para `wkc_forge_audio`; a fachada GDP apenas fornece receitas.
 > Na Fase 45, esses contratos e o mixer passaram para `wkc::audio`; eventos,
 > catálogo de receitas e `AudioSystem` permanecem em `gdp::audio`.
+> Na Fase 59, portas receberam cues procedurais e espacializados para abertura,
+> fechamento e trava.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -23,7 +25,8 @@ Gameplay Event → AudioEvent → AudioSystem → voice → spatialization → o
 
 `WeaponFire`, `DryFire`, `Reload`, `EnemyHit`, `EnemyDeath`, `PropImpact`,
 `PropDestroyed`, `Pickup`, `EventStart`, `EventComplete`, `PlayerHurt` e
-`Ambient`. Footstep, Door e UI dedicada permanecem planejados.
+`Ambient`, além de `DoorOpen`, `DoorClose` e `DoorLock`. Footstep e UI dedicada
+permanecem planejados.
 
 ## Mixer e buses
 
@@ -46,6 +49,13 @@ Eventos usam `sourceSeed + kind + eventCounter`, sem consumir RNG estrutural.
 do listener. Disparo, impacto e destruição usam localização; recarga, coleta,
 dano recebido e estados de evento usam o centro estéreo.
 
+Portas usam a seed da run e uma identidade formada por `edge + sequência local`.
+Esse contador por edge evita que a iteração de várias portas altere os sons. A
+posição vem do connector da mesma edge mais próximo do listener. Abrir ou
+reverter fechamento emite `DoorOpen`; iniciar fechamento emite `DoorClose`; a
+passagem efetiva para `Locked` emite `DoorLock`. Repetir `E` em uma porta que já
+abre ou está aberta não duplica o cue.
+
 ## Ambiência
 
 Os sete `RoomTheme` fornecem fundações distintas de frequência, modulação e
@@ -66,8 +76,9 @@ encerrar SDL.
 
 ## Testes
 
-O gate cobre 1.000 receitas/hash únicos, todas as doze categorias, sete perfis
+O gate cobre 1.000 receitas/hash únicos, todas as quinze categorias, sete perfis
 ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
 cache, limite de vozes, ciclo de one-shot/loop, crossfade de duas ambiências,
-pan, distância, dispositivo dummy e dispositivo ausente. Pause e som dedicado
-de porta permanecem planejados.
+pan, distância, assinaturas distintas das três transições de porta, dispositivo
+dummy e dispositivo ausente. Pause, Footstep e UI dedicada permanecem
+planejados.

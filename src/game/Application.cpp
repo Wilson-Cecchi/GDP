@@ -278,6 +278,30 @@ bool playerNearDoor(
     return false;
 }
 
+std::optional<wkc::core::Vec3> nearestDoorPosition(
+    const world::World& world,
+    const world::EdgeId edge,
+    const wkc::core::Vec3 listenerPosition) noexcept
+{
+    std::optional<wkc::core::Vec3> nearest;
+    float nearestDistanceSquared = 0.0F;
+    for (const world::RoomInstance& room : world.rooms) {
+        for (const world::ConnectorInstance& connector : room.connectors) {
+            if (!connector.edge || *connector.edge != edge) {
+                continue;
+            }
+            const wkc::core::Vec3 offset
+                = connector.worldPosition - listenerPosition;
+            const float distanceSquared = wkc::core::dot(offset, offset);
+            if (!nearest || distanceSquared < nearestDistanceSquared) {
+                nearest = connector.worldPosition;
+                nearestDistanceSquared = distanceSquared;
+            }
+        }
+    }
+    return nearest;
+}
+
 } // namespace
 
 Application::Application(ApplicationConfig config)
@@ -481,6 +505,7 @@ bool Application::initializeRun()
     initiallyBlockedEdges.reserve(world_->corridors.size());
     for (const world::CorridorPath& corridor : world_->corridors) {
         doorRuntimes_.emplace(corridor.edge, gameplay::makeDoorRuntime(corridor.edge));
+        doorAudioEventCounters_.emplace(corridor.edge, 0U);
         initiallyBlockedEdges.push_back(corridor.edge);
     }
     baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
@@ -801,6 +826,23 @@ void Application::fixedUpdate(const double fixedStep)
         });
     const bool doorsLocked = collisionEvent != roomEvents_.end()
         && gameplay::isRoomLocked(*collisionEvent);
+    const auto playDoorAudio = [this](
+        const gdp::audio::AudioEventKind kind,
+        const world::EdgeId edge) {
+        if (!audio_ || !world_) {
+            return;
+        }
+        const std::optional<wkc::core::Vec3> position = nearestDoorPosition(
+            *world_, edge, player_.state().position);
+        if (!position) {
+            return;
+        }
+        std::uint64_t& sequence = doorAudioEventCounters_[edge];
+        const std::uint64_t eventId
+            = (static_cast<std::uint64_t>(edge) << 32U) ^ sequence++;
+        audio_->playAt(kind, session_.state().currentSeed, eventId, *position,
+            player_.state().position, player_.planarForwardDirection());
+    };
     std::optional<world::EdgeId> occupiedCorridorEdge;
     if (world_ && !gameplay::roomContainingCharacter(
             *world_, player_.state().position)) {
@@ -819,7 +861,17 @@ void Application::fixedUpdate(const double fixedStep)
                 && edgeTouchesRoom(*world_, edge, playerRoom);
             const bool occupied = occupiedCorridorEdge == edge
                 || playerNearDoor(*world_, edge, player_.state().position);
-            (void)gameplay::updateDoor(door, step, locked, occupied);
+            const gameplay::DoorUpdate update
+                = gameplay::updateDoor(door, step, locked, occupied);
+            if (update.startedOpening) {
+                playDoorAudio(gdp::audio::AudioEventKind::DoorOpen, edge);
+            }
+            if (update.startedClosing) {
+                playDoorAudio(gdp::audio::AudioEventKind::DoorClose, edge);
+            }
+            if (update.fullyClosed && door.state == world::DoorState::Locked) {
+                playDoorAudio(gdp::audio::AudioEventKind::DoorLock, edge);
+            }
             if (!gameplay::isDoorPassable(door)) {
                 blockedDoorEdges.push_back(edge);
             }
@@ -888,8 +940,15 @@ void Application::fixedUpdate(const double fixedStep)
                 log(LogLevel::Info, "Door locked by active room event");
             } else {
                 const auto door = doorRuntimes_.find(transition->edge);
+                const world::DoorState previousState = door == doorRuntimes_.end()
+                    ? world::DoorState::Disabled : door->second.state;
                 if (door != doorRuntimes_.end()
                     && gameplay::requestDoorOpen(door->second, false)) {
+                    if (previousState != world::DoorState::Opening
+                        && previousState != world::DoorState::Open) {
+                        playDoorAudio(
+                            gdp::audio::AudioEventKind::DoorOpen, transition->edge);
+                    }
                     std::ostringstream message;
                     message << "Door opening on edge " << transition->edge;
                     log(LogLevel::Info, message.str());
@@ -1693,6 +1752,7 @@ void Application::shutdown()
     roomLighting_.clear();
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
+    doorAudioEventCounters_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};

@@ -242,6 +242,10 @@ especializados das pastas numeradas.
   ambos. O runtime coleta pickups Armor respeitando capacidade, o Entity Manager
   sincroniza o estado e o HUD exibe valor/barra azul. A geração procedural
   existente não foi alterada, preservando os hashes de loot e eventos.
+- **Fase 59 — Áudio funcional das portas:** abrir, fechar e travar possuem
+  receitas procedurais distintas e espacializadas na posição física da porta.
+  Os sons são emitidos somente quando o estado realmente transita; cada edge
+  mantém sua própria sequência determinística, inclusive durante lockdown.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -395,6 +399,13 @@ depois que o corredor está vazio. Os painéis deslizam lateralmente e lockdown
 solicita fechamento/bloqueio assim que o vão fica livre. O áudio mantém dois
 loops cacheados no corredor e
 aplica crossfade equal-power com o mesmo progresso suavizado da iluminação.
+
+Na Fase 59, as transições das portas ganharam leitura sonora própria. Interação
+e reversão disparam `DoorOpen`, fechamento automático ou por lockdown dispara
+`DoorClose`, e a conclusão do bloqueio dispara `DoorLock`. Cada cue é
+espacializada no connector da edge mais próximo do jogador e usa um contador
+por porta, preservando determinismo mesmo quando várias edges mudam no mesmo
+fixed update.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
