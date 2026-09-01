@@ -21,6 +21,7 @@
 #include "world/WorldGenerator.hpp"
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -69,6 +70,8 @@ private:
     void setPaused(bool paused);
     [[nodiscard]] bool returnToMainMenu();
     void applyRuntimeSettings();
+    void loadPersistedSettings();
+    [[nodiscard]] bool savePersistedSettings();
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
@@ -87,6 +90,7 @@ private:
     gameplay::ResultMenuState resultMenu_;
     gameplay::SettingsMenuState settingsMenu_;
     gameplay::RuntimeSettings runtimeSettings_;
+    std::optional<std::filesystem::path> settingsPath_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
@@ -107,6 +111,8 @@ private:
     bool running_{false};
     bool restartRequested_{false};
     bool fatalError_{false};
+    bool settingsLoaded_{false};
+    bool settingsDirty_{false};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
     std::uint64_t audioEventCounter_{0};

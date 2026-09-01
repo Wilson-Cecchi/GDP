@@ -123,4 +123,21 @@ float mouseSensitivity(const RuntimeSettings& settings) noexcept
     return baseSensitivity * (static_cast<float>(percent) / 100.0F);
 }
 
+RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
+{
+    settings.masterVolumePercent = std::min<std::uint16_t>(
+        settings.masterVolumePercent, 100U);
+    settings.effectsVolumePercent = std::min<std::uint16_t>(
+        settings.effectsVolumePercent, 100U);
+    settings.ambientVolumePercent = std::min<std::uint16_t>(
+        settings.ambientVolumePercent, 100U);
+    settings.uiVolumePercent = std::min<std::uint16_t>(
+        settings.uiVolumePercent, 100U);
+    settings.mouseSensitivityPercent = std::clamp<std::uint16_t>(
+        settings.mouseSensitivityPercent, 30U, 200U);
+    settings.fieldOfViewDegrees = std::clamp<std::uint16_t>(
+        settings.fieldOfViewDegrees, 60U, 100U);
+    return settings;
+}
+
 } // namespace gdp::gameplay

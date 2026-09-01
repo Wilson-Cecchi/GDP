@@ -270,8 +270,11 @@ especializados das pastas numeradas.
   recursos da run são limpos sem fechar ou recriar a janela.
 - **Fase 66 — Configurações runtime:** `SETTINGS` no título e na pausa ajusta
   Master, Effects, Ambient, UI, sensibilidade e FOV em tempo real. Teclado,
-  setas e mouse compartilham layout responsivo; persistência em disco continua
-  reservada para uma fase própria.
+  setas e mouse compartilham layout responsivo.
+- **Fase 67 — Persistência segura das configurações:** os seis valores são
+  carregados de `settings.toml` no diretório de preferências da plataforma e
+  salvos ao fechar o menu. O formato versionado aceita campos ausentes/futuros,
+  recupera valores inválidos e só substitui o arquivo após validar o temporário.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -477,8 +480,16 @@ Na Fase 66, `SettingsMenuState` passou a oferecer seis ajustes funcionais:
 volumes Master/Effects/Ambient/UI de 0–100%, sensibilidade de 30–200% e FOV de
 60–100 graus. A/D ou setas laterais alteram o valor; W/S ou setas verticais
 navegam; mouse seleciona a linha e ajusta pela metade esquerda/direita. Mudanças
-são aplicadas imediatamente e sobrevivem a novas runs dentro do processo, mas
-ainda não são gravadas em arquivo.
+são aplicadas imediatamente e sobrevivem a novas runs dentro do processo.
+
+Na Fase 67, `SettingsStore` passou a carregar e salvar esses valores em um TOML
+simples de versão 1 no diretório retornado por `SDL_GetPrefPath`. O carregamento
+aceita campos ausentes e desconhecidos; números fora da faixa são clampados e
+campos conhecidos malformados preservam o default. Ao sair de `SETTINGS`, a
+Application escreve `settings.toml.tmp`, faz flush, relê e valida o conteúdo e
+só então executa a troca no mesmo diretório. Falhas preservam o arquivo anterior
+e o shutdown repete uma gravação ainda pendente. O modo headless não consulta
+nem altera preferências do usuário.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

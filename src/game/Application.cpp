@@ -9,6 +9,7 @@
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
+#include "persistence/SettingsStore.hpp"
 #include "platform/SdlInput.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/GdpRenderer.hpp"
@@ -410,6 +411,8 @@ bool Application::initialize()
     }
     sdlInitialized_ = true;
 
+    loadPersistedSettings();
+
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
     (void)audio_->initialize(!config_.headless);
     applyRuntimeSettings();
@@ -644,6 +647,7 @@ void Application::processEvents()
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::closeSettingsMenu(settingsMenu_);
+            (void)savePersistedSettings();
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
             return;
         }
@@ -700,6 +704,7 @@ void Application::processEvents()
         if (adjustDown != adjustUp
             && gameplay::adjustRuntimeSetting(runtimeSettings_,
                 settingsMenu_.selection, adjustDown ? -1 : 1)) {
+            settingsDirty_ = true;
             applyRuntimeSettings();
             playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
         }
@@ -719,13 +724,15 @@ void Application::processEvents()
                         < (static_cast<float>(drawableWidth) * 0.5F)
                     ? -1 : 1;
                 if (gameplay::adjustRuntimeSetting(runtimeSettings_,
-                        settingsMenu_.selection, direction)) {
+                    settingsMenu_.selection, direction)) {
+                    settingsDirty_ = true;
                     applyRuntimeSettings();
                     playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
                 }
             }
         }
         if (command != gameplay::SettingsMenuCommand::None) {
+            (void)savePersistedSettings();
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
         }
         return;
@@ -1139,6 +1146,72 @@ void Application::applyRuntimeSettings()
         audio_->setUiVolume(gameplay::normalizedVolume(
             runtimeSettings_.uiVolumePercent));
     }
+}
+
+void Application::loadPersistedSettings()
+{
+    if (settingsLoaded_) {
+        return;
+    }
+    settingsLoaded_ = true;
+    if (config_.headless) {
+        return;
+    }
+
+    char* const preferenceDirectory = SDL_GetPrefPath("WKC", "GDP");
+    if (preferenceDirectory == nullptr) {
+        log(LogLevel::Warning,
+            sdlError("Settings preference path unavailable; using defaults"));
+        return;
+    }
+    settingsPath_ = std::filesystem::path{preferenceDirectory} / "settings.toml";
+    SDL_free(preferenceDirectory);
+
+    const persistence::SettingsLoadResult loaded
+        = persistence::loadRuntimeSettings(*settingsPath_);
+    runtimeSettings_ = loaded.settings;
+    switch (loaded.status) {
+    case persistence::SettingsLoadStatus::Loaded:
+        log(LogLevel::Info, "Runtime settings loaded from disk");
+        break;
+    case persistence::SettingsLoadStatus::LoadedWithRecovery:
+        log(LogLevel::Warning,
+            "Runtime settings loaded with invalid values recovered");
+        break;
+    case persistence::SettingsLoadStatus::Missing:
+        log(LogLevel::Info, "No settings file found; using defaults");
+        break;
+    case persistence::SettingsLoadStatus::Invalid:
+        log(LogLevel::Warning, "Invalid settings file; using defaults");
+        break;
+    case persistence::SettingsLoadStatus::UnsupportedVersion:
+        log(LogLevel::Warning,
+            "Unsupported settings version; using defaults");
+        break;
+    case persistence::SettingsLoadStatus::IoError:
+        log(LogLevel::Warning, "Settings file could not be read; using defaults");
+        break;
+    }
+}
+
+bool Application::savePersistedSettings()
+{
+    if (!settingsDirty_) {
+        return true;
+    }
+    if (!settingsPath_) {
+        log(LogLevel::Warning,
+            "Settings changed but no writable preference path is available");
+        return false;
+    }
+    if (!persistence::saveRuntimeSettings(*settingsPath_, runtimeSettings_)) {
+        log(LogLevel::Warning,
+            "Runtime settings could not be saved; previous file was preserved");
+        return false;
+    }
+    settingsDirty_ = false;
+    log(LogLevel::Info, "Runtime settings saved to disk");
+    return true;
 }
 
 void Application::fixedUpdate(const double fixedStep)
@@ -2161,6 +2234,8 @@ void Application::render()
 void Application::shutdown()
 {
     running_ = false;
+
+    (void)savePersistedSettings();
 
     renderer_.reset();
     audio_.reset();

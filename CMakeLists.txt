@@ -269,6 +269,18 @@ gdp_enable_sanitizers(gdp_world)
 
 target_link_libraries(gdp_gameplay PUBLIC gdp_world)
 
+add_library(
+    gdp_persistence
+    STATIC
+    src/persistence/SettingsStore.cpp
+)
+
+target_compile_features(gdp_persistence PUBLIC cxx_std_20)
+target_include_directories(gdp_persistence PUBLIC src)
+target_link_libraries(gdp_persistence PUBLIC gdp_gameplay)
+gdp_enable_warnings(gdp_persistence)
+gdp_enable_sanitizers(gdp_persistence)
+
 add_executable(
     gdp
     src/main.cpp
@@ -282,6 +294,7 @@ target_link_libraries(
     wkc_forge_core
     gdp_entities
     gdp_gameplay
+    gdp_persistence
     wkc_forge_platform
     wkc_forge_platform_sdl
     gdp_visual_renderer
@@ -440,6 +453,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME settings_menu_systems COMMAND gdp_settings_menu_tests)
     set_tests_properties(settings_menu_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_settings_store_tests tests/test_settings_store.cpp)
+    target_link_libraries(gdp_settings_store_tests PRIVATE gdp_persistence)
+    gdp_enable_warnings(gdp_settings_store_tests)
+    gdp_enable_sanitizers(gdp_settings_store_tests)
+
+    add_test(NAME settings_persistence_systems COMMAND gdp_settings_store_tests)
+    set_tests_properties(settings_persistence_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_progression_tests tests/test_progression.cpp)
     target_link_libraries(gdp_progression_tests PRIVATE gdp_gameplay)

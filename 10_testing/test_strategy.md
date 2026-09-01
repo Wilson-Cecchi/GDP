@@ -191,6 +191,13 @@ novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste
 CPU percorre as sete linhas do layout em resoluções ampla, compacta e mínima, e
 a regressão OpenGL exige pixels distintos para tela, seleção e valor de FOV.
 
+O gate de persistência usa diretório temporário isolado e cobre arquivo ausente,
+round-trip dos seis campos, substituição de arquivo existente, remoção do
+temporário, campos ausentes/desconhecidos, corrupção parcial, clamps, versão
+ausente e versão incompatível. Os bootstraps headless e OpenGL confirmam que a
+integração não altera o ciclo de inicialização; headless não toca nas
+preferências reais do usuário.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

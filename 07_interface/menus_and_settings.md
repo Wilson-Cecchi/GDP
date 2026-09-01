@@ -2,8 +2,8 @@
 
 > **Estado:** menu principal funcional implementado na Fase 21, pausa in-game
 > funcional desde a Fase 19 e menu de resultado integrado na Fase 64.
-> Configurações runtime foram integradas na Fase 66; persistência, invert Y,
-> resolução e fullscreen permanecem especificados.
+> Configurações runtime foram integradas na Fase 66 e sua persistência segura na
+> Fase 67; invert Y, resolução e fullscreen permanecem especificados.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 >
@@ -83,9 +83,12 @@ clicar na metade esquerda/direita da linha reduz/aumenta. `BACK`, `Enter` sobre
 `BACK` ou `Esc` retorna exatamente ao título ou à pausa de origem. Look e fixed
 update permanecem congelados enquanto a tela está aberta.
 
-Os valores são aplicados imediatamente e preservados entre runs enquanto o
-processo estiver aberto. Persistência em arquivo, invert Y, resolução,
-fullscreen e remapeamento continuam para fases posteriores.
+Os valores são aplicados imediatamente e preservados entre runs. Ao retornar por
+`BACK` ou `Esc`, eles são gravados no `settings.toml` do diretório de preferências
+da plataforma. Se a aplicação for encerrada diretamente, o shutdown também tenta
+salvar qualquer alteração pendente. Na próxima execução, o carregamento acontece
+antes da configuração de áudio, Player e câmera. Invert Y, resolução, fullscreen
+e remapeamento continuam para fases posteriores.
 
 ## Confirmações
 

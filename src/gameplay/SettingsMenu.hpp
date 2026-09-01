@@ -61,5 +61,7 @@ void selectSettingsMenuOption(
     SettingsMenuState& state) noexcept;
 [[nodiscard]] float normalizedVolume(std::uint16_t percent) noexcept;
 [[nodiscard]] float mouseSensitivity(const RuntimeSettings& settings) noexcept;
+[[nodiscard]] RuntimeSettings sanitizeRuntimeSettings(
+    RuntimeSettings settings) noexcept;
 
 } // namespace gdp::gameplay

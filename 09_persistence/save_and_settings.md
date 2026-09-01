@@ -35,7 +35,20 @@ for realmente necessária. Até lá, seed + progresso entre andares é mais simp
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.
 Valores inválidos usam defaults/clamps.
 
-A Fase 66 implementa somente o estado runtime clampado para volumes,
-sensibilidade e FOV. Ele sobrevive a novas runs no mesmo processo, mas ainda não
-é lido ou escrito em disco; esta seção continua sendo o contrato da futura
-persistência.
+A Fase 66 implementou o estado runtime clampado para volumes, sensibilidade e
+FOV. A Fase 67 adicionou `gdp_persistence/SettingsStore`: um `settings.toml` de
+versão 1 no diretório de preferências resolvido por SDL. Os campos atuais são
+`master_volume`, `effects_volume`, `ambient_volume`, `ui_volume`,
+`mouse_sensitivity` e `field_of_view`.
+
+Campos ausentes mantêm defaults e campos desconhecidos são ignorados para
+compatibilidade futura. Campos conhecidos malformados voltam ao default e
+valores numéricos fora da faixa são clampados, com status explícito de
+recuperação. Versão ausente, inválida ou incompatível não é interpretada como o
+schema atual.
+
+A escrita usa um temporário no mesmo diretório, faz flush, relê o arquivo pelo
+mesmo parser e compara o estado canônico antes do rename final. Se qualquer etapa
+falhar, o temporário é removido e o arquivo anterior não é apagado. A Application
+salva ao fechar `SETTINGS` e repete no shutdown apenas se ainda houver alteração
+pendente. Execuções headless não acessam preferências do usuário.

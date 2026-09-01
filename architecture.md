@@ -799,6 +799,13 @@ aplica os valores às APIs existentes de Audio, Player e Camera; o layout puro
 compartilha desenho e hit test high-DPI. O estado permanece em memória e não
 antecipa a futura persistência nem move conceitos de menu para a WKC Forge.
 
+Na Fase 67, `gdp_persistence` passou a depender do contrato de
+`RuntimeSettings`, sem contaminar as fundações WKC Forge. `SettingsStore` possui
+parser e escritor versionados independentes de SDL; somente a Application usa
+`SDL_GetPrefPath` para resolver o destino. O temporário é relido pelo mesmo
+parser antes do rename, e o estado sujo permanece pendente quando a escrita
+falha. Headless mantém o filesystem de preferências fora do ciclo de testes.
+
 ---
 
 # 8. Sistema de seed
