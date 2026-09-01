@@ -34,3 +34,8 @@ for realmente necessária. Até lá, seed + progresso entre andares é mais simp
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.
 Valores inválidos usam defaults/clamps.
+
+A Fase 66 implementa somente o estado runtime clampado para volumes,
+sensibilidade e FOV. Ele sobrevive a novas runs no mesmo processo, mas ainda não
+é lido ou escrito em disco; esta seção continua sendo o contrato da futura
+persistência.

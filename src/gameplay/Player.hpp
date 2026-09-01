@@ -44,6 +44,7 @@ public:
         wkc::core::Vec3 feetPosition,
         float yawDegrees) noexcept;
     void bindEntity(gdp::entities::EntityId entity) noexcept;
+    void setMouseSensitivity(float sensitivity) noexcept;
     void applyLook(wkc::core::Vec2 mouseDelta) noexcept;
     void fixedUpdate(
         const PlayerCommand& command,
@@ -71,6 +72,7 @@ public:
     [[nodiscard]] wkc::core::Vec3 planarForwardDirection() const noexcept;
     [[nodiscard]] wkc::core::Vec3 rightDirection() const noexcept;
     [[nodiscard]] wkc::core::Vec3 cameraPosition() const noexcept;
+    [[nodiscard]] float mouseSensitivity() const noexcept;
 
 private:
     PlayerState state_{};

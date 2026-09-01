@@ -25,11 +25,14 @@ void testMainMenuNavigation()
         "main menu starts on Start Run");
 
     moveMainMenuSelection(menu, 1);
-    expect(menu.selection == MainMenuOption::ExitGame,
-        "down selects Exit Game");
+    expect(menu.selection == MainMenuOption::Settings,
+        "down selects Settings");
     moveMainMenuSelection(menu, 4);
+    expect(menu.selection == MainMenuOption::ExitGame,
+        "navigation magnitude is normalized to one step");
+    moveMainMenuSelection(menu, 1);
     expect(menu.selection == MainMenuOption::StartRun,
-        "positive navigation wraps and ignores magnitude");
+        "down wraps from Exit Game to Start Run");
     moveMainMenuSelection(menu, -1);
     expect(menu.selection == MainMenuOption::ExitGame,
         "up wraps to Exit Game");
@@ -47,6 +50,10 @@ void testMainMenuActivation()
     using namespace gdp::gameplay;
 
     MainMenuState menu;
+    selectMainMenuOption(menu, MainMenuOption::Settings);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::Settings
+            && menu.active,
+        "Settings emits its command without closing the main menu");
     selectMainMenuOption(menu, MainMenuOption::ExitGame);
     expect(activateMainMenuSelection(menu) == MainMenuCommand::ExitGame,
         "Exit Game emits its command");

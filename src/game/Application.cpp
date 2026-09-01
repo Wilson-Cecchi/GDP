@@ -353,7 +353,8 @@ int Application::run()
                 continue;
             }
             if (session_.state().phase == gameplay::SessionPhase::Playing
-                && !mainMenu_.active && !pauseMenu_.paused) {
+                && !mainMenu_.active && !pauseMenu_.paused
+                && !settingsMenu_.active) {
                 player_.applyLook(input_.mouseDelta());
             }
 
@@ -411,6 +412,7 @@ bool Application::initialize()
 
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
     (void)audio_->initialize(!config_.headless);
+    applyRuntimeSettings();
 
     if (config_.headless) {
         log(LogLevel::Info, "GDP headless platform initialized");
@@ -634,6 +636,101 @@ void Application::processEvents()
         }
     };
 
+    if (settingsMenu_.active) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+
+        if (input_.wasKeyPressed(Key::Escape)) {
+            gameplay::closeSettingsMenu(settingsMenu_);
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
+            return;
+        }
+
+        std::optional<visual::HudSettingsSelection> pointedSelection;
+        float pointerDrawableX = 0.0F;
+        int drawableWidth = 0;
+        if (window_ != nullptr) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                pointerDrawableX = pointer.x * static_cast<float>(drawableWidth)
+                    / static_cast<float>(windowWidth);
+                const float pointerDrawableY
+                    = pointer.y * static_cast<float>(drawableHeight)
+                    / static_cast<float>(windowHeight);
+                pointedSelection = visual::settingsMenuSelectionAt(
+                    drawableWidth, drawableHeight,
+                    pointerDrawableX, pointerDrawableY);
+            }
+        }
+        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            const gameplay::SettingsMenuOption previousSelection
+                = settingsMenu_.selection;
+            gameplay::selectSettingsMenuOption(settingsMenu_,
+                static_cast<gameplay::SettingsMenuOption>(*pointedSelection));
+            if (settingsMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
+        const bool moveUp = input_.wasKeyPressed(Key::Up)
+            || input_.wasKeyPressed(Key::W);
+        const bool moveDown = input_.wasKeyPressed(Key::Down)
+            || input_.wasKeyPressed(Key::S);
+        if (moveUp != moveDown) {
+            const gameplay::SettingsMenuOption previousSelection
+                = settingsMenu_.selection;
+            gameplay::moveSettingsMenuSelection(
+                settingsMenu_, moveUp ? -1 : 1);
+            if (settingsMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
+        const bool adjustDown = input_.wasKeyPressed(Key::Left)
+            || input_.wasKeyPressed(Key::A);
+        const bool adjustUp = input_.wasKeyPressed(Key::Right)
+            || input_.wasKeyPressed(Key::D);
+        if (adjustDown != adjustUp
+            && gameplay::adjustRuntimeSetting(runtimeSettings_,
+                settingsMenu_.selection, adjustDown ? -1 : 1)) {
+            applyRuntimeSettings();
+            playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+        }
+
+        gameplay::SettingsMenuCommand command
+            = gameplay::SettingsMenuCommand::None;
+        if (input_.wasKeyPressed(Key::Enter)) {
+            command = gameplay::activateSettingsMenuSelection(settingsMenu_);
+        } else if (pointedSelection
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+            gameplay::selectSettingsMenuOption(settingsMenu_,
+                static_cast<gameplay::SettingsMenuOption>(*pointedSelection));
+            if (settingsMenu_.selection == gameplay::SettingsMenuOption::Back) {
+                command = gameplay::activateSettingsMenuSelection(settingsMenu_);
+            } else {
+                const int direction = pointerDrawableX
+                        < (static_cast<float>(drawableWidth) * 0.5F)
+                    ? -1 : 1;
+                if (gameplay::adjustRuntimeSetting(runtimeSettings_,
+                        settingsMenu_.selection, direction)) {
+                    applyRuntimeSettings();
+                    playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+                }
+            }
+        }
+        if (command != gameplay::SettingsMenuCommand::None) {
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
+        }
+        return;
+    }
+
     if (mainMenu_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
@@ -664,14 +761,20 @@ void Application::processEvents()
                         / static_cast<float>(windowHeight));
             }
         }
+        const auto mainMenuOptionFor
+            = [](const visual::HudMainMenuSelection selection) {
+                  if (selection == visual::HudMainMenuSelection::Settings) {
+                      return gameplay::MainMenuOption::Settings;
+                  }
+                  return selection == visual::HudMainMenuSelection::ExitGame
+                      ? gameplay::MainMenuOption::ExitGame
+                      : gameplay::MainMenuOption::StartRun;
+              };
         if (pointedSelection && input_.mouseDelta() != Vec2{}) {
             const gameplay::MainMenuOption previousSelection
                 = mainMenu_.selection;
             gameplay::selectMainMenuOption(
-                mainMenu_,
-                *pointedSelection == visual::HudMainMenuSelection::ExitGame
-                    ? gameplay::MainMenuOption::ExitGame
-                    : gameplay::MainMenuOption::StartRun);
+                mainMenu_, mainMenuOptionFor(*pointedSelection));
             if (mainMenu_.selection != previousSelection) {
                 playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
             }
@@ -696,10 +799,7 @@ void Application::processEvents()
         } else if (pointedSelection
             && input_.wasMouseButtonPressed(MouseButton::Primary)) {
             gameplay::selectMainMenuOption(
-                mainMenu_,
-                *pointedSelection == visual::HudMainMenuSelection::ExitGame
-                    ? gameplay::MainMenuOption::ExitGame
-                    : gameplay::MainMenuOption::StartRun);
+                mainMenu_, mainMenuOptionFor(*pointedSelection));
             command = gameplay::activateMainMenuSelection(mainMenu_);
         }
 
@@ -713,6 +813,10 @@ void Application::processEvents()
                 fatalError_ = true;
                 running_ = false;
             }
+        } else if (command == gameplay::MainMenuCommand::Settings) {
+            gameplay::openSettingsMenu(
+                settingsMenu_, gameplay::SettingsMenuOrigin::MainMenu);
+            log(LogLevel::Info, "Main menu opened settings");
         } else if (command == gameplay::MainMenuCommand::ExitGame) {
             log(LogLevel::Info, "Main menu requested game exit");
             running_ = false;
@@ -850,6 +954,8 @@ void Application::processEvents()
             switch (selection) {
             case visual::HudPauseSelection::RestartRun:
                 return gameplay::PauseMenuOption::RestartRun;
+            case visual::HudPauseSelection::Settings:
+                return gameplay::PauseMenuOption::Settings;
             case visual::HudPauseSelection::MainMenu:
                 return gameplay::PauseMenuOption::MainMenu;
             case visual::HudPauseSelection::ExitGame:
@@ -902,6 +1008,10 @@ void Application::processEvents()
                 false, world::RoomRole::Count, false, false);
             restartRequested_ = true;
             running_ = false;
+        } else if (command == gameplay::PauseMenuCommand::Settings) {
+            gameplay::openSettingsMenu(
+                settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
+            log(LogLevel::Info, "Pause menu opened settings");
         } else if (command == gameplay::PauseMenuCommand::MainMenu) {
             log(LogLevel::Info, "Pause menu requested main menu");
             if (!returnToMainMenu()) {
@@ -979,6 +1089,7 @@ bool Application::returnToMainMenu()
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     gameplay::closeResultMenu(resultMenu_);
+    gameplay::closeSettingsMenu(settingsMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};
@@ -991,6 +1102,7 @@ bool Application::returnToMainMenu()
     terminalEntity_ = {};
     world_.reset();
     clock_.reset();
+    applyRuntimeSettings();
 
     int drawableWidth = 0;
     int drawableHeight = 0;
@@ -1013,10 +1125,26 @@ bool Application::returnToMainMenu()
     return true;
 }
 
+void Application::applyRuntimeSettings()
+{
+    player_.setMouseSensitivity(
+        gameplay::mouseSensitivity(runtimeSettings_));
+    if (audio_) {
+        audio_->setMasterVolume(gameplay::normalizedVolume(
+            runtimeSettings_.masterVolumePercent));
+        audio_->setEffectsVolume(gameplay::normalizedVolume(
+            runtimeSettings_.effectsVolumePercent));
+        audio_->setAmbientVolume(gameplay::normalizedVolume(
+            runtimeSettings_.ambientVolumePercent));
+        audio_->setUiVolume(gameplay::normalizedVolume(
+            runtimeSettings_.uiVolumePercent));
+    }
+}
+
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
-    if (mainMenu_.active || pauseMenu_.paused) {
+    if (mainMenu_.active || pauseMenu_.paused || settingsMenu_.active) {
         if (audio_) {
             audio_->updateUi(step);
         }
@@ -1573,14 +1701,38 @@ void Application::render()
         return;
     }
 
+    if (settingsMenu_.active) {
+        SDL_SetWindowTitle(window_, "GDP | SETTINGS");
+        visual::HudRenderData hud;
+        hud.settingsMenu = true;
+        hud.settingsSelection = static_cast<visual::HudSettingsSelection>(
+            settingsMenu_.selection);
+        hud.masterVolumePercent = runtimeSettings_.masterVolumePercent;
+        hud.effectsVolumePercent = runtimeSettings_.effectsVolumePercent;
+        hud.ambientVolumePercent = runtimeSettings_.ambientVolumePercent;
+        hud.uiVolumePercent = runtimeSettings_.uiVolumePercent;
+        hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
+        hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
+        if (renderer_ == nullptr || !renderer_->render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
+            log(LogLevel::Error, "Renderer failed while drawing settings");
+            fatalError_ = true;
+            running_ = false;
+            return;
+        }
+        SDL_GL_SwapWindow(window_);
+        return;
+    }
+
     if (mainMenu_.active) {
         SDL_SetWindowTitle(window_, "GDP | MAIN MENU");
         visual::HudRenderData hud;
         hud.mainMenu = true;
-        hud.mainMenuSelection
-            = mainMenu_.selection == gameplay::MainMenuOption::ExitGame
-            ? visual::HudMainMenuSelection::ExitGame
-            : visual::HudMainMenuSelection::StartRun;
+        if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
+        } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
+        }
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
             log(LogLevel::Error, "Renderer failed while drawing the main menu");
@@ -1597,7 +1749,7 @@ void Application::render()
     const visual::CameraData camera{
         renderCameraPosition,
         player_.forwardDirection(),
-        68.0F,
+        static_cast<float>(runtimeSettings_.fieldOfViewDegrees),
     };
     std::vector<visual::EnemyRenderData> visibleEnemies;
     std::vector<visual::PickupRenderData> visiblePickups;
@@ -1905,6 +2057,8 @@ void Application::render()
     hud.paused = pauseMenu_.paused;
     if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
         hud.pauseSelection = visual::HudPauseSelection::RestartRun;
+    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Settings) {
+        hud.pauseSelection = visual::HudPauseSelection::Settings;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::MainMenu) {
         hud.pauseSelection = visual::HudPauseSelection::MainMenu;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
@@ -2026,6 +2180,7 @@ void Application::shutdown()
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     gameplay::closeResultMenu(resultMenu_);
+    gameplay::closeSettingsMenu(settingsMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};

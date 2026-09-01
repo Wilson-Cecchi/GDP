@@ -2,7 +2,8 @@
 
 > **Estado:** menu principal funcional implementado na Fase 21, pausa in-game
 > funcional desde a Fase 19 e menu de resultado integrado na Fase 64.
-> Configurações permanecem especificadas.
+> Configurações runtime foram integradas na Fase 66; persistência, invert Y,
+> resolução e fullscreen permanecem especificados.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 >
@@ -10,7 +11,7 @@
 
 ## Menu principal funcional
 
-O bootstrap gráfico mostra `START RUN` e `EXIT GAME` antes de gerar a dungeon.
+O bootstrap gráfico mostra `START RUN`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` encerra. A seleção inicial segura é sempre `START RUN`.
 Alterar efetivamente a seleção toca `UiNavigate`; confirmar por teclado ou mouse
@@ -21,14 +22,13 @@ fixed update. Confirmar `START RUN` cria mundo, entidades, eventos, iluminação
 recursos gráficos da run e então captura o mouse. `EXIT GAME` fecha a aplicação
 sem criar o mundo. `--headless` inicia diretamente porque não possui interação.
 
-Campanha, Speedrun, Ranking e Configurações continuam como expansão futura do
-mesmo estado, sem antecipar sistemas ainda não implementados.
+Campanha, Speedrun e Ranking continuam como expansões futuras do mesmo estado.
 
 ## Pausa in-game
 
 `Esc` abre e fecha a pausa, sempre selecionando `RESUME` como opção segura.
 `W/S` ou setas navegam com wrap e `Enter` confirma `RESUME`, `RESTART RUN`,
-`MAIN MENU` ou `EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
+`SETTINGS`, `MAIN MENU` ou `EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
 cliques fora dos botões não executam comandos. O mouse relativo é liberado no
 menu e restaurado no retorno.
 Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
@@ -66,15 +66,26 @@ mouse livre.
 
 ## Navegação
 
-Cima/baixo, confirmar e voltar continuam sendo ações lógicas independentes do
-dispositivo. Teclado e mouse já mapeiam para os mesmos comandos e cues; gamepad
-permanece como expansão futura.
+Cima/baixo, esquerda/direita, confirmar e voltar continuam sendo ações lógicas
+independentes do dispositivo. Teclado e mouse já mapeiam para os mesmos comandos
+e cues; gamepad permanece como expansão futura.
 
-## Configurações
+## Configurações runtime
 
-FOV, sensibilidade, invert Y, esquema de controles, resolução, fullscreen e
-volumes. Master, Effects, Ambient e UI já existem como buses independentes; a
-tela de configuração permanece planejada.
+`SETTINGS` pode ser aberto pelo título ou pela pausa. Os valores atuais são:
+
+- Master, Effects, Ambient e UI: 0–100%, passos de 10%;
+- sensibilidade: 30–200% da base de 0,12, passos de 10%;
+- FOV vertical: 60–100 graus, passos de 2 graus.
+
+W/S e setas verticais escolhem a linha. A/D e setas laterais ajustam; no mouse,
+clicar na metade esquerda/direita da linha reduz/aumenta. `BACK`, `Enter` sobre
+`BACK` ou `Esc` retorna exatamente ao título ou à pausa de origem. Look e fixed
+update permanecem congelados enquanto a tela está aberta.
+
+Os valores são aplicados imediatamente e preservados entre runs enquanto o
+processo estiver aberto. Persistência em arquivo, invert Y, resolução,
+fullscreen e remapeamento continuam para fases posteriores.
 
 ## Confirmações
 

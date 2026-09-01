@@ -793,6 +793,12 @@ recursos concretos da run. O renderer é reconstruído no contexto OpenGL já
 ativo, preservando janela e processo; nenhum conceito de fluxo GDP foi movido
 para as fundações WKC Forge.
 
+Na Fase 66, `SettingsMenuState` e `RuntimeSettings` adicionaram volumes,
+sensibilidade e FOV clampados, acessíveis pelo título e pela pausa. A Application
+aplica os valores às APIs existentes de Audio, Player e Camera; o layout puro
+compartilha desenho e hit test high-DPI. O estado permanece em memória e não
+antecipa a futura persistência nem move conceitos de menu para a WKC Forge.
+
 ---
 
 # 8. Sistema de seed

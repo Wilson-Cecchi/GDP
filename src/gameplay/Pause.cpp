@@ -50,6 +50,8 @@ PauseMenuCommand activatePauseSelection(PauseMenuState& state) noexcept
         return PauseMenuCommand::Resume;
     case PauseMenuOption::RestartRun:
         return PauseMenuCommand::RestartRun;
+    case PauseMenuOption::Settings:
+        return PauseMenuCommand::Settings;
     case PauseMenuOption::MainMenu:
         return PauseMenuCommand::MainMenu;
     case PauseMenuOption::ExitGame:

@@ -47,6 +47,8 @@ MainMenuCommand activateMainMenuSelection(MainMenuState& state) noexcept
     case MainMenuOption::StartRun:
         closeMainMenu(state);
         return MainMenuCommand::StartRun;
+    case MainMenuOption::Settings:
+        return MainMenuCommand::Settings;
     case MainMenuOption::ExitGame:
         return MainMenuCommand::ExitGame;
     case MainMenuOption::Count:

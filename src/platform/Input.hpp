@@ -19,6 +19,8 @@ enum class Key : std::uint8_t {
     Enter,
     Up,
     Down,
+    Left,
+    Right,
     Count,
 };
 

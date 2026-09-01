@@ -31,6 +31,10 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::Up;
     case SDL_SCANCODE_DOWN:
         return Key::Down;
+    case SDL_SCANCODE_LEFT:
+        return Key::Left;
+    case SDL_SCANCODE_RIGHT:
+        return Key::Right;
     default:
         return std::nullopt;
     }

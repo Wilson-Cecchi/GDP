@@ -231,6 +231,16 @@ void testLookAndCamera()
         "fixed updates do not reapply mouse delta");
     expect(wkc::core::nearlyEqual(once.state().pitchDegrees, manyUpdates.state().pitchDegrees),
         "mouse sensitivity is independent of fixed-update count");
+
+    Player configured;
+    configured.setMouseSensitivity(0.24F);
+    configured.applyLook({10.0F, 0.0F});
+    expect(wkc::core::nearlyEqual(configured.mouseSensitivity(), 0.24F)
+            && wkc::core::nearlyEqual(configured.state().yawDegrees, -87.6F),
+        "runtime sensitivity immediately changes frame-driven look");
+    configured.setMouseSensitivity(9.0F);
+    expect(wkc::core::nearlyEqual(configured.mouseSensitivity(), 0.24F),
+        "runtime sensitivity clamps at its documented maximum");
 }
 
 void testInteractionAndLife()

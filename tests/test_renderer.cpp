@@ -144,6 +144,8 @@ void testMainMenuLayout()
         "wide menu panel stays within the framebuffer");
     expect(wide.panel.contains(wide.startButton.x, wide.startButton.y),
         "Start Run button is inside the menu panel");
+    expect(wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y),
+        "Settings button is inside the menu panel");
     expect(wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "Exit Game button is inside the menu panel");
 
@@ -156,6 +158,13 @@ void testMainMenuLayout()
     expect(mainMenuSelectionAt(1280, 720, startX, startY)
             == HudMainMenuSelection::StartRun,
         "top-origin pointer maps to Start Run");
+    const float settingsX = static_cast<float>(
+        wide.settingsButton.x + wide.settingsButton.width / 2);
+    const float settingsY = static_cast<float>(
+        720 - 1 - (wide.settingsButton.y + wide.settingsButton.height / 2));
+    expect(mainMenuSelectionAt(1280, 720, settingsX, settingsY)
+            == HudMainMenuSelection::Settings,
+        "top-origin pointer maps to Settings");
     expect(mainMenuSelectionAt(1280, 720, exitX, exitY)
             == HudMainMenuSelection::ExitGame,
         "top-origin pointer maps to Exit Game");
@@ -171,8 +180,9 @@ void testMainMenuLayout()
 
     const MainMenuLayout tiny = makeMainMenuLayout(12, 12);
     expect(tiny.panel.contains(tiny.startButton.x, tiny.startButton.y)
+            && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
-        "tiny menu clamps both hit targets inside the framebuffer");
+        "tiny menu clamps all hit targets inside the framebuffer");
 }
 
 void testPauseMenuLayout()
@@ -187,6 +197,7 @@ void testPauseMenuLayout()
         "wide pause menu panel stays within the framebuffer");
     expect(wide.panel.contains(wide.resumeButton.x, wide.resumeButton.y)
             && wide.panel.contains(wide.restartButton.x, wide.restartButton.y)
+            && wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y)
             && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
             && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "pause menu hit targets stay inside the panel");
@@ -206,6 +217,10 @@ void testPauseMenuLayout()
                pointerX(wide.restartButton), pointerY(wide.restartButton))
             == HudPauseSelection::RestartRun,
         "top-origin pointer maps to Restart Run");
+    expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.settingsButton), pointerY(wide.settingsButton))
+            == HudPauseSelection::Settings,
+        "top-origin pointer maps to pause Settings");
     expect(pauseMenuSelectionAt(1280, 720,
                pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
             == HudPauseSelection::MainMenu,
@@ -228,9 +243,45 @@ void testPauseMenuLayout()
     const PauseMenuLayout tiny = makePauseMenuLayout(12, 12);
     expect(tiny.panel.contains(tiny.resumeButton.x, tiny.resumeButton.y)
             && tiny.panel.contains(tiny.restartButton.x, tiny.restartButton.y)
+            && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
             && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny pause menu clamps all hit targets inside the framebuffer");
+}
+
+void testSettingsMenuLayout()
+{
+    using namespace gdp::game::visual;
+    const SettingsMenuLayout wide = makeSettingsMenuLayout(1280, 720);
+    expect(wide.scale == 2, "wide settings menu uses doubled bitmap scale");
+    expect(wide.panel.x >= 0 && wide.panel.y >= 0
+            && wide.panel.x + wide.panel.width <= 1280
+            && wide.panel.y + wide.panel.height <= 720,
+        "settings panel stays within the framebuffer");
+    for (std::size_t index = 0U; index < wide.rows.size(); ++index) {
+        const UiRect row = wide.rows[index];
+        expect(wide.panel.contains(row.x, row.y),
+            "settings row starts inside the panel");
+        const float pointerX = static_cast<float>(row.x + row.width / 2);
+        const float pointerY = static_cast<float>(
+            720 - 1 - (row.y + row.height / 2));
+        expect(settingsMenuSelectionAt(1280, 720, pointerX, pointerY)
+                == static_cast<HudSettingsSelection>(index),
+            "top-origin pointer maps to each settings row");
+    }
+    expect(!settingsMenuSelectionAt(1280, 720, 0.0F, 0.0F),
+        "pointer outside settings rows has no selection");
+
+    const SettingsMenuLayout compact = makeSettingsMenuLayout(320, 200);
+    expect(compact.scale == 1
+            && compact.panel.x + compact.panel.width <= 320
+            && compact.panel.y + compact.panel.height <= 200,
+        "compact settings menu remains within the framebuffer");
+    const SettingsMenuLayout tiny = makeSettingsMenuLayout(12, 12);
+    for (const UiRect row : tiny.rows) {
+        expect(tiny.panel.contains(row.x, row.y),
+            "tiny settings menu clamps rows inside the framebuffer");
+    }
 }
 
 void testResultMenuLayout()
@@ -297,6 +348,7 @@ int main()
     testMainMenuLayout();
     testPauseMenuLayout();
     testResultMenuLayout();
+    testSettingsMenuLayout();
 
     if (failures != 0) {
         std::cerr << failures << " renderer test(s) failed\n";

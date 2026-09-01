@@ -132,12 +132,14 @@ enum class HudNotice : std::uint8_t {
 enum class HudPauseSelection : std::uint8_t {
     Resume,
     RestartRun,
+    Settings,
     MainMenu,
     ExitGame,
 };
 
 enum class HudMainMenuSelection : std::uint8_t {
     StartRun,
+    Settings,
     ExitGame,
 };
 
@@ -145,6 +147,17 @@ enum class HudResultMenuSelection : std::uint8_t {
     PlayAgain,
     MainMenu,
     ExitGame,
+};
+
+enum class HudSettingsSelection : std::uint8_t {
+    MasterVolume,
+    EffectsVolume,
+    AmbientVolume,
+    UiVolume,
+    MouseSensitivity,
+    FieldOfView,
+    Back,
+    Count,
 };
 
 struct UiRect {
@@ -160,6 +173,7 @@ struct MainMenuLayout {
     int scale{1};
     UiRect panel{};
     UiRect startButton{};
+    UiRect settingsButton{};
     UiRect exitButton{};
 };
 
@@ -168,6 +182,7 @@ struct PauseMenuLayout {
     UiRect panel{};
     UiRect resumeButton{};
     UiRect restartButton{};
+    UiRect settingsButton{};
     UiRect mainMenuButton{};
     UiRect exitButton{};
 };
@@ -178,6 +193,12 @@ struct ResultMenuLayout {
     UiRect playAgainButton{};
     UiRect mainMenuButton{};
     UiRect exitButton{};
+};
+
+struct SettingsMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    std::array<UiRect, static_cast<std::size_t>(HudSettingsSelection::Count)> rows{};
 };
 
 [[nodiscard]] MainMenuLayout makeMainMenuLayout(int width, int height) noexcept;
@@ -194,6 +215,12 @@ struct ResultMenuLayout {
     float pointerY) noexcept;
 [[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudResultMenuSelection> resultMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+[[nodiscard]] SettingsMenuLayout makeSettingsMenuLayout(int width, int height) noexcept;
+[[nodiscard]] std::optional<HudSettingsSelection> settingsMenuSelectionAt(
     int width,
     int height,
     float pointerX,
@@ -225,6 +252,14 @@ struct HudRenderData {
     bool mainMenu{false};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
     HudResultMenuSelection resultMenuSelection{HudResultMenuSelection::PlayAgain};
+    bool settingsMenu{false};
+    HudSettingsSelection settingsSelection{HudSettingsSelection::MasterVolume};
+    std::uint16_t masterVolumePercent{100U};
+    std::uint16_t effectsVolumePercent{100U};
+    std::uint16_t ambientVolumePercent{100U};
+    std::uint16_t uiVolumePercent{100U};
+    std::uint16_t mouseSensitivityPercent{100U};
+    std::uint16_t fieldOfViewDegrees{68U};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

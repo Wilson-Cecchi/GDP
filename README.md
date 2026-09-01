@@ -80,7 +80,7 @@ especializados das pastas numeradas.
   acertos e eliminações confirmam na mira, e coleta, ondas, eventos e level-up
   geram avisos temporários determinísticos.
 - **Fase 19 — Pausa funcional:** concluída; `Esc` congela a simulação e abre um
-  menu responsivo com `RESUME`, `RESTART RUN`, `MAIN MENU` e `EXIT GAME`,
+  menu responsivo com `RESUME`, `RESTART RUN`, `SETTINGS`, `MAIN MENU` e `EXIT GAME`,
   liberando o mouse até o retorno ao gameplay.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
   próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
@@ -268,6 +268,10 @@ especializados das pastas numeradas.
 - **Fase 65 — Retorno ao menu principal:** pausa e resultado agora oferecem
   `MAIN MENU`. A run ativa é encerrada, a próxima seed é preparada e todos os
   recursos da run são limpos sem fechar ou recriar a janela.
+- **Fase 66 — Configurações runtime:** `SETTINGS` no título e na pausa ajusta
+  Master, Effects, Ambient, UI, sensibilidade e FOV em tempo real. Teclado,
+  setas e mouse compartilham layout responsivo; persistência em disco continua
+  reservada para uma fase própria.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -469,6 +473,13 @@ Entidades, mundo, eventos, colisão, feedback, áudio e caches gráficos da run 
 limpos; o renderer é reinicializado no contexto OpenGL existente e a janela
 permanece aberta. Iniciar novamente pelo título usa a seed já preparada.
 
+Na Fase 66, `SettingsMenuState` passou a oferecer seis ajustes funcionais:
+volumes Master/Effects/Ambient/UI de 0–100%, sensibilidade de 30–200% e FOV de
+60–100 graus. A/D ou setas laterais alteram o valor; W/S ou setas verticais
+navegam; mouse seleciona a linha e ajusta pela metade esquerda/direita. Mudanças
+são aplicadas imediatamente e sobrevivem a novas runs dentro do processo, mas
+ainda não são gravadas em arquivo.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -556,14 +567,14 @@ foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
 gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
-responsivo com `START RUN` e `EXIT GAME`; `W/S` ou setas mudam a seleção com
-wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
+responsivo com `START RUN`, `SETTINGS` e `EXIT GAME`; `W/S` ou setas mudam a
+seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
 entidades, eventos, iluminação e materiais específicos só são preparados ao
 confirmar `START RUN`.
 
 O modo `--headless` ignora apenas essa espera interativa e inicia a run
 automaticamente para preservar os testes determinísticos. A regressão OpenGL
-verifica o overlay e suas duas seleções; outra integração encerra ainda no menu
+verifica o overlay e suas três seleções; outra integração encerra ainda no menu
 e falha se encontrar o log de geração do mundo. O restart da pausa também marca
 a run atual como encerrada antes de derivar a próxima seed, evitando a rejeição
 de um reinício solicitado durante `Playing`.

@@ -63,6 +63,8 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_RETURN, Key::Enter},
         std::pair{SDL_SCANCODE_UP, Key::Up},
         std::pair{SDL_SCANCODE_DOWN, Key::Down},
+        std::pair{SDL_SCANCODE_LEFT, Key::Left},
+        std::pair{SDL_SCANCODE_RIGHT, Key::Right},
     };
     for (const auto& [scancode, key] : controlMappings) {
         wkc::platform::Input mappedInput;

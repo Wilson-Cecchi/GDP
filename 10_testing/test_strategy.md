@@ -170,7 +170,7 @@ emite navegação quando a seleção realmente muda e usa transições de input,
 repetição por tecla mantida.
 
 O gate da pausa cobre navegação e seleção direta apenas quando o estado está
-ativo, rejeita opções inválidas e valida os quatro hit targets responsivos em
+ativo, rejeita opções inválidas e valida os cinco hit targets responsivos em
 resoluções ampla, compacta e mínima. Os centros dos botões são consultados em
 coordenadas SDL com origem superior, enquanto o renderer usa os mesmos retângulos
 em coordenadas OpenGL; pontos externos não produzem seleção.
@@ -184,6 +184,12 @@ O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
 não fecha e que `START RUN` inicia a seed seguinte.
+
+O gate de configurações cobre origem título/pausa, wrap, seleção direta, retorno,
+passos e clamps de todos os valores. Input neutro e adaptador SDL protegem as
+novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste
+CPU percorre as sete linhas do layout em resoluções ampla, compacta e mínima, e
+a regressão OpenGL exige pixels distintos para tela, seleção e valor de FOV.
 
 ## Sanitizers
 

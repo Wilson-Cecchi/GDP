@@ -399,6 +399,23 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuExitPixels.data());
 
+            gdp::game::visual::HudRenderData settingsHud;
+            settingsHud.settingsMenu = true;
+            const bool renderedSettings = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, settingsHud);
+            std::vector<std::uint8_t> settingsPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                settingsPixels.data());
+
+            settingsHud.settingsSelection
+                = gdp::game::visual::HudSettingsSelection::FieldOfView;
+            settingsHud.fieldOfViewDegrees = 90U;
+            const bool renderedSettingsFov = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, settingsHud);
+            std::vector<std::uint8_t> settingsFovPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                settingsFovPixels.data());
+
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
             std::vector<std::uint8_t> workerPixels(baseline.size());
@@ -472,6 +489,8 @@ int main()
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
+            std::size_t settingsMenuChangedChannels = 0;
+            std::size_t settingsSelectionChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -562,6 +581,14 @@ int main()
                         != mainMenuPixels[index + channel]) {
                         ++mainMenuSelectionChangedChannels;
                     }
+                    if (settingsPixels[index + channel]
+                        != baseline[index + channel]) {
+                        ++settingsMenuChangedChannels;
+                    }
+                    if (settingsFovPixels[index + channel]
+                        != settingsPixels[index + channel]) {
+                        ++settingsSelectionChangedChannels;
+                    }
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
@@ -615,6 +642,9 @@ int main()
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U
+                && renderedSettings && settingsMenuChangedChannels > 500U
+                && renderedSettingsFov
+                && settingsSelectionChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

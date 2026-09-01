@@ -76,6 +76,13 @@ void Player::bindEntity(const gdp::entities::EntityId entity) noexcept
     entity_ = entity;
 }
 
+void Player::setMouseSensitivity(const float sensitivity) noexcept
+{
+    if (std::isfinite(sensitivity)) {
+        mouseSensitivity_ = std::clamp(sensitivity, 0.036F, 0.24F);
+    }
+}
+
 void Player::applyLook(const wkc::core::Vec2 mouseDelta) noexcept
 {
     if (!state_.alive) {
@@ -248,6 +255,11 @@ wkc::core::Vec3 Player::rightDirection() const noexcept
 wkc::core::Vec3 Player::cameraPosition() const noexcept
 {
     return state_.position + wkc::core::Vec3{0.0F, eyeHeight_, 0.0F};
+}
+
+float Player::mouseSensitivity() const noexcept
+{
+    return mouseSensitivity_;
 }
 
 } // namespace gdp::gameplay

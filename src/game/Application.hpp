@@ -10,6 +10,7 @@
 #include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
+#include "gameplay/SettingsMenu.hpp"
 #include "gameplay/ViewMotion.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
@@ -67,6 +68,7 @@ private:
     void shutdown();
     void setPaused(bool paused);
     [[nodiscard]] bool returnToMainMenu();
+    void applyRuntimeSettings();
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
@@ -83,6 +85,8 @@ private:
     gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
     gameplay::ResultMenuState resultMenu_;
+    gameplay::SettingsMenuState settingsMenu_;
+    gameplay::RuntimeSettings runtimeSettings_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};

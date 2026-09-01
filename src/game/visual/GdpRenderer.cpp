@@ -1438,6 +1438,80 @@ bool GdpRenderer::render(
     const wkc::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
     const wkc::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
 
+    if (hud.settingsMenu) {
+        const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
+        const int scale = layout.scale;
+        drawSolidRect(0, 0, width, height, {0.006F, 0.012F, 0.016F});
+        drawSolidRect(layout.panel.x, layout.panel.y,
+            layout.panel.width, layout.panel.height, panelColor);
+        drawSolidRect(layout.panel.x,
+            layout.panel.y + layout.panel.height - (2 * scale),
+            layout.panel.width, 2 * scale, cyanColor);
+        constexpr std::string_view title = "SETTINGS";
+        drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
+            layout.panel.y + layout.panel.height - (22 * scale),
+            2 * scale, title, cyanColor);
+
+        constexpr std::array<std::string_view, 7> labels{
+            "MASTER", "EFFECTS", "AMBIENT", "UI VOLUME",
+            "SENSITIVITY", "FOV", "BACK",
+        };
+        const std::array<std::uint16_t, 6> numbers{
+            hud.masterVolumePercent,
+            hud.effectsVolumePercent,
+            hud.ambientVolumePercent,
+            hud.uiVolumePercent,
+            hud.mouseSensitivityPercent,
+            hud.fieldOfViewDegrees,
+        };
+        for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
+            const UiRect row = layout.rows[index];
+            const bool selected = index
+                == static_cast<std::size_t>(hud.settingsSelection);
+            if (selected) {
+                drawSolidRect(row.x, row.y, row.width, row.height,
+                    {0.06F, 0.18F, 0.21F});
+                drawSolidRect(row.x, row.y, 2 * scale,
+                    row.height, cyanColor);
+            }
+            if (index == static_cast<std::size_t>(HudSettingsSelection::Back)) {
+                drawBitmapText(
+                    (width - bitmapTextWidth(labels[index], scale)) / 2,
+                    row.y + (3 * scale), scale, labels[index],
+                    selected ? cyanColor : textColor);
+                continue;
+            }
+            const std::string value = index
+                    == static_cast<std::size_t>(HudSettingsSelection::FieldOfView)
+                ? "< " + std::to_string(numbers[index]) + " >"
+                : "< " + std::to_string(numbers[index]) + "% >";
+            drawBitmapText(row.x + (8 * scale), row.y + (3 * scale),
+                scale, labels[index], selected ? cyanColor : textColor);
+            drawBitmapText(row.x + row.width - bitmapTextWidth(value, scale)
+                    - (8 * scale),
+                row.y + (3 * scale), scale, value,
+                selected ? cyanColor : textColor);
+        }
+        const std::string_view controls = width >= 480
+            ? "W S SELECT  A D ADJUST  ENTER BACK  MOUSE"
+            : "W S  A D  ENTER  MOUSE";
+        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
+            layout.panel.y + (7 * scale), 1, controls,
+            {0.48F, 0.62F, 0.66F});
+
+        glDisable(GL_SCISSOR_TEST);
+        glEnable(GL_DEPTH_TEST);
+        const GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::ostringstream message;
+            message << "OpenGL settings menu render error: 0x"
+                    << std::hex << error;
+            wkc::core::log(wkc::core::LogLevel::Error, message.str());
+            return false;
+        }
+        return true;
+    }
+
     if (hud.mainMenu) {
         const MainMenuLayout layout = makeMainMenuLayout(width, height);
         const int scale = layout.scale;
@@ -1457,14 +1531,18 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (38 * scale),
             1, subtitle, {0.48F, 0.62F, 0.66F});
 
-        constexpr std::array<std::string_view, 2> options{
-            "START RUN", "EXIT GAME",
+        constexpr std::array<std::string_view, 3> options{
+            "START RUN", "SETTINGS", "EXIT GAME",
         };
-        const std::array<UiRect, 2> buttons{
-            layout.startButton, layout.exitButton,
+        const std::array<UiRect, 3> buttons{
+            layout.startButton, layout.settingsButton, layout.exitButton,
         };
-        const std::size_t selected
-            = hud.mainMenuSelection == HudMainMenuSelection::ExitGame ? 1U : 0U;
+        std::size_t selected = 0U;
+        if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
+            selected = 1U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 2U;
+        }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
             if (index == selected) {
@@ -1816,20 +1894,22 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (14 * scale), scale,
             pauseTitle, cyanColor);
 
-        constexpr std::array<std::string_view, 4> options{
-            "RESUME", "RESTART RUN", "MAIN MENU", "EXIT GAME",
+        constexpr std::array<std::string_view, 5> options{
+            "RESUME", "RESTART RUN", "SETTINGS", "MAIN MENU", "EXIT GAME",
         };
         std::size_t selected = 0U;
         if (hud.pauseSelection == HudPauseSelection::RestartRun) {
             selected = 1U;
-        } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
+        } else if (hud.pauseSelection == HudPauseSelection::Settings) {
             selected = 2U;
-        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
+        } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
             selected = 3U;
+        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
+            selected = 4U;
         }
-        const std::array<UiRect, 4> buttons{
+        const std::array<UiRect, 5> buttons{
             layout.resumeButton, layout.restartButton,
-            layout.mainMenuButton, layout.exitButton,
+            layout.settingsButton, layout.mainMenuButton, layout.exitButton,
         };
         for (std::size_t index = 0; index < options.size(); ++index) {
             const UiRect button = buttons[index];
