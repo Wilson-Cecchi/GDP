@@ -761,6 +761,13 @@ cue `Footstep` pertence ao catálogo concreto GDP, usa assinatura metálica e
 índice próprio por run; a WKC Forge continua responsável apenas por receita,
 síntese, espacialização e mixer genéricos. IDs e golden anteriores permanecem.
 
+Na Fase 61, `ViewMotionState` passou a produzir head bob exclusivamente
+cosmético a partir da distância pós-colisão. O ciclo de 3,20 m usa até 3,5 cm
+verticais e 1,8 cm laterais, com blend suave e reset para segmentos de relocação.
+Somente a `CameraData` de apresentação recebe o offset; posição lógica, mira,
+hitscan, interação, IA e colisão permanecem inalterados. A regra pertence ao GDP
+e consome apenas matemática genérica da WKC Forge.
+
 ---
 
 # 8. Sistema de seed

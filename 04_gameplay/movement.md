@@ -3,8 +3,8 @@
 > **Estado:** movimento, mouse look, gravidade e colisão básica implementados na
 > Fase 3; corredores contínuos implementados na Fase 13; portas físicas
 > animadas e sem teleporte implementadas na Fase 15; áudio dedicado de portas
-> implementado na Fase 59; passos por distância implementados na Fase 60. Head
-> bob permanece planejado.
+> implementado na Fase 59; passos por distância implementados na Fase 60; head
+> bob cosmético implementado na Fase 61.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -63,7 +63,15 @@ e as regras de coleta continuam limitadas ao `roomId` atual.
 ## Câmera
 
 Yaw em torno do eixo vertical e pitch limitado aproximadamente a ±89°. FOV altera apenas a
-projeção. Head bob é cosmético.
+projeção.
+
+`ViewMotionState` usa distância XZ pós-colisão e um ciclo de `3,20 m`. O offset
+máximo é `0,035 m` vertical e `0,018 m` lateral, com blend de entrada/saída a
+`7/s`. Parar ou sair do chão reduz o peso sem avançar a fase; deslocamento acima
+de `0,50 m` reseta o estado como proteção contra relocação. A Application soma
+esse offset somente à `CameraData` entregue ao renderer. `Player::cameraPosition`,
+`forwardDirection`, raycasts, hitscan, IA e interação não são alterados. Uma
+configuração futura poderá reduzir ou desativar o efeito sem tocar na simulação.
 
 ## Testes
 
@@ -73,4 +81,5 @@ caminhada segmentada contínua; bloqueio individual; lockdown físico;
 distância/orientação da interação; preservação de estado;
 quatro rotações; sinais únicos de abrir/fechar/travar; pitch clamp;
 cadência de passos por deslocamento real, silêncio parado/aéreo e reset;
-sensibilidade independente do FPS.
+head bob determinístico, limites de conforto, fade e proteção contra teleporte;
+sensibilidade independente do FPS; câmera lógica sem offset cosmético.

@@ -159,6 +159,7 @@ add_library(
     src/gameplay/RoomEvents.cpp
     src/gameplay/RoomTraversal.cpp
     src/gameplay/Session.cpp
+    src/gameplay/ViewMotion.cpp
     src/gameplay/Weapon.cpp
 )
 

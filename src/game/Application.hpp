@@ -10,6 +10,7 @@
 #include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
+#include "gameplay/ViewMotion.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/Progression.hpp"
@@ -76,6 +77,7 @@ private:
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
     gameplay::FootstepState footsteps_;
+    gameplay::ViewMotionState viewMotion_;
     gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
     entities::EntityManager entities_;

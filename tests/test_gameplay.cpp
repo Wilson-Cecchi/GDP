@@ -2,6 +2,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Footstep.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/ViewMotion.hpp"
 
 #include <array>
 #include <cmath>
@@ -124,6 +125,60 @@ void testFootstepCadence()
         "one second of real Player movement emits distance-based cadence");
 }
 
+void testCosmeticViewMotion()
+{
+    using namespace gdp::gameplay;
+    ViewMotionState first;
+    ViewMotionState repeated;
+    wkc::core::Vec3 previous{};
+    for (int update = 0; update < 30; ++update) {
+        const wkc::core::Vec3 current
+            = previous + wkc::core::Vec3{0.075F, 0.0F, 0.0F};
+        updateViewMotion(
+            first, previous, current, true, true, 1.0F / 60.0F);
+        updateViewMotion(
+            repeated, previous, current, true, true, 1.0F / 60.0F);
+        previous = current;
+    }
+    const wkc::core::Vec3 offset
+        = viewMotionOffset(first, {0.0F, 0.0F, 1.0F});
+    expect(first.weight == 1.0F && first.phaseRadians == repeated.phaseRadians
+            && offset == viewMotionOffset(repeated, {0.0F, 0.0F, 1.0F}),
+        "actual grounded travel produces deterministic cosmetic view motion");
+    expect(std::abs(offset.y) <= 0.0351F
+            && std::sqrt((offset.x * offset.x) + (offset.z * offset.z)) <= 0.0181F,
+        "view motion remains inside its comfort amplitudes");
+    Player logicalCameraOwner;
+    const wkc::core::Vec3 logicalCamera = logicalCameraOwner.cameraPosition();
+    const wkc::core::Vec3 presentationCamera = logicalCamera + offset;
+    expect(logicalCameraOwner.cameraPosition() == logicalCamera
+            && presentationCamera != logicalCamera,
+        "presentation offset leaves the Player camera used by gameplay unchanged");
+
+    const float walkingPhase = first.phaseRadians;
+    for (int update = 0; update < 12; ++update) {
+        updateViewMotion(first, previous, previous, true, true, 1.0F / 60.0F);
+    }
+    expect(first.phaseRadians == walkingPhase && first.weight == 0.0F
+            && viewMotionOffset(first, {1.0F, 0.0F, 0.0F}) == wkc::core::Vec3{},
+        "stopping fades the render offset without advancing gait phase");
+
+    first = {.phaseRadians = 1.0F, .weight = 1.0F};
+    updateViewMotion(first, previous,
+        previous + wkc::core::Vec3{1.0F, 0.0F, 0.0F},
+        true, true, 1.0F / 60.0F);
+    expect(first.phaseRadians == 0.0F && first.weight == 0.0F,
+        "teleport-sized segments reset view motion instead of jolting the camera");
+
+    first = {.phaseRadians = 1.0F, .weight = 1.0F};
+    updateViewMotion(first, previous, previous, false, true, 1.0F / 60.0F);
+    expect(first.phaseRadians == 1.0F && first.weight < 1.0F,
+        "airborne state fades bob while preserving a continuous gait phase");
+    resetViewMotion(first);
+    expect(first.phaseRadians == 0.0F && first.weight == 0.0F,
+        "run reset clears all cosmetic view motion");
+}
+
 void testCollisionAndGravity()
 {
     using namespace gdp::gameplay;
@@ -234,6 +289,7 @@ int main()
 {
     testMovement();
     testFootstepCadence();
+    testCosmeticViewMotion();
     testCollisionAndGravity();
     testLookAndCamera();
     testInteractionAndLife();

@@ -895,6 +895,9 @@ void Application::fixedUpdate(const double fixedStep)
             player_.state().position, player_.state().position,
             player_.planarForwardDirection());
     }
+    gameplay::updateViewMotion(
+        viewMotion_, previousPlayerPosition, player_.state().position,
+        player_.state().grounded, player_.state().alive, step);
 
     const auto adoptRoom = [this, &playerEntity, &playerRoom](
         const world::RoomInstance& destination,
@@ -1348,8 +1351,10 @@ void Application::render()
         return;
     }
 
+    const wkc::core::Vec3 renderCameraPosition = player_.cameraPosition()
+        + gameplay::viewMotionOffset(viewMotion_, player_.rightDirection());
     const visual::CameraData camera{
-        player_.cameraPosition(),
+        renderCameraPosition,
         player_.forwardDirection(),
         68.0F,
     };
@@ -1769,6 +1774,7 @@ void Application::shutdown()
     progression_ = gameplay::ProgressionSystem{};
     gameplay::clearFeedback(feedback_);
     gameplay::resetFootsteps(footsteps_);
+    gameplay::resetViewMotion(viewMotion_);
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();

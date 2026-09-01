@@ -250,6 +250,10 @@ especializados das pastas numeradas.
   grounded acumula uma passada a cada 1,60 m. Parado, no ar, morto ou após salto
   anormal de posição não emite áudio. `Footstep` usa impacto metálico procedural,
   variação por índice e sequência própria reiniciada a cada run.
+- **Fase 61 — Movimento cosmético da câmera:** `ViewMotionState` deriva head bob
+  do deslocamento real grounded, com ciclo de 3,20 m, limites de 3,5 cm vertical
+  e 1,8 cm lateral e blend suave. Somente a câmera enviada ao renderer recebe o
+  offset; mira, hitscan, interação, IA e colisão continuam na câmera lógica.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -417,6 +421,13 @@ procedural curto e metálico na posição do Player. Movimento bloqueado, estado
 aéreo/morto e segmentos acima de 0,50 m não produzem passos; o último caso evita
 rajadas falsas após reposicionamento. O índice dedicado dá variação reproduzível
 sem consumir a sequência dos demais eventos de áudio.
+
+Na Fase 61, `ViewMotionState` passou a produzir um head bob discreto a partir do
+mesmo deslocamento efetivo pós-colisão. Um ciclo cobre 3,20 m, alternando a
+oscilação lateral entre os pés; amplitude máxima é 3,5 cm vertical e 1,8 cm
+lateral. Entrada e parada convergem suavemente, estado aéreo perde peso sem
+avançar fase e segmentos acima de 0,50 m zeram o efeito. O offset existe somente
+na `CameraData` de renderização, nunca na origem usada por tiro ou interação.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

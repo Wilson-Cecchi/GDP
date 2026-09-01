@@ -48,10 +48,15 @@ papéis/temas, bounds, ambiente legível, pontos e luminárias. As seeds crític
 validam todas as salas e preservam o fingerprint estrutural. A regressão OpenGL
 confirma múltiplas luzes e a mudança temporária para alerta de lockdown.
 
-O gate de áudio gera 1.000 receitas com hashes únicos e sintetiza as doze
+O gate de áudio gera 1.000 receitas com hashes únicos e sintetiza as dezesseis
 categorias sem samples inválidos ou clipping. Testes do mixer silencioso cobrem
 cache, voice budget, descarte, loop, pan e distância; integrações SDL usam
 driver dummy para saída e driver inexistente para provar fallback não fatal.
+
+O gate do Player também cobre passos e movimento cosmético por distância real.
+Head bob exige fase determinística, amplitudes máximas, fade parado/aéreo,
+proteção contra relocação e reset. O teste mantém o offset fora da câmera lógica,
+preservando a origem usada por interação e combate.
 
 O gate de progressão cobre valores por fonte, curva/limite, múltiplos níveis no
 mesmo award, resto de XP, telemetria e entradas inválidas. Também exige os nove

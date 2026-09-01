@@ -837,6 +837,12 @@ Segmentos acima de 0,50 m são relocação e não geram áudio. O cue metálico
 `Footstep` usa índice local reiniciado por run, sem acoplar sua ordem aos demais
 efeitos. A WKC Forge permanece genérica e IDs/golden anteriores foram preservados.
 
+Na Fase 61, `ViewMotionState` passou a gerar head bob cosmético pela distância
+real pós-colisão. O ciclo de 3,20 m é limitado a 3,5 cm verticais e 1,8 cm
+laterais, entra/sai por blend e reseta em relocação. A Application aplica o
+offset somente à `CameraData` visual; câmera lógica, mira, hitscan, interação,
+IA e colisão não mudam. A WKC Forge fornece apenas a matemática genérica.
+
 ---
 
 # 8. Sistema de seed
