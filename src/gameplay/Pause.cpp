@@ -30,6 +30,15 @@ void movePauseSelection(PauseMenuState& state, const int direction) noexcept
     state.selection = static_cast<PauseMenuOption>(selection);
 }
 
+void selectPauseMenuOption(
+    PauseMenuState& state,
+    const PauseMenuOption option) noexcept
+{
+    if (state.paused && option < PauseMenuOption::Count) {
+        state.selection = option;
+    }
+}
+
 PauseMenuCommand activatePauseSelection(PauseMenuState& state) noexcept
 {
     if (!state.paused) {

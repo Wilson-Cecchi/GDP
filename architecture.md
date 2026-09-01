@@ -775,6 +775,12 @@ mantêm seus cursores congelados. O GDP acrescentou `UiNavigate`, `UiConfirm` e
 O mixer WKC continua sem conhecer menus ou comandos GDP; IDs e golden anteriores
 foram preservados.
 
+Na Fase 63, `PauseMenuLayout` tornou desenho e hit test da pausa uma única regra
+pura. A Application escala o ponteiro do tamanho lógico SDL para o framebuffer,
+converte hover/clique nos mesmos comandos de teclado e mantém a WKC Forge alheia
+a opções de menu. O menu principal já seguia esse contrato; ambos os menus
+funcionais agora aceitam teclado e mouse.
+
 ---
 
 # 8. Sistema de seed

@@ -1772,18 +1772,18 @@ bool GdpRenderer::render(
             1, prompt, {0.76F, 0.84F, 0.88F});
     }
     if (hud.paused) {
-        const int menuWidth = std::max(1, std::min(width - 16, 180 * hudScale));
-        const int menuHeight = std::max(1, std::min(height - 16, 95 * hudScale));
-        const int menuX = (width - menuWidth) / 2;
-        const int menuY = (height - menuHeight) / 2;
-        drawSolidRect(menuX, menuY, menuWidth, menuHeight,
+        const PauseMenuLayout layout = makePauseMenuLayout(width, height);
+        const int scale = layout.scale;
+        drawSolidRect(layout.panel.x, layout.panel.y,
+            layout.panel.width, layout.panel.height,
             {0.012F, 0.024F, 0.030F});
-        drawSolidRect(menuX, menuY + menuHeight - (2 * hudScale),
-            menuWidth, 2 * hudScale, cyanColor);
+        drawSolidRect(layout.panel.x,
+            layout.panel.y + layout.panel.height - (2 * scale),
+            layout.panel.width, 2 * scale, cyanColor);
         constexpr std::string_view pauseTitle = "PAUSED";
-        const int titleWidth = bitmapTextWidth(pauseTitle, hudScale);
+        const int titleWidth = bitmapTextWidth(pauseTitle, scale);
         drawBitmapText((width - titleWidth) / 2,
-            menuY + menuHeight - (14 * hudScale), hudScale,
+            layout.panel.y + layout.panel.height - (14 * scale), scale,
             pauseTitle, cyanColor);
 
         constexpr std::array<std::string_view, 3> options{
@@ -1791,25 +1791,26 @@ bool GdpRenderer::render(
         };
         const std::size_t selected = hud.pauseSelection == HudPauseSelection::RestartRun
             ? 1U : hud.pauseSelection == HudPauseSelection::ExitGame ? 2U : 0U;
-        const int firstOptionY = menuY + menuHeight - (34 * hudScale);
+        const std::array<UiRect, 3> buttons{
+            layout.resumeButton, layout.restartButton, layout.exitButton,
+        };
         for (std::size_t index = 0; index < options.size(); ++index) {
-            const int optionWidth = bitmapTextWidth(options[index], hudScale);
-            const int optionY = firstOptionY
-                - (static_cast<int>(index) * 14 * hudScale);
+            const UiRect button = buttons[index];
+            const int optionWidth = bitmapTextWidth(options[index], scale);
             if (index == selected) {
-                drawSolidRect((width - optionWidth) / 2 - (4 * hudScale),
-                    optionY - (2 * hudScale), optionWidth + (8 * hudScale),
-                    11 * hudScale, {0.06F, 0.18F, 0.21F});
+                drawSolidRect(button.x, button.y, button.width, button.height,
+                    {0.06F, 0.18F, 0.21F});
             }
-            drawBitmapText((width - optionWidth) / 2, optionY,
-                hudScale, options[index],
+            drawBitmapText((width - optionWidth) / 2,
+                button.y + (2 * scale), scale, options[index],
                 index == selected ? cyanColor : textColor);
         }
         const std::string_view controls = width >= 480
-            ? "W S SELECT  ENTER CONFIRM  ESC RESUME"
-            : "W S  ENTER  ESC";
+            ? "W S  ENTER  MOUSE  ESC"
+            : "W S  ENTER  MOUSE";
         const int controlsWidth = bitmapTextWidth(controls, 1);
-        drawBitmapText((width - controlsWidth) / 2, menuY + (6 * hudScale),
+        drawBitmapText((width - controlsWidth) / 2,
+            layout.panel.y + (6 * scale),
             1, controls, {0.48F, 0.62F, 0.66F});
     } else {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);

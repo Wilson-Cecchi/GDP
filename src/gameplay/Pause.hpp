@@ -28,6 +28,9 @@ struct PauseMenuState {
 void openPauseMenu(PauseMenuState& state) noexcept;
 void closePauseMenu(PauseMenuState& state) noexcept;
 void movePauseSelection(PauseMenuState& state, int direction) noexcept;
+void selectPauseMenuOption(
+    PauseMenuState& state,
+    PauseMenuOption option) noexcept;
 [[nodiscard]] PauseMenuCommand activatePauseSelection(
     PauseMenuState& state) noexcept;
 

@@ -175,6 +175,58 @@ void testMainMenuLayout()
         "tiny menu clamps both hit targets inside the framebuffer");
 }
 
+void testPauseMenuLayout()
+{
+    using namespace gdp::game::visual;
+
+    const PauseMenuLayout wide = makePauseMenuLayout(1280, 720);
+    expect(wide.scale == 2, "wide pause menu uses doubled bitmap scale");
+    expect(wide.panel.x >= 0 && wide.panel.y >= 0
+            && wide.panel.x + wide.panel.width <= 1280
+            && wide.panel.y + wide.panel.height <= 720,
+        "wide pause menu panel stays within the framebuffer");
+    expect(wide.panel.contains(wide.resumeButton.x, wide.resumeButton.y)
+            && wide.panel.contains(wide.restartButton.x, wide.restartButton.y)
+            && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
+        "pause menu hit targets stay inside the panel");
+
+    const auto pointerX = [](const UiRect& button) {
+        return static_cast<float>(button.x + button.width / 2);
+    };
+    const auto pointerY = [](const UiRect& button) {
+        return static_cast<float>(
+            720 - 1 - (button.y + button.height / 2));
+    };
+    expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.resumeButton), pointerY(wide.resumeButton))
+            == HudPauseSelection::Resume,
+        "top-origin pointer maps to Resume");
+    expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.restartButton), pointerY(wide.restartButton))
+            == HudPauseSelection::RestartRun,
+        "top-origin pointer maps to Restart Run");
+    expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.exitButton), pointerY(wide.exitButton))
+            == HudPauseSelection::ExitGame,
+        "top-origin pointer maps to Exit Game");
+    expect(!pauseMenuSelectionAt(1280, 720, 0.0F, 0.0F),
+        "pointer outside pause buttons has no selection");
+
+    const PauseMenuLayout compact = makePauseMenuLayout(320, 200);
+    expect(compact.scale == 1,
+        "compact pause menu uses base bitmap scale");
+    expect(compact.panel.x >= 0 && compact.panel.y >= 0
+            && compact.panel.x + compact.panel.width <= 320
+            && compact.panel.y + compact.panel.height <= 200,
+        "compact pause menu remains within the framebuffer");
+
+    const PauseMenuLayout tiny = makePauseMenuLayout(12, 12);
+    expect(tiny.panel.contains(tiny.resumeButton.x, tiny.resumeButton.y)
+            && tiny.panel.contains(tiny.restartButton.x, tiny.restartButton.y)
+            && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
+        "tiny pause menu clamps all hit targets inside the framebuffer");
+}
+
 } // namespace
 
 int main()
@@ -183,6 +235,7 @@ int main()
     testTextureData();
     testCameraAndMatrices();
     testMainMenuLayout();
+    testPauseMenuLayout();
 
     if (failures != 0) {
         std::cerr << failures << " renderer test(s) failed\n";

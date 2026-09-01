@@ -748,6 +748,46 @@ void Application::processEvents()
         interactionPending_ = false;
         firePending_ = false;
         reloadPending_ = false;
+
+        std::optional<visual::HudPauseSelection> pointedSelection;
+        if (window_ != nullptr) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableWidth = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                pointedSelection = visual::pauseMenuSelectionAt(
+                    drawableWidth, drawableHeight,
+                    pointer.x * static_cast<float>(drawableWidth)
+                        / static_cast<float>(windowWidth),
+                    pointer.y * static_cast<float>(drawableHeight)
+                        / static_cast<float>(windowHeight));
+            }
+        }
+        const auto pauseOptionFor = [](const visual::HudPauseSelection selection) {
+            switch (selection) {
+            case visual::HudPauseSelection::RestartRun:
+                return gameplay::PauseMenuOption::RestartRun;
+            case visual::HudPauseSelection::ExitGame:
+                return gameplay::PauseMenuOption::ExitGame;
+            case visual::HudPauseSelection::Resume:
+                return gameplay::PauseMenuOption::Resume;
+            }
+            return gameplay::PauseMenuOption::Resume;
+        };
+        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            const gameplay::PauseMenuOption previousSelection
+                = pauseMenu_.selection;
+            gameplay::selectPauseMenuOption(
+                pauseMenu_, pauseOptionFor(*pointedSelection));
+            if (pauseMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
         const bool moveUp = input_.wasKeyPressed(Key::Up)
             || input_.wasKeyPressed(Key::W);
         const bool moveDown = input_.wasKeyPressed(Key::Down)
@@ -760,25 +800,31 @@ void Application::processEvents()
                 playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
             }
         }
+
+        gameplay::PauseMenuCommand command = gameplay::PauseMenuCommand::None;
         if (input_.wasKeyPressed(Key::Enter)) {
-            const gameplay::PauseMenuCommand command
-                = gameplay::activatePauseSelection(pauseMenu_);
-            if (command != gameplay::PauseMenuCommand::None) {
-                playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
-            }
-            if (command == gameplay::PauseMenuCommand::Resume) {
-                setPaused(false);
-            } else if (command == gameplay::PauseMenuCommand::RestartRun) {
-                log(LogLevel::Info, "Pause menu requested run restart");
-                (void)session_.update(
-                    false, world::RoomRole::Count, false, false);
-                restartRequested_ = true;
-                running_ = false;
-            } else if (command == gameplay::PauseMenuCommand::ExitGame) {
-                log(LogLevel::Info, "Pause menu requested game exit");
-                restartRequested_ = false;
-                running_ = false;
-            }
+            command = gameplay::activatePauseSelection(pauseMenu_);
+        } else if (pointedSelection
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+            gameplay::selectPauseMenuOption(
+                pauseMenu_, pauseOptionFor(*pointedSelection));
+            command = gameplay::activatePauseSelection(pauseMenu_);
+        }
+        if (command != gameplay::PauseMenuCommand::None) {
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
+        }
+        if (command == gameplay::PauseMenuCommand::Resume) {
+            setPaused(false);
+        } else if (command == gameplay::PauseMenuCommand::RestartRun) {
+            log(LogLevel::Info, "Pause menu requested run restart");
+            (void)session_.update(
+                false, world::RoomRole::Count, false, false);
+            restartRequested_ = true;
+            running_ = false;
+        } else if (command == gameplay::PauseMenuCommand::ExitGame) {
+            log(LogLevel::Info, "Pause menu requested game exit");
+            restartRequested_ = false;
+            running_ = false;
         }
         return;
     }

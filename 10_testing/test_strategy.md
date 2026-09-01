@@ -169,6 +169,12 @@ Receitas distintas protegem navegação, confirmação e retorno; a Application 
 emite navegação quando a seleção realmente muda e usa transições de input, sem
 repetição por tecla mantida.
 
+O gate da pausa cobre navegação e seleção direta apenas quando o estado está
+ativo, rejeita opções inválidas e valida os três hit targets responsivos em
+resoluções ampla, compacta e mínima. Os centros dos botões são consultados em
+coordenadas SDL com origem superior, enquanto o renderer usa os mesmos retângulos
+em coordenadas OpenGL; pontos externos não produzem seleção.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

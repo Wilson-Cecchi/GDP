@@ -4,6 +4,7 @@
 > funcional desde a Fase 19. Configurações permanecem especificadas;
 > Victory/Defeat já usam banner no viewport e `Enter` para reconstruir a run.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
+> Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -27,13 +28,19 @@ mesmo estado, sem antecipar sistemas ainda não implementados.
 
 `Esc` abre e fecha a pausa, sempre selecionando `RESUME` como opção segura.
 `W/S` ou setas navegam com wrap e `Enter` confirma `RESUME`, `RESTART RUN` ou
-`EXIT GAME`. O mouse relativo é liberado no menu e restaurado no retorno.
+`EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
+cliques fora dos botões não executam comandos. O mouse relativo é liberado no
+menu e restaurado no retorno.
 Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
 avançam; a UI apenas converte a seleção em um comando para `Application`.
 O bus `UI` continua avançando para reproduzir `UiNavigate`, `UiConfirm` e
 `UiBack`, enquanto os cursores de Effects/Ambient permanecem congelados.
 `RESTART RUN` encerra explicitamente a sessão ativa antes de pedir a próxima
 seed, portanto o restart não é rejeitado por ainda estar em `Playing`.
+
+O desenho e o hit test usam o mesmo `PauseMenuLayout`. A posição lógica do
+ponteiro é convertida para as dimensões reais do framebuffer antes da consulta,
+mantendo os botões alinhados em escalas high-DPI e após redimensionamento.
 
 ## Resultado provisório
 
@@ -44,8 +51,9 @@ Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e mostr
 
 ## Navegação
 
-Cima/baixo, confirmar, voltar; gamepad e mouse podem mapear para as mesmas ações
-lógicas e os mesmos cues, sem criar regras sonoras específicas do dispositivo.
+Cima/baixo, confirmar e voltar continuam sendo ações lógicas independentes do
+dispositivo. Teclado e mouse já mapeiam para os mesmos comandos e cues; gamepad
+permanece como expansão futura.
 
 ## Configurações
 

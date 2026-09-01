@@ -258,6 +258,10 @@ especializados das pastas numeradas.
   volume e atualização seletiva próprios. `UiNavigate`, `UiConfirm` e `UiBack`
   respondem às transições reais dos menus; durante pausa somente esse bus
   avança, mantendo ambiência, efeitos e toda a simulação congelados.
+- **Fase 63 — Mouse em todos os menus funcionais:** menu principal e pausa
+  aceitam hover e clique sem remover `W/S`, setas, `Enter` ou `Esc`. O menu de
+  pausa compartilha o layout responsivo entre desenho e hit test, inclusive em
+  framebuffer high-DPI.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -283,8 +287,8 @@ terminal, dispara com o botão esquerdo
 e recarrega com `R`. Pickups próximos são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
 mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
-run; `W/S` ou setas navegam, `Enter` confirma e `Esc` retorna
-ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
+run; `W/S` ou setas navegam, `Enter` confirma, o mouse seleciona/clica e `Esc`
+retorna ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
 
 Em Victory ou Defeat, a simulação congela, o título mostra o resultado e
 `Enter` inicia uma nova run; `Esc` continua encerrando o jogo.
@@ -439,6 +443,12 @@ efetiva de opção, portanto tecla mantida ou hover estacionário não repete cu
 mixer genérico ganhou bus `UI`, volume independente e `updateUi()`: enquanto o
 overlay bloqueia o fixed update do jogo, apenas vozes da interface avançam;
 Effects e Ambient preservam seus cursores até retomar.
+
+Na Fase 63, o menu de pausa recebeu a mesma paridade de ponteiro já presente no
+menu principal. Hover escolhe `RESUME`, `RESTART RUN` ou `EXIT GAME`; o clique
+primário confirma somente quando aponta para um botão. `PauseMenuLayout` é a
+fonte única para desenho e hit test, e a Application converte coordenadas da
+janela para o framebuffer antes da consulta, preservando escala high-DPI.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

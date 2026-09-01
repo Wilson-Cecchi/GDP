@@ -849,6 +849,12 @@ Effects/Ambient junto da simulação congelada. O catálogo GDP recebeu
 `UiNavigate`, `UiConfirm` e `UiBack`, emitidos apenas por transições reais. A
 fundação permanece sem conceitos de menu; IDs e golden anteriores não mudaram.
 
+Na Fase 63, `PauseMenuLayout` passou a ser compartilhado pelo desenho e pelo hit
+test. A Application converte a posição lógica SDL para pixels do framebuffer e
+mapeia hover/clique aos mesmos comandos usados pelo teclado. O menu principal já
+possuía esse contrato; todos os menus funcionais agora aceitam os dois métodos
+sem introduzir conceitos de interface na WKC Forge.
+
 ---
 
 # 8. Sistema de seed

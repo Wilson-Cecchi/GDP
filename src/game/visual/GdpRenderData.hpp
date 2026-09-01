@@ -156,8 +156,22 @@ struct MainMenuLayout {
     UiRect exitButton{};
 };
 
+struct PauseMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    UiRect resumeButton{};
+    UiRect restartButton{};
+    UiRect exitButton{};
+};
+
 [[nodiscard]] MainMenuLayout makeMainMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudMainMenuSelection> mainMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+[[nodiscard]] PauseMenuLayout makePauseMenuLayout(int width, int height) noexcept;
+[[nodiscard]] std::optional<HudPauseSelection> pauseMenuSelectionAt(
     int width,
     int height,
     float pointerX,

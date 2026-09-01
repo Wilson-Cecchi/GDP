@@ -61,12 +61,36 @@ void testPauseCommands()
         "explicit close restores the default pause state");
 }
 
+void testDirectPauseSelection()
+{
+    using namespace gdp::gameplay;
+    PauseMenuState state;
+    selectPauseMenuOption(state, PauseMenuOption::ExitGame);
+    expect(state.selection == PauseMenuOption::Resume,
+        "pointer selection is ignored while the pause menu is inactive");
+
+    openPauseMenu(state);
+    selectPauseMenuOption(state, PauseMenuOption::RestartRun);
+    expect(state.selection == PauseMenuOption::RestartRun,
+        "pointer selection can target Restart Run directly");
+    selectPauseMenuOption(state, PauseMenuOption::ExitGame);
+    expect(state.selection == PauseMenuOption::ExitGame,
+        "pointer selection can target Exit Game directly");
+    selectPauseMenuOption(state, PauseMenuOption::Resume);
+    expect(state.selection == PauseMenuOption::Resume,
+        "pointer selection can return to Resume directly");
+    selectPauseMenuOption(state, PauseMenuOption::Count);
+    expect(state.selection == PauseMenuOption::Resume,
+        "invalid pointer selection is ignored");
+}
+
 } // namespace
 
 int main()
 {
     testPauseNavigation();
     testPauseCommands();
+    testDirectPauseSelection();
     if (failures != 0) {
         std::cerr << failures << " pause test(s) failed\n";
         return 1;
