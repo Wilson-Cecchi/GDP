@@ -48,10 +48,12 @@ papéis/temas, bounds, ambiente legível, pontos e luminárias. As seeds crític
 validam todas as salas e preservam o fingerprint estrutural. A regressão OpenGL
 confirma múltiplas luzes e a mudança temporária para alerta de lockdown.
 
-O gate de áudio gera 1.000 receitas com hashes únicos e sintetiza as dezesseis
+O gate de áudio gera 1.000 receitas com hashes únicos e sintetiza as dezenove
 categorias sem samples inválidos ou clipping. Testes do mixer silencioso cobrem
-cache, voice budget, descarte, loop, pan e distância; integrações SDL usam
-driver dummy para saída e driver inexistente para provar fallback não fatal.
+cache, voice budget, descarte, loop, pan, distância e os buses Effects/Ambient/UI.
+`updateUi()` deve concluir a voz de interface sem mover os cursores congelados
+dos outros buses. Integrações SDL usam driver dummy para saída e driver
+inexistente para provar fallback não fatal.
 
 O gate do Player também cobre passos e movimento cosmético por distância real.
 Head bob exige fase determinística, amplitudes máximas, fade parado/aéreo,
@@ -163,6 +165,9 @@ a regressão OpenGL diferencia `START RUN` de `EXIT GAME`. A integração
 `main_menu_defers_world_generation` abre duas frames no driver offscreen e
 falha caso uma seed de mundo seja gerada antes da confirmação. Os bootstraps
 headless continuam criando a run diretamente para exercer o gameplay real.
+Receitas distintas protegem navegação, confirmação e retorno; a Application só
+emite navegação quando a seleção realmente muda e usa transições de input, sem
+repetição por tecla mantida.
 
 ## Sanitizers
 

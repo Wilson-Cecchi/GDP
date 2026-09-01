@@ -627,6 +627,13 @@ void Application::processEvents()
         return;
     }
 
+    const auto playUiAudio = [this](const gdp::audio::AudioEventKind kind) {
+        if (audio_) {
+            audio_->playUi(
+                kind, config_.worldSeed, uiAudioEventCounter_++);
+        }
+    };
+
     if (mainMenu_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
@@ -658,11 +665,16 @@ void Application::processEvents()
             }
         }
         if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            const gameplay::MainMenuOption previousSelection
+                = mainMenu_.selection;
             gameplay::selectMainMenuOption(
                 mainMenu_,
                 *pointedSelection == visual::HudMainMenuSelection::ExitGame
                     ? gameplay::MainMenuOption::ExitGame
                     : gameplay::MainMenuOption::StartRun);
+            if (mainMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
         }
 
         const bool moveUp = input_.wasKeyPressed(Key::Up)
@@ -670,7 +682,12 @@ void Application::processEvents()
         const bool moveDown = input_.wasKeyPressed(Key::Down)
             || input_.wasKeyPressed(Key::S);
         if (moveUp != moveDown) {
+            const gameplay::MainMenuOption previousSelection
+                = mainMenu_.selection;
             gameplay::moveMainMenuSelection(mainMenu_, moveUp ? -1 : 1);
+            if (mainMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
         }
 
         gameplay::MainMenuCommand command = gameplay::MainMenuCommand::None;
@@ -684,6 +701,10 @@ void Application::processEvents()
                     ? gameplay::MainMenuOption::ExitGame
                     : gameplay::MainMenuOption::StartRun);
             command = gameplay::activateMainMenuSelection(mainMenu_);
+        }
+
+        if (command != gameplay::MainMenuCommand::None) {
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
         }
 
         if (command == gameplay::MainMenuCommand::StartRun) {
@@ -715,6 +736,9 @@ void Application::processEvents()
     }
 
     if (input_.wasKeyPressed(Key::Escape)) {
+        playUiAudio(pauseMenu_.paused
+                ? gdp::audio::AudioEventKind::UiBack
+                : gdp::audio::AudioEventKind::UiConfirm);
         setPaused(!pauseMenu_.paused);
         return;
     }
@@ -729,11 +753,19 @@ void Application::processEvents()
         const bool moveDown = input_.wasKeyPressed(Key::Down)
             || input_.wasKeyPressed(Key::S);
         if (moveUp != moveDown) {
+            const gameplay::PauseMenuOption previousSelection
+                = pauseMenu_.selection;
             gameplay::movePauseSelection(pauseMenu_, moveUp ? -1 : 1);
+            if (pauseMenu_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
         }
         if (input_.wasKeyPressed(Key::Enter)) {
             const gameplay::PauseMenuCommand command
                 = gameplay::activatePauseSelection(pauseMenu_);
+            if (command != gameplay::PauseMenuCommand::None) {
+                playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
+            }
             if (command == gameplay::PauseMenuCommand::Resume) {
                 setPaused(false);
             } else if (command == gameplay::PauseMenuCommand::RestartRun) {
@@ -782,10 +814,13 @@ void Application::setPaused(const bool paused)
 
 void Application::fixedUpdate(const double fixedStep)
 {
+    const float step = static_cast<float>(fixedStep);
     if (mainMenu_.active || pauseMenu_.paused) {
+        if (audio_) {
+            audio_->updateUi(step);
+        }
         return;
     }
-    const float step = static_cast<float>(fixedStep);
     gameplay::updateFeedback(feedback_, step);
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
         if (audio_) {
@@ -1784,6 +1819,7 @@ void Application::shutdown()
     firePending_ = false;
     reloadPending_ = false;
     audioEventCounter_ = 0U;
+    uiAudioEventCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
 

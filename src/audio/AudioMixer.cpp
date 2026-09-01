@@ -67,12 +67,13 @@ void AudioMixer::shutdown() noexcept
 }
 
 void AudioMixer::play(
-    const AudioRecipe& recipe)
+    const AudioRecipe& recipe,
+    const AudioBus bus)
 {
     if (!initialized_) {
         return;
     }
-    addVoice(acquireClip(recipe), 1.0F, 1.0F, false, false);
+    addVoice(acquireClip(recipe), 1.0F, 1.0F, false, bus);
 }
 
 void AudioMixer::playAt(
@@ -102,7 +103,7 @@ void AudioMixer::playAt(
         attenuation * left,
         attenuation * rightGain,
         false,
-        false);
+        AudioBus::Effects);
 }
 
 void AudioMixer::setAmbience(const AudioRecipe& recipe)
@@ -116,12 +117,12 @@ void AudioMixer::setAmbience(const AudioRecipe& recipe)
     }
     voices_.erase(std::remove_if(voices_.begin(), voices_.end(),
         [&clip](const Voice& voice) {
-            return voice.ambient && (!voice.clip
+            return voice.bus == AudioBus::Ambient && (!voice.clip
                 || voice.clip->recipeHash != clip->recipeHash);
         }), voices_.end());
     const auto existing = std::find_if(voices_.begin(), voices_.end(),
         [&clip](const Voice& voice) {
-            return voice.ambient && voice.clip
+            return voice.bus == AudioBus::Ambient && voice.clip
                 && voice.clip->recipeHash == clip->recipeHash;
         });
     if (existing != voices_.end()) {
@@ -129,7 +130,7 @@ void AudioMixer::setAmbience(const AudioRecipe& recipe)
         existing->rightGain = 1.0F;
         return;
     }
-    addVoice(clip, 1.0F, 1.0F, true, true);
+    addVoice(clip, 1.0F, 1.0F, true, AudioBus::Ambient);
 }
 
 void AudioMixer::setAmbienceBlend(
@@ -161,7 +162,7 @@ void AudioMixer::setAmbienceBlend(
     }
     voices_.erase(std::remove_if(voices_.begin(), voices_.end(),
         [&firstClip, &secondClip](const Voice& voice) {
-            return voice.ambient && (!voice.clip
+            return voice.bus == AudioBus::Ambient && (!voice.clip
                 || (voice.clip->recipeHash != firstClip->recipeHash
                     && voice.clip->recipeHash != secondClip->recipeHash));
         }), voices_.end());
@@ -170,14 +171,14 @@ void AudioMixer::setAmbienceBlend(
         const float gain) {
         const auto existing = std::find_if(voices_.begin(), voices_.end(),
             [&clip](const Voice& voice) {
-                return voice.ambient && voice.clip
+                return voice.bus == AudioBus::Ambient && voice.clip
                     && voice.clip->recipeHash == clip->recipeHash;
             });
         if (existing != voices_.end()) {
             existing->leftGain = gain;
             existing->rightGain = gain;
         } else {
-            addVoice(clip, gain, gain, true, true);
+            addVoice(clip, gain, gain, true, AudioBus::Ambient);
         }
     };
     ensureAmbient(firstClip, std::sqrt(1.0F - weight));
@@ -187,7 +188,8 @@ void AudioMixer::setAmbienceBlend(
 void AudioMixer::stopAmbience() noexcept
 {
     voices_.erase(std::remove_if(voices_.begin(), voices_.end(),
-        [](const Voice& voice) { return voice.ambient; }), voices_.end());
+        [](const Voice& voice) { return voice.bus == AudioBus::Ambient; }),
+        voices_.end());
 }
 
 void AudioMixer::clearVoices() noexcept
@@ -197,6 +199,18 @@ void AudioMixer::clearVoices() noexcept
 
 void AudioMixer::update(const float fixedStepSeconds)
 {
+    mix(fixedStepSeconds, std::nullopt);
+}
+
+void AudioMixer::updateUi(const float fixedStepSeconds)
+{
+    mix(fixedStepSeconds, AudioBus::Ui);
+}
+
+void AudioMixer::mix(
+    const float fixedStepSeconds,
+    const std::optional<AudioBus> selectedBus)
+{
     if (!initialized_ || !std::isfinite(fixedStepSeconds) || fixedStepSeconds <= 0.0F) {
         return;
     }
@@ -205,11 +219,21 @@ void AudioMixer::update(const float fixedStepSeconds)
     const int frameCount = std::clamp(requestedFrames, 1, 4'096);
     std::vector<float> mix(static_cast<std::size_t>(frameCount) * 2U, 0.0F);
 
+    bool selectedVoiceFound = false;
     for (Voice& voice : voices_) {
+        if (selectedBus && voice.bus != *selectedBus) {
+            continue;
+        }
         if (!voice.clip || voice.clip->samples.empty()) {
             continue;
         }
-        const float busVolume = voice.ambient ? ambientVolume_ : effectsVolume_;
+        selectedVoiceFound = true;
+        float busVolume = effectsVolume_;
+        if (voice.bus == AudioBus::Ambient) {
+            busVolume = ambientVolume_;
+        } else if (voice.bus == AudioBus::Ui) {
+            busVolume = uiVolume_;
+        }
         for (int frame = 0; frame < frameCount; ++frame) {
             if (voice.cursor >= voice.clip->samples.size()) {
                 if (!voice.loop) {
@@ -244,6 +268,10 @@ void AudioMixer::update(const float fixedStepSeconds)
     lastLeftEnergy_ = leftEnergy / static_cast<float>(frameCount);
     lastRightEnergy_ = rightEnergy / static_cast<float>(frameCount);
 
+    if (selectedBus && !selectedVoiceFound) {
+        return;
+    }
+
     if (outputActive_ && stream_ != nullptr) {
         const int queuedBytes = SDL_GetAudioStreamQueued(stream_);
         constexpr int maximumQueuedBytes = proceduralAudioSampleRate * 2
@@ -275,6 +303,11 @@ void AudioMixer::setAmbientVolume(const float volume) noexcept
     ambientVolume_ = std::clamp(volume, 0.0F, 1.0F);
 }
 
+void AudioMixer::setUiVolume(const float volume) noexcept
+{
+    uiVolume_ = std::clamp(volume, 0.0F, 1.0F);
+}
+
 bool AudioMixer::isInitialized() const noexcept
 {
     return initialized_;
@@ -294,7 +327,14 @@ std::size_t AudioMixer::ambientVoiceCount() const noexcept
 {
     return static_cast<std::size_t>(std::count_if(
         voices_.begin(), voices_.end(),
-        [](const Voice& voice) { return voice.ambient; }));
+        [](const Voice& voice) { return voice.bus == AudioBus::Ambient; }));
+}
+
+std::size_t AudioMixer::uiVoiceCount() const noexcept
+{
+    return static_cast<std::size_t>(std::count_if(
+        voices_.begin(), voices_.end(),
+        [](const Voice& voice) { return voice.bus == AudioBus::Ui; }));
 }
 
 std::size_t AudioMixer::cachedClipCount() const noexcept
@@ -336,17 +376,17 @@ void AudioMixer::addVoice(
     const float leftGain,
     const float rightGain,
     const bool loop,
-    const bool ambient)
+    const AudioBus bus)
 {
     if (!clip || clip->samples.empty()) {
         return;
     }
     if (voices_.size() >= maximumAudioVoices) {
         const auto removable = std::find_if(voices_.begin(), voices_.end(),
-            [](const Voice& voice) { return !voice.ambient; });
+            [](const Voice& voice) { return voice.bus != AudioBus::Ambient; });
         if (removable != voices_.end()) {
             voices_.erase(removable);
-        } else if (!ambient) {
+        } else if (bus != AudioBus::Ambient) {
             return;
         } else {
             voices_.erase(voices_.begin());
@@ -358,7 +398,7 @@ void AudioMixer::addVoice(
         std::clamp(leftGain, 0.0F, 1.0F),
         std::clamp(rightGain, 0.0F, 1.0F),
         loop,
-        ambient,
+        bus,
     });
 }
 

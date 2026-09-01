@@ -254,6 +254,10 @@ especializados das pastas numeradas.
   do deslocamento real grounded, com ciclo de 3,20 m, limites de 3,5 cm vertical
   e 1,8 cm lateral e blend suave. Somente a câmera enviada ao renderer recebe o
   offset; mira, hitscan, interação, IA e colisão continuam na câmera lógica.
+- **Fase 62 — Áudio funcional da interface:** a WKC Forge possui bus UI com
+  volume e atualização seletiva próprios. `UiNavigate`, `UiConfirm` e `UiBack`
+  respondem às transições reais dos menus; durante pausa somente esse bus
+  avança, mantendo ambiência, efeitos e toda a simulação congelados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -429,6 +433,13 @@ lateral. Entrada e parada convergem suavemente, estado aéreo perde peso sem
 avançar fase e segmentos acima de 0,50 m zeram o efeito. O offset existe somente
 na `CameraData` de renderização, nunca na origem usada por tiro ou interação.
 
+Na Fase 62, menu principal e pausa ganharam feedback procedural para mudança de
+seleção, confirmação e retorno por `Esc`. As ações usam `wasKeyPressed` e mudança
+efetiva de opção, portanto tecla mantida ou hover estacionário não repete cue. O
+mixer genérico ganhou bus `UI`, volume independente e `updateUi()`: enquanto o
+overlay bloqueia o fixed update do jogo, apenas vozes da interface avançam;
+Effects e Ambient preservam seus cursores até retomar.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -453,7 +464,8 @@ inválidos não consomem timers e reiniciar a run limpa todo feedback pendente.
 Na Fase 19, `PauseMenuState` mantém seleção segura em `RESUME`, navegação com
 wrap e comandos separados para retomar, reconstruir a run ou sair. Enquanto
 pausado, look, input pendente, IA, portas, arma, eventos, áudio atualizado pelo
-game loop e timers de HUD não avançam. O mouse relativo é liberado na abertura
+game loop e timers de HUD não avançam. Somente o bus UI continua para responder
+à navegação, sem avançar efeitos ou ambiência. O mouse relativo é liberado na abertura
 e restaurado no retorno; o renderer oculta mira e feedback transitório sob o
 overlay central.
 

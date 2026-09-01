@@ -25,6 +25,10 @@ public:
         AudioEventKind kind,
         wkc::core::Seed sourceSeed,
         std::uint64_t eventCounter = 0U);
+    void playUi(
+        AudioEventKind kind,
+        wkc::core::Seed sourceSeed,
+        std::uint64_t eventCounter = 0U);
     void playAt(
         AudioEventKind kind,
         wkc::core::Seed sourceSeed,
@@ -42,15 +46,18 @@ public:
     void stopAmbience() noexcept;
     void clearVoices() noexcept;
     void update(float fixedStepSeconds);
+    void updateUi(float fixedStepSeconds);
 
     void setMasterVolume(float volume) noexcept;
     void setEffectsVolume(float volume) noexcept;
     void setAmbientVolume(float volume) noexcept;
+    void setUiVolume(float volume) noexcept;
 
     [[nodiscard]] bool isInitialized() const noexcept;
     [[nodiscard]] bool isOutputActive() const noexcept;
     [[nodiscard]] std::size_t activeVoiceCount() const noexcept;
     [[nodiscard]] std::size_t ambientVoiceCount() const noexcept;
+    [[nodiscard]] std::size_t uiVoiceCount() const noexcept;
     [[nodiscard]] std::size_t cachedClipCount() const noexcept;
     [[nodiscard]] float lastMixPeak() const noexcept;
     [[nodiscard]] float lastLeftEnergy() const noexcept;

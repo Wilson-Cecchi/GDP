@@ -142,6 +142,32 @@ void testFootstepCueIdentity()
         "footstep keeps a short low metallic impact signature");
 }
 
+void testUiCueIdentity()
+{
+    using namespace gdp::audio;
+    using namespace wkc::audio;
+    constexpr wkc::core::Seed seed = 0x55495F415544494FULL;
+    const AudioRecipe navigate
+        = generateAudioRecipe(seed, AudioEventKind::UiNavigate, 0U);
+    const AudioRecipe confirm
+        = generateAudioRecipe(seed, AudioEventKind::UiConfirm, 0U);
+    const AudioRecipe back
+        = generateAudioRecipe(seed, AudioEventKind::UiBack, 0U);
+
+    expect(validateAudioRecipe(navigate).isValid()
+            && validateAudioRecipe(confirm).isValid()
+            && validateAudioRecipe(back).isValid(),
+        "all UI actions produce valid procedural recipes");
+    expect(navigate.recipeHash != confirm.recipeHash
+            && navigate.recipeHash != back.recipeHash
+            && confirm.recipeHash != back.recipeHash,
+        "navigate, confirm and back keep distinct deterministic identities");
+    expect(navigate.durationSeconds < back.durationSeconds
+            && confirm.secondaryFrequency > confirm.baseFrequency
+            && back.secondaryFrequency < back.baseFrequency,
+        "UI cues encode short navigation, positive confirm and falling back signatures");
+}
+
 void testValidationFailures()
 {
     using namespace gdp::audio;
@@ -229,6 +255,26 @@ void testSilentMixerAndSpatialization()
     audio.update(0.2F);
     expect(audio.activeVoiceCount() == 0U,
         "finished one-shot voices leave the mixer automatically");
+
+    audio.setAmbience(12345U, 2U);
+    audio.play(AudioEventKind::DryFire, 101U, 0U);
+    audio.playUi(AudioEventKind::UiNavigate, 101U, 0U);
+    audio.playUi(AudioEventKind::WeaponFire, 101U, 1U);
+    expect(audio.activeVoiceCount() == 3U
+            && audio.ambientVoiceCount() == 1U
+            && audio.uiVoiceCount() == 1U,
+        "GDP facade routes only UI categories to the dedicated bus");
+    audio.updateUi(0.20F);
+    expect(audio.activeVoiceCount() == 2U
+            && audio.ambientVoiceCount() == 1U
+            && audio.uiVoiceCount() == 0U
+            && audio.lastMixPeak() > 0.0F,
+        "menu update plays UI without advancing gameplay or ambience");
+    audio.update(0.08F);
+    expect(audio.activeVoiceCount() == 1U
+            && audio.ambientVoiceCount() == 1U,
+        "resuming the full mixer completes the previously frozen gameplay cue");
+    audio.stopAmbience();
 }
 
 } // namespace
@@ -239,6 +285,7 @@ int main()
     testCueCoverageAndClipping();
     testDoorCueIdentity();
     testFootstepCueIdentity();
+    testUiCueIdentity();
     testValidationFailures();
     testSilentMixerAndSpatialization();
 

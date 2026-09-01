@@ -768,6 +768,13 @@ Somente a `CameraData` de apresentação recebe o offset; posição lógica, mir
 hitscan, interação, IA e colisão permanecem inalterados. A regra pertence ao GDP
 e consome apenas matemática genérica da WKC Forge.
 
+Na Fase 62, `AudioMixer` ganhou o bus genérico `UI`, volume próprio e atualização
+seletiva. Durante menu/pausa, apenas vozes desse bus avançam; Effects e Ambient
+mantêm seus cursores congelados. O GDP acrescentou `UiNavigate`, `UiConfirm` e
+`UiBack` e a Application os emite somente em mudanças/ações reais da interface.
+O mixer WKC continua sem conhecer menus ou comandos GDP; IDs e golden anteriores
+foram preservados.
+
 ---
 
 # 8. Sistema de seed

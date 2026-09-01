@@ -843,6 +843,12 @@ laterais, entra/sai por blend e reseta em relocação. A Application aplica o
 offset somente à `CameraData` visual; câmera lógica, mira, hitscan, interação,
 IA e colisão não mudam. A WKC Forge fornece apenas a matemática genérica.
 
+Na Fase 62, o mixer WKC ganhou bus `UI`, volume independente e atualização
+seletiva. Menu e pausa podem avançar somente vozes UI, preservando os cursores
+Effects/Ambient junto da simulação congelada. O catálogo GDP recebeu
+`UiNavigate`, `UiConfirm` e `UiBack`, emitidos apenas por transições reais. A
+fundação permanece sem conceitos de menu; IDs e golden anteriores não mudaram.
+
 ---
 
 # 8. Sistema de seed

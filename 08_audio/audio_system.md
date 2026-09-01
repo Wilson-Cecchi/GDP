@@ -13,6 +13,7 @@
 > Na Fase 59, portas receberam cues procedurais e espacializados para abertura,
 > fechamento e trava.
 > Na Fase 60, o Player recebeu passos metálicos procedurais guiados por distância.
+> Na Fase 62, interface e mixer receberam cues e bus UI dedicados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -26,15 +27,19 @@ Gameplay Event → AudioEvent → AudioSystem → voice → spatialization → o
 
 `WeaponFire`, `DryFire`, `Reload`, `EnemyHit`, `EnemyDeath`, `PropImpact`,
 `PropDestroyed`, `Pickup`, `EventStart`, `EventComplete`, `PlayerHurt` e
-`Ambient`, além de `DoorOpen`, `DoorClose`, `DoorLock` e `Footstep`. UI dedicada
-permanece planejada.
+`Ambient`, além de `DoorOpen`, `DoorClose`, `DoorLock`, `Footstep`, `UiNavigate`,
+`UiConfirm` e `UiBack`.
 
 ## Mixer e buses
 
-`AudioMixer` mistura até 16 vozes em estéreo float de 48 kHz. Master, Effects
-e Ambient possuem volumes independentes; UI permanece planejado. A mixagem
+`AudioMixer` mistura até 16 vozes em estéreo float de 48 kHz. Master, Effects,
+Ambient e UI possuem volumes independentes. A mixagem
 limita a saída a `[-1, 1]`, descarta one-shots concluídos e reutiliza clips pelo
 hash integral da receita.
+
+`update()` avança todos os buses durante gameplay. `updateUi()` avança somente
+vozes UI quando menu principal ou pausa bloqueiam a simulação, preservando os
+cursores Effects/Ambient. Assim a navegação responde sem descongelar sons da run.
 
 ## Variação procedural
 
@@ -83,10 +88,10 @@ encerrar SDL.
 
 ## Testes
 
-O gate cobre 1.000 receitas/hash únicos, todas as dezesseis categorias, sete perfis
+O gate cobre 1.000 receitas/hash únicos, todas as dezenove categorias, sete perfis
 ambientes, hash dourado `0xEAD1C1A48BF9FF7F`, waveform repetível, clipping,
 cache, limite de vozes, ciclo de one-shot/loop, crossfade de duas ambiências,
 pan, distância, assinaturas distintas das três transições de porta, dispositivo
 dummy e dispositivo ausente. A cadência de passos testa distância real,
-grounded, bloqueio de teleporte e reset. Pause e UI dedicada permanecem
-planejados.
+grounded, bloqueio de teleporte e reset. Os três cues UI, roteamento de bus e
+avanço seletivo durante menu/pausa possuem regressões próprias.

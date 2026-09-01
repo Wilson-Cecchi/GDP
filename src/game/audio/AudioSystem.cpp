@@ -23,6 +23,20 @@ void AudioSystem::play(
     mixer_.play(generateAudioRecipe(sourceSeed, kind, eventCounter));
 }
 
+void AudioSystem::playUi(
+    const AudioEventKind kind,
+    const wkc::core::Seed sourceSeed,
+    const std::uint64_t eventCounter)
+{
+    if (kind != AudioEventKind::UiNavigate
+        && kind != AudioEventKind::UiConfirm
+        && kind != AudioEventKind::UiBack) {
+        return;
+    }
+    mixer_.play(generateAudioRecipe(sourceSeed, kind, eventCounter),
+        wkc::audio::AudioBus::Ui);
+}
+
 void AudioSystem::playAt(
     const AudioEventKind kind,
     const wkc::core::Seed sourceSeed,
@@ -74,6 +88,11 @@ void AudioSystem::update(const float fixedStepSeconds)
     mixer_.update(fixedStepSeconds);
 }
 
+void AudioSystem::updateUi(const float fixedStepSeconds)
+{
+    mixer_.updateUi(fixedStepSeconds);
+}
+
 void AudioSystem::setMasterVolume(const float volume) noexcept
 {
     mixer_.setMasterVolume(volume);
@@ -87,6 +106,11 @@ void AudioSystem::setEffectsVolume(const float volume) noexcept
 void AudioSystem::setAmbientVolume(const float volume) noexcept
 {
     mixer_.setAmbientVolume(volume);
+}
+
+void AudioSystem::setUiVolume(const float volume) noexcept
+{
+    mixer_.setUiVolume(volume);
 }
 
 bool AudioSystem::isInitialized() const noexcept
@@ -107,6 +131,11 @@ std::size_t AudioSystem::activeVoiceCount() const noexcept
 std::size_t AudioSystem::ambientVoiceCount() const noexcept
 {
     return mixer_.ambientVoiceCount();
+}
+
+std::size_t AudioSystem::uiVoiceCount() const noexcept
+{
+    return mixer_.uiVoiceCount();
 }
 
 std::size_t AudioSystem::cachedClipCount() const noexcept

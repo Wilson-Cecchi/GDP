@@ -3,6 +3,7 @@
 > **Estado:** menu principal funcional implementado na Fase 21 e pausa in-game
 > funcional desde a Fase 19. Configurações permanecem especificadas;
 > Victory/Defeat já usam banner no viewport e `Enter` para reconstruir a run.
+> Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -11,6 +12,8 @@
 O bootstrap gráfico mostra `START RUN` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` encerra. A seleção inicial segura é sempre `START RUN`.
+Alterar efetivamente a seleção toca `UiNavigate`; confirmar por teclado ou mouse
+toca `UiConfirm`. Movimento do ponteiro sem troca de opção não repete áudio.
 
 Enquanto o menu está aberto, o mouse permanece livre e Player/Enemy não recebem
 fixed update. Confirmar `START RUN` cria mundo, entidades, eventos, iluminação e
@@ -27,6 +30,8 @@ mesmo estado, sem antecipar sistemas ainda não implementados.
 `EXIT GAME`. O mouse relativo é liberado no menu e restaurado no retorno.
 Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
 avançam; a UI apenas converte a seleção em um comando para `Application`.
+O bus `UI` continua avançando para reproduzir `UiNavigate`, `UiConfirm` e
+`UiBack`, enquanto os cursores de Effects/Ambient permanecem congelados.
 `RESTART RUN` encerra explicitamente a sessão ativa antes de pedir a próxima
 seed, portanto o restart não é rejeitado por ainda estar em `Playing`.
 
@@ -39,11 +44,14 @@ Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e mostr
 
 ## Navegação
 
-Cima/baixo, confirmar, voltar; gamepad e mouse podem mapear para as mesmas ações lógicas.
+Cima/baixo, confirmar, voltar; gamepad e mouse podem mapear para as mesmas ações
+lógicas e os mesmos cues, sem criar regras sonoras específicas do dispositivo.
 
 ## Configurações
 
-FOV, sensibilidade, invert Y, esquema de controles, resolução, fullscreen e volumes.
+FOV, sensibilidade, invert Y, esquema de controles, resolução, fullscreen e
+volumes. Master, Effects, Ambient e UI já existem como buses independentes; a
+tela de configuração permanece planejada.
 
 ## Confirmações
 

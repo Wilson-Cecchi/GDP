@@ -61,6 +61,27 @@ int main()
         "generic mixer caches, spatializes and mixes a recipe");
     mixer.clearVoices();
 
+    mixer.play(recipe, AudioBus::Effects);
+    mixer.setAmbience(recipe);
+    mixer.play(recipe, AudioBus::Ui);
+    expect(mixer.activeVoiceCount() == 3U
+            && mixer.ambientVoiceCount() == 1U
+            && mixer.uiVoiceCount() == 1U,
+        "generic mixer tracks effects, ambient and UI buses independently");
+    mixer.updateUi(0.08F);
+    mixer.updateUi(0.08F);
+    expect(mixer.activeVoiceCount() == 2U
+            && mixer.ambientVoiceCount() == 1U
+            && mixer.uiVoiceCount() == 0U
+            && mixer.lastMixPeak() > 0.0F,
+        "UI-only update completes UI while gameplay and ambient voices stay frozen");
+    mixer.update(0.08F);
+    mixer.update(0.08F);
+    expect(mixer.activeVoiceCount() == 1U
+            && mixer.ambientVoiceCount() == 1U,
+        "full mixer update resumes effects while ambient continues looping");
+    mixer.clearVoices();
+
     AudioRecipe invalid = recipe;
     invalid.kind = invalid.kindCount;
     expect(!validateAudioRecipe(invalid).isValid(),

@@ -164,6 +164,33 @@ void configureRecipe(
         recipe.pulseRate = 13.0F;
         recipe.gain = 0.26F;
         break;
+    case AudioEventKind::UiNavigate:
+        recipe.durationSeconds = 0.055F;
+        recipe.baseFrequency = 780.0F;
+        recipe.secondaryFrequency = 1'040.0F;
+        recipe.attackSeconds = 0.001F;
+        recipe.releaseSeconds = 0.045F;
+        recipe.noiseMix = 0.02F;
+        recipe.gain = 0.16F;
+        break;
+    case AudioEventKind::UiConfirm:
+        recipe.durationSeconds = 0.12F;
+        recipe.baseFrequency = 460.0F;
+        recipe.secondaryFrequency = 920.0F;
+        recipe.attackSeconds = 0.003F;
+        recipe.releaseSeconds = 0.095F;
+        recipe.noiseMix = 0.015F;
+        recipe.gain = 0.20F;
+        break;
+    case AudioEventKind::UiBack:
+        recipe.durationSeconds = 0.10F;
+        recipe.baseFrequency = 620.0F;
+        recipe.secondaryFrequency = 280.0F;
+        recipe.attackSeconds = 0.002F;
+        recipe.releaseSeconds = 0.08F;
+        recipe.noiseMix = 0.03F;
+        recipe.gain = 0.18F;
+        break;
     case AudioEventKind::Count:
         break;
     }
