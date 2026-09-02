@@ -188,13 +188,14 @@ não fecha e que `START RUN` inicia a seed seguinte.
 O gate de configurações cobre origem título/pausa, wrap, seleção direta, retorno,
 passos e clamps de todos os valores. Input neutro e adaptador SDL protegem as
 novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste
-CPU percorre as sete linhas do layout em resoluções ampla, compacta e mínima, e
-a regressão OpenGL exige pixels distintos para tela, seleção e valor de FOV.
+CPU percorre as oito linhas do layout em resoluções ampla, compacta e mínima, e
+a regressão OpenGL exige pixels distintos para tela, seleção e estado `INVERT Y`.
 
 O gate de persistência usa diretório temporário isolado e cobre arquivo ausente,
-round-trip dos seis campos, substituição de arquivo existente, remoção do
+round-trip dos sete campos, substituição de arquivo existente, remoção do
 temporário, campos ausentes/desconhecidos, corrupção parcial, clamps, versão
-ausente e versão incompatível. Os bootstraps headless e OpenGL confirmam que a
+ausente, migração v1→v2 e versão incompatível. Gameplay compara deltas verticais
+normal e invertido, garantindo yaw inalterado. Os bootstraps headless e OpenGL confirmam que a
 integração não altera o ciclo de inicialização; headless não toca nas
 preferências reais do usuário.
 

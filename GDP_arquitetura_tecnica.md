@@ -880,6 +880,13 @@ parser e escritor versionados independentes de SDL; somente a Application usa
 parser antes do rename, e o estado sujo permanece pendente quando a escrita
 falha. Headless mantém o filesystem de preferências fora do ciclo de testes.
 
+Na Fase 68, `RuntimeSettings` ganhou `invertMouseY` e o schema persistente v2
+ganhou `invert_mouse_y`. O leitor mantém uma rota explícita para v1, preenchendo
+o campo novo com o default sem reescrever o arquivo durante o carregamento. A
+Application entrega o booleano ao Player, que altera apenas o sinal do delta
+vertical em `applyLook`; renderer e hit test continuam consumindo snapshots e o
+mesmo índice ordenado das oito linhas.
+
 ---
 
 # 8. Sistema de seed

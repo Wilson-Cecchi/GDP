@@ -87,6 +87,11 @@ bool adjustRuntimeSetting(
     case SettingsMenuOption::MouseSensitivity:
         return adjustPercent(
             settings.mouseSensitivityPercent, direction, 30U, 200U, 10U);
+    case SettingsMenuOption::InvertMouseY: {
+        const bool previous = settings.invertMouseY;
+        settings.invertMouseY = direction > 0;
+        return settings.invertMouseY != previous;
+    }
     case SettingsMenuOption::FieldOfView:
         return adjustPercent(
             settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);

@@ -60,6 +60,18 @@ void testRuntimeSettingsClamps()
     expect(settings.masterVolumePercent == 0U,
         "volume clamps at zero");
 
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::InvertMouseY, 1)
+            && settings.invertMouseY,
+        "right enables vertical mouse inversion");
+    expect(!adjustRuntimeSetting(
+               settings, SettingsMenuOption::InvertMouseY, 1),
+        "repeating the enabled value does not report a change");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::InvertMouseY, -1)
+            && !settings.invertMouseY,
+        "left disables vertical mouse inversion");
+
     for (int index = 0; index < 30; ++index) {
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::MouseSensitivity, 1);

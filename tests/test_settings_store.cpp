@@ -72,6 +72,7 @@ void testMissingAndRoundTrip()
     settings.ambientVolumePercent = 40U;
     settings.uiVolumePercent = 60U;
     settings.mouseSensitivityPercent = 130U;
+    settings.invertMouseY = true;
     settings.fieldOfViewDegrees = 82U;
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
@@ -95,11 +96,12 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 1\n"
+        "version = 2\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
         "mouse_sensitivity = 400\n"
+        "invert_mouse_y = maybe\n"
         "field_of_view = 20\n"
         "future_option = enabled\n");
 
@@ -111,11 +113,12 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.ambientVolumePercent == 45U
             && recovered.settings.uiVolumePercent == 100U
             && recovered.settings.mouseSensitivityPercent == 200U
+            && !recovered.settings.invertMouseY
             && recovered.settings.fieldOfViewDegrees == 60U,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 1\n"
+        "version = 2\n"
         "master_volume = 35\n"
         "future_option = any future representation\n");
     const SettingsLoadResult forwardCompatible = loadRuntimeSettings(path);
@@ -123,6 +126,20 @@ void testRecoveryAndForwardCompatibility()
             && forwardCompatible.settings.masterVolumePercent == 35U
             && forwardCompatible.settings.effectsVolumePercent == 100U,
         "unknown and missing fields remain forward compatible");
+
+    writeText(path,
+        "version = 1\n"
+        "master_volume = 55\n"
+        "mouse_sensitivity = 120\n"
+        "invert_mouse_y = true\n"
+        "field_of_view = 76\n");
+    const SettingsLoadResult migrated = loadRuntimeSettings(path);
+    expect(migrated.status == SettingsLoadStatus::Migrated
+            && migrated.settings.masterVolumePercent == 55U
+            && migrated.settings.mouseSensitivityPercent == 120U
+            && !migrated.settings.invertMouseY
+            && migrated.settings.fieldOfViewDegrees == 76U,
+        "schema version 1 migrates with invert Y safely disabled");
 }
 
 void testInvalidAndUnsupportedFiles()

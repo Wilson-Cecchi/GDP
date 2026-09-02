@@ -408,13 +408,13 @@ int main()
                 settingsPixels.data());
 
             settingsHud.settingsSelection
-                = gdp::game::visual::HudSettingsSelection::FieldOfView;
-            settingsHud.fieldOfViewDegrees = 90U;
-            const bool renderedSettingsFov = renderer.render(
+                = gdp::game::visual::HudSettingsSelection::InvertMouseY;
+            settingsHud.invertMouseY = true;
+            const bool renderedSettingsAdjusted = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, settingsHud);
-            std::vector<std::uint8_t> settingsFovPixels(baseline.size());
+            std::vector<std::uint8_t> settingsAdjustedPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
-                settingsFovPixels.data());
+                settingsAdjustedPixels.data());
 
             const bool renderedWorker = renderer.prepareWorkerVisual(111)
                 && renderer.render(width, height, {}, workerOnly);
@@ -585,7 +585,7 @@ int main()
                         != baseline[index + channel]) {
                         ++settingsMenuChangedChannels;
                     }
-                    if (settingsFovPixels[index + channel]
+                    if (settingsAdjustedPixels[index + channel]
                         != settingsPixels[index + channel]) {
                         ++settingsSelectionChangedChannels;
                     }
@@ -643,7 +643,7 @@ int main()
                 && renderedMainMenu && mainMenuChangedChannels > 500U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U
                 && renderedSettings && settingsMenuChangedChannels > 500U
-                && renderedSettingsFov
+                && renderedSettingsAdjusted
                 && settingsSelectionChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U

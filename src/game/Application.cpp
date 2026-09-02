@@ -1136,6 +1136,7 @@ void Application::applyRuntimeSettings()
 {
     player_.setMouseSensitivity(
         gameplay::mouseSensitivity(runtimeSettings_));
+    player_.setInvertMouseY(runtimeSettings_.invertMouseY);
     if (audio_) {
         audio_->setMasterVolume(gameplay::normalizedVolume(
             runtimeSettings_.masterVolumePercent));
@@ -1173,6 +1174,10 @@ void Application::loadPersistedSettings()
     switch (loaded.status) {
     case persistence::SettingsLoadStatus::Loaded:
         log(LogLevel::Info, "Runtime settings loaded from disk");
+        break;
+    case persistence::SettingsLoadStatus::Migrated:
+        log(LogLevel::Info,
+            "Runtime settings migrated in memory from schema version 1");
         break;
     case persistence::SettingsLoadStatus::LoadedWithRecovery:
         log(LogLevel::Warning,
@@ -1785,6 +1790,7 @@ void Application::render()
         hud.ambientVolumePercent = runtimeSettings_.ambientVolumePercent;
         hud.uiVolumePercent = runtimeSettings_.uiVolumePercent;
         hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
+        hud.invertMouseY = runtimeSettings_.invertMouseY;
         hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {

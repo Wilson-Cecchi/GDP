@@ -199,7 +199,7 @@ SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noe
     const int panelWidth = std::max(1,
         std::min(safeWidth - 16, 300 * scale));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 190 * scale));
+        std::min(safeHeight - 16, 208 * scale));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int rowWidth = std::max(1,
@@ -213,7 +213,7 @@ SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noe
     layout.panel = {panelX, panelY, panelWidth, panelHeight};
     for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
         const int rowY = std::clamp(
-            panelY + ((132 - (static_cast<int>(index) * 18)) * scale),
+            panelY + ((150 - (static_cast<int>(index) * 18)) * scale),
             panelY, maximumRowY);
         layout.rows[index] = {rowX, rowY, rowWidth, rowHeight};
     }

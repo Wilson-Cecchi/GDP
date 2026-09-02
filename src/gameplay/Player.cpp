@@ -83,14 +83,21 @@ void Player::setMouseSensitivity(const float sensitivity) noexcept
     }
 }
 
+void Player::setInvertMouseY(const bool inverted) noexcept
+{
+    invertMouseY_ = inverted;
+}
+
 void Player::applyLook(const wkc::core::Vec2 mouseDelta) noexcept
 {
     if (!state_.alive) {
         return;
     }
     state_.yawDegrees += mouseDelta.x * mouseSensitivity_;
+    const float verticalDelta = mouseDelta.y * mouseSensitivity_
+        * (invertMouseY_ ? 1.0F : -1.0F);
     state_.pitchDegrees = std::clamp(
-        state_.pitchDegrees - (mouseDelta.y * mouseSensitivity_),
+        state_.pitchDegrees + verticalDelta,
         -89.0F,
         89.0F);
     state_.yawDegrees = std::remainder(state_.yawDegrees, 360.0F);
@@ -260,6 +267,11 @@ wkc::core::Vec3 Player::cameraPosition() const noexcept
 float Player::mouseSensitivity() const noexcept
 {
     return mouseSensitivity_;
+}
+
+bool Player::invertMouseY() const noexcept
+{
+    return invertMouseY_;
 }
 
 } // namespace gdp::gameplay

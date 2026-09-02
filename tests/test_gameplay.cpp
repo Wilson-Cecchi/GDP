@@ -241,6 +241,19 @@ void testLookAndCamera()
     configured.setMouseSensitivity(9.0F);
     expect(wkc::core::nearlyEqual(configured.mouseSensitivity(), 0.24F),
         "runtime sensitivity clamps at its documented maximum");
+
+    Player regularVertical;
+    Player invertedVertical;
+    invertedVertical.setInvertMouseY(true);
+    regularVertical.applyLook({0.0F, 10.0F});
+    invertedVertical.applyLook({0.0F, 10.0F});
+    expect(!regularVertical.invertMouseY() && invertedVertical.invertMouseY()
+            && regularVertical.state().pitchDegrees < 0.0F
+            && invertedVertical.state().pitchDegrees > 0.0F
+            && wkc::core::nearlyEqual(
+                regularVertical.state().pitchDegrees,
+                -invertedVertical.state().pitchDegrees),
+        "invert Y reverses only the vertical look direction");
 }
 
 void testInteractionAndLife()

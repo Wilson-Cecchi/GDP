@@ -275,6 +275,9 @@ especializados das pastas numeradas.
   carregados de `settings.toml` no diretório de preferências da plataforma e
   salvos ao fechar o menu. O formato versionado aceita campos ausentes/futuros,
   recupera valores inválidos e só substitui o arquivo após validar o temporário.
+- **Fase 68 — Inversão vertical do mouse:** `INVERT Y` integra menu, Player e
+  persistência. Esquerda escolhe `OFF`, direita escolhe `ON`; o schema v2 lê
+  arquivos v1 preservando os seis valores anteriores e assume `OFF` com segurança.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -490,6 +493,13 @@ Application escreve `settings.toml.tmp`, faz flush, relê e valida o conteúdo e
 só então executa a troca no mesmo diretório. Falhas preservam o arquivo anterior
 e o shutdown repete uma gravação ainda pendente. O modo headless não consulta
 nem altera preferências do usuário.
+
+Na Fase 68, a sétima opção funcional `INVERT Y` passou a controlar somente o
+sinal do delta vertical aplicado por `Player::applyLook`; yaw e sensibilidade
+permanecem idênticos. A linha usa `ON/OFF` e mantém os mesmos controles de teclado
+e mouse. O arquivo evoluiu para versão 2 com `invert_mouse_y = true/false`;
+arquivos v1 continuam legíveis, carregam a opção nova como `OFF` e só são
+reescritos após uma alteração real do usuário.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -155,6 +155,7 @@ enum class HudSettingsSelection : std::uint8_t {
     AmbientVolume,
     UiVolume,
     MouseSensitivity,
+    InvertMouseY,
     FieldOfView,
     Back,
     Count,
@@ -259,6 +260,7 @@ struct HudRenderData {
     std::uint16_t ambientVolumePercent{100U};
     std::uint16_t uiVolumePercent{100U};
     std::uint16_t mouseSensitivityPercent{100U};
+    bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
 };
 

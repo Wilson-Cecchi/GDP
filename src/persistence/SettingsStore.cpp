@@ -37,6 +37,18 @@ std::optional<std::uint64_t> parseUnsigned(std::string_view value) noexcept
     return parsedValue;
 }
 
+std::optional<bool> parseBoolean(std::string_view value) noexcept
+{
+    value = trim(value);
+    if (value == "true") {
+        return true;
+    }
+    if (value == "false") {
+        return false;
+    }
+    return std::nullopt;
+}
+
 bool assignClamped(
     std::uint16_t& target,
     const std::string_view value,
@@ -65,6 +77,8 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "ambient_volume = " << settings.ambientVolumePercent << '\n'
            << "ui_volume = " << settings.uiVolumePercent << '\n'
            << "mouse_sensitivity = " << settings.mouseSensitivityPercent << '\n'
+           << "invert_mouse_y = "
+           << (settings.invertMouseY ? "true" : "false") << '\n'
            << "field_of_view = " << settings.fieldOfViewDegrees << '\n';
     return output.str();
 }
@@ -131,6 +145,13 @@ SettingsLoadResult loadRuntimeSettings(
                 recovered = !assignClamped(
                     result.settings.mouseSensitivityPercent, value, 30U, 200U)
                     || recovered;
+            } else if (key == "invert_mouse_y") {
+                const std::optional<bool> inverted = parseBoolean(value);
+                if (inverted) {
+                    result.settings.invertMouseY = *inverted;
+                } else {
+                    recovered = true;
+                }
             } else if (key == "field_of_view") {
                 recovered = !assignClamped(
                     result.settings.fieldOfViewDegrees, value, 60U, 100U)
@@ -147,15 +168,24 @@ SettingsLoadResult loadRuntimeSettings(
             result.status = SettingsLoadStatus::Invalid;
             return result;
         }
-        if (*version != currentSettingsVersion) {
+        constexpr std::uint64_t oldestSupportedVersion = 1U;
+        if (*version < oldestSupportedVersion
+            || *version > currentSettingsVersion) {
             result.settings = {};
             result.status = SettingsLoadStatus::UnsupportedVersion;
             return result;
         }
+        if (*version == 1U) {
+            result.settings.invertMouseY = false;
+        }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
-        result.status = recovered
-            ? SettingsLoadStatus::LoadedWithRecovery
-            : SettingsLoadStatus::Loaded;
+        if (*version < currentSettingsVersion) {
+            result.status = SettingsLoadStatus::Migrated;
+        } else {
+            result.status = recovered
+                ? SettingsLoadStatus::LoadedWithRecovery
+                : SettingsLoadStatus::Loaded;
+        }
         return result;
     } catch (...) {
         result.settings = {};

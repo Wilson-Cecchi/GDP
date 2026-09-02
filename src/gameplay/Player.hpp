@@ -45,6 +45,7 @@ public:
         float yawDegrees) noexcept;
     void bindEntity(gdp::entities::EntityId entity) noexcept;
     void setMouseSensitivity(float sensitivity) noexcept;
+    void setInvertMouseY(bool inverted) noexcept;
     void applyLook(wkc::core::Vec2 mouseDelta) noexcept;
     void fixedUpdate(
         const PlayerCommand& command,
@@ -73,6 +74,7 @@ public:
     [[nodiscard]] wkc::core::Vec3 rightDirection() const noexcept;
     [[nodiscard]] wkc::core::Vec3 cameraPosition() const noexcept;
     [[nodiscard]] float mouseSensitivity() const noexcept;
+    [[nodiscard]] bool invertMouseY() const noexcept;
 
 private:
     PlayerState state_{};
@@ -81,6 +83,7 @@ private:
     float moveSpeed_{4.5F};
     float gravity_{-20.0F};
     float mouseSensitivity_{0.12F};
+    bool invertMouseY_{false};
     float eyeHeight_{1.62F};
 };
 

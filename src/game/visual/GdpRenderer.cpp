@@ -1452,17 +1452,19 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (22 * scale),
             2 * scale, title, cyanColor);
 
-        constexpr std::array<std::string_view, 7> labels{
+        constexpr std::array<std::string_view, 8> labels{
             "MASTER", "EFFECTS", "AMBIENT", "UI VOLUME",
-            "SENSITIVITY", "FOV", "BACK",
+            "SENSITIVITY", "INVERT Y", "FOV", "BACK",
         };
-        const std::array<std::uint16_t, 6> numbers{
+        const std::array<std::uint16_t, 8> numbers{
             hud.masterVolumePercent,
             hud.effectsVolumePercent,
             hud.ambientVolumePercent,
             hud.uiVolumePercent,
             hud.mouseSensitivityPercent,
+            0U,
             hud.fieldOfViewDegrees,
+            0U,
         };
         for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
             const UiRect row = layout.rows[index];
@@ -1481,10 +1483,16 @@ bool GdpRenderer::render(
                     selected ? cyanColor : textColor);
                 continue;
             }
-            const std::string value = index
-                    == static_cast<std::size_t>(HudSettingsSelection::FieldOfView)
-                ? "< " + std::to_string(numbers[index]) + " >"
-                : "< " + std::to_string(numbers[index]) + "% >";
+            std::string value;
+            if (index
+                == static_cast<std::size_t>(HudSettingsSelection::InvertMouseY)) {
+                value = hud.invertMouseY ? "< ON >" : "< OFF >";
+            } else if (index
+                == static_cast<std::size_t>(HudSettingsSelection::FieldOfView)) {
+                value = "< " + std::to_string(numbers[index]) + " >";
+            } else {
+                value = "< " + std::to_string(numbers[index]) + "% >";
+            }
             drawBitmapText(row.x + (8 * scale), row.y + (3 * scale),
                 scale, labels[index], selected ? cyanColor : textColor);
             drawBitmapText(row.x + row.width - bitmapTextWidth(value, scale)
