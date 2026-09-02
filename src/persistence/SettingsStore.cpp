@@ -80,6 +80,10 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "invert_mouse_y = "
            << (settings.invertMouseY ? "true" : "false") << '\n'
            << "field_of_view = " << settings.fieldOfViewDegrees << '\n'
+           << "window_width = "
+           << gameplay::windowResolutionSize(settings.windowResolution).width << '\n'
+           << "window_height = "
+           << gameplay::windowResolutionSize(settings.windowResolution).height << '\n'
            << "fullscreen = "
            << (settings.fullscreen ? "true" : "false") << '\n';
     return output.str();
@@ -105,6 +109,8 @@ SettingsLoadResult loadRuntimeSettings(
         bool recovered = false;
         bool foundVersion = false;
         std::optional<std::uint64_t> version;
+        std::optional<std::uint64_t> windowWidth;
+        std::optional<std::uint64_t> windowHeight;
         std::string line;
         while (std::getline(input, line)) {
             std::string_view content = trim(line);
@@ -158,6 +164,12 @@ SettingsLoadResult loadRuntimeSettings(
                 recovered = !assignClamped(
                     result.settings.fieldOfViewDegrees, value, 60U, 100U)
                     || recovered;
+            } else if (key == "window_width") {
+                windowWidth = parseUnsigned(value);
+                recovered = !windowWidth || recovered;
+            } else if (key == "window_height") {
+                windowHeight = parseUnsigned(value);
+                recovered = !windowHeight || recovered;
             } else if (key == "fullscreen") {
                 const std::optional<bool> fullscreen = parseBoolean(value);
                 if (fullscreen) {
@@ -189,6 +201,23 @@ SettingsLoadResult loadRuntimeSettings(
         }
         if (*version <= 2U) {
             result.settings.fullscreen = false;
+        }
+        if (*version <= 3U) {
+            result.settings.windowResolution
+                = gameplay::WindowResolution::R1280x720;
+        } else if (windowWidth && windowHeight
+            && *windowWidth <= 65'535U && *windowHeight <= 65'535U) {
+            const std::optional<gameplay::WindowResolution> resolution
+                = gameplay::windowResolutionForSize(
+                    static_cast<std::uint16_t>(*windowWidth),
+                    static_cast<std::uint16_t>(*windowHeight));
+            if (resolution) {
+                result.settings.windowResolution = *resolution;
+            } else {
+                recovered = true;
+            }
+        } else if (windowWidth || windowHeight) {
+            recovered = true;
         }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {

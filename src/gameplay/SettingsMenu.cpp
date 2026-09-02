@@ -1,9 +1,17 @@
 #include "gameplay/SettingsMenu.hpp"
 
 #include <algorithm>
+#include <array>
 
 namespace gdp::gameplay {
 namespace {
+
+constexpr std::array<WindowResolutionSize, 4> windowResolutionSizes{{
+    {960U, 540U},
+    {1280U, 720U},
+    {1600U, 900U},
+    {1920U, 1080U},
+}};
 
 bool adjustPercent(
     std::uint16_t& value,
@@ -95,6 +103,15 @@ bool adjustRuntimeSetting(
     case SettingsMenuOption::FieldOfView:
         return adjustPercent(
             settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);
+    case SettingsMenuOption::WindowResolution: {
+        const WindowResolution previous = settings.windowResolution;
+        const int maximum = static_cast<int>(WindowResolution::Count) - 1;
+        const int adjusted = std::clamp(
+            static_cast<int>(previous) + (direction > 0 ? 1 : -1),
+            0, maximum);
+        settings.windowResolution = static_cast<WindowResolution>(adjusted);
+        return settings.windowResolution != previous;
+    }
     case SettingsMenuOption::Fullscreen: {
         const bool previous = settings.fullscreen;
         settings.fullscreen = direction > 0;
@@ -147,7 +164,32 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
         settings.mouseSensitivityPercent, 30U, 200U);
     settings.fieldOfViewDegrees = std::clamp<std::uint16_t>(
         settings.fieldOfViewDegrees, 60U, 100U);
+    if (settings.windowResolution >= WindowResolution::Count) {
+        settings.windowResolution = WindowResolution::R1280x720;
+    }
     return settings;
+}
+
+WindowResolutionSize windowResolutionSize(
+    const WindowResolution resolution) noexcept
+{
+    const std::size_t index = static_cast<std::size_t>(resolution);
+    return index < windowResolutionSizes.size()
+        ? windowResolutionSizes[index]
+        : windowResolutionSizes[1U];
+}
+
+std::optional<WindowResolution> windowResolutionForSize(
+    const std::uint16_t width,
+    const std::uint16_t height) noexcept
+{
+    for (std::size_t index = 0U; index < windowResolutionSizes.size(); ++index) {
+        if (windowResolutionSizes[index]
+            == WindowResolutionSize{width, height}) {
+            return static_cast<WindowResolution>(index);
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace gdp::gameplay

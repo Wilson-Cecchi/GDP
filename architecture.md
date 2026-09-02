@@ -821,6 +821,14 @@ renderer recebe as novas dimensões pelo fluxo já existente, e uma falha de tro
 é não fatal e restaura o valor à flag real. O teste de integração usa
 preferências isoladas do usuário.
 
+Na Fase 70, `WindowResolution` passou a representar quatro presets válidos e
+`SettingsMenu` centraliza a conversão enum↔tamanho. A Application usa o preset na
+criação da janela e chama `SDL_SetWindowSize` somente em modo janela; fullscreen
+preserva a escolha para o retorno. Persistência v4 grava o par largura/altura e
+migra v1–v3 para 1280×720. O renderer continua alheio ao SDL: recebe o valor para
+texto, mas dimensiona seus recursos pelo framebuffer real já consultado a cada
+quadro.
+
 ---
 
 # 8. Sistema de seed

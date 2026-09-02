@@ -74,6 +74,8 @@ void testMissingAndRoundTrip()
     settings.mouseSensitivityPercent = 130U;
     settings.invertMouseY = true;
     settings.fieldOfViewDegrees = 82U;
+    settings.windowResolution
+        = gdp::gameplay::WindowResolution::R1600x900;
     settings.fullscreen = true;
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
@@ -97,13 +99,15 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 3\n"
+        "version = 4\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
         "mouse_sensitivity = 400\n"
         "invert_mouse_y = maybe\n"
         "field_of_view = 20\n"
+        "window_width = 1111\n"
+        "window_height = 777\n"
         "fullscreen = maybe\n"
         "future_option = enabled\n");
 
@@ -117,11 +121,13 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.mouseSensitivityPercent == 200U
             && !recovered.settings.invertMouseY
             && recovered.settings.fieldOfViewDegrees == 60U
+            && recovered.settings.windowResolution
+                == gdp::gameplay::WindowResolution::R1280x720
             && !recovered.settings.fullscreen,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 3\n"
+        "version = 4\n"
         "master_volume = 35\n"
         "future_option = any future representation\n");
     const SettingsLoadResult forwardCompatible = loadRuntimeSettings(path);
@@ -157,6 +163,20 @@ void testRecoveryAndForwardCompatibility()
             && migratedV2.settings.fieldOfViewDegrees == 84U
             && !migratedV2.settings.fullscreen,
         "schema version 2 preserves invert Y and defaults fullscreen safely");
+
+    writeText(path,
+        "version = 3\n"
+        "master_volume = 75\n"
+        "fullscreen = true\n"
+        "window_width = 960\n"
+        "window_height = 540\n");
+    const SettingsLoadResult migratedV3 = loadRuntimeSettings(path);
+    expect(migratedV3.status == SettingsLoadStatus::Migrated
+            && migratedV3.settings.masterVolumePercent == 75U
+            && migratedV3.settings.fullscreen
+            && migratedV3.settings.windowResolution
+                == gdp::gameplay::WindowResolution::R1280x720,
+        "schema version 3 preserves fullscreen and defaults window resolution");
 }
 
 void testInvalidAndUnsupportedFiles()
@@ -181,13 +201,17 @@ void testInvalidAndUnsupportedFiles()
     invalidSource.masterVolumePercent = 500U;
     invalidSource.mouseSensitivityPercent = 1U;
     invalidSource.fieldOfViewDegrees = 500U;
+    invalidSource.windowResolution
+        = static_cast<gdp::gameplay::WindowResolution>(99U);
     expect(saveRuntimeSettings(path, invalidSource),
         "save accepts runtime values that require canonicalization");
     const SettingsLoadResult canonical = loadRuntimeSettings(path);
     expect(canonical.status == SettingsLoadStatus::Loaded
             && canonical.settings.masterVolumePercent == 100U
             && canonical.settings.mouseSensitivityPercent == 30U
-            && canonical.settings.fieldOfViewDegrees == 100U,
+            && canonical.settings.fieldOfViewDegrees == 100U
+            && canonical.settings.windowResolution
+                == gdp::gameplay::WindowResolution::R1280x720,
         "save persists only canonical settings ranges");
 }
 

@@ -80,6 +80,26 @@ void testRuntimeSettingsClamps()
             && !settings.fullscreen,
         "left restores windowed mode");
 
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::WindowResolution, -1)
+            && settings.windowResolution == WindowResolution::R960x540,
+        "left selects the previous window resolution preset");
+    expect(!adjustRuntimeSetting(
+               settings, SettingsMenuOption::WindowResolution, -1),
+        "window resolution clamps at the smallest preset");
+    for (int index = 0; index < 10; ++index) {
+        (void)adjustRuntimeSetting(
+            settings, SettingsMenuOption::WindowResolution, 1);
+    }
+    expect(settings.windowResolution == WindowResolution::R1920x1080,
+        "window resolution clamps at the largest preset");
+    expect(windowResolutionSize(WindowResolution::R1600x900)
+            == WindowResolutionSize{1600U, 900U}
+            && windowResolutionForSize(1920U, 1080U)
+                == WindowResolution::R1920x1080
+            && !windowResolutionForSize(800U, 600U),
+        "resolution catalog maps only supported 16:9 sizes");
+
     for (int index = 0; index < 30; ++index) {
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::MouseSensitivity, 1);
@@ -93,6 +113,11 @@ void testRuntimeSettingsClamps()
         "sensitivity percent maps to the established player baseline");
     expect(std::abs(normalizedVolume(250U) - 1.0F) < 0.0001F,
         "volume normalization clamps invalid percentages");
+
+    settings.windowResolution = static_cast<WindowResolution>(99U);
+    expect(sanitizeRuntimeSettings(settings).windowResolution
+            == WindowResolution::R1280x720,
+        "invalid resolution enum recovers to the default preset");
 }
 
 } // namespace

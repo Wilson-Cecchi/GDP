@@ -408,8 +408,9 @@ int main()
                 settingsPixels.data());
 
             settingsHud.settingsSelection
-                = gdp::game::visual::HudSettingsSelection::Fullscreen;
-            settingsHud.fullscreen = true;
+                = gdp::game::visual::HudSettingsSelection::WindowResolution;
+            settingsHud.windowWidth = 960U;
+            settingsHud.windowHeight = 540U;
             const bool renderedSettingsAdjusted = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, settingsHud);
             std::vector<std::uint8_t> settingsAdjustedPixels(baseline.size());

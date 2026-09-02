@@ -39,6 +39,29 @@ using wkc::platform::Key;
 using wkc::platform::MouseButton;
 namespace {
 
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::MasterVolume)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::MasterVolume));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::EffectsVolume)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::EffectsVolume));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::AmbientVolume)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::AmbientVolume));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::UiVolume)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::UiVolume));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::MouseSensitivity)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::MouseSensitivity));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::InvertMouseY)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::InvertMouseY));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::FieldOfView)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::FieldOfView));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::WindowResolution)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::WindowResolution));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Fullscreen)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::Fullscreen));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Back)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::Back));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Count)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::Count));
+
 std::string sdlError(const std::string_view operation)
 {
     std::ostringstream stream;
@@ -433,7 +456,10 @@ bool Application::initialize()
 
     const SDL_WindowFlags windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
         | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    window_ = SDL_CreateWindow("GDP", config_.windowWidth, config_.windowHeight, windowFlags);
+    const gameplay::WindowResolutionSize windowSize
+        = gameplay::windowResolutionSize(runtimeSettings_.windowResolution);
+    window_ = SDL_CreateWindow("GDP", static_cast<int>(windowSize.width),
+        static_cast<int>(windowSize.height), windowFlags);
     if (window_ == nullptr) {
         log(LogLevel::Error, sdlError("SDL_CreateWindow failed"));
         return false;
@@ -466,9 +492,14 @@ bool Application::initialize()
         return false;
     }
     const bool fullscreen = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0U;
-    log(LogLevel::Info, fullscreen
-        ? "Window initialized in fullscreen mode"
-        : "Window initialized in windowed mode");
+    int actualWindowWidth = 0;
+    int actualWindowHeight = 0;
+    (void)SDL_GetWindowSize(window_, &actualWindowWidth, &actualWindowHeight);
+    std::ostringstream windowSummary;
+    windowSummary << "Window initialized in "
+                  << (fullscreen ? "fullscreen" : "windowed")
+                  << " mode at " << actualWindowWidth << 'x' << actualWindowHeight;
+    log(LogLevel::Info, windowSummary.str());
     gameplay::openMainMenu(mainMenu_);
     log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     log(LogLevel::Info, "Main menu initialized before world generation");
@@ -1152,6 +1183,37 @@ void Application::applyRuntimeSettings()
             log(LogLevel::Warning,
                 sdlError("Fullscreen mode update failed; restored actual state"));
         }
+        if (!runtimeSettings_.fullscreen) {
+            const gameplay::WindowResolutionSize desired
+                = gameplay::windowResolutionSize(runtimeSettings_.windowResolution);
+            int actualWidth = 0;
+            int actualHeight = 0;
+            if (!SDL_GetWindowSize(window_, &actualWidth, &actualHeight)) {
+                log(LogLevel::Warning, sdlError("Window size query failed"));
+            } else if (actualWidth != static_cast<int>(desired.width)
+                || actualHeight != static_cast<int>(desired.height)) {
+                if (!SDL_SetWindowSize(window_, static_cast<int>(desired.width),
+                        static_cast<int>(desired.height))) {
+                    if (actualWidth > 0 && actualHeight > 0
+                        && actualWidth <= 65'535 && actualHeight <= 65'535) {
+                        const std::optional<gameplay::WindowResolution> actual
+                            = gameplay::windowResolutionForSize(
+                                static_cast<std::uint16_t>(actualWidth),
+                                static_cast<std::uint16_t>(actualHeight));
+                        if (actual) {
+                            runtimeSettings_.windowResolution = *actual;
+                            settingsDirty_ = true;
+                        }
+                    }
+                    log(LogLevel::Warning,
+                        sdlError("Window size update failed"));
+                } else if (!SDL_SetWindowPosition(window_,
+                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED)) {
+                    log(LogLevel::Warning,
+                        sdlError("Window centering after resize failed"));
+                }
+            }
+        }
     }
     if (audio_) {
         audio_->setMasterVolume(gameplay::normalizedVolume(
@@ -1808,6 +1870,10 @@ void Application::render()
         hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
         hud.invertMouseY = runtimeSettings_.invertMouseY;
         hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
+        const gameplay::WindowResolutionSize windowSize
+            = gameplay::windowResolutionSize(runtimeSettings_.windowResolution);
+        hud.windowWidth = windowSize.width;
+        hud.windowHeight = windowSize.height;
         hud.fullscreen = runtimeSettings_.fullscreen;
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {

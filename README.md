@@ -281,6 +281,9 @@ especializados das pastas numeradas.
 - **Fase 69 — Fullscreen persistente:** `FULLSCREEN` alterna a janela SDL em
   runtime sem reiniciar a run. O schema v3 migra v1/v2 com `OFF` como default, e
   um bootstrap isolado confirma que a preferência é aplicada na próxima abertura.
+- **Fase 70 — Resolução de janela persistente:** `RESOLUTION` oferece 960×540,
+  1280×720, 1600×900 e 1920×1080. A troca ocorre em runtime no modo janela; em
+  fullscreen, o preset fica preservado para o retorno. O schema v4 migra v1–v3.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -511,6 +514,14 @@ necessário. A troca mantém run, contexto e renderer, cujo framebuffer já acom
 o tamanho atual a cada quadro. O schema v3 adiciona `fullscreen = true/false` e
 migra v1/v2 com `OFF`; falha do backend é não fatal, restaura o estado real e
 fica registrada no log.
+
+Na Fase 70, `RESOLUTION` adicionou quatro presets 16:9, navegados sem wrap entre
+960×540 e 1920×1080. A janela inicia diretamente no preset persistido e
+`SDL_SetWindowSize` aplica mudanças em runtime, recentralizando-a sem reconstruir
+a run ou o contexto. Em fullscreen, o tamanho lógico fica guardado e é aplicado
+ao retornar ao modo janela; o framebuffer continua seguindo o tamanho real em
+pixels. O schema v4 salva `window_width/window_height`, migra v1–v3 para
+1280×720 e rejeita pares que não pertencem ao catálogo.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

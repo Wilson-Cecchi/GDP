@@ -8,7 +8,7 @@ set(settings_file "${settings_directory}/settings.toml")
 file(REMOVE_RECURSE "${preference_root}")
 file(MAKE_DIRECTORY "${settings_directory}")
 file(WRITE "${settings_file}"
-    "version = 3\n"
+    "version = 4\n"
     "fullscreen = true\n"
 )
 
