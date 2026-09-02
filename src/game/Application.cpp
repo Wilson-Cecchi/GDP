@@ -438,6 +438,7 @@ bool Application::initialize()
         log(LogLevel::Error, sdlError("SDL_CreateWindow failed"));
         return false;
     }
+    applyRuntimeSettings();
 
     glContext_ = SDL_GL_CreateContext(window_);
     if (glContext_ == nullptr) {
@@ -464,6 +465,10 @@ bool Application::initialize()
         log(LogLevel::Error, "Renderer initialization failed");
         return false;
     }
+    const bool fullscreen = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0U;
+    log(LogLevel::Info, fullscreen
+        ? "Window initialized in fullscreen mode"
+        : "Window initialized in windowed mode");
     gameplay::openMainMenu(mainMenu_);
     log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     log(LogLevel::Info, "Main menu initialized before world generation");
@@ -1137,6 +1142,17 @@ void Application::applyRuntimeSettings()
     player_.setMouseSensitivity(
         gameplay::mouseSensitivity(runtimeSettings_));
     player_.setInvertMouseY(runtimeSettings_.invertMouseY);
+    if (window_ != nullptr) {
+        const bool fullscreen
+            = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0U;
+        if (fullscreen != runtimeSettings_.fullscreen
+            && !SDL_SetWindowFullscreen(window_, runtimeSettings_.fullscreen)) {
+            runtimeSettings_.fullscreen = fullscreen;
+            settingsDirty_ = true;
+            log(LogLevel::Warning,
+                sdlError("Fullscreen mode update failed; restored actual state"));
+        }
+    }
     if (audio_) {
         audio_->setMasterVolume(gameplay::normalizedVolume(
             runtimeSettings_.masterVolumePercent));
@@ -1177,7 +1193,7 @@ void Application::loadPersistedSettings()
         break;
     case persistence::SettingsLoadStatus::Migrated:
         log(LogLevel::Info,
-            "Runtime settings migrated in memory from schema version 1");
+            "Runtime settings migrated in memory from an older schema");
         break;
     case persistence::SettingsLoadStatus::LoadedWithRecovery:
         log(LogLevel::Warning,
@@ -1792,6 +1808,7 @@ void Application::render()
         hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
         hud.invertMouseY = runtimeSettings_.invertMouseY;
         hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
+        hud.fullscreen = runtimeSettings_.fullscreen;
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
             log(LogLevel::Error, "Renderer failed while drawing settings");

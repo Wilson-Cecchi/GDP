@@ -278,6 +278,9 @@ especializados das pastas numeradas.
 - **Fase 68 — Inversão vertical do mouse:** `INVERT Y` integra menu, Player e
   persistência. Esquerda escolhe `OFF`, direita escolhe `ON`; o schema v2 lê
   arquivos v1 preservando os seis valores anteriores e assume `OFF` com segurança.
+- **Fase 69 — Fullscreen persistente:** `FULLSCREEN` alterna a janela SDL em
+  runtime sem reiniciar a run. O schema v3 migra v1/v2 com `OFF` como default, e
+  um bootstrap isolado confirma que a preferência é aplicada na próxima abertura.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -500,6 +503,14 @@ permanecem idênticos. A linha usa `ON/OFF` e mantém os mesmos controles de tec
 e mouse. O arquivo evoluiu para versão 2 com `invert_mouse_y = true/false`;
 arquivos v1 continuam legíveis, carregam a opção nova como `OFF` e só são
 reescritos após uma alteração real do usuário.
+
+Na Fase 69, `FULLSCREEN` tornou-se a oitava configuração funcional. Esquerda
+seleciona `OFF` e direita seleciona `ON`; a Application compara o estado desejado
+com as flags reais da janela e chama `SDL_SetWindowFullscreen` somente quando
+necessário. A troca mantém run, contexto e renderer, cujo framebuffer já acompanha
+o tamanho atual a cada quadro. O schema v3 adiciona `fullscreen = true/false` e
+migra v1/v2 com `OFF`; falha do backend é não fatal, restaura o estado real e
+fica registrada no log.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

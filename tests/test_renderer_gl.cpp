@@ -408,8 +408,8 @@ int main()
                 settingsPixels.data());
 
             settingsHud.settingsSelection
-                = gdp::game::visual::HudSettingsSelection::InvertMouseY;
-            settingsHud.invertMouseY = true;
+                = gdp::game::visual::HudSettingsSelection::Fullscreen;
+            settingsHud.fullscreen = true;
             const bool renderedSettingsAdjusted = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, settingsHud);
             std::vector<std::uint8_t> settingsAdjustedPixels(baseline.size());

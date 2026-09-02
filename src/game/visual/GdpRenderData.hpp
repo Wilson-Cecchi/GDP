@@ -157,6 +157,7 @@ enum class HudSettingsSelection : std::uint8_t {
     MouseSensitivity,
     InvertMouseY,
     FieldOfView,
+    Fullscreen,
     Back,
     Count,
 };
@@ -262,6 +263,7 @@ struct HudRenderData {
     std::uint16_t mouseSensitivityPercent{100U};
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
+    bool fullscreen{false};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

@@ -95,6 +95,11 @@ bool adjustRuntimeSetting(
     case SettingsMenuOption::FieldOfView:
         return adjustPercent(
             settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);
+    case SettingsMenuOption::Fullscreen: {
+        const bool previous = settings.fullscreen;
+        settings.fullscreen = direction > 0;
+        return settings.fullscreen != previous;
+    }
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
         return false;

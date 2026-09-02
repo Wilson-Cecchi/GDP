@@ -813,6 +813,14 @@ Application entrega o booleano ao Player, que altera apenas o sinal do delta
 vertical em `applyLook`; renderer e hit test continuam consumindo snapshots e o
 mesmo índice ordenado das oito linhas.
 
+Na Fase 69, `RuntimeSettings` e o snapshot visual ganharam `fullscreen`, enquanto
+o schema v3 mantém rotas de migração para v1/v2. A Application continua como
+única dona de SDL: aplica a preferência depois de criar uma janela segura e nas
+mudanças do menu, sem expor tipos de plataforma a gameplay ou persistência. O
+renderer recebe as novas dimensões pelo fluxo já existente, e uma falha de troca
+é não fatal e restaura o valor à flag real. O teste de integração usa
+preferências isoladas do usuário.
+
 ---
 
 # 8. Sistema de seed

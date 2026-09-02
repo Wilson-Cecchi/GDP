@@ -79,7 +79,9 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "mouse_sensitivity = " << settings.mouseSensitivityPercent << '\n'
            << "invert_mouse_y = "
            << (settings.invertMouseY ? "true" : "false") << '\n'
-           << "field_of_view = " << settings.fieldOfViewDegrees << '\n';
+           << "field_of_view = " << settings.fieldOfViewDegrees << '\n'
+           << "fullscreen = "
+           << (settings.fullscreen ? "true" : "false") << '\n';
     return output.str();
 }
 
@@ -156,6 +158,13 @@ SettingsLoadResult loadRuntimeSettings(
                 recovered = !assignClamped(
                     result.settings.fieldOfViewDegrees, value, 60U, 100U)
                     || recovered;
+            } else if (key == "fullscreen") {
+                const std::optional<bool> fullscreen = parseBoolean(value);
+                if (fullscreen) {
+                    result.settings.fullscreen = *fullscreen;
+                } else {
+                    recovered = true;
+                }
             }
         }
         if (input.bad()) {
@@ -177,6 +186,9 @@ SettingsLoadResult loadRuntimeSettings(
         }
         if (*version == 1U) {
             result.settings.invertMouseY = false;
+        }
+        if (*version <= 2U) {
+            result.settings.fullscreen = false;
         }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {

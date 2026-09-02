@@ -272,6 +272,15 @@ void testSettingsMenuLayout()
     expect(!settingsMenuSelectionAt(1280, 720, 0.0F, 0.0F),
         "pointer outside settings rows has no selection");
 
+    const SettingsMenuLayout medium = makeSettingsMenuLayout(640, 360);
+    expect(medium.scale == 1,
+        "medium settings menu keeps all nine rows at base bitmap scale");
+    for (std::size_t index = 1U; index < medium.rows.size(); ++index) {
+        expect(medium.rows[index].y + medium.rows[index].height
+                <= medium.rows[index - 1U].y,
+            "medium settings rows never overlap");
+    }
+
     const SettingsMenuLayout compact = makeSettingsMenuLayout(320, 200);
     expect(compact.scale == 1
             && compact.panel.x + compact.panel.width <= 320

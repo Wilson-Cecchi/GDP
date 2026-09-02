@@ -71,6 +71,14 @@ void testRuntimeSettingsClamps()
                settings, SettingsMenuOption::InvertMouseY, -1)
             && !settings.invertMouseY,
         "left disables vertical mouse inversion");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::Fullscreen, 1)
+            && settings.fullscreen,
+        "right enables fullscreen");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::Fullscreen, -1)
+            && !settings.fullscreen,
+        "left restores windowed mode");
 
     for (int index = 0; index < 30; ++index) {
         (void)adjustRuntimeSetting(

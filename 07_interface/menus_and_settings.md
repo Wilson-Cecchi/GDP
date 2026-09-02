@@ -3,7 +3,8 @@
 > **Estado:** menu principal funcional implementado na Fase 21, pausa in-game
 > funcional desde a Fase 19 e menu de resultado integrado na Fase 64.
 > Configurações runtime foram integradas na Fase 66, sua persistência segura na
-> Fase 67 e invert Y na Fase 68; resolução e fullscreen permanecem especificados.
+> Fase 67, invert Y na Fase 68 e fullscreen na Fase 69; resolução permanece
+> especificada.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 >
@@ -78,6 +79,7 @@ e cues; gamepad permanece como expansão futura.
 - sensibilidade: 30–200% da base de 0,12, passos de 10%;
 - Invert Y: `OFF/ON`, com esquerda/direita escolhendo o estado;
 - FOV vertical: 60–100 graus, passos de 2 graus.
+- Fullscreen: `OFF/ON`, aplicado à janela sem reiniciar a run.
 
 W/S e setas verticais escolhem a linha. A/D e setas laterais ajustam; no mouse,
 clicar na metade esquerda/direita da linha reduz/aumenta. `BACK`, `Enter` sobre
@@ -89,8 +91,10 @@ Os valores são aplicados imediatamente e preservados entre runs. Ao retornar po
 da plataforma. Se a aplicação for encerrada diretamente, o shutdown também tenta
 salvar qualquer alteração pendente. Na próxima execução, o carregamento acontece
 antes da configuração de áudio, Player e câmera. Invert Y é aplicado somente ao
-delta vertical do mouse; resolução, fullscreen e remapeamento continuam para
-fases posteriores.
+delta vertical do mouse. Fullscreen compara a preferência com o estado real da
+janela e solicita a troca ao SDL; se o backend rejeitar, o jogo permanece aberto
+e restaura/persiste o estado real antes de registrar o problema. Resolução e
+remapeamento continuam para fases posteriores.
 
 ## Confirmações
 

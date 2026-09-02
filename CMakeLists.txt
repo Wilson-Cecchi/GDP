@@ -603,5 +603,14 @@ if(GDP_BUILD_TESTS)
                 PASS_REGULAR_EXPRESSION "continuing silently"
                 TIMEOUT 10
         )
+
+        add_test(
+            NAME fullscreen_setting_bootstrap
+            COMMAND ${CMAKE_COMMAND}
+                -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+                -DGDP_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_fullscreen_setting.cmake
+        )
+        set_tests_properties(fullscreen_setting_bootstrap PROPERTIES TIMEOUT 10)
     endif()
 endif()

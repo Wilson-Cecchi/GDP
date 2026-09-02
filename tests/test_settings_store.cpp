@@ -74,6 +74,7 @@ void testMissingAndRoundTrip()
     settings.mouseSensitivityPercent = 130U;
     settings.invertMouseY = true;
     settings.fieldOfViewDegrees = 82U;
+    settings.fullscreen = true;
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
     const SettingsLoadResult loaded = loadRuntimeSettings(path);
@@ -96,13 +97,14 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 2\n"
+        "version = 3\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
         "mouse_sensitivity = 400\n"
         "invert_mouse_y = maybe\n"
         "field_of_view = 20\n"
+        "fullscreen = maybe\n"
         "future_option = enabled\n");
 
     const SettingsLoadResult recovered = loadRuntimeSettings(path);
@@ -114,11 +116,12 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.uiVolumePercent == 100U
             && recovered.settings.mouseSensitivityPercent == 200U
             && !recovered.settings.invertMouseY
-            && recovered.settings.fieldOfViewDegrees == 60U,
+            && recovered.settings.fieldOfViewDegrees == 60U
+            && !recovered.settings.fullscreen,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 2\n"
+        "version = 3\n"
         "master_volume = 35\n"
         "future_option = any future representation\n");
     const SettingsLoadResult forwardCompatible = loadRuntimeSettings(path);
@@ -140,6 +143,20 @@ void testRecoveryAndForwardCompatibility()
             && !migrated.settings.invertMouseY
             && migrated.settings.fieldOfViewDegrees == 76U,
         "schema version 1 migrates with invert Y safely disabled");
+
+    writeText(path,
+        "version = 2\n"
+        "master_volume = 65\n"
+        "invert_mouse_y = true\n"
+        "field_of_view = 84\n"
+        "fullscreen = true\n");
+    const SettingsLoadResult migratedV2 = loadRuntimeSettings(path);
+    expect(migratedV2.status == SettingsLoadStatus::Migrated
+            && migratedV2.settings.masterVolumePercent == 65U
+            && migratedV2.settings.invertMouseY
+            && migratedV2.settings.fieldOfViewDegrees == 84U
+            && !migratedV2.settings.fullscreen,
+        "schema version 2 preserves invert Y and defaults fullscreen safely");
 }
 
 void testInvalidAndUnsupportedFiles()

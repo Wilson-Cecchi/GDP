@@ -17,6 +17,7 @@ enum class SettingsMenuOption : std::uint8_t {
     MouseSensitivity,
     InvertMouseY,
     FieldOfView,
+    Fullscreen,
     Back,
     Count,
 };
@@ -35,6 +36,7 @@ struct RuntimeSettings {
     std::uint16_t mouseSensitivityPercent{100U};
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
+    bool fullscreen{false};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
 };
