@@ -79,6 +79,17 @@ void testRuntimeSettingsClamps()
                settings, SettingsMenuOption::Fullscreen, -1)
             && !settings.fullscreen,
         "left restores windowed mode");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::VerticalSync, -1)
+            && !settings.verticalSync,
+        "left disables vertical synchronization");
+    expect(!adjustRuntimeSetting(
+               settings, SettingsMenuOption::VerticalSync, -1),
+        "repeating disabled VSync does not report a change");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::VerticalSync, 1)
+            && settings.verticalSync,
+        "right enables vertical synchronization");
 
     expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::WindowResolution, -1)

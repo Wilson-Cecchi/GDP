@@ -204,13 +204,13 @@ SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noe
     const int panelY = (safeHeight - panelHeight) / 2;
     const int rowWidth = std::max(1,
         std::min(panelWidth - (20 * scale), 250 * scale));
-    const int rowHeight = std::max(1, std::min(13 * scale, panelHeight));
+    const int desiredRowHeight = std::max(1, std::min(13 * scale, panelHeight));
     const int rowX = (safeWidth - rowWidth) / 2;
-    const int maximumRowY = panelY + panelHeight - rowHeight;
+    const int maximumRowY = panelY + panelHeight - desiredRowHeight;
     const int bottomRowY = std::clamp(
         panelY + (24 * scale), panelY, maximumRowY);
     const int topRowLimit = std::clamp(
-        panelY + panelHeight - (26 * scale) - rowHeight,
+        panelY + panelHeight - (26 * scale) - desiredRowHeight,
         bottomRowY, maximumRowY);
     constexpr int rowCount
         = static_cast<int>(HudSettingsSelection::Count);
@@ -218,6 +218,9 @@ SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noe
         ? std::min(18 * scale,
             (topRowLimit - bottomRowY) / (rowCount - 1))
         : 0;
+    const int rowHeight = rowCount > 1
+        ? std::min(desiredRowHeight, std::max(1, rowPitch))
+        : desiredRowHeight;
 
     SettingsMenuLayout layout;
     layout.scale = scale;

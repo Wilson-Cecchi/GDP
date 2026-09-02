@@ -77,6 +77,7 @@ void testMissingAndRoundTrip()
     settings.windowResolution
         = gdp::gameplay::WindowResolution::R1600x900;
     settings.fullscreen = true;
+    settings.verticalSync = false;
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
     const SettingsLoadResult loaded = loadRuntimeSettings(path);
@@ -99,7 +100,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 4\n"
+        "version = 5\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -109,6 +110,7 @@ void testRecoveryAndForwardCompatibility()
         "window_width = 1111\n"
         "window_height = 777\n"
         "fullscreen = maybe\n"
+        "vertical_sync = maybe\n"
         "future_option = enabled\n");
 
     const SettingsLoadResult recovered = loadRuntimeSettings(path);
@@ -123,17 +125,19 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.fieldOfViewDegrees == 60U
             && recovered.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720
-            && !recovered.settings.fullscreen,
+            && !recovered.settings.fullscreen
+            && recovered.settings.verticalSync,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 4\n"
+        "version = 5\n"
         "master_volume = 35\n"
         "future_option = any future representation\n");
     const SettingsLoadResult forwardCompatible = loadRuntimeSettings(path);
     expect(forwardCompatible.status == SettingsLoadStatus::Loaded
             && forwardCompatible.settings.masterVolumePercent == 35U
-            && forwardCompatible.settings.effectsVolumePercent == 100U,
+            && forwardCompatible.settings.effectsVolumePercent == 100U
+            && forwardCompatible.settings.verticalSync,
         "unknown and missing fields remain forward compatible");
 
     writeText(path,
@@ -177,6 +181,20 @@ void testRecoveryAndForwardCompatibility()
             && migratedV3.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720,
         "schema version 3 preserves fullscreen and defaults window resolution");
+
+    writeText(path,
+        "version = 4\n"
+        "window_width = 960\n"
+        "window_height = 540\n"
+        "fullscreen = true\n"
+        "vertical_sync = false\n");
+    const SettingsLoadResult migratedV4 = loadRuntimeSettings(path);
+    expect(migratedV4.status == SettingsLoadStatus::Migrated
+            && migratedV4.settings.windowResolution
+                == gdp::gameplay::WindowResolution::R960x540
+            && migratedV4.settings.fullscreen
+            && migratedV4.settings.verticalSync,
+        "schema version 4 preserves video settings and defaults VSync on");
 }
 
 void testInvalidAndUnsupportedFiles()

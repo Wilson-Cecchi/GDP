@@ -287,6 +287,9 @@ especializados das pastas numeradas.
 - **Fase 71 — Setas clicáveis nas configurações:** cada linha ajustável possui
   hit targets próprios para `<` e `>`. A seta esquerda sempre reduz, a direita
   sempre aumenta, e clicar no nome/valor apenas seleciona sem alterar.
+- **Fase 72 — VSync persistente:** `VSYNC` alterna a sincronização vertical do
+  contexto OpenGL em runtime. O padrão permanece `ON`, o schema v5 migra v1–v4
+  e um bootstrap isolado confirma a aplicação de `OFF` na próxima abertura.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -533,6 +536,13 @@ valor fica centralizado entre `<` e `>`; clicar na seta esquerda reduz, clicar n
 direita aumenta e clicar no label/valor somente seleciona a opção. O espaçamento
 vertical também se adapta a alturas compactas sem sobrepor linhas quando há
 espaço físico suficiente.
+
+Na Fase 72, `VSYNC` tornou a sincronização vertical uma preferência explícita,
+aplicada pelo SDL ao contexto OpenGL ativo sem recriar janela, renderer ou run.
+Esquerda seleciona `OFF`, direita seleciona `ON`, e falhas do backend são não
+fatais. O schema v5 adiciona `vertical_sync = true/false`, migra v1–v4 com `ON`
+e preserva a configuração entre execuções. O layout passou a acomodar onze
+linhas e reduz apenas a altura dos hit targets em framebuffers muito compactos.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

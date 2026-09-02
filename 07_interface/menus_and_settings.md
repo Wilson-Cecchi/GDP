@@ -79,7 +79,8 @@ e cues; gamepad permanece como expansão futura.
 - Invert Y: `OFF/ON`, com esquerda/direita escolhendo o estado;
 - FOV vertical: 60–100 graus, passos de 2 graus;
 - resolução: 960×540, 1280×720, 1600×900 ou 1920×1080;
-- Fullscreen: `OFF/ON`, aplicado à janela sem reiniciar a run.
+- Fullscreen: `OFF/ON`, aplicado à janela sem reiniciar a run;
+- VSync: `OFF/ON`, aplicado ao contexto OpenGL ativo sem reiniciar a run.
 
 W/S e setas verticais escolhem a linha. A/D e setas laterais ajustam. No mouse,
 cada linha possui botões `<` e `>` independentes: o primeiro reduz e o segundo
@@ -98,7 +99,9 @@ e restaura/persiste o estado real antes de registrar o problema. Resolução e
 fullscreen são independentes: fullscreen usa a resolução do desktop e preserva
 o preset escolhido para aplicá-lo ao voltar ao modo janela. A troca de preset
 redimensiona e recentraliza a janela; o renderer consulta o framebuffer real a
-cada quadro. Remapeamento continua para uma fase posterior.
+cada quadro. VSync solicita intervalo de troca 1 quando ligado e 0 quando
+desligado; se o backend não oferecer o modo pedido, a falha é registrada sem
+encerrar a aplicação. Remapeamento continua para uma fase posterior.
 
 ## Confirmações
 

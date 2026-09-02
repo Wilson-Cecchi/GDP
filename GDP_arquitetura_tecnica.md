@@ -910,6 +910,13 @@ inferir direção pela posição global do cursor. O renderer usa os mesmos ret�
 para desenhar `<` e `>`, eliminando divergência entre o controle visível e a área
 clicável. O pitch vertical é calculado pelo espaço disponível.
 
+Na Fase 72, `RuntimeSettings` ganhou `verticalSync` e o schema v5 adicionou
+`vertical_sync`, migrando v1–v4 com o comportamento histórico `ON`. A Application
+continua como única dona do SDL: compara o intervalo de troca real do contexto
+OpenGL com a preferência e solicita 1 ou 0 somente quando necessário. Gameplay,
+persistência e renderer continuam recebendo apenas booleanos e snapshots; o
+layout puro agora organiza onze linhas e dez pares de setas.
+
 ---
 
 # 8. Sistema de seed

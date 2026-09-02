@@ -20,6 +20,7 @@ enum class SettingsMenuOption : std::uint8_t {
     FieldOfView,
     WindowResolution,
     Fullscreen,
+    VerticalSync,
     Back,
     Count,
 };
@@ -55,6 +56,7 @@ struct RuntimeSettings {
     std::uint16_t fieldOfViewDegrees{68U};
     WindowResolution windowResolution{WindowResolution::R1280x720};
     bool fullscreen{false};
+    bool verticalSync{true};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
 };

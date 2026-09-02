@@ -1452,12 +1452,12 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (22 * scale),
             2 * scale, title, cyanColor);
 
-        constexpr std::array<std::string_view, 10> labels{
+        constexpr std::array<std::string_view, 11> labels{
             "MASTER", "EFFECTS", "AMBIENT", "UI VOLUME",
             "SENSITIVITY", "INVERT Y", "FOV", "RESOLUTION",
-            "FULLSCREEN", "BACK",
+            "FULLSCREEN", "VSYNC", "BACK",
         };
-        const std::array<std::uint16_t, 10> numbers{
+        const std::array<std::uint16_t, 11> numbers{
             hud.masterVolumePercent,
             hud.effectsVolumePercent,
             hud.ambientVolumePercent,
@@ -1465,6 +1465,7 @@ bool GdpRenderer::render(
             hud.mouseSensitivityPercent,
             0U,
             hud.fieldOfViewDegrees,
+            0U,
             0U,
             0U,
             0U,
@@ -1493,6 +1494,9 @@ bool GdpRenderer::render(
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::Fullscreen)) {
                 value = hud.fullscreen ? "ON" : "OFF";
+            } else if (index
+                == static_cast<std::size_t>(HudSettingsSelection::VerticalSync)) {
+                value = hud.verticalSync ? "ON" : "OFF";
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::WindowResolution)) {
                 value = std::to_string(hud.windowWidth) + "X"

@@ -188,20 +188,20 @@ não fecha e que `START RUN` inicia a seed seguinte.
 O gate de configurações cobre origem título/pausa, wrap, seleção direta, retorno,
 passos e clamps de todos os valores. Input neutro e adaptador SDL protegem as
 novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste
-CPU percorre as dez linhas do layout em resoluções ampla, compacta e mínima, e
+CPU percorre as onze linhas do layout em resoluções ampla, compacta e mínima, e
 a regressão OpenGL exige pixels distintos para tela, seleção e valor de
-`RESOLUTION`.
+`VSYNC`.
 
-A regressão de setas percorre todas as nove linhas ajustáveis e confirma que os
+A regressão de setas percorre todas as dez linhas ajustáveis e confirma que os
 dois hit targets ficam dentro da linha: `<` sempre retorna direção negativa e
 `>` sempre retorna positiva. Cliques no label, no valor, fora do painel ou com
 dimensões inválidas não ajustam configurações. Layouts de 640×360 e 320×200
-também verificam que as dez linhas não se sobrepõem quando há espaço disponível.
+também verificam que as onze linhas não se sobrepõem quando há espaço disponível.
 
 O gate de persistência usa diretório temporário isolado e cobre arquivo ausente,
-round-trip das nove configurações/dez campos, substituição de arquivo existente,
+round-trip das dez configurações/onze campos, substituição de arquivo existente,
 remoção do temporário, campos ausentes/desconhecidos, corrupção parcial, clamps, versão
-ausente, migração v1/v2/v3→v4 e versão incompatível. Gameplay compara deltas
+ausente, migração v1/v2/v3/v4→v5 e versão incompatível. Gameplay compara deltas
 verticais normal e invertido, garantindo yaw inalterado. Os bootstraps headless
 e OpenGL confirmam que a integração não altera o ciclo de inicialização; headless
 não toca nas preferências reais do usuário. Um bootstrap adicional configura um
@@ -209,6 +209,8 @@ não toca nas preferências reais do usuário. Um bootstrap adicional configura 
 flag real de fullscreen no log e remove o diretório isolado ao terminar.
 Outro bootstrap isolado carrega 960×540 em modo janela e exige esse tamanho real
 no log, cobrindo a aplicação do preset sem acessar preferências do usuário.
+Um terceiro grava `vertical_sync = false`, inicia o contexto OpenGL offscreen e
+exige no log que o intervalo de troca efetivo permaneça desativado.
 
 ## Sanitizers
 

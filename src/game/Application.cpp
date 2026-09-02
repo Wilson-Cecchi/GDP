@@ -57,6 +57,8 @@ static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::WindowReso
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::WindowResolution));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Fullscreen)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Fullscreen));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::VerticalSync)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::VerticalSync));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Back)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Back));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Count)
@@ -477,9 +479,7 @@ bool Application::initialize()
         return false;
     }
 
-    if (!SDL_GL_SetSwapInterval(1)) {
-        log(LogLevel::Warning, sdlError("VSync unavailable"));
-    }
+    applyRuntimeSettings();
     int drawableWidth = 0;
     int drawableHeight = 0;
     if (!SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)) {
@@ -500,6 +500,12 @@ bool Application::initialize()
                   << (fullscreen ? "fullscreen" : "windowed")
                   << " mode at " << actualWindowWidth << 'x' << actualWindowHeight;
     log(LogLevel::Info, windowSummary.str());
+    int swapInterval = 0;
+    if (SDL_GL_GetSwapInterval(&swapInterval)) {
+        log(LogLevel::Info, swapInterval > 0
+                ? "VSync initialized enabled"
+                : "VSync initialized disabled");
+    }
     gameplay::openMainMenu(mainMenu_);
     log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     log(LogLevel::Info, "Main menu initialized before world generation");
@@ -1216,6 +1222,18 @@ void Application::applyRuntimeSettings()
             }
         }
     }
+    if (glContext_ != nullptr) {
+        const int desiredSwapInterval = runtimeSettings_.verticalSync ? 1 : 0;
+        int actualSwapInterval = 0;
+        const bool queried = SDL_GL_GetSwapInterval(&actualSwapInterval);
+        if ((!queried || actualSwapInterval != desiredSwapInterval)
+            && !SDL_GL_SetSwapInterval(desiredSwapInterval)) {
+            log(LogLevel::Warning,
+                sdlError(runtimeSettings_.verticalSync
+                        ? "VSync enable failed"
+                        : "VSync disable failed"));
+        }
+    }
     if (audio_) {
         audio_->setMasterVolume(gameplay::normalizedVolume(
             runtimeSettings_.masterVolumePercent));
@@ -1876,6 +1894,7 @@ void Application::render()
         hud.windowWidth = windowSize.width;
         hud.windowHeight = windowSize.height;
         hud.fullscreen = runtimeSettings_.fullscreen;
+        hud.verticalSync = runtimeSettings_.verticalSync;
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
             log(LogLevel::Error, "Renderer failed while drawing settings");

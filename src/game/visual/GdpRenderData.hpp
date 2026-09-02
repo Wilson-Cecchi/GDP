@@ -159,6 +159,7 @@ enum class HudSettingsSelection : std::uint8_t {
     FieldOfView,
     WindowResolution,
     Fullscreen,
+    VerticalSync,
     Back,
     Count,
 };
@@ -276,6 +277,7 @@ struct HudRenderData {
     std::uint16_t windowWidth{1280U};
     std::uint16_t windowHeight{720U};
     bool fullscreen{false};
+    bool verticalSync{true};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

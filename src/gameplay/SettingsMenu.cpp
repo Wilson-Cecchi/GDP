@@ -117,6 +117,11 @@ bool adjustRuntimeSetting(
         settings.fullscreen = direction > 0;
         return settings.fullscreen != previous;
     }
+    case SettingsMenuOption::VerticalSync: {
+        const bool previous = settings.verticalSync;
+        settings.verticalSync = direction > 0;
+        return settings.verticalSync != previous;
+    }
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
         return false;

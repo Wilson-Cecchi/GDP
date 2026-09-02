@@ -85,7 +85,9 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "window_height = "
            << gameplay::windowResolutionSize(settings.windowResolution).height << '\n'
            << "fullscreen = "
-           << (settings.fullscreen ? "true" : "false") << '\n';
+           << (settings.fullscreen ? "true" : "false") << '\n'
+           << "vertical_sync = "
+           << (settings.verticalSync ? "true" : "false") << '\n';
     return output.str();
 }
 
@@ -177,6 +179,13 @@ SettingsLoadResult loadRuntimeSettings(
                 } else {
                     recovered = true;
                 }
+            } else if (key == "vertical_sync") {
+                const std::optional<bool> verticalSync = parseBoolean(value);
+                if (verticalSync) {
+                    result.settings.verticalSync = *verticalSync;
+                } else {
+                    recovered = true;
+                }
             }
         }
         if (input.bad()) {
@@ -218,6 +227,9 @@ SettingsLoadResult loadRuntimeSettings(
             }
         } else if (windowWidth || windowHeight) {
             recovered = true;
+        }
+        if (*version <= 4U) {
+            result.settings.verticalSync = true;
         }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {
