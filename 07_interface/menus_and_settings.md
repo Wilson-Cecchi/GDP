@@ -105,7 +105,15 @@ encerrar a aplicação. Remapeamento continua para uma fase posterior.
 
 ## Confirmações
 
-Sobrescrever save, apagar dados ou sair deve exigir confirmação com opção segura selecionada inicialmente.
+`EXIT GAME` no título, pausa ou resultado abre o mesmo diálogo de confirmação,
+sem destruir o estado do menu de origem. `CANCEL` é sempre a opção inicial;
+WASD, setas, `Enter`, `Esc`, hover e clique estão disponíveis, e somente
+confirmar `EXIT` encerra o processo. `Esc` e `CANCEL` fecham o diálogo e devolvem
+o controle ao menu preservado. O evento de fechamento emitido diretamente pelo
+sistema operacional continua sendo atendido sem uma segunda confirmação.
+
+Sobrescrever save e apagar dados deverão usar o mesmo princípio quando esses
+fluxos forem implementados: confirmação com opção segura selecionada inicialmente.
 
 ## Separação
 

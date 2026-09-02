@@ -399,6 +399,22 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuExitPixels.data());
 
+            mainMenuHud.exitConfirmation = true;
+            const bool renderedExitConfirmation = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
+            std::vector<std::uint8_t> exitConfirmationPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                exitConfirmationPixels.data());
+
+            mainMenuHud.exitConfirmationSelection
+                = gdp::game::visual::HudExitConfirmationSelection::ExitGame;
+            const bool renderedExitConfirmationSelected = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mainMenuHud);
+            std::vector<std::uint8_t> exitConfirmationSelectedPixels(
+                baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                exitConfirmationSelectedPixels.data());
+
             gdp::game::visual::HudRenderData settingsHud;
             settingsHud.settingsMenu = true;
             const bool renderedSettings = renderer.render(
@@ -489,6 +505,8 @@ int main()
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
+            std::size_t exitConfirmationChangedChannels = 0;
+            std::size_t exitConfirmationSelectionChangedChannels = 0;
             std::size_t settingsMenuChangedChannels = 0;
             std::size_t settingsSelectionChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
@@ -581,6 +599,14 @@ int main()
                         != mainMenuPixels[index + channel]) {
                         ++mainMenuSelectionChangedChannels;
                     }
+                    if (exitConfirmationPixels[index + channel]
+                        != mainMenuExitPixels[index + channel]) {
+                        ++exitConfirmationChangedChannels;
+                    }
+                    if (exitConfirmationSelectedPixels[index + channel]
+                        != exitConfirmationPixels[index + channel]) {
+                        ++exitConfirmationSelectionChangedChannels;
+                    }
                     if (settingsPixels[index + channel]
                         != baseline[index + channel]) {
                         ++settingsMenuChangedChannels;
@@ -642,6 +668,10 @@ int main()
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U
+                && renderedExitConfirmation
+                && exitConfirmationChangedChannels > 500U
+                && renderedExitConfirmationSelected
+                && exitConfirmationSelectionChangedChannels > 100U
                 && renderedSettings && settingsMenuChangedChannels > 500U
                 && renderedSettingsAdjusted
                 && settingsSelectionChangedChannels > 100U

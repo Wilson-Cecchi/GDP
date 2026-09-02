@@ -148,6 +148,7 @@ add_library(
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/ExitConfirmation.cpp
     src/gameplay/Feedback.cpp
     src/gameplay/Footstep.cpp
     src/gameplay/Loot.cpp
@@ -445,6 +446,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME result_menu_systems COMMAND gdp_result_menu_tests)
     set_tests_properties(result_menu_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_exit_confirmation_tests tests/test_exit_confirmation.cpp)
+    target_link_libraries(gdp_exit_confirmation_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_exit_confirmation_tests)
+    gdp_enable_sanitizers(gdp_exit_confirmation_tests)
+
+    add_test(NAME exit_confirmation_systems COMMAND gdp_exit_confirmation_tests)
+    set_tests_properties(exit_confirmation_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_settings_menu_tests tests/test_settings_menu.cpp)
     target_link_libraries(gdp_settings_menu_tests PRIVATE gdp_gameplay)

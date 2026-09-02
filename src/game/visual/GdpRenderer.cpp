@@ -1437,6 +1437,56 @@ bool GdpRenderer::render(
     const wkc::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
     const wkc::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
     const wkc::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
+    const auto drawExitConfirmation = [&]() {
+        if (!hud.exitConfirmation) {
+            return;
+        }
+        const ExitConfirmationLayout layout
+            = makeExitConfirmationLayout(width, height);
+        const int scale = layout.scale;
+        const wkc::core::Vec3 dangerColor{0.96F, 0.26F, 0.16F};
+        drawSolidRect(layout.panel.x, layout.panel.y,
+            layout.panel.width, layout.panel.height,
+            {0.012F, 0.020F, 0.024F});
+        drawSolidRect(layout.panel.x,
+            layout.panel.y + layout.panel.height - (2 * scale),
+            layout.panel.width, 2 * scale, dangerColor);
+        constexpr std::string_view title = "EXIT GAME?";
+        drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
+            layout.panel.y + layout.panel.height - (22 * scale),
+            2 * scale, title, dangerColor);
+
+        constexpr std::array<std::string_view, 2> options{
+            "CANCEL", "EXIT",
+        };
+        const std::array<UiRect, 2> buttons{
+            layout.cancelButton, layout.exitButton,
+        };
+        const std::size_t selected = hud.exitConfirmationSelection
+                == HudExitConfirmationSelection::ExitGame
+            ? 1U
+            : 0U;
+        for (std::size_t index = 0U; index < buttons.size(); ++index) {
+            const UiRect button = buttons[index];
+            if (index == selected) {
+                drawSolidRect(button.x, button.y, button.width, button.height,
+                    index == 0U
+                        ? wkc::core::Vec3{0.06F, 0.18F, 0.21F}
+                        : wkc::core::Vec3{0.24F, 0.06F, 0.04F});
+            }
+            drawBitmapText(
+                button.x
+                    + ((button.width - bitmapTextWidth(options[index], scale)) / 2),
+                button.y + (3 * scale), scale, options[index],
+                index == selected
+                    ? (index == 0U ? cyanColor : dangerColor)
+                    : textColor);
+        }
+        constexpr std::string_view controls = "WASD  ARROWS  ENTER  ESC  MOUSE";
+        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
+            layout.panel.y + (5 * scale), 1, controls,
+            {0.48F, 0.62F, 0.66F});
+    };
 
     if (hud.settingsMenu) {
         const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
@@ -1606,6 +1656,8 @@ bool GdpRenderer::render(
         drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
             layout.panel.y + (7 * scale), 1, controls,
             {0.48F, 0.62F, 0.66F});
+
+        drawExitConfirmation();
 
         glDisable(GL_SCISSOR_TEST);
         glEnable(GL_DEPTH_TEST);
@@ -1979,6 +2031,7 @@ bool GdpRenderer::render(
         glScissor((width / 2) - 1, (height / 2) - 7, 3, 15);
         glClear(GL_COLOR_BUFFER_BIT);
     }
+    drawExitConfirmation();
     glDisable(GL_SCISSOR_TEST);
     glEnable(GL_DEPTH_TEST);
     const GLenum error = glGetError();

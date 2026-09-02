@@ -149,6 +149,11 @@ enum class HudResultMenuSelection : std::uint8_t {
     ExitGame,
 };
 
+enum class HudExitConfirmationSelection : std::uint8_t {
+    Cancel,
+    ExitGame,
+};
+
 enum class HudSettingsSelection : std::uint8_t {
     MasterVolume,
     EffectsVolume,
@@ -199,6 +204,13 @@ struct ResultMenuLayout {
     UiRect exitButton{};
 };
 
+struct ExitConfirmationLayout {
+    int scale{1};
+    UiRect panel{};
+    UiRect cancelButton{};
+    UiRect exitButton{};
+};
+
 struct SettingsMenuLayout {
     int scale{1};
     UiRect panel{};
@@ -223,6 +235,15 @@ struct SettingsMenuLayout {
     float pointerY) noexcept;
 [[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudResultMenuSelection> resultMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+[[nodiscard]] ExitConfirmationLayout makeExitConfirmationLayout(
+    int width,
+    int height) noexcept;
+[[nodiscard]] std::optional<HudExitConfirmationSelection>
+exitConfirmationSelectionAt(
     int width,
     int height,
     float pointerX,
@@ -265,6 +286,9 @@ struct HudRenderData {
     bool mainMenu{false};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
     HudResultMenuSelection resultMenuSelection{HudResultMenuSelection::PlayAgain};
+    bool exitConfirmation{false};
+    HudExitConfirmationSelection exitConfirmationSelection{
+        HudExitConfirmationSelection::Cancel};
     bool settingsMenu{false};
     HudSettingsSelection settingsSelection{HudSettingsSelection::MasterVolume};
     std::uint16_t masterVolumePercent{100U};

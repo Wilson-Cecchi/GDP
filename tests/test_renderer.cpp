@@ -381,6 +381,54 @@ void testResultMenuLayout()
         "tiny result menu clamps all hit targets inside the framebuffer");
 }
 
+void testExitConfirmationLayout()
+{
+    using namespace gdp::game::visual;
+
+    const ExitConfirmationLayout wide
+        = makeExitConfirmationLayout(1280, 720);
+    expect(wide.scale == 2
+            && wide.panel.x >= 0 && wide.panel.y >= 0
+            && wide.panel.x + wide.panel.width <= 1280
+            && wide.panel.y + wide.panel.height <= 720,
+        "wide exit confirmation stays inside the framebuffer");
+    expect(wide.panel.contains(wide.cancelButton.x, wide.cancelButton.y)
+            && wide.panel.contains(wide.exitButton.x, wide.exitButton.y)
+            && wide.cancelButton.x + wide.cancelButton.width
+                <= wide.exitButton.x,
+        "confirmation exposes distinct Cancel and Exit hit targets");
+    const auto pointerX = [](const UiRect& button) {
+        return static_cast<float>(button.x + button.width / 2);
+    };
+    const auto pointerY = [](const UiRect& button) {
+        return static_cast<float>(
+            720 - 1 - (button.y + button.height / 2));
+    };
+    expect(exitConfirmationSelectionAt(1280, 720,
+               pointerX(wide.cancelButton), pointerY(wide.cancelButton))
+            == HudExitConfirmationSelection::Cancel,
+        "top-origin pointer maps to the safe Cancel choice");
+    expect(exitConfirmationSelectionAt(1280, 720,
+               pointerX(wide.exitButton), pointerY(wide.exitButton))
+            == HudExitConfirmationSelection::ExitGame,
+        "top-origin pointer maps to the explicit Exit choice");
+    expect(!exitConfirmationSelectionAt(1280, 720, 0.0F, 0.0F)
+            && !exitConfirmationSelectionAt(0, 720, 1.0F, 1.0F),
+        "invalid or external confirmation pointers are ignored");
+
+    const ExitConfirmationLayout compact
+        = makeExitConfirmationLayout(320, 200);
+    expect(compact.scale == 1
+            && compact.panel.x + compact.panel.width <= 320
+            && compact.panel.y + compact.panel.height <= 200,
+        "compact exit confirmation remains within the framebuffer");
+    const ExitConfirmationLayout tiny
+        = makeExitConfirmationLayout(12, 12);
+    expect(tiny.panel.contains(tiny.cancelButton.x, tiny.cancelButton.y)
+            && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
+        "tiny confirmation clamps both choices inside its panel");
+}
+
 } // namespace
 
 int main()
@@ -391,6 +439,7 @@ int main()
     testMainMenuLayout();
     testPauseMenuLayout();
     testResultMenuLayout();
+    testExitConfirmationLayout();
     testSettingsMenuLayout();
 
     if (failures != 0) {

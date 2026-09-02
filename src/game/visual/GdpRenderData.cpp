@@ -191,6 +191,64 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     return std::nullopt;
 }
 
+ExitConfirmationLayout makeExitConfirmationLayout(
+    const int width,
+    const int height) noexcept
+{
+    const int safeWidth = std::max(width, 1);
+    const int safeHeight = std::max(height, 1);
+    const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
+    const int panelWidth = std::max(1,
+        std::min(safeWidth - 16, 210 * scale));
+    const int panelHeight = std::max(1,
+        std::min(safeHeight - 16, 84 * scale));
+    const int panelX = (safeWidth - panelWidth) / 2;
+    const int panelY = (safeHeight - panelHeight) / 2;
+    const int buttonWidth = std::max(1,
+        std::min((panelWidth - (30 * scale)) / 2, 76 * scale));
+    const int buttonHeight = std::max(1,
+        std::min(13 * scale, panelHeight));
+    const int maximumButtonX = panelX + panelWidth - buttonWidth;
+    const int maximumButtonY = panelY + panelHeight - buttonHeight;
+    const int gap = 8 * scale;
+    const int cancelX = std::clamp(
+        (safeWidth / 2) - buttonWidth - (gap / 2),
+        panelX, maximumButtonX);
+    const int exitX = std::clamp(
+        (safeWidth / 2) + (gap / 2), panelX, maximumButtonX);
+    const int buttonY = std::clamp(
+        panelY + (16 * scale), panelY, maximumButtonY);
+    return {
+        scale,
+        {panelX, panelY, panelWidth, panelHeight},
+        {cancelX, buttonY, buttonWidth, buttonHeight},
+        {exitX, buttonY, buttonWidth, buttonHeight},
+    };
+}
+
+std::optional<HudExitConfirmationSelection> exitConfirmationSelectionAt(
+    const int width,
+    const int height,
+    const float pointerX,
+    const float pointerY) noexcept
+{
+    if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
+        || !std::isfinite(pointerY)) {
+        return std::nullopt;
+    }
+    const int pixelX = static_cast<int>(pointerX);
+    const int pixelY = height - 1 - static_cast<int>(pointerY);
+    const ExitConfirmationLayout layout
+        = makeExitConfirmationLayout(width, height);
+    if (layout.cancelButton.contains(pixelX, pixelY)) {
+        return HudExitConfirmationSelection::Cancel;
+    }
+    if (layout.exitButton.contains(pixelX, pixelY)) {
+        return HudExitConfirmationSelection::ExitGame;
+    }
+    return std::nullopt;
+}
+
 SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noexcept
 {
     const int safeWidth = std::max(width, 1);

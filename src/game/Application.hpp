@@ -6,6 +6,7 @@
 #include "gameplay/Door.hpp"
 #include "gameplay/Feedback.hpp"
 #include "gameplay/Footstep.hpp"
+#include "gameplay/ExitConfirmation.hpp"
 #include "gameplay/MainMenu.hpp"
 #include "gameplay/Pause.hpp"
 #include "gameplay/RoomEvents.hpp"
@@ -89,6 +90,7 @@ private:
     gameplay::PauseMenuState pauseMenu_;
     gameplay::ResultMenuState resultMenu_;
     gameplay::SettingsMenuState settingsMenu_;
+    gameplay::ExitConfirmationState exitConfirmation_;
     gameplay::RuntimeSettings runtimeSettings_;
     std::optional<std::filesystem::path> settingsPath_;
     entities::EntityManager entities_;

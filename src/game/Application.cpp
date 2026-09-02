@@ -681,6 +681,91 @@ void Application::processEvents()
         }
     };
 
+    if (exitConfirmation_.active) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        firePending_ = false;
+        reloadPending_ = false;
+
+        if (input_.wasKeyPressed(Key::Escape)) {
+            gameplay::closeExitConfirmation(exitConfirmation_);
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
+            return;
+        }
+
+        std::optional<visual::HudExitConfirmationSelection> pointedSelection;
+        if (window_ != nullptr) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableWidth = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(
+                    window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                pointedSelection = visual::exitConfirmationSelectionAt(
+                    drawableWidth, drawableHeight,
+                    pointer.x * static_cast<float>(drawableWidth)
+                        / static_cast<float>(windowWidth),
+                    pointer.y * static_cast<float>(drawableHeight)
+                        / static_cast<float>(windowHeight));
+            }
+        }
+        const auto confirmationOptionFor
+            = [](const visual::HudExitConfirmationSelection selection) {
+                  return selection
+                          == visual::HudExitConfirmationSelection::ExitGame
+                      ? gameplay::ExitConfirmationOption::ExitGame
+                      : gameplay::ExitConfirmationOption::Cancel;
+              };
+        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
+            const gameplay::ExitConfirmationOption previousSelection
+                = exitConfirmation_.selection;
+            gameplay::selectExitConfirmationOption(
+                exitConfirmation_, confirmationOptionFor(*pointedSelection));
+            if (exitConfirmation_.selection != previousSelection) {
+                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+            }
+        }
+
+        const bool movePrevious = input_.wasKeyPressed(Key::Up)
+            || input_.wasKeyPressed(Key::Left)
+            || input_.wasKeyPressed(Key::W)
+            || input_.wasKeyPressed(Key::A);
+        const bool moveNext = input_.wasKeyPressed(Key::Down)
+            || input_.wasKeyPressed(Key::Right)
+            || input_.wasKeyPressed(Key::S)
+            || input_.wasKeyPressed(Key::D);
+        if (movePrevious != moveNext) {
+            gameplay::moveExitConfirmationSelection(
+                exitConfirmation_, movePrevious ? -1 : 1);
+            playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
+        }
+
+        gameplay::ExitConfirmationCommand command
+            = gameplay::ExitConfirmationCommand::None;
+        if (input_.wasKeyPressed(Key::Enter)) {
+            command = gameplay::activateExitConfirmationSelection(
+                exitConfirmation_);
+        } else if (pointedSelection
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+            gameplay::selectExitConfirmationOption(
+                exitConfirmation_, confirmationOptionFor(*pointedSelection));
+            command = gameplay::activateExitConfirmationSelection(
+                exitConfirmation_);
+        }
+        if (command == gameplay::ExitConfirmationCommand::Cancel) {
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
+        } else if (command == gameplay::ExitConfirmationCommand::ExitGame) {
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
+            log(LogLevel::Info, "Game exit confirmed");
+            restartRequested_ = false;
+            running_ = false;
+        }
+        return;
+    }
+
     if (settingsMenu_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
@@ -788,8 +873,8 @@ void Application::processEvents()
         reloadPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
-            log(LogLevel::Info, "Main menu requested game exit");
-            running_ = false;
+            gameplay::openExitConfirmation(exitConfirmation_);
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
             return;
         }
 
@@ -868,8 +953,8 @@ void Application::processEvents()
                 settingsMenu_, gameplay::SettingsMenuOrigin::MainMenu);
             log(LogLevel::Info, "Main menu opened settings");
         } else if (command == gameplay::MainMenuCommand::ExitGame) {
-            log(LogLevel::Info, "Main menu requested game exit");
-            running_ = false;
+            gameplay::openExitConfirmation(exitConfirmation_);
+            log(LogLevel::Info, "Main menu opened exit confirmation");
         }
         return;
     }
@@ -880,10 +965,8 @@ void Application::processEvents()
         firePending_ = false;
         reloadPending_ = false;
         if (input_.wasKeyPressed(Key::Escape)) {
-            playUiAudio(gdp::audio::AudioEventKind::UiBack);
-            log(LogLevel::Info, "Result menu requested game exit");
-            restartRequested_ = false;
-            running_ = false;
+            gameplay::openExitConfirmation(exitConfirmation_);
+            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
             return;
         }
 
@@ -961,9 +1044,8 @@ void Application::processEvents()
                 running_ = false;
             }
         } else if (command == gameplay::ResultMenuCommand::ExitGame) {
-            log(LogLevel::Info, "Result menu requested game exit");
-            restartRequested_ = false;
-            running_ = false;
+            gameplay::openExitConfirmation(exitConfirmation_);
+            log(LogLevel::Info, "Result menu opened exit confirmation");
         }
         return;
     }
@@ -1069,9 +1151,8 @@ void Application::processEvents()
                 running_ = false;
             }
         } else if (command == gameplay::PauseMenuCommand::ExitGame) {
-            log(LogLevel::Info, "Pause menu requested game exit");
-            restartRequested_ = false;
-            running_ = false;
+            gameplay::openExitConfirmation(exitConfirmation_);
+            log(LogLevel::Info, "Pause menu opened exit confirmation");
         }
         return;
     }
@@ -1915,6 +1996,12 @@ void Application::render()
         } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
         }
+        hud.exitConfirmation = exitConfirmation_.active;
+        if (exitConfirmation_.selection
+            == gameplay::ExitConfirmationOption::ExitGame) {
+            hud.exitConfirmationSelection
+                = visual::HudExitConfirmationSelection::ExitGame;
+        }
         if (renderer_ == nullptr || !renderer_->render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
             log(LogLevel::Error, "Renderer failed while drawing the main menu");
@@ -2237,6 +2324,12 @@ void Application::render()
     }
     hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
     hud.paused = pauseMenu_.paused;
+    hud.exitConfirmation = exitConfirmation_.active;
+    if (exitConfirmation_.selection
+        == gameplay::ExitConfirmationOption::ExitGame) {
+        hud.exitConfirmationSelection
+            = visual::HudExitConfirmationSelection::ExitGame;
+    }
     if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
         hud.pauseSelection = visual::HudPauseSelection::RestartRun;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Settings) {

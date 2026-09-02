@@ -185,6 +185,13 @@ integração mantém `SessionSystem` como dono do encerramento/restart e reinici
 o renderer no contexto existente; a validação manual deve confirmar que a janela
 não fecha e que `START RUN` inicia a seed seguinte.
 
+O gate de confirmação de saída cobre estado inativo, seleção segura inicial,
+navegação normalizada, wrap, seleção direta, cancelamento e emissão única do
+comando final. O teste de layout valida os dois hit targets em resoluções ampla,
+compacta e mínima; a regressão OpenGL exige que o modal altere a tela do menu
+principal. A Application abre o mesmo estado a partir do título, pausa e
+resultado, preservando o menu de origem até cancelar ou confirmar.
+
 O gate de configurações cobre origem título/pausa, wrap, seleção direta, retorno,
 passos e clamps de todos os valores. Input neutro e adaptador SDL protegem as
 novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste

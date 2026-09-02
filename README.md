@@ -89,7 +89,7 @@ especializados das pastas numeradas.
   biblioteca possui módulos compactos, médios e grandes, com Hub, Arena, Boss e
   Secret usando dimensões próprias e placement derivado dos bounds reais.
 - **Fase 21 — Menu principal:** implementada e validada; `START RUN` cria a
-  dungeon somente após confirmação e `EXIT GAME` encerra pelo fluxo principal.
+  dungeon somente após confirmação e `EXIT GAME` entra no fluxo principal de saída.
 - **Fase 22 — Revisão visual aprovada:** concluída; a proposta
   `Industrial Corridor/Wall v1` foi recusada e substituída pela v2 HD, aceita no
   jogo com mapas `1024×1024`, Albedo/Normal/RMA, UV físico e filtragem trilinear.
@@ -290,6 +290,9 @@ especializados das pastas numeradas.
 - **Fase 72 — VSync persistente:** `VSYNC` alterna a sincronização vertical do
   contexto OpenGL em runtime. O padrão permanece `ON`, o schema v5 migra v1–v4
   e um bootstrap isolado confirma a aplicação de `OFF` na próxima abertura.
+- **Fase 73 — Confirmação segura de saída:** `EXIT GAME` no título, pausa e
+  resultado abre um diálogo compartilhado com `CANCEL` selecionado por padrão.
+  WASD, setas, `Enter`, `Esc`, hover e clique usam o mesmo estado e hit test.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -544,6 +547,13 @@ fatais. O schema v5 adiciona `vertical_sync = true/false`, migra v1–v4 com `ON
 e preserva a configuração entre execuções. O layout passou a acomodar onze
 linhas e reduz apenas a altura dos hit targets em framebuffers muito compactos.
 
+Na Fase 73, toda saída iniciada pelos menus passou por
+`ExitConfirmationState`. O diálogo preserva o título, pausa ou resultado por
+baixo, começa em `CANCEL` e só encerra o processo depois da escolha explícita de
+`EXIT`. `Esc` cancela, WASD e todas as setas alternam as duas opções, e mouse,
+teclado, desenho e hit test compartilham o mesmo estado. O fechamento solicitado
+pelo sistema operacional continua imediato.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -677,7 +687,7 @@ ctest --preset debug
 Os mesmos comandos aceitam o preset `release`; ambos compilam e executam a suíte
 completa de Core, Renderer, Procedural Assets, Enemy Generation, Room Materials,
 Gameplay, Session, Room Traversal, Loot, Props, Events, Lighting, Audio, Progression,
-Combat, HUD Feedback, Pause Menu, Entities e World.
+Combat, HUD Feedback, Menus, Persistência, Entities e World.
 
 Validação instrumentada de memória e comportamento indefinido:
 

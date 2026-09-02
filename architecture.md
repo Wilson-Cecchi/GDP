@@ -843,6 +843,13 @@ OpenGL com a preferência e solicita 1 ou 0 somente quando necessário. Gameplay
 persistência e renderer continuam recebendo apenas booleanos e snapshots; o
 layout puro agora organiza onze linhas e dez pares de setas.
 
+Na Fase 73, `ExitConfirmationState` centralizou o gate de saída dos três menus
+concretos do GDP. A Application mantém o menu de origem ativo, traduz teclado e
+mouse para comandos puros e somente encerra depois de `ExitGame`; cancelar não
+reconstrói mundo, renderer ou sessão. `ExitConfirmationLayout` e o snapshot HUD
+mantêm desenho e hit test no renderer concreto, sem introduzir conceitos de menu
+nas fundações WKC Forge.
+
 ---
 
 # 8. Sistema de seed
