@@ -81,10 +81,11 @@ e cues; gamepad permanece como expansão futura.
 - resolução: 960×540, 1280×720, 1600×900 ou 1920×1080;
 - Fullscreen: `OFF/ON`, aplicado à janela sem reiniciar a run.
 
-W/S e setas verticais escolhem a linha. A/D e setas laterais ajustam; no mouse,
-clicar na metade esquerda/direita da linha reduz/aumenta. `BACK`, `Enter` sobre
-`BACK` ou `Esc` retorna exatamente ao título ou à pausa de origem. Look e fixed
-update permanecem congelados enquanto a tela está aberta.
+W/S e setas verticais escolhem a linha. A/D e setas laterais ajustam. No mouse,
+cada linha possui botões `<` e `>` independentes: o primeiro reduz e o segundo
+aumenta; clicar no nome ou no valor somente seleciona a linha. `BACK`, `Enter`
+sobre `BACK` ou `Esc` retorna exatamente ao título ou à pausa de origem. Look e
+fixed update permanecem congelados enquanto a tela está aberta.
 
 Os valores são aplicados imediatamente e preservados entre runs. Ao retornar por
 `BACK` ou `Esc`, eles são gravados no `settings.toml` do diretório de preferências

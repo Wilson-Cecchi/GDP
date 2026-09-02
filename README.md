@@ -284,6 +284,9 @@ especializados das pastas numeradas.
 - **Fase 70 — Resolução de janela persistente:** `RESOLUTION` oferece 960×540,
   1280×720, 1600×900 e 1920×1080. A troca ocorre em runtime no modo janela; em
   fullscreen, o preset fica preservado para o retorno. O schema v4 migra v1–v3.
+- **Fase 71 — Setas clicáveis nas configurações:** cada linha ajustável possui
+  hit targets próprios para `<` e `>`. A seta esquerda sempre reduz, a direita
+  sempre aumenta, e clicar no nome/valor apenas seleciona sem alterar.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -488,7 +491,7 @@ permanece aberta. Iniciar novamente pelo título usa a seed já preparada.
 Na Fase 66, `SettingsMenuState` passou a oferecer seis ajustes funcionais:
 volumes Master/Effects/Ambient/UI de 0–100%, sensibilidade de 30–200% e FOV de
 60–100 graus. A/D ou setas laterais alteram o valor; W/S ou setas verticais
-navegam; mouse seleciona a linha e ajusta pela metade esquerda/direita. Mudanças
+navegam; mouse seleciona a linha e ajusta pelas setas `<` e `>`. Mudanças
 são aplicadas imediatamente e sobrevivem a novas runs dentro do processo.
 
 Na Fase 67, `SettingsStore` passou a carregar e salvar esses valores em um TOML
@@ -522,6 +525,14 @@ a run ou o contexto. Em fullscreen, o tamanho lógico fica guardado e é aplicad
 ao retornar ao modo janela; o framebuffer continua seguindo o tamanho real em
 pixels. O schema v4 salva `window_width/window_height`, migra v1–v3 para
 1280×720 e rejeita pares que não pertencem ao catálogo.
+
+Na Fase 71, o ajuste por mouse deixou de inferir a direção pela metade global do
+framebuffer. `SettingsMenuLayout` passou a fornecer botões de decremento e
+incremento para cada linha, usados tanto pelo desenho quanto pelo hit test. O
+valor fica centralizado entre `<` e `>`; clicar na seta esquerda reduz, clicar na
+direita aumenta e clicar no label/valor somente seleciona a opção. O espaçamento
+vertical também se adapta a alturas compactas sem sobrepor linhas quando há
+espaço físico suficiente.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

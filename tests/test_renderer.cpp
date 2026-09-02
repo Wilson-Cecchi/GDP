@@ -268,9 +268,38 @@ void testSettingsMenuLayout()
         expect(settingsMenuSelectionAt(1280, 720, pointerX, pointerY)
                 == static_cast<HudSettingsSelection>(index),
             "top-origin pointer maps to each settings row");
+        if (index < static_cast<std::size_t>(HudSettingsSelection::Back)) {
+            const UiRect decrement = wide.decrementButtons[index];
+            const UiRect increment = wide.incrementButtons[index];
+            expect(row.contains(decrement.x, decrement.y)
+                    && row.contains(increment.x, increment.y),
+                "settings arrow hit targets stay inside their row");
+            const float decrementX
+                = static_cast<float>(decrement.x + decrement.width / 2);
+            const float decrementY = static_cast<float>(
+                720 - 1 - (decrement.y + decrement.height / 2));
+            const float incrementX
+                = static_cast<float>(increment.x + increment.width / 2);
+            const float incrementY = static_cast<float>(
+                720 - 1 - (increment.y + increment.height / 2));
+            expect(settingsMenuAdjustmentDirectionAt(
+                       1280, 720, decrementX, decrementY)
+                    == -1,
+                "left settings arrow always decrements");
+            expect(settingsMenuAdjustmentDirectionAt(
+                       1280, 720, incrementX, incrementY)
+                    == 1,
+                "right settings arrow always increments");
+            expect(!settingsMenuAdjustmentDirectionAt(
+                1280, 720, static_cast<float>(row.x + 4), pointerY),
+                "clicking a settings label selects without changing its value");
+        }
     }
     expect(!settingsMenuSelectionAt(1280, 720, 0.0F, 0.0F),
         "pointer outside settings rows has no selection");
+    expect(!settingsMenuAdjustmentDirectionAt(1280, 720, 0.0F, 0.0F)
+            && !settingsMenuAdjustmentDirectionAt(0, 720, 1.0F, 1.0F),
+        "pointer outside arrow buttons cannot adjust settings");
 
     const SettingsMenuLayout medium = makeSettingsMenuLayout(640, 360);
     expect(medium.scale == 1,
@@ -286,6 +315,11 @@ void testSettingsMenuLayout()
             && compact.panel.x + compact.panel.width <= 320
             && compact.panel.y + compact.panel.height <= 200,
         "compact settings menu remains within the framebuffer");
+    for (std::size_t index = 1U; index < compact.rows.size(); ++index) {
+        expect(compact.rows[index].y + compact.rows[index].height
+                <= compact.rows[index - 1U].y,
+            "compact settings rows remain separated when space permits");
+    }
     const SettingsMenuLayout tiny = makeSettingsMenuLayout(12, 12);
     for (const UiRect row : tiny.rows) {
         expect(tiny.panel.contains(row.x, row.y),

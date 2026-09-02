@@ -207,15 +207,36 @@ SettingsMenuLayout makeSettingsMenuLayout(const int width, const int height) noe
     const int rowHeight = std::max(1, std::min(13 * scale, panelHeight));
     const int rowX = (safeWidth - rowWidth) / 2;
     const int maximumRowY = panelY + panelHeight - rowHeight;
+    const int bottomRowY = std::clamp(
+        panelY + (24 * scale), panelY, maximumRowY);
+    const int topRowLimit = std::clamp(
+        panelY + panelHeight - (26 * scale) - rowHeight,
+        bottomRowY, maximumRowY);
+    constexpr int rowCount
+        = static_cast<int>(HudSettingsSelection::Count);
+    const int rowPitch = rowCount > 1
+        ? std::min(18 * scale,
+            (topRowLimit - bottomRowY) / (rowCount - 1))
+        : 0;
 
     SettingsMenuLayout layout;
     layout.scale = scale;
     layout.panel = {panelX, panelY, panelWidth, panelHeight};
     for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
-        const int rowY = std::clamp(
-            panelY + ((186 - (static_cast<int>(index) * 18)) * scale),
-            panelY, maximumRowY);
+        const int rowY = bottomRowY
+            + ((rowCount - 1 - static_cast<int>(index)) * rowPitch);
         layout.rows[index] = {rowX, rowY, rowWidth, rowHeight};
+        if (index < static_cast<std::size_t>(HudSettingsSelection::Back)
+            && rowWidth >= 3) {
+            const int adjustmentWidth = std::min(rowWidth, 104 * scale);
+            const int arrowWidth = std::max(1,
+                std::min(rowHeight, adjustmentWidth / 4));
+            const int adjustmentX = rowX + rowWidth - adjustmentWidth;
+            layout.decrementButtons[index]
+                = {adjustmentX, rowY, arrowWidth, rowHeight};
+            layout.incrementButtons[index]
+                = {rowX + rowWidth - arrowWidth, rowY, arrowWidth, rowHeight};
+        }
     }
     return layout;
 }
@@ -236,6 +257,30 @@ std::optional<HudSettingsSelection> settingsMenuSelectionAt(
     for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
         if (layout.rows[index].contains(pixelX, pixelY)) {
             return static_cast<HudSettingsSelection>(index);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<int> settingsMenuAdjustmentDirectionAt(
+    const int width,
+    const int height,
+    const float pointerX,
+    const float pointerY) noexcept
+{
+    if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
+        || !std::isfinite(pointerY)) {
+        return std::nullopt;
+    }
+    const int pixelX = static_cast<int>(pointerX);
+    const int pixelY = height - 1 - static_cast<int>(pointerY);
+    const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
+    for (std::size_t index = 0U; index < layout.rows.size(); ++index) {
+        if (layout.decrementButtons[index].contains(pixelX, pixelY)) {
+            return -1;
+        }
+        if (layout.incrementButtons[index].contains(pixelX, pixelY)) {
+            return 1;
         }
     }
     return std::nullopt;

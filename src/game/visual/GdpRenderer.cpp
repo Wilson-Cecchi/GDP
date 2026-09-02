@@ -1489,24 +1489,45 @@ bool GdpRenderer::render(
             std::string value;
             if (index
                 == static_cast<std::size_t>(HudSettingsSelection::InvertMouseY)) {
-                value = hud.invertMouseY ? "< ON >" : "< OFF >";
+                value = hud.invertMouseY ? "ON" : "OFF";
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::Fullscreen)) {
-                value = hud.fullscreen ? "< ON >" : "< OFF >";
+                value = hud.fullscreen ? "ON" : "OFF";
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::WindowResolution)) {
-                value = "< " + std::to_string(hud.windowWidth) + "X"
-                    + std::to_string(hud.windowHeight) + " >";
+                value = std::to_string(hud.windowWidth) + "X"
+                    + std::to_string(hud.windowHeight);
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::FieldOfView)) {
-                value = "< " + std::to_string(numbers[index]) + " >";
+                value = std::to_string(numbers[index]);
             } else {
-                value = "< " + std::to_string(numbers[index]) + "% >";
+                value = std::to_string(numbers[index]) + "%";
             }
             drawBitmapText(row.x + (8 * scale), row.y + (3 * scale),
                 scale, labels[index], selected ? cyanColor : textColor);
-            drawBitmapText(row.x + row.width - bitmapTextWidth(value, scale)
-                    - (8 * scale),
+            const UiRect decrement = layout.decrementButtons[index];
+            const UiRect increment = layout.incrementButtons[index];
+            const wkc::core::Vec3 arrowPanelColor = selected
+                ? wkc::core::Vec3{0.10F, 0.27F, 0.30F}
+                : wkc::core::Vec3{0.035F, 0.075F, 0.086F};
+            drawSolidRect(decrement.x, decrement.y,
+                decrement.width, decrement.height, arrowPanelColor);
+            drawSolidRect(increment.x, increment.y,
+                increment.width, increment.height, arrowPanelColor);
+            drawBitmapText(
+                decrement.x
+                    + ((decrement.width - bitmapTextWidth("<", scale)) / 2),
+                decrement.y + (3 * scale), scale, "<",
+                selected ? cyanColor : textColor);
+            drawBitmapText(
+                increment.x
+                    + ((increment.width - bitmapTextWidth(">", scale)) / 2),
+                increment.y + (3 * scale), scale, ">",
+                selected ? cyanColor : textColor);
+            const int valueLeft = decrement.x + decrement.width;
+            const int valueWidth = std::max(0, increment.x - valueLeft);
+            drawBitmapText(valueLeft
+                    + ((valueWidth - bitmapTextWidth(value, scale)) / 2),
                 row.y + (3 * scale), scale, value,
                 selected ? cyanColor : textColor);
         }

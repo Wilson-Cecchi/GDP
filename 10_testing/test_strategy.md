@@ -192,6 +192,12 @@ CPU percorre as dez linhas do layout em resoluções ampla, compacta e mínima, 
 a regressão OpenGL exige pixels distintos para tela, seleção e valor de
 `RESOLUTION`.
 
+A regressão de setas percorre todas as nove linhas ajustáveis e confirma que os
+dois hit targets ficam dentro da linha: `<` sempre retorna direção negativa e
+`>` sempre retorna positiva. Cliques no label, no valor, fora do painel ou com
+dimensões inválidas não ajustam configurações. Layouts de 640×360 e 320×200
+também verificam que as dez linhas não se sobrepõem quando há espaço disponível.
+
 O gate de persistência usa diretório temporário isolado e cobre arquivo ausente,
 round-trip das nove configurações/dez campos, substituição de arquivo existente,
 remoção do temporário, campos ausentes/desconhecidos, corrupção parcial, clamps, versão

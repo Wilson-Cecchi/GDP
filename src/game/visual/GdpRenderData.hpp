@@ -202,6 +202,10 @@ struct SettingsMenuLayout {
     int scale{1};
     UiRect panel{};
     std::array<UiRect, static_cast<std::size_t>(HudSettingsSelection::Count)> rows{};
+    std::array<UiRect, static_cast<std::size_t>(HudSettingsSelection::Count)>
+        decrementButtons{};
+    std::array<UiRect, static_cast<std::size_t>(HudSettingsSelection::Count)>
+        incrementButtons{};
 };
 
 [[nodiscard]] MainMenuLayout makeMainMenuLayout(int width, int height) noexcept;
@@ -224,6 +228,11 @@ struct SettingsMenuLayout {
     float pointerY) noexcept;
 [[nodiscard]] SettingsMenuLayout makeSettingsMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudSettingsSelection> settingsMenuSelectionAt(
+    int width,
+    int height,
+    float pointerX,
+    float pointerY) noexcept;
+[[nodiscard]] std::optional<int> settingsMenuAdjustmentDirectionAt(
     int width,
     int height,
     float pointerX,

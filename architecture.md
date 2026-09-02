@@ -829,6 +829,13 @@ migra v1–v3 para 1280×720. O renderer continua alheio ao SDL: recebe o valor 
 texto, mas dimensiona seus recursos pelo framebuffer real já consultado a cada
 quadro.
 
+Na Fase 71, `SettingsMenuLayout` passou a expor, além das dez linhas, pares de
+`decrementButtons/incrementButtons` para as nove opções ajustáveis. A Application
+consulta `settingsMenuAdjustmentDirectionAt` em coordenadas do framebuffer, sem
+inferir direção pela posição global do cursor. O renderer usa os mesmos retângulos
+para desenhar `<` e `>`, eliminando divergência entre o controle visível e a área
+clicável. O pitch vertical é calculado pelo espaço disponível.
+
 ---
 
 # 8. Sistema de seed

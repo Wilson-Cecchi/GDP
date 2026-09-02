@@ -690,19 +690,19 @@ void Application::processEvents()
 
         std::optional<visual::HudSettingsSelection> pointedSelection;
         float pointerDrawableX = 0.0F;
+        float pointerDrawableY = 0.0F;
         int drawableWidth = 0;
+        int drawableHeight = 0;
         if (window_ != nullptr) {
             int windowWidth = 0;
             int windowHeight = 0;
-            int drawableHeight = 0;
             if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
                 && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
                 && windowWidth > 0 && windowHeight > 0) {
                 const Vec2 pointer = input_.mousePosition();
                 pointerDrawableX = pointer.x * static_cast<float>(drawableWidth)
                     / static_cast<float>(windowWidth);
-                const float pointerDrawableY
-                    = pointer.y * static_cast<float>(drawableHeight)
+                pointerDrawableY = pointer.y * static_cast<float>(drawableHeight)
                     / static_cast<float>(windowHeight);
                 pointedSelection = visual::settingsMenuSelectionAt(
                     drawableWidth, drawableHeight,
@@ -756,11 +756,12 @@ void Application::processEvents()
             if (settingsMenu_.selection == gameplay::SettingsMenuOption::Back) {
                 command = gameplay::activateSettingsMenuSelection(settingsMenu_);
             } else {
-                const int direction = pointerDrawableX
-                        < (static_cast<float>(drawableWidth) * 0.5F)
-                    ? -1 : 1;
-                if (gameplay::adjustRuntimeSetting(runtimeSettings_,
-                    settingsMenu_.selection, direction)) {
+                const std::optional<int> direction
+                    = visual::settingsMenuAdjustmentDirectionAt(
+                        drawableWidth, drawableHeight,
+                        pointerDrawableX, pointerDrawableY);
+                if (direction && gameplay::adjustRuntimeSetting(runtimeSettings_,
+                    settingsMenu_.selection, *direction)) {
                     settingsDirty_ = true;
                     applyRuntimeSettings();
                     playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
