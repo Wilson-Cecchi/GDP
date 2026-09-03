@@ -293,6 +293,9 @@ especializados das pastas numeradas.
 - **Fase 73 — Confirmação segura de saída:** `EXIT GAME` no título, pausa e
   resultado abre um diálogo compartilhado com `CANCEL` selecionado por padrão.
   WASD, setas, `Enter`, `Esc`, hover e clique usam o mesmo estado e hit test.
+- **Fase 74 — Cronômetro determinístico de run:** o tempo avança nos passos
+  fixos de 60 Hz, congela em menus, pausa e resultado e zera somente na próxima
+  run. HUD, título e log terminal exibem o mesmo valor `MM:SS.cc`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -553,6 +556,14 @@ baixo, começa em `CANCEL` e só encerra o processo depois da escolha explícita
 `EXIT`. `Esc` cancela, WASD e todas as setas alternam as duas opções, e mouse,
 teclado, desenho e hit test compartilham o mesmo estado. O fechamento solicitado
 pelo sistema operacional continua imediato.
+
+Na Fase 74, `SessionState` passou a possuir `elapsedRunTicks`, avançado somente
+uma vez por fixed update jogável. Pausa, configurações, título e resultado não
+consomem tempo; o passo que decide Victory/Defeat é incluído, o resultado fica
+congelado e `restart()` zera a nova run. O renderer formata os ticks de 60 Hz em
+`MM:SS.cc` ou `HH:MM:SS.cc`, exibindo o tempo no HUD enquanto Application usa o
+mesmo texto no título e no log terminal. Essa é a base determinística de
+Speedrun e ranking, ainda sem criar um modo separado.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

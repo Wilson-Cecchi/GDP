@@ -429,6 +429,18 @@ void testExitConfirmationLayout()
         "tiny confirmation clamps both choices inside its panel");
 }
 
+void testRunTimeFormatting()
+{
+    using gdp::game::visual::runTimeText;
+
+    expect(runTimeText(0U) == "00:00.00"
+            && runTimeText(1U) == "00:00.01"
+            && runTimeText(59U) == "00:00.98"
+            && runTimeText(60U) == "00:01.00"
+            && runTimeText(216'000U) == "01:00:00.00",
+        "run timer formatting is deterministic across tick boundaries");
+}
+
 } // namespace
 
 int main()
@@ -440,6 +452,7 @@ int main()
     testPauseMenuLayout();
     testResultMenuLayout();
     testExitConfirmationLayout();
+    testRunTimeFormatting();
     testSettingsMenuLayout();
 
     if (failures != 0) {

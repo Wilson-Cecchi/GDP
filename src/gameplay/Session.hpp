@@ -9,6 +9,8 @@
 
 namespace gdp::gameplay {
 
+inline constexpr std::uint64_t runTimerTicksPerSecond = 60U;
+
 enum class SessionPhase : std::uint8_t {
     Playing,
     Victory,
@@ -21,6 +23,7 @@ struct SessionState {
     wkc::core::Seed currentSeed{0};
     std::uint32_t runIndex{0U};
     bool bossEngaged{false};
+    std::uint64_t elapsedRunTicks{0U};
 };
 
 struct SessionUpdate {
@@ -46,6 +49,7 @@ public:
         bool bossExists,
         bool bossAlive) noexcept;
     [[nodiscard]] std::optional<wkc::core::Seed> restart() noexcept;
+    void advanceRunTimer() noexcept;
     [[nodiscard]] const SessionState& state() const noexcept;
 
 private:

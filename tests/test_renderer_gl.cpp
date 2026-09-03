@@ -374,6 +374,15 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::game::visual::HudRenderData timedHud = functionalHud;
+            timedHud.runTimerVisible = true;
+            timedHud.elapsedRunTicks = 4'567U;
+            const bool renderedRunTimer = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, timedHud);
+            std::vector<std::uint8_t> runTimerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                runTimerPixels.data());
+
             gdp::game::visual::HudRenderData pausedHud = functionalHud;
             pausedHud.paused = true;
             pausedHud.pauseSelection = gdp::game::visual::HudPauseSelection::RestartRun;
@@ -502,6 +511,7 @@ int main()
             std::size_t hudChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t runTimerChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
@@ -588,6 +598,10 @@ int main()
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
                     }
+                    if (runTimerPixels[index + channel]
+                        != functionalHudPixels[index + channel]) {
+                        ++runTimerChangedChannels;
+                    }
                     if (pauseMenuPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
                         ++pauseMenuChangedChannels;
@@ -665,6 +679,7 @@ int main()
                 && renderedHud && hudChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U

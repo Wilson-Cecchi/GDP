@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 namespace gdp::game::visual {
 
@@ -345,6 +347,28 @@ std::optional<int> settingsMenuAdjustmentDirectionAt(
         }
     }
     return std::nullopt;
+}
+
+std::string runTimeText(const std::uint64_t elapsedTicks)
+{
+    constexpr std::uint64_t ticksPerSecond = 60U;
+    const std::uint64_t totalSeconds = elapsedTicks / ticksPerSecond;
+    const std::uint64_t centiseconds
+        = ((elapsedTicks % ticksPerSecond) * 100U) / ticksPerSecond;
+    const std::uint64_t seconds = totalSeconds % 60U;
+    const std::uint64_t totalMinutes = totalSeconds / 60U;
+    const std::uint64_t minutes = totalMinutes % 60U;
+    const std::uint64_t hours = totalMinutes / 60U;
+
+    std::ostringstream text;
+    text << std::setfill('0');
+    if (hours > 0U) {
+        text << std::setw(2) << hours << ':';
+    }
+    text << std::setw(2) << (hours > 0U ? minutes : totalMinutes)
+         << ':' << std::setw(2) << seconds
+         << '.' << std::setw(2) << centiseconds;
+    return text.str();
 }
 
 } // namespace gdp::game::visual

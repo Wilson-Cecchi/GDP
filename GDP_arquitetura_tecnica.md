@@ -924,6 +924,13 @@ reconstrói mundo, renderer ou sessão. `ExitConfirmationLayout` e o snapshot HU
 mantêm desenho e hit test no renderer concreto, sem introduzir conceitos de menu
 nas fundações WKC Forge.
 
+Na Fase 74, `SessionState::elapsedRunTicks` estabeleceu o tempo canônico da run
+na camada concreta de gameplay. A Application avança um tick por atualização
+fixa jogável, depois dos gates de menus/pausa e antes da simulação que pode gerar
+o resultado. O renderer recebe somente o snapshot numérico, formata e desenha o
+valor; relógio genérico, loop e fundações WKC Forge permanecem alheios às regras
+de Speedrun.
+
 ---
 
 # 8. Sistema de seed

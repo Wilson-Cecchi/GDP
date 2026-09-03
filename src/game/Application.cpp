@@ -1414,6 +1414,7 @@ void Application::fixedUpdate(const double fixedStep)
         ++fixedUpdates_;
         return;
     }
+    session_.advanceRunTimer();
     weapon_.fixedUpdate(step);
     entities::Entity* playerEntity = entities_.find(player_.entity());
     std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
@@ -1881,7 +1882,9 @@ void Application::fixedUpdate(const double fixedStep)
         message << "Session result: "
                 << gameplay::sessionPhaseName(sessionUpdate.phase)
                 << " | run " << session_.state().runIndex
-                << " | seed " << session_.state().currentSeed;
+                << " | seed " << session_.state().currentSeed
+                << " | time "
+                << visual::runTimeText(session_.state().elapsedRunTicks);
         log(LogLevel::Info, message.str());
         if (audio_ && sessionUpdate.phase == gameplay::SessionPhase::Victory) {
             audio_->play(gdp::audio::AudioEventKind::EventComplete,
@@ -2120,6 +2123,8 @@ void Application::render()
         title << " MAX";
     }
     title << " | Score " << progress.score;
+    title << " | Time "
+          << visual::runTimeText(session_.state().elapsedRunTicks);
     title << " | Room " << playerRoom;
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
         title << " | VICTORY - ENTER: NEW RUN";
@@ -2313,6 +2318,8 @@ void Application::render()
     hud.reserveAmmo = weapon_.reserveAmmo();
     hud.keys = player_.state().keys;
     hud.level = progress.level;
+    hud.runTimerVisible = true;
+    hud.elapsedRunTicks = session_.state().elapsedRunTicks;
     hud.experience = progress.experienceIntoLevel;
     hud.experienceForNextLevel = nextLevelXp;
     hud.damageFeedback = gameplay::damageFeedbackStrength(feedback_);

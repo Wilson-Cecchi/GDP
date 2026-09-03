@@ -180,6 +180,11 @@ wrap, seleção direta, comandos e reset. O teste CPU cobre `ResultMenuLayout` e
 seus três hit targets nas mesmas classes de resolução; a regressão OpenGL exige
 mudança de pixels ao alternar a seleção entre jogar novamente e sair.
 
+O timer de sessão é exercitado em ticks inteiros: 600 avanços equivalem a dez
+segundos, estado terminal congela o total e restart zera a próxima run. O teste
+de apresentação protege fronteiras de tick, segundo e hora; a regressão OpenGL
+compara o mesmo HUD com e sem `TIME`, impedindo que o dado deixe de ser exibido.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <span>
 
 namespace gdp::game::visual {
@@ -259,6 +260,7 @@ exitConfirmationSelectionAt(
     int height,
     float pointerX,
     float pointerY) noexcept;
+[[nodiscard]] std::string runTimeText(std::uint64_t elapsedTicks);
 
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
@@ -273,6 +275,8 @@ struct HudRenderData {
     std::uint32_t level{1};
     std::uint32_t experience{0};
     std::uint32_t experienceForNextLevel{0};
+    bool runTimerVisible{false};
+    std::uint64_t elapsedRunTicks{0U};
     HudEventState event{HudEventState::None};
     bool eventLocked{false};
     HudPrompt prompt{HudPrompt::None};

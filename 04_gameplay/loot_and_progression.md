@@ -4,7 +4,8 @@
 > nível 10 implementados na Fase 12; Victory, Defeat e nova run determinística
 > implementados na Fase 13. O runtime de Armor e sua recompensa por Vitality
 > foram integrados na Fase 58; Weapon pickup, Special e persistência entre
-> execuções permanecem planejados.
+> execuções permanecem planejados. A base determinística do cronômetro de run
+> foi implementada na Fase 74.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -100,8 +101,15 @@ regenerado pela seed quando não houver necessidade de retomar exatamente o esta
 
 ## Speedrun
 
-Usa a mesma simulação e geração; adiciona cronômetro e ranking. Regras de pausa e término do
-timer devem ser únicas e documentadas.
+Usa a mesma simulação e geração. A Fase 74 adicionou ao `SessionState` um
+cronômetro contado em ticks fixos de 60 Hz: ele começa em zero, avança somente
+durante gameplay ativo, inclui o passo que determina Victory/Defeat e congela no
+estado terminal. Título, HUD e log usam a mesma representação `MM:SS.cc` (ou
+`HH:MM:SS.cc` após uma hora). Pausa, configurações, menus e tempo de renderização
+não alteram o resultado; `restart()` zera o cronômetro junto da próxima run.
+
+O modo Speedrun selecionável e o ranking persistente continuam planejados sobre
+esse contrato.
 
 ## Dificuldade
 

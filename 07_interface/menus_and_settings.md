@@ -6,6 +6,7 @@
 > Fase 67, invert Y na Fase 68, fullscreen na Fase 69 e resolução na Fase 70.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
+> A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -13,14 +14,16 @@
 
 O bootstrap gráfico mostra `START RUN`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
-por clique, e `Esc` encerra. A seleção inicial segura é sempre `START RUN`.
+por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
+sempre `START RUN`.
 Alterar efetivamente a seleção toca `UiNavigate`; confirmar por teclado ou mouse
 toca `UiConfirm`. Movimento do ponteiro sem troca de opção não repete áudio.
 
 Enquanto o menu está aberto, o mouse permanece livre e Player/Enemy não recebem
 fixed update. Confirmar `START RUN` cria mundo, entidades, eventos, iluminação e
 recursos gráficos da run e então captura o mouse. `EXIT GAME` fecha a aplicação
-sem criar o mundo. `--headless` inicia diretamente porque não possui interação.
+somente após confirmação, sem criar o mundo. `--headless` inicia diretamente
+porque não possui interação.
 
 Campanha, Speedrun e Ranking continuam como expansões futuras do mesmo estado.
 
@@ -48,7 +51,7 @@ Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e abrem
 menu sobre o viewport. A opção segura é `NEW RUN` após vitória ou `RETRY` após
 derrota; `MAIN MENU` retorna ao título e `EXIT GAME` encerra a aplicação. `W/S`,
 setas, `Enter`, hover e clique seguem o mesmo contrato dos demais menus, enquanto
-`Esc` preserva a saída direta.
+`Esc` abre a mesma confirmação segura de saída.
 
 O mouse relativo é liberado na transição terminal. `ResultMenuLayout` é usado
 simultaneamente pelo renderer e pelo hit test high-DPI. Confirmar a primeira
@@ -69,6 +72,14 @@ mouse livre.
 Cima/baixo, esquerda/direita, confirmar e voltar continuam sendo ações lógicas
 independentes do dispositivo. Teclado e mouse já mapeiam para os mesmos comandos
 e cues; gamepad permanece como expansão futura.
+
+## Cronômetro da run
+
+Durante uma run, o canto superior direito mostra `TIME MM:SS.cc`, abaixo do
+objetivo. O valor vem dos ticks fixos da sessão e não do tempo de renderização;
+por isso permanece estável com qualquer FPS. Pausa e configurações congelam a
+contagem. Victory e Defeat preservam o tempo final visível, e a próxima run
+recomeça em zero. Runs acima de uma hora usam `HH:MM:SS.cc`.
 
 ## Configurações runtime
 

@@ -1922,6 +1922,16 @@ bool GdpRenderer::render(
             std::max(hudMargin, height - hudMargin - (7 * hudScale)),
             hudScale, objectiveText, objectiveColor);
     }
+    if (hud.visible && hud.runTimerVisible) {
+        const std::string timerText
+            = "TIME " + runTimeText(hud.elapsedRunTicks);
+        const int timerWidth = bitmapTextWidth(timerText, hudScale);
+        const int timerOffset = objectiveText.empty() ? 7 : 17;
+        drawBitmapText(std::max(hudMargin, width - timerWidth - hudMargin),
+            std::max(hudMargin,
+                height - hudMargin - (timerOffset * hudScale)),
+            hudScale, timerText, textColor);
+    }
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {
         const bool victory = hud.objective == ObjectiveRenderState::Victory;

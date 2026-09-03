@@ -41,6 +41,25 @@ void testBossVictoryRequiresARealEngagement()
         "a completed run has a stable terminal state");
 }
 
+void testDeterministicRunTimer()
+{
+    using namespace gdp;
+    gameplay::SessionSystem session{12345U};
+    for (std::uint64_t tick = 0U;
+         tick < gameplay::runTimerTicksPerSecond * 10U; ++tick) {
+        session.advanceRunTimer();
+    }
+    expect(session.state().elapsedRunTicks == 600U,
+        "run timer advances exactly once per active 60 Hz simulation step");
+
+    (void)session.update(false, world::RoomRole::Start, false, false);
+    session.advanceRunTimer();
+    expect(session.state().elapsedRunTicks == 600U,
+        "terminal sessions freeze the elapsed run timer");
+    expect(session.restart() && session.state().elapsedRunTicks == 0U,
+        "starting the next deterministic run resets its timer");
+}
+
 void testDefeatAndDeterministicRestart()
 {
     using namespace gdp;
@@ -121,6 +140,7 @@ void testRestartSeedRegeneratesAReproducibleWorld()
 int main()
 {
     testBossVictoryRequiresARealEngagement();
+    testDeterministicRunTimer();
     testDefeatAndDeterministicRestart();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();

@@ -2,6 +2,8 @@
 
 #include "game/SeedDomains.hpp"
 
+#include <limits>
+
 namespace gdp::gameplay {
 
 SessionSystem::SessionSystem(const wkc::core::Seed initialSeed) noexcept
@@ -41,7 +43,16 @@ std::optional<wkc::core::Seed> SessionSystem::restart() noexcept
     state_.currentSeed = seedForRun(state_.initialSeed, state_.runIndex);
     state_.phase = SessionPhase::Playing;
     state_.bossEngaged = false;
+    state_.elapsedRunTicks = 0U;
     return state_.currentSeed;
+}
+
+void SessionSystem::advanceRunTimer() noexcept
+{
+    if (state_.phase == SessionPhase::Playing
+        && state_.elapsedRunTicks < std::numeric_limits<std::uint64_t>::max()) {
+        ++state_.elapsedRunTicks;
+    }
 }
 
 const SessionState& SessionSystem::state() const noexcept
