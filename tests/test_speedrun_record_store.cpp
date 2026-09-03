@@ -1,0 +1,174 @@
+#include "persistence/SpeedrunRecordStore.hpp"
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <system_error>
+
+namespace {
+
+int failures = 0;
+
+void expect(const bool condition, const std::string_view message)
+{
+    if (!condition) {
+        std::cerr << "FAIL: " << message << '\n';
+        ++failures;
+    }
+}
+
+class TemporaryDirectory {
+public:
+    TemporaryDirectory()
+    {
+        const auto suffix = std::chrono::steady_clock::now()
+                                .time_since_epoch().count();
+        path_ = std::filesystem::temp_directory_path()
+            / ("gdp_speedrun_record_" + std::to_string(suffix));
+        std::filesystem::create_directories(path_);
+    }
+
+    ~TemporaryDirectory()
+    {
+        std::error_code error;
+        std::filesystem::remove_all(path_, error);
+    }
+
+    TemporaryDirectory(const TemporaryDirectory&) = delete;
+    TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept
+    {
+        return path_;
+    }
+
+private:
+    std::filesystem::path path_;
+};
+
+void writeText(const std::filesystem::path& path, const std::string_view text)
+{
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output << text;
+}
+
+void testMissingAndRoundTrip()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "speedrun_record.toml";
+
+    const persistence::SpeedrunRecordLoadResult missing
+        = persistence::loadSpeedrunRecord(path);
+    expect(missing.status == persistence::SpeedrunRecordLoadStatus::Missing
+            && !missing.record,
+        "a missing record file is a valid empty state");
+
+    gameplay::SpeedrunRecord record{
+        gameplay::currentSpeedrunRulesVersion, 7'654U, 123'456U};
+    expect(persistence::saveSpeedrunRecord(path, record),
+        "a valid record is written through a validated temporary file");
+    const persistence::SpeedrunRecordLoadResult loaded
+        = persistence::loadSpeedrunRecord(path);
+    expect(loaded.status == persistence::SpeedrunRecordLoadStatus::Loaded
+            && loaded.record == record,
+        "record time, seed and rules survive a disk round trip");
+    expect(!std::filesystem::exists(path.string() + ".tmp"),
+        "successful save leaves no temporary record file");
+
+    record.bestTicks = 6'000U;
+    record.seed = 999U;
+    expect(persistence::saveSpeedrunRecord(path, record)
+            && persistence::loadSpeedrunRecord(path).record == record,
+        "atomic replacement updates an existing personal best");
+}
+
+void testInvalidAndVersionedData()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "speedrun_record.toml";
+
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 1\n"
+        "best_ticks = 0\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::Invalid,
+        "zero-duration records are rejected");
+
+    writeText(path,
+        "version = 99\n"
+        "rules_version = 1\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::UnsupportedVersion,
+        "unknown file schemas are not interpreted as current data");
+
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 99\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
+        "records from another ruleset remain isolated");
+
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 1\n"
+        "best_ticks = six hundred\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::Invalid,
+        "malformed timing data is rejected safely");
+
+    const gameplay::SpeedrunRecord invalid{
+        gameplay::currentSpeedrunRulesVersion, 0U, 123U};
+    expect(!persistence::saveSpeedrunRecord(path, invalid),
+        "invalid in-memory timing data is never persisted");
+}
+
+void testCommentsAndFutureFields()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "speedrun_record.toml";
+    writeText(path,
+        "# local record\n"
+        "version = 1\n"
+        "rules_version = 1\n"
+        "best_ticks = 321 # fixed ticks\n"
+        "seed = 987\n"
+        "future_field = preserved_by_future_versions\n");
+    const persistence::SpeedrunRecordLoadResult loaded
+        = persistence::loadSpeedrunRecord(path);
+    expect(loaded.status == persistence::SpeedrunRecordLoadStatus::Loaded
+            && loaded.record
+            == gameplay::SpeedrunRecord{
+                gameplay::currentSpeedrunRulesVersion, 321U, 987U},
+        "comments and unknown future fields remain forward compatible");
+}
+
+} // namespace
+
+int main()
+{
+    testMissingAndRoundTrip();
+    testInvalidAndVersionedData();
+    testCommentsAndFutureFields();
+    if (failures != 0) {
+        std::cerr << failures << " Speedrun record persistence test(s) failed\n";
+        return 1;
+    }
+    std::cout << "All GDP Speedrun record persistence tests passed\n";
+    return 0;
+}

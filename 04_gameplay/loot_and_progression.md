@@ -5,7 +5,8 @@
 > implementados na Fase 13. O runtime de Armor e sua recompensa por Vitality
 > foram integrados na Fase 58; Weapon pickup, Special e persistência entre
 > execuções permanecem planejados. A base determinística do cronômetro de run
-> foi implementada na Fase 74 e o modo Speedrun tornou-se selecionável na Fase 75.
+> foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
+> e o recorde pessoal local foi integrado na Fase 76.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -115,7 +116,18 @@ congelam a simulação. Assim, menus não oferecem vantagem de tempo. O resultad
 terminal congela o valor; `RETRY/NEW RUN` preserva o modo e voltar ao título
 permite selecionar Standard novamente.
 
-O ranking persistente continua planejado sobre esse contrato.
+Na Fase 76, toda vitória válida em Speedrun é comparada a um recorde pessoal
+local. O primeiro tempo cria o recorde; somente um valor estritamente menor o
+substitui. Empates, tempos piores, Defeat, Standard e resultados com zero ticks
+não alteram o dado. O registro conserva também a seed vencedora e
+`currentSpeedrunRulesVersion`, impedindo que regras diferentes sejam comparadas
+silenciosamente.
+
+O arquivo `speedrun_record.toml` usa schema próprio e troca atômica após releitura
+do temporário. Um arquivo ausente inicia sem recorde; conteúdo inválido,
+incompatível ou de versão futura é ignorado com segurança. HUD e título mostram
+`BEST` durante Speedrun, e Victory destaca `NEW RECORD` quando o tempo acabou de
+ser criado ou melhorado. Ranking online continua planejado sobre esse contrato.
 
 ## Dificuldade
 

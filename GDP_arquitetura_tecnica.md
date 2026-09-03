@@ -939,6 +939,14 @@ diferença funcional: Standard exige gameplay ativo, enquanto Speedrun também
 conta passos fixos durante menus de uma run existente. Nenhuma regra de modo foi
 movida para o loop ou renderer genéricos da WKC Forge.
 
+Na Fase 76, `gameplay/Speedrun` passou a avaliar resultados terminais sem
+dependência de plataforma: somente Victory em Speedrun com ticks positivos pode
+criar ou melhorar `SpeedrunRecord`. O contrato guarda versão das regras, melhor
+tempo e seed. `persistence/SpeedrunRecordStore` possui schema próprio e escrita
+atômica validada, mantendo recordes fora de `RuntimeSettings`. A Application
+carrega o dado pelo diretório de preferências SDL, persiste somente mudanças e
+envia ao renderer um snapshot de `BEST/NEW RECORD`.
+
 ---
 
 # 8. Sistema de seed

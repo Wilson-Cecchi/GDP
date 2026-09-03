@@ -383,6 +383,16 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 runTimerPixels.data());
 
+            gdp::game::visual::HudRenderData speedrunRecordHud = timedHud;
+            speedrunRecordHud.speedrunMode = true;
+            speedrunRecordHud.speedrunRecordVisible = true;
+            speedrunRecordHud.bestSpeedrunTicks = 4'200U;
+            const bool renderedSpeedrunRecord = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, speedrunRecordHud);
+            std::vector<std::uint8_t> speedrunRecordPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                speedrunRecordPixels.data());
+
             gdp::game::visual::HudRenderData pausedHud = functionalHud;
             pausedHud.paused = true;
             pausedHud.pauseSelection = gdp::game::visual::HudPauseSelection::RestartRun;
@@ -512,6 +522,7 @@ int main()
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
+            std::size_t speedrunRecordChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
@@ -602,6 +613,10 @@ int main()
                         != functionalHudPixels[index + channel]) {
                         ++runTimerChangedChannels;
                     }
+                    if (speedrunRecordPixels[index + channel]
+                        != runTimerPixels[index + channel]) {
+                        ++speedrunRecordChangedChannels;
+                    }
                     if (pauseMenuPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
                         ++pauseMenuChangedChannels;
@@ -680,6 +695,8 @@ int main()
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedRunTimer && runTimerChangedChannels > 50U
+                && renderedSpeedrunRecord
+                && speedrunRecordChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U

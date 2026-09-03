@@ -12,6 +12,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
 #include "gameplay/SettingsMenu.hpp"
+#include "gameplay/Speedrun.hpp"
 #include "gameplay/ViewMotion.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
@@ -73,6 +74,8 @@ private:
     void applyRuntimeSettings();
     void loadPersistedSettings();
     [[nodiscard]] bool savePersistedSettings();
+    void loadPersistedSpeedrunRecord();
+    [[nodiscard]] bool savePersistedSpeedrunRecord();
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
@@ -93,6 +96,10 @@ private:
     gameplay::ExitConfirmationState exitConfirmation_;
     gameplay::RuntimeSettings runtimeSettings_;
     std::optional<std::filesystem::path> settingsPath_;
+    std::optional<gameplay::SpeedrunRecord> speedrunRecord_;
+    gameplay::SpeedrunRecordResult latestSpeedrunRecordResult_{
+        gameplay::SpeedrunRecordResult::Ineligible};
+    std::optional<std::filesystem::path> speedrunRecordPath_;
     entities::EntityManager entities_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
@@ -115,6 +122,7 @@ private:
     bool fatalError_{false};
     bool settingsLoaded_{false};
     bool settingsDirty_{false};
+    bool speedrunRecordLoaded_{false};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
     std::uint64_t audioEventCounter_{0};

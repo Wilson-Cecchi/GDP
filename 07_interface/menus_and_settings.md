@@ -7,7 +7,8 @@
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 > A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado;
-> a Fase 75 tornou Speedrun selecionável.
+> a Fase 75 tornou Speedrun selecionável e a Fase 76 adicionou o melhor tempo
+> local ao HUD e ao resultado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -86,6 +87,12 @@ por isso permanece estável com qualquer FPS. Pausa e configurações congelam a
 contagem Standard, mas não interrompem Speedrun. Victory e Defeat preservam o
 tempo final visível, e a próxima run recomeça em zero. Runs acima de uma hora
 usam `HH:MM:SS.cc`.
+
+Quando existe um recorde local e o modo ativo é Speedrun, uma segunda linha
+`BEST MM:SS.cc` aparece sob o cronômetro e o título da janela repete esse valor.
+Victory mostra `NEW RECORD` no painel central somente quando o primeiro recorde
+foi criado ou o tempo anterior foi superado; resultados piores continuam
+mostrando `BEST`. A informação não aparece em Standard.
 
 ## Configurações runtime
 

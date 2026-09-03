@@ -280,6 +280,9 @@ struct HudRenderData {
     bool runTimerVisible{false};
     std::uint64_t elapsedRunTicks{0U};
     bool speedrunMode{false};
+    bool speedrunRecordVisible{false};
+    std::uint64_t bestSpeedrunTicks{0U};
+    bool newSpeedrunRecord{false};
     HudEventState event{HudEventState::None};
     bool eventLocked{false};
     HudPrompt prompt{HudPrompt::None};

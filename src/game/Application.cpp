@@ -9,6 +9,8 @@
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
+#include "gameplay/Speedrun.hpp"
+#include "persistence/SpeedrunRecordStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "platform/SdlInput.hpp"
 #include "game/visual/GdpRenderData.hpp"
@@ -437,6 +439,7 @@ bool Application::initialize()
     sdlInitialized_ = true;
 
     loadPersistedSettings();
+    loadPersistedSpeedrunRecord();
 
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
     (void)audio_->initialize(!config_.headless);
@@ -514,6 +517,7 @@ bool Application::initialize()
 
 bool Application::initializeRun()
 {
+    latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
     if (!generation.succeeded()) {
         log(LogLevel::Error, "World generation exhausted all deterministic attempts");
@@ -1409,6 +1413,69 @@ bool Application::savePersistedSettings()
     return true;
 }
 
+void Application::loadPersistedSpeedrunRecord()
+{
+    if (speedrunRecordLoaded_) {
+        return;
+    }
+    speedrunRecordLoaded_ = true;
+    if (config_.headless) {
+        return;
+    }
+
+    char* const preferenceDirectory = SDL_GetPrefPath("WKC", "GDP");
+    if (preferenceDirectory == nullptr) {
+        log(LogLevel::Warning,
+            sdlError("Speedrun record preference path unavailable"));
+        return;
+    }
+    speedrunRecordPath_
+        = std::filesystem::path{preferenceDirectory} / "speedrun_record.toml";
+    SDL_free(preferenceDirectory);
+
+    const persistence::SpeedrunRecordLoadResult loaded
+        = persistence::loadSpeedrunRecord(*speedrunRecordPath_);
+    speedrunRecord_ = loaded.record;
+    switch (loaded.status) {
+    case persistence::SpeedrunRecordLoadStatus::Loaded:
+        log(LogLevel::Info, "Local Speedrun record loaded from disk");
+        break;
+    case persistence::SpeedrunRecordLoadStatus::Missing:
+        log(LogLevel::Info, "No local Speedrun record found");
+        break;
+    case persistence::SpeedrunRecordLoadStatus::Invalid:
+        log(LogLevel::Warning, "Invalid Speedrun record file ignored");
+        break;
+    case persistence::SpeedrunRecordLoadStatus::UnsupportedVersion:
+        log(LogLevel::Warning, "Unsupported Speedrun record file ignored");
+        break;
+    case persistence::SpeedrunRecordLoadStatus::IncompatibleRules:
+        log(LogLevel::Info,
+            "Speedrun record belongs to an older rules version and was ignored");
+        break;
+    case persistence::SpeedrunRecordLoadStatus::IoError:
+        log(LogLevel::Warning, "Speedrun record could not be read");
+        break;
+    }
+}
+
+bool Application::savePersistedSpeedrunRecord()
+{
+    if (!speedrunRecord_ || !speedrunRecordPath_) {
+        log(LogLevel::Warning,
+            "Speedrun record has no writable preference path");
+        return false;
+    }
+    if (!persistence::saveSpeedrunRecord(
+            *speedrunRecordPath_, *speedrunRecord_)) {
+        log(LogLevel::Warning,
+            "Speedrun record could not be saved; previous file was preserved");
+        return false;
+    }
+    log(LogLevel::Info, "Local Speedrun record saved to disk");
+    return true;
+}
+
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
@@ -1894,6 +1961,16 @@ void Application::fixedUpdate(const double fixedStep)
         interactionPending_ = false;
         firePending_ = false;
         reloadPending_ = false;
+        latestSpeedrunRecordResult_ = gameplay::considerSpeedrunResult(
+            session_.state(), speedrunRecord_);
+        if (gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_)) {
+            std::ostringstream recordMessage;
+            recordMessage << "New local Speedrun record: "
+                          << visual::runTimeText(speedrunRecord_->bestTicks)
+                          << " | seed " << speedrunRecord_->seed;
+            log(LogLevel::Info, recordMessage.str());
+            (void)savePersistedSpeedrunRecord();
+        }
         std::ostringstream message;
         message << "Session result: "
                 << gameplay::sessionPhaseName(sessionUpdate.phase)
@@ -2145,6 +2222,13 @@ void Application::render()
     title << " | Score " << progress.score;
     title << " | Time "
           << visual::runTimeText(session_.state().elapsedRunTicks);
+    if (session_.state().mode == gameplay::RunMode::Speedrun
+        && speedrunRecord_) {
+        title << " | Best " << visual::runTimeText(speedrunRecord_->bestTicks);
+        if (gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_)) {
+            title << " [NEW RECORD]";
+        }
+    }
     title << " | Room " << playerRoom;
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
         title << " | VICTORY - ENTER: NEW RUN";
@@ -2341,6 +2425,11 @@ void Application::render()
     hud.runTimerVisible = true;
     hud.elapsedRunTicks = session_.state().elapsedRunTicks;
     hud.speedrunMode = session_.state().mode == gameplay::RunMode::Speedrun;
+    hud.speedrunRecordVisible = hud.speedrunMode && speedrunRecord_.has_value();
+    hud.bestSpeedrunTicks
+        = speedrunRecord_ ? speedrunRecord_->bestTicks : 0U;
+    hud.newSpeedrunRecord
+        = gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_);
     hud.experience = progress.experienceIntoLevel;
     hud.experienceForNextLevel = nextLevelXp;
     hud.damageFeedback = gameplay::damageFeedbackStrength(feedback_);

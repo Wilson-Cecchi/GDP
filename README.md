@@ -299,6 +299,9 @@ especializados das pastas numeradas.
 - **Fase 75 — Modo Speedrun selecionável:** `SPEEDRUN` inicia a mesma geração e
   simulação com identidade própria. Seu cronômetro continua durante pausa e
   configurações, congela apenas no resultado e o modo é preservado em retry.
+- **Fase 76 — Recorde pessoal de Speedrun:** vitórias válidas criam ou melhoram
+  o melhor tempo local. Tempo, seed e versão das regras são salvos com troca
+  atômica; HUD, resultado, título e logs exibem `BEST` ou `NEW RECORD`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -575,6 +578,14 @@ mundo. Standard congela seu tempo em pausa/configurações; Speedrun mantém o
 cronômetro avançando nesses menus para impedir vantagem pelo pause. Victory e
 Defeat congelam ambos, retry preserva o modo e voltar ao título permite escolher
 outro. HUD, título e logs identificam Speedrun explicitamente.
+
+Na Fase 76, uma vitória em Speedrun passou a ser comparada ao melhor tempo local.
+O primeiro resultado válido cria o recorde e apenas um tempo estritamente menor
+o substitui; Standard, Defeat, zero ticks e empates não alteram o dado. O arquivo
+`speedrun_record.toml`, separado das configurações, registra schema, versão das
+regras, ticks e seed por meio de temporário validado antes do rename. Recordes de
+regras incompatíveis são ignorados sem serem apagados. Durante Speedrun, o HUD e
+o título mostram `BEST`; o resultado destaca `NEW RECORD` quando aplicável.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

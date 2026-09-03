@@ -162,6 +162,7 @@ add_library(
     src/gameplay/RoomTraversal.cpp
     src/gameplay/Session.cpp
     src/gameplay/SettingsMenu.cpp
+    src/gameplay/Speedrun.cpp
     src/gameplay/ViewMotion.cpp
     src/gameplay/Weapon.cpp
 )
@@ -274,6 +275,7 @@ add_library(
     gdp_persistence
     STATIC
     src/persistence/SettingsStore.cpp
+    src/persistence/SpeedrunRecordStore.cpp
 )
 
 target_compile_features(gdp_persistence PUBLIC cxx_std_20)
@@ -486,6 +488,28 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME session_systems COMMAND gdp_session_tests)
     set_tests_properties(session_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_speedrun_tests tests/test_speedrun.cpp)
+    target_link_libraries(gdp_speedrun_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_speedrun_tests)
+    gdp_enable_sanitizers(gdp_speedrun_tests)
+
+    add_test(NAME speedrun_systems COMMAND gdp_speedrun_tests)
+    set_tests_properties(speedrun_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(
+        gdp_speedrun_record_store_tests
+        tests/test_speedrun_record_store.cpp
+    )
+    target_link_libraries(gdp_speedrun_record_store_tests PRIVATE gdp_persistence)
+    gdp_enable_warnings(gdp_speedrun_record_store_tests)
+    gdp_enable_sanitizers(gdp_speedrun_record_store_tests)
+
+    add_test(
+        NAME speedrun_record_persistence_systems
+        COMMAND gdp_speedrun_record_store_tests
+    )
+    set_tests_properties(speedrun_record_persistence_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_room_traversal_tests tests/test_room_traversal.cpp)
     target_link_libraries(gdp_room_traversal_tests PRIVATE gdp_gameplay gdp_world)

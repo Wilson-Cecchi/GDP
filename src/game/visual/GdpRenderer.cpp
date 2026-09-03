@@ -1934,6 +1934,15 @@ bool GdpRenderer::render(
             std::max(hudMargin,
                 height - hudMargin - (timerOffset * hudScale)),
             hudScale, timerText, textColor);
+        if (hud.speedrunMode && hud.speedrunRecordVisible) {
+            const std::string bestText
+                = "BEST " + runTimeText(hud.bestSpeedrunTicks);
+            const int bestWidth = bitmapTextWidth(bestText, hudScale);
+            drawBitmapText(std::max(hudMargin, width - bestWidth - hudMargin),
+                std::max(hudMargin,
+                    height - hudMargin - ((timerOffset + 10) * hudScale)),
+                hudScale, bestText, {0.94F, 0.78F, 0.18F});
+        }
     }
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {
@@ -1953,6 +1962,20 @@ bool GdpRenderer::render(
         drawBitmapText((width - bitmapTextWidth(result, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (24 * scale),
             2 * scale, result, resultColor);
+
+        if (hud.speedrunMode && hud.speedrunRecordVisible
+            && layout.panel.height >= 100 * scale) {
+            const std::string recordText
+                = (hud.newSpeedrunRecord ? "NEW RECORD " : "BEST ")
+                + runTimeText(hud.bestSpeedrunTicks);
+            const wkc::core::Vec3 recordColor = hud.newSpeedrunRecord
+                ? wkc::core::Vec3{0.98F, 0.78F, 0.16F}
+                : wkc::core::Vec3{0.64F, 0.78F, 0.82F};
+            drawBitmapText(
+                (width - bitmapTextWidth(recordText, scale)) / 2,
+                layout.panel.y + (78 * scale), scale,
+                recordText, recordColor);
+        }
 
         const std::array<std::string_view, 3> options{
             victory ? "NEW RUN" : "RETRY", "MAIN MENU", "EXIT GAME",

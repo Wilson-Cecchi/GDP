@@ -189,6 +189,12 @@ somente antes do primeiro tick, contagem durante menus no Speedrun, bloqueio de
 troca durante a run e preservação do modo no retry. O layout do título protege
 os quatro hit targets e seu espaçamento em resoluções ampla e compacta.
 
+O recorde pessoal possui regressão própria para elegibilidade, primeiro tempo,
+melhoria estrita, empate, resultado pior e isolamento por versão das regras. O
+store cobre ausência, round trip, substituição atômica, temporário, campos
+futuros, dado malformado, schema desconhecido e regras incompatíveis. A
+regressão OpenGL exige mudança de pixels quando `BEST` entra no HUD de Speedrun.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
