@@ -50,6 +50,9 @@ ResultMenuCommand activateResultMenuSelection(ResultMenuState& state) noexcept
     case ResultMenuOption::PlayAgain:
         closeResultMenu(state);
         return ResultMenuCommand::PlayAgain;
+    case ResultMenuOption::ReplaySeed:
+        closeResultMenu(state);
+        return ResultMenuCommand::ReplaySeed;
     case ResultMenuOption::MainMenu:
         closeResultMenu(state);
         return ResultMenuCommand::MainMenu;

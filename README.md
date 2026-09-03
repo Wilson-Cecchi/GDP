@@ -302,6 +302,9 @@ especializados das pastas numeradas.
 - **Fase 76 — Recorde pessoal de Speedrun:** vitórias válidas criam ou melhoram
   o melhor tempo local. Tempo, seed e versão das regras são salvos com troca
   atômica; HUD, resultado, título e logs exibem `BEST` ou `NEW RECORD`.
+- **Fase 77 — Repetição da mesma seed:** o resultado oferece `REPLAY SEED`
+  separado de `NEW RUN/NEXT SEED`, com teclado e mouse. `RESTART RUN` na pausa
+  também preserva o mapa, sem pular a próxima seed da sequência determinística.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -331,7 +334,8 @@ run; `W/S` ou setas navegam, `Enter` confirma, o mouse seleciona/clica e `Esc`
 retorna ao jogo. `EXIT GAME` encerra a aplicação pelo menu.
 
 Em Victory ou Defeat, a simulação congela e o menu de resultado oferece
-`NEW RUN/RETRY`, `MAIN MENU` e `EXIT GAME`; teclado e mouse usam a mesma navegação.
+`NEW RUN/NEXT SEED`, `REPLAY SEED`, `MAIN MENU` e `EXIT GAME`; teclado e mouse
+usam a mesma navegação.
 
 Na inicialização, uma seed gera um mundo navegável validado com START, BOSS,
 branches, loop controlado, salas e corredores. Cada sala recebe IDs de entidades
@@ -587,6 +591,13 @@ regras, ticks e seed por meio de temporário validado antes do rename. Recordes 
 regras incompatíveis são ignorados sem serem apagados. Durante Speedrun, o HUD e
 o título mostram `BEST`; o resultado destaca `NEW RECORD` quando aplicável.
 
+Na Fase 77, o menu de resultado passou a separar avanço e repetição. `NEW RUN`
+após Victory ou `NEXT SEED` após Defeat avança a sequência determinística;
+`REPLAY SEED` reinicia todo o runtime com a seed atual, permitindo repetir o
+mesmo mapa e comparar rotas. `SessionState` mantém `runIndex` para tentativas e
+`seedIndex` para a sequência de mundos, portanto uma repetição não pula a seed
+seguinte. Pela mesma coerência, `RESTART RUN` da pausa agora preserva a seed.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -674,17 +685,17 @@ foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
 gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
-responsivo com `START RUN`, `SETTINGS` e `EXIT GAME`; `W/S` ou setas mudam a
+responsivo com `START RUN`, `SPEEDRUN`, `SETTINGS` e `EXIT GAME`; `W/S` ou setas mudam a
 seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
 entidades, eventos, iluminação e materiais específicos só são preparados ao
 confirmar `START RUN`.
 
 O modo `--headless` ignora apenas essa espera interativa e inicia a run
 automaticamente para preservar os testes determinísticos. A regressão OpenGL
-verifica o overlay e suas três seleções; outra integração encerra ainda no menu
+verifica o overlay e suas quatro seleções; outra integração encerra ainda no menu
 e falha se encontrar o log de geração do mundo. O restart da pausa também marca
-a run atual como encerrada antes de derivar a próxima seed, evitando a rejeição
-de um reinício solicitado durante `Playing`.
+a run atual como encerrada antes de repetir a seed, evitando a rejeição de um
+reinício solicitado durante `Playing`.
 
 ## Gate obrigatório de aprovação visual
 

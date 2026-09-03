@@ -6,7 +6,8 @@
 > foram integrados na Fase 58; Weapon pickup, Special e persistência entre
 > execuções permanecem planejados. A base determinística do cronômetro de run
 > foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
-> e o recorde pessoal local foi integrado na Fase 76.
+> e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
+> repetição integral da mesma seed.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -86,10 +87,11 @@ Segredos são opcionais e nunca bloqueiam o caminho principal.
 
 `SessionSystem` é independente do loop visual. Ele recebe vida do jogador,
 papel da sala e status do Boss, mantém um estado terminal idempotente e expõe a
-seed da run. A ação `NEW RUN/RETRY`, confirmada por teclado ou mouse no menu de
-resultado, é o único comando que solicita reinício. O índice começa em zero;
-a primeira run preserva a seed fornecida e as seguintes usam
-`deriveSeed(initialSeed, SeedDomain::World, runIndex)`. O restart limpa mundo,
+seed da run. `NEW RUN/NEXT SEED` e `REPLAY SEED`, confirmados por teclado ou
+mouse no menu de resultado, solicitam reinício com políticas distintas.
+`runIndex` conta tentativas e `seedIndex` conta avanços na sequência; ambos
+começam em zero. A primeira seed preserva o valor fornecido e as seguintes usam
+`deriveSeed(initialSeed, SeedDomain::World, seedIndex)`. Todo restart limpa mundo,
 entidades, Player, Weapon, progressão, eventos, iluminação, áudio e renderer
 antes de inicializar a nova seed.
 Enquanto Playing, o título indica `REACH BOSS` ou `DEFEAT BOSS` conforme a sala
@@ -113,7 +115,7 @@ Na Fase 75, `SPEEDRUN` tornou-se uma opção própria no menu principal. Ele usa
 mesma seed, geração, combate e condição de vitória da run Standard, mas o timer
 continua avançando enquanto pausa, configurações ou a confirmação de saída
 congelam a simulação. Assim, menus não oferecem vantagem de tempo. O resultado
-terminal congela o valor; `RETRY/NEW RUN` preserva o modo e voltar ao título
+terminal congela o valor; qualquer reinício preserva o modo e voltar ao título
 permite selecionar Standard novamente.
 
 Na Fase 76, toda vitória válida em Speedrun é comparada a um recorde pessoal
@@ -128,6 +130,12 @@ do temporário. Um arquivo ausente inicia sem recorde; conteúdo inválido,
 incompatível ou de versão futura é ignorado com segurança. HUD e título mostram
 `BEST` durante Speedrun, e Victory destaca `NEW RECORD` quando o tempo acabou de
 ser criado ou melhorado. Ranking online continua planejado sobre esse contrato.
+
+Na Fase 77, `REPLAY SEED` passou a reconstruir integralmente a run com a seed
+atual. A tentativa avança, mas o índice da sequência de seeds não; ao escolher
+`NEW RUN/NEXT SEED` depois, o próximo mundo determinístico ainda é o sucessor
+imediato. Isso permite treinar e comparar uma rota sob o mesmo mapa. O comando
+`RESTART RUN` da pausa segue a mesma política de repetição.
 
 ## Dificuldade
 

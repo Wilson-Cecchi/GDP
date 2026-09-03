@@ -150,7 +150,7 @@ ResultMenuLayout makeResultMenuLayout(const int width, const int height) noexcep
     const int panelWidth = std::max(1,
         std::min(safeWidth - 16, 220 * scale));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 122 * scale));
+        std::min(safeHeight - 16, 162 * scale));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
@@ -160,15 +160,18 @@ ResultMenuLayout makeResultMenuLayout(const int width, const int height) noexcep
     const int buttonX = (safeWidth - buttonWidth) / 2;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
     const int playAgainY = std::clamp(
-        panelY + (54 * scale), panelY, maximumButtonY);
-    const int mainMenuY = std::clamp(
+        panelY + (78 * scale), panelY, maximumButtonY);
+    const int replaySeedY = std::clamp(
         playAgainY - (18 * scale), panelY, maximumButtonY);
-    const int exitY = std::clamp(
+    const int mainMenuY = std::clamp(
         playAgainY - (36 * scale), panelY, maximumButtonY);
+    const int exitY = std::clamp(
+        playAgainY - (54 * scale), panelY, maximumButtonY);
     return {
         scale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, playAgainY, buttonWidth, buttonHeight},
+        {buttonX, replaySeedY, buttonWidth, buttonHeight},
         {buttonX, mainMenuY, buttonWidth, buttonHeight},
         {buttonX, exitY, buttonWidth, buttonHeight},
     };
@@ -189,6 +192,9 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     const ResultMenuLayout layout = makeResultMenuLayout(width, height);
     if (layout.playAgainButton.contains(pixelX, pixelY)) {
         return HudResultMenuSelection::PlayAgain;
+    }
+    if (layout.replaySeedButton.contains(pixelX, pixelY)) {
+        return HudResultMenuSelection::ReplaySeed;
     }
     if (layout.mainMenuButton.contains(pixelX, pixelY)) {
         return HudResultMenuSelection::MainMenu;

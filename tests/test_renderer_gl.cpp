@@ -336,6 +336,16 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 hudPixels.data());
 
+            gdp::game::visual::HudRenderData resultReplayHud{
+                gdp::game::visual::ObjectiveRenderState::Victory};
+            resultReplayHud.resultMenuSelection
+                = gdp::game::visual::HudResultMenuSelection::ReplaySeed;
+            const bool renderedResultReplay = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, resultReplayHud);
+            std::vector<std::uint8_t> resultReplayPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                resultReplayPixels.data());
+
             gdp::game::visual::HudRenderData resultExitHud{
                 gdp::game::visual::ObjectiveRenderState::Victory};
             resultExitHud.resultMenuSelection
@@ -519,6 +529,7 @@ int main()
             std::size_t connectedRoomMaterialChangedChannels = 0;
             std::size_t cornerCyanPixels = 0;
             std::size_t hudChangedChannels = 0;
+            std::size_t resultReplayChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
@@ -604,6 +615,10 @@ int main()
                     if (resultExitPixels[index + channel]
                         != hudPixels[index + channel]) {
                         ++resultSelectionChangedChannels;
+                    }
+                    if (resultReplayPixels[index + channel]
+                        != hudPixels[index + channel]) {
+                        ++resultReplayChangedChannels;
                     }
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
@@ -692,6 +707,8 @@ int main()
                 && connectedRoomMaterialChangedChannels > 100U
                 && renderedCornerCorridor && cornerCyanPixels > 20U
                 && renderedHud && hudChangedChannels > 100U
+                && renderedResultReplay
+                && resultReplayChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedRunTimer && runTimerChangedChannels > 50U

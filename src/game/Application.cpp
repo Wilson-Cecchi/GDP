@@ -352,6 +352,7 @@ int Application::run()
     bool launchRunImmediately = config_.headless;
     do {
         restartRequested_ = false;
+        restartMode_ = gameplay::RunRestartMode::NextSeed;
         fatalError_ = false;
         renderedFrames_ = 0U;
         fixedUpdates_ = 0U;
@@ -415,7 +416,7 @@ int Application::run()
             return 1;
         }
         if (beginAnotherRun) {
-            const auto nextSeed = session_.restart();
+            const auto nextSeed = session_.restart(restartMode_);
             if (!nextSeed) {
                 log(LogLevel::Error, "Session rejected a requested restart");
                 return 1;
@@ -1006,6 +1007,9 @@ void Application::processEvents()
         }
         const auto resultOptionFor
             = [](const visual::HudResultMenuSelection selection) {
+                  if (selection == visual::HudResultMenuSelection::ReplaySeed) {
+                      return gameplay::ResultMenuOption::ReplaySeed;
+                  }
                   if (selection == visual::HudResultMenuSelection::MainMenu) {
                       return gameplay::ResultMenuOption::MainMenu;
                   }
@@ -1050,7 +1054,13 @@ void Application::processEvents()
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
         }
         if (command == gameplay::ResultMenuCommand::PlayAgain) {
-            log(LogLevel::Info, "Result menu requested another run");
+            log(LogLevel::Info, "Result menu requested the next seed");
+            restartMode_ = gameplay::RunRestartMode::NextSeed;
+            restartRequested_ = true;
+            running_ = false;
+        } else if (command == gameplay::ResultMenuCommand::ReplaySeed) {
+            log(LogLevel::Info, "Result menu requested the same seed replay");
+            restartMode_ = gameplay::RunRestartMode::SameSeed;
             restartRequested_ = true;
             running_ = false;
         } else if (command == gameplay::ResultMenuCommand::MainMenu) {
@@ -1151,9 +1161,10 @@ void Application::processEvents()
         if (command == gameplay::PauseMenuCommand::Resume) {
             setPaused(false);
         } else if (command == gameplay::PauseMenuCommand::RestartRun) {
-            log(LogLevel::Info, "Pause menu requested run restart");
+            log(LogLevel::Info, "Pause menu requested the same seed restart");
             (void)session_.update(
                 false, world::RoomRole::Count, false, false);
+            restartMode_ = gameplay::RunRestartMode::SameSeed;
             restartRequested_ = true;
             running_ = false;
         } else if (command == gameplay::PauseMenuCommand::Settings) {
@@ -1208,7 +1219,8 @@ bool Application::returnToMainMenu()
         (void)session_.update(
             false, world::RoomRole::Count, false, false);
     }
-    const std::optional<wkc::core::Seed> nextSeed = session_.restart();
+    const std::optional<wkc::core::Seed> nextSeed
+        = session_.restart(gameplay::RunRestartMode::NextSeed);
     if (!nextSeed) {
         log(LogLevel::Error, "Session rejected return to main menu");
         return false;
@@ -2231,9 +2243,9 @@ void Application::render()
     }
     title << " | Room " << playerRoom;
     if (session_.state().phase == gameplay::SessionPhase::Victory) {
-        title << " | VICTORY - ENTER: NEW RUN";
+        title << " | VICTORY";
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
-        title << " | DEFEAT - ENTER: RETRY";
+        title << " | DEFEAT";
     }
     const auto activeEvent = std::find_if(
         roomEvents_.begin(), roomEvents_.end(),
@@ -2456,7 +2468,9 @@ void Application::render()
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
         hud.pauseSelection = visual::HudPauseSelection::ExitGame;
     }
-    if (resultMenu_.selection == gameplay::ResultMenuOption::MainMenu) {
+    if (resultMenu_.selection == gameplay::ResultMenuOption::ReplaySeed) {
+        hud.resultMenuSelection = visual::HudResultMenuSelection::ReplaySeed;
+    } else if (resultMenu_.selection == gameplay::ResultMenuOption::MainMenu) {
         hud.resultMenuSelection = visual::HudResultMenuSelection::MainMenu;
     } else if (resultMenu_.selection == gameplay::ResultMenuOption::ExitGame) {
         hud.resultMenuSelection = visual::HudResultMenuSelection::ExitGame;

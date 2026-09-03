@@ -177,8 +177,8 @@ em coordenadas OpenGL; pontos externos não produzem seleção.
 
 O menu de resultado possui gate próprio para estado inativo, opção segura,
 wrap, seleção direta, comandos e reset. O teste CPU cobre `ResultMenuLayout` e
-seus três hit targets nas mesmas classes de resolução; a regressão OpenGL exige
-mudança de pixels ao alternar a seleção entre jogar novamente e sair.
+seus quatro hit targets nas mesmas classes de resolução; a regressão OpenGL
+exige mudança de pixels ao alternar entre próxima seed, repetição e saída.
 
 O timer de sessão é exercitado em ticks inteiros: 600 avanços equivalem a dez
 segundos, estado terminal congela o total e restart zera a próxima run. O teste
@@ -194,6 +194,12 @@ melhoria estrita, empate, resultado pior e isolamento por versão das regras. O
 store cobre ausência, round trip, substituição atômica, temporário, campos
 futuros, dado malformado, schema desconhecido e regras incompatíveis. A
 regressão OpenGL exige mudança de pixels quando `BEST` entra no HUD de Speedrun.
+
+O contrato de restart cobre as duas políticas: `SameSeed` incrementa somente a
+tentativa, enquanto `NextSeed` incrementa o índice da sequência e deriva o mundo
+seguinte. Repetir uma seed e depois avançar deve produzir exatamente
+`seedForRun(initialSeed, 1)`, sem saltos. O menu emite um comando dedicado para
+`REPLAY SEED`, incluindo navegação, seleção direta, mouse e pixels OpenGL.
 
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa

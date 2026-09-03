@@ -105,11 +105,39 @@ void testDefeatAndDeterministicRestart()
         "restart derives the same distinct second-run seed from the initial seed");
     expect(first.state().phase == gameplay::SessionPhase::Playing
             && first.state().runIndex == 1U
+            && first.state().seedIndex == 1U
             && !first.state().bossEngaged,
         "restart resets terminal gameplay state and advances the run index");
     expect(gameplay::seedForRun(first.state().initialSeed, 0U)
             == first.state().initialSeed,
         "run zero preserves the user-provided world seed");
+}
+
+void testSameSeedReplayPreservesDeterministicSequence()
+{
+    using namespace gdp;
+    gameplay::SessionSystem session{0x5245504C41595F31ULL};
+    const wkc::core::Seed originalSeed = session.state().currentSeed;
+    (void)session.update(false, world::RoomRole::Start, false, false);
+    expect(!session.restart(gameplay::RunRestartMode::Count),
+        "invalid restart modes are rejected without changing terminal state");
+
+    const auto replayedSeed
+        = session.restart(gameplay::RunRestartMode::SameSeed);
+    expect(replayedSeed && *replayedSeed == originalSeed
+            && session.state().runIndex == 1U
+            && session.state().seedIndex == 0U
+            && session.state().phase == gameplay::SessionPhase::Playing,
+        "same-seed replay resets gameplay while preserving the world seed");
+
+    (void)session.update(false, world::RoomRole::Start, false, false);
+    const auto nextSeed
+        = session.restart(gameplay::RunRestartMode::NextSeed);
+    expect(nextSeed
+            && *nextSeed == gameplay::seedForRun(originalSeed, 1U)
+            && session.state().runIndex == 2U
+            && session.state().seedIndex == 1U,
+        "replays do not skip the next seed in the deterministic sequence");
 }
 
 void testBossStatusUsesArchetypeAndRoomOwnership()
@@ -170,6 +198,7 @@ int main()
     testDeterministicRunTimer();
     testSpeedrunModeTimerRules();
     testDefeatAndDeterministicRestart();
+    testSameSeedReplayPreservesDeterministicSequence();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();
 

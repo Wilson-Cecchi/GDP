@@ -35,13 +35,17 @@ SessionUpdate SessionSystem::update(
     return update;
 }
 
-std::optional<wkc::core::Seed> SessionSystem::restart() noexcept
+std::optional<wkc::core::Seed> SessionSystem::restart(
+    const RunRestartMode mode) noexcept
 {
-    if (state_.phase == SessionPhase::Playing) {
+    if (state_.phase == SessionPhase::Playing || mode >= RunRestartMode::Count) {
         return std::nullopt;
     }
     ++state_.runIndex;
-    state_.currentSeed = seedForRun(state_.initialSeed, state_.runIndex);
+    if (mode == RunRestartMode::NextSeed) {
+        ++state_.seedIndex;
+        state_.currentSeed = seedForRun(state_.initialSeed, state_.seedIndex);
+    }
     state_.phase = SessionPhase::Playing;
     state_.bossEngaged = false;
     state_.elapsedRunTicks = 0U;

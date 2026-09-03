@@ -873,6 +873,13 @@ atômica validada, mantendo recordes fora de `RuntimeSettings`. A Application
 carrega o dado pelo diretório de preferências SDL, persiste somente mudanças e
 envia ao renderer um snapshot de `BEST/NEW RECORD`.
 
+Na Fase 77, `RunRestartMode` separou avanço (`NextSeed`) de repetição
+(`SameSeed`). `runIndex` conta tentativas e `seedIndex` avança somente quando um
+novo mundo é solicitado, mantendo a sequência estável após qualquer quantidade
+de replays. `ResultMenuState` emite um comando próprio para `REPLAY SEED`; a
+Application usa a mesma política no restart da pausa. Layout, hit test e desenho
+continuam no renderer concreto, sem levar fluxo do GDP para a WKC Forge.
+
 ---
 
 # 8. Sistema de seed

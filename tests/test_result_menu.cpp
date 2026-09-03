@@ -30,11 +30,14 @@ void testResultMenuNavigation()
     expect(state.active && state.selection == ResultMenuOption::PlayAgain,
         "opening result menu selects the safe Play Again option");
     moveResultMenuSelection(state, 1);
+    expect(state.selection == ResultMenuOption::ReplaySeed,
+        "down navigation selects same-seed replay");
+    moveResultMenuSelection(state, 8);
     expect(state.selection == ResultMenuOption::MainMenu,
-        "down navigation selects Main Menu");
+        "positive navigation advances by one deterministic step");
     moveResultMenuSelection(state, 8);
     expect(state.selection == ResultMenuOption::ExitGame,
-        "positive navigation wraps by one deterministic step");
+        "positive navigation reaches Exit Game by one deterministic step");
     moveResultMenuSelection(state, 1);
     expect(state.selection == ResultMenuOption::PlayAgain,
         "down navigation wraps from Exit Game to Play Again");
@@ -55,6 +58,12 @@ void testResultMenuCommands()
     expect(activateResultMenuSelection(state) == ResultMenuCommand::PlayAgain
             && state == ResultMenuState{},
         "Play Again closes and resets the result menu");
+
+    openResultMenu(state);
+    selectResultMenuOption(state, ResultMenuOption::ReplaySeed);
+    expect(activateResultMenuSelection(state) == ResultMenuCommand::ReplaySeed
+            && state == ResultMenuState{},
+        "Replay Seed emits a dedicated command and resets the result menu");
 
     openResultMenu(state);
     selectResultMenuOption(state, ResultMenuOption::MainMenu);

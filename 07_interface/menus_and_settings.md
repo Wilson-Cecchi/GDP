@@ -8,7 +8,7 @@
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 > A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado;
 > a Fase 75 tornou Speedrun selecionável e a Fase 76 adicionou o melhor tempo
-> local ao HUD e ao resultado.
+> local ao HUD e ao resultado. A Fase 77 separou próxima seed e repetição.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -43,8 +43,8 @@ Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
 avançam; a UI apenas converte a seleção em um comando para `Application`.
 O bus `UI` continua avançando para reproduzir `UiNavigate`, `UiConfirm` e
 `UiBack`, enquanto os cursores de Effects/Ambient permanecem congelados.
-`RESTART RUN` encerra explicitamente a sessão ativa antes de pedir a próxima
-seed, portanto o restart não é rejeitado por ainda estar em `Playing`.
+`RESTART RUN` encerra explicitamente a sessão ativa antes de repetir a seed
+atual, portanto o restart não é rejeitado por ainda estar em `Playing`.
 
 O desenho e o hit test usam o mesmo `PauseMenuLayout`. A posição lógica do
 ponteiro é convertida para as dimensões reais do framebuffer antes da consulta,
@@ -53,15 +53,15 @@ mantendo os botões alinhados em escalas high-DPI e após redimensionamento.
 ## Menu de resultado
 
 Victory e Defeat bloqueiam a simulação, alteram a iluminação da cena e abrem um
-menu sobre o viewport. A opção segura é `NEW RUN` após vitória ou `RETRY` após
-derrota; `MAIN MENU` retorna ao título e `EXIT GAME` encerra a aplicação. `W/S`,
-setas, `Enter`, hover e clique seguem o mesmo contrato dos demais menus, enquanto
-`Esc` abre a mesma confirmação segura de saída.
+menu sobre o viewport. A opção inicial é `NEW RUN` após vitória ou `NEXT SEED`
+após derrota; `REPLAY SEED` repete o mesmo mapa, `MAIN MENU` retorna ao título e
+`EXIT GAME` abre a confirmação segura. `W/S`, setas, `Enter`, hover e clique
+seguem o mesmo contrato dos demais menus, enquanto `Esc` abre a mesma confirmação.
 
 O mouse relativo é liberado na transição terminal. `ResultMenuLayout` é usado
-simultaneamente pelo renderer e pelo hit test high-DPI. Confirmar a primeira
-opção apenas solicita o reinício existente; `SessionSystem` continua sendo o
-dono da fase e da derivação da próxima seed.
+simultaneamente pelo renderer e pelo hit test high-DPI. Os comandos de próxima
+seed e repetição são distintos; `SessionSystem` continua sendo o dono da fase e
+dos índices de tentativa/seed.
 
 ## Retorno ao título
 

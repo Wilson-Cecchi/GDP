@@ -1964,7 +1964,7 @@ bool GdpRenderer::render(
             2 * scale, result, resultColor);
 
         if (hud.speedrunMode && hud.speedrunRecordVisible
-            && layout.panel.height >= 100 * scale) {
+            && layout.panel.height >= 140 * scale) {
             const std::string recordText
                 = (hud.newSpeedrunRecord ? "NEW RECORD " : "BEST ")
                 + runTimeText(hud.bestSpeedrunTicks);
@@ -1973,22 +1973,26 @@ bool GdpRenderer::render(
                 : wkc::core::Vec3{0.64F, 0.78F, 0.82F};
             drawBitmapText(
                 (width - bitmapTextWidth(recordText, scale)) / 2,
-                layout.panel.y + (78 * scale), scale,
+                layout.panel.y + (104 * scale), scale,
                 recordText, recordColor);
         }
 
-        const std::array<std::string_view, 3> options{
-            victory ? "NEW RUN" : "RETRY", "MAIN MENU", "EXIT GAME",
+        const std::array<std::string_view, 4> options{
+            victory ? "NEW RUN" : "NEXT SEED", "REPLAY SEED",
+            "MAIN MENU", "EXIT GAME",
         };
-        const std::array<UiRect, 3> buttons{
-            layout.playAgainButton, layout.mainMenuButton, layout.exitButton,
+        const std::array<UiRect, 4> buttons{
+            layout.playAgainButton, layout.replaySeedButton,
+            layout.mainMenuButton, layout.exitButton,
         };
         std::size_t selected = 0U;
-        if (hud.resultMenuSelection == HudResultMenuSelection::MainMenu) {
+        if (hud.resultMenuSelection == HudResultMenuSelection::ReplaySeed) {
             selected = 1U;
+        } else if (hud.resultMenuSelection == HudResultMenuSelection::MainMenu) {
+            selected = 2U;
         } else if (hud.resultMenuSelection
             == HudResultMenuSelection::ExitGame) {
-            selected = 2U;
+            selected = 3U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];

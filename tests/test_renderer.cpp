@@ -358,9 +358,18 @@ void testResultMenuLayout()
         "wide result menu panel stays within the framebuffer");
     expect(wide.panel.contains(
                wide.playAgainButton.x, wide.playAgainButton.y)
+            && wide.panel.contains(
+                wide.replaySeedButton.x, wide.replaySeedButton.y)
             && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
             && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "result menu hit targets stay inside the panel");
+    expect(wide.exitButton.y + wide.exitButton.height
+                <= wide.mainMenuButton.y
+            && wide.mainMenuButton.y + wide.mainMenuButton.height
+                <= wide.replaySeedButton.y
+            && wide.replaySeedButton.y + wide.replaySeedButton.height
+                <= wide.playAgainButton.y,
+        "all result menu hit targets remain visually separated");
 
     const auto pointerX = [](const UiRect& button) {
         return static_cast<float>(button.x + button.width / 2);
@@ -373,6 +382,10 @@ void testResultMenuLayout()
                pointerX(wide.playAgainButton), pointerY(wide.playAgainButton))
             == HudResultMenuSelection::PlayAgain,
         "top-origin pointer maps to Play Again");
+    expect(resultMenuSelectionAt(1280, 720,
+               pointerX(wide.replaySeedButton), pointerY(wide.replaySeedButton))
+            == HudResultMenuSelection::ReplaySeed,
+        "top-origin pointer maps to Replay Seed");
     expect(resultMenuSelectionAt(1280, 720,
                pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
             == HudResultMenuSelection::MainMenu,
@@ -395,6 +408,8 @@ void testResultMenuLayout()
     const ResultMenuLayout tiny = makeResultMenuLayout(12, 12);
     expect(tiny.panel.contains(
                tiny.playAgainButton.x, tiny.playAgainButton.y)
+            && tiny.panel.contains(
+                tiny.replaySeedButton.x, tiny.replaySeedButton.y)
             && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny result menu clamps all hit targets inside the framebuffer");

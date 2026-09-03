@@ -147,6 +147,7 @@ enum class HudMainMenuSelection : std::uint8_t {
 
 enum class HudResultMenuSelection : std::uint8_t {
     PlayAgain,
+    ReplaySeed,
     MainMenu,
     ExitGame,
 };
@@ -203,6 +204,7 @@ struct ResultMenuLayout {
     int scale{1};
     UiRect panel{};
     UiRect playAgainButton{};
+    UiRect replaySeedButton{};
     UiRect mainMenuButton{};
     UiRect exitButton{};
 };
