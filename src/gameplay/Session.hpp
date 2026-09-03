@@ -17,8 +17,15 @@ enum class SessionPhase : std::uint8_t {
     Defeat,
 };
 
+enum class RunMode : std::uint8_t {
+    Standard,
+    Speedrun,
+    Count,
+};
+
 struct SessionState {
     SessionPhase phase{SessionPhase::Playing};
+    RunMode mode{RunMode::Standard};
     wkc::core::Seed initialSeed{0};
     wkc::core::Seed currentSeed{0};
     std::uint32_t runIndex{0U};
@@ -49,7 +56,8 @@ public:
         bool bossExists,
         bool bossAlive) noexcept;
     [[nodiscard]] std::optional<wkc::core::Seed> restart() noexcept;
-    void advanceRunTimer() noexcept;
+    [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;
+    void advanceRunTimer(bool gameplayActive = true) noexcept;
     [[nodiscard]] const SessionState& state() const noexcept;
 
 private:
@@ -60,6 +68,7 @@ private:
     wkc::core::Seed initialSeed,
     std::uint32_t runIndex) noexcept;
 [[nodiscard]] const char* sessionPhaseName(SessionPhase phase) noexcept;
+[[nodiscard]] const char* runModeName(RunMode mode) noexcept;
 [[nodiscard]] BossStatus bossStatus(
     const gdp::entities::EntityManager& entities,
     gdp::world::RoomId roomId) noexcept;

@@ -7,8 +7,9 @@
 namespace gdp::gameplay {
 
 SessionSystem::SessionSystem(const wkc::core::Seed initialSeed) noexcept
-    : state_{SessionPhase::Playing, initialSeed, initialSeed, 0U, false}
 {
+    state_.initialSeed = initialSeed;
+    state_.currentSeed = initialSeed;
 }
 
 SessionUpdate SessionSystem::update(
@@ -47,9 +48,20 @@ std::optional<wkc::core::Seed> SessionSystem::restart() noexcept
     return state_.currentSeed;
 }
 
-void SessionSystem::advanceRunTimer() noexcept
+bool SessionSystem::selectRunMode(const RunMode mode) noexcept
+{
+    if (mode >= RunMode::Count || state_.phase != SessionPhase::Playing
+        || state_.elapsedRunTicks != 0U || state_.bossEngaged) {
+        return false;
+    }
+    state_.mode = mode;
+    return true;
+}
+
+void SessionSystem::advanceRunTimer(const bool gameplayActive) noexcept
 {
     if (state_.phase == SessionPhase::Playing
+        && (gameplayActive || state_.mode == RunMode::Speedrun)
         && state_.elapsedRunTicks < std::numeric_limits<std::uint64_t>::max()) {
         ++state_.elapsedRunTicks;
     }
@@ -80,6 +92,19 @@ const char* sessionPhaseName(const SessionPhase phase) noexcept
         return "Victory";
     case SessionPhase::Defeat:
         return "Defeat";
+    }
+    return "Unknown";
+}
+
+const char* runModeName(const RunMode mode) noexcept
+{
+    switch (mode) {
+    case RunMode::Standard:
+        return "Standard";
+    case RunMode::Speedrun:
+        return "Speedrun";
+    case RunMode::Count:
+        break;
     }
     return "Unknown";
 }

@@ -857,6 +857,14 @@ o resultado. O renderer recebe somente o snapshot numérico, formata e desenha o
 valor; relógio genérico, loop e fundações WKC Forge permanecem alheios às regras
 de Speedrun.
 
+Na Fase 75, `RunMode` passou a pertencer ao contrato concreto de `SessionSystem`.
+O menu principal emite comandos distintos para Standard e Speedrun; a
+Application escolhe o modo antes de gerar o mundo e entrega apenas um booleano
+de apresentação ao HUD. `advanceRunTimer(gameplayActive)` centraliza a única
+diferença funcional: Standard exige gameplay ativo, enquanto Speedrun também
+conta passos fixos durante menus de uma run existente. Nenhuma regra de modo foi
+movida para o loop ou renderer genéricos da WKC Forge.
+
 ---
 
 # 8. Sistema de seed

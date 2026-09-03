@@ -6,13 +6,15 @@
 > Fase 67, invert Y na Fase 68, fullscreen na Fase 69 e resolução na Fase 70.
 > Feedback sonoro de navegação, confirmação e retorno foi integrado na Fase 62.
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
-> A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado.
+> A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado;
+> a Fase 75 tornou Speedrun selecionável.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal funcional
 
-O bootstrap gráfico mostra `START RUN`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
+O bootstrap gráfico mostra `START RUN`, `SPEEDRUN`, `SETTINGS` e `EXIT GAME`
+antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
 sempre `START RUN`.
@@ -25,7 +27,9 @@ recursos gráficos da run e então captura o mouse. `EXIT GAME` fecha a aplicaç
 somente após confirmação, sem criar o mundo. `--headless` inicia diretamente
 porque não possui interação.
 
-Campanha, Speedrun e Ranking continuam como expansões futuras do mesmo estado.
+`START RUN` inicia o modo Standard; `SPEEDRUN` inicia a mesma seed e gameplay,
+mas mantém o cronômetro correndo durante pausa e configurações. Campanha e
+Ranking continuam como expansões futuras do mesmo estado.
 
 ## Pausa in-game
 
@@ -75,11 +79,13 @@ e cues; gamepad permanece como expansão futura.
 
 ## Cronômetro da run
 
-Durante uma run, o canto superior direito mostra `TIME MM:SS.cc`, abaixo do
+Durante uma run Standard, o canto superior direito mostra `TIME MM:SS.cc`; em
+Speedrun, mostra `SPEEDRUN MM:SS.cc`, sempre abaixo do
 objetivo. O valor vem dos ticks fixos da sessão e não do tempo de renderização;
 por isso permanece estável com qualquer FPS. Pausa e configurações congelam a
-contagem. Victory e Defeat preservam o tempo final visível, e a próxima run
-recomeça em zero. Runs acima de uma hora usam `HH:MM:SS.cc`.
+contagem Standard, mas não interrompem Speedrun. Victory e Defeat preservam o
+tempo final visível, e a próxima run recomeça em zero. Runs acima de uma hora
+usam `HH:MM:SS.cc`.
 
 ## Configurações runtime
 

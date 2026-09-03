@@ -1624,17 +1624,20 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (38 * scale),
             1, subtitle, {0.48F, 0.62F, 0.66F});
 
-        constexpr std::array<std::string_view, 3> options{
-            "START RUN", "SETTINGS", "EXIT GAME",
+        constexpr std::array<std::string_view, 4> options{
+            "START RUN", "SPEEDRUN", "SETTINGS", "EXIT GAME",
         };
-        const std::array<UiRect, 3> buttons{
-            layout.startButton, layout.settingsButton, layout.exitButton,
+        const std::array<UiRect, 4> buttons{
+            layout.startButton, layout.speedrunButton,
+            layout.settingsButton, layout.exitButton,
         };
         std::size_t selected = 0U;
-        if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
+        if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
             selected = 1U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
             selected = 2U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 3U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
@@ -1923,8 +1926,8 @@ bool GdpRenderer::render(
             hudScale, objectiveText, objectiveColor);
     }
     if (hud.visible && hud.runTimerVisible) {
-        const std::string timerText
-            = "TIME " + runTimeText(hud.elapsedRunTicks);
+        const std::string timerText = (hud.speedrunMode ? "SPEEDRUN " : "TIME ")
+            + runTimeText(hud.elapsedRunTicks);
         const int timerWidth = bitmapTextWidth(timerText, hudScale);
         const int timerOffset = objectiveText.empty() ? 7 : 17;
         drawBitmapText(std::max(hudMargin, width - timerWidth - hudMargin),

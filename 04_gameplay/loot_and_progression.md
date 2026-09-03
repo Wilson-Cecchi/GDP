@@ -5,7 +5,7 @@
 > implementados na Fase 13. O runtime de Armor e sua recompensa por Vitality
 > foram integrados na Fase 58; Weapon pickup, Special e persistência entre
 > execuções permanecem planejados. A base determinística do cronômetro de run
-> foi implementada na Fase 74.
+> foi implementada na Fase 74 e o modo Speedrun tornou-se selecionável na Fase 75.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -108,8 +108,14 @@ estado terminal. Título, HUD e log usam a mesma representação `MM:SS.cc` (ou
 `HH:MM:SS.cc` após uma hora). Pausa, configurações, menus e tempo de renderização
 não alteram o resultado; `restart()` zera o cronômetro junto da próxima run.
 
-O modo Speedrun selecionável e o ranking persistente continuam planejados sobre
-esse contrato.
+Na Fase 75, `SPEEDRUN` tornou-se uma opção própria no menu principal. Ele usa a
+mesma seed, geração, combate e condição de vitória da run Standard, mas o timer
+continua avançando enquanto pausa, configurações ou a confirmação de saída
+congelam a simulação. Assim, menus não oferecem vantagem de tempo. O resultado
+terminal congela o valor; `RETRY/NEW RUN` preserva o modo e voltar ao título
+permite selecionar Standard novamente.
+
+O ranking persistente continua planejado sobre esse contrato.
 
 ## Dificuldade
 

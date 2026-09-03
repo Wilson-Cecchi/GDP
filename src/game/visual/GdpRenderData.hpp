@@ -140,6 +140,7 @@ enum class HudPauseSelection : std::uint8_t {
 
 enum class HudMainMenuSelection : std::uint8_t {
     StartRun,
+    Speedrun,
     Settings,
     ExitGame,
 };
@@ -183,6 +184,7 @@ struct MainMenuLayout {
     int scale{1};
     UiRect panel{};
     UiRect startButton{};
+    UiRect speedrunButton{};
     UiRect settingsButton{};
     UiRect exitButton{};
 };
@@ -277,6 +279,7 @@ struct HudRenderData {
     std::uint32_t experienceForNextLevel{0};
     bool runTimerVisible{false};
     std::uint64_t elapsedRunTicks{0U};
+    bool speedrunMode{false};
     HudEventState event{HudEventState::None};
     bool eventLocked{false};
     HudPrompt prompt{HudPrompt::None};

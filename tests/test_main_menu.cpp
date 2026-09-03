@@ -25,11 +25,14 @@ void testMainMenuNavigation()
         "main menu starts on Start Run");
 
     moveMainMenuSelection(menu, 1);
+    expect(menu.selection == MainMenuOption::Speedrun,
+        "down selects Speedrun");
+    moveMainMenuSelection(menu, 4);
     expect(menu.selection == MainMenuOption::Settings,
-        "down selects Settings");
+        "navigation magnitude is normalized to one step");
     moveMainMenuSelection(menu, 4);
     expect(menu.selection == MainMenuOption::ExitGame,
-        "navigation magnitude is normalized to one step");
+        "down selects Exit Game after Settings");
     moveMainMenuSelection(menu, 1);
     expect(menu.selection == MainMenuOption::StartRun,
         "down wraps from Exit Game to Start Run");
@@ -58,6 +61,12 @@ void testMainMenuActivation()
     expect(activateMainMenuSelection(menu) == MainMenuCommand::ExitGame,
         "Exit Game emits its command");
     expect(menu.active, "Exit Game keeps menu visible until application exits");
+
+    selectMainMenuOption(menu, MainMenuOption::Speedrun);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::Speedrun
+            && !menu.active,
+        "Speedrun emits its dedicated command and closes the menu");
+    openMainMenu(menu);
 
     selectMainMenuOption(menu, MainMenuOption::StartRun);
     expect(activateMainMenuSelection(menu) == MainMenuCommand::StartRun,

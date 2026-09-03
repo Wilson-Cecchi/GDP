@@ -296,6 +296,9 @@ especializados das pastas numeradas.
 - **Fase 74 — Cronômetro determinístico de run:** o tempo avança nos passos
   fixos de 60 Hz, congela em menus, pausa e resultado e zera somente na próxima
   run. HUD, título e log terminal exibem o mesmo valor `MM:SS.cc`.
+- **Fase 75 — Modo Speedrun selecionável:** `SPEEDRUN` inicia a mesma geração e
+  simulação com identidade própria. Seu cronômetro continua durante pausa e
+  configurações, congela apenas no resultado e o modo é preservado em retry.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -564,6 +567,14 @@ congelado e `restart()` zera a nova run. O renderer formata os ticks de 60 Hz em
 `MM:SS.cc` ou `HH:MM:SS.cc`, exibindo o tempo no HUD enquanto Application usa o
 mesmo texto no título e no log terminal. Essa é a base determinística de
 Speedrun e ranking, ainda sem criar um modo separado.
+
+Na Fase 75, o título passou a oferecer `START RUN`, `SPEEDRUN`, `SETTINGS` e
+`EXIT GAME`. A primeira opção seleciona `Standard`; a segunda registra
+`RunMode::Speedrun` antes da geração, sem alterar seed, combate ou estrutura do
+mundo. Standard congela seu tempo em pausa/configurações; Speedrun mantém o
+cronômetro avançando nesses menus para impedir vantagem pelo pause. Victory e
+Defeat congelam ambos, retry preserva o modo e voltar ao título permite escolher
+outro. HUD, título e logs identificam Speedrun explicitamente.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

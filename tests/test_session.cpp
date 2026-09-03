@@ -21,6 +21,7 @@ void testBossVictoryRequiresARealEngagement()
     using namespace gdp;
     gameplay::SessionSystem session{12345U};
     expect(session.state().phase == gameplay::SessionPhase::Playing
+            && session.state().mode == gameplay::RunMode::Standard
             && session.state().currentSeed == 12345U
             && session.state().runIndex == 0U,
         "session begins in the first deterministic run");
@@ -45,6 +46,9 @@ void testDeterministicRunTimer()
 {
     using namespace gdp;
     gameplay::SessionSystem session{12345U};
+    session.advanceRunTimer(false);
+    expect(session.state().elapsedRunTicks == 0U,
+        "standard run timer ignores fixed steps while gameplay is paused");
     for (std::uint64_t tick = 0U;
          tick < gameplay::runTimerTicksPerSecond * 10U; ++tick) {
         session.advanceRunTimer();
@@ -58,6 +62,29 @@ void testDeterministicRunTimer()
         "terminal sessions freeze the elapsed run timer");
     expect(session.restart() && session.state().elapsedRunTicks == 0U,
         "starting the next deterministic run resets its timer");
+}
+
+void testSpeedrunModeTimerRules()
+{
+    using namespace gdp;
+    gameplay::SessionSystem session{98765U};
+    expect(session.selectRunMode(gameplay::RunMode::Speedrun)
+            && session.state().mode == gameplay::RunMode::Speedrun
+            && std::string_view{gameplay::runModeName(session.state().mode)}
+                == "Speedrun",
+        "Speedrun can be selected before its first active tick");
+    session.advanceRunTimer(false);
+    expect(session.state().elapsedRunTicks == 1U,
+        "Speedrun timer continues while gameplay menus freeze the simulation");
+    expect(!session.selectRunMode(gameplay::RunMode::Standard)
+            && !session.selectRunMode(gameplay::RunMode::Count),
+        "run mode cannot change after timing starts or to an invalid value");
+
+    (void)session.update(false, world::RoomRole::Start, false, false);
+    expect(session.restart()
+            && session.state().mode == gameplay::RunMode::Speedrun
+            && session.state().elapsedRunTicks == 0U,
+        "retry preserves Speedrun mode while resetting its timer");
 }
 
 void testDefeatAndDeterministicRestart()
@@ -141,6 +168,7 @@ int main()
 {
     testBossVictoryRequiresARealEngagement();
     testDeterministicRunTimer();
+    testSpeedrunModeTimerRules();
     testDefeatAndDeterministicRestart();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();

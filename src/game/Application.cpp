@@ -651,6 +651,8 @@ bool Application::initializeRun()
                  << world_->rooms.size() << " rooms and " << world_->corridors.size()
                  << " corridors and " << entities_.activeCount()
                  << " entities on attempt " << world_->acceptedAttempt;
+    worldSummary << " in " << gameplay::runModeName(session_.state().mode)
+                 << " mode";
     log(LogLevel::Info, worldSummary.str());
     if (config_.headless) {
         log(LogLevel::Info, "GDP initialized in headless mode with a validated world");
@@ -901,6 +903,9 @@ void Application::processEvents()
                   if (selection == visual::HudMainMenuSelection::Settings) {
                       return gameplay::MainMenuOption::Settings;
                   }
+                  if (selection == visual::HudMainMenuSelection::Speedrun) {
+                      return gameplay::MainMenuOption::Speedrun;
+                  }
                   return selection == visual::HudMainMenuSelection::ExitGame
                       ? gameplay::MainMenuOption::ExitGame
                       : gameplay::MainMenuOption::StartRun;
@@ -942,9 +947,16 @@ void Application::processEvents()
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
         }
 
-        if (command == gameplay::MainMenuCommand::StartRun) {
-            log(LogLevel::Info, "Main menu requested run start");
-            if (!initializeRun()) {
+        if (command == gameplay::MainMenuCommand::StartRun
+            || command == gameplay::MainMenuCommand::Speedrun) {
+            const gameplay::RunMode mode
+                = command == gameplay::MainMenuCommand::Speedrun
+                ? gameplay::RunMode::Speedrun
+                : gameplay::RunMode::Standard;
+            log(LogLevel::Info, command == gameplay::MainMenuCommand::Speedrun
+                    ? "Main menu requested Speedrun start"
+                    : "Main menu requested standard run start");
+            if (!session_.selectRunMode(mode) || !initializeRun()) {
                 fatalError_ = true;
                 running_ = false;
             }
@@ -1400,7 +1412,12 @@ bool Application::savePersistedSettings()
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
-    if (mainMenu_.active || pauseMenu_.paused || settingsMenu_.active) {
+    const bool gameplayActive
+        = !mainMenu_.active && !pauseMenu_.paused && !settingsMenu_.active;
+    if (world_) {
+        session_.advanceRunTimer(gameplayActive);
+    }
+    if (!gameplayActive) {
         if (audio_) {
             audio_->updateUi(step);
         }
@@ -1414,7 +1431,6 @@ void Application::fixedUpdate(const double fixedStep)
         ++fixedUpdates_;
         return;
     }
-    session_.advanceRunTimer();
     weapon_.fixedUpdate(step);
     entities::Entity* playerEntity = entities_.find(player_.entity());
     std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
@@ -1883,6 +1899,7 @@ void Application::fixedUpdate(const double fixedStep)
                 << gameplay::sessionPhaseName(sessionUpdate.phase)
                 << " | run " << session_.state().runIndex
                 << " | seed " << session_.state().currentSeed
+                << " | mode " << gameplay::runModeName(session_.state().mode)
                 << " | time "
                 << visual::runTimeText(session_.state().elapsedRunTicks);
         log(LogLevel::Info, message.str());
@@ -1996,6 +2013,8 @@ void Application::render()
         hud.mainMenu = true;
         if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
+        } else if (mainMenu_.selection == gameplay::MainMenuOption::Speedrun) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::Speedrun;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
         }
@@ -2110,6 +2129,7 @@ void Application::render()
     }
     std::ostringstream title;
     title << "GDP | Run " << (session_.state().runIndex + 1U)
+          << " | " << gameplay::runModeName(session_.state().mode)
           << " | HP " << static_cast<int>(player_.state().health)
           << " | Armor " << static_cast<int>(player_.state().armor)
           << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
@@ -2320,6 +2340,7 @@ void Application::render()
     hud.level = progress.level;
     hud.runTimerVisible = true;
     hud.elapsedRunTicks = session_.state().elapsedRunTicks;
+    hud.speedrunMode = session_.state().mode == gameplay::RunMode::Speedrun;
     hud.experience = progress.experienceIntoLevel;
     hud.experienceForNextLevel = nextLevelXp;
     hud.damageFeedback = gameplay::damageFeedbackStrength(feedback_);

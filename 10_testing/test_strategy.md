@@ -184,6 +184,10 @@ O timer de sessão é exercitado em ticks inteiros: 600 avanços equivalem a dez
 segundos, estado terminal congela o total e restart zera a próxima run. O teste
 de apresentação protege fronteiras de tick, segundo e hora; a regressão OpenGL
 compara o mesmo HUD com e sem `TIME`, impedindo que o dado deixe de ser exibido.
+O contrato de modo também exige Standard como default, seleção de Speedrun
+somente antes do primeiro tick, contagem durante menus no Speedrun, bloqueio de
+troca durante a run e preservação do modo no retry. O layout do título protege
+os quatro hit targets e seu espaçamento em resoluções ampla e compacta.
 
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
