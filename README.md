@@ -305,6 +305,9 @@ especializados das pastas numeradas.
 - **Fase 77 — Repetição da mesma seed:** o resultado oferece `REPLAY SEED`
   separado de `NEW RUN/NEXT SEED`, com teclado e mouse. `RESTART RUN` na pausa
   também preserva o mapa, sem pular a próxima seed da sequência determinística.
+- **Fase 78 — Desafio da melhor seed:** `BEST SEED` no título carrega a seed do
+  recorde local e inicia um Speedrun no mesmo mapa. Sem recorde, a opção fica
+  indisponível e não fecha o menu nem gera mundo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -598,6 +601,13 @@ mesmo mapa e comparar rotas. `SessionState` mantém `runIndex` para tentativas e
 `seedIndex` para a sequência de mundos, portanto uma repetição não pula a seed
 seguinte. Pela mesma coerência, `RESTART RUN` da pausa agora preserva a seed.
 
+Na Fase 78, o menu principal ganhou `BEST SEED`. Quando há recorde local, a
+opção mostra seu tempo, seleciona a seed registrada e inicia diretamente em
+Speedrun; isso permite retomar o desafio mesmo depois de fechar o jogo. Sem
+recorde, o botão exibe `BEST SEED --`, usa cor inativa e rejeita a confirmação
+sem fechar o menu ou gerar um mundo. A troca de seed só é aceita antes do
+primeiro tick, preservando o estado da run em andamento.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -685,14 +695,15 @@ foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
 gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
-responsivo com `START RUN`, `SPEEDRUN`, `SETTINGS` e `EXIT GAME`; `W/S` ou setas mudam a
+responsivo com `START RUN`, `SPEEDRUN`, `BEST SEED`, `SETTINGS` e `EXIT GAME`;
+`W/S` ou setas mudam a
 seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
 entidades, eventos, iluminação e materiais específicos só são preparados ao
 confirmar `START RUN`.
 
 O modo `--headless` ignora apenas essa espera interativa e inicia a run
 automaticamente para preservar os testes determinísticos. A regressão OpenGL
-verifica o overlay e suas quatro seleções; outra integração encerra ainda no menu
+verifica o overlay e suas cinco seleções; outra integração encerra ainda no menu
 e falha se encontrar o log de geração do mundo. O restart da pausa também marca
 a run atual como encerrada antes de repetir a seed, evitando a rejeição de um
 reinício solicitado durante `Playing`.

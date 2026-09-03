@@ -187,7 +187,7 @@ compara o mesmo HUD com e sem `TIME`, impedindo que o dado deixe de ser exibido.
 O contrato de modo também exige Standard como default, seleção de Speedrun
 somente antes do primeiro tick, contagem durante menus no Speedrun, bloqueio de
 troca durante a run e preservação do modo no retry. O layout do título protege
-os quatro hit targets e seu espaçamento em resoluções ampla e compacta.
+os cinco hit targets e seu espaçamento em resoluções ampla e compacta.
 
 O recorde pessoal possui regressão própria para elegibilidade, primeiro tempo,
 melhoria estrita, empate, resultado pior e isolamento por versão das regras. O
@@ -200,6 +200,11 @@ tentativa, enquanto `NextSeed` incrementa o índice da sequência e deriva o mun
 seguinte. Repetir uma seed e depois avançar deve produzir exatamente
 `seedForRun(initialSeed, 1)`, sem saltos. O menu emite um comando dedicado para
 `REPLAY SEED`, incluindo navegação, seleção direta, mouse e pixels OpenGL.
+
+O desafio do recorde exige que `selectRunSeed()` aceite a seed antes da
+contagem e rejeite alterações depois do primeiro tick. O menu mantém `BEST SEED`
+aberto para a Application validar disponibilidade; renderer e teste OpenGL
+diferenciam o estado indisponível do botão ativo com tempo persistido.
 
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa

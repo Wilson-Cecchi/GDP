@@ -73,12 +73,17 @@ void testSpeedrunModeTimerRules()
             && std::string_view{gameplay::runModeName(session.state().mode)}
                 == "Speedrun",
         "Speedrun can be selected before its first active tick");
+    expect(session.selectRunSeed(4321U)
+            && session.state().currentSeed == 4321U,
+        "a stored challenge seed can be selected before timing begins");
     session.advanceRunTimer(false);
     expect(session.state().elapsedRunTicks == 1U,
         "Speedrun timer continues while gameplay menus freeze the simulation");
     expect(!session.selectRunMode(gameplay::RunMode::Standard)
-            && !session.selectRunMode(gameplay::RunMode::Count),
-        "run mode cannot change after timing starts or to an invalid value");
+            && !session.selectRunMode(gameplay::RunMode::Count)
+            && !session.selectRunSeed(9999U)
+            && session.state().currentSeed == 4321U,
+        "mode and challenge seed cannot change after timing starts");
 
     (void)session.update(false, world::RoomRole::Start, false, false);
     expect(session.restart()

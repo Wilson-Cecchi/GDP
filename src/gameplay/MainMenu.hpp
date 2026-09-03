@@ -7,6 +7,7 @@ namespace gdp::gameplay {
 enum class MainMenuOption : std::uint8_t {
     StartRun,
     Speedrun,
+    BestSeed,
     Settings,
     ExitGame,
     Count,
@@ -16,6 +17,7 @@ enum class MainMenuCommand : std::uint8_t {
     None,
     StartRun,
     Speedrun,
+    BestSeed,
     Settings,
     ExitGame,
 };

@@ -28,6 +28,9 @@ void testMainMenuNavigation()
     expect(menu.selection == MainMenuOption::Speedrun,
         "down selects Speedrun");
     moveMainMenuSelection(menu, 4);
+    expect(menu.selection == MainMenuOption::BestSeed,
+        "navigation reaches the stored Best Seed challenge");
+    moveMainMenuSelection(menu, 4);
     expect(menu.selection == MainMenuOption::Settings,
         "navigation magnitude is normalized to one step");
     moveMainMenuSelection(menu, 4);
@@ -57,6 +60,10 @@ void testMainMenuActivation()
     expect(activateMainMenuSelection(menu) == MainMenuCommand::Settings
             && menu.active,
         "Settings emits its command without closing the main menu");
+    selectMainMenuOption(menu, MainMenuOption::BestSeed);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::BestSeed
+            && menu.active,
+        "Best Seed delegates availability to the application without closing");
     selectMainMenuOption(menu, MainMenuOption::ExitGame);
     expect(activateMainMenuSelection(menu) == MainMenuCommand::ExitGame,
         "Exit Game emits its command");

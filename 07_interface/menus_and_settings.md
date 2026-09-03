@@ -8,13 +8,14 @@
 > Na Fase 63, todos os menus funcionais possuem paridade entre teclado e mouse.
 > A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado;
 > a Fase 75 tornou Speedrun selecionável e a Fase 76 adicionou o melhor tempo
-> local ao HUD e ao resultado. A Fase 77 separou próxima seed e repetição.
+> local ao HUD e ao resultado. A Fase 77 separou próxima seed e repetição, e a
+> Fase 78 adicionou acesso direto à seed do recorde.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal funcional
 
-O bootstrap gráfico mostra `START RUN`, `SPEEDRUN`, `SETTINGS` e `EXIT GAME`
+O bootstrap gráfico mostra `START RUN`, `SPEEDRUN`, `BEST SEED`, `SETTINGS` e `EXIT GAME`
 antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
@@ -29,8 +30,10 @@ somente após confirmação, sem criar o mundo. `--headless` inicia diretamente
 porque não possui interação.
 
 `START RUN` inicia o modo Standard; `SPEEDRUN` inicia a mesma seed e gameplay,
-mas mantém o cronômetro correndo durante pausa e configurações. Campanha e
-Ranking continuam como expansões futuras do mesmo estado.
+mas mantém o cronômetro correndo durante pausa e configurações. `BEST SEED`
+mostra o tempo do recorde e inicia um Speedrun na seed correspondente. Sem
+recorde, mostra `--`, permanece visualmente inativo e não fecha o menu quando
+confirmado. Campanha e Ranking continuam como expansões futuras do mesmo estado.
 
 ## Pausa in-game
 

@@ -62,6 +62,16 @@ bool SessionSystem::selectRunMode(const RunMode mode) noexcept
     return true;
 }
 
+bool SessionSystem::selectRunSeed(const wkc::core::Seed seed) noexcept
+{
+    if (state_.phase != SessionPhase::Playing
+        || state_.elapsedRunTicks != 0U || state_.bossEngaged) {
+        return false;
+    }
+    state_.currentSeed = seed;
+    return true;
+}
+
 void SessionSystem::advanceRunTimer(const bool gameplayActive) noexcept
 {
     if (state_.phase == SessionPhase::Playing

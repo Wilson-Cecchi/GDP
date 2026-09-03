@@ -141,6 +141,7 @@ enum class HudPauseSelection : std::uint8_t {
 enum class HudMainMenuSelection : std::uint8_t {
     StartRun,
     Speedrun,
+    BestSeed,
     Settings,
     ExitGame,
 };
@@ -186,6 +187,7 @@ struct MainMenuLayout {
     UiRect panel{};
     UiRect startButton{};
     UiRect speedrunButton{};
+    UiRect bestSeedButton{};
     UiRect settingsButton{};
     UiRect exitButton{};
 };
@@ -297,6 +299,7 @@ struct HudRenderData {
     HudPauseSelection pauseSelection{HudPauseSelection::Resume};
     bool mainMenu{false};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
+    bool bestSeedAvailable{false};
     HudResultMenuSelection resultMenuSelection{HudResultMenuSelection::PlayAgain};
     bool exitConfirmation{false};
     HudExitConfirmationSelection exitConfirmationSelection{

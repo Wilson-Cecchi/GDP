@@ -50,6 +50,8 @@ MainMenuCommand activateMainMenuSelection(MainMenuState& state) noexcept
     case MainMenuOption::Speedrun:
         closeMainMenu(state);
         return MainMenuCommand::Speedrun;
+    case MainMenuOption::BestSeed:
+        return MainMenuCommand::BestSeed;
     case MainMenuOption::Settings:
         return MainMenuCommand::Settings;
     case MainMenuOption::ExitGame:

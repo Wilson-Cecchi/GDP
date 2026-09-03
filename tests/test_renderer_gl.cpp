@@ -420,6 +420,18 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuPixels.data());
 
+            gdp::game::visual::HudRenderData mainMenuBestSeedHud = mainMenuHud;
+            mainMenuBestSeedHud.mainMenuSelection
+                = gdp::game::visual::HudMainMenuSelection::BestSeed;
+            mainMenuBestSeedHud.bestSeedAvailable = true;
+            mainMenuBestSeedHud.bestSpeedrunTicks = 4'200U;
+            const bool renderedMainMenuBestSeed = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                mainMenuBestSeedHud);
+            std::vector<std::uint8_t> mainMenuBestSeedPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mainMenuBestSeedPixels.data());
+
             mainMenuHud.mainMenuSelection
                 = gdp::game::visual::HudMainMenuSelection::ExitGame;
             const bool renderedMainMenuExit = renderer.render(
@@ -536,6 +548,7 @@ int main()
             std::size_t speedrunRecordChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
+            std::size_t mainMenuBestSeedChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
             std::size_t exitConfirmationChangedChannels = 0;
             std::size_t exitConfirmationSelectionChangedChannels = 0;
@@ -639,6 +652,10 @@ int main()
                     if (mainMenuPixels[index + channel] != baseline[index + channel]) {
                         ++mainMenuChangedChannels;
                     }
+                    if (mainMenuBestSeedPixels[index + channel]
+                        != mainMenuPixels[index + channel]) {
+                        ++mainMenuBestSeedChangedChannels;
+                    }
                     if (mainMenuExitPixels[index + channel]
                         != mainMenuPixels[index + channel]) {
                         ++mainMenuSelectionChangedChannels;
@@ -716,6 +733,8 @@ int main()
                 && speedrunRecordChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
+                && renderedMainMenuBestSeed
+                && mainMenuBestSeedChangedChannels > 100U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U
                 && renderedExitConfirmation
                 && exitConfirmationChangedChannels > 500U

@@ -911,6 +911,9 @@ void Application::processEvents()
                   if (selection == visual::HudMainMenuSelection::Speedrun) {
                       return gameplay::MainMenuOption::Speedrun;
                   }
+                  if (selection == visual::HudMainMenuSelection::BestSeed) {
+                      return gameplay::MainMenuOption::BestSeed;
+                  }
                   return selection == visual::HudMainMenuSelection::ExitGame
                       ? gameplay::MainMenuOption::ExitGame
                       : gameplay::MainMenuOption::StartRun;
@@ -948,20 +951,45 @@ void Application::processEvents()
             command = gameplay::activateMainMenuSelection(mainMenu_);
         }
 
+        const bool unavailableBestSeed
+            = command == gameplay::MainMenuCommand::BestSeed
+            && !speedrunRecord_;
         if (command != gameplay::MainMenuCommand::None) {
-            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
+            playUiAudio(unavailableBestSeed
+                    ? gdp::audio::AudioEventKind::UiBack
+                    : gdp::audio::AudioEventKind::UiConfirm);
         }
 
         if (command == gameplay::MainMenuCommand::StartRun
-            || command == gameplay::MainMenuCommand::Speedrun) {
+            || command == gameplay::MainMenuCommand::Speedrun
+            || command == gameplay::MainMenuCommand::BestSeed) {
+            if (unavailableBestSeed) {
+                log(LogLevel::Info,
+                    "Best Seed requested without a local Speedrun record");
+                return;
+            }
             const gameplay::RunMode mode
                 = command == gameplay::MainMenuCommand::Speedrun
+                    || command == gameplay::MainMenuCommand::BestSeed
                 ? gameplay::RunMode::Speedrun
                 : gameplay::RunMode::Standard;
-            log(LogLevel::Info, command == gameplay::MainMenuCommand::Speedrun
-                    ? "Main menu requested Speedrun start"
-                    : "Main menu requested standard run start");
-            if (!session_.selectRunMode(mode) || !initializeRun()) {
+            bool selectionAccepted = session_.selectRunMode(mode);
+            if (command == gameplay::MainMenuCommand::BestSeed) {
+                selectionAccepted = selectionAccepted
+                    && session_.selectRunSeed(speedrunRecord_->seed);
+                if (selectionAccepted) {
+                    config_.worldSeed = speedrunRecord_->seed;
+                    gameplay::closeMainMenu(mainMenu_);
+                }
+            }
+            if (command == gameplay::MainMenuCommand::BestSeed) {
+                log(LogLevel::Info, "Main menu requested Best Seed challenge");
+            } else {
+                log(LogLevel::Info, command == gameplay::MainMenuCommand::Speedrun
+                        ? "Main menu requested Speedrun start"
+                        : "Main menu requested standard run start");
+            }
+            if (!selectionAccepted || !initializeRun()) {
                 fatalError_ = true;
                 running_ = false;
             }
@@ -2104,9 +2132,14 @@ void Application::render()
             hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::Speedrun) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Speedrun;
+        } else if (mainMenu_.selection == gameplay::MainMenuOption::BestSeed) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::BestSeed;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
         }
+        hud.bestSeedAvailable = speedrunRecord_.has_value();
+        hud.bestSpeedrunTicks
+            = speedrunRecord_ ? speedrunRecord_->bestTicks : 0U;
         hud.exitConfirmation = exitConfirmation_.active;
         if (exitConfirmation_.selection
             == gameplay::ExitConfirmationOption::ExitGame) {

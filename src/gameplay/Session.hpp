@@ -65,6 +65,7 @@ public:
     [[nodiscard]] std::optional<wkc::core::Seed> restart(
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;
+    [[nodiscard]] bool selectRunSeed(wkc::core::Seed seed) noexcept;
     void advanceRunTimer(bool gameplayActive = true) noexcept;
     [[nodiscard]] const SessionState& state() const noexcept;
 

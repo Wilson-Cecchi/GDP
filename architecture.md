@@ -880,6 +880,13 @@ de replays. `ResultMenuState` emite um comando próprio para `REPLAY SEED`; a
 Application usa a mesma política no restart da pausa. Layout, hit test e desenho
 continuam no renderer concreto, sem levar fluxo do GDP para a WKC Forge.
 
+Na Fase 78, `SessionSystem::selectRunSeed` passou a permitir uma seed de desafio
+somente antes do início da simulação. `MainMenuState` emite `BestSeed` sem fechar
+o menu; a Application consulta o recorde persistido, rejeita ausência sem gerar
+mundo ou, quando disponível, combina a seed gravada com `RunMode::Speedrun`.
+`HudRenderData` transporta apenas disponibilidade e tempo para o renderer
+concreto desenhar os estados ativo/inativo.
+
 ---
 
 # 8. Sistema de seed

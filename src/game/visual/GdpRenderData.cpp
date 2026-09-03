@@ -18,28 +18,31 @@ MainMenuLayout makeMainMenuLayout(const int width, const int height) noexcept
     const int safeWidth = std::max(width, 1);
     const int safeHeight = std::max(height, 1);
     const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
-    const int panelWidth = std::max(1, std::min(safeWidth - 16, 210 * scale));
-    const int panelHeight = std::max(1, std::min(safeHeight - 16, 162 * scale));
+    const int panelWidth = std::max(1, std::min(safeWidth - 16, 240 * scale));
+    const int panelHeight = std::max(1, std::min(safeHeight - 16, 182 * scale));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
-        std::min(panelWidth - (20 * scale), 112 * scale));
+        std::min(panelWidth - (20 * scale), 180 * scale));
     const int buttonHeight = std::max(1, std::min(13 * scale, panelHeight));
     const int buttonX = (safeWidth - buttonWidth) / 2;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
     const int startY = std::clamp(
-        panelY + (78 * scale), panelY, maximumButtonY);
+        panelY + (98 * scale), panelY, maximumButtonY);
     const int speedrunY = std::clamp(
         startY - (20 * scale), panelY, maximumButtonY);
-    const int settingsY = std::clamp(
+    const int bestSeedY = std::clamp(
         startY - (40 * scale), panelY, maximumButtonY);
-    const int exitY = std::clamp(
+    const int settingsY = std::clamp(
         startY - (60 * scale), panelY, maximumButtonY);
+    const int exitY = std::clamp(
+        startY - (80 * scale), panelY, maximumButtonY);
     return {
         scale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, startY, buttonWidth, buttonHeight},
         {buttonX, speedrunY, buttonWidth, buttonHeight},
+        {buttonX, bestSeedY, buttonWidth, buttonHeight},
         {buttonX, settingsY, buttonWidth, buttonHeight},
         {buttonX, exitY, buttonWidth, buttonHeight},
     };
@@ -63,6 +66,9 @@ std::optional<HudMainMenuSelection> mainMenuSelectionAt(
     }
     if (layout.speedrunButton.contains(pixelX, pixelY)) {
         return HudMainMenuSelection::Speedrun;
+    }
+    if (layout.bestSeedButton.contains(pixelX, pixelY)) {
+        return HudMainMenuSelection::BestSeed;
     }
     if (layout.settingsButton.contains(pixelX, pixelY)) {
         return HudMainMenuSelection::Settings;

@@ -1624,20 +1624,25 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (38 * scale),
             1, subtitle, {0.48F, 0.62F, 0.66F});
 
-        constexpr std::array<std::string_view, 4> options{
-            "START RUN", "SPEEDRUN", "SETTINGS", "EXIT GAME",
+        const std::string bestSeedText = hud.bestSeedAvailable
+            ? "BEST SEED " + runTimeText(hud.bestSpeedrunTicks)
+            : "BEST SEED --";
+        const std::array<std::string_view, 5> options{
+            "START RUN", "SPEEDRUN", bestSeedText, "SETTINGS", "EXIT GAME",
         };
-        const std::array<UiRect, 4> buttons{
+        const std::array<UiRect, 5> buttons{
             layout.startButton, layout.speedrunButton,
-            layout.settingsButton, layout.exitButton,
+            layout.bestSeedButton, layout.settingsButton, layout.exitButton,
         };
         std::size_t selected = 0U;
         if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
             selected = 1U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::BestSeed) {
             selected = 2U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
             selected = 3U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 4U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
@@ -1650,7 +1655,9 @@ bool GdpRenderer::render(
             const int textWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - textWidth) / 2,
                 button.y + (3 * scale), scale, options[index],
-                index == selected ? cyanColor : textColor);
+                index == 2U && !hud.bestSeedAvailable
+                    ? wkc::core::Vec3{0.30F, 0.38F, 0.40F}
+                    : index == selected ? cyanColor : textColor);
         }
 
         const std::string_view controls = width >= 480

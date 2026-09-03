@@ -7,7 +7,7 @@
 > execuções permanecem planejados. A base determinística do cronômetro de run
 > foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
 > e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
-> repetição integral da mesma seed.
+> repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -136,6 +136,12 @@ atual. A tentativa avança, mas o índice da sequência de seeds não; ao escolh
 `NEW RUN/NEXT SEED` depois, o próximo mundo determinístico ainda é o sucessor
 imediato. Isso permite treinar e comparar uma rota sob o mesmo mapa. O comando
 `RESTART RUN` da pausa segue a mesma política de repetição.
+
+Na Fase 78, `BEST SEED` usa a seed guardada no recorde para iniciar um novo
+Speedrun diretamente pelo título. `SessionSystem::selectRunSeed()` só aceita a
+troca antes do primeiro tick e não altera a seed inicial nem o índice da
+sequência; assim, `REPLAY SEED` repete o desafio e `NEXT SEED` continua capaz de
+retomar a progressão determinística normal.
 
 ## Dificuldade
 

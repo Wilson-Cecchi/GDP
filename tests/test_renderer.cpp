@@ -146,6 +146,8 @@ void testMainMenuLayout()
         "Start Run button is inside the menu panel");
     expect(wide.panel.contains(wide.speedrunButton.x, wide.speedrunButton.y),
         "Speedrun button is inside the menu panel");
+    expect(wide.panel.contains(wide.bestSeedButton.x, wide.bestSeedButton.y),
+        "Best Seed button is inside the menu panel");
     expect(wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y),
         "Settings button is inside the menu panel");
     expect(wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
@@ -154,10 +156,12 @@ void testMainMenuLayout()
             && wide.exitButton.y + wide.exitButton.height
                 <= wide.settingsButton.y
             && wide.settingsButton.y + wide.settingsButton.height
+                <= wide.bestSeedButton.y
+            && wide.bestSeedButton.y + wide.bestSeedButton.height
                 <= wide.speedrunButton.y
             && wide.speedrunButton.y + wide.speedrunButton.height
                 <= wide.startButton.y,
-        "four main-menu buttons remain separated from controls and each other");
+        "five main-menu buttons remain separated from controls and each other");
 
     const float startX = static_cast<float>(wide.startButton.x + wide.startButton.width / 2);
     const float startY = static_cast<float>(
@@ -175,6 +179,13 @@ void testMainMenuLayout()
     expect(mainMenuSelectionAt(1280, 720, speedrunX, speedrunY)
             == HudMainMenuSelection::Speedrun,
         "top-origin pointer maps to Speedrun");
+    const float bestSeedX = static_cast<float>(
+        wide.bestSeedButton.x + wide.bestSeedButton.width / 2);
+    const float bestSeedY = static_cast<float>(
+        720 - 1 - (wide.bestSeedButton.y + wide.bestSeedButton.height / 2));
+    expect(mainMenuSelectionAt(1280, 720, bestSeedX, bestSeedY)
+            == HudMainMenuSelection::BestSeed,
+        "top-origin pointer maps to Best Seed");
     const float settingsX = static_cast<float>(
         wide.settingsButton.x + wide.settingsButton.width / 2);
     const float settingsY = static_cast<float>(
@@ -199,6 +210,8 @@ void testMainMenuLayout()
     expect(tiny.panel.contains(tiny.startButton.x, tiny.startButton.y)
             && tiny.panel.contains(
                 tiny.speedrunButton.x, tiny.speedrunButton.y)
+            && tiny.panel.contains(
+                tiny.bestSeedButton.x, tiny.bestSeedButton.y)
             && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny menu clamps all hit targets inside the framebuffer");
