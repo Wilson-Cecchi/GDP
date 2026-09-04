@@ -3,6 +3,7 @@
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Campaign.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Feedback.hpp"
 #include "gameplay/Footstep.hpp"
@@ -70,6 +71,7 @@ private:
     void render();
     void shutdown();
     void setPaused(bool paused);
+    [[nodiscard]] bool stageCampaignFloorReplay();
     [[nodiscard]] bool returnToMainMenu();
     void applyRuntimeSettings();
     void loadPersistedSettings();
@@ -85,6 +87,8 @@ private:
     gameplay::Player player_;
     gameplay::Weapon weapon_;
     gameplay::ProgressionSystem progression_;
+    std::optional<gameplay::CampaignCarryover> campaignCarryover_;
+    std::optional<gameplay::CampaignCarryover> campaignFloorEntry_;
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
     gameplay::FootstepState footsteps_;

@@ -225,6 +225,28 @@ bool Player::increaseMaximumArmor(
     return true;
 }
 
+bool Player::restoreCampaignProgress(
+    const PlayerCampaignProgress& progress) noexcept
+{
+    if (!std::isfinite(progress.health)
+        || !std::isfinite(progress.maximumHealth)
+        || !std::isfinite(progress.armor)
+        || !std::isfinite(progress.maximumArmor)
+        || progress.health <= 0.0F || progress.maximumHealth <= 0.0F
+        || progress.health > progress.maximumHealth
+        || progress.armor < 0.0F || progress.maximumArmor < 0.0F
+        || progress.armor > progress.maximumArmor) {
+        return false;
+    }
+    state_.health = progress.health;
+    state_.maximumHealth = progress.maximumHealth;
+    state_.armor = progress.armor;
+    state_.maximumArmor = progress.maximumArmor;
+    state_.keys = progress.keys;
+    state_.alive = true;
+    return true;
+}
+
 const PlayerState& Player::state() const noexcept
 {
     return state_;

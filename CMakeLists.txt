@@ -144,6 +144,7 @@ gdp_enable_sanitizers(gdp_audio)
 add_library(
     gdp_gameplay
     STATIC
+    src/gameplay/Campaign.cpp
     src/gameplay/Collision.cpp
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
@@ -480,6 +481,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME progression_systems COMMAND gdp_progression_tests)
     set_tests_properties(progression_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_campaign_tests tests/test_campaign.cpp)
+    target_link_libraries(gdp_campaign_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_campaign_tests)
+    gdp_enable_sanitizers(gdp_campaign_tests)
+
+    add_test(NAME campaign_systems COMMAND gdp_campaign_tests)
+    set_tests_properties(campaign_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_session_tests tests/test_session.cpp)
     target_link_libraries(gdp_session_tests PRIVATE gdp_gameplay gdp_world)

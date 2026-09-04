@@ -212,6 +212,13 @@ além do limite. Replay preserva andar/seed e nova campanha retorna ao primeiro
 andar. Layout e hit test incluem a sexta opção do título; a regressão OpenGL
 diferencia seleção de `CAMPAIGN`, timer `FLOOR n/3` e resultado `FLOOR CLEAR`.
 
+O carry-over da Campanha possui gate próprio para round trip de HP, Armor,
+capacidades, chaves, upgrades, munição, nível, XP e score. O mesmo teste exige
+que o spawn do novo andar permaneça intacto e o cooldown seja zerado. Casos com
+NaN, munição acima da capacidade ou ranks inconsistentes são rejeitados antes
+de alterar os sistemas de destino. Restaurar novamente o snapshot de entrada
+também deve desfazer dano e munição gastos durante uma tentativa repetida.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

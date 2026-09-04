@@ -149,6 +149,16 @@ const ProgressionState& ProgressionSystem::state() const noexcept
     return state_;
 }
 
+bool ProgressionSystem::restoreCampaignProgress(
+    const ProgressionState& savedState) noexcept
+{
+    if (!validateProgressionState(savedState)) {
+        return false;
+    }
+    state_ = savedState;
+    return true;
+}
+
 void ProgressionSystem::reset() noexcept
 {
     state_ = {};

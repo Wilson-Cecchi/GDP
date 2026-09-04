@@ -970,6 +970,16 @@ expõe modo, andar, limite e disponibilidade para o renderer concreto. O
 carry-over de Player, Weapon e Progression permanece fora desta fundação e será
 adicionado por snapshot explícito em uma etapa própria.
 
+Na Fase 80, `CampaignCarryover` passou a ser esse snapshot explícito. Gameplay
+captura somente estado permanente de Player, Weapon e Progression, valida o
+conjunto integralmente e o restaura após o spawn do próximo andar. Transform,
+velocidade, entidade vinculada, cooldown, feedback e recursos de mundo não são
+transportados. A Application mantém o snapshot apenas entre a confirmação de
+`NEXT FLOOR` e `initializeRun`. Um segundo snapshot registra a entrada do andar
+e alimenta replay/restart, preservando ganhos anteriores sem conservar gastos da
+tentativa. Título e outros modos limpam ambos. A solução permanece concreta do
+GDP e não adiciona persistência ou conceitos de Campanha à WKC Forge.
+
 ---
 
 # 8. Sistema de seed

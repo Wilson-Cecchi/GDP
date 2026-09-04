@@ -11,6 +11,7 @@
 > local ao HUD e ao resultado. A Fase 77 separou próxima seed e repetição, e a
 > Fase 78 adicionou acesso direto à seed do recorde. A Fase 79 integrou a
 > Campanha de três andares ao título, HUD e resultado.
+> A Fase 80 passou a preservar recursos e progressão em `NEXT FLOOR`.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -37,6 +38,9 @@ recorde, mostra `--`, permanece visualmente inativo e não fecha o menu quando
 confirmado. `CAMPAIGN` inicia três andares determinísticos: o HUD identifica
 `FLOOR n/3`, os resultados intermediários oferecem `NEXT FLOOR` e o último
 mostra `CAMPAIGN CLEAR`. Ranking continua como expansão futura do mesmo estado.
+Ao avançar, os valores já apresentados de HP, Armor, munição, nível e XP são
+restaurados no novo andar; posição e estados transitórios pertencem ao novo
+mundo.
 
 ## Pausa in-game
 
@@ -50,7 +54,8 @@ avançam; a UI apenas converte a seleção em um comando para `Application`.
 O bus `UI` continua avançando para reproduzir `UiNavigate`, `UiConfirm` e
 `UiBack`, enquanto os cursores de Effects/Ambient permanecem congelados.
 `RESTART RUN` encerra explicitamente a sessão ativa antes de repetir a seed
-atual, portanto o restart não é rejeitado por ainda estar em `Playing`.
+atual, portanto o restart não é rejeitado por ainda estar em `Playing`. Em
+Campaign, ele também restaura o snapshot da entrada do andar.
 
 O desenho e o hit test usam o mesmo `PauseMenuLayout`. A posição lógica do
 ponteiro é convertida para as dimensões reais do framebuffer antes da consulta,
@@ -63,6 +68,9 @@ menu sobre o viewport. A opção inicial é `NEW RUN` após vitória ou `NEXT SE
 após derrota; `REPLAY SEED` repete o mesmo mapa, `MAIN MENU` retorna ao título e
 `EXIT GAME` abre a confirmação segura. `W/S`, setas, `Enter`, hover e clique
 seguem o mesmo contrato dos demais menus, enquanto `Esc` abre a mesma confirmação.
+Na Campaign, uma vitória antes do terceiro andar troca a ação inicial por
+`NEXT FLOOR` e a repetição por `REPLAY FLOOR`; replay restaura os recursos com
+que o jogador entrou naquele andar.
 
 O mouse relativo é liberado na transição terminal. `ResultMenuLayout` é usado
 simultaneamente pelo renderer e pelo hit test high-DPI. Os comandos de próxima

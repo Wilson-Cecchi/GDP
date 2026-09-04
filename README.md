@@ -311,6 +311,10 @@ especializados das pastas numeradas.
 - **Fase 79 — Fundação jogável da Campanha:** `CAMPAIGN` encadeia três andares
   determinísticos. Os dois primeiros bosses liberam `NEXT FLOOR`; o terceiro
   encerra em `CAMPAIGN CLEAR`, com andar visível no HUD e no título.
+- **Fase 80 — Carry-over da Campanha:** a passagem por `NEXT FLOOR` preserva
+  HP, Armor, capacidades, chaves, upgrades, munição, nível, XP, score e
+  contadores. Replay/restart restaura a entrada do andar; spawn, cooldowns e
+  vínculos do mundo anterior são reiniciados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -618,6 +622,16 @@ avanço após Defeat ou além do terceiro andar. O HUD mostra `FLOOR n/3` junto 
 tempo e a vitória final usa `CAMPAIGN CLEAR`. Nesta fundação, cada andar começa
 com recursos básicos; o transporte de atributos, munição e progressão será um
 incremento próprio, com snapshot e regressão de fronteira entre andares.
+
+Na Fase 80, essa fronteira ganhou `CampaignCarryover`. O snapshot é criado
+somente ao confirmar `NEXT FLOOR` e transporta saúde/armadura atuais e máximas,
+chaves, definição e munição da arma, além do estado integral de progressão.
+Antes da restauração, capacidades, valores finitos, vida, munição e ranks são
+validados em conjunto. O novo andar mantém seu próprio spawn e entidades;
+velocidade, cooldown da arma, feedback e handles antigos são descartados.
+Cada entrada de andar cria ainda uma base própria: `REPLAY FLOOR` e o restart da
+pausa restauram essa base, descartando apenas dano e munição gastos na tentativa.
+Voltar ao título ou começar outro modo elimina ambos os snapshots.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

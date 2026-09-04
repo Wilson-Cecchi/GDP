@@ -80,6 +80,26 @@ bool Weapon::increaseReserveCapacity(
     return true;
 }
 
+bool Weapon::restoreCampaignProgress(
+    const WeaponCampaignProgress& progress) noexcept
+{
+    const WeaponDefinition& definition = progress.definition;
+    if (!std::isfinite(definition.damage)
+        || !std::isfinite(definition.fireInterval)
+        || !std::isfinite(definition.range)
+        || definition.damage <= 0.0F || definition.fireInterval < 0.0F
+        || definition.range <= 0.0F || definition.magazineSize == 0U
+        || progress.magazineAmmo > definition.magazineSize
+        || progress.reserveAmmo > definition.reserveMaximum) {
+        return false;
+    }
+    definition_ = definition;
+    magazineAmmo_ = progress.magazineAmmo;
+    reserveAmmo_ = progress.reserveAmmo;
+    cooldownRemaining_ = 0.0F;
+    return true;
+}
+
 const WeaponDefinition& Weapon::definition() const noexcept
 {
     return definition_;

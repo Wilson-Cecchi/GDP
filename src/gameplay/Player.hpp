@@ -35,6 +35,14 @@ struct PlayerState {
     bool alive{true};
 };
 
+struct PlayerCampaignProgress {
+    float health{100.0F};
+    float maximumHealth{100.0F};
+    float armor{0.0F};
+    float maximumArmor{50.0F};
+    std::uint32_t keys{0U};
+};
+
 class Player {
 public:
     Player() = default;
@@ -66,6 +74,8 @@ public:
     [[nodiscard]] bool increaseMaximumArmor(
         float amount,
         float armor = 0.0F) noexcept;
+    [[nodiscard]] bool restoreCampaignProgress(
+        const PlayerCampaignProgress& progress) noexcept;
 
     [[nodiscard]] const PlayerState& state() const noexcept;
     [[nodiscard]] gdp::entities::EntityId entity() const noexcept;

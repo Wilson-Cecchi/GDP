@@ -8,7 +8,8 @@
 > foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
 > e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
 > repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
-> A Fase 79 iniciou uma Campanha jogável de três andares.
+> A Fase 79 iniciou uma Campanha jogável de três andares; a Fase 80 adicionou
+> carry-over validado de recursos e progressão entre eles.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -68,9 +69,8 @@ nível 4, 7, 10 → Capacity: +4 reserva máxima e +4 munição
 ```
 
 Os benefícios são aplicados às instâncias reais de `Player` e `Weapon`. O
-título mostra nível, XP atual/limiar e score. O sistema atual dura um andar; a
-fundação da Campanha reinicia esses valores e a próxima etapa definirá por
-snapshot o que persiste na passagem para o andar seguinte.
+título mostra nível, XP atual/limiar e score. Em Standard e Speedrun, o sistema
+dura uma run; na Campanha, a Fase 80 preserva esse estado ao avançar de andar.
 
 ## Validação atual
 
@@ -110,9 +110,15 @@ terceiro rejeitam `NextCampaignFloor` sem alterar a sessão.
 HUD e título mostram `FLOOR n/3`. Vitórias intermediárias exibem `FLOOR CLEAR`;
 a final exibe `CAMPAIGN CLEAR`. `REPLAY FLOOR` mantém andar e seed, enquanto uma
 nova campanha volta ao primeiro andar e avança a sequência determinística.
-Nesta fundação, Player, Weapon e `ProgressionSystem` ainda reiniciam entre
-andares; o carry-over será implementado separadamente para definir com precisão
-quais recursos sobrevivem à fronteira.
+Desde a Fase 80, `NEXT FLOOR` captura um `CampaignCarryover` com HP, Armor,
+capacidades máximas, chaves, definição da arma, munição e todo o
+`ProgressionState`. O snapshot só é aceito com jogador vivo, números finitos,
+recursos dentro das capacidades e ranks consistentes. A restauração ocorre
+depois do spawn, preservando a posição do novo andar, e zera cooldowns e estados
+transitórios. Uma segunda cópia registra a entrada do andar; `REPLAY FLOOR` e
+restart restauram essa base, sem perder os ganhos de andares anteriores nem
+manter dano/munição gastos na tentativa. Título e outros modos descartam os
+snapshots.
 
 ## Speedrun
 

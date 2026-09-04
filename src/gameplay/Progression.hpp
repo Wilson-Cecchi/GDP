@@ -60,6 +60,8 @@ public:
         Weapon& weapon);
 
     [[nodiscard]] const ProgressionState& state() const noexcept;
+    [[nodiscard]] bool restoreCampaignProgress(
+        const ProgressionState& savedState) noexcept;
     void reset() noexcept;
 
 private:

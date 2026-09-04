@@ -538,6 +538,29 @@ bool Application::initializeRun()
     const wkc::core::Vec3 startPosition = startRoom->transform.position
         + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
     player_.spawn(startPosition, yawForDirection(startForward));
+    if (campaignCarryover_) {
+        if (!gameplay::restoreCampaignCarryover(
+                *campaignCarryover_, player_, weapon_, progression_)) {
+            log(LogLevel::Error,
+                "Campaign carry-over failed validation on the next floor");
+            return false;
+        }
+        campaignCarryover_.reset();
+        log(LogLevel::Info, "Campaign progress restored on the next floor");
+    }
+    if (session_.state().mode == gameplay::RunMode::Campaign) {
+        gameplay::CampaignCarryover floorEntry
+            = gameplay::captureCampaignCarryover(
+                player_, weapon_, progression_);
+        if (!gameplay::validateCampaignCarryover(floorEntry)) {
+            log(LogLevel::Error,
+                "Campaign floor entry produced invalid carry-over state");
+            return false;
+        }
+        campaignFloorEntry_ = std::move(floorEntry);
+    } else {
+        campaignFloorEntry_.reset();
+    }
     const world::InitialEntitySet initialEntities = world::populateInitialEntities(
         *world_, entities_,
         {
@@ -972,6 +995,8 @@ void Application::processEvents()
                     "Best Seed requested without a local Speedrun record");
                 return;
             }
+            campaignCarryover_.reset();
+            campaignFloorEntry_.reset();
             const gameplay::RunMode mode
                 = command == gameplay::MainMenuCommand::Speedrun
                     || command == gameplay::MainMenuCommand::BestSeed
@@ -1092,6 +1117,21 @@ void Application::processEvents()
         if (command == gameplay::ResultMenuCommand::PlayAgain) {
             const bool nextCampaignFloor
                 = gameplay::canAdvanceCampaign(session_.state());
+            if (nextCampaignFloor) {
+                gameplay::CampaignCarryover carryover
+                    = gameplay::captureCampaignCarryover(
+                        player_, weapon_, progression_);
+                if (!gameplay::validateCampaignCarryover(carryover)) {
+                    log(LogLevel::Error,
+                        "Campaign result produced invalid carry-over state");
+                    fatalError_ = true;
+                    running_ = false;
+                    return;
+                }
+                campaignCarryover_ = std::move(carryover);
+            } else {
+                campaignCarryover_.reset();
+            }
             log(LogLevel::Info, nextCampaignFloor
                     ? "Result menu requested the next Campaign floor"
                     : "Result menu requested the next seed");
@@ -1101,6 +1141,11 @@ void Application::processEvents()
             restartRequested_ = true;
             running_ = false;
         } else if (command == gameplay::ResultMenuCommand::ReplaySeed) {
+            if (!stageCampaignFloorReplay()) {
+                fatalError_ = true;
+                running_ = false;
+                return;
+            }
             log(LogLevel::Info, "Result menu requested the same seed replay");
             restartMode_ = gameplay::RunRestartMode::SameSeed;
             restartRequested_ = true;
@@ -1203,6 +1248,11 @@ void Application::processEvents()
         if (command == gameplay::PauseMenuCommand::Resume) {
             setPaused(false);
         } else if (command == gameplay::PauseMenuCommand::RestartRun) {
+            if (!stageCampaignFloorReplay()) {
+                fatalError_ = true;
+                running_ = false;
+                return;
+            }
             log(LogLevel::Info, "Pause menu requested the same seed restart");
             (void)session_.update(
                 false, world::RoomRole::Count, false, false);
@@ -1255,8 +1305,26 @@ void Application::setPaused(const bool paused)
     log(LogLevel::Info, paused ? "Game paused" : "Game resumed");
 }
 
+bool Application::stageCampaignFloorReplay()
+{
+    campaignCarryover_.reset();
+    if (session_.state().mode != gameplay::RunMode::Campaign) {
+        return true;
+    }
+    if (!campaignFloorEntry_
+        || !gameplay::validateCampaignCarryover(*campaignFloorEntry_)) {
+        log(LogLevel::Error,
+            "Campaign floor replay is missing a valid entry snapshot");
+        return false;
+    }
+    campaignCarryover_ = *campaignFloorEntry_;
+    return true;
+}
+
 bool Application::returnToMainMenu()
 {
+    campaignCarryover_.reset();
+    campaignFloorEntry_.reset();
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
         (void)session_.update(
             false, world::RoomRole::Count, false, false);
