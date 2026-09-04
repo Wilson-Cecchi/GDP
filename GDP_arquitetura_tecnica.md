@@ -961,6 +961,15 @@ mundo ou, quando disponível, combina a seed gravada com `RunMode::Speedrun`.
 `HudRenderData` transporta apenas disponibilidade e tempo para o renderer
 concreto desenhar os estados ativo/inativo.
 
+Na Fase 79, `RunMode::Campaign` e `SessionState::campaignFloor` passaram a
+representar uma sequência de três andares. `NextCampaignFloor` só é aceito em
+Victory antes do limite, avança a sub-sequência determinística de mundos e
+retorna a sessão a Playing; qualquer outro contexto é rejeitado sem mutação.
+A Application escolhe essa política pelo resultado, enquanto `HudRenderData`
+expõe modo, andar, limite e disponibilidade para o renderer concreto. O
+carry-over de Player, Weapon e Progression permanece fora desta fundação e será
+adicionado por snapshot explícito em uma etapa própria.
+
 ---
 
 # 8. Sistema de seed

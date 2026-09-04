@@ -346,6 +346,19 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 resultReplayPixels.data());
 
+            gdp::game::visual::HudRenderData campaignResultHud{
+                gdp::game::visual::ObjectiveRenderState::Victory};
+            campaignResultHud.campaignMode = true;
+            campaignResultHud.campaignFloor = 1U;
+            campaignResultHud.campaignFloorCount = 3U;
+            campaignResultHud.campaignAdvanceAvailable = true;
+            const bool renderedCampaignResult = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                campaignResultHud);
+            std::vector<std::uint8_t> campaignResultPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                campaignResultPixels.data());
+
             gdp::game::visual::HudRenderData resultExitHud{
                 gdp::game::visual::ObjectiveRenderState::Victory};
             resultExitHud.resultMenuSelection
@@ -393,6 +406,17 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 runTimerPixels.data());
 
+            gdp::game::visual::HudRenderData campaignTimerHud = timedHud;
+            campaignTimerHud.campaignMode = true;
+            campaignTimerHud.campaignFloor = 2U;
+            campaignTimerHud.campaignFloorCount = 3U;
+            const bool renderedCampaignTimer = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                campaignTimerHud);
+            std::vector<std::uint8_t> campaignTimerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                campaignTimerPixels.data());
+
             gdp::game::visual::HudRenderData speedrunRecordHud = timedHud;
             speedrunRecordHud.speedrunMode = true;
             speedrunRecordHud.speedrunRecordVisible = true;
@@ -419,6 +443,16 @@ int main()
             std::vector<std::uint8_t> mainMenuPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuPixels.data());
+
+            gdp::game::visual::HudRenderData mainMenuCampaignHud = mainMenuHud;
+            mainMenuCampaignHud.mainMenuSelection
+                = gdp::game::visual::HudMainMenuSelection::Campaign;
+            const bool renderedMainMenuCampaign = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                mainMenuCampaignHud);
+            std::vector<std::uint8_t> mainMenuCampaignPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mainMenuCampaignPixels.data());
 
             gdp::game::visual::HudRenderData mainMenuBestSeedHud = mainMenuHud;
             mainMenuBestSeedHud.mainMenuSelection
@@ -542,12 +576,15 @@ int main()
             std::size_t cornerCyanPixels = 0;
             std::size_t hudChangedChannels = 0;
             std::size_t resultReplayChangedChannels = 0;
+            std::size_t campaignResultChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
+            std::size_t campaignTimerChangedChannels = 0;
             std::size_t speedrunRecordChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
+            std::size_t mainMenuCampaignChangedChannels = 0;
             std::size_t mainMenuBestSeedChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
             std::size_t exitConfirmationChangedChannels = 0;
@@ -633,6 +670,10 @@ int main()
                         != hudPixels[index + channel]) {
                         ++resultReplayChangedChannels;
                     }
+                    if (campaignResultPixels[index + channel]
+                        != hudPixels[index + channel]) {
+                        ++campaignResultChangedChannels;
+                    }
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
@@ -640,6 +681,10 @@ int main()
                     if (runTimerPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
                         ++runTimerChangedChannels;
+                    }
+                    if (campaignTimerPixels[index + channel]
+                        != runTimerPixels[index + channel]) {
+                        ++campaignTimerChangedChannels;
                     }
                     if (speedrunRecordPixels[index + channel]
                         != runTimerPixels[index + channel]) {
@@ -651,6 +696,10 @@ int main()
                     }
                     if (mainMenuPixels[index + channel] != baseline[index + channel]) {
                         ++mainMenuChangedChannels;
+                    }
+                    if (mainMenuCampaignPixels[index + channel]
+                        != mainMenuPixels[index + channel]) {
+                        ++mainMenuCampaignChangedChannels;
                     }
                     if (mainMenuBestSeedPixels[index + channel]
                         != mainMenuPixels[index + channel]) {
@@ -726,13 +775,18 @@ int main()
                 && renderedHud && hudChangedChannels > 100U
                 && renderedResultReplay
                 && resultReplayChangedChannels > 100U
+                && renderedCampaignResult
+                && campaignResultChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedRunTimer && runTimerChangedChannels > 50U
+                && renderedCampaignTimer && campaignTimerChangedChannels > 50U
                 && renderedSpeedrunRecord
                 && speedrunRecordChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
+                && renderedMainMenuCampaign
+                && mainMenuCampaignChangedChannels > 100U
                 && renderedMainMenuBestSeed
                 && mainMenuBestSeedChangedChannels > 100U
                 && renderedMainMenuExit && mainMenuSelectionChangedChannels > 100U

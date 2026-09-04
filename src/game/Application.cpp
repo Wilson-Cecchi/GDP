@@ -908,6 +908,9 @@ void Application::processEvents()
                   if (selection == visual::HudMainMenuSelection::Settings) {
                       return gameplay::MainMenuOption::Settings;
                   }
+                  if (selection == visual::HudMainMenuSelection::Campaign) {
+                      return gameplay::MainMenuOption::Campaign;
+                  }
                   if (selection == visual::HudMainMenuSelection::Speedrun) {
                       return gameplay::MainMenuOption::Speedrun;
                   }
@@ -961,6 +964,7 @@ void Application::processEvents()
         }
 
         if (command == gameplay::MainMenuCommand::StartRun
+            || command == gameplay::MainMenuCommand::Campaign
             || command == gameplay::MainMenuCommand::Speedrun
             || command == gameplay::MainMenuCommand::BestSeed) {
             if (unavailableBestSeed) {
@@ -972,6 +976,8 @@ void Application::processEvents()
                 = command == gameplay::MainMenuCommand::Speedrun
                     || command == gameplay::MainMenuCommand::BestSeed
                 ? gameplay::RunMode::Speedrun
+                : command == gameplay::MainMenuCommand::Campaign
+                    ? gameplay::RunMode::Campaign
                 : gameplay::RunMode::Standard;
             bool selectionAccepted = session_.selectRunMode(mode);
             if (command == gameplay::MainMenuCommand::BestSeed) {
@@ -984,6 +990,8 @@ void Application::processEvents()
             }
             if (command == gameplay::MainMenuCommand::BestSeed) {
                 log(LogLevel::Info, "Main menu requested Best Seed challenge");
+            } else if (command == gameplay::MainMenuCommand::Campaign) {
+                log(LogLevel::Info, "Main menu requested Campaign start");
             } else {
                 log(LogLevel::Info, command == gameplay::MainMenuCommand::Speedrun
                         ? "Main menu requested Speedrun start"
@@ -1082,8 +1090,14 @@ void Application::processEvents()
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
         }
         if (command == gameplay::ResultMenuCommand::PlayAgain) {
-            log(LogLevel::Info, "Result menu requested the next seed");
-            restartMode_ = gameplay::RunRestartMode::NextSeed;
+            const bool nextCampaignFloor
+                = gameplay::canAdvanceCampaign(session_.state());
+            log(LogLevel::Info, nextCampaignFloor
+                    ? "Result menu requested the next Campaign floor"
+                    : "Result menu requested the next seed");
+            restartMode_ = nextCampaignFloor
+                ? gameplay::RunRestartMode::NextCampaignFloor
+                : gameplay::RunRestartMode::NextSeed;
             restartRequested_ = true;
             running_ = false;
         } else if (command == gameplay::ResultMenuCommand::ReplaySeed) {
@@ -2130,6 +2144,8 @@ void Application::render()
         hud.mainMenu = true;
         if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
+        } else if (mainMenu_.selection == gameplay::MainMenuOption::Campaign) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::Campaign;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::Speedrun) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Speedrun;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::BestSeed) {
@@ -2265,6 +2281,10 @@ void Application::render()
         title << " MAX";
     }
     title << " | Score " << progress.score;
+    if (session_.state().mode == gameplay::RunMode::Campaign) {
+        title << " | Floor " << session_.state().campaignFloor
+              << '/' << gameplay::campaignFloorCount;
+    }
     title << " | Time "
           << visual::runTimeText(session_.state().elapsedRunTicks);
     if (session_.state().mode == gameplay::RunMode::Speedrun
@@ -2469,6 +2489,11 @@ void Application::render()
     hud.level = progress.level;
     hud.runTimerVisible = true;
     hud.elapsedRunTicks = session_.state().elapsedRunTicks;
+    hud.campaignMode = session_.state().mode == gameplay::RunMode::Campaign;
+    hud.campaignFloor = session_.state().campaignFloor;
+    hud.campaignFloorCount = gameplay::campaignFloorCount;
+    hud.campaignAdvanceAvailable
+        = gameplay::canAdvanceCampaign(session_.state());
     hud.speedrunMode = session_.state().mode == gameplay::RunMode::Speedrun;
     hud.speedrunRecordVisible = hud.speedrunMode && speedrunRecord_.has_value();
     hud.bestSpeedrunTicks

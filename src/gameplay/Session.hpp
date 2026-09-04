@@ -10,6 +10,7 @@
 namespace gdp::gameplay {
 
 inline constexpr std::uint64_t runTimerTicksPerSecond = 60U;
+inline constexpr std::uint32_t campaignFloorCount = 3U;
 
 enum class SessionPhase : std::uint8_t {
     Playing,
@@ -19,6 +20,7 @@ enum class SessionPhase : std::uint8_t {
 
 enum class RunMode : std::uint8_t {
     Standard,
+    Campaign,
     Speedrun,
     Count,
 };
@@ -26,6 +28,7 @@ enum class RunMode : std::uint8_t {
 enum class RunRestartMode : std::uint8_t {
     NextSeed,
     SameSeed,
+    NextCampaignFloor,
     Count,
 };
 
@@ -36,6 +39,7 @@ struct SessionState {
     wkc::core::Seed currentSeed{0};
     std::uint32_t runIndex{0U};
     std::uint32_t seedIndex{0U};
+    std::uint32_t campaignFloor{1U};
     bool bossEngaged{false};
     std::uint64_t elapsedRunTicks{0U};
 };
@@ -78,6 +82,7 @@ private:
     std::uint32_t runIndex) noexcept;
 [[nodiscard]] const char* sessionPhaseName(SessionPhase phase) noexcept;
 [[nodiscard]] const char* runModeName(RunMode mode) noexcept;
+[[nodiscard]] bool canAdvanceCampaign(const SessionState& state) noexcept;
 [[nodiscard]] BossStatus bossStatus(
     const gdp::entities::EntityManager& entities,
     gdp::world::RoomId roomId) noexcept;

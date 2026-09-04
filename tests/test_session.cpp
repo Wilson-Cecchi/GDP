@@ -145,6 +145,55 @@ void testSameSeedReplayPreservesDeterministicSequence()
         "replays do not skip the next seed in the deterministic sequence");
 }
 
+void testCampaignAdvancesThreeDeterministicFloors()
+{
+    using namespace gdp;
+    gameplay::SessionSystem session{0x43414D504149474EULL};
+    expect(session.selectRunMode(gameplay::RunMode::Campaign)
+            && session.state().campaignFloor == 1U
+            && std::string_view{gameplay::runModeName(session.state().mode)}
+                == "Campaign",
+        "Campaign starts on floor one with an explicit run mode");
+
+    const auto defeat = session.update(
+        false, world::RoomRole::Start, false, false);
+    expect(defeat.changed && !gameplay::canAdvanceCampaign(session.state())
+            && !session.restart(gameplay::RunRestartMode::NextCampaignFloor),
+        "Defeat cannot skip directly to the next Campaign floor");
+    expect(session.restart(gameplay::RunRestartMode::SameSeed)
+            && session.state().campaignFloor == 1U,
+        "replaying a Campaign floor keeps its floor and seed");
+
+    const wkc::core::Seed firstSeed = session.state().currentSeed;
+    (void)session.update(true, world::RoomRole::Boss, true, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false);
+    expect(gameplay::canAdvanceCampaign(session.state()),
+        "boss victory unlocks the second Campaign floor");
+    const auto secondSeed
+        = session.restart(gameplay::RunRestartMode::NextCampaignFloor);
+    expect(secondSeed && *secondSeed == gameplay::seedForRun(firstSeed, 1U)
+            && session.state().campaignFloor == 2U
+            && session.state().seedIndex == 1U,
+        "second floor advances through the deterministic world sequence");
+
+    (void)session.update(true, world::RoomRole::Boss, true, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false);
+    const auto thirdSeed
+        = session.restart(gameplay::RunRestartMode::NextCampaignFloor);
+    expect(thirdSeed && *thirdSeed == gameplay::seedForRun(firstSeed, 2U)
+            && session.state().campaignFloor == gameplay::campaignFloorCount,
+        "third floor is derived deterministically and reaches the Campaign cap");
+
+    (void)session.update(true, world::RoomRole::Boss, true, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false);
+    expect(!gameplay::canAdvanceCampaign(session.state())
+            && !session.restart(gameplay::RunRestartMode::NextCampaignFloor),
+        "final Campaign victory cannot advance beyond the floor cap");
+    expect(session.restart(gameplay::RunRestartMode::NextSeed)
+            && session.state().campaignFloor == 1U,
+        "a new Campaign resets its floor while advancing the seed sequence");
+}
+
 void testBossStatusUsesArchetypeAndRoomOwnership()
 {
     using namespace gdp;
@@ -204,6 +253,7 @@ int main()
     testSpeedrunModeTimerRules();
     testDefeatAndDeterministicRestart();
     testSameSeedReplayPreservesDeterministicSequence();
+    testCampaignAdvancesThreeDeterministicFloors();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();
 

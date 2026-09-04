@@ -8,6 +8,7 @@
 > foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
 > e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
 > repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
+> A Fase 79 iniciou uma Campanha jogável de três andares.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -67,8 +68,9 @@ nível 4, 7, 10 → Capacity: +4 reserva máxima e +4 munição
 ```
 
 Os benefícios são aplicados às instâncias reais de `Player` e `Weapon`. O
-título mostra nível, XP atual/limiar e score. O sistema atual dura a sessão; a
-Campanha futura decidirá o que persiste entre andares e execuções.
+título mostra nível, XP atual/limiar e score. O sistema atual dura um andar; a
+fundação da Campanha reinicia esses valores e a próxima etapa definirá por
+snapshot o que persiste na passagem para o andar seguinte.
 
 ## Validação atual
 
@@ -99,8 +101,18 @@ ativa; o índice mostrado ao jogador começa em um.
 
 ## Campanha
 
-Campanha armazena seed, andar, dificuldade e estado persistente do jogador. O mundo pode ser
-regenerado pela seed quando não houver necessidade de retomar exatamente o estado intermediário.
+Na Fase 79, `CAMPAIGN` passou a ser um modo selecionável no título e encadeia
+três andares. O primeiro usa a seed atual; cada `NEXT FLOOR` deriva o próximo
+mundo por `seedForRun(initialSeed, seedIndex)`. Somente Victory nos andares um e
+dois permite esse avanço. Defeat, estado jogável, modo diferente e vitória no
+terceiro rejeitam `NextCampaignFloor` sem alterar a sessão.
+
+HUD e título mostram `FLOOR n/3`. Vitórias intermediárias exibem `FLOOR CLEAR`;
+a final exibe `CAMPAIGN CLEAR`. `REPLAY FLOOR` mantém andar e seed, enquanto uma
+nova campanha volta ao primeiro andar e avança a sequência determinística.
+Nesta fundação, Player, Weapon e `ProgressionSystem` ainda reiniciam entre
+andares; o carry-over será implementado separadamente para definir com precisão
+quais recursos sobrevivem à fronteira.
 
 ## Speedrun
 

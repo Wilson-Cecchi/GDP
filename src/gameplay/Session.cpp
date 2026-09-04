@@ -41,10 +41,20 @@ std::optional<wkc::core::Seed> SessionSystem::restart(
     if (state_.phase == SessionPhase::Playing || mode >= RunRestartMode::Count) {
         return std::nullopt;
     }
+    if (mode == RunRestartMode::NextCampaignFloor
+        && !canAdvanceCampaign(state_)) {
+        return std::nullopt;
+    }
     ++state_.runIndex;
-    if (mode == RunRestartMode::NextSeed) {
+    if (mode == RunRestartMode::NextSeed
+        || mode == RunRestartMode::NextCampaignFloor) {
         ++state_.seedIndex;
         state_.currentSeed = seedForRun(state_.initialSeed, state_.seedIndex);
+    }
+    if (mode == RunRestartMode::NextCampaignFloor) {
+        ++state_.campaignFloor;
+    } else if (mode == RunRestartMode::NextSeed) {
+        state_.campaignFloor = 1U;
     }
     state_.phase = SessionPhase::Playing;
     state_.bossEngaged = false;
@@ -115,12 +125,22 @@ const char* runModeName(const RunMode mode) noexcept
     switch (mode) {
     case RunMode::Standard:
         return "Standard";
+    case RunMode::Campaign:
+        return "Campaign";
     case RunMode::Speedrun:
         return "Speedrun";
     case RunMode::Count:
         break;
     }
     return "Unknown";
+}
+
+bool canAdvanceCampaign(const SessionState& state) noexcept
+{
+    return state.mode == RunMode::Campaign
+        && state.phase == SessionPhase::Victory
+        && state.campaignFloor >= 1U
+        && state.campaignFloor < campaignFloorCount;
 }
 
 BossStatus bossStatus(

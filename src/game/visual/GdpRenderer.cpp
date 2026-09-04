@@ -1627,22 +1627,25 @@ bool GdpRenderer::render(
         const std::string bestSeedText = hud.bestSeedAvailable
             ? "BEST SEED " + runTimeText(hud.bestSpeedrunTicks)
             : "BEST SEED --";
-        const std::array<std::string_view, 5> options{
-            "START RUN", "SPEEDRUN", bestSeedText, "SETTINGS", "EXIT GAME",
+        const std::array<std::string_view, 6> options{
+            "START RUN", "CAMPAIGN", "SPEEDRUN", bestSeedText,
+            "SETTINGS", "EXIT GAME",
         };
-        const std::array<UiRect, 5> buttons{
-            layout.startButton, layout.speedrunButton,
+        const std::array<UiRect, 6> buttons{
+            layout.startButton, layout.campaignButton, layout.speedrunButton,
             layout.bestSeedButton, layout.settingsButton, layout.exitButton,
         };
         std::size_t selected = 0U;
-        if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
+        if (hud.mainMenuSelection == HudMainMenuSelection::Campaign) {
             selected = 1U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::BestSeed) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
             selected = 2U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::BestSeed) {
             selected = 3U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
             selected = 4U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 5U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
@@ -1655,7 +1658,7 @@ bool GdpRenderer::render(
             const int textWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - textWidth) / 2,
                 button.y + (3 * scale), scale, options[index],
-                index == 2U && !hud.bestSeedAvailable
+                index == 3U && !hud.bestSeedAvailable
                     ? wkc::core::Vec3{0.30F, 0.38F, 0.40F}
                     : index == selected ? cyanColor : textColor);
         }
@@ -1933,8 +1936,13 @@ bool GdpRenderer::render(
             hudScale, objectiveText, objectiveColor);
     }
     if (hud.visible && hud.runTimerVisible) {
-        const std::string timerText = (hud.speedrunMode ? "SPEEDRUN " : "TIME ")
-            + runTimeText(hud.elapsedRunTicks);
+        const std::string timerPrefix = hud.speedrunMode
+            ? "SPEEDRUN "
+            : hud.campaignMode
+                ? "FLOOR " + std::to_string(hud.campaignFloor) + "/"
+                    + std::to_string(hud.campaignFloorCount) + "  TIME "
+                : "TIME ";
+        const std::string timerText = timerPrefix + runTimeText(hud.elapsedRunTicks);
         const int timerWidth = bitmapTextWidth(timerText, hudScale);
         const int timerOffset = objectiveText.empty() ? 7 : 17;
         drawBitmapText(std::max(hudMargin, width - timerWidth - hudMargin),
@@ -1954,7 +1962,10 @@ bool GdpRenderer::render(
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {
         const bool victory = hud.objective == ObjectiveRenderState::Victory;
-        const std::string_view result = victory ? "VICTORY" : "DEFEAT";
+        const std::string_view result = hud.campaignAdvanceAvailable
+            ? "FLOOR CLEAR"
+            : victory && hud.campaignMode ? "CAMPAIGN CLEAR"
+            : victory ? "VICTORY" : "DEFEAT";
         const ResultMenuLayout layout = makeResultMenuLayout(width, height);
         const int scale = layout.scale;
         drawSolidRect(layout.panel.x, layout.panel.y,
@@ -1985,7 +1996,9 @@ bool GdpRenderer::render(
         }
 
         const std::array<std::string_view, 4> options{
-            victory ? "NEW RUN" : "NEXT SEED", "REPLAY SEED",
+            hud.campaignAdvanceAvailable
+                ? "NEXT FLOOR" : victory ? "NEW RUN" : "NEXT SEED",
+            hud.campaignMode ? "REPLAY FLOOR" : "REPLAY SEED",
             "MAIN MENU", "EXIT GAME",
         };
         const std::array<UiRect, 4> buttons{

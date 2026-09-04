@@ -25,6 +25,9 @@ void testMainMenuNavigation()
         "main menu starts on Start Run");
 
     moveMainMenuSelection(menu, 1);
+    expect(menu.selection == MainMenuOption::Campaign,
+        "down selects Campaign");
+    moveMainMenuSelection(menu, 1);
     expect(menu.selection == MainMenuOption::Speedrun,
         "down selects Speedrun");
     moveMainMenuSelection(menu, 4);
@@ -73,6 +76,12 @@ void testMainMenuActivation()
     expect(activateMainMenuSelection(menu) == MainMenuCommand::Speedrun
             && !menu.active,
         "Speedrun emits its dedicated command and closes the menu");
+    openMainMenu(menu);
+
+    selectMainMenuOption(menu, MainMenuOption::Campaign);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::Campaign
+            && !menu.active,
+        "Campaign emits its dedicated command and closes the menu");
     openMainMenu(menu);
 
     selectMainMenuOption(menu, MainMenuOption::StartRun);

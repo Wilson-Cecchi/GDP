@@ -144,6 +144,8 @@ void testMainMenuLayout()
         "wide menu panel stays within the framebuffer");
     expect(wide.panel.contains(wide.startButton.x, wide.startButton.y),
         "Start Run button is inside the menu panel");
+    expect(wide.panel.contains(wide.campaignButton.x, wide.campaignButton.y),
+        "Campaign button is inside the menu panel");
     expect(wide.panel.contains(wide.speedrunButton.x, wide.speedrunButton.y),
         "Speedrun button is inside the menu panel");
     expect(wide.panel.contains(wide.bestSeedButton.x, wide.bestSeedButton.y),
@@ -160,8 +162,10 @@ void testMainMenuLayout()
             && wide.bestSeedButton.y + wide.bestSeedButton.height
                 <= wide.speedrunButton.y
             && wide.speedrunButton.y + wide.speedrunButton.height
+                <= wide.campaignButton.y
+            && wide.campaignButton.y + wide.campaignButton.height
                 <= wide.startButton.y,
-        "five main-menu buttons remain separated from controls and each other");
+        "six main-menu buttons remain separated from controls and each other");
 
     const float startX = static_cast<float>(wide.startButton.x + wide.startButton.width / 2);
     const float startY = static_cast<float>(
@@ -172,6 +176,13 @@ void testMainMenuLayout()
     expect(mainMenuSelectionAt(1280, 720, startX, startY)
             == HudMainMenuSelection::StartRun,
         "top-origin pointer maps to Start Run");
+    const float campaignX = static_cast<float>(
+        wide.campaignButton.x + wide.campaignButton.width / 2);
+    const float campaignY = static_cast<float>(
+        720 - 1 - (wide.campaignButton.y + wide.campaignButton.height / 2));
+    expect(mainMenuSelectionAt(1280, 720, campaignX, campaignY)
+            == HudMainMenuSelection::Campaign,
+        "top-origin pointer maps to Campaign");
     const float speedrunX = static_cast<float>(
         wide.speedrunButton.x + wide.speedrunButton.width / 2);
     const float speedrunY = static_cast<float>(
@@ -208,6 +219,8 @@ void testMainMenuLayout()
 
     const MainMenuLayout tiny = makeMainMenuLayout(12, 12);
     expect(tiny.panel.contains(tiny.startButton.x, tiny.startButton.y)
+            && tiny.panel.contains(
+                tiny.campaignButton.x, tiny.campaignButton.y)
             && tiny.panel.contains(
                 tiny.speedrunButton.x, tiny.speedrunButton.y)
             && tiny.panel.contains(

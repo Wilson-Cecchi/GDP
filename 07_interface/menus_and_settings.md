@@ -9,14 +9,15 @@
 > A Fase 74 adicionou o cronômetro determinístico da run ao HUD e ao resultado;
 > a Fase 75 tornou Speedrun selecionável e a Fase 76 adicionou o melhor tempo
 > local ao HUD e ao resultado. A Fase 77 separou próxima seed e repetição, e a
-> Fase 78 adicionou acesso direto à seed do recorde.
+> Fase 78 adicionou acesso direto à seed do recorde. A Fase 79 integrou a
+> Campanha de três andares ao título, HUD e resultado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal funcional
 
-O bootstrap gráfico mostra `START RUN`, `SPEEDRUN`, `BEST SEED`, `SETTINGS` e `EXIT GAME`
-antes de gerar a dungeon.
+O bootstrap gráfico mostra `START RUN`, `CAMPAIGN`, `SPEEDRUN`, `BEST SEED`,
+`SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
 sempre `START RUN`.
@@ -33,7 +34,9 @@ porque não possui interação.
 mas mantém o cronômetro correndo durante pausa e configurações. `BEST SEED`
 mostra o tempo do recorde e inicia um Speedrun na seed correspondente. Sem
 recorde, mostra `--`, permanece visualmente inativo e não fecha o menu quando
-confirmado. Campanha e Ranking continuam como expansões futuras do mesmo estado.
+confirmado. `CAMPAIGN` inicia três andares determinísticos: o HUD identifica
+`FLOOR n/3`, os resultados intermediários oferecem `NEXT FLOOR` e o último
+mostra `CAMPAIGN CLEAR`. Ranking continua como expansão futura do mesmo estado.
 
 ## Pausa in-game
 

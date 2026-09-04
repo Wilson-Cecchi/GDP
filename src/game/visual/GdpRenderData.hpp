@@ -140,6 +140,7 @@ enum class HudPauseSelection : std::uint8_t {
 
 enum class HudMainMenuSelection : std::uint8_t {
     StartRun,
+    Campaign,
     Speedrun,
     BestSeed,
     Settings,
@@ -186,6 +187,7 @@ struct MainMenuLayout {
     int scale{1};
     UiRect panel{};
     UiRect startButton{};
+    UiRect campaignButton{};
     UiRect speedrunButton{};
     UiRect bestSeedButton{};
     UiRect settingsButton{};
@@ -283,6 +285,10 @@ struct HudRenderData {
     std::uint32_t experienceForNextLevel{0};
     bool runTimerVisible{false};
     std::uint64_t elapsedRunTicks{0U};
+    bool campaignMode{false};
+    std::uint32_t campaignFloor{1U};
+    std::uint32_t campaignFloorCount{1U};
+    bool campaignAdvanceAvailable{false};
     bool speedrunMode{false};
     bool speedrunRecordVisible{false};
     std::uint64_t bestSpeedrunTicks{0U};
