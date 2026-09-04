@@ -1627,25 +1627,31 @@ bool GdpRenderer::render(
         const std::string bestSeedText = hud.bestSeedAvailable
             ? "BEST SEED " + runTimeText(hud.bestSpeedrunTicks)
             : "BEST SEED --";
-        const std::array<std::string_view, 6> options{
-            "START RUN", "CAMPAIGN", "SPEEDRUN", bestSeedText,
+        const std::string continueText = hud.campaignContinueAvailable
+            ? "CONTINUE F" + std::to_string(hud.campaignContinueFloor) + "/3"
+            : "CONTINUE --";
+        const std::array<std::string_view, 7> options{
+            "START RUN", continueText, "CAMPAIGN", "SPEEDRUN", bestSeedText,
             "SETTINGS", "EXIT GAME",
         };
-        const std::array<UiRect, 6> buttons{
-            layout.startButton, layout.campaignButton, layout.speedrunButton,
+        const std::array<UiRect, 7> buttons{
+            layout.startButton, layout.continueButton, layout.campaignButton,
+            layout.speedrunButton,
             layout.bestSeedButton, layout.settingsButton, layout.exitButton,
         };
         std::size_t selected = 0U;
-        if (hud.mainMenuSelection == HudMainMenuSelection::Campaign) {
+        if (hud.mainMenuSelection == HudMainMenuSelection::ContinueCampaign) {
             selected = 1U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Campaign) {
             selected = 2U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::BestSeed) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Speedrun) {
             selected = 3U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::BestSeed) {
             selected = 4U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
             selected = 5U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 6U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
@@ -1658,7 +1664,8 @@ bool GdpRenderer::render(
             const int textWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - textWidth) / 2,
                 button.y + (3 * scale), scale, options[index],
-                index == 3U && !hud.bestSeedAvailable
+                (index == 1U && !hud.campaignContinueAvailable)
+                        || (index == 4U && !hud.bestSeedAvailable)
                     ? wkc::core::Vec3{0.30F, 0.38F, 0.40F}
                     : index == selected ? cyanColor : textColor);
         }

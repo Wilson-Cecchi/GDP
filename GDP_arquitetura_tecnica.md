@@ -980,6 +980,14 @@ e alimenta replay/restart, preservando ganhos anteriores sem conservar gastos da
 tentativa. Título e outros modos limpam ambos. A solução permanece concreta do
 GDP e não adiciona persistência ou conceitos de Campanha à WKC Forge.
 
+Na Fase 81, `CampaignCheckpoint` combinou a entrada do andar com identidade
+determinística da sessão e versão das regras. `CampaignCheckpointStore`, na
+camada concreta de persistência, escreve um schema próprio por temporário
+relido/validado antes do rename. A Application resolve o caminho SDL, oferece
+`CONTINUE` somente para dados válidos, restaura uma `SessionSystem` ainda
+prístina e remove o arquivo na vitória final. Nenhum estado de plataforma,
+Campaign ou serialização foi movido para a WKC Forge.
+
 ---
 
 # 8. Sistema de seed

@@ -70,6 +70,12 @@ public:
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;
     [[nodiscard]] bool selectRunSeed(wkc::core::Seed seed) noexcept;
+    [[nodiscard]] bool restoreCampaignCheckpoint(
+        wkc::core::Seed initialSeed,
+        wkc::core::Seed currentSeed,
+        std::uint32_t runIndex,
+        std::uint32_t seedIndex,
+        std::uint32_t floor) noexcept;
     void advanceRunTimer(bool gameplayActive = true) noexcept;
     [[nodiscard]] const SessionState& state() const noexcept;
 

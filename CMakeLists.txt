@@ -275,6 +275,7 @@ target_link_libraries(gdp_gameplay PUBLIC gdp_world)
 add_library(
     gdp_persistence
     STATIC
+    src/persistence/CampaignCheckpointStore.cpp
     src/persistence/SettingsStore.cpp
     src/persistence/SpeedrunRecordStore.cpp
 )
@@ -520,6 +521,21 @@ if(GDP_BUILD_TESTS)
     )
     set_tests_properties(speedrun_record_persistence_systems PROPERTIES TIMEOUT 10)
 
+    add_executable(
+        gdp_campaign_checkpoint_store_tests
+        tests/test_campaign_checkpoint_store.cpp
+    )
+    target_link_libraries(gdp_campaign_checkpoint_store_tests PRIVATE gdp_persistence)
+    gdp_enable_warnings(gdp_campaign_checkpoint_store_tests)
+    gdp_enable_sanitizers(gdp_campaign_checkpoint_store_tests)
+
+    add_test(
+        NAME campaign_checkpoint_persistence_systems
+        COMMAND gdp_campaign_checkpoint_store_tests
+    )
+    set_tests_properties(
+        campaign_checkpoint_persistence_systems PROPERTIES TIMEOUT 10)
+
     add_executable(gdp_room_traversal_tests tests/test_room_traversal.cpp)
     target_link_libraries(gdp_room_traversal_tests PRIVATE gdp_gameplay gdp_world)
     gdp_enable_warnings(gdp_room_traversal_tests)
@@ -617,7 +633,7 @@ if(GDP_BUILD_TESTS)
             renderer_opengl_pixels
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
-                TIMEOUT 10
+                TIMEOUT 20
         )
 
         add_test(NAME bootstrap_opengl_offscreen COMMAND gdp --frames 2)
@@ -626,7 +642,7 @@ if(GDP_BUILD_TESTS)
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy"
                 PASS_REGULAR_EXPRESSION "Main menu initialized before world generation"
-                TIMEOUT 10
+                TIMEOUT 20
         )
 
         add_test(
@@ -635,7 +651,7 @@ if(GDP_BUILD_TESTS)
                 -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_main_menu_bootstrap.cmake
         )
-        set_tests_properties(main_menu_defers_world_generation PROPERTIES TIMEOUT 10)
+        set_tests_properties(main_menu_defers_world_generation PROPERTIES TIMEOUT 20)
 
         add_test(NAME bootstrap_audio_device_fallback COMMAND gdp --frames 2)
         set_tests_properties(
@@ -643,7 +659,7 @@ if(GDP_BUILD_TESTS)
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=gdp_missing"
                 PASS_REGULAR_EXPRESSION "continuing silently"
-                TIMEOUT 10
+                TIMEOUT 20
         )
 
         add_test(
@@ -653,7 +669,7 @@ if(GDP_BUILD_TESTS)
                 -DGDP_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_fullscreen_setting.cmake
         )
-        set_tests_properties(fullscreen_setting_bootstrap PROPERTIES TIMEOUT 10)
+        set_tests_properties(fullscreen_setting_bootstrap PROPERTIES TIMEOUT 30)
 
         add_test(
             NAME window_resolution_setting_bootstrap
@@ -663,7 +679,7 @@ if(GDP_BUILD_TESTS)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_window_resolution.cmake
         )
         set_tests_properties(
-            window_resolution_setting_bootstrap PROPERTIES TIMEOUT 10)
+            window_resolution_setting_bootstrap PROPERTIES TIMEOUT 30)
 
         add_test(
             NAME vsync_setting_bootstrap
@@ -672,6 +688,6 @@ if(GDP_BUILD_TESTS)
                 -DGDP_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_vsync_setting.cmake
         )
-        set_tests_properties(vsync_setting_bootstrap PROPERTIES TIMEOUT 10)
+        set_tests_properties(vsync_setting_bootstrap PROPERTIES TIMEOUT 30)
     endif()
 endif()

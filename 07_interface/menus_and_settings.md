@@ -12,13 +12,14 @@
 > Fase 78 adicionou acesso direto à seed do recorde. A Fase 79 integrou a
 > Campanha de três andares ao título, HUD e resultado.
 > A Fase 80 passou a preservar recursos e progressão em `NEXT FLOOR`.
+> A Fase 81 adicionou `CONTINUE` persistente no início do andar atual.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal funcional
 
-O bootstrap gráfico mostra `START RUN`, `CAMPAIGN`, `SPEEDRUN`, `BEST SEED`,
-`SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
+O bootstrap gráfico mostra `START RUN`, `CONTINUE`, `CAMPAIGN`, `SPEEDRUN`,
+`BEST SEED`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
 sempre `START RUN`.
@@ -41,6 +42,12 @@ mostra `CAMPAIGN CLEAR`. Ranking continua como expansão futura do mesmo estado.
 Ao avançar, os valores já apresentados de HP, Armor, munição, nível e XP são
 restaurados no novo andar; posição e estados transitórios pertencem ao novo
 mundo.
+
+`CONTINUE Fn/3` aparece ativo quando existe um checkpoint de Campaign válido.
+Ele restaura a entrada do andar indicado e só então gera seu mundo; sem arquivo,
+com corrupção, schema futuro ou regras incompatíveis, exibe `CONTINUE --` e a
+confirmação mantém o menu aberto. O checkpoint permanece disponível ao voltar
+ao título ou jogar outro modo e é removido após `CAMPAIGN CLEAR`.
 
 ## Pausa in-game
 

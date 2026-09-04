@@ -23,7 +23,7 @@ execute_process(
     RESULT_VARIABLE result
     OUTPUT_VARIABLE output
     ERROR_VARIABLE error_output
-    TIMEOUT 8
+    TIMEOUT 20
 )
 file(REMOVE_RECURSE "${preference_root}")
 

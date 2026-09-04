@@ -1,4 +1,5 @@
 #include "gameplay/Campaign.hpp"
+#include "gameplay/Session.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -150,12 +151,46 @@ void testCampaignCarryoverRejectsInvalidStateAtomically()
         "inconsistent progression ranks invalidate Campaign carry-over");
 }
 
+void testCampaignCheckpointValidation()
+{
+    using namespace gdp::gameplay;
+    Player player;
+    Weapon weapon;
+    ProgressionSystem progression;
+    constexpr wkc::core::Seed initialSeed = 0x43414D505F534156ULL;
+    constexpr std::uint32_t seedIndex = 1U;
+    CampaignCheckpoint checkpoint{
+        currentCampaignRulesVersion,
+        initialSeed,
+        seedForRun(initialSeed, seedIndex),
+        2U,
+        seedIndex,
+        2U,
+        captureCampaignCarryover(player, weapon, progression),
+    };
+    expect(validateCampaignCheckpoint(checkpoint),
+        "a deterministic floor-entry snapshot is a valid checkpoint");
+
+    checkpoint.currentSeed += 1U;
+    expect(!validateCampaignCheckpoint(checkpoint),
+        "checkpoint seed must match its deterministic sequence index");
+    checkpoint.currentSeed = seedForRun(initialSeed, seedIndex);
+    checkpoint.floor = campaignFloorCount + 1U;
+    expect(!validateCampaignCheckpoint(checkpoint),
+        "checkpoint floor cannot exceed the Campaign length");
+    checkpoint.floor = 2U;
+    checkpoint.rulesVersion += 1U;
+    expect(!validateCampaignCheckpoint(checkpoint),
+        "checkpoint rules version must match the running game");
+}
+
 } // namespace
 
 int main()
 {
     testCampaignCarryoverRoundTrip();
     testCampaignCarryoverRejectsInvalidStateAtomically();
+    testCampaignCheckpointValidation();
     if (failures != 0) {
         std::cerr << failures << " campaign test(s) failed\n";
         return 1;

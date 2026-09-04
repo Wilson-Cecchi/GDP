@@ -78,6 +78,9 @@ private:
     [[nodiscard]] bool savePersistedSettings();
     void loadPersistedSpeedrunRecord();
     [[nodiscard]] bool savePersistedSpeedrunRecord();
+    void loadPersistedCampaignCheckpoint();
+    [[nodiscard]] bool saveCurrentCampaignCheckpoint();
+    [[nodiscard]] bool clearPersistedCampaignCheckpoint();
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
@@ -89,6 +92,8 @@ private:
     gameplay::ProgressionSystem progression_;
     std::optional<gameplay::CampaignCarryover> campaignCarryover_;
     std::optional<gameplay::CampaignCarryover> campaignFloorEntry_;
+    std::optional<gameplay::CampaignCheckpoint> campaignCheckpoint_;
+    std::optional<std::filesystem::path> campaignCheckpointPath_;
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;
     gameplay::FootstepState footsteps_;
@@ -127,6 +132,7 @@ private:
     bool settingsLoaded_{false};
     bool settingsDirty_{false};
     bool speedrunRecordLoaded_{false};
+    bool campaignCheckpointLoaded_{false};
     gameplay::RunRestartMode restartMode_{
         gameplay::RunRestartMode::NextSeed};
     std::uint64_t renderedFrames_{0};

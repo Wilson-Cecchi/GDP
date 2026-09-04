@@ -1,6 +1,8 @@
 # Persistence — Saves e configurações
 
-> **Estado:** especificação técnica inicial do novo GDP.
+> **Estado:** configurações e recorde de Speedrun persistentes; checkpoint único
+> de entrada de andar da Campaign implementado na Fase 81. Slots completos e
+> save no meio do andar permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -29,6 +31,25 @@ silenciosamente um save anterior.
 
 Só adicionar serialização de portas, inimigos, pickups e objetivos quando essa funcionalidade
 for realmente necessária. Até lá, seed + progresso entre andares é mais simples.
+
+## Checkpoint da Campaign
+
+A Fase 81 implementou `CampaignCheckpointStore` como um save único e automático
+em `campaign_checkpoint.toml`, no diretório de preferências da plataforma. Ele
+registra versão do arquivo e das regras, seed inicial e atual, índices de
+tentativa e sequência, andar e o snapshot permanente de Player, Weapon e
+Progression capturado na entrada do andar.
+
+O arquivo usa `write temp → flush → reload/validate → rename`. Seeds precisam
+corresponder a `seedForRun`, o andar deve estar entre 1 e 3 e todo recurso,
+capacidade, munição e rank precisa formar um estado válido. Arquivo ausente,
+malformado, futuro ou de regras incompatíveis não habilita `CONTINUE`; campos
+desconhecidos são ignorados para extensão futura.
+
+O checkpoint representa o início do andar, nunca um frame intermediário. Assim,
+Defeat, saída e retorno ao título preservam uma tentativa reproduzível sem
+serializar entidades e portas. `NEXT FLOOR`, replay e nova Campaign substituem
+o arquivo somente após inicialização válida; concluir o terceiro andar o remove.
 
 ## Settings
 

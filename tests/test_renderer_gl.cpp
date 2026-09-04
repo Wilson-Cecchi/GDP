@@ -444,6 +444,18 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuPixels.data());
 
+            gdp::game::visual::HudRenderData mainMenuContinueHud = mainMenuHud;
+            mainMenuContinueHud.mainMenuSelection
+                = gdp::game::visual::HudMainMenuSelection::ContinueCampaign;
+            mainMenuContinueHud.campaignContinueAvailable = true;
+            mainMenuContinueHud.campaignContinueFloor = 2U;
+            const bool renderedMainMenuContinue = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                mainMenuContinueHud);
+            std::vector<std::uint8_t> mainMenuContinuePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mainMenuContinuePixels.data());
+
             gdp::game::visual::HudRenderData mainMenuCampaignHud = mainMenuHud;
             mainMenuCampaignHud.mainMenuSelection
                 = gdp::game::visual::HudMainMenuSelection::Campaign;
@@ -584,6 +596,7 @@ int main()
             std::size_t speedrunRecordChangedChannels = 0;
             std::size_t pauseMenuChangedChannels = 0;
             std::size_t mainMenuChangedChannels = 0;
+            std::size_t mainMenuContinueChangedChannels = 0;
             std::size_t mainMenuCampaignChangedChannels = 0;
             std::size_t mainMenuBestSeedChangedChannels = 0;
             std::size_t mainMenuSelectionChangedChannels = 0;
@@ -697,6 +710,10 @@ int main()
                     if (mainMenuPixels[index + channel] != baseline[index + channel]) {
                         ++mainMenuChangedChannels;
                     }
+                    if (mainMenuContinuePixels[index + channel]
+                        != mainMenuPixels[index + channel]) {
+                        ++mainMenuContinueChangedChannels;
+                    }
                     if (mainMenuCampaignPixels[index + channel]
                         != mainMenuPixels[index + channel]) {
                         ++mainMenuCampaignChangedChannels;
@@ -785,6 +802,8 @@ int main()
                 && speedrunRecordChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
+                && renderedMainMenuContinue
+                && mainMenuContinueChangedChannels > 100U
                 && renderedMainMenuCampaign
                 && mainMenuCampaignChangedChannels > 100U
                 && renderedMainMenuBestSeed

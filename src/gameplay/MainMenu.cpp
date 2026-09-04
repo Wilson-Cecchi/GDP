@@ -47,6 +47,8 @@ MainMenuCommand activateMainMenuSelection(MainMenuState& state) noexcept
     case MainMenuOption::StartRun:
         closeMainMenu(state);
         return MainMenuCommand::StartRun;
+    case MainMenuOption::ContinueCampaign:
+        return MainMenuCommand::ContinueCampaign;
     case MainMenuOption::Campaign:
         closeMainMenu(state);
         return MainMenuCommand::Campaign;

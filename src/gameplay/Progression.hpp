@@ -40,6 +40,8 @@ struct ProgressionState {
     std::uint32_t vitalityRank{0U};
     std::uint32_t firepowerRank{0U};
     std::uint32_t capacityRank{0U};
+
+    constexpr bool operator==(const ProgressionState&) const noexcept = default;
 };
 
 struct ProgressionUpdate {

@@ -10,6 +10,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "gameplay/Speedrun.hpp"
+#include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SpeedrunRecordStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "platform/SdlInput.hpp"
@@ -441,6 +442,7 @@ bool Application::initialize()
 
     loadPersistedSettings();
     loadPersistedSpeedrunRecord();
+    loadPersistedCampaignCheckpoint();
 
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
     (void)audio_->initialize(!config_.headless);
@@ -670,6 +672,11 @@ bool Application::initializeRun()
         if (!SDL_SetWindowRelativeMouseMode(window_, true)) {
             log(LogLevel::Warning, sdlError("Relative mouse mode unavailable"));
         }
+    }
+    if (session_.state().mode == gameplay::RunMode::Campaign
+        && !saveCurrentCampaignCheckpoint()) {
+        log(LogLevel::Warning,
+            "Campaign started without a persistent floor checkpoint");
     }
     gameplay::closeMainMenu(mainMenu_);
     input_ = Input{};
@@ -931,6 +938,10 @@ void Application::processEvents()
                   if (selection == visual::HudMainMenuSelection::Settings) {
                       return gameplay::MainMenuOption::Settings;
                   }
+                  if (selection
+                      == visual::HudMainMenuSelection::ContinueCampaign) {
+                      return gameplay::MainMenuOption::ContinueCampaign;
+                  }
                   if (selection == visual::HudMainMenuSelection::Campaign) {
                       return gameplay::MainMenuOption::Campaign;
                   }
@@ -980,13 +991,17 @@ void Application::processEvents()
         const bool unavailableBestSeed
             = command == gameplay::MainMenuCommand::BestSeed
             && !speedrunRecord_;
+        const bool unavailableContinue
+            = command == gameplay::MainMenuCommand::ContinueCampaign
+            && !campaignCheckpoint_;
         if (command != gameplay::MainMenuCommand::None) {
-            playUiAudio(unavailableBestSeed
+            playUiAudio(unavailableBestSeed || unavailableContinue
                     ? gdp::audio::AudioEventKind::UiBack
                     : gdp::audio::AudioEventKind::UiConfirm);
         }
 
         if (command == gameplay::MainMenuCommand::StartRun
+            || command == gameplay::MainMenuCommand::ContinueCampaign
             || command == gameplay::MainMenuCommand::Campaign
             || command == gameplay::MainMenuCommand::Speedrun
             || command == gameplay::MainMenuCommand::BestSeed) {
@@ -995,25 +1010,50 @@ void Application::processEvents()
                     "Best Seed requested without a local Speedrun record");
                 return;
             }
+            if (unavailableContinue) {
+                log(LogLevel::Info,
+                    "Continue requested without a valid Campaign checkpoint");
+                return;
+            }
             campaignCarryover_.reset();
             campaignFloorEntry_.reset();
-            const gameplay::RunMode mode
-                = command == gameplay::MainMenuCommand::Speedrun
-                    || command == gameplay::MainMenuCommand::BestSeed
-                ? gameplay::RunMode::Speedrun
-                : command == gameplay::MainMenuCommand::Campaign
-                    ? gameplay::RunMode::Campaign
-                : gameplay::RunMode::Standard;
-            bool selectionAccepted = session_.selectRunMode(mode);
-            if (command == gameplay::MainMenuCommand::BestSeed) {
-                selectionAccepted = selectionAccepted
-                    && session_.selectRunSeed(speedrunRecord_->seed);
+            bool selectionAccepted = false;
+            if (command == gameplay::MainMenuCommand::ContinueCampaign) {
+                const gameplay::CampaignCheckpoint& checkpoint
+                    = *campaignCheckpoint_;
+                selectionAccepted = session_.restoreCampaignCheckpoint(
+                    checkpoint.initialSeed,
+                    checkpoint.currentSeed,
+                    checkpoint.runIndex,
+                    checkpoint.seedIndex,
+                    checkpoint.floor);
                 if (selectionAccepted) {
-                    config_.worldSeed = speedrunRecord_->seed;
+                    config_.worldSeed = checkpoint.currentSeed;
+                    campaignCarryover_ = checkpoint.floorEntry;
                     gameplay::closeMainMenu(mainMenu_);
                 }
+            } else {
+                const gameplay::RunMode mode
+                    = command == gameplay::MainMenuCommand::Speedrun
+                        || command == gameplay::MainMenuCommand::BestSeed
+                    ? gameplay::RunMode::Speedrun
+                    : command == gameplay::MainMenuCommand::Campaign
+                        ? gameplay::RunMode::Campaign
+                    : gameplay::RunMode::Standard;
+                selectionAccepted = session_.selectRunMode(mode);
+                if (command == gameplay::MainMenuCommand::BestSeed) {
+                    selectionAccepted = selectionAccepted
+                        && session_.selectRunSeed(speedrunRecord_->seed);
+                    if (selectionAccepted) {
+                        config_.worldSeed = speedrunRecord_->seed;
+                        gameplay::closeMainMenu(mainMenu_);
+                    }
+                }
             }
-            if (command == gameplay::MainMenuCommand::BestSeed) {
+            if (command == gameplay::MainMenuCommand::ContinueCampaign) {
+                log(LogLevel::Info,
+                    "Main menu requested Campaign checkpoint continuation");
+            } else if (command == gameplay::MainMenuCommand::BestSeed) {
                 log(LogLevel::Info, "Main menu requested Best Seed challenge");
             } else if (command == gameplay::MainMenuCommand::Campaign) {
                 log(LogLevel::Info, "Main menu requested Campaign start");
@@ -1598,6 +1638,110 @@ bool Application::savePersistedSpeedrunRecord()
     return true;
 }
 
+void Application::loadPersistedCampaignCheckpoint()
+{
+    if (campaignCheckpointLoaded_) {
+        return;
+    }
+    campaignCheckpointLoaded_ = true;
+    if (config_.headless) {
+        return;
+    }
+
+    char* const preferenceDirectory = SDL_GetPrefPath("WKC", "GDP");
+    if (preferenceDirectory == nullptr) {
+        log(LogLevel::Warning,
+            sdlError("Campaign checkpoint preference path unavailable"));
+        return;
+    }
+    campaignCheckpointPath_
+        = std::filesystem::path{preferenceDirectory}
+        / "campaign_checkpoint.toml";
+    SDL_free(preferenceDirectory);
+
+    const persistence::CampaignCheckpointLoadResult loaded
+        = persistence::loadCampaignCheckpoint(*campaignCheckpointPath_);
+    campaignCheckpoint_ = loaded.checkpoint;
+    switch (loaded.status) {
+    case persistence::CampaignCheckpointLoadStatus::Loaded:
+        log(LogLevel::Info, "Campaign checkpoint loaded from disk");
+        break;
+    case persistence::CampaignCheckpointLoadStatus::Missing:
+        log(LogLevel::Info, "No Campaign checkpoint found");
+        break;
+    case persistence::CampaignCheckpointLoadStatus::Invalid:
+        log(LogLevel::Warning, "Invalid Campaign checkpoint ignored");
+        break;
+    case persistence::CampaignCheckpointLoadStatus::UnsupportedVersion:
+        log(LogLevel::Warning, "Unsupported Campaign checkpoint ignored");
+        break;
+    case persistence::CampaignCheckpointLoadStatus::IncompatibleRules:
+        log(LogLevel::Info,
+            "Campaign checkpoint belongs to an older rules version and was ignored");
+        break;
+    case persistence::CampaignCheckpointLoadStatus::IoError:
+        log(LogLevel::Warning, "Campaign checkpoint could not be read");
+        break;
+    }
+}
+
+bool Application::saveCurrentCampaignCheckpoint()
+{
+    if (session_.state().mode != gameplay::RunMode::Campaign
+        || session_.state().phase != gameplay::SessionPhase::Playing
+        || !campaignFloorEntry_) {
+        return false;
+    }
+    const gameplay::SessionState& state = session_.state();
+    const gameplay::CampaignCheckpoint checkpoint{
+        gameplay::currentCampaignRulesVersion,
+        state.initialSeed,
+        state.currentSeed,
+        state.runIndex,
+        state.seedIndex,
+        state.campaignFloor,
+        *campaignFloorEntry_,
+    };
+    if (!gameplay::validateCampaignCheckpoint(checkpoint)) {
+        log(LogLevel::Warning,
+            "Campaign floor checkpoint failed validation and was not saved");
+        return false;
+    }
+    if (!campaignCheckpointPath_) {
+        log(LogLevel::Warning,
+            "Campaign checkpoint has no writable preference path");
+        return false;
+    }
+    if (!persistence::saveCampaignCheckpoint(
+            *campaignCheckpointPath_, checkpoint)) {
+        log(LogLevel::Warning,
+            "Campaign checkpoint could not be saved; previous file was preserved");
+        return false;
+    }
+    campaignCheckpoint_ = checkpoint;
+    std::ostringstream message;
+    message << "Campaign floor " << state.campaignFloor
+            << " checkpoint saved to disk";
+    log(LogLevel::Info, message.str());
+    return true;
+}
+
+bool Application::clearPersistedCampaignCheckpoint()
+{
+    if (!campaignCheckpointPath_) {
+        campaignCheckpoint_.reset();
+        return config_.headless;
+    }
+    if (!persistence::removeCampaignCheckpoint(*campaignCheckpointPath_)) {
+        log(LogLevel::Warning,
+            "Completed Campaign checkpoint could not be removed");
+        return false;
+    }
+    campaignCheckpoint_.reset();
+    log(LogLevel::Info, "Completed Campaign checkpoint removed from disk");
+    return true;
+}
+
 void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
@@ -2093,6 +2237,12 @@ void Application::fixedUpdate(const double fixedStep)
             log(LogLevel::Info, recordMessage.str());
             (void)savePersistedSpeedrunRecord();
         }
+        if (sessionUpdate.phase == gameplay::SessionPhase::Victory
+            && session_.state().mode == gameplay::RunMode::Campaign
+            && session_.state().campaignFloor
+                >= gameplay::campaignFloorCount) {
+            (void)clearPersistedCampaignCheckpoint();
+        }
         std::ostringstream message;
         message << "Session result: "
                 << gameplay::sessionPhaseName(sessionUpdate.phase)
@@ -2212,6 +2362,10 @@ void Application::render()
         hud.mainMenu = true;
         if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
+        } else if (mainMenu_.selection
+            == gameplay::MainMenuOption::ContinueCampaign) {
+            hud.mainMenuSelection
+                = visual::HudMainMenuSelection::ContinueCampaign;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::Campaign) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Campaign;
         } else if (mainMenu_.selection == gameplay::MainMenuOption::Speedrun) {
@@ -2221,6 +2375,9 @@ void Application::render()
         } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
         }
+        hud.campaignContinueAvailable = campaignCheckpoint_.has_value();
+        hud.campaignContinueFloor
+            = campaignCheckpoint_ ? campaignCheckpoint_->floor : 1U;
         hud.bestSeedAvailable = speedrunRecord_.has_value();
         hud.bestSpeedrunTicks
             = speedrunRecord_ ? speedrunRecord_->bestTicks : 0U;

@@ -82,6 +82,29 @@ bool SessionSystem::selectRunSeed(const wkc::core::Seed seed) noexcept
     return true;
 }
 
+bool SessionSystem::restoreCampaignCheckpoint(
+    const wkc::core::Seed initialSeed,
+    const wkc::core::Seed currentSeed,
+    const std::uint32_t runIndex,
+    const std::uint32_t seedIndex,
+    const std::uint32_t floor) noexcept
+{
+    if (state_.phase != SessionPhase::Playing
+        || state_.elapsedRunTicks != 0U || state_.bossEngaged
+        || floor < 1U || floor > campaignFloorCount
+        || runIndex < seedIndex
+        || currentSeed != seedForRun(initialSeed, seedIndex)) {
+        return false;
+    }
+    state_.mode = RunMode::Campaign;
+    state_.initialSeed = initialSeed;
+    state_.currentSeed = currentSeed;
+    state_.runIndex = runIndex;
+    state_.seedIndex = seedIndex;
+    state_.campaignFloor = floor;
+    return true;
+}
+
 void SessionSystem::advanceRunTimer(const bool gameplayActive) noexcept
 {
     if (state_.phase == SessionPhase::Playing

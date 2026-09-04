@@ -1,5 +1,7 @@
 #include "gameplay/Campaign.hpp"
 
+#include "gameplay/Session.hpp"
+
 #include <cmath>
 
 namespace gdp::gameplay {
@@ -61,6 +63,18 @@ bool restoreCampaignCarryover(
     return player.restoreCampaignProgress(carryover.player)
         && weapon.restoreCampaignProgress(carryover.weapon)
         && progression.restoreCampaignProgress(carryover.progression);
+}
+
+bool validateCampaignCheckpoint(
+    const CampaignCheckpoint& checkpoint) noexcept
+{
+    return checkpoint.rulesVersion == currentCampaignRulesVersion
+        && checkpoint.floor >= 1U
+        && checkpoint.floor <= campaignFloorCount
+        && checkpoint.runIndex >= checkpoint.seedIndex
+        && checkpoint.currentSeed
+            == seedForRun(checkpoint.initialSeed, checkpoint.seedIndex)
+        && validateCampaignCarryover(checkpoint.floorEntry);
 }
 
 } // namespace gdp::gameplay

@@ -209,7 +209,7 @@ diferenciam o estado indisponível do botão ativo com tempo persistido.
 O contrato da Campanha exige início no andar um, avanço exclusivo após Victory,
 seeds derivadas para os andares dois e três, rejeição após Defeat e bloqueio
 além do limite. Replay preserva andar/seed e nova campanha retorna ao primeiro
-andar. Layout e hit test incluem a sexta opção do título; a regressão OpenGL
+andar. Layout e hit test incluem as sete opções do título; a regressão OpenGL
 diferencia seleção de `CAMPAIGN`, timer `FLOOR n/3` e resultado `FLOOR CLEAR`.
 
 O carry-over da Campanha possui gate próprio para round trip de HP, Armor,
@@ -218,6 +218,13 @@ que o spawn do novo andar permaneça intacto e o cooldown seja zerado. Casos com
 NaN, munição acima da capacidade ou ranks inconsistentes são rejeitados antes
 de alterar os sistemas de destino. Restaurar novamente o snapshot de entrada
 também deve desfazer dano e munição gastos durante uma tentativa repetida.
+
+O checkpoint persistente possui gate isolado para ausência, round trip integral,
+substituição atômica, remoção idempotente, temporário, comentários/campos
+futuros, valores malformados, schema desconhecido, regras incompatíveis, NaN e
+seed inconsistente. `SessionSystem` aceita sua restauração apenas antes do
+primeiro tick e sem mutação parcial em entradas inválidas. Layout, mouse e pixels
+OpenGL diferenciam `CONTINUE --` de `CONTINUE F2/3`.
 
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa

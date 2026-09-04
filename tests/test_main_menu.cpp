@@ -25,6 +25,9 @@ void testMainMenuNavigation()
         "main menu starts on Start Run");
 
     moveMainMenuSelection(menu, 1);
+    expect(menu.selection == MainMenuOption::ContinueCampaign,
+        "down selects Continue Campaign");
+    moveMainMenuSelection(menu, 1);
     expect(menu.selection == MainMenuOption::Campaign,
         "down selects Campaign");
     moveMainMenuSelection(menu, 1);
@@ -63,6 +66,10 @@ void testMainMenuActivation()
     expect(activateMainMenuSelection(menu) == MainMenuCommand::Settings
             && menu.active,
         "Settings emits its command without closing the main menu");
+    selectMainMenuOption(menu, MainMenuOption::ContinueCampaign);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::ContinueCampaign
+            && menu.active,
+        "Continue delegates checkpoint availability to the application");
     selectMainMenuOption(menu, MainMenuOption::BestSeed);
     expect(activateMainMenuSelection(menu) == MainMenuCommand::BestSeed
             && menu.active,

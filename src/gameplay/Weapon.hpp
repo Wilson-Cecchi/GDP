@@ -10,12 +10,16 @@ struct WeaponDefinition {
     float range{30.0F};
     std::uint32_t magazineSize{8};
     std::uint32_t reserveMaximum{32};
+
+    constexpr bool operator==(const WeaponDefinition&) const noexcept = default;
 };
 
 struct WeaponCampaignProgress {
     WeaponDefinition definition{};
     std::uint32_t magazineAmmo{0U};
     std::uint32_t reserveAmmo{0U};
+
+    constexpr bool operator==(const WeaponCampaignProgress&) const noexcept = default;
 };
 
 enum class FireReadiness : std::uint8_t {

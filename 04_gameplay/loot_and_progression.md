@@ -9,7 +9,8 @@
 > e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
 > repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
 > A Fase 79 iniciou uma Campanha jogável de três andares; a Fase 80 adicionou
-> carry-over validado de recursos e progressão entre eles.
+> carry-over validado de recursos e progressão entre eles. A Fase 81 tornou a
+> entrada do andar um checkpoint persistente retomável pelo menu principal.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -119,6 +120,13 @@ transitórios. Uma segunda cópia registra a entrada do andar; `REPLAY FLOOR` e
 restart restauram essa base, sem perder os ganhos de andares anteriores nem
 manter dano/munição gastos na tentativa. Título e outros modos descartam os
 snapshots.
+
+Na Fase 81, essa base segura recebe também seed inicial/atual, índices de run e
+seed, andar e versão das regras em `CampaignCheckpoint`. `CONTINUE` restaura
+somente uma sessão ainda não iniciada e regenera deterministicamente o andar;
+estado intermediário de portas, inimigos, pickups e eventos não é transportado.
+Defeat ou encerramento preserva a entrada para nova tentativa. Uma nova Campaign
+substitui o checkpoint quando o andar inicializa, e `CAMPAIGN CLEAR` o remove.
 
 ## Speedrun
 

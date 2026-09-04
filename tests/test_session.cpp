@@ -194,6 +194,41 @@ void testCampaignAdvancesThreeDeterministicFloors()
         "a new Campaign resets its floor while advancing the seed sequence");
 }
 
+void testCampaignCheckpointRestoresOnlyPristineSessions()
+{
+    using namespace gdp;
+    constexpr wkc::core::Seed initialSeed = 0x53415645445F5255ULL;
+    constexpr std::uint32_t seedIndex = 2U;
+    const wkc::core::Seed currentSeed
+        = gameplay::seedForRun(initialSeed, seedIndex);
+    gameplay::SessionSystem restored{999U};
+    expect(restored.restoreCampaignCheckpoint(
+            initialSeed, currentSeed, 4U, seedIndex, 3U)
+            && restored.state().mode == gameplay::RunMode::Campaign
+            && restored.state().initialSeed == initialSeed
+            && restored.state().currentSeed == currentSeed
+            && restored.state().runIndex == 4U
+            && restored.state().seedIndex == seedIndex
+            && restored.state().campaignFloor == 3U,
+        "a valid checkpoint restores its deterministic Campaign session");
+
+    gameplay::SessionSystem invalid{123U};
+    expect(!invalid.restoreCampaignCheckpoint(
+                initialSeed, currentSeed + 1U, 4U, seedIndex, 3U)
+            && !invalid.restoreCampaignCheckpoint(
+                initialSeed, currentSeed, 1U, seedIndex, 3U)
+            && !invalid.restoreCampaignCheckpoint(
+                initialSeed, currentSeed, 4U, seedIndex, 4U)
+            && invalid.state().mode == gameplay::RunMode::Standard
+            && invalid.state().currentSeed == 123U,
+        "inconsistent checkpoint metadata is rejected without mutation");
+
+    invalid.advanceRunTimer();
+    expect(!invalid.restoreCampaignCheckpoint(
+            initialSeed, currentSeed, 4U, seedIndex, 3U),
+        "a checkpoint cannot replace a session after gameplay has started");
+}
+
 void testBossStatusUsesArchetypeAndRoomOwnership()
 {
     using namespace gdp;
@@ -254,6 +289,7 @@ int main()
     testDefeatAndDeterministicRestart();
     testSameSeedReplayPreservesDeterministicSequence();
     testCampaignAdvancesThreeDeterministicFloors();
+    testCampaignCheckpointRestoresOnlyPristineSessions();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();
 

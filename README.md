@@ -315,6 +315,9 @@ especializados das pastas numeradas.
   HP, Armor, capacidades, chaves, upgrades, munição, nível, XP, score e
   contadores. Replay/restart restaura a entrada do andar; spawn, cooldowns e
   vínculos do mundo anterior são reiniciados.
+- **Fase 81 — Continue persistente da Campanha:** cada entrada de andar grava
+  um checkpoint versionado e validado. `CONTINUE Fn/3` restaura a seed, o andar
+  e o progresso permanente após reabrir o jogo; a vitória final remove o save.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -633,6 +636,16 @@ Cada entrada de andar cria ainda uma base própria: `REPLAY FLOOR` e o restart d
 pausa restauram essa base, descartando apenas dano e munição gastos na tentativa.
 Voltar ao título ou começar outro modo elimina ambos os snapshots.
 
+Na Fase 81, a entrada segura do andar também passou a ser persistida em
+`campaign_checkpoint.toml`. O arquivo guarda as versões do schema e das regras,
+seed inicial/atual, índices determinísticos, andar e o `CampaignCarryover`; um
+temporário é relido e comparado antes da troca atômica. `CONTINUE Fn/3` fica
+ativo somente quando todo o conjunto é válido e regenera o mesmo andar desde o
+início, sem serializar portas, inimigos ou eventos no meio do combate. Defeat,
+replay, retorno ao título e encerramento conservam esse ponto; iniciar uma nova
+Campaign o substitui depois que o novo andar termina de inicializar. A vitória
+do terceiro boss remove o checkpoint concluído.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -720,8 +733,8 @@ foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
 gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
-responsivo com `START RUN`, `CAMPAIGN`, `SPEEDRUN`, `BEST SEED`, `SETTINGS` e
-`EXIT GAME`;
+responsivo com `START RUN`, `CONTINUE`, `CAMPAIGN`, `SPEEDRUN`, `BEST SEED`,
+`SETTINGS` e `EXIT GAME`;
 `W/S` ou setas mudam a
 seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
 entidades, eventos, iluminação e materiais específicos só são preparados ao
@@ -729,7 +742,7 @@ confirmar `START RUN`.
 
 O modo `--headless` ignora apenas essa espera interativa e inicia a run
 automaticamente para preservar os testes determinísticos. A regressão OpenGL
-verifica o overlay e suas seis seleções; outra integração encerra ainda no menu
+verifica o overlay e suas sete seleções; outra integração encerra ainda no menu
 e falha se encontrar o log de geração do mundo. O restart da pausa também marca
 a run atual como encerrada antes de repetir a seed, evitando a rejeição de um
 reinício solicitado durante `Playing`.

@@ -6,6 +6,7 @@ namespace gdp::gameplay {
 
 enum class MainMenuOption : std::uint8_t {
     StartRun,
+    ContinueCampaign,
     Campaign,
     Speedrun,
     BestSeed,
@@ -17,6 +18,7 @@ enum class MainMenuOption : std::uint8_t {
 enum class MainMenuCommand : std::uint8_t {
     None,
     StartRun,
+    ContinueCampaign,
     Campaign,
     Speedrun,
     BestSeed,

@@ -41,6 +41,8 @@ struct PlayerCampaignProgress {
     float armor{0.0F};
     float maximumArmor{50.0F};
     std::uint32_t keys{0U};
+
+    constexpr bool operator==(const PlayerCampaignProgress&) const noexcept = default;
 };
 
 class Player {

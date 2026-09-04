@@ -1,0 +1,193 @@
+#include "persistence/CampaignCheckpointStore.hpp"
+
+#include "gameplay/Player.hpp"
+#include "gameplay/Progression.hpp"
+#include "gameplay/Session.hpp"
+#include "gameplay/Weapon.hpp"
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <string>
+#include <string_view>
+#include <system_error>
+
+namespace {
+
+int failures = 0;
+
+void expect(const bool condition, const std::string_view message)
+{
+    if (!condition) {
+        std::cerr << "FAIL: " << message << '\n';
+        ++failures;
+    }
+}
+
+class TemporaryDirectory {
+public:
+    TemporaryDirectory()
+    {
+        const auto suffix = std::chrono::steady_clock::now()
+                                .time_since_epoch().count();
+        path_ = std::filesystem::temp_directory_path()
+            / ("gdp_campaign_checkpoint_" + std::to_string(suffix));
+        std::filesystem::create_directories(path_);
+    }
+
+    ~TemporaryDirectory()
+    {
+        std::error_code error;
+        std::filesystem::remove_all(path_, error);
+    }
+
+    TemporaryDirectory(const TemporaryDirectory&) = delete;
+    TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept
+    {
+        return path_;
+    }
+
+private:
+    std::filesystem::path path_;
+};
+
+void writeText(const std::filesystem::path& path, const std::string_view text)
+{
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output << text;
+}
+
+gdp::gameplay::CampaignCheckpoint makeCheckpoint()
+{
+    using namespace gdp::gameplay;
+    Player player;
+    player.applyDamage(18.0F);
+    player.addKeys(2U);
+    Weapon weapon;
+    weapon.fixedUpdate(1.0F);
+    (void)weapon.tryFire();
+    ProgressionSystem progression;
+    const wkc::core::Seed initialSeed = 0x434845434B504F49ULL;
+    constexpr std::uint32_t seedIndex = 1U;
+    return {
+        currentCampaignRulesVersion,
+        initialSeed,
+        seedForRun(initialSeed, seedIndex),
+        2U,
+        seedIndex,
+        2U,
+        captureCampaignCarryover(player, weapon, progression),
+    };
+}
+
+void testMissingRoundTripReplacementAndRemoval()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "campaign_checkpoint.toml";
+
+    const persistence::CampaignCheckpointLoadResult missing
+        = persistence::loadCampaignCheckpoint(path);
+    expect(missing.status == persistence::CampaignCheckpointLoadStatus::Missing
+            && !missing.checkpoint,
+        "a missing Campaign checkpoint is a valid empty state");
+
+    gameplay::CampaignCheckpoint checkpoint = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, checkpoint),
+        "a valid Campaign floor entry is saved atomically");
+    const persistence::CampaignCheckpointLoadResult loaded
+        = persistence::loadCampaignCheckpoint(path);
+    expect(loaded.status == persistence::CampaignCheckpointLoadStatus::Loaded
+            && loaded.checkpoint == checkpoint,
+        "all deterministic session and carry-over data survive disk round trip");
+    expect(!std::filesystem::exists(path.string() + ".tmp"),
+        "successful checkpoint save leaves no temporary file");
+
+    checkpoint.floorEntry.player.health = 60.0F;
+    expect(persistence::saveCampaignCheckpoint(path, checkpoint)
+            && persistence::loadCampaignCheckpoint(path).checkpoint == checkpoint,
+        "saving again atomically replaces the previous floor entry");
+
+    expect(persistence::removeCampaignCheckpoint(path)
+            && persistence::loadCampaignCheckpoint(path).status
+                == persistence::CampaignCheckpointLoadStatus::Missing
+            && persistence::removeCampaignCheckpoint(path),
+        "checkpoint removal is idempotent and returns to the empty state");
+}
+
+void testInvalidAndVersionedData()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "campaign_checkpoint.toml";
+
+    writeText(path, "version = 99\nrules_version = 1\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
+        "unknown checkpoint schemas are not interpreted as current data");
+
+    writeText(path, "version = 1\nrules_version = 99\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from another Campaign ruleset remain isolated");
+
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 1\n"
+        "initial_seed = broken\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::Invalid,
+        "malformed checkpoint values are rejected safely");
+
+    gameplay::CampaignCheckpoint invalid = makeCheckpoint();
+    invalid.currentSeed += 1U;
+    expect(!persistence::saveCampaignCheckpoint(path, invalid),
+        "an inconsistent deterministic seed is never persisted");
+    invalid = makeCheckpoint();
+    invalid.floorEntry.player.health
+        = std::numeric_limits<float>::quiet_NaN();
+    expect(!persistence::saveCampaignCheckpoint(path, invalid),
+        "non-finite gameplay state is never persisted");
+}
+
+void testCommentsAndFutureFields()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "campaign_checkpoint.toml";
+    const gameplay::CampaignCheckpoint checkpoint = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, checkpoint),
+        "forward compatibility fixture starts from a valid checkpoint");
+    {
+        std::ofstream output(path, std::ios::binary | std::ios::app);
+        output << "# reserved for later versions\n"
+               << "future_field = ignored_by_version_one\n";
+    }
+    const persistence::CampaignCheckpointLoadResult loaded
+        = persistence::loadCampaignCheckpoint(path);
+    expect(loaded.status == persistence::CampaignCheckpointLoadStatus::Loaded
+            && loaded.checkpoint == checkpoint,
+        "comments and unknown future fields remain forward compatible");
+}
+
+} // namespace
+
+int main()
+{
+    testMissingRoundTripReplacementAndRemoval();
+    testInvalidAndVersionedData();
+    testCommentsAndFutureFields();
+    if (failures != 0) {
+        std::cerr << failures << " Campaign checkpoint persistence test(s) failed\n";
+        return 1;
+    }
+    std::cout << "All GDP Campaign checkpoint persistence tests passed\n";
+    return 0;
+}
