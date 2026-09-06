@@ -318,6 +318,9 @@ especializados das pastas numeradas.
 - **Fase 81 — Continue persistente da Campanha:** cada entrada de andar grava
   um checkpoint versionado e validado. `CONTINUE Fn/3` restaura a seed, o andar
   e o progresso permanente após reabrir o jogo; a vitória final remove o save.
+- **Fase 82 — Pressão progressiva da Campanha:** o primeiro andar preserva o
+  balanceamento original; os seguintes aplicam `THREAT 110%` e `120%` à vida,
+  mobilidade e dano dos inimigos, aos eventos e aos budgets de recursos/props.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -645,6 +648,16 @@ início, sem serializar portas, inimigos ou eventos no meio do combate. Defeat,
 replay, retorno ao título e encerramento conservam esse ponto; iniciar uma nova
 Campaign o substitui depois que o novo andar termina de inicializar. A vitória
 do terceiro boss remove o checkpoint concluído.
+
+Na Fase 82, `campaignDifficultyMultiplier()` passou a derivar uma pressão
+determinística exclusivamente do andar: `1.00x`, `1.10x` e `1.20x`. O valor é
+aplicado à vida de inimigos fixos e procedurais, velocidade e dano de todos os
+arquétipos, além dos budgets já parametrizados de eventos, loot e props. Range,
+cadência de ataque, suporte e reparo permanecem inalterados para conservar a
+leitura dos encontros. Standard e Speedrun continuam em `1.00x`; Campanha exibe
+`THREAT` no HUD e título. Como a regra altera o balanceamento reproduzível, a
+versão das regras da Campanha avançou para 2 e checkpoints anteriores são
+rejeitados com segurança.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

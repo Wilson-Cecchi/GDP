@@ -137,9 +137,14 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from another Campaign ruleset remain isolated");
 
+    writeText(path, "version = 1\nrules_version = 1\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from the pre-progression balance are rejected safely");
+
     writeText(path,
         "version = 1\n"
-        "rules_version = 1\n"
+        "rules_version = 2\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

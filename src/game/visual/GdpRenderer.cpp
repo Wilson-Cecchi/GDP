@@ -1947,7 +1947,8 @@ bool GdpRenderer::render(
             ? "SPEEDRUN "
             : hud.campaignMode
                 ? "FLOOR " + std::to_string(hud.campaignFloor) + "/"
-                    + std::to_string(hud.campaignFloorCount) + "  TIME "
+                    + std::to_string(hud.campaignFloorCount) + "  THREAT "
+                    + std::to_string(hud.campaignThreatPercent) + "%  TIME "
                 : "TIME ";
         const std::string timerText = timerPrefix + runTimeText(hud.elapsedRunTicks);
         const int timerWidth = bitmapTextWidth(timerText, hudScale);

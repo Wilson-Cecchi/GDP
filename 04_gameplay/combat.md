@@ -5,7 +5,8 @@
 > na Fase 11, junto do Officer de suporte, Engineer de reparo e IndustrialRobot
 > de três fases. Props destrutíveis e cobertura dinâmica foram validados na
 > Fase 12. Eventos procedurais de sala estão funcionais; Armor do Player foi
-> integrada na Fase 58. A fila desacoplada de sinais de combate, além de spread
+> integrada na Fase 58. A Fase 82 adicionou pressão progressiva por andar na
+> Campanha. A fila desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
 >
@@ -62,6 +63,12 @@ HP. O excedente do mesmo ataque alcança HP, Armor nunca fica negativo e zerar
 somente Armor não mata. A regra independe do arquétipo atacante e não altera o
 pipeline de dano de Enemy/Prop.
 
+Na Campanha, a Fase 82 usa `1.00x`, `1.10x` e `1.20x` nos andares um a três.
+O multiplicador escala vida, velocidade de movimento e dano de Worker, Guard,
+Officer, Engineer e IndustrialRobot. Alcances, intervalos de ataque, comando,
+reparo e transições de fase do Boss não mudam, evitando picos difíceis de ler.
+Standard e Speedrun usam sempre `1.00x`.
+
 ## Eventos
 
 `ShotResult` já separa os resultados lógicos consumidos pela aplicação. A fila
@@ -86,6 +93,7 @@ suporte independente, cura/restauração do Engineer, escolha do alvo reparável
 mais próximo e bloqueio de reparo por sólido/sala. Spread determinístico e weak point entram com suas
 respectivas features. O Boss também testa limiares exatos de HP, três envelopes,
 velocidades/danos/cadências distintos, recuo, perseguição, line of sight,
-isolamento por sala, cooldown e estado Dead. Props acrescentam prioridade do
+isolamento por sala, cooldown e estado Dead. A fábrica de configurações também
+valida a escala neutra, o aumento e o fallback para entrada não finita. Props acrescentam prioridade do
 alvo mais próximo, cobertura, três estados, reparo, colisão reconstruída, drop
 único e proteção de terminal.

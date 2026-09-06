@@ -564,6 +564,35 @@ void testInitialEntityPopulation()
         expect(false, "repeated entity population test world generates");
     }
 
+    WorldGenerationResult harder = generateWorld(12345);
+    EntityManager harderManager;
+    if (harder.world) {
+        const InitialEntitySet harderInitial = populateInitialEntities(
+            *harder.world,
+            harderManager,
+            {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
+            1.2F);
+        const std::vector<EntityId> baselineEnemies = manager.query(EntityKind::Enemy);
+        const std::vector<EntityId> harderEnemies = harderManager.query(EntityKind::Enemy);
+        bool enemyHealthScaled = harderInitial.isValid()
+            && baselineEnemies.size() == harderEnemies.size();
+        for (std::size_t index = 0;
+             enemyHealthScaled && index < baselineEnemies.size(); ++index) {
+            const EnemyData* baselineEnemy
+                = manager.findData<EnemyData>(baselineEnemies[index]);
+            const EnemyData* harderEnemy
+                = harderManager.findData<EnemyData>(harderEnemies[index]);
+            enemyHealthScaled = baselineEnemy != nullptr && harderEnemy != nullptr
+                && baselineEnemy->archetype == harderEnemy->archetype
+                && std::abs(harderEnemy->maximumHealth
+                    - (baselineEnemy->maximumHealth * 1.2F)) < 1.0e-4F;
+        }
+        expect(enemyHealthScaled,
+            "higher threat scales every initial enemy without changing its archetype order");
+    } else {
+        expect(false, "higher-threat entity population test world generates");
+    }
+
     WorldGenerationResult different = generateWorld(54321);
     EntityManager differentManager;
     if (different.world) {

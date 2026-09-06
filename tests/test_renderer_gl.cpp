@@ -410,6 +410,7 @@ int main()
             campaignTimerHud.campaignMode = true;
             campaignTimerHud.campaignFloor = 2U;
             campaignTimerHud.campaignFloorCount = 3U;
+            campaignTimerHud.campaignThreatPercent = 110U;
             const bool renderedCampaignTimer = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {},
                 campaignTimerHud);

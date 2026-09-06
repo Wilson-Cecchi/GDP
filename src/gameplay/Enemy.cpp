@@ -4,9 +4,32 @@
 #include "gameplay/Props.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace gdp::gameplay {
+
+EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexcept
+{
+    const float safeMultiplier = std::clamp(
+        std::isfinite(multiplier) ? multiplier : 1.0F, 0.5F, 2.0F);
+    EnemyDifficultyConfigs configs;
+    configs.worker.moveSpeed *= safeMultiplier;
+    configs.worker.attackDamage *= safeMultiplier;
+    configs.guard.moveSpeed *= safeMultiplier;
+    configs.guard.attackDamage *= safeMultiplier;
+    configs.officer.moveSpeed *= safeMultiplier;
+    configs.officer.attackDamage *= safeMultiplier;
+    configs.engineer.moveSpeed *= safeMultiplier;
+    configs.engineer.attackDamage *= safeMultiplier;
+    configs.industrialRobot.longRangeMoveSpeed *= safeMultiplier;
+    configs.industrialRobot.pressureMoveSpeed *= safeMultiplier;
+    configs.industrialRobot.pursuitMoveSpeed *= safeMultiplier;
+    configs.industrialRobot.longRangeDamage *= safeMultiplier;
+    configs.industrialRobot.pressureDamage *= safeMultiplier;
+    configs.industrialRobot.pursuitDamage *= safeMultiplier;
+    return configs;
+}
 
 EnemyUpdateSummary updateWorkers(
     gdp::entities::EntityManager& manager,

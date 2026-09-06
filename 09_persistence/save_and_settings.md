@@ -51,6 +51,11 @@ Defeat, saída e retorno ao título preservam uma tentativa reproduzível sem
 serializar entidades e portas. `NEXT FLOOR`, replay e nova Campaign substituem
 o arquivo somente após inicialização válida; concluir o terceiro andar o remove.
 
+A Fase 82 avançou `currentCampaignRulesVersion` para 2 porque a pressão por
+andar altera combate e geração de conteúdo. Checkpoints da regra 1 não são
+migrados silenciosamente: ficam indisponíveis, e uma nova Campanha cria um
+checkpoint coerente com o balanceamento atual.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

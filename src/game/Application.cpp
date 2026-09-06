@@ -521,6 +521,9 @@ bool Application::initialize()
 bool Application::initializeRun()
 {
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
+    runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
+        ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
+        : 1.0F;
     world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
     if (!generation.succeeded()) {
         log(LogLevel::Error, "World generation exhausted all deterministic attempts");
@@ -570,7 +573,8 @@ bool Application::initializeRun()
             .health = player_.state().health,
             .armor = player_.state().armor,
             .maximumArmor = player_.state().maximumArmor,
-        });
+        },
+        runDifficulty_);
     if (!initialEntities.isValid()) {
         log(LogLevel::Error, "Initial entity population did not find a START room");
         return false;
@@ -598,7 +602,8 @@ bool Application::initializeRun()
             return false;
         }
         world::RoomEventPlan plan = world::generateRoomEventPlan(
-            room.seed, room.role, room.theme, node->depth, room.enemyZones);
+            room.seed, room.role, room.theme, node->depth, room.enemyZones,
+            runDifficulty_);
         if (!world::validateRoomEventPlan(plan, room.enemyZones).isValid()) {
             log(LogLevel::Error, "Room event plan failed deterministic validation");
             return false;
@@ -687,7 +692,7 @@ bool Application::initializeRun()
                  << " corridors and " << entities_.activeCount()
                  << " entities on attempt " << world_->acceptedAttempt;
     worldSummary << " in " << gameplay::runModeName(session_.state().mode)
-                 << " mode";
+                 << " mode at threat " << runDifficulty_ << 'x';
     log(LogLevel::Info, worldSummary.str());
     if (config_.headless) {
         log(LogLevel::Info, "GDP initialized in headless mode with a validated world");
@@ -1365,6 +1370,7 @@ bool Application::returnToMainMenu()
 {
     campaignCarryover_.reset();
     campaignFloorEntry_.reset();
+    runDifficulty_ = 1.0F;
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
         (void)session_.update(
             false, world::RoomRole::Count, false, false);
@@ -2080,16 +2086,23 @@ void Application::fixedUpdate(const double fixedStep)
     firePending_ = false;
 
     const bool playerWasAlive = player_.state().alive;
+    const gameplay::EnemyDifficultyConfigs difficultyConfigs
+        = gameplay::makeEnemyDifficultyConfigs(runDifficulty_);
     const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
-        entities_, player_, playerRoom, collisionWorld_, step);
+        entities_, player_, playerRoom, collisionWorld_, step,
+        difficultyConfigs.worker);
     const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
-        entities_, player_, playerRoom, collisionWorld_, step);
+        entities_, player_, playerRoom, collisionWorld_, step,
+        difficultyConfigs.guard);
     const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
-        entities_, player_, playerRoom, collisionWorld_, step);
+        entities_, player_, playerRoom, collisionWorld_, step,
+        difficultyConfigs.officer);
     const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
-        entities_, player_, playerRoom, collisionWorld_, step);
+        entities_, player_, playerRoom, collisionWorld_, step,
+        difficultyConfigs.engineer);
     const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
-        entities_, player_, playerRoom, collisionWorld_, step);
+        entities_, player_, playerRoom, collisionWorld_, step,
+        difficultyConfigs.industrialRobot);
     const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
         + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
     if (audio_ && attacksLanded > 0U) {
@@ -2508,7 +2521,10 @@ void Application::render()
     title << " | Score " << progress.score;
     if (session_.state().mode == gameplay::RunMode::Campaign) {
         title << " | Floor " << session_.state().campaignFloor
-              << '/' << gameplay::campaignFloorCount;
+              << '/' << gameplay::campaignFloorCount
+              << " | Threat "
+              << static_cast<unsigned>(std::lround(runDifficulty_ * 100.0F))
+              << '%';
     }
     title << " | Time "
           << visual::runTimeText(session_.state().elapsedRunTicks);
@@ -2717,6 +2733,8 @@ void Application::render()
     hud.campaignMode = session_.state().mode == gameplay::RunMode::Campaign;
     hud.campaignFloor = session_.state().campaignFloor;
     hud.campaignFloorCount = gameplay::campaignFloorCount;
+    hud.campaignThreatPercent = static_cast<std::uint16_t>(
+        std::lround(runDifficulty_ * 100.0F));
     hud.campaignAdvanceAvailable
         = gameplay::canAdvanceCampaign(session_.state());
     hud.speedrunMode = session_.state().mode == gameplay::RunMode::Speedrun;
@@ -2850,6 +2868,7 @@ void Application::render()
 void Application::shutdown()
 {
     running_ = false;
+    runDifficulty_ = 1.0F;
 
     (void)savePersistedSettings();
 

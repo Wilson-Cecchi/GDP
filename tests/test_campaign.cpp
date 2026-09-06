@@ -184,6 +184,19 @@ void testCampaignCheckpointValidation()
         "checkpoint rules version must match the running game");
 }
 
+void testCampaignDifficultyProgression()
+{
+    using namespace gdp::gameplay;
+    expect(near(campaignDifficultyMultiplier(1U), 1.0F),
+        "Campaign floor one preserves the original gameplay balance");
+    expect(near(campaignDifficultyMultiplier(2U), 1.1F)
+            && near(campaignDifficultyMultiplier(3U), 1.2F),
+        "Campaign threat increases by ten percent on each later floor");
+    expect(near(campaignDifficultyMultiplier(0U), 1.0F)
+            && near(campaignDifficultyMultiplier(99U), 1.2F),
+        "Campaign threat clamps invalid floor numbers safely");
+}
+
 } // namespace
 
 int main()
@@ -191,6 +204,7 @@ int main()
     testCampaignCarryoverRoundTrip();
     testCampaignCarryoverRejectsInvalidStateAtomically();
     testCampaignCheckpointValidation();
+    testCampaignDifficultyProgression();
     if (failures != 0) {
         std::cerr << failures << " campaign test(s) failed\n";
         return 1;

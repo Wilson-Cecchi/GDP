@@ -15,6 +15,7 @@ struct InitialEntitySet {
 [[nodiscard]] InitialEntitySet populateInitialEntities(
     World& world,
     gdp::entities::EntityManager& manager,
-    gdp::entities::PlayerCreateInfo player);
+    gdp::entities::PlayerCreateInfo player,
+    float difficulty = 1.0F);
 
 } // namespace gdp::world

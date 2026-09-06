@@ -5,6 +5,7 @@
 #include "world/PropGenerator.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace gdp::world {
 
@@ -16,7 +17,8 @@ bool InitialEntitySet::isValid() const noexcept
 InitialEntitySet populateInitialEntities(
     World& world,
     gdp::entities::EntityManager& manager,
-    gdp::entities::PlayerCreateInfo player)
+    gdp::entities::PlayerCreateInfo player,
+    const float difficulty)
 {
     using namespace gdp::entities;
 
@@ -27,6 +29,8 @@ InitialEntitySet populateInitialEntities(
     if (!hasStartRoom || manager.activeCount() != 0) {
         return result;
     }
+    const float safeDifficulty = std::clamp(
+        std::isfinite(difficulty) ? difficulty : 1.0F, 0.5F, 2.0F);
     std::vector<LootLayout> lootLayouts;
     std::vector<PropLayout> propLayouts;
     lootLayouts.reserve(world.rooms.size());
@@ -39,13 +43,15 @@ InitialEntitySet populateInitialEntities(
             return result;
         }
         LootLayout layout = generateLootLayout(
-            room.seed, room.role, room.theme, node->depth, room.lootZones);
+            room.seed, room.role, room.theme, node->depth, room.lootZones,
+            safeDifficulty);
         if (!validateLootLayout(layout, room.lootZones).isValid()) {
             return result;
         }
         lootLayouts.push_back(std::move(layout));
         PropLayout props = generatePropLayout(
-            room.seed, room.role, room.theme, node->depth, room.propZones);
+            room.seed, room.role, room.theme, node->depth, room.propZones,
+            safeDifficulty);
         if (!validatePropLayout(props, room.propZones).isValid()) {
             return result;
         }
@@ -106,7 +112,7 @@ InitialEntitySet populateInitialEntities(
                 .transform = {.position = positionInRoom(room, {2.4F, 0.0F, -0.5F})},
                 .roomId = room.id,
                 .archetype = EnemyArchetype::Worker,
-                .health = 68.0F,
+                .health = 68.0F * safeDifficulty,
                 .visualSeed = wkc::core::deriveSeed(
                     room.seed, gdp::game::SeedDomain::EnemyVisual, 0),
             }));
@@ -123,7 +129,7 @@ InitialEntitySet populateInitialEntities(
                 .transform = {.position = positionInRoom(room, offset)},
                 .roomId = room.id,
                 .archetype = archetype,
-                .health = health,
+                .health = health * safeDifficulty,
                 .visualSeed = wkc::core::deriveSeed(
                     room.seed,
                     gdp::game::SeedDomain::EnemyVisual,

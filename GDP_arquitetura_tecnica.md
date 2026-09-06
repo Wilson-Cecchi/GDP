@@ -988,6 +988,14 @@ relido/validado antes do rename. A Application resolve o caminho SDL, oferece
 prístina e remove o arquivo na vitória final. Nenhum estado de plataforma,
 Campaign ou serialização foi movido para a WKC Forge.
 
+Na Fase 82, `campaignDifficultyMultiplier` passou a derivar da posição na
+Campanha uma escala `1.00x/1.10x/1.20x`. A Application distribui esse valor aos
+geradores concretos de entidades, eventos, loot e props e às configurações de
+IA, enquanto `HudRenderData` transporta somente o percentual de apresentação.
+Standard e Speedrun permanecem neutros. A versão das regras avançou para 2 para
+que checkpoints anteriores não misturem balanceamentos, sem introduzir qualquer
+conceito de dificuldade ou Campanha na WKC Forge.
+
 ---
 
 # 8. Sistema de seed

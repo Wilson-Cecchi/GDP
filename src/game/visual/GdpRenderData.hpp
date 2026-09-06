@@ -290,6 +290,7 @@ struct HudRenderData {
     bool campaignMode{false};
     std::uint32_t campaignFloor{1U};
     std::uint32_t campaignFloorCount{1U};
+    std::uint16_t campaignThreatPercent{100U};
     bool campaignAdvanceAvailable{false};
     bool speedrunMode{false};
     bool speedrunRecordVisible{false};

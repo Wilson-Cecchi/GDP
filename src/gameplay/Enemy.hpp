@@ -76,6 +76,17 @@ struct IndustrialRobotConfig {
     float pursuitAttackInterval{0.65F};
 };
 
+struct EnemyDifficultyConfigs {
+    WorkerConfig worker{};
+    GuardConfig guard{};
+    OfficerConfig officer{};
+    EngineerConfig engineer{};
+    IndustrialRobotConfig industrialRobot{};
+};
+
+[[nodiscard]] EnemyDifficultyConfigs makeEnemyDifficultyConfigs(
+    float multiplier) noexcept;
+
 struct EnemyUpdateSummary {
     std::size_t idle{0};
     std::size_t chasing{0};

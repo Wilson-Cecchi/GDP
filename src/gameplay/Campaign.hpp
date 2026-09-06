@@ -8,7 +8,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 1U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 2U;
 
 struct CampaignCarryover {
     PlayerCampaignProgress player{};
@@ -43,5 +43,7 @@ struct CampaignCheckpoint {
     ProgressionSystem& progression) noexcept;
 [[nodiscard]] bool validateCampaignCheckpoint(
     const CampaignCheckpoint& checkpoint) noexcept;
+[[nodiscard]] float campaignDifficultyMultiplier(
+    std::uint32_t floor) noexcept;
 
 } // namespace gdp::gameplay

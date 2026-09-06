@@ -10,7 +10,8 @@
 > repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
 > A Fase 79 iniciou uma Campanha jogável de três andares; a Fase 80 adicionou
 > carry-over validado de recursos e progressão entre eles. A Fase 81 tornou a
-> entrada do andar um checkpoint persistente retomável pelo menu principal.
+> entrada do andar um checkpoint persistente retomável pelo menu principal. A
+> Fase 82 adicionou pressão progressiva determinística entre os andares.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -128,6 +129,12 @@ estado intermediário de portas, inimigos, pickups e eventos não é transportad
 Defeat ou encerramento preserva a entrada para nova tentativa. Uma nova Campaign
 substitui o checkpoint quando o andar inicializa, e `CAMPAIGN CLEAR` o remove.
 
+Na Fase 82, cada andar recebe respectivamente `1.00x`, `1.10x` e `1.20x` de
+pressão. Além do combate e dos eventos, o mesmo valor alimenta os parâmetros de
+loot e props: andares posteriores reduzem gradualmente o budget de recursos e
+podem elevar a pressão espacial sem alterar mapa, seed estrutural ou categorias
+obrigatórias. O HUD mostra o percentual ativo.
+
 ## Speedrun
 
 Usa a mesma simulação e geração. A Fase 74 adicionou ao `SessionState` um
@@ -171,5 +178,7 @@ retomar a progressão determinística normal.
 
 ## Dificuldade
 
-Pode alterar dano, densidade, agressividade e recursos. Não deve silenciosamente mudar a
-identidade estrutural da seed sem versão própria.
+A progressão da Campanha altera dano, mobilidade, vida, eventos e budgets de
+recursos/props, mas não muda a identidade estrutural da seed. O multiplicador é
+derivado do andar, limitado ao intervalo da Campanha e coberto por uma versão
+própria de regras. Modos Standard e Speedrun preservam o balanceamento original.

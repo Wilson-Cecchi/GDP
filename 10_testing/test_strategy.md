@@ -226,6 +226,12 @@ seed inconsistente. `SessionSystem` aceita sua restauração apenas antes do
 primeiro tick e sem mutação parcial em entradas inválidas. Layout, mouse e pixels
 OpenGL diferenciam `CONTINUE --` de `CONTINUE F2/3`.
 
+O gate da pressão de Campanha exige multiplicadores exatos de `1.00x`, `1.10x`
+e `1.20x`, clamp de andares inválidos, configuração neutra idêntica ao legado e
+fallback para valores não finitos. População do mundo confirma a escala da vida
+sem reordenar arquétipos; o HUD OpenGL renderiza também `THREAT 110%`. A versão
+2 das regras impede que checkpoints do balanceamento anterior sejam retomados.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

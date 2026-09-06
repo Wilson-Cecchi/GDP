@@ -5,7 +5,9 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/Weapon.hpp"
 
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -18,6 +20,41 @@ void expect(const bool condition, const std::string_view message)
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+bool near(const float first, const float second) noexcept
+{
+    return std::abs(first - second) < 1.0e-5F;
+}
+
+void testEnemyDifficultyConfigs()
+{
+    using namespace gdp::gameplay;
+    const EnemyDifficultyConfigs baseline = makeEnemyDifficultyConfigs(1.0F);
+    expect(near(baseline.worker.moveSpeed, WorkerConfig{}.moveSpeed)
+            && near(baseline.guard.attackDamage, GuardConfig{}.attackDamage)
+            && near(baseline.industrialRobot.pursuitDamage,
+                IndustrialRobotConfig{}.pursuitDamage),
+        "neutral threat keeps every original enemy tuning value");
+
+    const EnemyDifficultyConfigs harder = makeEnemyDifficultyConfigs(1.2F);
+    expect(near(harder.worker.moveSpeed, WorkerConfig{}.moveSpeed * 1.2F)
+            && near(harder.worker.attackDamage, WorkerConfig{}.attackDamage * 1.2F)
+            && near(harder.officer.moveSpeed, OfficerConfig{}.moveSpeed * 1.2F)
+            && near(harder.engineer.attackDamage,
+                EngineerConfig{}.attackDamage * 1.2F)
+            && near(harder.industrialRobot.longRangeDamage,
+                IndustrialRobotConfig{}.longRangeDamage * 1.2F),
+        "higher threat scales enemy mobility and damage consistently");
+    expect(near(harder.worker.attackInterval, WorkerConfig{}.attackInterval)
+            && near(harder.officer.supportInterval, OfficerConfig{}.supportInterval)
+            && near(harder.engineer.repairAmount, EngineerConfig{}.repairAmount),
+        "threat scaling leaves cadence and support mechanics readable");
+
+    const EnemyDifficultyConfigs invalid = makeEnemyDifficultyConfigs(
+        std::numeric_limits<float>::quiet_NaN());
+    expect(near(invalid.worker.attackDamage, WorkerConfig{}.attackDamage),
+        "non-finite threat falls back to neutral tuning");
 }
 
 void testWeaponLifecycle()
@@ -738,6 +775,7 @@ void testIndustrialRobotLineOfSightAndRoomIsolation()
 
 int main()
 {
+    testEnemyDifficultyConfigs();
     testWeaponLifecycle();
     testDamageLifecycle();
     testDormantEnemyIgnoresCombat();

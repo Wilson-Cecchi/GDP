@@ -2,6 +2,7 @@
 
 #include "gameplay/Session.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace gdp::gameplay {
@@ -75,6 +76,12 @@ bool validateCampaignCheckpoint(
         && checkpoint.currentSeed
             == seedForRun(checkpoint.initialSeed, checkpoint.seedIndex)
         && validateCampaignCarryover(checkpoint.floorEntry);
+}
+
+float campaignDifficultyMultiplier(const std::uint32_t floor) noexcept
+{
+    const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
+    return 1.0F + (static_cast<float>(safeFloor - 1U) * 0.10F);
 }
 
 } // namespace gdp::gameplay
