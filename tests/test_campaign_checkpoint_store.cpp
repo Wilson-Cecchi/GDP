@@ -142,9 +142,14 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from the pre-progression balance are rejected safely");
 
+    writeText(path, "version = 1\nrules_version = 2\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before procedural Armor remain isolated");
+
     writeText(path,
         "version = 1\n"
-        "rules_version = 2\n"
+        "rules_version = 3\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

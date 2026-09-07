@@ -90,6 +90,8 @@ void testRoleBudgetsAndBatch()
         11, RoomRole::DeadEnd, RoomTheme::Storage, 3, zones, 0.5F);
     const LootLayout hard = generateLootLayout(
         11, RoomRole::DeadEnd, RoomTheme::Storage, 3, zones, 2.0F);
+    const LootLayout campaignHard = generateLootLayout(
+        11, RoomRole::DeadEnd, RoomTheme::Storage, 3, zones, 1.2F);
     expect(start.drops.size() == 1U
             && start.drops.front().type == gdp::entities::ItemType::Ammo,
         "START receives one immediately testable tutorial ammo pickup");
@@ -98,11 +100,16 @@ void testRoleBudgetsAndBatch()
     expect(easy.budget > hard.budget && easy.spent <= easy.budget
             && hard.spent <= hard.budget,
         "difficulty scales resource budget without allowing overspend");
+    expect(campaignHard.drops.size() == 2U
+            && campaignHard.drops[0].type == gdp::entities::ItemType::Ammo
+            && campaignHard.drops[1].type == gdp::entities::ItemType::Armor,
+        "DeadEnd preserves ammo and adds guaranteed Armor across Campaign threat");
 
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
     bool foundHealth = false;
     bool foundAmmo = false;
+    bool foundArmor = false;
     for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         const LootLayout layout = generateLootLayout(
             seed, RoomRole::Normal, RoomTheme::Industrial, 4, zones);
@@ -118,13 +125,14 @@ void testRoleBudgetsAndBatch()
         for (const LootDrop& drop : layout.drops) {
             foundHealth = foundHealth || drop.type == gdp::entities::ItemType::Health;
             foundAmmo = foundAmmo || drop.type == gdp::entities::ItemType::Ammo;
+            foundArmor = foundArmor || drop.type == gdp::entities::ItemType::Armor;
         }
     }
     expect(allValid, "1,000 room seeds pass loot budget, zone and spacing gates");
     expect(hashes.size() == 1'000U,
         "1,000 room seeds produce unique canonical loot hashes");
-    expect(foundHealth && foundAmmo,
-        "normal-room batch reaches both functional resource categories");
+    expect(foundHealth && foundAmmo && foundArmor,
+        "normal-room batch reaches all three functional resource categories");
 
     const LootLayout missingZone = generateLootLayout(
         12, RoomRole::Normal, RoomTheme::Industrial, 2, {});

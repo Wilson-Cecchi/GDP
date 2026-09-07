@@ -56,6 +56,11 @@ andar altera combate e geração de conteúdo. Checkpoints da regra 1 não são
 migrados silenciosamente: ficam indisponíveis, e uma nova Campanha cria um
 checkpoint coerente com o balanceamento atual.
 
+A Fase 83 avançou as regras da Campanha para 3 e as do Speedrun para 2, pois a
+entrada de Armor nas tabelas procedurais muda decisões de rota, sobrevivência e
+tempo. Checkpoints da regra 2 e recordes da regra 1 ficam incompatíveis sem
+serem apagados ou reinterpretados.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

@@ -70,6 +70,27 @@ float healthProbability(const RoomTheme theme) noexcept
     return 0.46F;
 }
 
+float armorProbability(const RoomTheme theme) noexcept
+{
+    switch (theme) {
+    case RoomTheme::Security:
+        return 0.34F;
+    case RoomTheme::Storage:
+        return 0.26F;
+    case RoomTheme::Maintenance:
+        return 0.22F;
+    case RoomTheme::Industrial:
+        return 0.18F;
+    case RoomTheme::Laboratory:
+        return 0.14F;
+    case RoomTheme::Office:
+        return 0.10F;
+    case RoomTheme::Cafeteria:
+        return 0.08F;
+    }
+    return 0.18F;
+}
+
 std::uint32_t quantityFor(
     const gdp::entities::ItemType type,
     const wkc::core::Seed seed,
@@ -198,8 +219,14 @@ LootLayout generateLootLayout(
     switch (role) {
     case RoomRole::Start:
     case RoomRole::Arena:
+        addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
+        break;
     case RoomRole::DeadEnd:
         addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
+        if (layout.budget - layout.spent
+            >= itemCost(gdp::entities::ItemType::Armor)) {
+            addDrop(layout, gdp::entities::ItemType::Armor, lootZones);
+        }
         break;
     case RoomRole::Hub:
         addDrop(layout, gdp::entities::ItemType::Health, lootZones);
@@ -218,12 +245,15 @@ LootLayout generateLootLayout(
         layout.seed, gdp::game::SeedDomain::Loot, 1)};
     while (layout.drops.size() < 3U && layout.spent < layout.budget) {
         const std::uint32_t remaining = layout.budget - layout.spent;
-        const bool chooseHealth = remaining >= itemCost(gdp::entities::ItemType::Health)
-            && selection.chance(healthProbability(theme));
-        addDrop(layout,
-            chooseHealth ? gdp::entities::ItemType::Health
-                         : gdp::entities::ItemType::Ammo,
-            lootZones);
+        gdp::entities::ItemType type = gdp::entities::ItemType::Ammo;
+        if (remaining >= itemCost(gdp::entities::ItemType::Armor)
+            && selection.chance(armorProbability(theme))) {
+            type = gdp::entities::ItemType::Armor;
+        } else if (remaining >= itemCost(gdp::entities::ItemType::Health)
+            && selection.chance(healthProbability(theme))) {
+            type = gdp::entities::ItemType::Health;
+        }
+        addDrop(layout, type, lootZones);
     }
     layout.layoutHash = lootLayoutHash(layout);
     return layout;

@@ -11,7 +11,8 @@
 > A Fase 79 iniciou uma Campanha jogável de três andares; a Fase 80 adicionou
 > carry-over validado de recursos e progressão entre eles. A Fase 81 tornou a
 > entrada do andar um checkpoint persistente retomável pelo menu principal. A
-> Fase 82 adicionou pressão progressiva determinística entre os andares.
+> Fase 82 adicionou pressão progressiva determinística entre os andares e a
+> Fase 83 integrou Armor à geração procedural.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -28,8 +29,9 @@ RoomRole + RoomTheme + depth + difficulty + LootSeed
 
 `generateLootLayout()` implementa esse fluxo usando somente `SeedDomain::Loot`.
 START garante Ammo; Hub garante Health; Arena e DeadEnd garantem Ammo; Secret
-garante uma Key e Health; Boss não recebe recurso antes da luta. Normal usa a
-preferência temática entre Health e Ammo. Dificuldade escala o budget sem
+garante uma Key e Health; Boss não recebe recurso antes da luta. DeadEnd também
+prioriza Armor enquanto houver budget; Normal e Arena sorteiam entre Health,
+Ammo e Armor com pesos temáticos. Dificuldade escala o budget sem
 permitir overspend e cada layout possui hash canônico.
 
 ## Categorias
@@ -48,9 +50,10 @@ handle da sala e só então faz flush. Jogador morto não coleta.
 
 O renderer usa formas mínimas emissivas verdes, amarelas, ciano e azul para
 Health, Ammo, Key e Armor. Assets procedurais específicos permanecem para uma
-etapa visual posterior. Nesta fase as tabelas procedurais continuam sorteando
-somente Health/Ammo/Key, preservando hashes e distribuição; Armor chega ao fluxo
-jogável pela recompensa Vitality.
+etapa visual posterior. Desde a Fase 83, Armor também aparece no layout
+procedural: Security, Storage e Maintenance possuem os maiores pesos, sem
+consumir o RNG estrutural do mundo. A recompensa Vitality continua sendo uma
+fonte independente de Armor.
 
 ## Progressão de sessão
 

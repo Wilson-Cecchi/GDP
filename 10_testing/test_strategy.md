@@ -232,6 +232,12 @@ fallback para valores não finitos. População do mundo confirma a escala da vi
 sem reordenar arquétipos; o HUD OpenGL renderiza também `THREAT 110%`. A versão
 2 das regras impede que checkpoints do balanceamento anterior sejam retomados.
 
+O gate da Fase 83 exige Ammo + Armor em DeadEnd sob toda a faixa de pressão da
+Campanha e observa Health, Ammo e Armor em 1.000 seeds de salas normais. A
+população representativa precisa conter Armor e continuar correspondendo
+exatamente aos layouts validados. Stores isolam checkpoint da regra 2 e recorde
+de Speedrun da regra 1 após a atualização de balanceamento.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

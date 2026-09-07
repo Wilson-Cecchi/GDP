@@ -321,6 +321,9 @@ especializados das pastas numeradas.
 - **Fase 82 — Pressão progressiva da Campanha:** o primeiro andar preserva o
   balanceamento original; os seguintes aplicam `THREAT 110%` e `120%` à vida,
   mobilidade e dano dos inimigos, aos eventos e aos budgets de recursos/props.
+- **Fase 83 — Armor no loot procedural:** becos sem saída agora entregam Ammo e
+  Armor nas dificuldades jogáveis; salas comuns e arenas podem sortear Armor
+  por tema, usando a mesma substream, budget, placement e validação do loot.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -399,7 +402,7 @@ mesmos contratos determinísticos do restante do elenco.
 
 O primeiro incremento da Fase 12 deriva loot exclusivamente da substream
 `Loot`, combinando papel, tema, profundidade, dificuldade, orçamento e as zonas
-válidas da sala. `Health`, `Ammo` e `Key` recebem quantidade e posição
+válidas da sala. `Health`, `Ammo`, `Key` e, desde a Fase 83, `Armor` recebem quantidade e posição
 determinísticas, sem ocupar connectors. A START contém uma caixa de munição
 para teste imediato; recursos cheios não consomem pickups, enquanto coleta
 válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
@@ -658,6 +661,14 @@ leitura dos encontros. Standard e Speedrun continuam em `1.00x`; Campanha exibe
 `THREAT` no HUD e título. Como a regra altera o balanceamento reproduzível, a
 versão das regras da Campanha avançou para 2 e checkpoints anteriores são
 rejeitados com segurança.
+
+Na Fase 83, Armor deixou de existir apenas como recompensa de Vitality e entrou
+na tabela procedural. `DeadEnd` prioriza a combinação Ammo + Armor dentro do
+budget atual; Normal e Arena podem selecionar Armor com pesos por tema, maiores
+em Security, Storage e Maintenance. A quantidade continua escalando por
+profundidade e a coleta cheia preserva o pickup no chão. Como a distribuição
+afeta rotas e tempo, `currentCampaignRulesVersion` avançou para 3 e
+`currentSpeedrunRulesVersion` para 2; saves e recordes antigos ficam isolados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

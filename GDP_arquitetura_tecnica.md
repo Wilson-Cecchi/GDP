@@ -996,6 +996,13 @@ Standard e Speedrun permanecem neutros. A versão das regras avançou para 2 par
 que checkpoints anteriores não misturem balanceamentos, sem introduzir qualquer
 conceito de dificuldade ou Campanha na WKC Forge.
 
+Na Fase 83, `LootGenerator` passou a selecionar Armor pela mesma substream
+isolada que já governa os recursos. DeadEnd prioriza Ammo + Armor quando o
+budget permite; Normal e Arena aplicam pesos temáticos sem alterar o grafo ou o
+fingerprint estrutural. A mecânica reutiliza `ItemType::Armor`, coleta e visual
+concreto existentes. As regras da Campanha/Speedrun foram versionadas em 3/2
+para impedir comparação ou retomada silenciosa sob tabelas diferentes.
+
 ---
 
 # 8. Sistema de seed
