@@ -1024,6 +1024,11 @@ Todos os arquétipos o reutilizam, mas configuração de IA, identidade do Enemy
 decisão de rota permanecem no GDP. A WKC Forge continua fornecendo apenas math,
 tempo e contratos genéricos; as regras Campaign/Speedrun avançaram para 6/5.
 
+Na Fase 87, `gdp_gameplay` passou a combinar a direção desejada com separação
+local baseada nas entidades vivas da sala antes de consultar colisão. Raios por
+arquétipo e regras de grupo continuam concretos do GDP; não foi introduzido um
+sistema de agentes ou crowd na WKC Forge. Campaign/Speedrun usam regras 7/6.
+
 ---
 
 # 8. Sistema de seed

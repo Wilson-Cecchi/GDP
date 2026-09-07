@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
+#include <vector>
 
 namespace gdp::gameplay {
 namespace {
@@ -28,9 +30,68 @@ wkc::core::Vec3 avoidanceDirection(
     return wkc::core::normalized((desired * 0.35F) + lateral);
 }
 
+float enemyCollisionRadius(
+    const gdp::entities::EnemyArchetype archetype) noexcept
+{
+    return archetype == gdp::entities::EnemyArchetype::IndustrialRobot
+        ? 0.52F : 0.35F;
+}
+
+wkc::core::Vec3 separationDirection(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    const wkc::core::Vec3 position,
+    const wkc::core::Vec3 desiredDirection,
+    const float ownRadius) noexcept
+{
+    wkc::core::Vec3 repulsion{};
+    for (const gdp::entities::EntityId otherId : enemyIds) {
+        if (otherId == id) {
+            continue;
+        }
+        const gdp::entities::Entity* other = manager.find(otherId);
+        const gdp::entities::EnemyData* otherEnemy
+            = manager.findData<gdp::entities::EnemyData>(otherId);
+        if (other == nullptr || otherEnemy == nullptr || other->roomId != roomId
+            || !otherEnemy->active
+            || otherEnemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
+            continue;
+        }
+        const float preferredDistance = ownRadius
+            + enemyCollisionRadius(otherEnemy->archetype) + 0.20F;
+        const wkc::core::Vec3 offset = position - other->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
+        if (distance >= preferredDistance) {
+            continue;
+        }
+        wkc::core::Vec3 away;
+        if (distance > 1.0e-5F) {
+            away = planarOffset * (1.0F / distance);
+        } else {
+            const float side = id.packed() < otherId.packed() ? -1.0F : 1.0F;
+            away = {-desiredDirection.z * side, 0.0F,
+                desiredDirection.x * side};
+        }
+        const float strength
+            = std::clamp((preferredDistance - distance) / preferredDistance,
+                0.0F, 1.0F);
+        repulsion = repulsion + (away * strength);
+    }
+    if (wkc::core::length(repulsion) <= 1.0e-5F) {
+        return desiredDirection;
+    }
+    return wkc::core::normalized(desiredDirection + (repulsion * 1.4F));
+}
+
 wkc::core::Vec3 moveEnemy(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
     const CollisionWorld& collisionWorld,
     const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
     gdp::entities::EnemyData& enemy,
     const wkc::core::Vec3 position,
     const wkc::core::Vec3 desiredDirection,
@@ -41,6 +102,8 @@ wkc::core::Vec3 moveEnemy(
     if (step <= 0.0F || speed <= 0.0F) {
         return position;
     }
+    const wkc::core::Vec3 steeringDirection = separationDirection(
+        manager, enemyIds, id, roomId, position, desiredDirection, collider.radius);
     enemy.avoidanceTime = std::max(0.0F, enemy.avoidanceTime - step);
     const auto attempt = [&](const wkc::core::Vec3 direction) {
         return collisionWorld.moveCharacter(
@@ -48,25 +111,25 @@ wkc::core::Vec3 moveEnemy(
     };
     if (enemy.avoidanceTime > 0.0F && enemy.avoidanceSide != 0) {
         CharacterMotionResult motion = attempt(
-            avoidanceDirection(desiredDirection, enemy.avoidanceSide));
+            avoidanceDirection(steeringDirection, enemy.avoidanceSide));
         const float requested = speed * step;
         if (motion.collided
             && planarDistanceSquared(position, motion.position)
                 < (requested * requested * 0.04F)) {
             enemy.avoidanceSide = static_cast<std::int8_t>(-enemy.avoidanceSide);
             motion = attempt(avoidanceDirection(
-                desiredDirection, enemy.avoidanceSide));
+                steeringDirection, enemy.avoidanceSide));
         }
         return motion.position;
     }
 
-    const CharacterMotionResult direct = attempt(desiredDirection);
+    const CharacterMotionResult direct = attempt(steeringDirection);
     if (!direct.collided) {
         enemy.avoidanceSide = 0;
         return direct.position;
     }
     const wkc::core::Vec3 displacement = direct.position - position;
-    const float forwardProgress = wkc::core::dot(displacement, desiredDirection);
+    const float forwardProgress = wkc::core::dot(displacement, steeringDirection);
     if (forwardProgress >= speed * step * 0.45F) {
         return direct.position;
     }
@@ -74,11 +137,11 @@ wkc::core::Vec3 moveEnemy(
     enemy.avoidanceSide = ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
     enemy.avoidanceTime = 1.6F;
     CharacterMotionResult detour = attempt(
-        avoidanceDirection(desiredDirection, enemy.avoidanceSide));
+        avoidanceDirection(steeringDirection, enemy.avoidanceSide));
     if (planarDistanceSquared(position, detour.position) <= 1.0e-8F) {
         enemy.avoidanceSide = static_cast<std::int8_t>(-enemy.avoidanceSide);
         detour = attempt(avoidanceDirection(
-            desiredDirection, enemy.avoidanceSide));
+            steeringDirection, enemy.avoidanceSide));
     }
     return detour.position;
 }
@@ -129,7 +192,9 @@ EnemyUpdateSummary updateWorkers(
     config.attackDamage = std::max(config.attackDamage, 0.0F);
     config.attackInterval = std::max(config.attackInterval, 0.0F);
 
-    for (const gdp::entities::EntityId id : manager.query(EntityKind::Enemy)) {
+    const std::vector<gdp::entities::EntityId> enemyIds
+        = manager.query(EntityKind::Enemy);
+    for (const gdp::entities::EntityId id : enemyIds) {
         Entity* entity = manager.find(id);
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
@@ -171,7 +236,8 @@ EnemyUpdateSummary updateWorkers(
         }
         const wkc::core::Vec3 direction = planarOffset * (1.0F / distance);
         entity->transform.position = moveEnemy(
-            collisionWorld, id, *enemy, entity->transform.position,
+            manager, enemyIds, collisionWorld, id, roomId, *enemy,
+            entity->transform.position,
             direction, config.moveSpeed, step,
             {.radius = 0.35F, .height = 1.8F});
     }
@@ -204,7 +270,9 @@ EnemyUpdateSummary updateGuards(
     config.attackDamage = std::max(config.attackDamage, 0.0F);
     config.attackInterval = std::max(config.attackInterval, 0.0F);
 
-    for (const gdp::entities::EntityId id : manager.query(EntityKind::Enemy)) {
+    const std::vector<gdp::entities::EntityId> enemyIds
+        = manager.query(EntityKind::Enemy);
+    for (const gdp::entities::EntityId id : enemyIds) {
         Entity* entity = manager.find(id);
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
@@ -236,7 +304,8 @@ EnemyUpdateSummary updateGuards(
             ++summary.repositioning;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -248,7 +317,8 @@ EnemyUpdateSummary updateGuards(
             ++summary.chasing;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -295,7 +365,9 @@ EnemyUpdateSummary updateOfficers(
     config.supportInterval = std::max(config.supportInterval, 0.0F);
     config.allyCooldownReduction = std::max(config.allyCooldownReduction, 0.0F);
 
-    for (const gdp::entities::EntityId id : manager.query(EntityKind::Enemy)) {
+    const std::vector<gdp::entities::EntityId> enemyIds
+        = manager.query(EntityKind::Enemy);
+    for (const gdp::entities::EntityId id : enemyIds) {
         Entity* entity = manager.find(id);
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
@@ -318,7 +390,7 @@ EnemyUpdateSummary updateOfficers(
 
         if (enemy->supportCooldown <= 0.0F && config.allyCooldownReduction > 0.0F) {
             std::size_t supported = 0;
-            for (const gdp::entities::EntityId allyId : manager.query(EntityKind::Enemy)) {
+            for (const gdp::entities::EntityId allyId : enemyIds) {
                 if (allyId == id) {
                     continue;
                 }
@@ -362,7 +434,8 @@ EnemyUpdateSummary updateOfficers(
             ++summary.repositioning;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -374,7 +447,8 @@ EnemyUpdateSummary updateOfficers(
             ++summary.chasing;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -424,7 +498,8 @@ EnemyUpdateSummary updateEngineers(
     config.repairInterval = std::max(config.repairInterval, 0.0F);
     config.repairAmount = std::max(config.repairAmount, 0.0F);
 
-    for (const EntityId id : manager.query(EntityKind::Enemy)) {
+    const std::vector<EntityId> enemyIds = manager.query(EntityKind::Enemy);
+    for (const EntityId id : enemyIds) {
         Entity* entity = manager.find(id);
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
@@ -442,7 +517,7 @@ EnemyUpdateSummary updateEngineers(
             float nearestDistance = std::numeric_limits<float>::max();
             const wkc::core::Vec3 repairOrigin
                 = entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F};
-            for (const EntityId allyId : manager.query(EntityKind::Enemy)) {
+            for (const EntityId allyId : enemyIds) {
                 if (allyId == id || config.repairAmount <= 0.0F) {
                     continue;
                 }
@@ -528,7 +603,8 @@ EnemyUpdateSummary updateEngineers(
             ++summary.repositioning;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -539,7 +615,8 @@ EnemyUpdateSummary updateEngineers(
             ++summary.chasing;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
@@ -622,7 +699,9 @@ EnemyUpdateSummary updateIndustrialRobots(
     config.pressureAttackInterval = std::max(config.pressureAttackInterval, 0.0F);
     config.pursuitAttackInterval = std::max(config.pursuitAttackInterval, 0.0F);
 
-    for (const gdp::entities::EntityId id : manager.query(EntityKind::Enemy)) {
+    const std::vector<gdp::entities::EntityId> enemyIds
+        = manager.query(EntityKind::Enemy);
+    for (const gdp::entities::EntityId id : enemyIds) {
         Entity* entity = manager.find(id);
         EnemyData* enemy = manager.findData<EnemyData>(id);
         if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
@@ -683,7 +762,8 @@ EnemyUpdateSummary updateIndustrialRobots(
             ++summary.repositioning;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
             }
@@ -694,7 +774,8 @@ EnemyUpdateSummary updateIndustrialRobots(
             ++summary.chasing;
             if (step > 0.0F) {
                 entity->transform.position = moveEnemy(
-                    collisionWorld, id, *enemy, entity->transform.position,
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
             }

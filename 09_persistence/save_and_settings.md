@@ -76,6 +76,10 @@ contornam cobertura alteram sobrevivência e tempo. O compromisso lateral é
 estado transitório de cada Enemy e não pertence ao checkpoint de entrada do
 andar; o schema continua em 2.
 
+A Fase 87 avançou as regras da Campanha/Speedrun para 7/6 porque a separação de
+grupos altera posições de tiro e tempos. Nenhum dado novo é persistente: o
+steering é recalculado do estado vivo da sala, mantendo o checkpoint schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

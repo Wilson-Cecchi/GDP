@@ -258,6 +258,11 @@ posição final com a mesma seed. As regressões anteriores continuam cobrindo
 movimento direto, recuo, line of sight, sala e morte. Stores isolam as regras
 5/4 das regras atuais Campaign/Speedrun 6/5.
 
+O gate da Fase 87 inicia dois Workers na mesma coordenada, executa 360 passos e
+exige separação horizontal mínima de `0,65 m`. Uma segunda fixture com as mesmas
+identidades deve reproduzir ambas as posições exatamente. Campaign/Speedrun
+isolam as regras anteriores 6/5 das atuais 7/6.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

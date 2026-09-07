@@ -116,3 +116,6 @@ fixed update, bloqueio de duplicata e restauração do perfil-base.
 O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
 e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
 na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.
+Na Fase 87, dois Workers iniciam sobrepostos e precisam separar-se durante a
+perseguição sem perder determinismo. A regressão exige ao menos `0,65 m` entre
+os centros após 360 passos e igualdade exata em uma segunda execução.

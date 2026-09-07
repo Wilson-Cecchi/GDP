@@ -333,6 +333,9 @@ especializados das pastas numeradas.
 - **Fase 86 — Desvio local dos inimigos:** Worker, Guard, Officer, Engineer e
   IndustrialRobot contornam obstáculos quando o avanço direto bloqueia. O lado
   é derivado da identidade da entidade e permanece estável por uma janela curta.
+- **Fase 87 — Separação de combate:** inimigos vivos e ativos da mesma sala
+  preservam espaço pessoal durante avanço e recuo. Sobreposições exatas usam
+  desempate estável por `EntityId`, sem criar colisão rígida ou travar grupos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -703,6 +706,13 @@ e mantém essa decisão por `1,6 s`, evitando oscilação a cada frame. Se o lad
 também bloquear, tenta o oposto sem atravessar colisão, bounds ou sala. O estado
 é descartado na morte e nunca entra em save; caminhos e tempos de combate podem
 mudar, portanto as regras da Campanha/Speedrun avançaram para 6/5.
+
+Na Fase 87, o mesmo movimento passou a combinar a direção tática com repulsão
+dos aliados próximos. A distância desejada soma os raios dos dois inimigos e
+`0,20 m`; o IndustrialRobot contribui com seu raio maior. Apenas inimigos vivos,
+ativos e no mesmo `roomId` participam. A resposta é steering, não sólido rígido,
+permitindo que grupos ainda atravessem passagens sem formar uma barreira. Como
+o resultado altera posicionamento e tempo, Campaign/Speedrun avançaram para 7/6.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

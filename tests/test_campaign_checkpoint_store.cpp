@@ -163,6 +163,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before deterministic obstacle avoidance remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 6\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before deterministic enemy separation remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
@@ -170,7 +175,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 2\n"
-        "rules_version = 6\n"
+        "rules_version = 7\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

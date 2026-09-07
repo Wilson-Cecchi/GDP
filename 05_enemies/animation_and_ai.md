@@ -3,6 +3,7 @@
 > **Estado:** ciclo mínimo Idle/Chase/Attack/Dead do Worker validado na Fase 7 e
 > Guard, Officer, Engineer e IndustrialRobot validados na Fase 11. A Fase 86
 > adicionou desvio local determinístico de obstáculos aos cinco arquétipos;
+> a Fase 87 adicionou separação local entre aliados;
 > animação, patrulha, investigação e pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -66,3 +67,9 @@ menos de 45% de progresso frontal, escolhe esquerda ou direita por
 `visualSeed + EntityId` e mantém o desvio por `1,6 s`. Um lado sem deslocamento
 troca para o oposto. A movimentação continua passando por `CollisionWorld`, de
 modo que caixas, paredes, limites e portas continuam autoritativos.
+
+A Fase 87 acrescenta repulsão suave antes desse desvio. Somente aliados vivos e
+ativos no mesmo `roomId` entram no cálculo; a distância preferida combina os
+raios físicos e uma margem de `0,20 m`. Sobreposição exata escolhe sentidos
+opostos pela ordem estável dos `EntityId`. A repulsão não vira um collider, para
+que grupos consigam atravessar portas e corredores estreitos.

@@ -5,6 +5,7 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/Weapon.hpp"
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -396,6 +397,55 @@ void testDeterministicEnemyObstacleAvoidance()
         "Worker routes around an occluding obstacle instead of remaining stuck");
     expect(first == repeated,
         "obstacle avoidance reproduces the same route for the same entity seed");
+}
+
+void testDeterministicEnemySeparation()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const auto runFixture = [&room] {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId first = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 1,
+            .archetype = EnemyArchetype::Worker,
+            .visualSeed = 101U,
+        });
+        const EntityId second = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 1,
+            .archetype = EnemyArchetype::Worker,
+            .visualSeed = 202U,
+        });
+        const WorkerConfig config{
+            .detectionRange = 12.0F,
+            .attackRange = 1.15F,
+            .moveSpeed = 1.35F,
+            .attackDamage = 0.0F,
+            .attackInterval = 1.0F,
+        };
+        for (std::size_t step = 0; step < 360U; ++step) {
+            (void)updateWorkers(
+                manager, player, 1, room, 1.0F / 60.0F, config);
+        }
+        return std::array{
+            manager.find(first)->transform.position,
+            manager.find(second)->transform.position,
+        };
+    };
+
+    const auto positions = runFixture();
+    const auto repeated = runFixture();
+    const wkc::core::Vec3 separation = positions[0] - positions[1];
+    expect(wkc::core::length(
+               {separation.x, 0.0F, separation.z}) >= 0.65F,
+        "Workers converging on one target preserve readable personal space");
+    expect(positions == repeated,
+        "enemy separation reproduces exactly for the same identities and seed");
 }
 
 void testGuardRangedBehavior()
@@ -879,6 +929,7 @@ int main()
     testWorkerBehavior();
     testWorkerLineOfSight();
     testDeterministicEnemyObstacleAvoidance();
+    testDeterministicEnemySeparation();
     testGuardRangedBehavior();
     testGuardLineOfSight();
     testOfficerCommandSupport();
