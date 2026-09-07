@@ -357,6 +357,47 @@ void testWorkerLineOfSight()
         "Worker cannot attack through blocking geometry");
 }
 
+void testDeterministicEnemyObstacleAvoidance()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld blocked{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-1.0F, 0.0F, 2.4F}, {1.0F, 3.0F, 3.6F}}},
+    };
+    const auto runFixture = [&blocked] {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId worker = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 1,
+            .archetype = EnemyArchetype::Worker,
+            .visualSeed = 0xA11CEU,
+        });
+        const WorkerConfig config{
+            .detectionRange = 12.0F,
+            .attackRange = 1.15F,
+            .moveSpeed = 1.35F,
+            .attackDamage = 0.0F,
+            .attackInterval = 1.0F,
+        };
+        for (std::size_t step = 0; step < 360U; ++step) {
+            (void)updateWorkers(
+                manager, player, 1, blocked, 1.0F / 60.0F, config);
+        }
+        return manager.find(worker)->transform.position;
+    };
+
+    const wkc::core::Vec3 first = runFixture();
+    const wkc::core::Vec3 repeated = runFixture();
+    expect(first.z < 2.0F,
+        "Worker routes around an occluding obstacle instead of remaining stuck");
+    expect(first == repeated,
+        "obstacle avoidance reproduces the same route for the same entity seed");
+}
+
 void testGuardRangedBehavior()
 {
     using namespace gdp::entities;
@@ -837,6 +878,7 @@ int main()
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testWorkerBehavior();
     testWorkerLineOfSight();
+    testDeterministicEnemyObstacleAvoidance();
     testGuardRangedBehavior();
     testGuardLineOfSight();
     testOfficerCommandSupport();

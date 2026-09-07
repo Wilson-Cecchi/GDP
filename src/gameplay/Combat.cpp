@@ -133,6 +133,8 @@ DamageOutcome applyDamage(
     enemy->behavior = gdp::entities::EnemyBehaviorState::Dead;
     enemy->attackCooldown = 0.0F;
     enemy->supportCooldown = 0.0F;
+    enemy->avoidanceTime = 0.0F;
+    enemy->avoidanceSide = 0;
     return DamageOutcome::Killed;
 }
 

@@ -71,6 +71,11 @@ Arena altera combate e tempo. Overdrive não é serializado: cooldown e timer s�
 estado transitório e voltam a zero na entrada, replay ou troca de andar. O
 schema do checkpoint permanece 2, pois sua estrutura persistente não mudou.
 
+A Fase 86 avançou as regras da Campanha/Speedrun para 6/5 porque inimigos que
+contornam cobertura alteram sobrevivência e tempo. O compromisso lateral é
+estado transitório de cada Enemy e não pertence ao checkpoint de entrada do
+andar; o schema continua em 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

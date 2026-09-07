@@ -252,6 +252,12 @@ expiração e bloqueio de duplicata. Carry-over prova que Overdrive não atraves
 andares; HUD/pixels cobrem o marcador `OD`, e stores isolam as regras anteriores
 4/3 das regras atuais Campaign/Speedrun 5/4.
 
+O gate da Fase 86 executa 360 fixed updates com uma barreira sólida entre um
+Worker e o Player: o inimigo precisa sair do bloqueio e repetir exatamente a
+posição final com a mesma seed. As regressões anteriores continuam cobrindo
+movimento direto, recuo, line of sight, sala e morte. Stores isolam as regras
+5/4 das regras atuais Campaign/Speedrun 6/5.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

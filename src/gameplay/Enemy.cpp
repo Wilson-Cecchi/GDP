@@ -8,6 +8,82 @@
 #include <limits>
 
 namespace gdp::gameplay {
+namespace {
+
+float planarDistanceSquared(
+    const wkc::core::Vec3 first,
+    const wkc::core::Vec3 second) noexcept
+{
+    const float x = first.x - second.x;
+    const float z = first.z - second.z;
+    return (x * x) + (z * z);
+}
+
+wkc::core::Vec3 avoidanceDirection(
+    const wkc::core::Vec3 desired,
+    const std::int8_t side) noexcept
+{
+    const float sign = side < 0 ? -1.0F : 1.0F;
+    const wkc::core::Vec3 lateral{-desired.z * sign, 0.0F, desired.x * sign};
+    return wkc::core::normalized((desired * 0.35F) + lateral);
+}
+
+wkc::core::Vec3 moveEnemy(
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    gdp::entities::EnemyData& enemy,
+    const wkc::core::Vec3 position,
+    const wkc::core::Vec3 desiredDirection,
+    const float speed,
+    const float step,
+    const CharacterCollider collider) noexcept
+{
+    if (step <= 0.0F || speed <= 0.0F) {
+        return position;
+    }
+    enemy.avoidanceTime = std::max(0.0F, enemy.avoidanceTime - step);
+    const auto attempt = [&](const wkc::core::Vec3 direction) {
+        return collisionWorld.moveCharacter(
+            position, direction * speed, step, collider);
+    };
+    if (enemy.avoidanceTime > 0.0F && enemy.avoidanceSide != 0) {
+        CharacterMotionResult motion = attempt(
+            avoidanceDirection(desiredDirection, enemy.avoidanceSide));
+        const float requested = speed * step;
+        if (motion.collided
+            && planarDistanceSquared(position, motion.position)
+                < (requested * requested * 0.04F)) {
+            enemy.avoidanceSide = static_cast<std::int8_t>(-enemy.avoidanceSide);
+            motion = attempt(avoidanceDirection(
+                desiredDirection, enemy.avoidanceSide));
+        }
+        return motion.position;
+    }
+
+    const CharacterMotionResult direct = attempt(desiredDirection);
+    if (!direct.collided) {
+        enemy.avoidanceSide = 0;
+        return direct.position;
+    }
+    const wkc::core::Vec3 displacement = direct.position - position;
+    const float forwardProgress = wkc::core::dot(displacement, desiredDirection);
+    if (forwardProgress >= speed * step * 0.45F) {
+        return direct.position;
+    }
+
+    enemy.avoidanceSide = ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
+    enemy.avoidanceTime = 1.6F;
+    CharacterMotionResult detour = attempt(
+        avoidanceDirection(desiredDirection, enemy.avoidanceSide));
+    if (planarDistanceSquared(position, detour.position) <= 1.0e-8F) {
+        enemy.avoidanceSide = static_cast<std::int8_t>(-enemy.avoidanceSide);
+        detour = attempt(avoidanceDirection(
+            desiredDirection, enemy.avoidanceSide));
+    }
+    return detour.position;
+}
+
+} // namespace
 
 EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexcept
 {
@@ -94,12 +170,10 @@ EnemyUpdateSummary updateWorkers(
             continue;
         }
         const wkc::core::Vec3 direction = planarOffset * (1.0F / distance);
-        const CharacterMotionResult motion = collisionWorld.moveCharacter(
-            entity->transform.position,
-            direction * config.moveSpeed,
-            step,
+        entity->transform.position = moveEnemy(
+            collisionWorld, id, *enemy, entity->transform.position,
+            direction, config.moveSpeed, step,
             {.radius = 0.35F, .height = 1.8F});
-        entity->transform.position = motion.position;
     }
     return summary;
 }
@@ -161,12 +235,10 @@ EnemyUpdateSummary updateGuards(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * -config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -175,12 +247,10 @@ EnemyUpdateSummary updateGuards(
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -291,12 +361,10 @@ EnemyUpdateSummary updateOfficers(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * -config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -305,12 +373,10 @@ EnemyUpdateSummary updateOfficers(
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -461,12 +527,10 @@ EnemyUpdateSummary updateEngineers(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * -config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -474,12 +538,10 @@ EnemyUpdateSummary updateEngineers(
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position,
-                    towardPlayer * config.moveSpeed,
-                    step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -620,10 +682,10 @@ EnemyUpdateSummary updateIndustrialRobots(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position, towardPlayer * -moveSpeed, step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer * -1.0F, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
-                entity->transform.position = motion.position;
             }
             continue;
         }
@@ -631,10 +693,10 @@ EnemyUpdateSummary updateIndustrialRobots(
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
-                const CharacterMotionResult motion = collisionWorld.moveCharacter(
-                    entity->transform.position, towardPlayer * moveSpeed, step,
+                entity->transform.position = moveEnemy(
+                    collisionWorld, id, *enemy, entity->transform.position,
+                    towardPlayer, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
-                entity->transform.position = motion.position;
             }
             continue;
         }

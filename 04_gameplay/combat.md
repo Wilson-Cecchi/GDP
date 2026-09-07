@@ -113,3 +113,6 @@ alvo mais próximo, cobertura, três estados, reparo, colisão reconstruída, dr
 único e proteção de terminal.
 Overdrive acrescenta ativação única, aumento de dano, cadência, expiração no
 fixed update, bloqueio de duplicata e restauração do perfil-base.
+O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
+e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
+na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.

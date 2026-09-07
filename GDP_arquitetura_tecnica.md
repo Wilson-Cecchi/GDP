@@ -1018,6 +1018,12 @@ visual transporta apenas o estado ativo; carry-over descarta o efeito. As regras
 Campaign/Speedrun 5/4 isolam o novo balanceamento, sem levar pickups, armas ou
 timers específicos para a WKC Forge.
 
+Na Fase 86, a camada concreta `gdp_gameplay` ganhou um helper de movimento que
+mantém compromisso lateral curto quando `CollisionWorld` bloqueia o avanço.
+Todos os arquétipos o reutilizam, mas configuração de IA, identidade do Enemy e
+decisão de rota permanecem no GDP. A WKC Forge continua fornecendo apenas math,
+tempo e contratos genéricos; as regras Campaign/Speedrun avançaram para 6/5.
+
 ---
 
 # 8. Sistema de seed

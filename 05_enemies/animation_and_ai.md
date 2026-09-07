@@ -1,8 +1,9 @@
 # Enemies — Animação e IA
 
 > **Estado:** ciclo mínimo Idle/Chase/Attack/Dead do Worker validado na Fase 7 e
-> Guard, Officer, Engineer e IndustrialRobot validados na Fase 11; animação, patrulha, investigação e
-> navegação avançada permanecem planejadas.
+> Guard, Officer, Engineer e IndustrialRobot validados na Fase 11. A Fase 86
+> adicionou desvio local determinístico de obstáculos aos cinco arquétipos;
+> animação, patrulha, investigação e pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -58,3 +59,10 @@ mínimo. Todo ataque exige line of sight e Dead encerra movimento e transições
 ## Navegação
 
 A* sobre grid/grafo local é suficiente inicialmente. Não criar navmesh universal antes de necessidade.
+
+Antes de um pathfinding global, a Fase 86 implementa o caso frequente de
+obstáculo local. O movimento tenta a direção desejada; quando a colisão deixa
+menos de 45% de progresso frontal, escolhe esquerda ou direita por
+`visualSeed + EntityId` e mantém o desvio por `1,6 s`. Um lado sem deslocamento
+troca para o oposto. A movimentação continua passando por `CollisionWorld`, de
+modo que caixas, paredes, limites e portas continuam autoritativos.

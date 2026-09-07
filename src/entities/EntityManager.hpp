@@ -92,6 +92,8 @@ struct EnemyData {
     wkc::core::Seed visualSeed{0};
     float supportCooldown{0.0F};
     bool active{true};
+    float avoidanceTime{0.0F};
+    std::int8_t avoidanceSide{0};
 };
 
 struct ItemData {
