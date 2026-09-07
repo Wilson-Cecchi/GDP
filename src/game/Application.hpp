@@ -2,6 +2,7 @@
 
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
+#include "game/LaunchSeed.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Campaign.hpp"
 #include "gameplay/Door.hpp"
@@ -48,7 +49,7 @@ struct ApplicationConfig {
     std::optional<std::uint64_t> frameLimit;
     int windowWidth{1280};
     int windowHeight{720};
-    wkc::core::Seed worldSeed{0x4744505F574F524CULL};
+    wkc::core::Seed worldSeed{deterministicDefaultWorldSeed};
 };
 
 class Application {

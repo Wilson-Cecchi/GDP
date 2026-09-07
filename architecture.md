@@ -961,6 +961,13 @@ Idle/Attack. Essa política física continua específica do GDP e reutiliza apen
 matemática e colisão já disponíveis; a WKC Forge não ganhou sistema de crowd.
 Campaign/Speedrun usam regras 8/7.
 
+Na Fase 89, `game/LaunchSeed` passou a separar a política de entrada da geração.
+O executável coleta entropia somente para uma abertura gráfica normal sem
+`--seed`; o helper puro prioriza seed explícita, conserva um default headless e
+transforma a entropia em uma master seed. World, Gameplay, Visual e Audio
+continuam consumindo exclusivamente esse valor estável. A WKC Forge fornece
+apenas hash e tipos genéricos, sem conhecer modos ou argumentos do GDP.
+
 ---
 
 # 8. Sistema de seed

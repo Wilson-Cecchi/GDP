@@ -116,6 +116,11 @@ antes de inicializar a nova seed.
 Enquanto Playing, o título indica `REACH BOSS` ou `DEFEAT BOSS` conforme a sala
 ativa; o índice mostrado ao jogador começa em um.
 
+Na Fase 89, o executável fornece uma seed inicial variável apenas ao abrir uma
+sessão gráfica normal sem `--seed`. `SessionSystem` continua recebendo somente o
+valor pronto e deriva a sequência como antes; replay, Campaign, Continue,
+Speedrun e Best Seed não consultam relógio nem entropia.
+
 ## Campanha
 
 Na Fase 79, `CAMPAIGN` passou a ser um modo selecionável no título e encadeia

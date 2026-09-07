@@ -339,6 +339,9 @@ especializados das pastas numeradas.
 - **Fase 88 — Volumes físicos entre inimigos:** o movimento agora testa todo o
   segmento percorrido contra os raios dos demais inimigos, impedindo que corpos
   se atravessem em grupos densos. Idle e Attack também liberam sobreposições.
+- **Fase 89 — Seed inicial variável:** abrir o jogo normalmente seleciona uma
+  seed nova antes do menu. `--seed`, headless, Continue, Best Seed, replay e
+  restart preservam seus contratos determinísticos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -726,6 +729,15 @@ lenta para abrir espaço sem abandonar `CollisionWorld`. A regra permanece no
 gameplay concreto do GDP e usa ordem estável de entidades. Como posições e
 tempos podem mudar, Campaign/Speedrun avançaram para 8/7.
 
+Na Fase 89, a entrada concreta do executável passou a selecionar uma seed nova
+para cada abertura gráfica sem `--seed`, combinando relógios do sistema com a
+fonte de entropia disponível. Depois dessa escolha, a seed numérica continua
+imutável e todo o mundo permanece reproduzível. Uma seed explícita sempre vence;
+headless sem seed conserva o valor fixo dos testes. Continue, Best Seed,
+`REPLAY SEED` e `RESTART RUN` continuam substituindo ou preservando a seed pelas
+regras anteriores. A geração não mudou, portanto Campaign/Speedrun permanecem
+nas regras 8/7.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -885,6 +897,9 @@ Executar normalmente:
 ```bash
 build/debug/gdp
 ```
+
+Cada nova abertura gráfica sem argumentos escolhe uma seed inicial diferente.
+O valor usado aparece no log e pode ser reproduzido com `--seed`.
 
 Executar sem janela por uma quantidade determinada de frames:
 

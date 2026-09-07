@@ -1,9 +1,14 @@
 #include "game/Application.hpp"
 
+#include "core/Hash.hpp"
+#include "game/LaunchSeed.hpp"
+
 #include <charconv>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <random>
 #include <string_view>
 
 namespace {
@@ -43,11 +48,31 @@ std::optional<std::uint64_t> parseFrameLimit(const std::string_view value)
     return result;
 }
 
+wkc::core::Seed collectLaunchEntropy()
+{
+    const auto wallTime = std::chrono::system_clock::now().time_since_epoch().count();
+    const auto monotonicTime = std::chrono::steady_clock::now().time_since_epoch().count();
+    wkc::core::Seed entropy = wkc::core::hashCombine(
+        static_cast<wkc::core::Seed>(wallTime),
+        static_cast<wkc::core::Seed>(monotonicTime));
+    try {
+        std::random_device source;
+        entropy = wkc::core::hashCombine(
+            entropy, static_cast<wkc::core::Seed>(source()));
+        entropy = wkc::core::hashCombine(
+            entropy, static_cast<wkc::core::Seed>(source()));
+    } catch (...) {
+        // Clocks still provide a changing launch seed when system entropy is unavailable.
+    }
+    return entropy;
+}
+
 } // namespace
 
 int main(const int argc, char* argv[])
 {
     gdp::game::ApplicationConfig config;
+    std::optional<wkc::core::Seed> requestedSeed;
 
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument{argv[index]};
@@ -88,7 +113,7 @@ int main(const int argc, char* argv[])
                 std::cerr << "Invalid world seed: " << argv[index] << '\n';
                 return 2;
             }
-            config.worldSeed = *seed;
+            requestedSeed = *seed;
             continue;
         }
 
@@ -96,6 +121,11 @@ int main(const int argc, char* argv[])
         printUsage(argv[0]);
         return 2;
     }
+
+    const wkc::core::Seed launchEntropy
+        = !config.headless && !requestedSeed ? collectLaunchEntropy() : 0U;
+    config.worldSeed = gdp::game::selectLaunchSeed(
+        config.headless, requestedSeed, launchEntropy);
 
     gdp::game::Application application{config};
     return application.run();

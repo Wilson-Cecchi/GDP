@@ -290,6 +290,7 @@ add_executable(
     gdp
     src/main.cpp
     src/game/Application.cpp
+    src/game/LaunchSeed.cpp
 )
 
 target_link_libraries(
@@ -335,6 +336,18 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME gdp_seed_domain_systems COMMAND gdp_seed_domain_tests)
     set_tests_properties(gdp_seed_domain_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(
+        gdp_launch_seed_tests
+        tests/test_launch_seed.cpp
+        src/game/LaunchSeed.cpp
+    )
+    target_link_libraries(gdp_launch_seed_tests PRIVATE wkc_forge_core gdp_world)
+    gdp_enable_warnings(gdp_launch_seed_tests)
+    gdp_enable_sanitizers(gdp_launch_seed_tests)
+
+    add_test(NAME launch_seed_systems COMMAND gdp_launch_seed_tests)
+    set_tests_properties(launch_seed_systems PROPERTIES TIMEOUT 10)
 
     add_executable(wkc_forge_platform_tests tests/test_input.cpp)
     target_link_libraries(wkc_forge_platform_tests PRIVATE wkc_forge_platform)

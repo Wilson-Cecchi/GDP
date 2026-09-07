@@ -268,6 +268,12 @@ passos e testa todos os pares a cada atualização. Nenhum par pode reduzir a
 distância horizontal abaixo de `0,68 m`, e duas execuções devem terminar em
 posições idênticas. Os stores isolam regras 7/6 das atuais Campaign/Speedrun 8/7.
 
+O gate da Fase 89 testa a política de lançamento isoladamente: `--seed` vence
+em modo gráfico e headless, headless sem argumento mantém a seed fixa e a mesma
+entropia reproduz o mesmo valor. Entropias distintas precisam gerar seeds e
+fingerprints estruturais diferentes. Os bootstraps headless existentes continuam
+determinísticos e a geração procedural permanece inalterada.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

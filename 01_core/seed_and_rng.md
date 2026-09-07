@@ -6,6 +6,8 @@
 > preservando a derivação e todos os valores golden existentes.
 > Na Fase 54, `Seed`, `GenerationVersion`, `deriveSeed` e `RandomStream` também
 > passaram para `wkc::core`, concluindo a fronteira determinística da engine.
+> Na Fase 89, a camada concreta de entrada passou a escolher uma seed variável
+> no lançamento gráfico normal, sem alterar a reprodução após a escolha.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -121,6 +123,11 @@ Toda mudança deliberada que altera resultados procedurais exige alteração da 
 - RNG global escondido;
 - endereço de memória como aleatoriedade;
 - ordem de threads influenciando resultado.
+
+O relógio e a entropia do sistema podem participar somente da escolha inicial
+de uma execução gráfica sem `--seed`. O número resultante torna-se a master seed
+identificada no log; nenhum gerador consulta relógio ou entropia depois disso.
+Execuções headless e seeds explícitas ignoram essa fonte variável.
 
 ## Testes
 
