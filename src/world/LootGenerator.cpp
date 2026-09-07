@@ -49,6 +49,8 @@ std::uint32_t itemCost(const gdp::entities::ItemType type) noexcept
         return 2U;
     case gdp::entities::ItemType::Weapon:
         return 3U;
+    case gdp::entities::ItemType::Special:
+        return 2U;
     }
     return 0U;
 }
@@ -113,6 +115,8 @@ std::uint32_t quantityFor(
     case gdp::entities::ItemType::Armor:
         return 10U + (5U * std::min(depth, 4U));
     case gdp::entities::ItemType::Weapon:
+        return 1U;
+    case gdp::entities::ItemType::Special:
         return 1U;
     }
     return 1U;
@@ -213,6 +217,8 @@ LootLayout generateLootLayout(
             static_cast<float>(rawBudget) / safeDifficulty)));
     if (role == RoomRole::Hub) {
         layout.budget = std::max(layout.budget, 2U);
+    } else if (role == RoomRole::Arena) {
+        layout.budget = std::max(layout.budget, 3U);
     } else if (role == RoomRole::Secret) {
         layout.budget = std::max(layout.budget, 5U);
     }
@@ -224,8 +230,11 @@ LootLayout generateLootLayout(
 
     switch (role) {
     case RoomRole::Start:
+        addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
+        break;
     case RoomRole::Arena:
         addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
+        addDrop(layout, gdp::entities::ItemType::Special, lootZones);
         break;
     case RoomRole::DeadEnd:
         addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
@@ -286,7 +295,7 @@ LootValidationResult validateLootLayout(
     std::size_t keyCount = 0;
     for (std::size_t index = 0; index < layout.drops.size(); ++index) {
         const LootDrop& drop = layout.drops[index];
-        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Weapon) {
+        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Special) {
             result.errors.push_back(LootValidationError::InvalidDrop);
         }
         keyCount += drop.type == gdp::entities::ItemType::Key ? 1U : 0U;

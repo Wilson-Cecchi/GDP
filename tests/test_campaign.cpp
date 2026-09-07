@@ -45,6 +45,8 @@ void testCampaignCarryoverRoundTrip()
     sourceWeapon.fixedUpdate(1.0F);
     expect(sourceWeapon.tryFire() == FireReadiness::Fired,
         "campaign fixture spends the second magazine round");
+    expect(sourceWeapon.activateOverdrive(),
+        "campaign fixture activates a temporary Arena Overdrive");
 
     const CampaignCarryover carryover = captureCampaignCarryover(
         sourcePlayer, sourceWeapon, sourceProgression);
@@ -85,8 +87,9 @@ void testCampaignCarryoverRoundTrip()
                 == sourceWeapon.reserveCapacity()
             && restoredWeapon.magazineAmmo() == sourceWeapon.magazineAmmo()
             && restoredWeapon.reserveAmmo() == sourceWeapon.reserveAmmo()
-            && near(restoredWeapon.cooldownRemaining(), 0.0F),
-        "weapon upgrades and ammunition persist while cooldown resets");
+            && near(restoredWeapon.cooldownRemaining(), 0.0F)
+            && !restoredWeapon.overdriveActive(),
+        "weapon upgrades and ammunition persist while transient combat state resets");
     expect(restoredProgression.state().level
                 == sourceProgression.state().level
             && restoredProgression.state().experienceIntoLevel

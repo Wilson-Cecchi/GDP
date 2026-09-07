@@ -3,8 +3,8 @@
 > **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,
 > XP, objetivo, evento, resultado e prompts contextuais aparecem no viewport;
 > a Fase 18 acrescenta feedback temporário de combate e eventos e a Fase 58
-> integra Armor. A Fase 82 expõe a pressão do andar da Campanha e a Fase 84
-> identifica Pistol ou Carbine ao lado da munição. O título permanece somente
+> integra Armor. A Fase 82 expõe a pressão do andar da Campanha, a Fase 84
+> identifica Pistol ou Carbine e a Fase 85 indica Overdrive ativo. O título permanece somente
 > como apoio de diagnóstico.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -43,6 +43,10 @@ somente quando a mesma ação é válida ou necessária na simulação.
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o
 pickup é aceito.
+
+Durante Overdrive, a mesma linha acrescenta `OD` entre a identidade da arma e a
+munição. O título diagnóstico mostra também os segundos inteiros restantes; o
+renderer recebe apenas o booleano de apresentação e nunca avança o timer.
 
 Durante a Campanha, a linha do cronômetro inclui `FLOOR n/3` e `THREAT 100%`,
 `110%` ou `120%`. O renderer recebe o percentual pronto em `HudRenderData`; ele

@@ -3,8 +3,8 @@
 > **Estado:** loot procedural, coleta automática e progressão de sessão até o
 > nível 10 implementados na Fase 12; Victory, Defeat e nova run determinística
 > implementados na Fase 13. O runtime de Armor e sua recompensa por Vitality
-> foram integrados na Fase 58; Special e persistência completa entre execuções
-> permanecem planejados. A base determinística do cronômetro de run
+> foram integrados na Fase 58; persistência completa entre execuções permanece
+> planejada. A base determinística do cronômetro de run
 > foi implementada na Fase 74, o modo Speedrun tornou-se selecionável na Fase 75
 > e o recorde pessoal local foi integrado na Fase 76. A Fase 77 adicionou
 > repetição integral da mesma seed; a Fase 78 permite retomar a seed do recorde.
@@ -13,7 +13,8 @@
 > entrada do andar um checkpoint persistente retomável pelo menu principal. A
 > Fase 82 adicionou pressão progressiva determinística entre os andares e a
 > Fase 83 integrou Armor à geração procedural. A Fase 84 tornou Weapon um
-> pickup jogável por meio da Carbine encontrada em salas Secret.
+> pickup jogável por meio da Carbine encontrada em salas Secret. A Fase 85
+> integrou Special como Overdrive temporário garantido em Arenas.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -29,7 +30,7 @@ RoomRole + RoomTheme + depth + difficulty + LootSeed
 ```
 
 `generateLootLayout()` implementa esse fluxo usando somente `SeedDomain::Loot`.
-START garante Ammo; Hub garante Health; Arena e DeadEnd garantem Ammo; Secret
+START garante Ammo; Hub garante Health; Arena garante Ammo e Special; DeadEnd garante Ammo; Secret
 garante uma Key, Health e Weapon; Boss não recebe recurso antes da luta. DeadEnd também
 prioriza Armor enquanto houver budget; Normal e Arena sorteiam entre Health,
 Ammo e Armor com pesos temáticos. Dificuldade escala o budget sem
@@ -37,8 +38,8 @@ permitir overspend e cada layout possui hash canônico.
 
 ## Categorias
 
-Health, Ammo, Key/Objective, Armor e Weapon estão implementados no contrato de
-coleta. Special permanece planejado. Pickups são posicionados nas `lootZones`, mantêm
+Health, Ammo, Key/Objective, Armor, Weapon e Special estão implementados no contrato de
+coleta. Pickups são posicionados nas `lootZones`, mantêm
 separação mínima e não bloqueiam connectors.
 
 ## Coleta
@@ -53,8 +54,13 @@ Weapon equipa a Carbine somente enquanto a Pistol está ativa. O pickup transfer
 os bônus de progressão, aplica seu perfil próprio e permanece disponível quando
 a mesma Carbine já está equipada, impedindo que duplicatas virem fonte de munição.
 
-O renderer usa formas mínimas emissivas verdes, amarelas, ciano, azul e violeta
-para Health, Ammo, Key, Armor e Weapon. A Carbine possui uma silhueta longa
+Special ativa 12 segundos de Overdrive na arma equipada. Durante o efeito, dano
+é multiplicado por `1,5` e o intervalo de tiro por `0,65`; outro Special fica no
+chão até o timer terminar. O estado é deliberadamente transitório e não entra
+no carry-over nem no checkpoint da Campanha.
+
+O renderer usa formas mínimas emissivas verdes, amarelas, ciano, azul, violeta
+e magenta para Health, Ammo, Key, Armor, Weapon e Special. A Carbine possui uma silhueta longa
 provisória para ser distinguida antes da revisão visual. Assets específicos permanecem para uma
 etapa visual posterior. Desde a Fase 83, Armor também aparece no layout
 procedural: Security, Storage e Maintenance possuem os maiores pesos, sem
@@ -87,7 +93,7 @@ dura uma run; na Campanha, a Fase 80 preserva esse estado ao avançar de andar.
 
 O gate executa 1.000 room seeds, exige hashes únicos, budget, placement,
 separação, categorias e key de Secret válidos e protege o hash dourado
-`0x23E65CDDD8252D83`. Testes funcionais cobrem capacidade, clamp, distância,
+`0x8F73F0890E80B4C9`. Testes funcionais cobrem capacidade, clamp, distância,
 sala, jogador morto, remoção e ciclo de vida do Entity Manager.
 
 ## Andar

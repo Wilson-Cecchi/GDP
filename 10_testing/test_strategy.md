@@ -245,6 +245,13 @@ Coleta, população, pixels OpenGL e carry-over cobrem o novo tipo; o store exig
 schema 2 e round trip da identidade, isolando versões antigas de checkpoint e
 recorde.
 
+O gate da Fase 85 exige `Ammo + Special` determinísticos em Arena sob pressão
+de Campanha, presença do pickup no mundo populado e coleta sem desperdício.
+Combate valida 150% de dano, intervalo de 65%, timer pelo fixed update,
+expiração e bloqueio de duplicata. Carry-over prova que Overdrive não atravessa
+andares; HUD/pixels cobrem o marcador `OD`, e stores isolam as regras anteriores
+4/3 das regras atuais Campaign/Speedrun 5/4.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

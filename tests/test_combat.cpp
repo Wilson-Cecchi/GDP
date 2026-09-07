@@ -110,6 +110,33 @@ void testWeaponPickupEquipment()
         "duplicate Carbine pickups cannot refill an already equipped weapon");
 }
 
+void testWeaponOverdrive()
+{
+    using namespace gdp::gameplay;
+    Weapon weapon({
+        .damage = 20.0F,
+        .fireInterval = 0.20F,
+        .magazineSize = 3,
+        .reserveMaximum = 0,
+    });
+    expect(weapon.activateOverdrive(2.0F) && weapon.overdriveActive()
+            && near(weapon.damage(), 30.0F)
+            && near(weapon.overdriveRemaining(), 2.0F),
+        "Overdrive activates once and boosts weapon damage by fifty percent");
+    expect(!weapon.activateOverdrive(5.0F),
+        "active Overdrive rejects duplicate pickups instead of refreshing duration");
+    expect(weapon.tryFire() == FireReadiness::Fired
+            && near(weapon.cooldownRemaining(), 0.13F),
+        "Overdrive reduces the firing interval to sixty-five percent");
+    weapon.fixedUpdate(0.13F);
+    expect(near(weapon.cooldownRemaining(), 0.0F) && weapon.overdriveActive(),
+        "weapon cooldown and temporary effect advance on the same fixed step");
+    weapon.fixedUpdate(2.0F);
+    expect(!weapon.overdriveActive() && near(weapon.overdriveRemaining(), 0.0F)
+            && near(weapon.damage(), 20.0F),
+        "expired Overdrive restores the base weapon profile deterministically");
+}
+
 void testDamageLifecycle()
 {
     using namespace gdp::entities;
@@ -803,6 +830,7 @@ int main()
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
     testWeaponPickupEquipment();
+    testWeaponOverdrive();
     testDamageLifecycle();
     testDormantEnemyIgnoresCombat();
     testHitscanSelectionAndBlocking();

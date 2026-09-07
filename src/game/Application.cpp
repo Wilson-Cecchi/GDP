@@ -1979,6 +1979,9 @@ void Application::fixedUpdate(const double fixedStep)
                     << gameplay::weaponArchetypeName(
                         weapon_.definition().archetype);
         }
+        if (loot.specialsActivated > 0U) {
+            message << " | OVERDRIVE activated";
+        }
         log(LogLevel::Info, message.str());
         if (audio_) {
             audio_->play(gdp::audio::AudioEventKind::Pickup,
@@ -2478,6 +2481,8 @@ void Application::render()
             role = visual::PickupVisualRole::Armor;
         } else if (item->type == entities::ItemType::Weapon) {
             role = visual::PickupVisualRole::Weapon;
+        } else if (item->type == entities::ItemType::Special) {
+            role = visual::PickupVisualRole::Special;
         }
         visiblePickups.push_back({entity->transform.position, role});
     }
@@ -2518,6 +2523,11 @@ void Application::render()
           << " | " << gameplay::weaponArchetypeName(weapon_.definition().archetype)
           << ' ' << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
     title << " | Keys " << player_.state().keys;
+    if (weapon_.overdriveActive()) {
+        title << " | OVERDRIVE "
+              << static_cast<unsigned>(std::ceil(weapon_.overdriveRemaining()))
+              << 's';
+    }
     const gameplay::ProgressionState& progress = progression_.state();
     title << " | Lv " << progress.level << " XP " << progress.experienceIntoLevel;
     const std::uint32_t nextLevelXp = gameplay::experienceForNextLevel(progress.level);
@@ -2736,6 +2746,7 @@ void Application::render()
     hud.reserveAmmo = weapon_.reserveAmmo();
     hud.weapon = weapon_.definition().archetype == gameplay::WeaponArchetype::Carbine
         ? visual::HudWeaponRole::Carbine : visual::HudWeaponRole::Pistol;
+    hud.weaponOverdrive = weapon_.overdriveActive();
     hud.keys = player_.state().keys;
     hud.level = progress.level;
     hud.runTimerVisible = true;

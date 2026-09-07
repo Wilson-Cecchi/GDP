@@ -19,6 +19,7 @@ struct LootCollectionSummary {
     std::uint32_t ammoAdded{0};
     std::uint32_t keysAdded{0};
     std::size_t weaponsEquipped{0};
+    std::size_t specialsActivated{0};
     std::vector<gdp::entities::EntityId> collectedItems;
 };
 

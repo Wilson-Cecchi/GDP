@@ -1011,6 +1011,13 @@ renderer apenas apresenta nome e placeholder. O checkpoint schema v2 persiste
 o arquétipo e as regras Campaign/Speedrun 4/3 isolam execuções anteriores. Nada
 desse inventário específico foi levado para a WKC Forge.
 
+Na Fase 85, `ItemType::Special` passou a ativar um Overdrive temporário na arma
+concreta. Arena garante Ammo + Special pela substream de loot, `Weapon` mantém o
+timer autoritativo no fixed update e `Combat` consulta o dano efetivo. O snapshot
+visual transporta apenas o estado ativo; carry-over descarta o efeito. As regras
+Campaign/Speedrun 5/4 isolam o novo balanceamento, sem levar pickups, armas ou
+timers específicos para a WKC Forge.
+
 ---
 
 # 8. Sistema de seed

@@ -6,7 +6,8 @@
 > de três fases. Props destrutíveis e cobertura dinâmica foram validados na
 > Fase 12. Eventos procedurais de sala estão funcionais; Armor do Player foi
 > integrada na Fase 58. A Fase 82 adicionou pressão progressiva por andar na
-> Campanha e a Fase 84 integrou a Carbine encontrada em salas Secret. A fila
+> Campanha, a Fase 84 integrou a Carbine encontrada em salas Secret e a Fase 85
+> adicionou o Overdrive temporário encontrado em Arenas. A fila
 > desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
@@ -57,6 +58,12 @@ pente de 12 e reserva de 48. Ao equipá-la, os bônus acumulados sobre o dano e 
 reserva-base da Pistol são transportados; munição começa cheia e o cooldown é
 zerado. Recolher outra Carbine não altera nem reabastece a arma atual.
 
+O Special da Fase 85 ativa Overdrive por `12 s`. Enquanto o timer está ativo,
+`Weapon::damage()` retorna 150% do dano atual e cada tiro usa 65% do intervalo
+da arma equipada. O timer e o cooldown avançam pelo mesmo fixed update; ao
+expirar, o perfil-base volta sem mutar `WeaponDefinition`. Um segundo Special
+não reinicia nem acumula duração, evitando extensão infinita do efeito.
+
 ## Dano
 
 `applyDamage()` opera sobre Enemy ou Prop destrutível, ignora IDs inválidos,
@@ -104,3 +111,5 @@ isolamento por sala, cooldown e estado Dead. A fábrica de configurações tamb�
 valida a escala neutra, o aumento e o fallback para entrada não finita. Props acrescentam prioridade do
 alvo mais próximo, cobertura, três estados, reparo, colisão reconstruída, drop
 único e proteção de terminal.
+Overdrive acrescenta ativação única, aumento de dano, cadência, expiração no
+fixed update, bloqueio de duplicata e restauração do perfil-base.

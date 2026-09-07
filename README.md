@@ -327,6 +327,9 @@ especializados das pastas numeradas.
 - **Fase 84 — Carabina secreta:** toda sala Secret contém uma Carbine funcional
   junto de Key e Health. O pickup troca cadência, dano, alcance e capacidades,
   preserva upgrades, não recarrega duplicatas e persiste entre andares.
+- **Fase 85 — Overdrive de Arena:** toda Arena contém Ammo e um pickup Special
+  que ativa 12 segundos de Overdrive. O efeito aumenta dano em 50%, reduz o
+  intervalo de tiro para 65%, bloqueia duplicatas e não atravessa andares.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -405,7 +408,7 @@ mesmos contratos determinísticos do restante do elenco.
 
 O primeiro incremento da Fase 12 deriva loot exclusivamente da substream
 `Loot`, combinando papel, tema, profundidade, dificuldade, orçamento e as zonas
-válidas da sala. `Health`, `Ammo`, `Key`, `Armor` e `Weapon` recebem quantidade e posição
+válidas da sala. `Health`, `Ammo`, `Key`, `Armor`, `Weapon` e `Special` recebem quantidade e posição
 determinísticas, sem ocupar connectors. A START contém uma caixa de munição
 para teste imediato; recursos cheios não consomem pickups, enquanto coleta
 válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
@@ -681,6 +684,14 @@ zera apenas o cooldown transitório. Uma Carbine duplicada permanece no chão,
 evitando recarga infinita. HUD, título e pickup usam identidade visual própria.
 O checkpoint schema v2 serializa o arquétipo, as regras da Campanha avançam
 para 4 e as de Speedrun para 3.
+
+Na Fase 85, Arena passou a garantir `Ammo + Special` mesmo sob a maior pressão
+da Campanha. Special ativa 12 segundos de Overdrive na arma equipada: o dano
+efetivo sobe 50% e o intervalo entre tiros cai para 65% do valor-base. O efeito
+usa somente o fixed update, aparece como `OD` no HUD e com segundos restantes
+no título; enquanto ativo, outro pickup permanece no chão. Overdrive é estado
+transitório: expira deterministicamente e é descartado ao repetir, reiniciar ou
+avançar de andar. As regras da Campanha/Speedrun avançaram para 5/4.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

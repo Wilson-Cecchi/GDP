@@ -94,6 +94,8 @@ void testRoleBudgetsAndBatch()
         11, RoomRole::DeadEnd, RoomTheme::Storage, 3, zones, 2.0F);
     const LootLayout campaignHard = generateLootLayout(
         11, RoomRole::DeadEnd, RoomTheme::Storage, 3, zones, 1.2F);
+    const LootLayout arena = generateLootLayout(
+        11, RoomRole::Arena, RoomTheme::Industrial, 4, zones, 1.2F);
     expect(start.drops.size() == 1U
             && start.drops.front().type == gdp::entities::ItemType::Ammo,
         "START receives one immediately testable tutorial ammo pickup");
@@ -106,6 +108,10 @@ void testRoleBudgetsAndBatch()
             && campaignHard.drops[0].type == gdp::entities::ItemType::Ammo
             && campaignHard.drops[1].type == gdp::entities::ItemType::Armor,
         "DeadEnd preserves ammo and adds guaranteed Armor across Campaign threat");
+    expect(arena.drops.size() == 2U
+            && arena.drops[0].type == gdp::entities::ItemType::Ammo
+            && arena.drops[1].type == gdp::entities::ItemType::Special,
+        "Arena guarantees ammunition and the temporary Overdrive pickup");
 
     std::unordered_set<std::uint64_t> hashes;
     bool allValid = true;
@@ -192,6 +198,12 @@ void testAutomaticLootCollection()
         .type = ItemType::Weapon,
         .quantity = 1,
     });
+    const EntityId special = manager.createItem({
+        .transform = {.position = {0.70F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Special,
+        .quantity = 1,
+    });
     const EntityId otherRoom = manager.createItem({
         .transform = {.position = {0.10F, 0.0F, 0.0F}},
         .roomId = 3,
@@ -206,22 +218,25 @@ void testAutomaticLootCollection()
     });
     const LootCollectionSummary collected
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(collected.itemsInRange == 5U && collected.collected == 5U
+    expect(collected.itemsInRange == 6U && collected.collected == 6U
             && collected.healthRestored == 25.0F && collected.ammoAdded == 2U
             && collected.keysAdded == 1U && collected.armorAdded == 15.0F
-            && collected.weaponsEquipped == 1U,
-        "nearby loot applies resources, objective key and the Carbine");
+            && collected.weaponsEquipped == 1U
+            && collected.specialsActivated == 1U,
+        "nearby loot applies resources, objective key, Carbine and Overdrive");
     expect(player.state().health == 85.0F && weapon.reserveAmmo() == 48U
             && weapon.definition().archetype == WeaponArchetype::Carbine
+            && weapon.overdriveActive()
             && player.state().keys == 1U && player.state().armor == 15.0F,
         "collected resources update the authoritative player and weapon state");
     expect(manager.find(health) == nullptr && manager.find(ammo) == nullptr
             && manager.find(key) == nullptr && manager.find(armor) == nullptr
             && manager.find(carbine) == nullptr
+            && manager.find(special) == nullptr
             && manager.find(otherRoom) != nullptr
             && manager.find(farAway) != nullptr,
         "collection consumes only applied pickups in range and in the active room");
-    expect(manager.flushDestroyed() == 5U,
+    expect(manager.flushDestroyed() == 6U,
         "collected pickups complete the deferred entity lifecycle cleanly");
 
     player.heal(100.0F);
@@ -250,13 +265,20 @@ void testAutomaticLootCollection()
         .type = ItemType::Weapon,
         .quantity = 1,
     });
+    const EntityId duplicateSpecial = manager.createItem({
+        .transform = {.position = {0.50F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Special,
+        .quantity = 1,
+    });
     const LootCollectionSummary blocked
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(blocked.collected == 0U && blocked.blockedByCapacity == 4U
+    expect(blocked.collected == 0U && blocked.blockedByCapacity == 5U
             && manager.find(fullHealth) != nullptr && manager.find(fullAmmo) != nullptr
             && manager.find(fullArmor) != nullptr
-            && manager.find(duplicateCarbine) != nullptr,
-        "full resources and duplicate weapon leave pickups available instead of wasting them");
+            && manager.find(duplicateCarbine) != nullptr
+            && manager.find(duplicateSpecial) != nullptr,
+        "full resources and duplicate equipment leave pickups available instead of wasting them");
 
     player.applyDamage(500.0F);
     expect(collectNearbyLoot(manager, player, weapon, 2, 0.85F).itemsInRange == 0U,

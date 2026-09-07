@@ -66,6 +66,11 @@ avançou para 2 e grava `weapon_archetype` junto dos atributos e munição; sche
 1 não é reinterpretado. As regras da Campanha/Speedrun avançaram para 4/3, pois
 encontrar a Carbine altera sobrevivência, rota e tempo de conclusão.
 
+A Fase 85 avançou as regras da Campanha/Speedrun para 5/4 porque o Special de
+Arena altera combate e tempo. Overdrive não é serializado: cooldown e timer são
+estado transitório e voltam a zero na entrada, replay ou troca de andar. O
+schema do checkpoint permanece 2, pois sua estrutura persistente não mudou.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

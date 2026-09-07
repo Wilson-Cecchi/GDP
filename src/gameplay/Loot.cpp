@@ -73,6 +73,10 @@ LootCollectionSummary collectNearbyLoot(
             applied = weapon.equip(WeaponArchetype::Carbine);
             summary.weaponsEquipped += applied ? 1U : 0U;
             break;
+        case ItemType::Special:
+            applied = weapon.activateOverdrive();
+            summary.specialsActivated += applied ? 1U : 0U;
+            break;
         }
         if (!applied) {
             ++summary.blockedByCapacity;

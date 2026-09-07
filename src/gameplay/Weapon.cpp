@@ -42,9 +42,11 @@ Weapon::Weapon(WeaponDefinition definition)
 
 void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
 {
+    const float step = std::max(fixedStepSeconds, 0.0F);
     cooldownRemaining_ = std::max(
         0.0F,
-        cooldownRemaining_ - std::max(fixedStepSeconds, 0.0F));
+        cooldownRemaining_ - step);
+    overdriveRemaining_ = std::max(0.0F, overdriveRemaining_ - step);
 }
 
 FireReadiness Weapon::tryFire() noexcept
@@ -56,7 +58,8 @@ FireReadiness Weapon::tryFire() noexcept
         return FireReadiness::Empty;
     }
     --magazineAmmo_;
-    cooldownRemaining_ = definition_.fireInterval;
+    cooldownRemaining_ = definition_.fireInterval
+        * (overdriveActive() ? 0.65F : 1.0F);
     return FireReadiness::Fired;
 }
 
@@ -121,6 +124,16 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     return true;
 }
 
+bool Weapon::activateOverdrive(const float durationSeconds) noexcept
+{
+    if (!std::isfinite(durationSeconds) || durationSeconds <= 0.0F
+        || overdriveActive()) {
+        return false;
+    }
+    overdriveRemaining_ = durationSeconds;
+    return true;
+}
+
 bool Weapon::restoreCampaignProgress(
     const WeaponCampaignProgress& progress) noexcept
 {
@@ -139,6 +152,7 @@ bool Weapon::restoreCampaignProgress(
     magazineAmmo_ = progress.magazineAmmo;
     reserveAmmo_ = progress.reserveAmmo;
     cooldownRemaining_ = 0.0F;
+    overdriveRemaining_ = 0.0F;
     return true;
 }
 
@@ -165,6 +179,21 @@ std::uint32_t Weapon::reserveCapacity() const noexcept
 float Weapon::cooldownRemaining() const noexcept
 {
     return cooldownRemaining_;
+}
+
+float Weapon::damage() const noexcept
+{
+    return definition_.damage * (overdriveActive() ? 1.5F : 1.0F);
+}
+
+float Weapon::overdriveRemaining() const noexcept
+{
+    return overdriveRemaining_;
+}
+
+bool Weapon::overdriveActive() const noexcept
+{
+    return overdriveRemaining_ > 0.0F;
 }
 
 } // namespace gdp::gameplay

@@ -47,6 +47,8 @@ public:
         std::uint32_t amount,
         std::uint32_t bonusAmmo = 0U) noexcept;
     [[nodiscard]] bool equip(WeaponArchetype archetype) noexcept;
+    [[nodiscard]] bool activateOverdrive(
+        float durationSeconds = 12.0F) noexcept;
     [[nodiscard]] bool restoreCampaignProgress(
         const WeaponCampaignProgress& progress) noexcept;
 
@@ -55,12 +57,16 @@ public:
     [[nodiscard]] std::uint32_t reserveAmmo() const noexcept;
     [[nodiscard]] std::uint32_t reserveCapacity() const noexcept;
     [[nodiscard]] float cooldownRemaining() const noexcept;
+    [[nodiscard]] float damage() const noexcept;
+    [[nodiscard]] float overdriveRemaining() const noexcept;
+    [[nodiscard]] bool overdriveActive() const noexcept;
 
 private:
     WeaponDefinition definition_{};
     std::uint32_t magazineAmmo_{0};
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
+    float overdriveRemaining_{0.0F};
 };
 
 [[nodiscard]] WeaponDefinition baseWeaponDefinition(

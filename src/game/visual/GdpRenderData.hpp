@@ -32,6 +32,7 @@ enum class PickupVisualRole : std::uint8_t {
     Key,
     Armor,
     Weapon,
+    Special,
 };
 
 enum class HudWeaponRole : std::uint8_t {
@@ -288,6 +289,7 @@ struct HudRenderData {
     std::uint32_t magazineAmmo{0};
     std::uint32_t reserveAmmo{0};
     HudWeaponRole weapon{HudWeaponRole::Pistol};
+    bool weaponOverdrive{false};
     std::uint32_t keys{0};
     std::uint32_t level{1};
     std::uint32_t experience{0};

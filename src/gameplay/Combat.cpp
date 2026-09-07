@@ -207,14 +207,15 @@ ShotResult fireHitscan(
             && target->kind == gdp::entities::EntityKind::Prop;
         if (targetIsProp) {
             const PropDamageResult damage
-                = damageProp(manager, nearestHit->target, weapon.definition().damage);
+                = damageProp(manager, nearestHit->target, weapon.damage());
             const ShotOutcome outcome = damage.outcome == PropDamageOutcome::Destroyed
                 ? ShotOutcome::Destroyed
                 : damage.outcome == PropDamageOutcome::Damaged ? ShotOutcome::Hit
                                                                : ShotOutcome::ImpactProp;
             return {outcome, nearestHit, damage.spawnedDrop};
         }
-        const DamageOutcome damage = applyDamage(manager, nearestHit->target, weapon.definition().damage);
+        const DamageOutcome damage = applyDamage(
+            manager, nearestHit->target, weapon.damage());
         return {
             damage == DamageOutcome::Killed ? ShotOutcome::Killed : ShotOutcome::Hit,
             nearestHit,
