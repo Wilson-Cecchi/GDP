@@ -48,11 +48,13 @@ void testDeterministicLootLayout()
         "same room inputs reproduce loot types, quantities and placement exactly");
     expect(first.layoutHash != different.layoutHash,
         "different room seed changes the canonical loot layout");
-    expect(first.drops.size() >= 2U
+    expect(first.drops.size() == 3U
             && first.drops.front().type == gdp::entities::ItemType::Key
+            && first.drops[1].type == gdp::entities::ItemType::Health
+            && first.drops[2].type == gdp::entities::ItemType::Weapon
             && first.drops.front().quantity == 1U,
-        "Secret loot always starts with one objective key and useful support loot");
-    constexpr std::uint64_t goldenHash = 0x23E65CDDD8252D83ULL;
+        "Secret loot guarantees objective, support and the Carbine pickup");
+    constexpr std::uint64_t goldenHash = 0x8F73F0890E80B4C9ULL;
     expect(first.layoutHash == goldenHash,
         "golden procedural loot hash remains stable across builds");
 
@@ -184,6 +186,12 @@ void testAutomaticLootCollection()
         .type = ItemType::Armor,
         .quantity = 15,
     });
+    const EntityId carbine = manager.createItem({
+        .transform = {.position = {0.60F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Weapon,
+        .quantity = 1,
+    });
     const EntityId otherRoom = manager.createItem({
         .transform = {.position = {0.10F, 0.0F, 0.0F}},
         .roomId = 3,
@@ -198,19 +206,22 @@ void testAutomaticLootCollection()
     });
     const LootCollectionSummary collected
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(collected.itemsInRange == 4U && collected.collected == 4U
+    expect(collected.itemsInRange == 5U && collected.collected == 5U
             && collected.healthRestored == 25.0F && collected.ammoAdded == 2U
-            && collected.keysAdded == 1U && collected.armorAdded == 15.0F,
-        "nearby loot applies health, armor, available ammo and objective key");
-    expect(player.state().health == 85.0F && weapon.reserveAmmo() == 10U
+            && collected.keysAdded == 1U && collected.armorAdded == 15.0F
+            && collected.weaponsEquipped == 1U,
+        "nearby loot applies resources, objective key and the Carbine");
+    expect(player.state().health == 85.0F && weapon.reserveAmmo() == 48U
+            && weapon.definition().archetype == WeaponArchetype::Carbine
             && player.state().keys == 1U && player.state().armor == 15.0F,
         "collected resources update the authoritative player and weapon state");
     expect(manager.find(health) == nullptr && manager.find(ammo) == nullptr
             && manager.find(key) == nullptr && manager.find(armor) == nullptr
+            && manager.find(carbine) == nullptr
             && manager.find(otherRoom) != nullptr
             && manager.find(farAway) != nullptr,
         "collection consumes only applied pickups in range and in the active room");
-    expect(manager.flushDestroyed() == 4U,
+    expect(manager.flushDestroyed() == 5U,
         "collected pickups complete the deferred entity lifecycle cleanly");
 
     player.heal(100.0F);
@@ -233,12 +244,19 @@ void testAutomaticLootCollection()
         .type = ItemType::Armor,
         .quantity = 20,
     });
+    const EntityId duplicateCarbine = manager.createItem({
+        .transform = {.position = {0.40F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .type = ItemType::Weapon,
+        .quantity = 1,
+    });
     const LootCollectionSummary blocked
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
-    expect(blocked.collected == 0U && blocked.blockedByCapacity == 3U
+    expect(blocked.collected == 0U && blocked.blockedByCapacity == 4U
             && manager.find(fullHealth) != nullptr && manager.find(fullAmmo) != nullptr
-            && manager.find(fullArmor) != nullptr,
-        "full health, armor and ammo leave pickups available instead of wasting them");
+            && manager.find(fullArmor) != nullptr
+            && manager.find(duplicateCarbine) != nullptr,
+        "full resources and duplicate weapon leave pickups available instead of wasting them");
 
     player.applyDamage(500.0F);
     expect(collectNearbyLoot(manager, player, weapon, 2, 0.85F).itemsInRange == 0U,

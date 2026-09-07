@@ -324,6 +324,9 @@ especializados das pastas numeradas.
 - **Fase 83 — Armor no loot procedural:** becos sem saída agora entregam Ammo e
   Armor nas dificuldades jogáveis; salas comuns e arenas podem sortear Armor
   por tema, usando a mesma substream, budget, placement e validação do loot.
+- **Fase 84 — Carabina secreta:** toda sala Secret contém uma Carbine funcional
+  junto de Key e Health. O pickup troca cadência, dano, alcance e capacidades,
+  preserva upgrades, não recarrega duplicatas e persiste entre andares.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -402,7 +405,7 @@ mesmos contratos determinísticos do restante do elenco.
 
 O primeiro incremento da Fase 12 deriva loot exclusivamente da substream
 `Loot`, combinando papel, tema, profundidade, dificuldade, orçamento e as zonas
-válidas da sala. `Health`, `Ammo`, `Key` e, desde a Fase 83, `Armor` recebem quantidade e posição
+válidas da sala. `Health`, `Ammo`, `Key`, `Armor` e `Weapon` recebem quantidade e posição
 determinísticas, sem ocupar connectors. A START contém uma caixa de munição
 para teste imediato; recursos cheios não consomem pickups, enquanto coleta
 válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
@@ -669,6 +672,15 @@ em Security, Storage e Maintenance. A quantidade continua escalando por
 profundidade e a coleta cheia preserva o pickup no chão. Como a distribuição
 afeta rotas e tempo, `currentCampaignRulesVersion` avançou para 3 e
 `currentSpeedrunRulesVersion` para 2; saves e recordes antigos ficam isolados.
+
+Na Fase 84, a sala Secret passou a garantir `Key + Health + Weapon`. O primeiro
+pickup Weapon equipa a Carbine: 26 de dano, intervalo de `0,13 s`, alcance de
+34 m, pente de 12 e reserva de 48. Bônus já conquistados de Firepower e
+Capacity são transferidos para a nova base; o equipamento começa abastecido e
+zera apenas o cooldown transitório. Uma Carbine duplicada permanece no chão,
+evitando recarga infinita. HUD, título e pickup usam identidade visual própria.
+O checkpoint schema v2 serializa o arquétipo, as regras da Campanha avançam
+para 4 e as de Speedrun para 3.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

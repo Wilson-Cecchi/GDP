@@ -6,7 +6,8 @@
 > de três fases. Props destrutíveis e cobertura dinâmica foram validados na
 > Fase 12. Eventos procedurais de sala estão funcionais; Armor do Player foi
 > integrada na Fase 58. A Fase 82 adicionou pressão progressiva por andar na
-> Campanha. A fila desacoplada de sinais de combate, além de spread
+> Campanha e a Fase 84 integrou a Carbine encontrada em salas Secret. A fila
+> desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
 >
@@ -42,6 +43,7 @@ struct WeaponDefinition {
     float range;
     int magazineSize;
     int reserveMax;
+    WeaponArchetype archetype;
 };
 ```
 
@@ -49,6 +51,11 @@ A pistola inicial usa 34 de dano, intervalo de `0,22 s`, alcance de `30 m`,
 pente de 8 e reserva de 32. Botão esquerdo dispara e `R` transfere a quantidade
 necessária da reserva para o pente. Progressão pode aumentar dano em blocos de
 4 e reserva máxima em blocos de 4 sem substituir a arma.
+
+A Carbine da Fase 84 usa 26 de dano, intervalo de `0,13 s`, alcance de `34 m`,
+pente de 12 e reserva de 48. Ao equipá-la, os bônus acumulados sobre o dano e a
+reserva-base da Pistol são transportados; munição começa cheia e o cooldown é
+zerado. Recolher outra Carbine não altera nem reabastece a arma atual.
 
 ## Dano
 

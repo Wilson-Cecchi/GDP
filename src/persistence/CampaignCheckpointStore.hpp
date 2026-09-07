@@ -8,7 +8,7 @@
 
 namespace gdp::persistence {
 
-inline constexpr std::uint32_t currentCampaignCheckpointFileVersion = 1U;
+inline constexpr std::uint32_t currentCampaignCheckpointFileVersion = 2U;
 
 enum class CampaignCheckpointLoadStatus : std::uint8_t {
     Loaded,

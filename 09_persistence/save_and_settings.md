@@ -61,6 +61,11 @@ entrada de Armor nas tabelas procedurais muda decisões de rota, sobrevivência 
 tempo. Checkpoints da regra 2 e recordes da regra 1 ficam incompatíveis sem
 serem apagados ou reinterpretados.
 
+A Fase 84 introduziu `WeaponArchetype` no carry-over. O schema do checkpoint
+avançou para 2 e grava `weapon_archetype` junto dos atributos e munição; schema
+1 não é reinterpretado. As regras da Campanha/Speedrun avançaram para 4/3, pois
+encontrar a Carbine altera sobrevivência, rota e tempo de conclusão.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

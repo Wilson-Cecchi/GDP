@@ -4,12 +4,18 @@
 
 namespace gdp::gameplay {
 
+enum class WeaponArchetype : std::uint8_t {
+    Pistol,
+    Carbine,
+};
+
 struct WeaponDefinition {
     float damage{34.0F};
     float fireInterval{0.22F};
     float range{30.0F};
     std::uint32_t magazineSize{8};
     std::uint32_t reserveMaximum{32};
+    WeaponArchetype archetype{WeaponArchetype::Pistol};
 
     constexpr bool operator==(const WeaponDefinition&) const noexcept = default;
 };
@@ -40,6 +46,7 @@ public:
     [[nodiscard]] bool increaseReserveCapacity(
         std::uint32_t amount,
         std::uint32_t bonusAmmo = 0U) noexcept;
+    [[nodiscard]] bool equip(WeaponArchetype archetype) noexcept;
     [[nodiscard]] bool restoreCampaignProgress(
         const WeaponCampaignProgress& progress) noexcept;
 
@@ -55,5 +62,10 @@ private:
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
 };
+
+[[nodiscard]] WeaponDefinition baseWeaponDefinition(
+    WeaponArchetype archetype) noexcept;
+[[nodiscard]] const char* weaponArchetypeName(
+    WeaponArchetype archetype) noexcept;
 
 } // namespace gdp::gameplay

@@ -461,6 +461,7 @@ void testInitialEntityPopulation()
     bool lootLayoutsValid = true;
     bool propLayoutsValid = true;
     bool proceduralArmorPresent = false;
+    bool proceduralWeaponPresent = false;
     for (const RoomInstance& room : generated.world->rooms) {
         const auto node = std::find_if(
             generated.world->graph.nodes.begin(), generated.world->graph.nodes.end(),
@@ -499,6 +500,8 @@ void testInitialEntityPopulation()
             }
             proceduralArmorPresent = proceduralArmorPresent
                 || item->type == ItemType::Armor;
+            proceduralWeaponPresent = proceduralWeaponPresent
+                || item->type == ItemType::Weapon;
             if (dropIndex >= loot.drops.size()
                 || item->type != loot.drops[dropIndex].type
                 || item->quantity != loot.drops[dropIndex].quantity
@@ -547,6 +550,8 @@ void testInitialEntityPopulation()
         "room population preserves each deterministic procedural loot layout exactly");
     expect(proceduralArmorPresent,
         "representative populated world exposes procedural Armor as playable loot");
+    expect(proceduralWeaponPresent,
+        "representative populated world exposes the Secret weapon pickup");
     expect(propLayoutsValid,
         "room population preserves each deterministic procedural prop layout exactly");
 

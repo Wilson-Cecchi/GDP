@@ -929,6 +929,14 @@ fingerprint estrutural. A mecânica reutiliza `ItemType::Armor`, coleta e visual
 concreto existentes. As regras da Campanha/Speedrun foram versionadas em 3/2
 para impedir comparação ou retomada silenciosa sob tabelas diferentes.
 
+Na Fase 84, `WeaponArchetype` passou a distinguir Pistol e Carbine dentro do
+contrato concreto de gameplay. Secret garante o pickup Weapon pela substream de
+loot; `Weapon::equip` troca a definição preservando bônus permanentes e rejeita
+duplicata. Application converte a identidade para `HudWeaponRole`, enquanto o
+renderer apenas apresenta nome e placeholder. O checkpoint schema v2 persiste
+o arquétipo e as regras Campaign/Speedrun 4/3 isolam execuções anteriores. Nada
+desse inventário específico foi levado para a WKC Forge.
+
 ---
 
 # 8. Sistema de seed

@@ -47,6 +47,7 @@ bool validateCampaignCarryover(const CampaignCarryover& carryover) noexcept
         && std::isfinite(weapon.definition.range)
         && weapon.definition.range > 0.0F
         && weapon.definition.magazineSize > 0U
+        && weapon.definition.archetype <= WeaponArchetype::Carbine
         && weapon.magazineAmmo <= weapon.definition.magazineSize
         && weapon.reserveAmmo <= weapon.definition.reserveMaximum
         && validateProgressionState(carryover.progression);

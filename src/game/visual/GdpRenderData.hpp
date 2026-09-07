@@ -31,6 +31,12 @@ enum class PickupVisualRole : std::uint8_t {
     Ammo,
     Key,
     Armor,
+    Weapon,
+};
+
+enum class HudWeaponRole : std::uint8_t {
+    Pistol,
+    Carbine,
 };
 
 enum class PropVisualRole : std::uint8_t {
@@ -281,6 +287,7 @@ struct HudRenderData {
     float maximumArmor{50.0F};
     std::uint32_t magazineAmmo{0};
     std::uint32_t reserveAmmo{0};
+    HudWeaponRole weapon{HudWeaponRole::Pistol};
     std::uint32_t keys{0};
     std::uint32_t level{1};
     std::uint32_t experience{0};

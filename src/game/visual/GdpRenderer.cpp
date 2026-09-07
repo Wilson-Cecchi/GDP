@@ -1380,6 +1380,9 @@ bool GdpRenderer::render(
         } else if (pickup.role == PickupVisualRole::Armor) {
             tint = {0.18F, 0.42F, 0.96F};
             scale = {0.36F, 0.26F, 0.30F};
+        } else if (pickup.role == PickupVisualRole::Weapon) {
+            tint = {0.72F, 0.28F, 0.96F};
+            scale = {0.62F, 0.16F, 0.20F};
         }
         const wkc::core::Mat4 model
             = wkc::core::translationMatrix(
@@ -1721,7 +1724,9 @@ bool GdpRenderer::render(
         std::ostringstream armorStream;
         armorStream << "ARMOR " << armor << '/' << maximumArmor;
         std::ostringstream ammoStream;
-        ammoStream << "AMMO " << hud.magazineAmmo << '/' << hud.reserveAmmo;
+        ammoStream << (hud.weapon == HudWeaponRole::Carbine
+                ? "CARBINE " : "PISTOL ")
+                   << hud.magazineAmmo << '/' << hud.reserveAmmo;
         std::ostringstream keysStream;
         keysStream << "KEYS " << hud.keys;
         const std::string healthText = healthStream.str();

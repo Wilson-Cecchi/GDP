@@ -28,7 +28,7 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
     case RoomRole::DeadEnd:
         return 3U;
     case RoomRole::Secret:
-        return 3U;
+        return 5U;
     case RoomRole::Boss:
     case RoomRole::Count:
         return 0U;
@@ -47,6 +47,8 @@ std::uint32_t itemCost(const gdp::entities::ItemType type) noexcept
         return 0U;
     case gdp::entities::ItemType::Armor:
         return 2U;
+    case gdp::entities::ItemType::Weapon:
+        return 3U;
     }
     return 0U;
 }
@@ -110,6 +112,8 @@ std::uint32_t quantityFor(
         return 1U;
     case gdp::entities::ItemType::Armor:
         return 10U + (5U * std::min(depth, 4U));
+    case gdp::entities::ItemType::Weapon:
+        return 1U;
     }
     return 1U;
 }
@@ -207,8 +211,10 @@ LootLayout generateLootLayout(
     layout.budget = rawBudget == 0U ? 0U : std::max(
         1U, static_cast<std::uint32_t>(std::lround(
             static_cast<float>(rawBudget) / safeDifficulty)));
-    if (role == RoomRole::Hub || role == RoomRole::Secret) {
+    if (role == RoomRole::Hub) {
         layout.budget = std::max(layout.budget, 2U);
+    } else if (role == RoomRole::Secret) {
+        layout.budget = std::max(layout.budget, 5U);
     }
 
     if (layout.budget == 0U || lootZones.empty()) {
@@ -234,6 +240,7 @@ LootLayout generateLootLayout(
     case RoomRole::Secret:
         addDrop(layout, gdp::entities::ItemType::Key, lootZones);
         addDrop(layout, gdp::entities::ItemType::Health, lootZones);
+        addDrop(layout, gdp::entities::ItemType::Weapon, lootZones);
         break;
     case RoomRole::Normal:
     case RoomRole::Boss:
@@ -279,7 +286,7 @@ LootValidationResult validateLootLayout(
     std::size_t keyCount = 0;
     for (std::size_t index = 0; index < layout.drops.size(); ++index) {
         const LootDrop& drop = layout.drops[index];
-        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Armor) {
+        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Weapon) {
             result.errors.push_back(LootValidationError::InvalidDrop);
         }
         keyCount += drop.type == gdp::entities::ItemType::Key ? 1U : 0U;

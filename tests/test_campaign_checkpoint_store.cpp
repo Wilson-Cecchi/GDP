@@ -68,6 +68,7 @@ gdp::gameplay::CampaignCheckpoint makeCheckpoint()
     player.applyDamage(18.0F);
     player.addKeys(2U);
     Weapon weapon;
+    (void)weapon.equip(WeaponArchetype::Carbine);
     weapon.fixedUpdate(1.0F);
     (void)weapon.tryFire();
     ProgressionSystem progression;
@@ -132,24 +133,34 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
         "unknown checkpoint schemas are not interpreted as current data");
 
-    writeText(path, "version = 1\nrules_version = 99\n");
+    writeText(path, "version = 2\nrules_version = 99\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from another Campaign ruleset remain isolated");
 
-    writeText(path, "version = 1\nrules_version = 1\n");
+    writeText(path, "version = 2\nrules_version = 1\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from the pre-progression balance are rejected safely");
 
-    writeText(path, "version = 1\nrules_version = 2\n");
+    writeText(path, "version = 2\nrules_version = 2\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before procedural Armor remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 3\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints without weapon identity remain isolated by their rules");
+
+    writeText(path, "version = 1\nrules_version = 3\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
+        "checkpoint schema without weapon identity is not reinterpreted");
+
     writeText(path,
-        "version = 1\n"
-        "rules_version = 3\n"
+        "version = 2\n"
+        "rules_version = 4\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

@@ -1974,6 +1974,11 @@ void Application::fixedUpdate(const double fixedStep)
                 << " | armor +" << static_cast<int>(loot.armorAdded)
                 << " | ammo +" << loot.ammoAdded
                 << " | keys +" << loot.keysAdded;
+        if (loot.weaponsEquipped > 0U) {
+            message << " | equipped "
+                    << gameplay::weaponArchetypeName(
+                        weapon_.definition().archetype);
+        }
         log(LogLevel::Info, message.str());
         if (audio_) {
             audio_->play(gdp::audio::AudioEventKind::Pickup,
@@ -2471,6 +2476,8 @@ void Application::render()
             role = visual::PickupVisualRole::Key;
         } else if (item->type == entities::ItemType::Armor) {
             role = visual::PickupVisualRole::Armor;
+        } else if (item->type == entities::ItemType::Weapon) {
+            role = visual::PickupVisualRole::Weapon;
         }
         visiblePickups.push_back({entity->transform.position, role});
     }
@@ -2508,7 +2515,8 @@ void Application::render()
           << " | " << gameplay::runModeName(session_.state().mode)
           << " | HP " << static_cast<int>(player_.state().health)
           << " | Armor " << static_cast<int>(player_.state().armor)
-          << " | Ammo " << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
+          << " | " << gameplay::weaponArchetypeName(weapon_.definition().archetype)
+          << ' ' << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
     title << " | Keys " << player_.state().keys;
     const gameplay::ProgressionState& progress = progression_.state();
     title << " | Lv " << progress.level << " XP " << progress.experienceIntoLevel;
@@ -2726,6 +2734,8 @@ void Application::render()
     hud.maximumArmor = player_.state().maximumArmor;
     hud.magazineAmmo = weapon_.magazineAmmo();
     hud.reserveAmmo = weapon_.reserveAmmo();
+    hud.weapon = weapon_.definition().archetype == gameplay::WeaponArchetype::Carbine
+        ? visual::HudWeaponRole::Carbine : visual::HudWeaponRole::Pistol;
     hud.keys = player_.state().keys;
     hud.level = progress.level;
     hud.runTimerVisible = true;

@@ -238,6 +238,13 @@ população representativa precisa conter Armor e continuar correspondendo
 exatamente aos layouts validados. Stores isolam checkpoint da regra 2 e recorde
 de Speedrun da regra 1 após a atualização de balanceamento.
 
+O gate da Fase 84 exige `Key + Health + Weapon` determinísticos em Secret e o
+novo hash dourado `0x8F73F0890E80B4C9`. Equipar a Carbine valida atributos,
+munição, cooldown, preservação de Firepower/Capacity e rejeição de duplicata.
+Coleta, população, pixels OpenGL e carry-over cobrem o novo tipo; o store exige
+schema 2 e round trip da identidade, isolando versões antigas de checkpoint e
+recorde.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

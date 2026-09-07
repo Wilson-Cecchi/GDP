@@ -57,6 +57,7 @@ enum class ItemType : std::uint8_t {
     Ammo,
     Key,
     Armor,
+    Weapon,
 };
 
 enum class PropType : std::uint8_t {

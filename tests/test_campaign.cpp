@@ -37,6 +37,8 @@ void testCampaignCarryoverRoundTrip()
         3U,
         sourcePlayer,
         sourceWeapon);
+    expect(sourceWeapon.equip(WeaponArchetype::Carbine),
+        "campaign fixture equips the discovered Carbine");
     sourcePlayer.applyDamage(15.0F);
     expect(sourceWeapon.tryFire() == FireReadiness::Fired,
         "campaign fixture spends the first magazine round");
@@ -71,6 +73,8 @@ void testCampaignCarryoverRoundTrip()
         "health, armor, capacities and keys survive the floor boundary");
     expect(near(restoredWeapon.definition().damage,
                 sourceWeapon.definition().damage)
+            && restoredWeapon.definition().archetype
+                == WeaponArchetype::Carbine
             && near(restoredWeapon.definition().fireInterval,
                 sourceWeapon.definition().fireInterval)
             && near(restoredWeapon.definition().range,
@@ -144,6 +148,12 @@ void testCampaignCarryoverRejectsInvalidStateAtomically()
         = invalidAmmo.weapon.definition.magazineSize + 1U;
     expect(!validateCampaignCarryover(invalidAmmo),
         "magazine values above capacity invalidate Campaign carry-over");
+
+    CampaignCarryover invalidWeapon = valid;
+    invalidWeapon.weapon.definition.archetype
+        = static_cast<WeaponArchetype>(99U);
+    expect(!validateCampaignCarryover(invalidWeapon),
+        "unknown weapon identity invalidates Campaign carry-over");
 
     CampaignCarryover invalidProgression = valid;
     invalidProgression.progression.vitalityRank = 1U;

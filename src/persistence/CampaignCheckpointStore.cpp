@@ -75,6 +75,7 @@ struct Fields {
     std::optional<float> armor;
     std::optional<float> maximumArmor;
     std::optional<std::uint64_t> keys;
+    std::optional<std::uint64_t> weaponArchetype;
     std::optional<float> weaponDamage;
     std::optional<float> fireInterval;
     std::optional<float> range;
@@ -138,6 +139,8 @@ bool assignField(
         unsignedTarget = &fields.floor;
     } else if (key == "player_keys") {
         unsignedTarget = &fields.keys;
+    } else if (key == "weapon_archetype") {
+        unsignedTarget = &fields.weaponArchetype;
     } else if (key == "weapon_magazine_size") {
         unsignedTarget = &fields.magazineSize;
     } else if (key == "weapon_reserve_maximum") {
@@ -193,6 +196,8 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
            << "player_armor = " << state.player.armor << '\n'
            << "player_maximum_armor = " << state.player.maximumArmor << '\n'
            << "player_keys = " << state.player.keys << '\n'
+           << "weapon_archetype = "
+           << static_cast<std::uint32_t>(state.weapon.definition.archetype) << '\n'
            << "weapon_damage = " << state.weapon.definition.damage << '\n'
            << "weapon_fire_interval = " << state.weapon.definition.fireInterval << '\n'
            << "weapon_range = " << state.weapon.definition.range << '\n'
@@ -272,6 +277,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto seedIndex = narrowUnsigned(fields.seedIndex);
         const auto floor = narrowUnsigned(fields.floor);
         const auto keys = narrowUnsigned(fields.keys);
+        const auto weaponArchetype = narrowUnsigned(fields.weaponArchetype);
         const auto magazineSize = narrowUnsigned(fields.magazineSize);
         const auto reserveMaximum = narrowUnsigned(fields.reserveMaximum);
         const auto magazineAmmo = narrowUnsigned(fields.magazineAmmo);
@@ -287,7 +293,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto capacityRank = narrowUnsigned(fields.capacityRank);
         if (!fields.initialSeed || !fields.currentSeed || !runIndex || !seedIndex
             || !floor || !fields.health || !fields.maximumHealth || !fields.armor
-            || !fields.maximumArmor || !keys || !fields.weaponDamage
+            || !fields.maximumArmor || !keys || !weaponArchetype
+            || !fields.weaponDamage
             || !fields.fireInterval || !fields.range || !magazineSize
             || !reserveMaximum || !magazineAmmo || !reserveAmmo || !level
             || !experience || !fields.totalExperience || !fields.score
@@ -308,7 +315,9 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
                 {*fields.health, *fields.maximumHealth, *fields.armor,
                     *fields.maximumArmor, *keys},
                 {{*fields.weaponDamage, *fields.fireInterval, *fields.range,
-                    *magazineSize, *reserveMaximum}, *magazineAmmo, *reserveAmmo},
+                    *magazineSize, *reserveMaximum,
+                    static_cast<gameplay::WeaponArchetype>(*weaponArchetype)},
+                    *magazineAmmo, *reserveAmmo},
                 {*level, *experience, *fields.totalExperience, *fields.score,
                     *enemiesKilled, *propsDestroyed, *lootCollected,
                     *eventsCompleted, *vitalityRank, *firepowerRank, *capacityRank},

@@ -69,6 +69,10 @@ LootCollectionSummary collectNearbyLoot(
             }
             break;
         }
+        case ItemType::Weapon:
+            applied = weapon.equip(WeaponArchetype::Carbine);
+            summary.weaponsEquipped += applied ? 1U : 0U;
+            break;
         }
         if (!applied) {
             ++summary.blockedByCapacity;

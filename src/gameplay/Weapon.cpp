@@ -6,9 +6,32 @@
 
 namespace gdp::gameplay {
 
+WeaponDefinition baseWeaponDefinition(const WeaponArchetype archetype) noexcept
+{
+    if (archetype == WeaponArchetype::Carbine) {
+        return {
+            .damage = 26.0F,
+            .fireInterval = 0.13F,
+            .range = 34.0F,
+            .magazineSize = 12U,
+            .reserveMaximum = 48U,
+            .archetype = WeaponArchetype::Carbine,
+        };
+    }
+    return {};
+}
+
+const char* weaponArchetypeName(const WeaponArchetype archetype) noexcept
+{
+    return archetype == WeaponArchetype::Carbine ? "CARBINE" : "PISTOL";
+}
+
 Weapon::Weapon(WeaponDefinition definition)
     : definition_(definition)
 {
+    if (definition_.archetype > WeaponArchetype::Carbine) {
+        definition_.archetype = WeaponArchetype::Pistol;
+    }
     definition_.damage = std::max(definition_.damage, 0.0F);
     definition_.fireInterval = std::max(definition_.fireInterval, 0.0F);
     definition_.range = std::max(definition_.range, 0.0F);
@@ -80,6 +103,24 @@ bool Weapon::increaseReserveCapacity(
     return true;
 }
 
+bool Weapon::equip(const WeaponArchetype archetype) noexcept
+{
+    if (archetype > WeaponArchetype::Carbine
+        || archetype == definition_.archetype) {
+        return false;
+    }
+    const WeaponDefinition currentBase = baseWeaponDefinition(definition_.archetype);
+    WeaponDefinition replacement = baseWeaponDefinition(archetype);
+    replacement.damage += std::max(definition_.damage - currentBase.damage, 0.0F);
+    replacement.reserveMaximum += definition_.reserveMaximum > currentBase.reserveMaximum
+        ? definition_.reserveMaximum - currentBase.reserveMaximum : 0U;
+    definition_ = replacement;
+    magazineAmmo_ = definition_.magazineSize;
+    reserveAmmo_ = definition_.reserveMaximum;
+    cooldownRemaining_ = 0.0F;
+    return true;
+}
+
 bool Weapon::restoreCampaignProgress(
     const WeaponCampaignProgress& progress) noexcept
 {
@@ -89,6 +130,7 @@ bool Weapon::restoreCampaignProgress(
         || !std::isfinite(definition.range)
         || definition.damage <= 0.0F || definition.fireInterval < 0.0F
         || definition.range <= 0.0F || definition.magazineSize == 0U
+        || definition.archetype > WeaponArchetype::Carbine
         || progress.magazineAmmo > definition.magazineSize
         || progress.reserveAmmo > definition.reserveMaximum) {
         return false;

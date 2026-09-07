@@ -85,6 +85,31 @@ void testWeaponLifecycle()
         "empty weapon rejects fire deterministically");
 }
 
+void testWeaponPickupEquipment()
+{
+    using namespace gdp::gameplay;
+    Weapon weapon;
+    expect(weapon.increaseDamage(4.0F)
+            && weapon.increaseReserveCapacity(4U),
+        "weapon pickup fixture applies existing progression bonuses");
+    (void)weapon.tryFire();
+    expect(weapon.equip(WeaponArchetype::Carbine),
+        "Carbine pickup replaces the initial Pistol");
+    expect(weapon.definition().archetype == WeaponArchetype::Carbine
+            && near(weapon.definition().damage, 30.0F)
+            && near(weapon.definition().fireInterval, 0.13F)
+            && weapon.definition().magazineSize == 12U
+            && weapon.reserveCapacity() == 52U
+            && weapon.magazineAmmo() == 12U
+            && weapon.reserveAmmo() == 52U
+            && near(weapon.cooldownRemaining(), 0.0F),
+        "Carbine keeps upgrades and starts with its own complete ammunition profile");
+    (void)weapon.tryFire();
+    expect(!weapon.equip(WeaponArchetype::Carbine)
+            && weapon.magazineAmmo() == 11U,
+        "duplicate Carbine pickups cannot refill an already equipped weapon");
+}
+
 void testDamageLifecycle()
 {
     using namespace gdp::entities;
@@ -777,6 +802,7 @@ int main()
 {
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
+    testWeaponPickupEquipment();
     testDamageLifecycle();
     testDormantEnemyIgnoresCombat();
     testHitscanSelectionAndBlocking();
