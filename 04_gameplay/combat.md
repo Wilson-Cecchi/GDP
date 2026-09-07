@@ -119,3 +119,8 @@ na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.
 Na Fase 87, dois Workers iniciam sobrepostos e precisam separar-se durante a
 perseguição sem perder determinismo. A regressão exige ao menos `0,65 m` entre
 os centros após 360 passos e igualdade exata em uma segunda execução.
+
+Na Fase 88, uma regressão densa posiciona oito Workers ao redor do mesmo alvo e
+verifica todos os pares em cada um dos 600 passos. A distância entre centros não
+pode cair abaixo de `0,68 m`, e a repetição precisa produzir posições finais
+idênticas. Isso cobre o contato físico contínuo além da separação final.

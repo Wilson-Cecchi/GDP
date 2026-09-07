@@ -3,7 +3,8 @@
 > **Estado:** ciclo mínimo Idle/Chase/Attack/Dead do Worker validado na Fase 7 e
 > Guard, Officer, Engineer e IndustrialRobot validados na Fase 11. A Fase 86
 > adicionou desvio local determinístico de obstáculos aos cinco arquétipos;
-> a Fase 87 adicionou separação local entre aliados;
+> a Fase 87 adicionou separação local entre aliados e a Fase 88 consolidou
+> volumes físicos entre inimigos;
 > animação, patrulha, investigação e pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -68,8 +69,15 @@ menos de 45% de progresso frontal, escolhe esquerda ou direita por
 troca para o oposto. A movimentação continua passando por `CollisionWorld`, de
 modo que caixas, paredes, limites e portas continuam autoritativos.
 
-A Fase 87 acrescenta repulsão suave antes desse desvio. Somente aliados vivos e
+A Fase 87 acrescentou repulsão suave antes desse desvio. Somente aliados vivos e
 ativos no mesmo `roomId` entram no cálculo; a distância preferida combina os
 raios físicos e uma margem de `0,20 m`. Sobreposição exata escolhe sentidos
-opostos pela ordem estável dos `EntityId`. A repulsão não vira um collider, para
-que grupos consigam atravessar portas e corredores estreitos.
+opostos pela ordem estável dos `EntityId`. Isoladamente, essa resposta não era
+um collider e podia permitir cruzamentos em grupos densos.
+
+A Fase 88 mantém o steering para fluidez, mas acrescenta contato físico no
+gameplay. O segmento completo de cada deslocamento é testado contra os raios dos
+outros inimigos, evitando penetração e troca de lados mesmo em um passo grande.
+Sobreposições preexistentes só podem aumentar a distância, e estados Idle ou
+Attack aplicam uma correção lenta. Paredes, portas e props continuam resolvidos
+por `CollisionWorld`, preservando passagem e autoridade da geometria.

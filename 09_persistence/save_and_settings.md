@@ -80,6 +80,11 @@ A Fase 87 avançou as regras da Campanha/Speedrun para 7/6 porque a separação 
 grupos altera posições de tiro e tempos. Nenhum dado novo é persistente: o
 steering é recalculado do estado vivo da sala, mantendo o checkpoint schema 2.
 
+A Fase 88 avançou as regras da Campanha/Speedrun para 8/7 porque volumes físicos
+mudam rotas e tempos em encontros densos. O contato e a correção de sobreposição
+são recalculados no fixed update; nenhum campo foi adicionado e o checkpoint
+permanece no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

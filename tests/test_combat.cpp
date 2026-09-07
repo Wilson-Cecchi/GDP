@@ -448,6 +448,76 @@ void testDeterministicEnemySeparation()
         "enemy separation reproduces exactly for the same identities and seed");
 }
 
+void testDenseEnemyVolumesDoNotCross()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    struct FixtureResult {
+        std::array<wkc::core::Vec3, 8> positions{};
+        bool respectedVolumes{true};
+    };
+
+    const CollisionWorld room{{{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}}};
+    const auto runFixture = [&room] {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        constexpr std::array<wkc::core::Vec3, 8> starts{{
+            {0.0F, 0.0F, 6.0F},
+            {4.25F, 0.0F, 4.25F},
+            {6.0F, 0.0F, 0.0F},
+            {4.25F, 0.0F, -4.25F},
+            {0.0F, 0.0F, -6.0F},
+            {-4.25F, 0.0F, -4.25F},
+            {-6.0F, 0.0F, 0.0F},
+            {-4.25F, 0.0F, 4.25F},
+        }};
+        std::array<EntityId, starts.size()> enemies{};
+        for (std::size_t index = 0; index < starts.size(); ++index) {
+            enemies[index] = manager.createEnemy({
+                .transform = {.position = starts[index]},
+                .roomId = 1,
+                .archetype = EnemyArchetype::Worker,
+                .visualSeed = static_cast<std::uint32_t>(100U + index),
+            });
+        }
+        const WorkerConfig config{
+            .detectionRange = 12.0F,
+            .attackRange = 1.15F,
+            .moveSpeed = 1.35F,
+            .attackDamage = 0.0F,
+            .attackInterval = 1.0F,
+        };
+        FixtureResult result;
+        for (std::size_t step = 0; step < 600U; ++step) {
+            (void)updateWorkers(
+                manager, player, 1, room, 1.0F / 60.0F, config);
+            for (std::size_t first = 0; first < enemies.size(); ++first) {
+                for (std::size_t second = first + 1; second < enemies.size(); ++second) {
+                    const wkc::core::Vec3 offset
+                        = manager.find(enemies[first])->transform.position
+                        - manager.find(enemies[second])->transform.position;
+                    if (wkc::core::length({offset.x, 0.0F, offset.z}) < 0.68F) {
+                        result.respectedVolumes = false;
+                    }
+                }
+            }
+        }
+        for (std::size_t index = 0; index < enemies.size(); ++index) {
+            result.positions[index] = manager.find(enemies[index])->transform.position;
+        }
+        return result;
+    };
+
+    const FixtureResult first = runFixture();
+    const FixtureResult repeated = runFixture();
+    expect(first.respectedVolumes && repeated.respectedVolumes,
+        "eight Workers preserve physical contact volumes throughout a dense encounter");
+    expect(first.positions == repeated.positions,
+        "dense enemy contact produces the same positions on repeated simulations");
+}
+
 void testGuardRangedBehavior()
 {
     using namespace gdp::entities;
@@ -930,6 +1000,7 @@ int main()
     testWorkerLineOfSight();
     testDeterministicEnemyObstacleAvoidance();
     testDeterministicEnemySeparation();
+    testDenseEnemyVolumesDoNotCross();
     testGuardRangedBehavior();
     testGuardLineOfSight();
     testOfficerCommandSupport();

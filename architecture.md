@@ -955,6 +955,12 @@ local baseada nas entidades vivas da sala antes de consultar colisão. Raios por
 arquétipo e regras de grupo continuam concretos do GDP; não foi introduzido um
 sistema de agentes ou crowd na WKC Forge. Campaign/Speedrun usam regras 7/6.
 
+Na Fase 88, `gdp_gameplay` passou a validar o segmento de movimento contra
+volumes circulares dos outros inimigos e a resolver sobreposições também em
+Idle/Attack. Essa política física continua específica do GDP e reutiliza apenas
+matemática e colisão já disponíveis; a WKC Forge não ganhou sistema de crowd.
+Campaign/Speedrun usam regras 8/7.
+
 ---
 
 # 8. Sistema de seed

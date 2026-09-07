@@ -37,7 +37,7 @@ float enemyCollisionRadius(
         ? 0.52F : 0.35F;
 }
 
-wkc::core::Vec3 separationDirection(
+wkc::core::Vec3 separationRepulsion(
     const gdp::entities::EntityManager& manager,
     const std::span<const gdp::entities::EntityId> enemyIds,
     const gdp::entities::EntityId id,
@@ -80,10 +80,83 @@ wkc::core::Vec3 separationDirection(
                 0.0F, 1.0F);
         repulsion = repulsion + (away * strength);
     }
+    return repulsion;
+}
+
+wkc::core::Vec3 separationDirection(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    const wkc::core::Vec3 position,
+    const wkc::core::Vec3 desiredDirection,
+    const float ownRadius) noexcept
+{
+    const wkc::core::Vec3 repulsion = separationRepulsion(
+        manager, enemyIds, id, roomId, position, desiredDirection, ownRadius);
     if (wkc::core::length(repulsion) <= 1.0e-5F) {
         return desiredDirection;
     }
     return wkc::core::normalized(desiredDirection + (repulsion * 1.4F));
+}
+
+bool movementRespectsEnemyVolumes(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    const wkc::core::Vec3 position,
+    const wkc::core::Vec3 candidate,
+    const float ownRadius) noexcept
+{
+    const wkc::core::Vec3 movement = candidate - position;
+    const float movementLengthSquared
+        = (movement.x * movement.x) + (movement.z * movement.z);
+    for (const gdp::entities::EntityId otherId : enemyIds) {
+        if (otherId == id) {
+            continue;
+        }
+        const gdp::entities::Entity* other = manager.find(otherId);
+        const gdp::entities::EnemyData* otherEnemy
+            = manager.findData<gdp::entities::EnemyData>(otherId);
+        if (other == nullptr || otherEnemy == nullptr || other->roomId != roomId
+            || !otherEnemy->active
+            || otherEnemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
+            continue;
+        }
+        const float contactDistance = std::max(
+            0.0F, ownRadius + enemyCollisionRadius(otherEnemy->archetype) - 0.01F);
+        const float contactDistanceSquared = contactDistance * contactDistance;
+        const float currentDistanceSquared
+            = planarDistanceSquared(position, other->transform.position);
+        const float candidateDistanceSquared
+            = planarDistanceSquared(candidate, other->transform.position);
+        if (currentDistanceSquared < contactDistanceSquared) {
+            if (candidateDistanceSquared <= currentDistanceSquared + 1.0e-8F) {
+                return false;
+            }
+            continue;
+        }
+        if (movementLengthSquared <= 1.0e-10F) {
+            continue;
+        }
+        const wkc::core::Vec3 towardOther
+            = other->transform.position - position;
+        const float along = std::clamp(
+            ((towardOther.x * movement.x) + (towardOther.z * movement.z))
+                / movementLengthSquared,
+            0.0F, 1.0F);
+        const wkc::core::Vec3 closest{
+            position.x + (movement.x * along),
+            position.y,
+            position.z + (movement.z * along),
+        };
+        if (planarDistanceSquared(closest, other->transform.position)
+            < contactDistanceSquared) {
+            return false;
+        }
+    }
+    return true;
 }
 
 wkc::core::Vec3 moveEnemy(
@@ -106,8 +179,16 @@ wkc::core::Vec3 moveEnemy(
         manager, enemyIds, id, roomId, position, desiredDirection, collider.radius);
     enemy.avoidanceTime = std::max(0.0F, enemy.avoidanceTime - step);
     const auto attempt = [&](const wkc::core::Vec3 direction) {
-        return collisionWorld.moveCharacter(
+        CharacterMotionResult motion = collisionWorld.moveCharacter(
             position, direction * speed, step, collider);
+        if (!movementRespectsEnemyVolumes(
+                manager, enemyIds, id, roomId, position, motion.position,
+                collider.radius)) {
+            motion.position = position;
+            motion.velocity = {};
+            motion.collided = true;
+        }
+        return motion;
     };
     if (enemy.avoidanceTime > 0.0F && enemy.avoidanceSide != 0) {
         CharacterMotionResult motion = attempt(
@@ -144,6 +225,31 @@ wkc::core::Vec3 moveEnemy(
             steeringDirection, enemy.avoidanceSide));
     }
     return detour.position;
+}
+
+void separateEnemyIfNeeded(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const float moveSpeed,
+    const float step,
+    const CharacterCollider collider) noexcept
+{
+    constexpr wkc::core::Vec3 stableReference{0.0F, 0.0F, -1.0F};
+    const wkc::core::Vec3 repulsion = separationRepulsion(
+        manager, enemyIds, id, roomId, entity.transform.position,
+        stableReference, collider.radius);
+    if (wkc::core::length(repulsion) <= 1.0e-5F) {
+        return;
+    }
+    entity.transform.position = moveEnemy(
+        manager, enemyIds, collisionWorld, id, roomId, enemy,
+        entity.transform.position, wkc::core::normalized(repulsion),
+        moveSpeed * 0.55F, step, collider);
 }
 
 } // namespace
@@ -211,6 +317,9 @@ EnemyUpdateSummary updateWorkers(
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
             continue;
         }
 
@@ -221,6 +330,9 @@ EnemyUpdateSummary updateWorkers(
         if (distance <= config.attackRange && lineOfSight) {
             enemy->behavior = EnemyBehaviorState::Attack;
             ++summary.attacking;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
             if (enemy->attackCooldown <= 0.0F) {
                 player.applyDamage(config.attackDamage);
                 enemy->attackCooldown = config.attackInterval;
@@ -289,6 +401,9 @@ EnemyUpdateSummary updateGuards(
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
             continue;
         }
 
@@ -327,6 +442,9 @@ EnemyUpdateSummary updateGuards(
 
         enemy->behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+            config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -385,6 +503,9 @@ EnemyUpdateSummary updateOfficers(
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
             continue;
         }
 
@@ -457,6 +578,9 @@ EnemyUpdateSummary updateOfficers(
 
         enemy->behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+            config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -588,6 +712,9 @@ EnemyUpdateSummary updateEngineers(
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
             continue;
         }
 
@@ -625,6 +752,9 @@ EnemyUpdateSummary updateEngineers(
 
         enemy->behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+            config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -747,6 +877,9 @@ EnemyUpdateSummary updateIndustrialRobots(
         if (!player.state().alive || distance > config.detectionRange) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
+            separateEnemyIfNeeded(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                moveSpeed, step, {.radius = 0.52F, .height = 1.9F});
             continue;
         }
 
@@ -784,6 +917,9 @@ EnemyUpdateSummary updateIndustrialRobots(
 
         enemy->behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+            moveSpeed, step, {.radius = 0.52F, .height = 1.9F});
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(attackDamage);
             enemy->attackCooldown = attackInterval;

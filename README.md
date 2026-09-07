@@ -336,6 +336,9 @@ especializados das pastas numeradas.
 - **Fase 87 — Separação de combate:** inimigos vivos e ativos da mesma sala
   preservam espaço pessoal durante avanço e recuo. Sobreposições exatas usam
   desempate estável por `EntityId`, sem criar colisão rígida ou travar grupos.
+- **Fase 88 — Volumes físicos entre inimigos:** o movimento agora testa todo o
+  segmento percorrido contra os raios dos demais inimigos, impedindo que corpos
+  se atravessem em grupos densos. Idle e Attack também liberam sobreposições.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -713,6 +716,15 @@ dos aliados próximos. A distância desejada soma os raios dos dois inimigos e
 ativos e no mesmo `roomId` participam. A resposta é steering, não sólido rígido,
 permitindo que grupos ainda atravessem passagens sem formar uma barreira. Como
 o resultado altera posicionamento e tempo, Campaign/Speedrun avançaram para 7/6.
+
+Na Fase 88, o contato entre inimigos deixou de depender somente dessa repulsão
+suave. Cada tentativa de movimento testa o segmento percorrido contra o volume
+circular dos inimigos vivos da sala, bloqueando tanto penetração quanto troca de
+lados no mesmo passo. Uma sobreposição já existente só aceita movimento que
+aumente a distância; inimigos em Idle ou Attack também executam uma correção
+lenta para abrir espaço sem abandonar `CollisionWorld`. A regra permanece no
+gameplay concreto do GDP e usa ordem estável de entidades. Como posições e
+tempos podem mudar, Campaign/Speedrun avançaram para 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

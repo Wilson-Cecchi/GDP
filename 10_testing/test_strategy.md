@@ -263,6 +263,11 @@ exige separação horizontal mínima de `0,65 m`. Uma segunda fixture com as mes
 identidades deve reproduzir ambas as posições exatamente. Campaign/Speedrun
 isolam as regras anteriores 6/5 das atuais 7/6.
 
+O gate da Fase 88 acompanha oito Workers convergindo ao mesmo alvo durante 600
+passos e testa todos os pares a cada atualização. Nenhum par pode reduzir a
+distância horizontal abaixo de `0,68 m`, e duas execuções devem terminar em
+posições idênticas. Os stores isolam regras 7/6 das atuais Campaign/Speedrun 8/7.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
