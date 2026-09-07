@@ -85,6 +85,11 @@ mudam rotas e tempos em encontros densos. O contato e a correção de sobreposi�
 são recalculados no fixed update; nenhum campo foi adicionado e o checkpoint
 permanece no schema 2.
 
+A Fase 90 não altera regras nem schema: poses de inimigo são apresentação
+derivada do comportamento, do tick visual e da `visualSeed`. O contador reinicia
+com a run, não é serializado e não muda IA, colisão, dano ou geração;
+Campaign/Speedrun permanecem em 8/7 e o checkpoint em schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

@@ -342,6 +342,9 @@ especializados das pastas numeradas.
 - **Fase 89 — Seed inicial variável:** abrir o jogo normalmente seleciona uma
   seed nova antes do menu. `--seed`, headless, Continue, Best Seed, replay e
   restart preservam seus contratos determinísticos.
+- **Fase 90 — Poses procedurais dos inimigos:** Idle, Walk, Attack e Death agora
+  possuem poses de raiz distintas, amostradas pelos ticks fixos e defasadas pela
+  `visualSeed`. Pausa, resultado e inimigos dormentes permanecem congelados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -737,6 +740,17 @@ headless sem seed conserva o valor fixo dos testes. Continue, Best Seed,
 `REPLAY SEED` e `RESTART RUN` continuam substituindo ou preservando a seed pelas
 regras anteriores. A geração não mudou, portanto Campaign/Speedrun permanecem
 nas regras 8/7.
+
+Na Fase 90, o estado de comportamento de cada inimigo passou a alimentar uma
+pose visual de raiz: Idle respira discretamente, Chase/Reposition usam a
+cadência Walk, Attack aplica um alongamento curto e Dead conserva a silhueta
+achatada anterior. O ciclo usa somente ticks fixos e uma fase derivada da
+`visualSeed`, evitando grupos perfeitamente sincronizados sem consumir RNG. O
+contador é reiniciado com a run e não avança em pausa ou resultado; inimigos
+dormentes ficam estáticos. Esta primeira camada transforma o modelo consolidado
+inteiro. A hierarquia rígida de torso, cabeça e membros, além da pose Hit,
+permanece para a etapa de revisão dos assets. Colliders, IA, dano e geração não
+mudaram, por isso Campaign/Speedrun continuam nas regras 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

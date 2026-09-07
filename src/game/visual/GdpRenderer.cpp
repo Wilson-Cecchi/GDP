@@ -1343,13 +1343,12 @@ bool GdpRenderer::render(
             return false;
         }
         visual->second.texture.bind(gl_);
-        const wkc::core::Vec3 position = enemy.position
-            + (enemy.alive ? wkc::core::Vec3{} : wkc::core::Vec3{0.0F, 0.04F, 0.0F});
-        const wkc::core::Vec3 scale = enemy.alive
-            ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-            : wkc::core::Vec3{1.15F, 0.18F, 1.15F};
+        const EnemyRootPose pose = sampleEnemyRootPose(
+            enemy.alive ? enemy.animationState : EnemyAnimationState::Dead,
+            enemy.animationTick, enemy.visualSeed, enemy.active);
+        const wkc::core::Vec3 position = enemy.position + pose.offset;
         const wkc::core::Mat4 model = wkc::core::translationMatrix(position)
-            * wkc::core::scaleMatrix(scale);
+            * wkc::core::scaleMatrix(pose.scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(
             gl_, "uTint", !enemy.alive

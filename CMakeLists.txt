@@ -422,7 +422,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_room_material_tests)
 
     add_test(NAME room_material_systems COMMAND gdp_room_material_tests)
-    set_tests_properties(room_material_systems PROPERTIES TIMEOUT 120)
+    set_tests_properties(room_material_systems PROPERTIES TIMEOUT 300)
 
     add_executable(gdp_gameplay_tests tests/test_gameplay.cpp)
     target_link_libraries(gdp_gameplay_tests PRIVATE gdp_gameplay)

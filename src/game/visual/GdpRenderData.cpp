@@ -7,6 +7,63 @@
 
 namespace gdp::game::visual {
 
+EnemyRootPose sampleEnemyRootPose(
+    const EnemyAnimationState state,
+    const std::uint64_t animationTick,
+    const wkc::core::Seed visualSeed,
+    const bool active) noexcept
+{
+    if (state == EnemyAnimationState::Dead) {
+        return {
+            {0.0F, 0.04F, 0.0F},
+            {1.15F, 0.18F, 1.15F},
+        };
+    }
+    if (!active) {
+        return {};
+    }
+
+    constexpr float tau = 6.28318530717958647692F;
+    std::uint64_t period = 120U;
+    if (state == EnemyAnimationState::Walk) {
+        period = 30U;
+    } else if (state == EnemyAnimationState::Attack) {
+        period = 24U;
+    }
+    const std::uint64_t phaseTick
+        = (animationTick + (visualSeed % period)) % period;
+    const float phase = static_cast<float>(phaseTick)
+        / static_cast<float>(period) * tau;
+    const float wave = std::sin(phase);
+
+    if (state == EnemyAnimationState::Walk) {
+        const float stride = std::abs(wave);
+        return {
+            {0.0F, stride * 0.035F, 0.0F},
+            {1.0F + (stride * 0.015F),
+                1.0F - (stride * 0.018F),
+                1.0F + (stride * 0.015F)},
+        };
+    }
+    if (state == EnemyAnimationState::Attack) {
+        const float impulse = std::max(wave, 0.0F);
+        return {
+            {0.0F, impulse * 0.01F, 0.0F},
+            {1.0F + (impulse * 0.02F),
+                1.0F - (impulse * 0.025F),
+                1.0F + (impulse * 0.055F)},
+        };
+    }
+
+    const float breath = (wave + 1.0F) * 0.5F;
+    return {
+        {0.0F, breath * 0.012F, 0.0F},
+        {1.0F + (wave * 0.004F),
+            1.0F - (wave * 0.004F),
+            1.0F + (wave * 0.004F)},
+    };
+}
+
 bool UiRect::contains(const int pointX, const int pointY) const noexcept
 {
     return pointX >= x && pointX < x + width

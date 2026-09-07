@@ -72,6 +72,12 @@ int main()
         constexpr std::array workerOnly{
             gdp::game::visual::EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 111},
         };
+        constexpr std::array animatedWorkerOnly{
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 111,
+                gdp::game::visual::EnemyVisualRole::Worker, true,
+                gdp::game::visual::EnemyAnimationState::Attack, 15U},
+        };
         constexpr std::array guardOnly{
             gdp::game::visual::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 333, gdp::game::visual::EnemyVisualRole::Guard},
@@ -531,6 +537,12 @@ int main()
             std::vector<std::uint8_t> workerPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, workerPixels.data());
 
+            const bool renderedAnimatedWorker
+                = renderer.render(width, height, {}, animatedWorkerOnly);
+            std::vector<std::uint8_t> animatedWorkerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                animatedWorkerPixels.data());
+
             const bool renderedGuard = renderer.prepareGuardVisual(333)
                 && renderer.render(width, height, {}, guardOnly);
             std::vector<std::uint8_t> guardPixels(baseline.size());
@@ -612,6 +624,7 @@ int main()
             std::size_t settingsMenuChangedChannels = 0;
             std::size_t settingsSelectionChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
+            std::size_t enemyAnimationChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
             std::size_t engineerChangedChannels = 0;
@@ -752,6 +765,10 @@ int main()
                     if (workerPixels[index + channel] != centralHubPixels[index + channel]) {
                         ++workerChangedChannels;
                     }
+                    if (animatedWorkerPixels[index + channel]
+                        != workerPixels[index + channel]) {
+                        ++enemyAnimationChangedChannels;
+                    }
                     if (guardPixels[index + channel] != workerPixels[index + channel]) {
                         ++guardChangedChannels;
                     }
@@ -824,6 +841,7 @@ int main()
                 && renderedSettingsAdjusted
                 && settingsSelectionChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
+                && renderedAnimatedWorker && enemyAnimationChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U
                 && renderedEngineer && engineerChangedChannels > 100U

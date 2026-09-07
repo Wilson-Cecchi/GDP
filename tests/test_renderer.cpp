@@ -514,6 +514,65 @@ void testRunTimeFormatting()
         "run timer formatting is deterministic across tick boundaries");
 }
 
+void testEnemyRootAnimation()
+{
+    using namespace gdp::game::visual;
+
+    const EnemyRootPose inactive = sampleEnemyRootPose(
+        EnemyAnimationState::Walk, 30U, 111U, false);
+    expect(inactive == EnemyRootPose{},
+        "dormant enemy previews remain visually static");
+
+    const EnemyRootPose dead = sampleEnemyRootPose(
+        EnemyAnimationState::Dead, 999U, 111U);
+    expect(dead == EnemyRootPose{
+            {0.0F, 0.04F, 0.0F}, {1.15F, 0.18F, 1.15F}},
+        "dead enemies keep the established flattened terminal pose");
+
+    const EnemyRootPose idle = sampleEnemyRootPose(
+        EnemyAnimationState::Idle, 7U, 111U);
+    expect(idle == sampleEnemyRootPose(
+            EnemyAnimationState::Idle, 7U, 111U),
+        "enemy root animation is deterministic for the same tick and visual seed");
+    expect(idle != sampleEnemyRootPose(
+            EnemyAnimationState::Idle, 7U, 112U),
+        "visual seeds offset enemy cycles to avoid synchronized groups");
+
+    float maximumIdleLift = 0.0F;
+    float maximumWalkLift = 0.0F;
+    float maximumAttackReach = 1.0F;
+    bool finiteAndGrounded = true;
+    for (std::uint64_t tick = 0U; tick < 120U; ++tick) {
+        const EnemyRootPose idlePose = sampleEnemyRootPose(
+            EnemyAnimationState::Idle, tick, 111U);
+        const EnemyRootPose walkPose = sampleEnemyRootPose(
+            EnemyAnimationState::Walk, tick, 111U);
+        const EnemyRootPose attackPose = sampleEnemyRootPose(
+            EnemyAnimationState::Attack, tick, 111U);
+        maximumIdleLift = std::max(maximumIdleLift, idlePose.offset.y);
+        maximumWalkLift = std::max(maximumWalkLift, walkPose.offset.y);
+        maximumAttackReach = std::max(maximumAttackReach, attackPose.scale.z);
+        for (const EnemyRootPose pose : {idlePose, walkPose, attackPose}) {
+            finiteAndGrounded = finiteAndGrounded
+                && std::isfinite(pose.offset.y)
+                && std::isfinite(pose.scale.x)
+                && std::isfinite(pose.scale.y)
+                && std::isfinite(pose.scale.z)
+                && pose.offset.y >= 0.0F
+                && pose.scale.x > 0.0F
+                && pose.scale.y > 0.0F
+                && pose.scale.z > 0.0F;
+        }
+    }
+    expect(finiteAndGrounded,
+        "all live root poses stay finite, positive and above the floor plane");
+    expect(maximumIdleLift <= 0.0121F
+            && maximumWalkLift > maximumIdleLift + 0.02F,
+        "Walk has a stronger readable cadence than the restrained Idle cycle");
+    expect(maximumAttackReach > 1.05F,
+        "Attack produces a distinct axial impulse at its peak");
+}
+
 } // namespace
 
 int main()
@@ -526,6 +585,7 @@ int main()
     testResultMenuLayout();
     testExitConfirmationLayout();
     testRunTimeFormatting();
+    testEnemyRootAnimation();
     testSettingsMenuLayout();
 
     if (failures != 0) {

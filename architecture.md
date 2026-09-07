@@ -968,6 +968,15 @@ transforma a entropia em uma master seed. World, Gameplay, Visual e Audio
 continuam consumindo exclusivamente esse valor estável. A WKC Forge fornece
 apenas hash e tipos genéricos, sem conhecer modos ou argumentos do GDP.
 
+Na Fase 90, `game/visual/GdpRenderData` passou a definir os estados e a
+amostragem das poses de raiz dos inimigos. A `Application` traduz o estado de IA
+para esse snapshot concreto e fornece um contador de fixed updates; o
+`GdpRenderer` limita-se a aplicar offset e escala prontos. A `visualSeed` apenas
+defasa ciclos e nenhum RNG é consumido. Como os meshes atuais são consolidados,
+a hierarquia de membros e Hit permanecem no domínio visual do GDP para uma
+futura revisão de assets. Nenhum sistema universal de animação foi promovido à
+WKC Forge, e as regras Campaign/Speedrun permanecem 8/7.
+
 ---
 
 # 8. Sistema de seed

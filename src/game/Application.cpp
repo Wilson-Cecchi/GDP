@@ -520,6 +520,7 @@ bool Application::initialize()
 
 bool Application::initializeRun()
 {
+    enemyAnimationTicks_ = 0U;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
@@ -2331,6 +2332,7 @@ void Application::fixedUpdate(const double fixedStep)
         }
         audio_->update(step);
     }
+    ++enemyAnimationTicks_;
     ++fixedUpdates_;
 }
 
@@ -2457,12 +2459,24 @@ void Application::render()
             } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
                 role = visual::EnemyVisualRole::IndustrialRobot;
             }
+            visual::EnemyAnimationState animationState
+                = visual::EnemyAnimationState::Idle;
+            if (enemy->behavior == entities::EnemyBehaviorState::Chase
+                || enemy->behavior == entities::EnemyBehaviorState::Reposition) {
+                animationState = visual::EnemyAnimationState::Walk;
+            } else if (enemy->behavior == entities::EnemyBehaviorState::Attack) {
+                animationState = visual::EnemyAnimationState::Attack;
+            } else if (enemy->behavior == entities::EnemyBehaviorState::Dead) {
+                animationState = visual::EnemyAnimationState::Dead;
+            }
             visibleEnemies.push_back({
                 entity->transform.position,
                 enemy->behavior != entities::EnemyBehaviorState::Dead,
                 enemy->visualSeed,
                 role,
                 enemy->active,
+                animationState,
+                enemyAnimationTicks_,
             });
         }
     }

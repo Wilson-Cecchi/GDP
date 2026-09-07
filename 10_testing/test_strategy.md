@@ -274,6 +274,14 @@ entropia reproduz o mesmo valor. Entropias distintas precisam gerar seeds e
 fingerprints estruturais diferentes. Os bootstraps headless existentes continuam
 determinísticos e a geração procedural permanece inalterada.
 
+O gate da Fase 90 amostra Idle, Walk, Attack e Dead diretamente. Ele exige
+repetição exata para tick/seed iguais, defasagem entre seeds, valores finitos e
+positivos, limites da respiração, passada mais legível e impulso próprio do
+ataque. Também confirma que inimigos dormentes ficam estáticos e que Death
+mantém a pose terminal anterior. A regressão OpenGL compara o mesmo Worker em
+Idle e Attack e exige diferença material de pixels, cobrindo a aplicação real
+da pose pelo renderer.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
@@ -321,3 +329,7 @@ O preset CMake `sanitizers` ativa ambos em GCC/Clang e executa a mesma suíte de
 Debug/Release. Erros de memória ou comportamento indefinido usam `halt_on_error`.
 LeakSanitizer fica desativado nesse preset para não atribuir ao GDP alocações
 persistentes dos drivers e bibliotecas gráficas externas.
+
+O teste de materiais HD possui teto de 300 segundos: a instrumentação completa
+de ASan/UBSan pode ultrapassar 120 segundos sem alterar o resultado funcional.
+Os demais testes mantêm limites curtos e específicos para detectar travamentos.

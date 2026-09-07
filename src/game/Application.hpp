@@ -139,6 +139,7 @@ private:
         gameplay::RunRestartMode::NextSeed};
     std::uint64_t renderedFrames_{0};
     std::uint64_t fixedUpdates_{0};
+    std::uint64_t enemyAnimationTicks_{0};
     std::uint64_t audioEventCounter_{0};
     std::uint64_t uiAudioEventCounter_{0};
 };

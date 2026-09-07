@@ -4,20 +4,35 @@
 > Guard, Officer, Engineer e IndustrialRobot validados na Fase 11. A Fase 86
 > adicionou desvio local determinístico de obstáculos aos cinco arquétipos;
 > a Fase 87 adicionou separação local entre aliados e a Fase 88 consolidou
-> volumes físicos entre inimigos;
-> animação, patrulha, investigação e pathfinding global permanecem planejados.
+> volumes físicos entre inimigos. A Fase 90 implementou poses procedurais de
+> raiz para Idle, Walk, Attack e Death; hierarquia por membros, Hit, patrulha,
+> investigação e pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Animação
 
-Começar com hierarquia rígida por partes: root → torso → cabeça/braços/pernas. Estados
-mínimos: Idle, Walk, Attack, Hit e Death. Não construir um sistema universal de animação.
+A Fase 90 introduziu a primeira camada funcional: a `Application` converte o
+comportamento atual em Idle, Walk, Attack ou Dead, e o renderer amostra uma pose
+de raiz determinística. Idle usa respiração contida, Walk possui elevação e
+compressão mais legíveis, Attack alonga a silhueta e Death preserva a
+pose achatada terminal já existente. Os ciclos avançam nos fixed updates,
+congelam em pausa/resultado e recebem apenas uma defasagem da `visualSeed`, sem
+consumir RNG nem alterar gameplay. Inimigos pré-carregados ainda dormentes ficam
+estáticos.
+
+Os assets procedurais atuais são meshes consolidadas. Portanto esta etapa move e
+escala o inimigo inteiro; ela não finge oferecer articulação que o formato ainda
+não suporta. A próxima evolução visual deve separar uma hierarquia rígida por
+partes — root → torso → cabeça/braços/pernas —, preservar sockets e então
+adicionar Hit e amplitudes próprias por arquétipo. Não construir um sistema
+universal de animação.
 
 ## Walk
 
-Pode ser paramétrico por fase; sockets preservam conexão entre partes. Peças mecânicas podem
-usar amplitudes próprias.
+A pose de raiz já é paramétrica por fase. Quando os meshes forem separados,
+sockets devem preservar a conexão entre partes e peças mecânicas podem usar
+amplitudes próprias.
 
 ## IA base
 

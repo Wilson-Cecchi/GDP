@@ -52,12 +52,34 @@ enum class PropVisualState : std::uint8_t {
     Destroyed,
 };
 
+enum class EnemyAnimationState : std::uint8_t {
+    Idle,
+    Walk,
+    Attack,
+    Dead,
+};
+
+struct EnemyRootPose {
+    wkc::core::Vec3 offset{};
+    wkc::core::Vec3 scale{1.0F, 1.0F, 1.0F};
+
+    constexpr bool operator==(const EnemyRootPose&) const noexcept = default;
+};
+
+[[nodiscard]] EnemyRootPose sampleEnemyRootPose(
+    EnemyAnimationState state,
+    std::uint64_t animationTick,
+    wkc::core::Seed visualSeed,
+    bool active = true) noexcept;
+
 struct EnemyRenderData {
     wkc::core::Vec3 position{};
     bool alive{true};
     wkc::core::Seed visualSeed{0};
     EnemyVisualRole role{EnemyVisualRole::Worker};
     bool active{true};
+    EnemyAnimationState animationState{EnemyAnimationState::Idle};
+    std::uint64_t animationTick{0U};
 };
 
 struct PickupRenderData {
