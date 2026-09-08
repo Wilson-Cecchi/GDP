@@ -95,6 +95,10 @@ A Fase 91 também mantém regras e schema: o yaw é estado visual transitório d
 andar. Checkpoints continuam representando apenas a entrada do andar;
 Campaign/Speedrun permanecem em 8/7 e o schema em 2.
 
+A Fase 92 mantém o mesmo contrato: a convergência angular é transitória e
+recalculada pelo fixed update, sem campos persistentes. Campaign/Speedrun
+continuam em 8/7 e o checkpoint permanece no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

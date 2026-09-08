@@ -1059,6 +1059,13 @@ Forge recebeu apenas `rotationYMatrix`, primitiva matemática genérica coerente
 com `+Y` e frente `+Z`; não recebeu conceitos de Enemy ou orientação tática.
 Como a mudança é somente de apresentação, Campaign/Speedrun permanecem 8/7.
 
+Na Fase 92, `gdp_gameplay` passou a aproximar o yaw atual do alvo com limites
+angulares por segundo e `std::remainder` para escolher o arco mais curto. O
+fixed step continua sendo a única fonte de tempo; renderer, snapshot e WKC
+Forge permanecem inalterados. As taxas são política visual concreta dos
+inimigos do GDP, não uma abstração universal de animação. Campaign/Speedrun
+permanecem 8/7.
+
 ---
 
 # 8. Sistema de seed

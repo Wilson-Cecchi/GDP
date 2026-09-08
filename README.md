@@ -348,6 +348,9 @@ especializados das pastas numeradas.
 - **Fase 91 — Orientação corporal dos inimigos:** Chase acompanha o deslocamento
   real, Attack e Reposition encaram o jogador, e Idle/Death preservam a última
   direção válida. O renderer aplica o yaw antes da pose de raiz.
+- **Fase 92 — Giro suave dos inimigos:** o yaw converge pelo arco mais curto nos
+  fixed updates, a `480°/s` em Chase e `720°/s` ao mirar/recuar, eliminando
+  mudanças instantâneas sem atrasar a resposta de combate.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -764,6 +767,14 @@ preservam a última orientação, e deslocamentos nulos não introduzem rotaçã
 inválida. A `Application` envia o yaw no snapshot e o renderer compõe
 translação × rotação × escala. Trajetória, colisores e combate permanecem
 inalterados, portanto Campaign/Speedrun continuam nas regras 8/7.
+
+Na Fase 92, a orientação passou a convergir deterministicamente em vez de saltar
+para o yaw-alvo. Chase usa um limite de `480°/s`; Attack e Reposition usam
+`720°/s` para continuar responsivos. A diferença angular usa o arco mais curto,
+inclusive ao atravessar `-180°/180°`, e o orçamento é consumido uma única vez
+por fixed update. Reposition move para trás, mas gira somente em direção ao
+jogador. Pausa, Idle, Death e deslocamentos nulos não avançam a rotação. Como o
+resultado é exclusivamente visual, Campaign/Speedrun permanecem nas regras 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

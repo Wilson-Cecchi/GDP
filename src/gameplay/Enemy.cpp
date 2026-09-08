@@ -227,18 +227,35 @@ wkc::core::Vec3 moveEnemy(
     return detour.position;
 }
 
-void faceEnemyToward(
+constexpr float travelTurnRateDegreesPerSecond = 480.0F;
+constexpr float targetTurnRateDegreesPerSecond = 720.0F;
+
+void turnEnemyToward(
     gdp::entities::Entity& entity,
-    const wkc::core::Vec3 direction) noexcept
+    const wkc::core::Vec3 direction,
+    const float step,
+    const float turnRateDegreesPerSecond) noexcept
 {
     const float planarLengthSquared
         = (direction.x * direction.x) + (direction.z * direction.z);
-    if (!std::isfinite(planarLengthSquared) || planarLengthSquared <= 1.0e-10F) {
+    if (!std::isfinite(planarLengthSquared) || planarLengthSquared <= 1.0e-10F
+        || !std::isfinite(step) || step <= 0.0F
+        || !std::isfinite(turnRateDegreesPerSecond)
+        || turnRateDegreesPerSecond <= 0.0F) {
         return;
     }
     constexpr float radiansToDegrees = 57.29577951308232F;
-    entity.transform.rotationDegrees.y = std::remainder(
+    const float target = std::remainder(
         std::atan2(direction.x, direction.z) * radiansToDegrees, 360.0F);
+    float current = entity.transform.rotationDegrees.y;
+    if (!std::isfinite(current)) {
+        current = target;
+    }
+    const float delta = std::remainder(target - current, 360.0F);
+    const float maximumDelta = turnRateDegreesPerSecond * step;
+    const float appliedDelta = std::clamp(delta, -maximumDelta, maximumDelta);
+    entity.transform.rotationDegrees.y = std::remainder(
+        current + appliedDelta, 360.0F);
 }
 
 void moveEnemyAndFaceTravel(
@@ -258,7 +275,9 @@ void moveEnemyAndFaceTravel(
     entity.transform.position = moveEnemy(
         manager, enemyIds, collisionWorld, id, roomId, enemy,
         previous, desiredDirection, speed, step, collider);
-    faceEnemyToward(entity, entity.transform.position - previous);
+    turnEnemyToward(
+        entity, entity.transform.position - previous, step,
+        travelTurnRateDegreesPerSecond);
 }
 
 void separateEnemyIfNeeded(
@@ -367,8 +386,9 @@ EnemyUpdateSummary updateWorkers(
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-            faceEnemyToward(
-                *entity, player.state().position - entity->transform.position);
+            turnEnemyToward(
+                *entity, player.state().position - entity->transform.position,
+                step, targetTurnRateDegreesPerSecond);
             if (enemy->attackCooldown <= 0.0F) {
                 player.applyDamage(config.attackDamage);
                 enemy->attackCooldown = config.attackInterval;
@@ -453,13 +473,15 @@ EnemyUpdateSummary updateGuards(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                moveEnemyAndFaceTravel(
-                    manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                entity->transform.position = moveEnemy(
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
-            faceEnemyToward(
-                *entity, player.state().position - entity->transform.position);
+            turnEnemyToward(
+                *entity, player.state().position - entity->transform.position,
+                step, targetTurnRateDegreesPerSecond);
             continue;
         }
 
@@ -480,8 +502,9 @@ EnemyUpdateSummary updateGuards(
         separateEnemyIfNeeded(
             manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
             config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-        faceEnemyToward(
-            *entity, player.state().position - entity->transform.position);
+        turnEnemyToward(
+            *entity, player.state().position - entity->transform.position,
+            step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -591,13 +614,15 @@ EnemyUpdateSummary updateOfficers(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                moveEnemyAndFaceTravel(
-                    manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                entity->transform.position = moveEnemy(
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
-            faceEnemyToward(
-                *entity, player.state().position - entity->transform.position);
+            turnEnemyToward(
+                *entity, player.state().position - entity->transform.position,
+                step, targetTurnRateDegreesPerSecond);
             continue;
         }
 
@@ -618,8 +643,9 @@ EnemyUpdateSummary updateOfficers(
         separateEnemyIfNeeded(
             manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
             config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-        faceEnemyToward(
-            *entity, player.state().position - entity->transform.position);
+        turnEnemyToward(
+            *entity, player.state().position - entity->transform.position,
+            step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -768,13 +794,15 @@ EnemyUpdateSummary updateEngineers(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                moveEnemyAndFaceTravel(
-                    manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                entity->transform.position = moveEnemy(
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
-            faceEnemyToward(
-                *entity, player.state().position - entity->transform.position);
+            turnEnemyToward(
+                *entity, player.state().position - entity->transform.position,
+                step, targetTurnRateDegreesPerSecond);
             continue;
         }
         if (!lineOfSight || distance > config.preferredMaximumRange) {
@@ -794,8 +822,9 @@ EnemyUpdateSummary updateEngineers(
         separateEnemyIfNeeded(
             manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
             config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-        faceEnemyToward(
-            *entity, player.state().position - entity->transform.position);
+        turnEnemyToward(
+            *entity, player.state().position - entity->transform.position,
+            step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(config.attackDamage);
             enemy->attackCooldown = config.attackInterval;
@@ -935,13 +964,15 @@ EnemyUpdateSummary updateIndustrialRobots(
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
-                moveEnemyAndFaceTravel(
-                    manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                entity->transform.position = moveEnemy(
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position,
                     towardPlayer * -1.0F, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
             }
-            faceEnemyToward(
-                *entity, player.state().position - entity->transform.position);
+            turnEnemyToward(
+                *entity, player.state().position - entity->transform.position,
+                step, targetTurnRateDegreesPerSecond);
             continue;
         }
         if (!lineOfSight || distance > maximumRange) {
@@ -961,8 +992,9 @@ EnemyUpdateSummary updateIndustrialRobots(
         separateEnemyIfNeeded(
             manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
             moveSpeed, step, {.radius = 0.52F, .height = 1.9F});
-        faceEnemyToward(
-            *entity, player.state().position - entity->transform.position);
+        turnEnemyToward(
+            *entity, player.state().position - entity->transform.position,
+            step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
             player.applyDamage(attackDamage);
             enemy->attackCooldown = attackInterval;

@@ -289,6 +289,12 @@ para o alvo, não para a direção de fuga. O Core valida a matriz de yaw e seu
 fallback para ângulo não finito; a regressão OpenGL exige pixels distintos ao
 girar o mesmo asset em 90°.
 
+O gate da Fase 92 verifica o avanço parcial exato de Chase (`480°/s`) e Attack
+(`720°/s`), convergência quando há tempo suficiente e travessia de
+`-180°/180°` pelo arco mais curto. Reposition confirma que o orçamento angular
+é aplicado uma única vez enquanto o inimigo recua olhando para o jogador;
+Idle/Death continuam preservando a orientação.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

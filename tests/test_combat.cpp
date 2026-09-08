@@ -1009,20 +1009,31 @@ void testEnemyFacingLifecycle()
         .attackInterval = 1.0F,
     };
 
-    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
-    expect(near(manager.find(worker)->transform.rotationDegrees.y, -90.0F),
-        "a chasing enemy faces its actual travel toward world -X");
+    (void)updateWorkers(manager, player, 1, room, 0.05F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, -7.0F),
+        "Chase advances yaw at the fixed 480-degree-per-second turn rate");
 
     manager.find(worker)->transform.position = {-5.0F, 0.0F, 0.0F};
     (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
     expect(near(manager.find(worker)->transform.rotationDegrees.y, 90.0F),
-        "enemy facing changes when its travel reverses toward world +X");
+        "smoothed enemy facing converges exactly when the fixed-step budget allows it");
+
+    manager.find(worker)->transform.position = {0.86824F, 0.0F, 4.92404F};
+    manager.find(worker)->transform.rotationDegrees.y = 170.0F;
+    (void)updateWorkers(manager, player, 1, room, 0.05F, workerConfig);
+    expect(std::abs(std::remainder(
+               manager.find(worker)->transform.rotationDegrees.y + 170.0F,
+               360.0F)) < 0.05F,
+        "yaw smoothing crosses the 180-degree boundary by the shortest arc");
 
     manager.find(worker)->transform.position = {0.0F, 0.0F, 1.0F};
     manager.find(worker)->transform.rotationDegrees.y = 23.0F;
-    (void)updateWorkers(manager, player, 1, room, 0.0F, workerConfig);
+    (void)updateWorkers(manager, player, 1, room, 0.05F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, 59.0F),
+        "Attack uses the faster 720-degree-per-second target turn rate");
+    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
     expect(near(std::abs(manager.find(worker)->transform.rotationDegrees.y), 180.0F),
-        "an attacking enemy faces the player even without a movement step");
+        "Attack converges toward the player without translating the enemy");
 
     player.applyDamage(1'000.0F);
     manager.find(worker)->transform.rotationDegrees.y = 42.0F;
@@ -1044,15 +1055,24 @@ void testEnemyFacingLifecycle()
         .archetype = EnemyArchetype::Guard,
     });
     (void)updateGuards(
-        retreatManager, retreatPlayer, 2, room, 1.0F,
+        retreatManager, retreatPlayer, 2, room, 0.05F,
         {.detectionRange = 20.0F,
             .preferredMinimumRange = 4.0F,
             .preferredMaximumRange = 8.0F,
             .moveSpeed = 1.0F,
             .attackDamage = 0.0F});
-    expect(retreatManager.find(guard)->transform.position.x > 1.5F
-            && near(retreatManager.find(guard)->transform.rotationDegrees.y, -90.0F),
-        "a repositioning ranged enemy backs away while still facing the player");
+    expect(retreatManager.find(guard)->transform.position.x > 1.01F
+            && near(retreatManager.find(guard)->transform.rotationDegrees.y, -36.0F),
+        "Reposition backs away while turning smoothly toward the player");
+    (void)updateGuards(
+        retreatManager, retreatPlayer, 2, room, 0.2F,
+        {.detectionRange = 20.0F,
+            .preferredMinimumRange = 4.0F,
+            .preferredMaximumRange = 8.0F,
+            .moveSpeed = 1.0F,
+            .attackDamage = 0.0F});
+    expect(near(retreatManager.find(guard)->transform.rotationDegrees.y, -90.0F),
+        "Reposition converges to the target after enough deterministic time");
 }
 
 } // namespace

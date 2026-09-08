@@ -6,8 +6,9 @@
 > a Fase 87 adicionou separação local entre aliados e a Fase 88 consolidou
 > volumes físicos entre inimigos. A Fase 90 implementou poses procedurais de
 > raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
-> deslocamento/alvo; hierarquia por membros, Hit, patrulha, investigação e
-> pathfinding global permanecem planejados.
+> deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update; hierarquia por
+> membros, Hit, patrulha, investigação e pathfinding global permanecem
+> planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -28,6 +29,12 @@ recuam em Reposition ainda voltados para o alvo. Idle, Death e deslocamentos
 nulos conservam o último yaw válido. O eixo frontal dos assets é `+Z`, coerente
 com os sockets traseiros em `-Z`, e o snapshot visual transporta a rotação já
 decidida pelo gameplay.
+
+A Fase 92 limita a aproximação angular pelo menor arco: `480°/s` ao acompanhar
+o deslocamento de Chase e `720°/s` ao mirar em Attack/Reposition. O cálculo usa
+o mesmo fixed step da IA e não depende de FPS. Reposition não acumula dois giros
+no mesmo tick: o deslocamento de recuo não consome rotação, apenas a direção do
+jogador. Idle e Death continuam congelando o último yaw.
 
 Os assets procedurais atuais são meshes consolidadas. Portanto esta etapa move e
 escala o inimigo inteiro; ela não finge oferecer articulação que o formato ainda
