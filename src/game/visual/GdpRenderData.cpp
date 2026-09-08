@@ -22,6 +22,12 @@ EnemyRootPose sampleEnemyRootPose(
     if (!active) {
         return {};
     }
+    if (state == EnemyAnimationState::Hit) {
+        return {
+            {0.0F, 0.022F, 0.0F},
+            {1.07F, 0.88F, 1.07F},
+        };
+    }
 
     constexpr float tau = 6.28318530717958647692F;
     std::uint64_t period = 120U;

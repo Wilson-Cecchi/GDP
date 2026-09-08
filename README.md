@@ -351,6 +351,9 @@ especializados das pastas numeradas.
 - **Fase 92 — Giro suave dos inimigos:** o yaw converge pelo arco mais curto nos
   fixed updates, a `480°/s` em Chase e `720°/s` ao mirar/recuar, eliminando
   mudanças instantâneas sem atrasar a resposta de combate.
+- **Fase 93 — Reação visual ao dano:** acertos não letais ativam por `0,12 s`
+  uma compressão de raiz com tonalidade quente e emissivo reforçado. O pulso
+  não interrompe IA/ataque, reinicia em novo acerto e Death sempre prevalece.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -754,8 +757,9 @@ achatada anterior. O ciclo usa somente ticks fixos e uma fase derivada da
 `visualSeed`, evitando grupos perfeitamente sincronizados sem consumir RNG. O
 contador é reiniciado com a run e não avança em pausa ou resultado; inimigos
 dormentes ficam estáticos. Esta primeira camada transforma o modelo consolidado
-inteiro. A hierarquia rígida de torso, cabeça e membros, além da pose Hit,
-permanece para a etapa de revisão dos assets. Colliders, IA, dano e geração não
+inteiro. A hierarquia rígida de torso, cabeça e membros, além do refinamento da
+pose Hit por partes, permanece para a etapa de revisão dos assets. Colliders,
+IA, dano e geração não
 mudaram, por isso Campaign/Speedrun continuam nas regras 8/7.
 
 Na Fase 91, a direção visual deixou de permanecer presa ao eixo original do
@@ -775,6 +779,15 @@ inclusive ao atravessar `-180°/180°`, e o orçamento é consumido uma única v
 por fixed update. Reposition move para trás, mas gira somente em direção ao
 jogador. Pausa, Idle, Death e deslocamentos nulos não avançam a rotação. Como o
 resultado é exclusivamente visual, Campaign/Speedrun permanecem nas regras 8/7.
+
+Na Fase 93, `applyDamage()` passou a iniciar um timer visual de `0,12 s` em
+acertos não letais. A `Application` avança todos esses timers uma única vez por
+fixed update e converte a janela ativa em Hit, com prioridade abaixo apenas de
+Death. O renderer aplica uma compressão curta da raiz, tonalidade quente e
+emissivo moderadamente reforçado; movimento, ataque, cooldowns e colisores
+continuam avançando sem interrupção. Novo dano reinicia a janela, morte a limpa
+e o valor não consome RNG. Como esse feedback é transitório e não altera regras,
+Campaign/Speedrun permanecem nas versões 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

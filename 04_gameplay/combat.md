@@ -7,7 +7,8 @@
 > Fase 12. Eventos procedurais de sala estão funcionais; Armor do Player foi
 > integrada na Fase 58. A Fase 82 adicionou pressão progressiva por andar na
 > Campanha, a Fase 84 integrou a Carbine encontrada em salas Secret e a Fase 85
-> adicionou o Overdrive temporário encontrado em Arenas. A fila
+> adicionou o Overdrive temporário encontrado em Arenas. A Fase 93 adicionou
+> reação visual transitória ao dano de inimigos. A fila
 > desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
@@ -72,6 +73,11 @@ transição terminal. Props passam por `Damaged`, perdem colisão em `Destroyed`
 um crate cria somente seu drop controlado. Weak points entram quando forem
 visualmente legíveis.
 
+Acertos não letais em Enemy também reiniciam `hitReactionTime` em `0,12 s`.
+Esse timer é avançado uma única vez por fixed update, não interrompe IA,
+movimento, ataque nem cooldowns e é limpo pela transição Dead. A camada visual
+o traduz para uma reação Hit; ele não faz parte do cálculo de dano.
+
 Na Fase 58, a defesa do Player passou a consumir Armor ponto a ponto antes do
 HP. O excedente do mesmo ataque alcança HP, Armor nunca fica negativo e zerar
 somente Armor não mata. A regra independe do arquétipo atacante e não altera o
@@ -113,6 +119,8 @@ alvo mais próximo, cobertura, três estados, reparo, colisão reconstruída, dr
 único e proteção de terminal.
 Overdrive acrescenta ativação única, aumento de dano, cadência, expiração no
 fixed update, bloqueio de duplicata e restauração do perfil-base.
+Hit acrescenta início e reinício do timer em dano não letal, avanço por fixed
+step, clamp em zero e limpeza imediata na morte.
 O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
 e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
 na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.

@@ -295,6 +295,12 @@ O gate da Fase 92 verifica o avanço parcial exato de Chase (`480°/s`) e Attack
 é aplicado uma única vez enquanto o inimigo recua olhando para o jogador;
 Idle/Death continuam preservando a orientação.
 
+O gate da Fase 93 exige que dano não letal inicie e reinicie a janela Hit de
+`0,12 s`, que o fixed step a reduza com clamp em zero e que Death a limpe. A
+amostragem CPU confirma a pose comprimida estável; a regressão OpenGL compara o
+mesmo Worker em Idle e Hit e exige diferença material de pixels, cobrindo pose,
+tint e emissivo no pipeline real.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

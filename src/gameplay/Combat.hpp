@@ -10,6 +10,8 @@
 
 namespace gdp::gameplay {
 
+inline constexpr float enemyHitReactionDuration = 0.12F;
+
 enum class DamageOutcome : std::uint8_t {
     Ignored,
     Damaged,
@@ -43,6 +45,10 @@ struct ShotResult {
     gdp::entities::EntityManager& manager,
     gdp::entities::EntityId target,
     float amount) noexcept;
+
+void updateEnemyHitReactions(
+    gdp::entities::EntityManager& manager,
+    float fixedStepSeconds) noexcept;
 
 [[nodiscard]] ShotResult fireHitscan(
     Weapon& weapon,

@@ -99,6 +99,10 @@ A Fase 92 mantém o mesmo contrato: a convergência angular é transitória e
 recalculada pelo fixed update, sem campos persistentes. Campaign/Speedrun
 continuam em 8/7 e o checkpoint permanece no schema 2.
 
+A Fase 93 não altera schema nem checkpoint. `hitReactionTime` é feedback visual
+transitório, reiniciado por dano não letal e descartado ao reconstruir uma run;
+não deve ser serializado. Campaign/Speedrun permanecem nas regras 8/7.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

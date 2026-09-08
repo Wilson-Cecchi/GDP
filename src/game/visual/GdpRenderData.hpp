@@ -56,6 +56,7 @@ enum class EnemyAnimationState : std::uint8_t {
     Idle,
     Walk,
     Attack,
+    Hit,
     Dead,
 };
 

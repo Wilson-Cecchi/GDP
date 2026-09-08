@@ -529,6 +529,14 @@ void testEnemyRootAnimation()
             {0.0F, 0.04F, 0.0F}, {1.15F, 0.18F, 1.15F}},
         "dead enemies keep the established flattened terminal pose");
 
+    const EnemyRootPose hit = sampleEnemyRootPose(
+        EnemyAnimationState::Hit, 999U, 111U);
+    expect(hit == EnemyRootPose{
+            {0.0F, 0.022F, 0.0F}, {1.07F, 0.88F, 1.07F}}
+            && hit == sampleEnemyRootPose(
+                EnemyAnimationState::Hit, 0U, 999U),
+        "Hit applies a stable compressed root pulse independent of cycle phase");
+
     const EnemyRootPose idle = sampleEnemyRootPose(
         EnemyAnimationState::Idle, 7U, 111U);
     expect(idle == sampleEnemyRootPose(
@@ -552,7 +560,7 @@ void testEnemyRootAnimation()
         maximumIdleLift = std::max(maximumIdleLift, idlePose.offset.y);
         maximumWalkLift = std::max(maximumWalkLift, walkPose.offset.y);
         maximumAttackReach = std::max(maximumAttackReach, attackPose.scale.z);
-        for (const EnemyRootPose pose : {idlePose, walkPose, attackPose}) {
+        for (const EnemyRootPose pose : {idlePose, walkPose, attackPose, hit}) {
             finiteAndGrounded = finiteAndGrounded
                 && std::isfinite(pose.offset.y)
                 && std::isfinite(pose.scale.x)

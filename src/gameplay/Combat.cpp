@@ -128,6 +128,7 @@ DamageOutcome applyDamage(
     }
     enemy->health = std::max(0.0F, enemy->health - amount);
     if (enemy->health > 0.0F) {
+        enemy->hitReactionTime = enemyHitReactionDuration;
         return DamageOutcome::Damaged;
     }
     enemy->behavior = gdp::entities::EnemyBehaviorState::Dead;
@@ -135,7 +136,25 @@ DamageOutcome applyDamage(
     enemy->supportCooldown = 0.0F;
     enemy->avoidanceTime = 0.0F;
     enemy->avoidanceSide = 0;
+    enemy->hitReactionTime = 0.0F;
     return DamageOutcome::Killed;
+}
+
+void updateEnemyHitReactions(
+    gdp::entities::EntityManager& manager,
+    const float fixedStepSeconds) noexcept
+{
+    const float step = std::max(fixedStepSeconds, 0.0F);
+    for (const gdp::entities::EntityId id
+        : manager.query(gdp::entities::EntityKind::Enemy)) {
+        gdp::entities::EnemyData* enemy
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (enemy == nullptr) {
+            continue;
+        }
+        enemy->hitReactionTime
+            = std::max(0.0F, enemy->hitReactionTime - step);
+    }
 }
 
 ShotResult fireHitscan(

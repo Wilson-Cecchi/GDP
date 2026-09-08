@@ -2005,6 +2005,7 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
     reloadPending_ = false;
+    gameplay::updateEnemyHitReactions(entities_, step);
     if (firePending_ && player_.state().alive) {
         const gameplay::ShotResult shot = gameplay::fireHitscan(
             weapon_,
@@ -2461,13 +2462,15 @@ void Application::render()
             }
             visual::EnemyAnimationState animationState
                 = visual::EnemyAnimationState::Idle;
-            if (enemy->behavior == entities::EnemyBehaviorState::Chase
+            if (enemy->behavior == entities::EnemyBehaviorState::Dead) {
+                animationState = visual::EnemyAnimationState::Dead;
+            } else if (enemy->hitReactionTime > 0.0F) {
+                animationState = visual::EnemyAnimationState::Hit;
+            } else if (enemy->behavior == entities::EnemyBehaviorState::Chase
                 || enemy->behavior == entities::EnemyBehaviorState::Reposition) {
                 animationState = visual::EnemyAnimationState::Walk;
             } else if (enemy->behavior == entities::EnemyBehaviorState::Attack) {
                 animationState = visual::EnemyAnimationState::Attack;
-            } else if (enemy->behavior == entities::EnemyBehaviorState::Dead) {
-                animationState = visual::EnemyAnimationState::Dead;
             }
             visibleEnemies.push_back({
                 entity->transform.position,

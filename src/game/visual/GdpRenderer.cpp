@@ -1353,9 +1353,13 @@ bool GdpRenderer::render(
             * wkc::core::rotationYMatrix(enemy.yawDegrees * degreesToRadians)
             * wkc::core::scaleMatrix(pose.scale);
         shader_.setMat4(gl_, "uModel", model);
+        const bool hit = enemy.alive && enemy.active
+            && enemy.animationState == EnemyAnimationState::Hit;
         shader_.setVec3(
             gl_, "uTint", !enemy.alive
                 ? wkc::core::Vec3{0.30F, 0.24F, 0.20F}
+                : hit
+                ? wkc::core::Vec3{1.0F, 0.48F, 0.38F}
                 : enemy.active
                 ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                 : wkc::core::Vec3{0.68F, 0.72F, 0.78F});
@@ -1364,7 +1368,8 @@ bool GdpRenderer::render(
         shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength",
             enemy.alive
-                ? visual->second.emissiveStrength * (enemy.active ? 1.0F : 0.25F)
+                ? visual->second.emissiveStrength
+                    * (hit ? 1.65F : enemy.active ? 1.0F : 0.25F)
                 : 0.0F);
         visual->second.mesh.draw(gl_);
     }

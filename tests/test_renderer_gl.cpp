@@ -78,6 +78,12 @@ int main()
                 gdp::game::visual::EnemyVisualRole::Worker, true,
                 gdp::game::visual::EnemyAnimationState::Attack, 15U},
         };
+        constexpr std::array hitWorkerOnly{
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, true, 111,
+                gdp::game::visual::EnemyVisualRole::Worker, true,
+                gdp::game::visual::EnemyAnimationState::Hit, 15U},
+        };
         constexpr std::array rotatedWorkerOnly{
             gdp::game::visual::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 111,
@@ -549,6 +555,12 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 animatedWorkerPixels.data());
 
+            const bool renderedHitWorker
+                = renderer.render(width, height, {}, hitWorkerOnly);
+            std::vector<std::uint8_t> hitWorkerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                hitWorkerPixels.data());
+
             const bool renderedRotatedWorker
                 = renderer.render(width, height, {}, rotatedWorkerOnly);
             std::vector<std::uint8_t> rotatedWorkerPixels(baseline.size());
@@ -637,6 +649,7 @@ int main()
             std::size_t settingsSelectionChangedChannels = 0;
             std::size_t workerChangedChannels = 0;
             std::size_t enemyAnimationChangedChannels = 0;
+            std::size_t enemyHitChangedChannels = 0;
             std::size_t enemyFacingChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -782,6 +795,10 @@ int main()
                         != workerPixels[index + channel]) {
                         ++enemyAnimationChangedChannels;
                     }
+                    if (hitWorkerPixels[index + channel]
+                        != workerPixels[index + channel]) {
+                        ++enemyHitChangedChannels;
+                    }
                     if (rotatedWorkerPixels[index + channel]
                         != workerPixels[index + channel]) {
                         ++enemyFacingChangedChannels;
@@ -859,6 +876,7 @@ int main()
                 && settingsSelectionChangedChannels > 100U
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedAnimatedWorker && enemyAnimationChangedChannels > 100U
+                && renderedHitWorker && enemyHitChangedChannels > 100U
                 && renderedRotatedWorker && enemyFacingChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U

@@ -6,8 +6,9 @@
 > a Fase 87 adicionou separação local entre aliados e a Fase 88 consolidou
 > volumes físicos entre inimigos. A Fase 90 implementou poses procedurais de
 > raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
-> deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update; hierarquia por
-> membros, Hit, patrulha, investigação e pathfinding global permanecem
+> deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update e a Fase 93
+> adicionou uma reação Hit de raiz; hierarquia por membros, patrulha,
+> investigação e pathfinding global permanecem
 > planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -36,12 +37,19 @@ o mesmo fixed step da IA e não depende de FPS. Reposition não acumula dois gir
 no mesmo tick: o deslocamento de recuo não consome rotação, apenas a direção do
 jogador. Idle e Death continuam congelando o último yaw.
 
-Os assets procedurais atuais são meshes consolidadas. Portanto esta etapa move e
-escala o inimigo inteiro; ela não finge oferecer articulação que o formato ainda
-não suporta. A próxima evolução visual deve separar uma hierarquia rígida por
-partes — root → torso → cabeça/braços/pernas —, preservar sockets e então
-adicionar Hit e amplitudes próprias por arquétipo. Não construir um sistema
-universal de animação.
+A Fase 93 adiciona o estado visual Hit sem interromper a máquina de IA. Cada
+acerto não letal reinicia uma janela de `0,12 s`, avançada uma única vez no
+fixed update; durante ela, a raiz recebe compressão, tonalidade quente e
+emissivo reforçado. Death possui prioridade e limpa o timer. Como movimento,
+ataque e cooldowns continuam normalmente, o feedback melhora a leitura do
+acerto sem criar hit stun ou alterar o balanceamento.
+
+Os assets procedurais atuais são meshes consolidadas. Portanto estas etapas
+movem e escalam o inimigo inteiro; elas não fingem oferecer articulação que o
+formato ainda não suporta. A próxima evolução visual deve separar uma
+hierarquia rígida por partes — root → torso → cabeça/braços/pernas —, preservar
+sockets e então refinar Hit e amplitudes próprias por arquétipo. Não construir
+um sistema universal de animação.
 
 ## Walk
 

@@ -94,6 +94,7 @@ struct EnemyData {
     bool active{true};
     float avoidanceTime{0.0F};
     std::int8_t avoidanceSide{0};
+    float hitReactionTime{0.0F};
 };
 
 struct ItemData {

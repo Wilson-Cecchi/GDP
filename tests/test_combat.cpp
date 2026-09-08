@@ -147,13 +147,27 @@ void testDamageLifecycle()
     const EntityId enemy = manager.createEnemy({.health = 50.0F});
     expect(applyDamage(manager, enemy, 20.0F) == DamageOutcome::Damaged,
         "non-lethal damage reports a live damaged enemy");
-    expect(manager.findData<EnemyData>(enemy)->health == 30.0F,
-        "damage subtracts from enemy HP");
+    EnemyData* data = manager.findData<EnemyData>(enemy);
+    expect(data->health == 30.0F
+            && near(data->hitReactionTime, enemyHitReactionDuration),
+        "damage subtracts enemy HP and starts the transient hit reaction");
+    updateEnemyHitReactions(manager, 0.05F);
+    expect(near(data->hitReactionTime, enemyHitReactionDuration - 0.05F),
+        "hit reaction advances once from the deterministic fixed step");
+    expect(applyDamage(manager, enemy, 5.0F) == DamageOutcome::Damaged
+            && near(data->hitReactionTime, enemyHitReactionDuration),
+        "a repeated live hit restarts the short visual reaction window");
+    updateEnemyHitReactions(manager, 1.0F);
+    expect(near(data->hitReactionTime, 0.0F),
+        "hit reaction expires with a zero clamp");
+    updateEnemyHitReactions(manager, -1.0F);
+    expect(near(data->hitReactionTime, 0.0F),
+        "negative elapsed time cannot revive a hit reaction");
     expect(applyDamage(manager, enemy, 100.0F) == DamageOutcome::Killed,
         "overkill clamps HP and produces one kill");
-    const EnemyData* data = manager.findData<EnemyData>(enemy);
-    expect(data->health == 0.0F && data->behavior == EnemyBehaviorState::Dead,
-        "lethal damage enters the terminal Dead state");
+    expect(data->health == 0.0F && data->behavior == EnemyBehaviorState::Dead
+            && near(data->hitReactionTime, 0.0F),
+        "lethal damage enters Dead and clears the transient hit reaction");
     expect(applyDamage(manager, enemy, 1.0F) == DamageOutcome::Ignored,
         "dead enemy ignores repeated damage and cannot die twice");
     expect(applyDamage(manager, {}, 10.0F) == DamageOutcome::Ignored,
