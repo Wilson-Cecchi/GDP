@@ -563,23 +563,37 @@ void testEnemyRootAnimation()
         "Hit interrupts the current target with a faster visual response");
     advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
     expect(transition.previousState == EnemyAnimationState::Hit
-            && transition.durationTicks == 18U
-            && enemyAnimationTransitionBlend(transition) > 0.008F
-            && enemyAnimationTransitionBlend(transition) < 0.010F,
+            && transition.durationTicks == 36U
+            && enemyAnimationTransitionBlend(transition) > 0.027F
+            && enemyAnimationTransitionBlend(transition) < 0.029F,
         "Death starts a longer deterministic settling transition");
-    for (std::uint32_t tick = 1U; tick < 18U; ++tick) {
+    for (std::uint32_t tick = 1U; tick < 36U; ++tick) {
         advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
     }
     expect(enemyAnimationTransitionBlend(transition) == 1.0F,
         "death settling clamps exactly at its terminal pose");
+    EnemyAnimationTransition robotTransition;
+    advanceEnemyAnimationTransition(
+        robotTransition, EnemyAnimationState::Attack,
+        EnemyVisualRole::IndustrialRobot);
+    advanceEnemyAnimationTransition(
+        robotTransition, EnemyAnimationState::Dead,
+        EnemyVisualRole::IndustrialRobot);
+    expect(robotTransition.durationTicks == 52U,
+        "IndustrialRobot receives a visibly heavier death duration");
 
     const EnemyRootPose halfFall = sampleEnemyRagdollRootPose(
         EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.5F);
-    expect(halfFall.offset.y == 0.11F
+    expect(halfFall.offset.y > 0.10F && halfFall.offset.y < 0.13F
             && halfFall.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-            && halfFall.rotationDegrees.z == 38.0F
+            && halfFall.rotationDegrees.z > 45.0F
+            && halfFall.rotationDegrees.z < 52.0F
             && halfFall.offset.z != 0.0F,
-        "ragdoll root falls rigidly while absorbing momentum along the floor");
+        "ragdoll root accelerates after support is lost and carries momentum");
+    expect(sampleEnemyRagdollRootPose(
+               EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.08F)
+            == EnemyRootPose{},
+        "root briefly retains inertia while the legs begin to give way");
     expect(sampleEnemyRagdollRootPose(
                EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.0F)
             == EnemyRootPose{}
@@ -606,6 +620,13 @@ void testEnemyRootAnimation()
     expect(std::abs(deadRobotLeftArm.rotationDegrees.z)
             < std::abs(deadLeftArm.rotationDegrees.z) * 0.6F,
         "robot limbs retain visibly greater mass than Worker limbs");
+    const EnemyPartPose earlyRagdollLeg = sampleEnemyRagdollPartPose(
+        EnemyPartPose{}, 111U, EnemyVisualRole::Worker, 4U, 8U, 0.12F);
+    const EnemyPartPose earlyRagdollHead = sampleEnemyRagdollPartPose(
+        EnemyPartPose{}, 111U, EnemyVisualRole::Worker, 1U, 8U, 0.12F);
+    expect(earlyRagdollLeg != EnemyPartPose{}
+            && earlyRagdollHead == EnemyPartPose{},
+        "legs lose support before the head follows the falling torso");
     const EnemyPartPose previousAttackArm = sampleEnemyPartPose(
         EnemyAnimationState::Attack, 6U, 111U, 2U, 8U);
     const EnemyPartPose halfRagdollArm = sampleEnemyRagdollPartPose(

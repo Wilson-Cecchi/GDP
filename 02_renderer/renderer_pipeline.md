@@ -40,6 +40,8 @@
 > somente a matriz `rotationZMatrix` foi acrescentada à matemática WKC.
 > A Fase 97 reutilizou essa fundação para um ragdoll procedural inteiramente
 > concreto do GDP, sem promover juntas ou simulação física à engine.
+> A Fase 98 refinou somente as curvas e durações concretas de Death após o gate
+> visual apontar sincronização excessiva entre raiz e membros.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -130,6 +132,9 @@ progressivamente e usa uma rotação lateral em vez de deformar a malha. Na Fase
 97, cada parte recebe rotação também no eixo Z e uma trajetória procedural
 própria com atraso e amortecimento. A raiz compensa aproximadamente o contato
 com o piso; colisões detalhadas de cadáver não fazem parte do renderer.
+Na Fase 98, o snapshot usa progresso linear durante Death para que raiz e partes
+apliquem estágios próprios. As outras transições continuam usando `smoothstep`.
+O draw permanece sem estado e recebe a pose final já amostrada.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.
 `PropRenderData` desenha crate, canister e barricade com escala/tint derivados

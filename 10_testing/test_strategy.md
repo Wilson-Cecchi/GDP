@@ -329,6 +329,13 @@ variação repetível pela mesma seed e amplitude do IndustrialRobot inferior a
 60% da Worker. A regressão OpenGL compara o ragdoll intermediário com o cadáver
 acomodado e exige diferença material de pixels.
 
+O gate da Fase 98 protege a transferência de peso que não era capturada apenas
+por endpoints: a raiz preserva a pose até 8%; aos 12% as pernas já precisam
+reagir enquanto a cabeça ainda espera; no meio da janela o torso deve ter acelerado.
+Também exige 36 ticks para Worker, 52 para IndustrialRobot, conclusão exata e
+as regressões CPU/OpenGL anteriores. Assim, uma futura simplificação não pode
+voltar a sincronizar todas as partes em uma queda curta.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

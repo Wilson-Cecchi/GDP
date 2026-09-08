@@ -85,7 +85,8 @@ struct EnemyAnimationTransition {
 
 void advanceEnemyAnimationTransition(
     EnemyAnimationTransition& transition,
-    EnemyAnimationState requestedState) noexcept;
+    EnemyAnimationState requestedState,
+    EnemyVisualRole role = EnemyVisualRole::Worker) noexcept;
 
 [[nodiscard]] float enemyAnimationTransitionBlend(
     const EnemyAnimationTransition& transition) noexcept;

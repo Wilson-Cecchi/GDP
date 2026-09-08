@@ -93,6 +93,24 @@ visual::EnemyAnimationState animationStateFor(
     return visual::EnemyAnimationState::Idle;
 }
 
+visual::EnemyVisualRole visualRoleFor(
+    const entities::EnemyData& enemy) noexcept
+{
+    switch (enemy.archetype) {
+    case entities::EnemyArchetype::Worker:
+        return visual::EnemyVisualRole::Worker;
+    case entities::EnemyArchetype::Guard:
+        return visual::EnemyVisualRole::Guard;
+    case entities::EnemyArchetype::Officer:
+        return visual::EnemyVisualRole::Officer;
+    case entities::EnemyArchetype::Engineer:
+        return visual::EnemyVisualRole::Engineer;
+    case entities::EnemyArchetype::IndustrialRobot:
+        return visual::EnemyVisualRole::IndustrialRobot;
+    }
+    return visual::EnemyVisualRole::Worker;
+}
+
 visual::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert)
@@ -2371,7 +2389,8 @@ void Application::updateEnemyAnimationTransitions(const bool deadOnly)
             continue;
         }
         visual::advanceEnemyAnimationTransition(
-            enemyAnimationTransitions_[id.packed()], animationStateFor(*enemy));
+            enemyAnimationTransitions_[id.packed()], animationStateFor(*enemy),
+            visualRoleFor(*enemy));
     }
 }
 
@@ -2488,16 +2507,7 @@ void Application::render()
                 || enemy->archetype == entities::EnemyArchetype::Officer
                 || enemy->archetype == entities::EnemyArchetype::Engineer
                 || enemy->archetype == entities::EnemyArchetype::IndustrialRobot)) {
-            visual::EnemyVisualRole role = visual::EnemyVisualRole::Worker;
-            if (enemy->archetype == entities::EnemyArchetype::Guard) {
-                role = visual::EnemyVisualRole::Guard;
-            } else if (enemy->archetype == entities::EnemyArchetype::Officer) {
-                role = visual::EnemyVisualRole::Officer;
-            } else if (enemy->archetype == entities::EnemyArchetype::Engineer) {
-                role = visual::EnemyVisualRole::Engineer;
-            } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
-                role = visual::EnemyVisualRole::IndustrialRobot;
-            }
+            const visual::EnemyVisualRole role = visualRoleFor(*enemy);
             const visual::EnemyAnimationState animationState
                 = animationStateFor(*enemy);
             visual::EnemyAnimationState previousAnimationState = animationState;

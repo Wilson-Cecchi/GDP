@@ -29,6 +29,7 @@ struct EnemyMotionProfile {
 };
 
 struct EnemyDeathProfile {
+    std::uint32_t durationTicks{36U};
     float rootRoll{76.0F};
     float rootLift{0.18F};
     float rootPitchVariation{7.0F};
@@ -67,13 +68,13 @@ EnemyDeathProfile deathProfileFor(const EnemyVisualRole role) noexcept
     case EnemyVisualRole::Worker:
         return {};
     case EnemyVisualRole::Guard:
-        return {72.0F, 0.20F, 5.0F, 0.82F, 7.0F};
+        return {38U, 72.0F, 0.20F, 5.0F, 0.82F, 7.0F};
     case EnemyVisualRole::Officer:
-        return {68.0F, 0.21F, 4.0F, 0.70F, 6.0F};
+        return {40U, 68.0F, 0.21F, 4.0F, 0.70F, 6.0F};
     case EnemyVisualRole::Engineer:
-        return {74.0F, 0.19F, 6.0F, 1.05F, 11.0F};
+        return {36U, 74.0F, 0.19F, 6.0F, 1.05F, 11.0F};
     case EnemyVisualRole::IndustrialRobot:
-        return {62.0F, 0.26F, 3.0F, 0.48F, 3.5F};
+        return {52U, 62.0F, 0.26F, 3.0F, 0.48F, 3.5F};
     }
     return {};
 }
@@ -157,10 +158,11 @@ EnemyPartPose terminalDeathPartPose(
 
 std::uint32_t transitionDurationTicks(
     const EnemyAnimationState previous,
-    const EnemyAnimationState current) noexcept
+    const EnemyAnimationState current,
+    const EnemyVisualRole role) noexcept
 {
     if (current == EnemyAnimationState::Dead) {
-        return 18U;
+        return deathProfileFor(role).durationTicks;
     }
     if (current == EnemyAnimationState::Hit) {
         return 3U;
@@ -193,7 +195,8 @@ wkc::core::Vec3 mix(
 
 void advanceEnemyAnimationTransition(
     EnemyAnimationTransition& transition,
-    const EnemyAnimationState requestedState) noexcept
+    const EnemyAnimationState requestedState,
+    const EnemyVisualRole role) noexcept
 {
     if (!transition.initialized) {
         transition.previousState = requestedState;
@@ -208,7 +211,7 @@ void advanceEnemyAnimationTransition(
         transition.currentState = requestedState;
         transition.elapsedTicks = 0U;
         transition.durationTicks = transitionDurationTicks(
-            transition.previousState, transition.currentState);
+            transition.previousState, transition.currentState, role);
     }
     if (transition.elapsedTicks < transition.durationTicks) {
         ++transition.elapsedTicks;
@@ -225,7 +228,10 @@ float enemyAnimationTransitionBlend(
         static_cast<float>(transition.elapsedTicks)
             / static_cast<float>(transition.durationTicks),
         0.0F, 1.0F);
-    return progress * progress * (3.0F - (2.0F * progress));
+    if (transition.currentState == EnemyAnimationState::Dead) {
+        return progress;
+    }
+    return smoothProgress(progress);
 }
 
 EnemyRootPose blendEnemyRootPoses(
@@ -265,14 +271,25 @@ EnemyRootPose sampleEnemyRagdollRootPose(
         ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
     const EnemyRootPose terminal = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 0U, visualSeed, true, role);
-    EnemyRootPose pose = blendEnemyRootPoses(previous, terminal, safeProgress);
     const EnemyDeathProfile profile = deathProfileFor(role);
-    const float transient = std::sin(safeProgress * 3.14159265358979323846F)
-        * (1.0F - safeProgress);
-    pose.offset.y += transient * 0.04F;
-    pose.offset.z += transient * seededSignedUnit(visualSeed, 2U) * 0.06F;
-    pose.rotationDegrees.x += transient
-        * seededSignedUnit(visualSeed, 3U) * profile.rootPitchVariation;
+    const float fallProgress = smoothProgress(
+        (safeProgress - 0.10F) / 0.68F);
+    EnemyRootPose pose = blendEnemyRootPoses(previous, terminal, fallProgress);
+    const float fallArc = std::sin(fallProgress * 3.14159265358979323846F)
+        * (1.0F - fallProgress);
+    pose.offset.z += fallArc * seededSignedUnit(visualSeed, 2U) * 0.085F;
+    pose.rotationDegrees.x += fallArc
+        * seededSignedUnit(visualSeed, 3U)
+        * (profile.rootPitchVariation + 4.0F);
+    const float contactProgress = std::clamp(
+        (safeProgress - 0.72F) / 0.28F, 0.0F, 1.0F);
+    const float contactOscillation
+        = std::sin(contactProgress * 6.28318530717958647692F)
+        * (1.0F - contactProgress) * (1.0F - contactProgress);
+    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+    pose.offset.y += std::abs(contactOscillation) * 0.025F;
+    pose.rotationDegrees.z += contactOscillation * fallDirection
+        * profile.settlingAmplitude * 0.55F;
     return pose;
 }
 
@@ -289,27 +306,38 @@ EnemyPartPose sampleEnemyRagdollPartPose(
     }
     const float safeProgress = std::isfinite(progress)
         ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
-    const float baseDelay = partIndex == 0U ? 0.0F
-        : partIndex == 1U ? 0.08F
-        : partIndex == 2U ? 0.02F
-        : partIndex == 3U ? 0.11F
-        : partIndex == 4U ? 0.14F
-        : partIndex == 5U ? 0.20F
-        : 0.07F;
+    const float baseDelay = partIndex == 4U ? 0.0F
+        : partIndex == 5U ? 0.03F
+        : partIndex == 0U ? 0.08F
+        : partIndex == 2U ? 0.14F
+        : partIndex == 1U ? 0.18F
+        : partIndex == 3U ? 0.22F
+        : 0.24F;
     const float variation = seededSignedUnit(visualSeed, partIndex + 19U);
-    const float delay = std::clamp(baseDelay + (variation * 0.025F), 0.0F, 0.24F);
+    const float delay = std::clamp(baseDelay + (variation * 0.025F), 0.0F, 0.27F);
     const float localProgress = smoothProgress(
-        (safeProgress - delay) / std::max(1.0F - delay, 0.001F));
+        (safeProgress - delay) / std::max(0.76F - delay, 0.001F));
     const EnemyPartPose terminal = terminalDeathPartPose(
         visualSeed, role, partIndex, partCount);
     EnemyPartPose pose = blendEnemyPartPoses(previous, terminal, localProgress);
     const EnemyDeathProfile profile = deathProfileFor(role);
-    const float settling = std::sin(localProgress * 6.28318530717958647692F)
-        * localProgress * (1.0F - localProgress)
+    const float inertia = std::sin(localProgress * 3.14159265358979323846F)
+        * (1.0F - localProgress) * profile.articulation;
+    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+    const float inertiaScale = partIndex == 1U ? 13.0F
+        : partIndex == 2U || partIndex == 3U ? 20.0F
+        : partIndex == 4U || partIndex == 5U ? 9.0F
+        : 15.0F;
+    pose.rotationDegrees.x += inertia * variation * inertiaScale * 0.55F;
+    pose.rotationDegrees.z -= inertia * fallDirection * inertiaScale;
+    const float contactProgress = std::clamp(
+        (safeProgress - 0.70F) / 0.30F, 0.0F, 1.0F);
+    const float settling = std::sin(
+        contactProgress * 12.56637061435917295384F)
+        * (1.0F - contactProgress) * (1.0F - contactProgress)
         * profile.settlingAmplitude;
-    pose.rotationDegrees.x += settling * variation;
-    pose.rotationDegrees.z -= settling
-        * ((visualSeed & 1U) == 0U ? -1.0F : 1.0F);
+    pose.rotationDegrees.x += settling * variation * 0.45F;
+    pose.rotationDegrees.z -= settling * fallDirection;
     return pose;
 }
 

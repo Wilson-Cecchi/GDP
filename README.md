@@ -367,6 +367,9 @@ especializados das pastas numeradas.
 - **Fase 97 — Ragdoll procedural dos inimigos:** a queda rígida foi substituída
   por uma reação articulada de torso, cabeça, braços, pernas e equipamento, com
   atrasos, limites e amortecimento próprios por massa, sem física de gameplay.
+- **Fase 98 — Queda orgânica por transferência de peso:** o ragdoll agora perde
+  sustentação pelas pernas antes do torso, conserva inércia na cabeça e membros
+  e termina com contato amortecido; o Boss usa uma queda mais longa e pesada.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -843,6 +846,16 @@ ordem de acomodação derivam exclusivamente da `visualSeed`, sem RNG novo. Não
 há solver físico, colisão de cadáver com paredes/props nem alteração de
 collider: a morte continua imediata para IA e combate. Regras 8/7 e saves não
 mudaram.
+
+Na Fase 98, o feedback visual expôs que a primeira versão ainda sincronizava
+demais a raiz e os membros. Death passou a transportar progresso linear próprio
+e aplicar curvas diferentes por estágio: pernas cedem primeiro, a raiz mantém
+um intervalo curto de inércia, o torso acelera entre 10–78% e cabeça, braços e
+equipamento entram depois. O contato final usa duas oscilações pequenas com
+decaimento quadrático. Worker/Engineer levam 36 ticks, Guard 38, Officer 40 e
+IndustrialRobot 52, em vez dos 18 ticks comuns anteriores. A alteração continua
+exclusivamente visual e determinística; gameplay, RNG, colliders, saves e regras
+8/7 permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

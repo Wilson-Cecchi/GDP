@@ -1110,6 +1110,15 @@ compõe X/Y/Z ao redor dos pivôs existentes. Trata-se de apresentação: não h
 solver, corpos físicos, colisores de cadáver ou estado persistente. Nenhum tipo
 de ragdoll foi promovido à WKC Forge e regras 8/7 não mudam.
 
+Na Fase 98, a duração de Death passou a fazer parte de `EnemyDeathProfile`: 36
+ticks para Worker/Engineer, 38 para Guard, 40 para Officer e 52 para
+IndustrialRobot. `enemyAnimationTransitionBlend()` mantém `smoothstep` nos
+estados vivos, mas entrega progresso linear a Death; as funções de ragdoll o
+dividem em perda de sustentação, queda acelerada, inércia local e contato
+amortecido. `Application` apenas encaminha o papel visual estável ao tracker.
+Nada foi adicionado à WKC Forge, ao gameplay ou à persistência; regras 8/7 não
+mudam.
+
 ---
 
 # 8. Sistema de seed

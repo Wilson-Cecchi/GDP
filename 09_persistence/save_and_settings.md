@@ -123,6 +123,10 @@ A Fase 97 calcula o ragdoll somente do histórico transitório, papel,
 junta é serializada; reiniciar a run reconstrói tudo deterministicamente.
 Campaign/Speedrun seguem em 8/7 e o checkpoint permanece no schema 2.
 
+A Fase 98 apenas amplia a duração transitória de Death conforme o papel e muda
+suas curvas visuais. O histórico continua descartável e não é serializado;
+Campaign/Speedrun permanecem em 8/7 e o checkpoint no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

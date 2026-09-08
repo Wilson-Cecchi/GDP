@@ -10,7 +10,8 @@
 > adicionou uma reação Hit de raiz. A Fase 94 separou a hierarquia rígida e
 > articulou os membros; a Fase 95 especializou o movimento por arquétipo e a
 > Fase 96 suavizou as transições e removeu a morte achatada. A Fase 97 evoluiu
-> essa queda para um ragdoll procedural articulado.
+> essa queda para um ragdoll procedural articulado; a Fase 98 separou perda de
+> sustentação, inércia, queda e contato para remover a rigidez remanescente.
 > Patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
@@ -93,6 +94,14 @@ metade da amplitude e maior compensação vertical de contato com o piso.
 Este é deliberadamente um ragdoll visual híbrido, não um solver físico da WKC
 Forge. Cadáveres não ganham colliders por membro, não colidem com props/paredes
 e não alteram navegação, hitscan, vitória ou balanceamento.
+
+A Fase 98 retifica o primeiro timing de Death após validação dentro do jogo. O
+progresso terminal deixa de receber o `smoothstep` único das demais transições:
+as pernas começam em 0–3%, a raiz em 10%, braços entre 14–22%, cabeça em 18% e
+equipamentos por volta de 24%, com pequena variação estável por seed. A queda do
+torso termina sua fase principal em 78%; os 22% finais absorvem o contato no
+piso. Humanos usam 36–40 ticks e o IndustrialRobot usa 52 ticks, reforçando a
+diferença de massa sem alterar o instante lógico da morte.
 
 ## Walk
 
