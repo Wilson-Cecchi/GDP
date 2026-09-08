@@ -128,6 +128,15 @@ struct WorkerVisual {
     std::uint32_t fallbackCount{0};
 };
 
+struct EnemyRigidPartRecipe {
+    std::uint32_t index{0};
+    wkc::core::Vec3 pivot{};
+    wkc::procedural::MeshRecipe meshRecipe;
+};
+
+[[nodiscard]] std::vector<EnemyRigidPartRecipe> splitEnemyRigidParts(
+    const wkc::procedural::MeshRecipe& assembledRecipe);
+
 enum class WorkerVisualValidationError : std::uint8_t {
     InvalidBodyProfile,
     MissingSocket,

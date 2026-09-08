@@ -354,6 +354,10 @@ especializados das pastas numeradas.
 - **Fase 93 — Reação visual ao dano:** acertos não letais ativam por `0,12 s`
   uma compressão de raiz com tonalidade quente e emissivo reforçado. O pulso
   não interrompe IA/ataque, reinicia em novo acerto e Death sempre prevalece.
+- **Fase 94 — Hierarquia rígida dos inimigos:** as receitas consolidadas agora
+  são enviadas à GPU por torso, cabeça, braços, pernas e acessórios, preservando
+  pivôs estáveis. Walk/Attack articulam partes com amplitudes contidas e Hit foi
+  refinado para recuo mecânico sem compressão cartunesca da silhueta.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -788,6 +792,18 @@ emissivo moderadamente reforçado; movimento, ataque, cooldowns e colisores
 continuam avançando sem interrupção. Novo dano reinicia a janela, morte a limpa
 e o valor não consome RNG. Como esse feedback é transitório e não altera regras,
 Campaign/Speedrun permanecem nas versões 8/7.
+
+Na Fase 94, cada primitiva da receita visual passou a ser preservada como uma
+parte rígida independente na GPU: torso, cabeça, braços, pernas e acessórios
+mantêm ordem e pivôs estáveis, sem regenerar ou perder geometria. O renderer
+compõe transform da entidade, pose de raiz e pose local por parte. Walk usa
+balanço oposto e discreto de braços/pernas, Attack recua braços e ferramenta, e
+Idle limita-se a uma pequena leitura de cabeça. O feedback Hit aprovado como
+funcional foi refinado: não comprime nem rebaixa mais o corpo; aplica um recuo
+mecânico curto e progressivamente reduz tint/emissivo. A WKC Forge recebeu
+somente `rotationXMatrix`, primitiva matemática genérica; estados, amplitudes e
+hierarquia continuam concretos do GDP. Gameplay, RNG, colisores e regras 8/7
+permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

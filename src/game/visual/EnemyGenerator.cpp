@@ -1063,6 +1063,36 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
 
 } // namespace
 
+std::vector<EnemyRigidPartRecipe> splitEnemyRigidParts(
+    const wkc::procedural::MeshRecipe& assembledRecipe)
+{
+    std::vector<EnemyRigidPartRecipe> parts;
+    parts.reserve(assembledRecipe.primitives.size());
+    for (std::size_t index = 0; index < assembledRecipe.primitives.size(); ++index) {
+        const PrimitiveRecipe& primitive = assembledRecipe.primitives[index];
+        const wkc::core::Vec3 effectiveDimensions{
+            primitive.dimensions.x * primitive.localTransform.scale.x,
+            primitive.dimensions.y * primitive.localTransform.scale.y,
+            primitive.dimensions.z * primitive.localTransform.scale.z,
+        };
+        wkc::core::Vec3 pivot = primitive.localTransform.position;
+        if (index == 0U) {
+            pivot = {};
+        } else if (index == 1U) {
+            pivot.y -= effectiveDimensions.y * 0.5F;
+        } else if (index >= 2U && index <= 5U) {
+            pivot.y += effectiveDimensions.y * 0.5F;
+        }
+        wkc::procedural::MeshRecipe partRecipe;
+        partRecipe.version = assembledRecipe.version;
+        partRecipe.seed = assembledRecipe.seed;
+        partRecipe.primitives.push_back(primitive);
+        parts.push_back({
+            static_cast<std::uint32_t>(index), pivot, std::move(partRecipe)});
+    }
+    return parts;
+}
+
 bool WorkerVisualValidationResult::isValid() const noexcept
 {
     return errors.empty();

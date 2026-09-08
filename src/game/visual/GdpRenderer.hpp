@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 namespace gdp::game::visual {
 
@@ -62,11 +63,22 @@ public:
         HudRenderData hud = {});
 
 private:
-    struct EnemyGpuVisual {
+    struct EnemyGpuPart {
         wkc::render::Mesh mesh;
+        wkc::core::Vec3 pivot{};
+        std::uint32_t index{0};
+    };
+
+    struct EnemyGpuVisual {
+        std::vector<EnemyGpuPart> parts;
         wkc::render::Texture texture;
         float emissiveStrength{0.0F};
     };
+
+    [[nodiscard]] bool uploadEnemyGpuVisual(
+        const wkc::procedural::MeshRecipe& meshRecipe,
+        const wkc::procedural::TextureRecipe& textureRecipe,
+        EnemyGpuVisual& gpuVisual);
 
     struct IndustrialWallGpuMaterial {
         wkc::render::Texture albedo;

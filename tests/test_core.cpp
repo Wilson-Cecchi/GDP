@@ -151,6 +151,15 @@ void testMath()
     expect(rotationYMatrix(std::numeric_limits<float>::quiet_NaN()).elements
             == Mat4::identity().elements,
         "non-finite Y rotation falls back to identity");
+    const Mat4 quarterPitch = rotationXMatrix(std::numbers::pi_v<float> * 0.5F);
+    expect(nearlyEqual(quarterPitch.elements[5], 0.0F)
+            && nearlyEqual(quarterPitch.elements[6], 1.0F)
+            && nearlyEqual(quarterPitch.elements[9], -1.0F)
+            && nearlyEqual(quarterPitch.elements[10], 0.0F),
+        "X rotation matrix turns local +Y toward world +Z");
+    expect(rotationXMatrix(std::numeric_limits<float>::infinity()).elements
+            == Mat4::identity().elements,
+        "non-finite X rotation falls back to identity");
 }
 
 } // namespace

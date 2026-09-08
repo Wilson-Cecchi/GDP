@@ -531,11 +531,54 @@ void testEnemyRootAnimation()
 
     const EnemyRootPose hit = sampleEnemyRootPose(
         EnemyAnimationState::Hit, 999U, 111U);
-    expect(hit == EnemyRootPose{
-            {0.0F, 0.022F, 0.0F}, {1.07F, 0.88F, 1.07F}}
+    expect(hit == EnemyRootPose{}
             && hit == sampleEnemyRootPose(
                 EnemyAnimationState::Hit, 0U, 999U),
-        "Hit applies a stable compressed root pulse independent of cycle phase");
+        "Hit keeps rigid proportions instead of applying cartoon root compression");
+
+    const EnemyPartPose hitTorso = sampleEnemyPartPose(
+        EnemyAnimationState::Hit, 0U, 111U, 0U, 8U, 1.0F);
+    const EnemyPartPose fadingHitTorso = sampleEnemyPartPose(
+        EnemyAnimationState::Hit, 999U, 222U, 0U, 8U, 0.5F);
+    expect(hitTorso.rotationDegrees.x == -3.0F
+            && hitTorso.offset.z == -0.012F
+            && fadingHitTorso.rotationDegrees.x == -1.5F
+            && fadingHitTorso.offset.z == -0.006F,
+        "Hit produces a short strength-scaled mechanical recoil at the torso");
+    expect(sampleEnemyPartPose(
+               EnemyAnimationState::Hit, 0U, 111U, 1U, 8U, 1.0F)
+               .rotationDegrees.x == 4.5F
+            && sampleEnemyPartPose(
+                EnemyAnimationState::Hit, 0U, 111U, 7U, 8U, 1.0F)
+                .offset.z == -0.035F,
+        "Hit transfers restrained counter-motion to the head and held tool");
+
+    const EnemyPartPose walkLeftArm = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 0U, 0U, 2U, 8U);
+    const EnemyPartPose walkRightArm = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 0U, 0U, 3U, 8U);
+    const EnemyPartPose walkLeftLeg = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 0U, 0U, 4U, 8U);
+    expect(walkLeftArm == EnemyPartPose{}
+            && walkRightArm == EnemyPartPose{}
+            && walkLeftLeg == EnemyPartPose{},
+        "rigid Walk articulation returns to the neutral pose at its cycle boundary");
+    const EnemyPartPose peakLeftArm = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 2U, 8U);
+    const EnemyPartPose peakRightArm = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 3U, 8U);
+    const EnemyPartPose peakLeftLeg = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 4U, 8U);
+    expect(peakLeftArm.rotationDegrees.x > 7.0F
+            && peakRightArm.rotationDegrees.x < -7.0F
+            && peakLeftLeg.rotationDegrees.x < -9.0F,
+        "Walk articulates opposing rigid limbs with restrained amplitudes");
+    expect(sampleEnemyPartPose(
+               EnemyAnimationState::Walk, 7U, 0U, 2U, 8U, 0.0F, false)
+            == EnemyPartPose{}
+            && sampleEnemyPartPose(
+                EnemyAnimationState::Walk, 7U, 0U, 8U, 8U) == EnemyPartPose{},
+        "dormant enemies and invalid rigid-part indices remain neutral");
 
     const EnemyRootPose idle = sampleEnemyRootPose(
         EnemyAnimationState::Idle, 7U, 111U);

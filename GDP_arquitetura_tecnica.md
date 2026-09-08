@@ -1075,6 +1075,16 @@ update e a morte a limpa. A `Application` converte essa janela em
 separados; nenhum contrato universal foi adicionado ao WKC Forge. O estado não
 é persistido e Campaign/Speedrun permanecem nas regras 8/7.
 
+Na Fase 94, `gdp_visual_content::splitEnemyRigidParts()` passou a decompor cada
+receita montada sem alterar suas primitivas, produzindo meshes independentes e
+pivôs estáveis. `GdpRenderer` mantém a textura compartilhada e compõe para cada
+parte a pose da entidade, da raiz e do pivô. `sampleEnemyPartPose()` contém as
+amplitudes concretas de Idle/Walk/Attack/Hit; o snapshot fornece apenas estado,
+tick, seed e força restante do Hit. O recuo de dano deixa de comprimir a raiz e
+passa a mover partes rígidas com retorno progressivo. A WKC Forge recebe apenas
+`rotationXMatrix`, operação matemática genérica; não recebe hierarquia ou
+estados de animação. Gameplay, persistência e regras 8/7 permanecem inalterados.
+
 ---
 
 # 8. Sistema de seed

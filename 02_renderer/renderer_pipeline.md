@@ -32,6 +32,8 @@
 > A Fase 56 auditou a direção final de dependências: a fundação gráfica WKC não
 > inclui camadas GDP, enquanto o renderer e o conteúdo concretos continuam no
 > jogo. A separação permanece no monorepo e é protegida por regressão própria.
+> A Fase 94 passou a enviar cada primitiva dos inimigos como parte rígida
+> independente e a compor poses locais nos pivôs, sem promover animação ao WKC.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -110,7 +112,10 @@ o teste offscreen alterna pelos outros sete ambientes, confirma mudança de
 pixels entre os oito perfis e repetição exata da mesma variante Industrial.
 `prepareWorkerVisual()`, `prepareGuardVisual()`, `prepareOfficerVisual()`,
 `prepareEngineerVisual()` e `prepareIndustrialRobotVisual()` usam mapas GPU separados por papel;
-`EnemyRenderData::role` seleciona mesh/textura sem geração durante draw. O teste
+`EnemyRenderData::role` seleciona mesh/textura sem geração durante draw. Desde a
+Fase 94, cada primitiva é cacheada e enviada como mesh rígida independente. O
+draw compõe a pose da raiz com transform local ao redor do pivô de cada parte;
+estado, timing e amplitudes permanecem no renderer concreto do GDP. O teste
 offscreen posiciona os cinco no mesmo ponto e exige pixels distintos.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.

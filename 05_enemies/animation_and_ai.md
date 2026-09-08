@@ -7,8 +7,8 @@
 > volumes físicos entre inimigos. A Fase 90 implementou poses procedurais de
 > raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
 > deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update e a Fase 93
-> adicionou uma reação Hit de raiz; hierarquia por membros, patrulha,
-> investigação e pathfinding global permanecem
+> adicionou uma reação Hit de raiz. A Fase 94 separou a hierarquia rígida e
+> articulou os membros; patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -44,18 +44,30 @@ emissivo reforçado. Death possui prioridade e limpa o timer. Como movimento,
 ataque e cooldowns continuam normalmente, o feedback melhora a leitura do
 acerto sem criar hit stun ou alterar o balanceamento.
 
-Os assets procedurais atuais são meshes consolidadas. Portanto estas etapas
-movem e escalam o inimigo inteiro; elas não fingem oferecer articulação que o
-formato ainda não suporta. A próxima evolução visual deve separar uma
-hierarquia rígida por partes — root → torso → cabeça/braços/pernas —, preservar
-sockets e então refinar Hit e amplitudes próprias por arquétipo. Não construir
-um sistema universal de animação.
+A Fase 94 substitui a transformação consolidada por uma hierarquia rígida de
+partes. As 8 primitivas de Worker/Guard/Officer/Engineer e as 9 do
+IndustrialRobot recebem meshes GPU independentes e pivôs estáveis em raiz,
+pescoço, ombros e quadris. Walk movimenta braços e pernas em oposição com
+amplitudes de `8°/10°`; Attack recua braços e a ferramenta; Idle conserva só
+`0,8°` de leitura da cabeça. A ordem da receita define a função de cada parte e
+o split preserva integralmente vértices e índices da geometria consolidada.
+
+O Hit também foi revisto para a direção séria do jogo. A raiz mantém proporções
+e altura; torso, cabeça, braços e ferramenta executam um recuo rígido pequeno,
+escalado pela fração restante do timer. Tint e emissivo retornam gradualmente ao
+material normal. Não há squash and stretch, deslocamento de collider ou hit
+stun.
+
+Os assets procedurais continuam definidos por receitas consolidadas, mas o
+upload preserva cada primitiva como parte rígida articulável. A próxima evolução
+visual pode especializar amplitudes e timings por arquétipo sobre esta base, sem
+construir um sistema universal de animação.
 
 ## Walk
 
-A pose de raiz já é paramétrica por fase. Quando os meshes forem separados,
-sockets devem preservar a conexão entre partes e peças mecânicas podem usar
-amplitudes próprias.
+A pose de raiz continua paramétrica por fase e os meshes separados giram ao
+redor dos sockets preservados. Uma evolução posterior pode trocar as amplitudes
+comuns por perfis mecânicos próprios de cada arquétipo.
 
 ## IA base
 

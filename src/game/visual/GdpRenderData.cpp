@@ -23,10 +23,7 @@ EnemyRootPose sampleEnemyRootPose(
         return {};
     }
     if (state == EnemyAnimationState::Hit) {
-        return {
-            {0.0F, 0.022F, 0.0F},
-            {1.07F, 0.88F, 1.07F},
-        };
+        return {};
     }
 
     constexpr float tau = 6.28318530717958647692F;
@@ -68,6 +65,83 @@ EnemyRootPose sampleEnemyRootPose(
             1.0F - (wave * 0.004F),
             1.0F + (wave * 0.004F)},
     };
+}
+
+EnemyPartPose sampleEnemyPartPose(
+    const EnemyAnimationState state,
+    const std::uint64_t animationTick,
+    const wkc::core::Seed visualSeed,
+    const std::uint32_t partIndex,
+    const std::uint32_t partCount,
+    const float hitReactionStrength,
+    const bool active) noexcept
+{
+    if (!active || state == EnemyAnimationState::Dead
+        || partIndex >= partCount || partCount == 0U) {
+        return {};
+    }
+
+    const float safeHitStrength = std::isfinite(hitReactionStrength)
+        ? std::clamp(hitReactionStrength, 0.0F, 1.0F) : 0.0F;
+    if (state == EnemyAnimationState::Hit) {
+        if (partIndex == 0U) {
+            return {{0.0F, 0.0F, -0.012F * safeHitStrength},
+                {-3.0F * safeHitStrength, 0.0F, 0.0F}};
+        }
+        if (partIndex == 1U) {
+            return {{}, {4.5F * safeHitStrength, 0.0F, 0.0F}};
+        }
+        if (partIndex == 2U || partIndex == 3U) {
+            return {{}, {7.0F * safeHitStrength, 0.0F, 0.0F}};
+        }
+        if (partIndex + 1U == partCount) {
+            return {{0.0F, 0.0F, -0.035F * safeHitStrength}, {}};
+        }
+        return {};
+    }
+
+    constexpr float tau = 6.28318530717958647692F;
+    std::uint64_t period = 120U;
+    if (state == EnemyAnimationState::Walk) {
+        period = 30U;
+    } else if (state == EnemyAnimationState::Attack) {
+        period = 24U;
+    }
+    const std::uint64_t phaseTick
+        = (animationTick + (visualSeed % period)) % period;
+    const float phase = static_cast<float>(phaseTick)
+        / static_cast<float>(period) * tau;
+    const float wave = std::sin(phase);
+
+    if (state == EnemyAnimationState::Walk) {
+        if (partIndex == 2U) {
+            return {{}, {wave * 8.0F, 0.0F, 0.0F}};
+        }
+        if (partIndex == 3U) {
+            return {{}, {-wave * 8.0F, 0.0F, 0.0F}};
+        }
+        if (partIndex == 4U) {
+            return {{}, {-wave * 10.0F, 0.0F, 0.0F}};
+        }
+        if (partIndex == 5U) {
+            return {{}, {wave * 10.0F, 0.0F, 0.0F}};
+        }
+        return {};
+    }
+    if (state == EnemyAnimationState::Attack) {
+        const float impulse = std::max(wave, 0.0F);
+        if (partIndex == 2U || partIndex == 3U) {
+            return {{}, {-4.0F * impulse, 0.0F, 0.0F}};
+        }
+        if (partIndex + 1U == partCount) {
+            return {{0.0F, 0.0F, -0.055F * impulse}, {}};
+        }
+        return {};
+    }
+    if (state == EnemyAnimationState::Idle && partIndex == 1U) {
+        return {{}, {0.0F, wave * 0.8F, 0.0F}};
+    }
+    return {};
 }
 
 bool UiRect::contains(const int pointX, const int pointY) const noexcept

@@ -103,6 +103,11 @@ A Fase 93 não altera schema nem checkpoint. `hitReactionTime` é feedback visua
 transitório, reiniciado por dano não letal e descartado ao reconstruir uma run;
 não deve ser serializado. Campaign/Speedrun permanecem nas regras 8/7.
 
+A Fase 94 também não altera dados persistentes. A hierarquia e as poses locais
+são reconstruídas da receita visual, seed, estado e tick; a força de Hit deriva
+do timer transitório já existente. Campaign/Speedrun continuam em 8/7 e o
+checkpoint permanece no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

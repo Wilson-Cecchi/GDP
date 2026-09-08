@@ -654,22 +654,11 @@ bool GdpRenderer::prepareWorkerVisual(const wkc::core::Seed visualSeed)
         wkc::core::log(wkc::core::LogLevel::Error, "Worker visual generation failed validation");
         return false;
     }
-    const auto meshData = meshCache_.acquire(
-        wkc::procedural::meshRecipeHash(visual.meshRecipe),
-        [&visual] {
-            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
-        });
-    const auto textureData = textureCache_.acquire(
-        wkc::procedural::textureRecipeHash(visual.textureRecipe),
-        [&visual] {
-            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
-        });
     EnemyGpuVisual gpuVisual;
-    if (!gpuVisual.mesh.upload(gl_, *meshData)
-        || !gpuVisual.texture.upload(gl_, *textureData)) {
+    if (!uploadEnemyGpuVisual(
+            visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
-    gpuVisual.emissiveStrength = visual.textureRecipe.emissiveAmount;
     workerVisuals_.emplace(visualSeed, std::move(gpuVisual));
     return true;
 }
@@ -689,22 +678,11 @@ bool GdpRenderer::prepareGuardVisual(const wkc::core::Seed visualSeed)
         wkc::core::log(wkc::core::LogLevel::Error, "Guard visual generation failed validation");
         return false;
     }
-    const auto meshData = meshCache_.acquire(
-        wkc::procedural::meshRecipeHash(visual.meshRecipe),
-        [&visual] {
-            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
-        });
-    const auto textureData = textureCache_.acquire(
-        wkc::procedural::textureRecipeHash(visual.textureRecipe),
-        [&visual] {
-            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
-        });
     EnemyGpuVisual gpuVisual;
-    if (!gpuVisual.mesh.upload(gl_, *meshData)
-        || !gpuVisual.texture.upload(gl_, *textureData)) {
+    if (!uploadEnemyGpuVisual(
+            visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
-    gpuVisual.emissiveStrength = visual.textureRecipe.emissiveAmount;
     guardVisuals_.emplace(visualSeed, std::move(gpuVisual));
     return true;
 }
@@ -724,22 +702,11 @@ bool GdpRenderer::prepareOfficerVisual(const wkc::core::Seed visualSeed)
         wkc::core::log(wkc::core::LogLevel::Error, "Officer visual generation failed validation");
         return false;
     }
-    const auto meshData = meshCache_.acquire(
-        wkc::procedural::meshRecipeHash(visual.meshRecipe),
-        [&visual] {
-            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
-        });
-    const auto textureData = textureCache_.acquire(
-        wkc::procedural::textureRecipeHash(visual.textureRecipe),
-        [&visual] {
-            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
-        });
     EnemyGpuVisual gpuVisual;
-    if (!gpuVisual.mesh.upload(gl_, *meshData)
-        || !gpuVisual.texture.upload(gl_, *textureData)) {
+    if (!uploadEnemyGpuVisual(
+            visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
-    gpuVisual.emissiveStrength = visual.textureRecipe.emissiveAmount;
     officerVisuals_.emplace(visualSeed, std::move(gpuVisual));
     return true;
 }
@@ -760,22 +727,11 @@ bool GdpRenderer::prepareEngineerVisual(const wkc::core::Seed visualSeed)
             "Engineer visual generation failed validation");
         return false;
     }
-    const auto meshData = meshCache_.acquire(
-        wkc::procedural::meshRecipeHash(visual.meshRecipe),
-        [&visual] {
-            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
-        });
-    const auto textureData = textureCache_.acquire(
-        wkc::procedural::textureRecipeHash(visual.textureRecipe),
-        [&visual] {
-            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
-        });
     EnemyGpuVisual gpuVisual;
-    if (!gpuVisual.mesh.upload(gl_, *meshData)
-        || !gpuVisual.texture.upload(gl_, *textureData)) {
+    if (!uploadEnemyGpuVisual(
+            visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
-    gpuVisual.emissiveStrength = visual.textureRecipe.emissiveAmount;
     engineerVisuals_.emplace(visualSeed, std::move(gpuVisual));
     return true;
 }
@@ -795,23 +751,50 @@ bool GdpRenderer::prepareIndustrialRobotVisual(const wkc::core::Seed visualSeed)
             "IndustrialRobot visual generation failed validation");
         return false;
     }
-    const auto meshData = meshCache_.acquire(
-        wkc::procedural::meshRecipeHash(visual.meshRecipe),
-        [&visual] {
-            return std::move(wkc::procedural::generateMesh(visual.meshRecipe)->mesh);
-        });
-    const auto textureData = textureCache_.acquire(
-        wkc::procedural::textureRecipeHash(visual.textureRecipe),
-        [&visual] {
-            return std::move(*wkc::procedural::generateAlbedo(visual.textureRecipe));
-        });
     EnemyGpuVisual gpuVisual;
-    if (!gpuVisual.mesh.upload(gl_, *meshData)
-        || !gpuVisual.texture.upload(gl_, *textureData)) {
+    if (!uploadEnemyGpuVisual(
+            visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
-    gpuVisual.emissiveStrength = visual.textureRecipe.emissiveAmount;
     industrialRobotVisuals_.emplace(visualSeed, std::move(gpuVisual));
+    return true;
+}
+
+bool GdpRenderer::uploadEnemyGpuVisual(
+    const wkc::procedural::MeshRecipe& meshRecipe,
+    const wkc::procedural::TextureRecipe& textureRecipe,
+    EnemyGpuVisual& gpuVisual)
+{
+    const std::vector<EnemyRigidPartRecipe> rigidParts
+        = splitEnemyRigidParts(meshRecipe);
+    if (rigidParts.empty()) {
+        return false;
+    }
+    gpuVisual.parts.reserve(rigidParts.size());
+    for (const EnemyRigidPartRecipe& rigidPart : rigidParts) {
+        const auto meshData = meshCache_.acquire(
+            wkc::procedural::meshRecipeHash(rigidPart.meshRecipe),
+            [&rigidPart] {
+                return std::move(
+                    wkc::procedural::generateMesh(rigidPart.meshRecipe)->mesh);
+            });
+        EnemyGpuPart gpuPart;
+        if (!gpuPart.mesh.upload(gl_, *meshData)) {
+            return false;
+        }
+        gpuPart.pivot = rigidPart.pivot;
+        gpuPart.index = rigidPart.index;
+        gpuVisual.parts.push_back(std::move(gpuPart));
+    }
+    const auto textureData = textureCache_.acquire(
+        wkc::procedural::textureRecipeHash(textureRecipe),
+        [&textureRecipe] {
+            return std::move(*wkc::procedural::generateAlbedo(textureRecipe));
+        });
+    if (!gpuVisual.texture.upload(gl_, *textureData)) {
+        return false;
+    }
+    gpuVisual.emissiveStrength = textureRecipe.emissiveAmount;
     return true;
 }
 
@@ -1349,17 +1332,20 @@ bool GdpRenderer::render(
             enemy.animationTick, enemy.visualSeed, enemy.active);
         const wkc::core::Vec3 position = enemy.position + pose.offset;
         constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
-        const wkc::core::Mat4 model = wkc::core::translationMatrix(position)
+        const wkc::core::Mat4 rootModel = wkc::core::translationMatrix(position)
             * wkc::core::rotationYMatrix(enemy.yawDegrees * degreesToRadians)
             * wkc::core::scaleMatrix(pose.scale);
-        shader_.setMat4(gl_, "uModel", model);
         const bool hit = enemy.alive && enemy.active
             && enemy.animationState == EnemyAnimationState::Hit;
+        const float hitStrength = std::isfinite(enemy.hitReactionStrength)
+            ? std::clamp(enemy.hitReactionStrength, 0.0F, 1.0F) : 0.0F;
         shader_.setVec3(
             gl_, "uTint", !enemy.alive
                 ? wkc::core::Vec3{0.30F, 0.24F, 0.20F}
                 : hit
-                ? wkc::core::Vec3{1.0F, 0.48F, 0.38F}
+                ? wkc::core::Vec3{
+                    1.0F, 1.0F - (hitStrength * 0.28F),
+                    1.0F - (hitStrength * 0.32F)}
                 : enemy.active
                 ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                 : wkc::core::Vec3{0.68F, 0.72F, 0.78F});
@@ -1369,9 +1355,27 @@ bool GdpRenderer::render(
         shader_.setFloat(gl_, "uEmissiveStrength",
             enemy.alive
                 ? visual->second.emissiveStrength
-                    * (hit ? 1.65F : enemy.active ? 1.0F : 0.25F)
+                    * (hit ? 1.0F + (hitStrength * 0.15F)
+                           : enemy.active ? 1.0F : 0.25F)
                 : 0.0F);
-        visual->second.mesh.draw(gl_);
+        for (const EnemyGpuPart& part : visual->second.parts) {
+            const EnemyPartPose partPose = sampleEnemyPartPose(
+                enemy.alive ? enemy.animationState : EnemyAnimationState::Dead,
+                enemy.animationTick, enemy.visualSeed, part.index,
+                static_cast<std::uint32_t>(visual->second.parts.size()),
+                hitStrength, enemy.active);
+            const wkc::core::Vec3 pivot = part.pivot + partPose.offset;
+            const wkc::core::Mat4 partModel
+                = wkc::core::translationMatrix(pivot)
+                * wkc::core::rotationXMatrix(
+                    partPose.rotationDegrees.x * degreesToRadians)
+                * wkc::core::rotationYMatrix(
+                    partPose.rotationDegrees.y * degreesToRadians)
+                * wkc::core::translationMatrix(
+                    {-part.pivot.x, -part.pivot.y, -part.pivot.z});
+            shader_.setMat4(gl_, "uModel", rootModel * partModel);
+            part.mesh.draw(gl_);
+        }
     }
 
     fallbackTexture_.bind(gl_);

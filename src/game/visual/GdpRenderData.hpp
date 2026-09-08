@@ -67,10 +67,26 @@ struct EnemyRootPose {
     constexpr bool operator==(const EnemyRootPose&) const noexcept = default;
 };
 
+struct EnemyPartPose {
+    wkc::core::Vec3 offset{};
+    wkc::core::Vec3 rotationDegrees{};
+
+    constexpr bool operator==(const EnemyPartPose&) const noexcept = default;
+};
+
 [[nodiscard]] EnemyRootPose sampleEnemyRootPose(
     EnemyAnimationState state,
     std::uint64_t animationTick,
     wkc::core::Seed visualSeed,
+    bool active = true) noexcept;
+
+[[nodiscard]] EnemyPartPose sampleEnemyPartPose(
+    EnemyAnimationState state,
+    std::uint64_t animationTick,
+    wkc::core::Seed visualSeed,
+    std::uint32_t partIndex,
+    std::uint32_t partCount,
+    float hitReactionStrength = 0.0F,
     bool active = true) noexcept;
 
 struct EnemyRenderData {
@@ -82,6 +98,7 @@ struct EnemyRenderData {
     EnemyAnimationState animationState{EnemyAnimationState::Idle};
     std::uint64_t animationTick{0U};
     float yawDegrees{0.0F};
+    float hitReactionStrength{0.0F};
 };
 
 struct PickupRenderData {

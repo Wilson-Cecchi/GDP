@@ -849,6 +849,49 @@ void testIndustrialRobotSeedBatch()
         "IndustrialRobot seed batch reaches every heavy material family");
 }
 
+void testRigidPartSplit()
+{
+    using namespace gdp::game::visual;
+    using namespace wkc::procedural;
+
+    const WorkerVisual worker = generateWorkerVisual(42U);
+    const std::vector<EnemyRigidPartRecipe> workerParts
+        = splitEnemyRigidParts(worker.meshRecipe);
+    const IndustrialRobotVisual robot = generateIndustrialRobotVisual(42U);
+    const std::vector<EnemyRigidPartRecipe> robotParts
+        = splitEnemyRigidParts(robot.meshRecipe);
+    expect(workerParts.size() == 8U && robotParts.size() == 9U,
+        "rigid hierarchy preserves every assembled enemy primitive");
+
+    const auto assembled = generateMesh(worker.meshRecipe);
+    std::size_t vertexCount = 0U;
+    std::size_t indexCount = 0U;
+    bool validParts = true;
+    for (std::size_t index = 0; index < workerParts.size(); ++index) {
+        const EnemyRigidPartRecipe& part = workerParts[index];
+        const auto mesh = generateMesh(part.meshRecipe);
+        validParts = validParts && part.index == index
+            && part.meshRecipe.primitives.size() == 1U
+            && mesh.has_value() && wkc::render::validateMeshData(mesh->mesh);
+        if (mesh) {
+            vertexCount += mesh->mesh.vertices.size();
+            indexCount += mesh->mesh.indices.size();
+        }
+    }
+    expect(validParts && assembled
+            && vertexCount == assembled->mesh.vertices.size()
+            && indexCount == assembled->mesh.indices.size(),
+        "split rigid meshes preserve the assembled geometry without loss");
+    expect(workerParts[0].pivot == wkc::core::Vec3{}
+            && workerParts[1].pivot.y
+                < worker.meshRecipe.primitives[1].localTransform.position.y
+            && workerParts[2].pivot.y
+                > worker.meshRecipe.primitives[2].localTransform.position.y
+            && workerParts[4].pivot.y
+                > worker.meshRecipe.primitives[4].localTransform.position.y,
+        "torso, neck, shoulder and hip pivots follow the stable hierarchy order");
+}
+
 } // namespace
 
 int main()
@@ -868,6 +911,7 @@ int main()
     testIndustrialRobotPartLibrary();
     testDeterministicIndustrialRobot();
     testIndustrialRobotSeedBatch();
+    testRigidPartSplit();
 
     if (failures != 0) {
         std::cerr << failures << " enemy generation test(s) failed\n";

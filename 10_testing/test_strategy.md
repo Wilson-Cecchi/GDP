@@ -301,6 +301,14 @@ amostragem CPU confirma a pose comprimida estável; a regressão OpenGL compara 
 mesmo Worker em Idle e Hit e exige diferença material de pixels, cobrindo pose,
 tint e emissivo no pipeline real.
 
+O gate da Fase 94 separa receitas representativas de Worker e IndustrialRobot
+em 8/9 partes, valida cada mesh e exige que a soma de vértices/índices seja
+idêntica à geometria montada. Também verifica pivôs de raiz, pescoço, ombro e
+quadril. A amostragem CPU cobre neutralidade, oposição dos membros em Walk,
+recuo proporcional de Hit e entradas dormentes/inválidas. O Core valida pitch
+de `90°` e fallback não finito; OpenGL e bootstrap offscreen cobrem o draw real
+multipartes.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

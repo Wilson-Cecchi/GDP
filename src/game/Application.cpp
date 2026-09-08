@@ -2481,6 +2481,9 @@ void Application::render()
                 animationState,
                 enemyAnimationTicks_,
                 entity->transform.rotationDegrees.y,
+                std::clamp(
+                    enemy->hitReactionTime / gameplay::enemyHitReactionDuration,
+                    0.0F, 1.0F),
             });
         }
     }

@@ -82,7 +82,7 @@ int main()
             gdp::game::visual::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 111,
                 gdp::game::visual::EnemyVisualRole::Worker, true,
-                gdp::game::visual::EnemyAnimationState::Hit, 15U},
+                gdp::game::visual::EnemyAnimationState::Hit, 15U, 0.0F, 1.0F},
         };
         constexpr std::array rotatedWorkerOnly{
             gdp::game::visual::EnemyRenderData{

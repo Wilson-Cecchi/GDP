@@ -50,7 +50,9 @@ testam contenção e podem acompanhar a translação do módulo.
 
 A Fase 91 adicionou `rotationYMatrix()` para composição contínua de yaw em
 radianos. A matriz mantém a mesma convenção (`+Z` gira para `+X` com `+90°`) e
-retorna identidade para entradas não finitas.
+retorna identidade para entradas não finitas. A Fase 94 adicionou
+`rotationXMatrix()` com o mesmo fallback, permitindo composição genérica de
+pitch sem introduzir conceitos de inimigo ou animação na fundação.
 
 ## Ângulos
 
