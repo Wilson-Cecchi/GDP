@@ -359,6 +359,14 @@ estados; casos sem observação anterior também garantem que paredes não inici
 Chase. Morte limpa a memória e os testes de persistência isolam regras 10/9 das
 regras 9/8.
 
+O gate da Fase 102 exige que a START populada contenha exatamente uma cobertura
+industrial fixa de `0,46 × 2,25 × 2,80 m`, 180 HP, seed visual isolada e escala
+horizontal coerente com a rotação da sala. Uma regressão de gameplay testa três
+pontos ao longo de dois metros atrás do volume, todos sem line of sight, confirma
+que sair pela borda restaura visão e que o Player percorre o lado oculto sem
+colidir. O headless de 900 ticks continua inicializando e encerrando a run sem
+falha; regras anteriores 10/9 permanecem isoladas.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

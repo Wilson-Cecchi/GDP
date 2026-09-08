@@ -382,6 +382,10 @@ especializados das pastas numeradas.
   para adquirir o jogador. Ao perder contato, cada papel busca por tempo
   limitado a última posição realmente observada e então retorna à patrulha;
   Campaign/Speedrun avançam para regras 10/9.
+- **Fase 102 — Cobertura para validação:** a START recebe uma divisória industrial
+  alta e larga, fora da rota de portas e do terminal, permitindo ocultar-se do
+  primeiro Worker, mover-se atrás dela e reaparecer pela borda. Campaign e
+  Speedrun avançam para regras 11/10.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -902,6 +906,18 @@ terminar; depois a patrulha retorna. Readquirir visão substitui imediatamente a
 memória, e Player morto ou Enemy morto limpa a busca. Como essa percepção muda
 rotas e tempos, as regras passam a Campaign 10 e Speedrun 9; o schema de save
 continua 2.
+
+Na Fase 102, a sala START recebe uma barricada industrial fixa de `2,25 m` de
+altura, `2,80 m` de extensão e `0,46 m` de espessura. Ela fica no lado oposto ao
+primeiro Worker, preserva o eixo central entre portas e deixa `1,5 m` livres
+entre a face externa e a parede para o Player circular. A extensão bloqueia a
+linha de visão durante cerca de `2 m` de deslocamento lateral e a borda devolve
+uma visão direta, tornando aquisição, investigação e readquisição observáveis
+logo no começo da run. Rotação de sala troca os eixos físicos da escala; colisão,
+hitscan e render usam o mesmo volume. O visual funcional de Barricade já
+existente é reutilizado; o acabamento HD definitivo continua sujeito à aprovação
+visual antes de qualquer textura nova. Como a cobertura altera conteúdo e rota,
+Campaign/Speedrun passam às regras 11/10.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

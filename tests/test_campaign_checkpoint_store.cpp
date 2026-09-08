@@ -183,6 +183,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before enemy investigation remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 10\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before the START validation cover remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
@@ -190,7 +195,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 2\n"
-        "rules_version = 10\n"
+        "rules_version = 11\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

@@ -5,7 +5,8 @@
 > funcionais/procedurais validados na Fase 11.
 > A Fase 100 acrescentou patrulha local determinística aos cinco papéis sem
 > alterar seus contratos de combate. A Fase 101 acrescentou percepção visual e
-> investigação temporária da última posição conhecida.
+> investigação temporária da última posição conhecida. A Fase 102 tornou esse
+> ciclo validável atrás de uma cobertura larga na sala START.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

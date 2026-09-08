@@ -1145,6 +1145,14 @@ patrulha ao expirar. Player ou Enemy morto limpa a busca. Não há RNG adicional
 pathfinding global nem API nova na WKC Forge. Campaign/Speedrun avançam para
 regras 10/9 e o checkpoint permanece no schema 2.
 
+Na Fase 102, `populateInitialEntities()` adiciona à START uma Barricade concreta
+de `0,46 × 2,25 × 2,80 m`, fora do eixo central e oposta ao primeiro Worker. O
+comprimento horizontal troca de eixo com `QuarterTurn`, pois colisão e renderer
+consomem AABBs; posição, HP e `visualSeed` derivada são estáveis e não avançam o
+stream procedural de props. A peça reutiliza os contratos existentes de
+Entity/Prop, colisão, hitscan e render, sem generalização na WKC Forge nem textura
+nova. Campaign/Speedrun avançam para regras 11/10; checkpoint permanece schema 2.
+
 ---
 
 # 8. Sistema de seed

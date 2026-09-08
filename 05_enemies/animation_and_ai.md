@@ -18,6 +18,8 @@
 > A Fase 101 implementou aquisição visual e investigação da última posição
 > conhecida. Ruído recente, Alert dedicado e pathfinding global permanecem
 > planejados.
+> A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
+> aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

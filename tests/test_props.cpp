@@ -248,6 +248,41 @@ void testHitscanPropPriority()
         "protected terminal absorbs hits without entering a damage state");
 }
 
+void testTallCoverSupportsHiddenMovement()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    EntityManager manager;
+    (void)manager.createProp({
+        .transform = {.scale = {0.46F, 2.25F, 2.80F}},
+        .roomId = 9,
+        .type = PropType::Barricade,
+        .solid = true,
+        .health = 180.0F,
+        .maximumHealth = 180.0F,
+        .visualSeed = 123U,
+    });
+    const CollisionWorld base{{{-4.0F, 0.0F, -4.0F}, {4.0F, 4.0F, 4.0F}}};
+    const CollisionWorld cover = collisionWorldWithProps(base, manager, 9);
+    const wkc::core::Vec3 enemyEye{1.0F, 1.45F, 0.0F};
+    bool hiddenAcrossMovement = true;
+    for (const float z : {-1.0F, 0.0F, 1.0F}) {
+        hiddenAcrossMovement = hiddenAcrossMovement
+            && !hasLineOfSight(enemyEye, {-1.0F, 1.62F, z}, cover);
+    }
+    expect(hiddenAcrossMovement,
+        "tall cover conceals the player while moving two metres behind it");
+    expect(hasLineOfSight(
+               {1.0F, 1.45F, 1.60F}, {-1.0F, 1.62F, 1.60F}, cover),
+        "leaving the wide cover edge restores a direct observation line");
+
+    const CharacterMotionResult movement = cover.moveCharacter(
+        {-0.75F, 0.0F, -1.0F}, {0.0F, 0.0F, 1.0F}, 2.0F, {});
+    expect(!movement.collided && movement.position.z == 1.0F,
+        "the player can traverse the concealed side without colliding with cover");
+}
+
 } // namespace
 
 int main()
@@ -256,6 +291,7 @@ int main()
     testPropSeedBatch();
     testPropDamageCollisionAndDrops();
     testHitscanPropPriority();
+    testTallCoverSupportsHiddenMovement();
     if (failures != 0) {
         std::cerr << failures << " prop test(s) failed\n";
         return 1;

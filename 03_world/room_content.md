@@ -62,6 +62,15 @@ barricadas/props. Os quatro
 papéis da Arena e o IndustrialRobot já possuem IA, visual e combate; itens
 possuem coleta e efeitos funcionais.
 
+Desde a Fase 102, START também recebe uma divisória industrial fixa de
+`0,46 × 2,25 × 2,80 m`, posicionada fora do eixo das portas e no lado oposto ao
+Worker. A escala horizontal acompanha a rotação da sala, mantendo o mesmo espaço
+de ocultação em qualquer orientação. O vão atrás da divisória permite caminhar
+por aproximadamente `2 m` ainda sem linha de visão e sair por uma borda para
+forçar a readquisição. Ela reutiliza o papel visual funcional de Barricade, tem
+180 HP e não consome budget nem RNG do layout procedural. O acabamento HD final
+permanece pendente de aprovação visual.
+
 A operação exige um world com START e um manager vazio; se uma dessas
 pré-condições falhar, retorna handles inválidos sem criar conteúdo parcial.
 

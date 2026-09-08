@@ -116,6 +116,26 @@ InitialEntitySet populateInitialEntities(
                 .visualSeed = wkc::core::deriveSeed(
                     room.seed, gdp::game::SeedDomain::EnemyVisual, 0),
             }));
+            constexpr wkc::core::Vec3 localCoverScale{0.46F, 2.25F, 2.80F};
+            const wkc::core::Vec3 rotatedCoverScale
+                = wkc::core::rotateQuarterTurns(localCoverScale, room.rotation);
+            addToRoom(manager.createProp({
+                .transform = {
+                    .position = positionInRoom(room, {-2.55F, 0.0F, 0.0F}),
+                    .scale = {
+                        std::abs(rotatedCoverScale.x),
+                        localCoverScale.y,
+                        std::abs(rotatedCoverScale.z),
+                    },
+                },
+                .roomId = room.id,
+                .type = PropType::Barricade,
+                .solid = true,
+                .health = 180.0F,
+                .maximumHealth = 180.0F,
+                .visualSeed = wkc::core::deriveSeed(
+                    room.seed, gdp::game::SeedDomain::Props, 900U),
+            }));
             addProps();
             addLoot();
             continue;

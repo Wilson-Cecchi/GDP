@@ -407,9 +407,45 @@ void testInitialEntityPopulation()
     bool arenaOfficerValid = false;
     bool arenaEngineerValid = false;
     bool bossRobotValid = false;
+    bool startCoverValid = false;
+    bool startCoverSpawnClear = false;
     for (const RoomInstance& room : generated.world->rooms) {
         for (const EntityId id : room.entities) {
             const EnemyData* enemy = manager.findData<EnemyData>(id);
+            const Entity* entity = manager.find(id);
+            const PropData* prop = manager.findData<PropData>(id);
+            startCoverValid = startCoverValid || (room.role == RoomRole::Start
+                && entity != nullptr && prop != nullptr
+                && prop->type == PropType::Barricade && prop->solid
+                && prop->health == 180.0F && prop->maximumHealth == 180.0F
+                && prop->visualSeed != 0U
+                && entity->transform.scale.y == 2.25F
+                && std::max(
+                    entity->transform.scale.x, entity->transform.scale.z) == 2.80F
+                && std::min(
+                    entity->transform.scale.x, entity->transform.scale.z) == 0.46F);
+            if (room.role == RoomRole::Start && entity != nullptr && prop != nullptr
+                && prop->type == PropType::Barricade
+                && prop->maximumHealth == 180.0F) {
+                const wkc::core::Vec3 halfScale{
+                    entity->transform.scale.x * 0.5F,
+                    0.0F,
+                    entity->transform.scale.z * 0.5F,
+                };
+                const wkc::core::Aabb coverBounds{
+                    entity->transform.position - halfScale,
+                    entity->transform.position + wkc::core::Vec3{
+                        halfScale.x, entity->transform.scale.y, halfScale.z},
+                };
+                startCoverSpawnClear = room.worldBounds.contains(coverBounds.minimum)
+                    && room.worldBounds.contains(coverBounds.maximum);
+                for (const EntityId otherId : room.entities) {
+                    const Entity* other = manager.find(otherId);
+                    startCoverSpawnClear = startCoverSpawnClear
+                        && (otherId == id || other == nullptr
+                            || !coverBounds.contains(other->transform.position));
+                }
+            }
             arenaGuardValid = arenaGuardValid || (room.role == RoomRole::Arena
                 && enemy != nullptr
                 && enemy->archetype == EnemyArchetype::Guard
@@ -440,6 +476,10 @@ void testInitialEntityPopulation()
         "Arena population includes one healthy Engineer with an isolated visual seed");
     expect(bossRobotValid,
         "Boss population includes one healthy IndustrialRobot with an isolated visual seed");
+    expect(startCoverValid,
+        "START includes one tall and wide cover volume for perception validation");
+    expect(startCoverSpawnClear,
+        "START cover stays inside the room without enclosing any initial entity");
 
     const auto collectEnemyVisualSeeds = [](const EntityManager& entities) {
         std::vector<wkc::core::Seed> seeds;
@@ -476,7 +516,7 @@ void testInitialEntityPopulation()
             : generatePropLayout(
                 room.seed, room.role, room.theme, node->depth, room.propZones);
         const std::size_t baseCount = room.role == RoomRole::Arena ? 4U
-            : room.role == RoomRole::Start ? 3U
+            : room.role == RoomRole::Start ? 4U
             : room.role == RoomRole::Normal ? 1U
             : room.role == RoomRole::Boss ? 2U : 0U;
         const std::size_t expectedCount
@@ -524,6 +564,11 @@ void testInitialEntityPopulation()
                 || (prop->type != PropType::Crate
                     && prop->type != PropType::Canister
                     && prop->type != PropType::Barricade)) {
+                continue;
+            }
+            if (room.role == RoomRole::Start
+                && prop->type == PropType::Barricade
+                && prop->maximumHealth == 180.0F) {
                 continue;
             }
             if (propIndex >= props.props.size()) {

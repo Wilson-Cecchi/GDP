@@ -149,3 +149,10 @@ visão retoma o combate no mesmo tick, expirar retorna à patrulha e morte limpa
 a memória transitória. A regressão executa o ciclo completo nos cinco
 arquétipos duas vezes e exige resultados idênticos. Campaign/Speedrun passam às
 regras 10/9.
+
+Na Fase 102, uma cobertura larga e acima da altura da câmera entra na START para
+transformar o gate automatizado de percepção em uma validação jogável imediata.
+O mesmo AABB autoritativo bloqueia visão, hitscan e movimento; há espaço para o
+Player percorrer dois metros pelo lado oculto e reaparecer pela extremidade. A
+peça fica fora do fluxo central e pode ser destruída com 180 HP. A alteração de
+conteúdo avança Campaign/Speedrun para regras 11/10.

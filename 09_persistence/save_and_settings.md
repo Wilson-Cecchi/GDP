@@ -145,6 +145,12 @@ busca temporária mudam rotas e tempos, Campaign avança das regras 9 para 10 e
 Speedrun das regras 8 para 9. Fixtures das regras imediatamente anteriores
 confirmam o isolamento de checkpoints e recordes.
 
+A Fase 102 adiciona uma cobertura fixa à população da START sem alterar o
+schema 2: o checkpoint continua armazenando seed e recria o conteúdo da sala.
+Como o novo volume muda visão, hitscan, navegação e tempo, Campaign avança das
+regras 10 para 11 e Speedrun das regras 9 para 10. Fixtures das regras 10/9
+confirmam o isolamento da versão anterior.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.
