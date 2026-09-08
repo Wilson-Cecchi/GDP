@@ -282,6 +282,13 @@ mantém a pose terminal anterior. A regressão OpenGL compara o mesmo Worker em
 Idle e Attack e exige diferença material de pixels, cobrindo a aplicação real
 da pose pelo renderer.
 
+O gate da Fase 91 movimenta um Worker pelos eixos `-X` e `+X`, verifica yaw
+`-90°/+90°`, exige que Attack encare o jogador mesmo sem passo de movimento e
+que Idle/Death preservem a última direção. Um Guard confirma o recuo olhando
+para o alvo, não para a direção de fuga. O Core valida a matriz de yaw e seu
+fallback para ângulo não finito; a regressão OpenGL exige pixels distintos ao
+girar o mesmo asset em 90°.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

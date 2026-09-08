@@ -230,6 +230,21 @@ struct Mat4 {
     return result;
 }
 
+[[nodiscard]] inline Mat4 rotationYMatrix(const float radians) noexcept
+{
+    if (!std::isfinite(radians)) {
+        return Mat4::identity();
+    }
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    Mat4 result = Mat4::identity();
+    result.elements[0] = cosine;
+    result.elements[2] = -sine;
+    result.elements[8] = sine;
+    result.elements[10] = cosine;
+    return result;
+}
+
 [[nodiscard]] inline Mat4 perspectiveMatrix(
     const float verticalFieldOfViewRadians,
     const float aspectRatio,

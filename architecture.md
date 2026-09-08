@@ -977,6 +977,14 @@ a hierarquia de membros e Hit permanecem no domínio visual do GDP para uma
 futura revisão de assets. Nenhum sistema universal de animação foi promovido à
 WKC Forge, e as regras Campaign/Speedrun permanecem 8/7.
 
+Na Fase 91, o `Transform` da entidade passou a conservar o yaw visual decidido
+pelo gameplay concreto: movimento usa o deslocamento efetivo, enquanto Attack
+e Reposition usam a direção do alvo. A `Application` copia somente esse ângulo
+para `EnemyRenderData`, e o `GdpRenderer` compõe a matriz sem inferir IA. A WKC
+Forge recebeu apenas `rotationYMatrix`, primitiva matemática genérica coerente
+com `+Y` e frente `+Z`; não recebeu conceitos de Enemy ou orientação tática.
+Como a mudança é somente de apresentação, Campaign/Speedrun permanecem 8/7.
+
 ---
 
 # 8. Sistema de seed

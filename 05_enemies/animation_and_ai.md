@@ -5,8 +5,9 @@
 > adicionou desvio local determinístico de obstáculos aos cinco arquétipos;
 > a Fase 87 adicionou separação local entre aliados e a Fase 88 consolidou
 > volumes físicos entre inimigos. A Fase 90 implementou poses procedurais de
-> raiz para Idle, Walk, Attack e Death; hierarquia por membros, Hit, patrulha,
-> investigação e pathfinding global permanecem planejados.
+> raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
+> deslocamento/alvo; hierarquia por membros, Hit, patrulha, investigação e
+> pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -20,6 +21,13 @@ pose achatada terminal já existente. Os ciclos avançam nos fixed updates,
 congelam em pausa/resultado e recebem apenas uma defasagem da `visualSeed`, sem
 consumir RNG nem alterar gameplay. Inimigos pré-carregados ainda dormentes ficam
 estáticos.
+
+A Fase 91 completa a orientação da raiz. Chase usa o deslocamento efetivo após
+colisão, separação e desvio; Attack encara o jogador; os arquétipos remotos
+recuam em Reposition ainda voltados para o alvo. Idle, Death e deslocamentos
+nulos conservam o último yaw válido. O eixo frontal dos assets é `+Z`, coerente
+com os sockets traseiros em `-Z`, e o snapshot visual transporta a rotação já
+decidida pelo gameplay.
 
 Os assets procedurais atuais são meshes consolidadas. Portanto esta etapa move e
 escala o inimigo inteiro; ela não finge oferecer articulação que o formato ainda

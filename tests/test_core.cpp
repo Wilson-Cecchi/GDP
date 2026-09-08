@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <numbers>
 #include <string_view>
 
 namespace {
@@ -140,6 +141,16 @@ void testMath()
     expect(!bounds.contains({2.0F, 1.0F, 0.0F}), "AABB rejects an exterior point");
     expect(translated(bounds, {4.0F, 0.0F, 0.0F}).contains({4.0F, 1.0F, 0.0F}),
         "translated AABB follows its module");
+
+    const Mat4 quarterYaw = rotationYMatrix(std::numbers::pi_v<float> * 0.5F);
+    expect(nearlyEqual(quarterYaw.elements[0], 0.0F)
+            && nearlyEqual(quarterYaw.elements[2], -1.0F)
+            && nearlyEqual(quarterYaw.elements[8], 1.0F)
+            && nearlyEqual(quarterYaw.elements[10], 0.0F),
+        "Y rotation matrix turns local +Z toward world +X");
+    expect(rotationYMatrix(std::numeric_limits<float>::quiet_NaN()).elements
+            == Mat4::identity().elements,
+        "non-finite Y rotation falls back to identity");
 }
 
 } // namespace

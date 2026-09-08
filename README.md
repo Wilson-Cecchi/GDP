@@ -345,6 +345,9 @@ especializados das pastas numeradas.
 - **Fase 90 — Poses procedurais dos inimigos:** Idle, Walk, Attack e Death agora
   possuem poses de raiz distintas, amostradas pelos ticks fixos e defasadas pela
   `visualSeed`. Pausa, resultado e inimigos dormentes permanecem congelados.
+- **Fase 91 — Orientação corporal dos inimigos:** Chase acompanha o deslocamento
+  real, Attack e Reposition encaram o jogador, e Idle/Death preservam a última
+  direção válida. O renderer aplica o yaw antes da pose de raiz.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -751,6 +754,16 @@ dormentes ficam estáticos. Esta primeira camada transforma o modelo consolidado
 inteiro. A hierarquia rígida de torso, cabeça e membros, além da pose Hit,
 permanece para a etapa de revisão dos assets. Colliders, IA, dano e geração não
 mudaram, por isso Campaign/Speedrun continuam nas regras 8/7.
+
+Na Fase 91, a direção visual deixou de permanecer presa ao eixo original do
+asset. Depois de cada deslocamento de Chase, o yaw é calculado pelo vetor
+realmente percorrido, incluindo desvios de obstáculos e separação do grupo.
+Attack encara a posição atual do jogador; Guard, Officer, Engineer e
+IndustrialRobot recuam em Reposition sem dar as costas ao alvo. Idle e Death
+preservam a última orientação, e deslocamentos nulos não introduzem rotação
+inválida. A `Application` envia o yaw no snapshot e o renderer compõe
+translação × rotação × escala. Trajetória, colisores e combate permanecem
+inalterados, portanto Campaign/Speedrun continuam nas regras 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

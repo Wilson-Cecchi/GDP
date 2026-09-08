@@ -90,6 +90,11 @@ derivada do comportamento, do tick visual e da `visualSeed`. O contador reinicia
 com a run, não é serializado e não muda IA, colisão, dano ou geração;
 Campaign/Speedrun permanecem em 8/7 e o checkpoint em schema 2.
 
+A Fase 91 também mantém regras e schema: o yaw é estado visual transitório do
+`Transform`, recalculado deterministicamente durante a IA e regenerado com o
+andar. Checkpoints continuam representando apenas a entrada do andar;
+Campaign/Speedrun permanecem em 8/7 e o schema em 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

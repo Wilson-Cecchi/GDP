@@ -984,6 +984,77 @@ void testIndustrialRobotLineOfSightAndRoomIsolation()
         "occluded IndustrialRobot keeps an explicit Chase state");
 }
 
+void testEnemyFacingLifecycle()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld room{{{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId worker = manager.createEnemy({
+        .transform = {
+            .position = {5.0F, 0.0F, 0.0F},
+            .rotationDegrees = {0.0F, 17.0F, 0.0F},
+        },
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const WorkerConfig workerConfig{
+        .detectionRange = 10.0F,
+        .attackRange = 1.1F,
+        .moveSpeed = 1.0F,
+        .attackDamage = 0.0F,
+        .attackInterval = 1.0F,
+    };
+
+    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, -90.0F),
+        "a chasing enemy faces its actual travel toward world -X");
+
+    manager.find(worker)->transform.position = {-5.0F, 0.0F, 0.0F};
+    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, 90.0F),
+        "enemy facing changes when its travel reverses toward world +X");
+
+    manager.find(worker)->transform.position = {0.0F, 0.0F, 1.0F};
+    manager.find(worker)->transform.rotationDegrees.y = 23.0F;
+    (void)updateWorkers(manager, player, 1, room, 0.0F, workerConfig);
+    expect(near(std::abs(manager.find(worker)->transform.rotationDegrees.y), 180.0F),
+        "an attacking enemy faces the player even without a movement step");
+
+    player.applyDamage(1'000.0F);
+    manager.find(worker)->transform.rotationDegrees.y = 42.0F;
+    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, 42.0F),
+        "Idle preserves the last valid enemy facing");
+    expect(applyDamage(manager, worker, 1'000.0F) == DamageOutcome::Killed,
+        "facing fixture can enter its terminal state");
+    (void)updateWorkers(manager, player, 1, room, 1.0F, workerConfig);
+    expect(near(manager.find(worker)->transform.rotationDegrees.y, 42.0F),
+        "Dead freezes the last valid enemy facing");
+
+    Player retreatPlayer;
+    retreatPlayer.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager retreatManager;
+    const EntityId guard = retreatManager.createEnemy({
+        .transform = {.position = {1.0F, 0.0F, 0.0F}},
+        .roomId = 2,
+        .archetype = EnemyArchetype::Guard,
+    });
+    (void)updateGuards(
+        retreatManager, retreatPlayer, 2, room, 1.0F,
+        {.detectionRange = 20.0F,
+            .preferredMinimumRange = 4.0F,
+            .preferredMaximumRange = 8.0F,
+            .moveSpeed = 1.0F,
+            .attackDamage = 0.0F});
+    expect(retreatManager.find(guard)->transform.position.x > 1.5F
+            && near(retreatManager.find(guard)->transform.rotationDegrees.y, -90.0F),
+        "a repositioning ranged enemy backs away while still facing the player");
+}
+
 } // namespace
 
 int main()
@@ -1009,6 +1080,7 @@ int main()
     testEngineerRangedBehaviorAndRepairOcclusion();
     testIndustrialRobotPhases();
     testIndustrialRobotLineOfSightAndRoomIsolation();
+    testEnemyFacingLifecycle();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numbers>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -1347,7 +1348,9 @@ bool GdpRenderer::render(
             enemy.alive ? enemy.animationState : EnemyAnimationState::Dead,
             enemy.animationTick, enemy.visualSeed, enemy.active);
         const wkc::core::Vec3 position = enemy.position + pose.offset;
+        constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
         const wkc::core::Mat4 model = wkc::core::translationMatrix(position)
+            * wkc::core::rotationYMatrix(enemy.yawDegrees * degreesToRadians)
             * wkc::core::scaleMatrix(pose.scale);
         shader_.setMat4(gl_, "uModel", model);
         shader_.setVec3(

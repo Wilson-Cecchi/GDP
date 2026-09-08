@@ -80,6 +80,7 @@ struct EnemyRenderData {
     bool active{true};
     EnemyAnimationState animationState{EnemyAnimationState::Idle};
     std::uint64_t animationTick{0U};
+    float yawDegrees{0.0F};
 };
 
 struct PickupRenderData {

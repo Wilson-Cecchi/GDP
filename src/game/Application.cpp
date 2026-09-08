@@ -2477,6 +2477,7 @@ void Application::render()
                 enemy->active,
                 animationState,
                 enemyAnimationTicks_,
+                entity->transform.rotationDegrees.y,
             });
         }
     }

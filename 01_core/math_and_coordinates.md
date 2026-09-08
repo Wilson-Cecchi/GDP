@@ -48,6 +48,10 @@ Na implementação, `QuarterTurn` representa essas quatro rotações e
 Conversões grid/mundo aceitam o tamanho da célula, e AABBs validam limites,
 testam contenção e podem acompanhar a translação do módulo.
 
+A Fase 91 adicionou `rotationYMatrix()` para composição contínua de yaw em
+radianos. A matriz mantém a mesma convenção (`+Z` gira para `+X` com `+90°`) e
+retorna identidade para entradas não finitas.
+
 ## Ângulos
 
 Yaw em +Y; pitch vertical; roll fora do controle padrão. Configuração pode usar graus e matemática interna radianos.
