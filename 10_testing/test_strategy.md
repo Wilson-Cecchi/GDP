@@ -322,6 +322,13 @@ distintas e preservar escala unitária inclusive no meio do blend. O Core cobre
 `rotationZMatrix` em `90°` e fallback não finito; renderer OpenGL e bootstrap
 offscreen continuam validando a composição real.
 
+O gate da Fase 97 exige escala unitária durante toda a morte, endpoints exatos
+na entrada e no assentamento e movimento intermediário diferente de ambos. Ele
+confirma articulação distinta de cabeça e braços, lados opostos dos membros,
+variação repetível pela mesma seed e amplitude do IndustrialRobot inferior a
+60% da Worker. A regressão OpenGL compara o ragdoll intermediário com o cadáver
+acomodado e exige diferença material de pixels.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

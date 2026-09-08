@@ -38,6 +38,8 @@
 > renderer concreto do GDP.
 > A Fase 96 adicionou blends de pose por fixed tick e queda rígida de Death;
 > somente a matriz `rotationZMatrix` foi acrescentada à matemática WKC.
+> A Fase 97 reutilizou essa fundação para um ragdoll procedural inteiramente
+> concreto do GDP, sem promover juntas ou simulação física à engine.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -124,7 +126,10 @@ o papel visual seleciona a assinatura de movimento sem consultar IA. O teste
 offscreen posiciona os cinco no mesmo ponto e exige pixels distintos. Na Fase
 96, o snapshot também informa estado anterior e fração de blend; raiz e partes
 são interpoladas antes do draw. Death mantém escala unitária, perde emissão
-progressivamente e usa uma rotação lateral rígida em vez de deformar a malha.
+progressivamente e usa uma rotação lateral em vez de deformar a malha. Na Fase
+97, cada parte recebe rotação também no eixo Z e uma trajetória procedural
+própria com atraso e amortecimento. A raiz compensa aproximadamente o contato
+com o piso; colisões detalhadas de cadáver não fazem parte do renderer.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.
 `PropRenderData` desenha crate, canister e barricade com escala/tint derivados

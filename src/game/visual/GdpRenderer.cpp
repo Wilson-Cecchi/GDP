@@ -1331,14 +1331,16 @@ bool GdpRenderer::render(
             = enemy.alive ? enemy.animationState : EnemyAnimationState::Dead;
         const EnemyRootPose currentPose = sampleEnemyRootPose(
             currentAnimationState,
-            enemy.animationTick, enemy.visualSeed, enemy.active);
+            enemy.animationTick, enemy.visualSeed, enemy.active, enemy.role);
         const EnemyRootPose previousPose = sampleEnemyRootPose(
             enemy.previousAnimationState,
-            enemy.animationTick, enemy.visualSeed, enemy.active);
+            enemy.animationTick, enemy.visualSeed, enemy.active, enemy.role);
         const float transitionBlend = std::isfinite(enemy.animationTransitionBlend)
             ? std::clamp(enemy.animationTransitionBlend, 0.0F, 1.0F) : 1.0F;
-        const EnemyRootPose pose = blendEnemyRootPoses(
-            previousPose, currentPose, transitionBlend);
+        const EnemyRootPose pose = currentAnimationState == EnemyAnimationState::Dead
+            ? sampleEnemyRagdollRootPose(
+                previousPose, enemy.visualSeed, enemy.role, transitionBlend)
+            : blendEnemyRootPoses(previousPose, currentPose, transitionBlend);
         const wkc::core::Vec3 position = enemy.position + pose.offset;
         constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
         const wkc::core::Mat4 rootModel = wkc::core::translationMatrix(position)
@@ -1388,9 +1390,14 @@ bool GdpRenderer::render(
                 enemy.animationTick, enemy.visualSeed, part.index,
                 static_cast<std::uint32_t>(visual->second.parts.size()),
                 hitStrength, enemy.active, enemy.role);
-            const EnemyPartPose partPose = blendEnemyPartPoses(
-                previousPartPose, currentPartPose,
-                transitionBlend);
+            const EnemyPartPose partPose
+                = currentAnimationState == EnemyAnimationState::Dead
+                ? sampleEnemyRagdollPartPose(
+                    previousPartPose, enemy.visualSeed, enemy.role, part.index,
+                    static_cast<std::uint32_t>(visual->second.parts.size()),
+                    transitionBlend)
+                : blendEnemyPartPoses(
+                    previousPartPose, currentPartPose, transitionBlend);
             const wkc::core::Vec3 pivot = part.pivot + partPose.offset;
             const wkc::core::Mat4 partModel
                 = wkc::core::translationMatrix(pivot)
@@ -1398,6 +1405,8 @@ bool GdpRenderer::render(
                     partPose.rotationDegrees.x * degreesToRadians)
                 * wkc::core::rotationYMatrix(
                     partPose.rotationDegrees.y * degreesToRadians)
+                * wkc::core::rotationZMatrix(
+                    partPose.rotationDegrees.z * degreesToRadians)
                 * wkc::core::translationMatrix(
                     {-part.pivot.x, -part.pivot.y, -part.pivot.z});
             shader_.setMat4(gl_, "uModel", rootModel * partModel);

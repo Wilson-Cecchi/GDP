@@ -1101,6 +1101,15 @@ interpola raiz e partes, enquanto Death usa 18 ticks para uma queda lateral de
 somente transições de mortos avançam. A WKC Forge ganhou apenas a primitiva
 genérica `rotationZMatrix`; gameplay, RNG, persistência e regras 8/7 não mudam.
 
+Na Fase 97, `sampleEnemyRagdollRootPose()` e
+`sampleEnemyRagdollPartPose()` passaram a transformar o progresso de Death em
+queda articulada. Perfis concretos definem inclinação da raiz, compensação do
+piso, amplitude das juntas e amortecimento por papel. Cada parte aplica um
+atraso estável e uma oscilação convergente derivada da `visualSeed`; o renderer
+compõe X/Y/Z ao redor dos pivôs existentes. Trata-se de apresentação: não há
+solver, corpos físicos, colisores de cadáver ou estado persistente. Nenhum tipo
+de ragdoll foi promovido à WKC Forge e regras 8/7 não mudam.
+
 ---
 
 # 8. Sistema de seed

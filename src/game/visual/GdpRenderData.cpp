@@ -1,5 +1,7 @@
 #include "game/visual/GdpRenderData.hpp"
 
+#include "core/Hash.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -26,6 +28,14 @@ struct EnemyMotionProfile {
     float hitToolTravel{-0.035F};
 };
 
+struct EnemyDeathProfile {
+    float rootRoll{76.0F};
+    float rootLift{0.18F};
+    float rootPitchVariation{7.0F};
+    float articulation{1.0F};
+    float settlingAmplitude{10.0F};
+};
+
 EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
 {
     switch (role) {
@@ -49,6 +59,100 @@ EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
             -2.0F, -0.065F, -0.006F, -1.3F, 1.8F, 2.5F, -0.020F};
     }
     return {};
+}
+
+EnemyDeathProfile deathProfileFor(const EnemyVisualRole role) noexcept
+{
+    switch (role) {
+    case EnemyVisualRole::Worker:
+        return {};
+    case EnemyVisualRole::Guard:
+        return {72.0F, 0.20F, 5.0F, 0.82F, 7.0F};
+    case EnemyVisualRole::Officer:
+        return {68.0F, 0.21F, 4.0F, 0.70F, 6.0F};
+    case EnemyVisualRole::Engineer:
+        return {74.0F, 0.19F, 6.0F, 1.05F, 11.0F};
+    case EnemyVisualRole::IndustrialRobot:
+        return {62.0F, 0.26F, 3.0F, 0.48F, 3.5F};
+    }
+    return {};
+}
+
+float seededSignedUnit(
+    const wkc::core::Seed visualSeed,
+    const std::uint64_t channel) noexcept
+{
+    constexpr std::uint64_t salt = 0x9e3779b97f4a7c15ULL;
+    const std::uint64_t mixed = wkc::core::mix64(
+        visualSeed ^ (salt * (channel + 1U)));
+    const float unit = static_cast<float>(mixed & 0xffffU) / 65535.0F;
+    return (unit * 2.0F) - 1.0F;
+}
+
+float smoothProgress(const float progress) noexcept
+{
+    const float safeProgress = std::isfinite(progress)
+        ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
+    return safeProgress * safeProgress * (3.0F - (2.0F * safeProgress));
+}
+
+EnemyPartPose terminalDeathPartPose(
+    const wkc::core::Seed visualSeed,
+    const EnemyVisualRole role,
+    const std::uint32_t partIndex,
+    const std::uint32_t partCount) noexcept
+{
+    if (partIndex >= partCount || partCount == 0U) {
+        return {};
+    }
+    const EnemyDeathProfile profile = deathProfileFor(role);
+    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+    const float variation = seededSignedUnit(visualSeed, partIndex + 7U);
+    const float articulation = profile.articulation;
+    if (partIndex == 0U) {
+        return {{}, {-3.0F * articulation, 0.0F,
+            -fallDirection * 4.0F * articulation}};
+    }
+    if (partIndex == 1U) {
+        return {{}, {
+            (12.0F + (variation * 5.0F)) * articulation,
+            variation * 7.0F * articulation,
+            -fallDirection * (18.0F + (variation * 4.0F)) * articulation}};
+    }
+    if (partIndex == 2U) {
+        return {{}, {
+            (28.0F + (variation * 10.0F)) * articulation,
+            variation * 6.0F * articulation,
+            -fallDirection * (42.0F + (variation * 7.0F)) * articulation}};
+    }
+    if (partIndex == 3U) {
+        return {{}, {
+            (-22.0F + (variation * 10.0F)) * articulation,
+            variation * 6.0F * articulation,
+            fallDirection * (48.0F - (variation * 7.0F)) * articulation}};
+    }
+    if (partIndex == 4U) {
+        return {{}, {
+            (-16.0F + (variation * 7.0F)) * articulation,
+            0.0F,
+            -fallDirection * (10.0F + (variation * 4.0F)) * articulation}};
+    }
+    if (partIndex == 5U) {
+        return {{}, {
+            (20.0F + (variation * 7.0F)) * articulation,
+            0.0F,
+            fallDirection * (13.0F - (variation * 4.0F)) * articulation}};
+    }
+    if (partIndex + 1U == partCount) {
+        return {{0.0F, -0.012F * articulation, 0.0F}, {
+            (32.0F + (variation * 12.0F)) * articulation,
+            variation * 9.0F * articulation,
+            fallDirection * (24.0F + (variation * 8.0F)) * articulation}};
+    }
+    return {{}, {
+        variation * 7.0F * articulation,
+        0.0F,
+        -fallDirection * 8.0F * articulation}};
 }
 
 std::uint32_t transitionDurationTicks(
@@ -151,18 +255,79 @@ EnemyPartPose blendEnemyPartPoses(
     };
 }
 
+EnemyRootPose sampleEnemyRagdollRootPose(
+    const EnemyRootPose& previous,
+    const wkc::core::Seed visualSeed,
+    const EnemyVisualRole role,
+    const float progress) noexcept
+{
+    const float safeProgress = std::isfinite(progress)
+        ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
+    const EnemyRootPose terminal = sampleEnemyRootPose(
+        EnemyAnimationState::Dead, 0U, visualSeed, true, role);
+    EnemyRootPose pose = blendEnemyRootPoses(previous, terminal, safeProgress);
+    const EnemyDeathProfile profile = deathProfileFor(role);
+    const float transient = std::sin(safeProgress * 3.14159265358979323846F)
+        * (1.0F - safeProgress);
+    pose.offset.y += transient * 0.04F;
+    pose.offset.z += transient * seededSignedUnit(visualSeed, 2U) * 0.06F;
+    pose.rotationDegrees.x += transient
+        * seededSignedUnit(visualSeed, 3U) * profile.rootPitchVariation;
+    return pose;
+}
+
+EnemyPartPose sampleEnemyRagdollPartPose(
+    const EnemyPartPose& previous,
+    const wkc::core::Seed visualSeed,
+    const EnemyVisualRole role,
+    const std::uint32_t partIndex,
+    const std::uint32_t partCount,
+    const float progress) noexcept
+{
+    if (partIndex >= partCount || partCount == 0U) {
+        return {};
+    }
+    const float safeProgress = std::isfinite(progress)
+        ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
+    const float baseDelay = partIndex == 0U ? 0.0F
+        : partIndex == 1U ? 0.08F
+        : partIndex == 2U ? 0.02F
+        : partIndex == 3U ? 0.11F
+        : partIndex == 4U ? 0.14F
+        : partIndex == 5U ? 0.20F
+        : 0.07F;
+    const float variation = seededSignedUnit(visualSeed, partIndex + 19U);
+    const float delay = std::clamp(baseDelay + (variation * 0.025F), 0.0F, 0.24F);
+    const float localProgress = smoothProgress(
+        (safeProgress - delay) / std::max(1.0F - delay, 0.001F));
+    const EnemyPartPose terminal = terminalDeathPartPose(
+        visualSeed, role, partIndex, partCount);
+    EnemyPartPose pose = blendEnemyPartPoses(previous, terminal, localProgress);
+    const EnemyDeathProfile profile = deathProfileFor(role);
+    const float settling = std::sin(localProgress * 6.28318530717958647692F)
+        * localProgress * (1.0F - localProgress)
+        * profile.settlingAmplitude;
+    pose.rotationDegrees.x += settling * variation;
+    pose.rotationDegrees.z -= settling
+        * ((visualSeed & 1U) == 0U ? -1.0F : 1.0F);
+    return pose;
+}
+
 EnemyRootPose sampleEnemyRootPose(
     const EnemyAnimationState state,
     const std::uint64_t animationTick,
     const wkc::core::Seed visualSeed,
-    const bool active) noexcept
+    const bool active,
+    const EnemyVisualRole role) noexcept
 {
     if (state == EnemyAnimationState::Dead) {
+        const EnemyDeathProfile profile = deathProfileFor(role);
         const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
         return {
-            {0.0F, 0.22F, 0.0F},
+            {0.0F, profile.rootLift, 0.0F},
             {1.0F, 1.0F, 1.0F},
-            {0.0F, 0.0F, fallDirection * 82.0F},
+            {seededSignedUnit(visualSeed, 1U) * profile.rootPitchVariation,
+                0.0F, fallDirection * profile.rootRoll},
         };
     }
     if (!active) {
@@ -223,8 +388,13 @@ EnemyPartPose sampleEnemyPartPose(
     const bool active,
     const EnemyVisualRole role) noexcept
 {
-    if (!active || state == EnemyAnimationState::Dead
-        || partIndex >= partCount || partCount == 0U) {
+    if (partIndex >= partCount || partCount == 0U) {
+        return {};
+    }
+    if (state == EnemyAnimationState::Dead) {
+        return terminalDeathPartPose(visualSeed, role, partIndex, partCount);
+    }
+    if (!active) {
         return {};
     }
 

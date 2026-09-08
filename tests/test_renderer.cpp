@@ -525,15 +525,23 @@ void testEnemyRootAnimation()
 
     const EnemyRootPose dead = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 999U, 111U);
-    expect(dead == EnemyRootPose{
-            {0.0F, 0.22F, 0.0F}, {1.0F, 1.0F, 1.0F},
-            {0.0F, 0.0F, 82.0F}},
-        "dead enemies keep rigid proportions in a seeded lateral fall");
+    expect(dead.offset == wkc::core::Vec3{0.0F, 0.18F, 0.0F}
+            && dead.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+            && dead.rotationDegrees.z == 76.0F
+            && std::abs(dead.rotationDegrees.x) <= 7.0F,
+        "dead Worker keeps rigid proportions with seeded fall variation");
     const EnemyRootPose oppositeDead = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 999U, 112U);
-    expect(oppositeDead.rotationDegrees.z == -82.0F
+    expect(oppositeDead.rotationDegrees.z == -76.0F
             && oppositeDead.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F},
         "death direction varies deterministically without silhouette compression");
+    const EnemyRootPose robotDead = sampleEnemyRootPose(
+        EnemyAnimationState::Dead, 999U, 111U, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(robotDead.offset.y == 0.26F
+            && robotDead.rotationDegrees.z == 62.0F
+            && std::abs(robotDead.rotationDegrees.x) <= 3.0F,
+        "IndustrialRobot settles with a heavier restrained root response");
 
     EnemyAnimationTransition transition;
     advanceEnemyAnimationTransition(transition, EnemyAnimationState::Idle);
@@ -565,15 +573,55 @@ void testEnemyRootAnimation()
     expect(enemyAnimationTransitionBlend(transition) == 1.0F,
         "death settling clamps exactly at its terminal pose");
 
-    const EnemyRootPose halfFall = blendEnemyRootPoses(
-        EnemyRootPose{}, dead, 0.5F);
+    const EnemyRootPose halfFall = sampleEnemyRagdollRootPose(
+        EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.5F);
     expect(halfFall.offset.y == 0.11F
             && halfFall.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-            && halfFall.rotationDegrees.z == 41.0F,
-        "death blend rotates a rigid body without squash and stretch");
+            && halfFall.rotationDegrees.z == 38.0F
+            && halfFall.offset.z != 0.0F,
+        "ragdoll root falls rigidly while absorbing momentum along the floor");
+    expect(sampleEnemyRagdollRootPose(
+               EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.0F)
+            == EnemyRootPose{}
+            && sampleEnemyRagdollRootPose(
+                EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 1.0F) == dead,
+        "ragdoll root preserves its endpoints exactly");
     expect(blendEnemyRootPoses(EnemyRootPose{}, dead,
                std::numeric_limits<float>::quiet_NaN()) == dead,
         "non-finite transition blends safely select the current pose");
+
+    const EnemyPartPose deadHead = sampleEnemyPartPose(
+        EnemyAnimationState::Dead, 0U, 111U, 1U, 8U);
+    const EnemyPartPose deadLeftArm = sampleEnemyPartPose(
+        EnemyAnimationState::Dead, 0U, 111U, 2U, 8U);
+    const EnemyPartPose deadRightArm = sampleEnemyPartPose(
+        EnemyAnimationState::Dead, 0U, 111U, 3U, 8U);
+    const EnemyPartPose deadRobotLeftArm = sampleEnemyPartPose(
+        EnemyAnimationState::Dead, 0U, 111U, 2U, 9U, 0.0F, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(deadHead != EnemyPartPose{}
+            && deadLeftArm.rotationDegrees.z < -30.0F
+            && deadRightArm.rotationDegrees.z > 30.0F,
+        "terminal ragdoll separates head and arms around their joint pivots");
+    expect(std::abs(deadRobotLeftArm.rotationDegrees.z)
+            < std::abs(deadLeftArm.rotationDegrees.z) * 0.6F,
+        "robot limbs retain visibly greater mass than Worker limbs");
+    const EnemyPartPose previousAttackArm = sampleEnemyPartPose(
+        EnemyAnimationState::Attack, 6U, 111U, 2U, 8U);
+    const EnemyPartPose halfRagdollArm = sampleEnemyRagdollPartPose(
+        previousAttackArm, 111U, EnemyVisualRole::Worker, 2U, 8U, 0.5F);
+    expect(halfRagdollArm != previousAttackArm
+            && halfRagdollArm != deadLeftArm
+            && halfRagdollArm == sampleEnemyRagdollPartPose(
+                previousAttackArm, 111U, EnemyVisualRole::Worker, 2U, 8U, 0.5F),
+        "ragdoll limb motion is staged, damped and deterministic");
+    expect(sampleEnemyRagdollPartPose(
+               previousAttackArm, 111U, EnemyVisualRole::Worker, 2U, 8U, 0.0F)
+            == previousAttackArm
+            && sampleEnemyRagdollPartPose(
+                previousAttackArm, 111U, EnemyVisualRole::Worker, 2U, 8U, 1.0F)
+                == deadLeftArm,
+        "ragdoll limbs preserve their animated and settled endpoints");
 
     const EnemyRootPose hit = sampleEnemyRootPose(
         EnemyAnimationState::Hit, 999U, 111U);

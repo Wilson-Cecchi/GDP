@@ -118,6 +118,11 @@ inicializar ou repetir a run e não entra em checkpoint, settings ou recorde. A
 queda terminal usa somente a `visualSeed` existente; regras 8/7 e checkpoint
 schema 2 permanecem inalterados.
 
+A Fase 97 calcula o ragdoll somente do histórico transitório, papel,
+`visualSeed`, índice da parte e progresso de Death. Nenhuma pose, velocidade ou
+junta é serializada; reiniciar a run reconstrói tudo deterministicamente.
+Campaign/Speedrun seguem em 8/7 e o checkpoint permanece no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

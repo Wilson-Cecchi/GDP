@@ -9,7 +9,8 @@
 > deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update e a Fase 93
 > adicionou uma reação Hit de raiz. A Fase 94 separou a hierarquia rígida e
 > articulou os membros; a Fase 95 especializou o movimento por arquétipo e a
-> Fase 96 suavizou as transições e substituiu a morte achatada por queda rígida.
+> Fase 96 suavizou as transições e removeu a morte achatada. A Fase 97 evoluiu
+> essa queda para um ragdoll procedural articulado.
 > Patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
@@ -80,6 +81,18 @@ longa para Death. A morte tem prioridade, preserva todas as proporções e incli
 rigidamente em `82°` para um lado determinado pela paridade da `visualSeed`.
 Esse assentamento continua atrás do resultado, mas nenhum estado vivo, IA ou
 combate volta a avançar. Reiniciar a run descarta integralmente o histórico.
+
+Na Fase 97, a raiz deixou de carregar sozinha toda a leitura da morte. Cada
+parte usa seu pivô anatômico já validado e recebe uma pose terminal derivada do
+papel e da `visualSeed`. A progressão local introduz atrasos de até 24% da janela
+e uma oscilação que converge a zero, simulando transferência e perda de energia
+sem consumir RNG. O Worker tem articulação de referência; Guard e Officer são
+mais contidos; Engineer é ligeiramente mais solto; IndustrialRobot usa menos da
+metade da amplitude e maior compensação vertical de contato com o piso.
+
+Este é deliberadamente um ragdoll visual híbrido, não um solver físico da WKC
+Forge. Cadáveres não ganham colliders por membro, não colidem com props/paredes
+e não alteram navegação, hitscan, vitória ou balanceamento.
 
 ## Walk
 

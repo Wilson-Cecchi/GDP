@@ -364,6 +364,9 @@ especializados das pastas numeradas.
 - **Fase 96 — Transições e queda rígida dos inimigos:** trocas entre Idle, Walk,
   Attack e Hit agora usam blends curtos por fixed tick. Death interrompe os
   demais estados e conclui uma queda lateral sem achatar ou alargar o modelo.
+- **Fase 97 — Ragdoll procedural dos inimigos:** a queda rígida foi substituída
+  por uma reação articulada de torso, cabeça, braços, pernas e equipamento, com
+  atrasos, limites e amortecimento próprios por massa, sem física de gameplay.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -829,6 +832,17 @@ com lado derivado da `visualSeed`. Durante Victory/Defeat somente a acomodação
 de inimigos mortos pode avançar; IA, combate, timers da run e inimigos vivos
 continuam congelados. A WKC Forge recebeu apenas `rotationZMatrix`, operação
 matemática genérica. RNG, gameplay, persistência e regras 8/7 não mudaram.
+
+Na Fase 97, Death passou a usar um ragdoll procedural visual sobre os pivôs já
+preservados. A raiz continua fazendo contato aproximado com o piso, enquanto
+cabeça, braços, pernas, acessórios e ferramenta recebem alvos angulares,
+atrasos curtos e uma oscilação amortecida independentes. Worker se desarticula
+mais; Guard e Officer permanecem contidos; Engineer conserva assimetria; e o
+IndustrialRobot limita amplitudes para comunicar massa. Direção, variações e
+ordem de acomodação derivam exclusivamente da `visualSeed`, sem RNG novo. Não
+há solver físico, colisão de cadáver com paredes/props nem alteração de
+collider: a morte continua imediata para IA e combate. Regras 8/7 e saves não
+mudaram.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

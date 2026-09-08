@@ -100,11 +100,26 @@ void advanceEnemyAnimationTransition(
     const EnemyPartPose& current,
     float blend) noexcept;
 
+[[nodiscard]] EnemyRootPose sampleEnemyRagdollRootPose(
+    const EnemyRootPose& previous,
+    wkc::core::Seed visualSeed,
+    EnemyVisualRole role,
+    float progress) noexcept;
+
+[[nodiscard]] EnemyPartPose sampleEnemyRagdollPartPose(
+    const EnemyPartPose& previous,
+    wkc::core::Seed visualSeed,
+    EnemyVisualRole role,
+    std::uint32_t partIndex,
+    std::uint32_t partCount,
+    float progress) noexcept;
+
 [[nodiscard]] EnemyRootPose sampleEnemyRootPose(
     EnemyAnimationState state,
     std::uint64_t animationTick,
     wkc::core::Seed visualSeed,
-    bool active = true) noexcept;
+    bool active = true,
+    EnemyVisualRole role = EnemyVisualRole::Worker) noexcept;
 
 [[nodiscard]] EnemyPartPose sampleEnemyPartPose(
     EnemyAnimationState state,
