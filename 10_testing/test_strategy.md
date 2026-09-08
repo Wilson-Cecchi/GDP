@@ -336,6 +336,13 @@ Também exige 36 ticks para Worker, 52 para IndustrialRobot, conclusão exata e
 as regressões CPU/OpenGL anteriores. Assim, uma futura simplificação não pode
 voltar a sincronizar todas as partes em uma queda curta.
 
+O gate da Fase 99 amostra 128 `visualSeed`s e exige quedas para frente, trás,
+esquerda, direita e diagonais, repetição exata para a mesma seed e inclinação
+terminal constante de `88°`. Também confirma que a ferramenta ainda difere da
+pose terminal em 99%, que todas as partes coincidem com seus alvos em 100% e
+que as novas durações são 48 ticks para Worker e 66 para IndustrialRobot. As
+regressões OpenGL continuam comparando queda intermediária e cadáver assentado.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

@@ -527,20 +527,52 @@ void testEnemyRootAnimation()
         EnemyAnimationState::Dead, 999U, 111U);
     expect(dead.offset == wkc::core::Vec3{0.0F, 0.18F, 0.0F}
             && dead.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-            && dead.rotationDegrees.z == 76.0F
-            && std::abs(dead.rotationDegrees.x) <= 7.0F,
-        "dead Worker keeps rigid proportions with seeded fall variation");
-    const EnemyRootPose oppositeDead = sampleEnemyRootPose(
-        EnemyAnimationState::Dead, 999U, 112U);
-    expect(oppositeDead.rotationDegrees.z == -76.0F
-            && oppositeDead.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F},
-        "death direction varies deterministically without silhouette compression");
+            && (std::abs(dead.rotationDegrees.x) > 1.0F
+                || std::abs(dead.rotationDegrees.z) > 1.0F),
+        "dead Worker keeps rigid proportions with a seeded full-plane fall");
+    constexpr float degreesToRadians
+        = 3.14159265358979323846F / 180.0F;
+    const auto fallDirection = [](const EnemyRootPose& pose) {
+        constexpr float toRadians
+            = 3.14159265358979323846F / 180.0F;
+        const float pitch = pose.rotationDegrees.x * toRadians;
+        const float roll = pose.rotationDegrees.z * toRadians;
+        return wkc::core::Vec3{
+            -std::sin(roll) * std::cos(pitch),
+            std::cos(roll) * std::cos(pitch),
+            std::sin(pitch),
+        };
+    };
+    bool fallsLeft = false;
+    bool fallsRight = false;
+    bool fallsForward = false;
+    bool fallsBackward = false;
+    bool fallsDiagonally = false;
+    for (wkc::core::Seed seed = 1U; seed <= 128U; ++seed) {
+        const EnemyRootPose seededDeath = sampleEnemyRootPose(
+            EnemyAnimationState::Dead, 999U, seed);
+        const wkc::core::Vec3 direction = fallDirection(seededDeath);
+        fallsLeft = fallsLeft || direction.x < -0.70F;
+        fallsRight = fallsRight || direction.x > 0.70F;
+        fallsForward = fallsForward || direction.z > 0.70F;
+        fallsBackward = fallsBackward || direction.z < -0.70F;
+        fallsDiagonally = fallsDiagonally
+            || (std::abs(direction.x) > 0.45F
+                && std::abs(direction.z) > 0.45F);
+        expect(std::abs(direction.y - std::cos(88.0F * degreesToRadians))
+                < 0.0001F,
+            "every seeded Worker death finishes at the same grounded tilt");
+    }
+    expect(fallsLeft && fallsRight && fallsForward && fallsBackward
+            && fallsDiagonally
+            && dead == sampleEnemyRootPose(
+                EnemyAnimationState::Dead, 0U, 111U),
+        "death direction deterministically covers the full ground plane");
     const EnemyRootPose robotDead = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 999U, 111U, true,
         EnemyVisualRole::IndustrialRobot);
     expect(robotDead.offset.y == 0.26F
-            && robotDead.rotationDegrees.z == 62.0F
-            && std::abs(robotDead.rotationDegrees.x) <= 3.0F,
+            && fallDirection(robotDead).y < 0.04F,
         "IndustrialRobot settles with a heavier restrained root response");
 
     EnemyAnimationTransition transition;
@@ -563,11 +595,11 @@ void testEnemyRootAnimation()
         "Hit interrupts the current target with a faster visual response");
     advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
     expect(transition.previousState == EnemyAnimationState::Hit
-            && transition.durationTicks == 36U
-            && enemyAnimationTransitionBlend(transition) > 0.027F
-            && enemyAnimationTransitionBlend(transition) < 0.029F,
+            && transition.durationTicks == 48U
+            && enemyAnimationTransitionBlend(transition) > 0.020F
+            && enemyAnimationTransitionBlend(transition) < 0.022F,
         "Death starts a longer deterministic settling transition");
-    for (std::uint32_t tick = 1U; tick < 36U; ++tick) {
+    for (std::uint32_t tick = 1U; tick < 48U; ++tick) {
         advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
     }
     expect(enemyAnimationTransitionBlend(transition) == 1.0F,
@@ -579,16 +611,33 @@ void testEnemyRootAnimation()
     advanceEnemyAnimationTransition(
         robotTransition, EnemyAnimationState::Dead,
         EnemyVisualRole::IndustrialRobot);
-    expect(robotTransition.durationTicks == 52U,
-        "IndustrialRobot receives a visibly heavier death duration");
+    EnemyAnimationTransition guardTransition;
+    advanceEnemyAnimationTransition(
+        guardTransition, EnemyAnimationState::Attack, EnemyVisualRole::Guard);
+    advanceEnemyAnimationTransition(
+        guardTransition, EnemyAnimationState::Dead, EnemyVisualRole::Guard);
+    EnemyAnimationTransition officerTransition;
+    advanceEnemyAnimationTransition(
+        officerTransition, EnemyAnimationState::Attack, EnemyVisualRole::Officer);
+    advanceEnemyAnimationTransition(
+        officerTransition, EnemyAnimationState::Dead, EnemyVisualRole::Officer);
+    EnemyAnimationTransition engineerTransition;
+    advanceEnemyAnimationTransition(
+        engineerTransition, EnemyAnimationState::Attack, EnemyVisualRole::Engineer);
+    advanceEnemyAnimationTransition(
+        engineerTransition, EnemyAnimationState::Dead, EnemyVisualRole::Engineer);
+    expect(guardTransition.durationTicks == 50U
+            && officerTransition.durationTicks == 52U
+            && engineerTransition.durationTicks == 48U
+            && robotTransition.durationTicks == 66U,
+        "each enemy role keeps enough time for its complete grounded settling");
 
     const EnemyRootPose halfFall = sampleEnemyRagdollRootPose(
         EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.5F);
     expect(halfFall.offset.y > 0.10F && halfFall.offset.y < 0.13F
             && halfFall.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-            && halfFall.rotationDegrees.z > 45.0F
-            && halfFall.rotationDegrees.z < 52.0F
-            && halfFall.offset.z != 0.0F,
+            && halfFall != dead
+            && (halfFall.offset.x != 0.0F || halfFall.offset.z != 0.0F),
         "ragdoll root accelerates after support is lost and carries momentum");
     expect(sampleEnemyRagdollRootPose(
                EnemyRootPose{}, 111U, EnemyVisualRole::Worker, 0.08F)
@@ -614,8 +663,10 @@ void testEnemyRootAnimation()
         EnemyAnimationState::Dead, 0U, 111U, 2U, 9U, 0.0F, true,
         EnemyVisualRole::IndustrialRobot);
     expect(deadHead != EnemyPartPose{}
-            && deadLeftArm.rotationDegrees.z < -30.0F
-            && deadRightArm.rotationDegrees.z > 30.0F,
+            && std::abs(deadLeftArm.rotationDegrees.z) > 30.0F
+            && std::abs(deadRightArm.rotationDegrees.z) > 30.0F
+            && deadLeftArm.rotationDegrees.z
+                * deadRightArm.rotationDegrees.z < 0.0F,
         "terminal ragdoll separates head and arms around their joint pivots");
     expect(std::abs(deadRobotLeftArm.rotationDegrees.z)
             < std::abs(deadLeftArm.rotationDegrees.z) * 0.6F,
@@ -643,6 +694,37 @@ void testEnemyRootAnimation()
                 previousAttackArm, 111U, EnemyVisualRole::Worker, 2U, 8U, 1.0F)
                 == deadLeftArm,
         "ragdoll limbs preserve their animated and settled endpoints");
+    const EnemyPartPose previousAttackTool = sampleEnemyPartPose(
+        EnemyAnimationState::Attack, 6U, 111U, 7U, 8U);
+    const EnemyPartPose deadTool = sampleEnemyPartPose(
+        EnemyAnimationState::Dead, 0U, 111U, 7U, 8U);
+    expect(sampleEnemyRagdollPartPose(
+               previousAttackTool, 111U, EnemyVisualRole::Worker,
+               7U, 8U, 0.99F) != deadTool,
+        "the final loose part is still settling before Death completes");
+    const auto everyPartSettles = [](const EnemyVisualRole role,
+                                      const std::uint32_t partCount) {
+        for (std::uint32_t part = 0U; part < partCount; ++part) {
+            const EnemyPartPose previousPart = sampleEnemyPartPose(
+                EnemyAnimationState::Attack, 6U, 111U, part, partCount,
+                0.0F, true, role);
+            const EnemyPartPose terminalPart = sampleEnemyPartPose(
+                EnemyAnimationState::Dead, 0U, 111U, part, partCount,
+                0.0F, true, role);
+            if (sampleEnemyRagdollPartPose(
+                    previousPart, 111U, role, part, partCount, 1.0F)
+                != terminalPart) {
+                return false;
+            }
+        }
+        return true;
+    };
+    expect(everyPartSettles(EnemyVisualRole::Worker, 8U)
+            && everyPartSettles(EnemyVisualRole::Guard, 8U)
+            && everyPartSettles(EnemyVisualRole::Officer, 8U)
+            && everyPartSettles(EnemyVisualRole::Engineer, 8U)
+            && everyPartSettles(EnemyVisualRole::IndustrialRobot, 9U),
+        "Death completes only after every part of every role is grounded");
 
     const EnemyRootPose hit = sampleEnemyRootPose(
         EnemyAnimationState::Hit, 999U, 111U);

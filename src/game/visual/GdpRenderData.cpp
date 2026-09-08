@@ -29,12 +29,24 @@ struct EnemyMotionProfile {
 };
 
 struct EnemyDeathProfile {
-    std::uint32_t durationTicks{36U};
-    float rootRoll{76.0F};
+    std::uint32_t durationTicks{48U};
+    float rootTilt{88.0F};
     float rootLift{0.18F};
-    float rootPitchVariation{7.0F};
     float articulation{1.0F};
     float settlingAmplitude{10.0F};
+};
+
+struct EnemyFallFrame {
+    wkc::core::Vec3 direction{};
+    float pitchDegrees{0.0F};
+    float rollDegrees{0.0F};
+    float handedness{1.0F};
+};
+
+struct EnemyPartDeathTiming {
+    float delay{0.0F};
+    float contact{0.78F};
+    float settled{0.96F};
 };
 
 EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
@@ -68,13 +80,13 @@ EnemyDeathProfile deathProfileFor(const EnemyVisualRole role) noexcept
     case EnemyVisualRole::Worker:
         return {};
     case EnemyVisualRole::Guard:
-        return {38U, 72.0F, 0.20F, 5.0F, 0.82F, 7.0F};
+        return {50U, 88.0F, 0.20F, 0.82F, 7.0F};
     case EnemyVisualRole::Officer:
-        return {40U, 68.0F, 0.21F, 4.0F, 0.70F, 6.0F};
+        return {52U, 88.0F, 0.21F, 0.70F, 6.0F};
     case EnemyVisualRole::Engineer:
-        return {36U, 74.0F, 0.19F, 6.0F, 1.05F, 11.0F};
+        return {48U, 88.0F, 0.19F, 1.05F, 11.0F};
     case EnemyVisualRole::IndustrialRobot:
-        return {52U, 62.0F, 0.26F, 3.0F, 0.48F, 3.5F};
+        return {66U, 88.0F, 0.26F, 0.48F, 3.5F};
     }
     return {};
 }
@@ -88,6 +100,86 @@ float seededSignedUnit(
         visualSeed ^ (salt * (channel + 1U)));
     const float unit = static_cast<float>(mixed & 0xffffU) / 65535.0F;
     return (unit * 2.0F) - 1.0F;
+}
+
+float seededUnit(
+    const wkc::core::Seed visualSeed,
+    const std::uint64_t channel) noexcept
+{
+    return (seededSignedUnit(visualSeed, channel) + 1.0F) * 0.5F;
+}
+
+EnemyFallFrame enemyFallFrame(
+    const wkc::core::Seed visualSeed,
+    const EnemyDeathProfile& profile) noexcept
+{
+    constexpr float pi = 3.14159265358979323846F;
+    constexpr float radiansToDegrees = 180.0F / pi;
+    const float azimuth = seededUnit(visualSeed, 4U) * (2.0F * pi);
+    const wkc::core::Vec3 direction{
+        std::cos(azimuth), 0.0F, std::sin(azimuth)};
+    const float tilt = profile.rootTilt / radiansToDegrees;
+    const float horizontal = std::sin(tilt);
+    const float vertical = std::cos(tilt);
+    const float pitch = std::asin(std::clamp(
+        direction.z * horizontal, -1.0F, 1.0F));
+    const float roll = std::atan2(-direction.x * horizontal, vertical);
+    return {
+        direction,
+        pitch * radiansToDegrees,
+        roll * radiansToDegrees,
+        seededSignedUnit(visualSeed, 5U) < 0.0F ? -1.0F : 1.0F,
+    };
+}
+
+EnemyPartDeathTiming partDeathTiming(
+    const wkc::core::Seed visualSeed,
+    const std::uint32_t partIndex,
+    const std::uint32_t partCount) noexcept
+{
+    EnemyPartDeathTiming timing;
+    if (partIndex == 4U) {
+        timing = {0.00F, 0.67F, 0.86F};
+    } else if (partIndex == 5U) {
+        timing = {0.03F, 0.69F, 0.89F};
+    } else if (partIndex == 0U) {
+        timing = {0.08F, 0.73F, 0.92F};
+    } else if (partIndex == 2U) {
+        timing = {0.14F, 0.75F, 0.95F};
+    } else if (partIndex == 1U) {
+        timing = {0.18F, 0.77F, 0.97F};
+    } else if (partIndex == 3U) {
+        timing = {0.22F, 0.79F, 0.98F};
+    } else if (partIndex + 1U == partCount) {
+        timing = {0.24F, 0.81F, 1.00F};
+    } else {
+        timing = {0.24F, 0.80F, 0.96F};
+    }
+    const float variation = seededSignedUnit(visualSeed, partIndex + 29U);
+    timing.delay = std::clamp(
+        timing.delay + (variation * 0.018F), 0.0F, 0.26F);
+    timing.contact = std::clamp(
+        timing.contact + (variation * 0.012F), timing.delay + 0.40F, 0.83F);
+    if (timing.settled < 1.0F) {
+        timing.settled = std::clamp(
+            timing.settled + (variation * 0.008F), timing.contact + 0.12F, 0.99F);
+    }
+    return timing;
+}
+
+float dampedContact(
+    const float progress,
+    const float contact,
+    const float settled,
+    const float cycles) noexcept
+{
+    if (progress <= contact || progress >= settled) {
+        return 0.0F;
+    }
+    constexpr float tau = 6.28318530717958647692F;
+    const float local = (progress - contact) / (settled - contact);
+    const float damping = (1.0F - local) * (1.0F - local);
+    return std::sin(local * tau * cycles) * damping;
 }
 
 float smoothProgress(const float progress) noexcept
@@ -107,53 +199,53 @@ EnemyPartPose terminalDeathPartPose(
         return {};
     }
     const EnemyDeathProfile profile = deathProfileFor(role);
-    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+    const EnemyFallFrame fall = enemyFallFrame(visualSeed, profile);
     const float variation = seededSignedUnit(visualSeed, partIndex + 7U);
     const float articulation = profile.articulation;
     if (partIndex == 0U) {
         return {{}, {-3.0F * articulation, 0.0F,
-            -fallDirection * 4.0F * articulation}};
+            -fall.handedness * 4.0F * articulation}};
     }
     if (partIndex == 1U) {
         return {{}, {
             (12.0F + (variation * 5.0F)) * articulation,
             variation * 7.0F * articulation,
-            -fallDirection * (18.0F + (variation * 4.0F)) * articulation}};
+            -fall.handedness * (18.0F + (variation * 4.0F)) * articulation}};
     }
     if (partIndex == 2U) {
         return {{}, {
             (28.0F + (variation * 10.0F)) * articulation,
             variation * 6.0F * articulation,
-            -fallDirection * (42.0F + (variation * 7.0F)) * articulation}};
+            -fall.handedness * (42.0F + (variation * 7.0F)) * articulation}};
     }
     if (partIndex == 3U) {
         return {{}, {
             (-22.0F + (variation * 10.0F)) * articulation,
             variation * 6.0F * articulation,
-            fallDirection * (48.0F - (variation * 7.0F)) * articulation}};
+            fall.handedness * (48.0F - (variation * 7.0F)) * articulation}};
     }
     if (partIndex == 4U) {
         return {{}, {
             (-16.0F + (variation * 7.0F)) * articulation,
             0.0F,
-            -fallDirection * (10.0F + (variation * 4.0F)) * articulation}};
+            -fall.handedness * (10.0F + (variation * 4.0F)) * articulation}};
     }
     if (partIndex == 5U) {
         return {{}, {
             (20.0F + (variation * 7.0F)) * articulation,
             0.0F,
-            fallDirection * (13.0F - (variation * 4.0F)) * articulation}};
+            fall.handedness * (13.0F - (variation * 4.0F)) * articulation}};
     }
     if (partIndex + 1U == partCount) {
         return {{0.0F, -0.012F * articulation, 0.0F}, {
             (32.0F + (variation * 12.0F)) * articulation,
             variation * 9.0F * articulation,
-            fallDirection * (24.0F + (variation * 8.0F)) * articulation}};
+            fall.handedness * (24.0F + (variation * 8.0F)) * articulation}};
     }
     return {{}, {
         variation * 7.0F * articulation,
         0.0F,
-        -fallDirection * 8.0F * articulation}};
+        -fall.handedness * 8.0F * articulation}};
 }
 
 std::uint32_t transitionDurationTicks(
@@ -272,23 +364,20 @@ EnemyRootPose sampleEnemyRagdollRootPose(
     const EnemyRootPose terminal = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 0U, visualSeed, true, role);
     const EnemyDeathProfile profile = deathProfileFor(role);
+    const EnemyFallFrame fall = enemyFallFrame(visualSeed, profile);
     const float fallProgress = smoothProgress(
         (safeProgress - 0.10F) / 0.68F);
     EnemyRootPose pose = blendEnemyRootPoses(previous, terminal, fallProgress);
     const float fallArc = std::sin(fallProgress * 3.14159265358979323846F)
         * (1.0F - fallProgress);
-    pose.offset.z += fallArc * seededSignedUnit(visualSeed, 2U) * 0.085F;
-    pose.rotationDegrees.x += fallArc
-        * seededSignedUnit(visualSeed, 3U)
-        * (profile.rootPitchVariation + 4.0F);
-    const float contactProgress = std::clamp(
-        (safeProgress - 0.72F) / 0.28F, 0.0F, 1.0F);
-    const float contactOscillation
-        = std::sin(contactProgress * 6.28318530717958647692F)
-        * (1.0F - contactProgress) * (1.0F - contactProgress);
-    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+    pose.offset.x += fallArc * fall.direction.x * 0.085F;
+    pose.offset.z += fallArc * fall.direction.z * 0.085F;
+    const float contactOscillation = dampedContact(
+        safeProgress, 0.72F, 0.94F, 1.0F);
     pose.offset.y += std::abs(contactOscillation) * 0.025F;
-    pose.rotationDegrees.z += contactOscillation * fallDirection
+    pose.rotationDegrees.x += contactOscillation * fall.direction.z
+        * profile.settlingAmplitude * 0.55F;
+    pose.rotationDegrees.z -= contactOscillation * fall.direction.x
         * profile.settlingAmplitude * 0.55F;
     return pose;
 }
@@ -306,38 +395,36 @@ EnemyPartPose sampleEnemyRagdollPartPose(
     }
     const float safeProgress = std::isfinite(progress)
         ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
-    const float baseDelay = partIndex == 4U ? 0.0F
-        : partIndex == 5U ? 0.03F
-        : partIndex == 0U ? 0.08F
-        : partIndex == 2U ? 0.14F
-        : partIndex == 1U ? 0.18F
-        : partIndex == 3U ? 0.22F
-        : 0.24F;
+    const EnemyPartDeathTiming timing = partDeathTiming(
+        visualSeed, partIndex, partCount);
     const float variation = seededSignedUnit(visualSeed, partIndex + 19U);
-    const float delay = std::clamp(baseDelay + (variation * 0.025F), 0.0F, 0.27F);
     const float localProgress = smoothProgress(
-        (safeProgress - delay) / std::max(0.76F - delay, 0.001F));
+        (safeProgress - timing.delay)
+            / std::max(timing.contact - timing.delay, 0.001F));
     const EnemyPartPose terminal = terminalDeathPartPose(
         visualSeed, role, partIndex, partCount);
     EnemyPartPose pose = blendEnemyPartPoses(previous, terminal, localProgress);
     const EnemyDeathProfile profile = deathProfileFor(role);
+    const EnemyFallFrame fall = enemyFallFrame(visualSeed, profile);
     const float inertia = std::sin(localProgress * 3.14159265358979323846F)
         * (1.0F - localProgress) * profile.articulation;
-    const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
     const float inertiaScale = partIndex == 1U ? 13.0F
         : partIndex == 2U || partIndex == 3U ? 20.0F
         : partIndex == 4U || partIndex == 5U ? 9.0F
         : 15.0F;
-    pose.rotationDegrees.x += inertia * variation * inertiaScale * 0.55F;
-    pose.rotationDegrees.z -= inertia * fallDirection * inertiaScale;
-    const float contactProgress = std::clamp(
-        (safeProgress - 0.70F) / 0.30F, 0.0F, 1.0F);
-    const float settling = std::sin(
-        contactProgress * 12.56637061435917295384F)
-        * (1.0F - contactProgress) * (1.0F - contactProgress)
+    pose.rotationDegrees.x += inertia
+        * ((fall.direction.z * 0.75F) + (variation * 0.25F))
+        * inertiaScale;
+    pose.rotationDegrees.z -= inertia
+        * ((fall.direction.x * 0.75F) + (fall.handedness * 0.25F))
+        * inertiaScale;
+    const float settling = dampedContact(
+        safeProgress, timing.contact, timing.settled, 2.0F)
         * profile.settlingAmplitude;
-    pose.rotationDegrees.x += settling * variation * 0.45F;
-    pose.rotationDegrees.z -= settling * fallDirection;
+    pose.rotationDegrees.x += settling
+        * ((fall.direction.z * 0.75F) + (variation * 0.25F));
+    pose.rotationDegrees.z -= settling
+        * ((fall.direction.x * 0.75F) + (fall.handedness * 0.25F));
     return pose;
 }
 
@@ -350,12 +437,11 @@ EnemyRootPose sampleEnemyRootPose(
 {
     if (state == EnemyAnimationState::Dead) {
         const EnemyDeathProfile profile = deathProfileFor(role);
-        const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
+        const EnemyFallFrame fall = enemyFallFrame(visualSeed, profile);
         return {
             {0.0F, profile.rootLift, 0.0F},
             {1.0F, 1.0F, 1.0F},
-            {seededSignedUnit(visualSeed, 1U) * profile.rootPitchVariation,
-                0.0F, fallDirection * profile.rootRoll},
+            {fall.pitchDegrees, 0.0F, fall.rollDegrees},
         };
     }
     if (!active) {

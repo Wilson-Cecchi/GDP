@@ -1045,6 +1045,14 @@ amortecido. `Application` apenas encaminha o papel visual estável ao tracker.
 Nada foi adicionado à WKC Forge, ao gameplay ou à persistência; regras 8/7 não
 mudam.
 
+Na Fase 99, `visualSeed` define um azimute contínuo sem consumir stream de RNG.
+O sampler de raiz converte a inclinação terminal de `88°` em pitch/roll para
+cobrir todo o plano XZ e aplica o impulso na mesma direção. Os samplers de parte
+usam janelas individuais de contato e repouso: a transição visual de 48–66 ticks
+só termina quando inclusive a última ferramenta coincide com sua pose terminal.
+Isso continua no renderer concreto do GDP; WKC Forge, gameplay, colisores,
+persistência e regras 8/7 permanecem inalterados.
+
 ---
 
 # 8. Sistema de seed

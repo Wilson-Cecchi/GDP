@@ -127,6 +127,11 @@ A Fase 98 apenas amplia a duração transitória de Death conforme o papel e mud
 suas curvas visuais. O histórico continua descartável e não é serializado;
 Campaign/Speedrun permanecem em 8/7 e o checkpoint no schema 2.
 
+A Fase 99 deriva o azimute e os tempos de contato exclusivamente da
+`visualSeed`, do papel e do índice da parte. Direção, progresso e repouso não
+entram no save; a nova janela de 48–66 ticks continua sendo apenas apresentação.
+Campaign/Speedrun permanecem em 8/7 e o checkpoint no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

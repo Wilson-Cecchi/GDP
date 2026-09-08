@@ -42,6 +42,8 @@
 > concreto do GDP, sem promover juntas ou simulação física à engine.
 > A Fase 98 refinou somente as curvas e durações concretas de Death após o gate
 > visual apontar sincronização excessiva entre raiz e membros.
+> A Fase 99 generalizou a direção concreta para todo o plano XZ e condicionou
+> o fim visual ao repouso de todas as partes rígidas.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -135,6 +137,11 @@ com o piso; colisões detalhadas de cadáver não fazem parte do renderer.
 Na Fase 98, o snapshot usa progresso linear durante Death para que raiz e partes
 apliquem estágios próprios. As outras transições continuam usando `smoothstep`.
 O draw permanece sem estado e recebe a pose final já amostrada.
+Na Fase 99, o sampler converte a `visualSeed` em um azimute contínuo e decompõe
+a inclinação terminal entre pitch e roll, mantendo `88°` em qualquer direção.
+Os samplers de parte consomem a mesma fração linear, mas cada um possui limites
+de contato e repouso; o equipamento final permanece ativo até 100%. O renderer
+continua apenas compondo matrizes e não mantém solver, velocidade ou colisores.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.
 `PropRenderData` desenha crate, canister e barricade com escala/tint derivados

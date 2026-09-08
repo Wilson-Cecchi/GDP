@@ -370,6 +370,10 @@ especializados das pastas numeradas.
 - **Fase 98 — Queda orgânica por transferência de peso:** o ragdoll agora perde
   sustentação pelas pernas antes do torso, conserva inércia na cabeça e membros
   e termina com contato amortecido; o Boss usa uma queda mais longa e pesada.
+- **Fase 99 — Direção integral e assentamento completo:** cada morte escolhe de
+  forma determinística qualquer direção nos 360° ao redor do inimigo. A janela
+  só termina após torso, cabeça, braços, pernas e equipamento alcançarem suas
+  poses no piso, inclusive a última peça solta.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -856,6 +860,17 @@ decaimento quadrático. Worker/Engineer levam 36 ticks, Guard 38, Officer 40 e
 IndustrialRobot 52, em vez dos 18 ticks comuns anteriores. A alteração continua
 exclusivamente visual e determinística; gameplay, RNG, colliders, saves e regras
 8/7 permanecem inalterados.
+
+Na Fase 99, a direção binária esquerda/direita foi substituída por um azimute
+contínuo derivado por hash da `visualSeed`. A raiz inclina `88°` em direção a
+esse vetor e transporta impulso nos dois eixos do piso, permitindo quedas para
+frente, trás, lados e diagonais sem consumir o RNG estrutural. Cada parte passou
+a ter instantes próprios de primeiro contato e repouso; pernas e torso assentam
+antes, enquanto cabeça, braços e a peça de equipamento continuam amortecendo.
+A transição só chega a 100% quando a última peça alcança exatamente a pose
+terminal. As janelas são 48 ticks para Worker/Engineer, 50 para Guard, 52 para
+Officer e 66 para IndustrialRobot. A mudança permanece estritamente visual:
+gameplay, colisores, saves e regras 8/7 não mudaram.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -12,6 +12,8 @@
 > Fase 96 suavizou as transições e removeu a morte achatada. A Fase 97 evoluiu
 > essa queda para um ragdoll procedural articulado; a Fase 98 separou perda de
 > sustentação, inércia, queda e contato para remover a rigidez remanescente.
+> A Fase 99 abriu a direção da queda para 360° e tornou o repouso da última
+> parte uma condição explícita do fim da transição visual.
 > Patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
@@ -102,6 +104,16 @@ equipamentos por volta de 24%, com pequena variação estável por seed. A queda
 torso termina sua fase principal em 78%; os 22% finais absorvem o contato no
 piso. Humanos usam 36–40 ticks e o IndustrialRobot usa 52 ticks, reforçando a
 diferença de massa sem alterar o instante lógico da morte.
+
+Na Fase 99, Death deixa de escolher apenas um dos dois lados. Um azimute
+contínuo, obtido diretamente da `visualSeed`, orienta a inclinação de `88°` e o
+impulso da raiz no plano XZ; assim, frente, trás, laterais e diagonais aparecem
+sem estado aleatório mutável. O contato também passa a ser escalonado até o fim:
+pernas, torso, acessórios, cabeça, braços e ferramenta possuem pares próprios
+de primeiro contato/repouso, e a última peça só zera sua oscilação em 100%.
+Worker/Engineer usam 48 ticks, Guard 50, Officer 52 e IndustrialRobot 66. Todas
+as partes coincidem exatamente com suas poses terminais quando a transição
+encerra; a morte lógica continua imediata.
 
 ## Walk
 
