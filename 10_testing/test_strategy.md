@@ -343,6 +343,14 @@ pose terminal em 99%, que todas as partes coincidem com seus alvos em 100% e
 que as novas durações são 48 ticks para Worker e 66 para IndustrialRobot. As
 regressões OpenGL continuam comparando queda intermediária e cadáver assentado.
 
+O gate da Fase 100 executa 240 fixed ticks de patrulha para Worker, Guard,
+Officer, Engineer e IndustrialRobot. Cada papel precisa mover, alcançar ao
+menos um waypoint, entrar em pausa, permanecer dentro do volume navegável e
+repetir posição, yaw, índice e estados exatamente em uma segunda simulação.
+Também confirma origem inicial no payload e congelamento integral quando o
+Player morreu. Os testes de combate anteriores continuam protegendo detecção,
+prioridade de ataque, desvio e separação.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

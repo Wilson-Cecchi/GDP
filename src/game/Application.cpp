@@ -84,7 +84,8 @@ visual::EnemyAnimationState animationStateFor(
         return visual::EnemyAnimationState::Hit;
     }
     if (enemy.behavior == entities::EnemyBehaviorState::Chase
-        || enemy.behavior == entities::EnemyBehaviorState::Reposition) {
+        || enemy.behavior == entities::EnemyBehaviorState::Reposition
+        || enemy.behavior == entities::EnemyBehaviorState::Patrol) {
         return visual::EnemyAnimationState::Walk;
     }
     if (enemy.behavior == entities::EnemyBehaviorState::Attack) {

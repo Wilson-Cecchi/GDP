@@ -3,6 +3,8 @@
 > **Estado:** catálogo lógico e shells implementados na Fase 6; Worker completo
 > validado nas Fases 7–9; Guard, Officer, Engineer e IndustrialRobot
 > funcionais/procedurais validados na Fase 11.
+> A Fase 100 acrescentou patrulha local determinística aos cinco papéis sem
+> alterar seus contratos de combate.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -50,6 +52,11 @@ recebem update e visual completo quando sua sala se torna atual. O Officer acele
 repara HP ou props `Damaged`, sempre por range, linha de visão e `roomId`, usando
 cooldowns independentes. O IndustrialRobot alterna entre longa distância,
 pressão e perseguição nos limiares de 66% e 33% de seus 250 HP.
+
+Enquanto o Player vivo permanece além do alcance de detecção, cada inimigo
+ativo da sala atual alterna `Patrol` e `Idle` ao percorrer e observar waypoints
+locais em torno do spawn. A percepção existente interrompe essa rotina antes de
+Chase/Reposition/Attack; inimigos dormentes e de outras salas não são atualizados.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

@@ -374,6 +374,10 @@ especializados das pastas numeradas.
   forma determinística qualquer direção nos 360° ao redor do inimigo. A janela
   só termina após torso, cabeça, braços, pernas e equipamento alcançarem suas
   poses no piso, inclusive a última peça solta.
+- **Fase 100 — Patrulha local determinística:** os cinco arquétipos percorrem
+  waypoints curtos ao redor do spawn enquanto não detectam o jogador, pausam
+  entre destinos e reutilizam colisão, desvio e separação. Combate interrompe a
+  patrulha imediatamente; Campaign/Speedrun avançam para regras 9/8.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -871,6 +875,18 @@ A transição só chega a 100% quando a última peça alcança exatamente a pose
 terminal. As janelas são 48 ticks para Worker/Engineer, 50 para Guard, 52 para
 Officer e 66 para IndustrialRobot. A mudança permanece estritamente visual:
 gameplay, colisores, saves e regras 8/7 não mudaram.
+
+Na Fase 100, inimigos ativos fora do alcance de detecção deixam de permanecer
+completamente imóveis. `EnemyData` conserva origem, índice do waypoint, tempo
+de tentativa e pausa; os destinos formam uma rota curta ao redor do spawn com
+ângulo e raio derivados de `EntityId`, `roomId` e índice, sem consumir RNG.
+Chegada produz uma pausa breve; um destino bloqueado expira e avança, impedindo
+tentativas eternas contra paredes. O movimento usa os mesmos colliders, desvio
+e volumes físicos do combate, e o estado `Patrol` alimenta a pose Walk. Player
+morto, inimigo dormente, outra sala e estado Dead continuam congelados. Como a
+patrulha altera posição e tempo de encontro, `currentCampaignRulesVersion`
+avança para 9 e `currentSpeedrunRulesVersion` para 8; saves e recordes antigos
+ficam isolados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

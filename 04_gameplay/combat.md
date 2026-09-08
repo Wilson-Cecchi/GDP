@@ -132,3 +132,11 @@ Na Fase 88, uma regressão densa posiciona oito Workers ao redor do mesmo alvo e
 verifica todos os pares em cada um dos 600 passos. A distância entre centros não
 pode cair abaixo de `0,68 m`, e a repetição precisa produzir posições finais
 idênticas. Isso cobre o contato físico contínuo além da separação final.
+
+Na Fase 100, os cinco updates de arquétipo também compartilham a patrulha local
+quando o Player vivo está fora do alcance de detecção. Waypoints são derivados
+da identidade estável, ficam ancorados no spawn e usam velocidade reduzida. A
+mesma resolução de paredes, props, desvio e volumes físicos permanece
+autoritativa; chegada gera pausa e timeout troca destinos bloqueados. Detectar
+o Player interrompe a patrulha no mesmo update. Como a posição inicial do
+encontro pode mudar, Campaign/Speedrun passam às regras 9/8.

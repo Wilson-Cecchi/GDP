@@ -1127,6 +1127,15 @@ só termina quando inclusive a última ferramenta coincide com sua pose terminal
 Isso continua no renderer concreto do GDP; WKC Forge, gameplay, colisores,
 persistência e regras 8/7 permanecem inalterados.
 
+Na Fase 100, `EnemyData` recebeu estado transitório de patrulha: origem no
+spawn, índice de waypoint, timeout e pausa. O helper concreto de gameplay deriva
+ângulo/raio de `EntityId + roomId + índice`, sem stream de RNG, e reutiliza
+colisão, desvio, separação e giro existentes. Os cinco arquétipos entram em
+`Patrol` somente fora do alcance de detecção e voltam ao combate com prioridade
+imediata; Player morto e entidades dormentes não avançam. Nenhuma API foi
+promovida à WKC Forge. A mudança de rotas eleva Campaign/Speedrun às regras 9/8;
+o schema de checkpoint continua 2.
+
 ---
 
 # 8. Sistema de seed

@@ -14,8 +14,8 @@
 > sustentação, inércia, queda e contato para remover a rigidez remanescente.
 > A Fase 99 abriu a direção da queda para 360° e tornou o repouso da última
 > parte uma condição explícita do fim da transição visual.
-> Patrulha, investigação e pathfinding global permanecem
-> planejados.
+> A Fase 100 implementou patrulha local determinística nos cinco arquétipos.
+> Investigação e pathfinding global permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -183,3 +183,14 @@ outros inimigos, evitando penetração e troca de lados mesmo em um passo grande
 Sobreposições preexistentes só podem aumentar a distância, e estados Idle ou
 Attack aplicam uma correção lenta. Paredes, portas e props continuam resolvidos
 por `CollisionWorld`, preservando passagem e autoridade da geometria.
+
+A Fase 100 adiciona a primeira navegação fora de combate. Cada Enemy guarda o
+ponto de spawn como origem e percorre waypoints de raio curto derivados de
+`EntityId`, `roomId` e índice por hash estável. O movimento usa velocidade
+reduzida por papel, gira pela mesma curva de Walk e compartilha integralmente
+`CollisionWorld`, desvio local e volumes entre inimigos. Ao alcançar o destino,
+o inimigo pausa antes do próximo; se o destino permanecer bloqueado além do
+timeout, a rota avança em vez de insistir contra a parede. Detecção assume
+prioridade no mesmo tick. Player morto, Dead, entidades dormentes e outras
+salas não avançam patrulha. Nenhum stream de RNG ou pathfinding global foi
+introduzido.

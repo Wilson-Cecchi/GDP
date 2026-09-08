@@ -132,6 +132,12 @@ A Fase 99 deriva o azimute e os tempos de contato exclusivamente da
 entram no save; a nova janela de 48–66 ticks continua sendo apenas apresentação.
 Campaign/Speedrun permanecem em 8/7 e o checkpoint no schema 2.
 
+A Fase 100 mantém origem, waypoint, timeout e pausa da patrulha somente no
+`EnemyData` runtime; nenhum desses campos entra no checkpoint, que continua no
+schema 2 e recria o andar pela seed. Como a patrulha muda rotas e tempos,
+Campaign avança das regras 8 para 9 e Speedrun das regras 7 para 8. Checkpoints
+e recordes de regras anteriores são rejeitados pelos contratos existentes.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

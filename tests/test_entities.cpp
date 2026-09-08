@@ -67,8 +67,13 @@ void testCreationAndTypedData()
     expect(enemyData != nullptr && enemyData->archetype == EnemyArchetype::Guard
             && enemyData->health == 75.0F && enemyData->maximumHealth == 75.0F
             && enemyData->behavior == EnemyBehaviorState::Idle
-            && enemyData->visualSeed == 9876,
-        "enemy payload preserves archetype, health, behavior and visual seed");
+            && enemyData->visualSeed == 9876
+            && enemyData->patrolOrigin
+                == manager.find(enemy)->transform.position
+            && enemyData->patrolWaypoint == 0U
+            && enemyData->patrolWaypointTime == 0.0F
+            && enemyData->patrolPauseTime == 0.0F,
+        "enemy payload preserves identity and initializes patrol at its spawn");
     expect(itemData != nullptr && itemData->type == ItemType::Ammo && itemData->quantity == 1,
         "item payload clamps invalid zero quantity");
     expect(propData != nullptr && propData->type == PropType::Terminal && propData->solid,

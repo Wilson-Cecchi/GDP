@@ -1089,6 +1089,139 @@ void testEnemyFacingLifecycle()
         "Reposition converges to the target after enough deterministic time");
 }
 
+void testDeterministicLocalPatrol()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    struct PatrolResult {
+        wkc::core::Vec3 position{};
+        float yaw{0.0F};
+        std::uint32_t waypoint{0U};
+        bool moved{false};
+        bool paused{false};
+        bool stayedInside{true};
+
+        constexpr bool operator==(const PatrolResult&) const noexcept = default;
+    };
+
+    const CollisionWorld room{{{-6.0F, 0.0F, -6.0F}, {6.0F, 4.0F, 6.0F}}};
+    const auto runFixture = [&room](const EnemyArchetype archetype) {
+        Player player;
+        player.spawn({5.0F, 0.0F, 5.0F});
+        EntityManager manager;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 0.0F}},
+            .roomId = 4,
+            .archetype = archetype,
+        });
+        PatrolResult result;
+        const PatrolConfig patrol{1.5F, 0.5F, 2.5F, 0.25F, 0.16F};
+        for (std::size_t tick = 0U; tick < 240U; ++tick) {
+            EnemyUpdateSummary update;
+            switch (archetype) {
+            case EnemyArchetype::Worker: {
+                WorkerConfig config;
+                config.detectionRange = 0.5F;
+                config.moveSpeed = 2.0F;
+                config.attackDamage = 0.0F;
+                config.patrol = patrol;
+                update = updateWorkers(
+                    manager, player, 4, room, 1.0F / 60.0F, config);
+                break;
+            }
+            case EnemyArchetype::Guard: {
+                GuardConfig config;
+                config.detectionRange = 0.5F;
+                config.moveSpeed = 2.0F;
+                config.attackDamage = 0.0F;
+                config.patrol = patrol;
+                update = updateGuards(
+                    manager, player, 4, room, 1.0F / 60.0F, config);
+                break;
+            }
+            case EnemyArchetype::Officer: {
+                OfficerConfig config;
+                config.detectionRange = 0.5F;
+                config.moveSpeed = 2.0F;
+                config.attackDamage = 0.0F;
+                config.allyCooldownReduction = 0.0F;
+                config.patrol = patrol;
+                update = updateOfficers(
+                    manager, player, 4, room, 1.0F / 60.0F, config);
+                break;
+            }
+            case EnemyArchetype::Engineer: {
+                EngineerConfig config;
+                config.detectionRange = 0.5F;
+                config.moveSpeed = 2.0F;
+                config.attackDamage = 0.0F;
+                config.repairAmount = 0.0F;
+                config.patrol = patrol;
+                update = updateEngineers(
+                    manager, player, 4, room, 1.0F / 60.0F, config);
+                break;
+            }
+            case EnemyArchetype::IndustrialRobot: {
+                IndustrialRobotConfig config;
+                config.detectionRange = 0.5F;
+                config.longRangeMoveSpeed = 2.0F;
+                config.longRangeDamage = 0.0F;
+                config.patrol = patrol;
+                update = updateIndustrialRobots(
+                    manager, player, 4, room, 1.0F / 60.0F, config);
+                break;
+            }
+            }
+            result.moved = result.moved || update.patrolling == 1U;
+            result.paused = result.paused
+                || (update.idle == 1U
+                    && manager.findData<EnemyData>(id)->patrolWaypoint > 0U);
+            const wkc::core::Vec3 position = manager.find(id)->transform.position;
+            result.stayedInside = result.stayedInside
+                && std::abs(position.x) <= 5.66F
+                && std::abs(position.z) <= 5.66F;
+        }
+        result.position = manager.find(id)->transform.position;
+        result.yaw = manager.find(id)->transform.rotationDegrees.y;
+        result.waypoint = manager.findData<EnemyData>(id)->patrolWaypoint;
+        return result;
+    };
+
+    constexpr std::array archetypes{
+        EnemyArchetype::Worker,
+        EnemyArchetype::Guard,
+        EnemyArchetype::Officer,
+        EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot,
+    };
+    for (const EnemyArchetype archetype : archetypes) {
+        const PatrolResult first = runFixture(archetype);
+        const PatrolResult repeated = runFixture(archetype);
+        expect(first == repeated && first.moved && first.paused
+                && first.stayedInside && first.waypoint > 0U,
+            "local patrol is bounded and deterministic for every enemy role");
+    }
+
+    Player deadPlayer;
+    deadPlayer.spawn({5.0F, 0.0F, 5.0F});
+    deadPlayer.applyDamage(1'000.0F);
+    EntityManager manager;
+    const EntityId worker = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 0.0F}},
+        .roomId = 4,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EnemyUpdateSummary inactivePatrol = updateWorkers(
+        manager, deadPlayer, 4, room, 1.0F,
+        {.detectionRange = 0.5F, .moveSpeed = 2.0F, .attackDamage = 0.0F});
+    expect(inactivePatrol.idle == 1U && inactivePatrol.patrolling == 0U
+            && manager.find(worker)->transform.position
+                == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && manager.findData<EnemyData>(worker)->patrolWaypointTime == 0.0F,
+        "patrol remains frozen after player death");
+}
+
 } // namespace
 
 int main()
@@ -1115,6 +1248,7 @@ int main()
     testIndustrialRobotPhases();
     testIndustrialRobotLineOfSightAndRoomIsolation();
     testEnemyFacingLifecycle();
+    testDeterministicLocalPatrol();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";

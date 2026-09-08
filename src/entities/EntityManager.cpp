@@ -49,8 +49,15 @@ EntityId EntityManager::createEnemy(const EnemyCreateInfo& info)
         EntityKind::Enemy,
         info.transform,
         info.roomId,
-        EnemyData{info.archetype, health, health,
-            EnemyBehaviorState::Idle, 0.0F, info.visualSeed, 0.0F, info.active});
+        EnemyData{
+            .archetype = info.archetype,
+            .health = health,
+            .maximumHealth = health,
+            .behavior = EnemyBehaviorState::Idle,
+            .visualSeed = info.visualSeed,
+            .active = info.active,
+            .patrolOrigin = info.transform.position,
+        });
 }
 
 EntityId EntityManager::createItem(const ItemCreateInfo& info)

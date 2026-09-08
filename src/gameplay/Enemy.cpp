@@ -1,5 +1,6 @@
 #include "gameplay/Enemy.hpp"
 
+#include "core/Hash.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Props.hpp"
 
@@ -305,6 +306,105 @@ void separateEnemyIfNeeded(
         moveSpeed * 0.55F, step, collider);
 }
 
+float patrolUnit(const std::uint64_t value) noexcept
+{
+    return static_cast<float>(wkc::core::mix64(value) & 0xffffU) / 65535.0F;
+}
+
+wkc::core::Vec3 patrolWaypointPosition(
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    const gdp::entities::EnemyData& enemy,
+    const PatrolConfig& config) noexcept
+{
+    constexpr float tau = 6.28318530717958647692F;
+    constexpr float goldenAngle = 2.39996322972865332223F;
+    const std::uint64_t identity = wkc::core::hashCombine(
+        id.packed(), static_cast<std::uint64_t>(roomId));
+    const float baseAngle = patrolUnit(identity ^ 0x706174726f6cULL) * tau;
+    const std::uint64_t waypointHash = wkc::core::hashCombine(
+        identity, static_cast<std::uint64_t>(enemy.patrolWaypoint));
+    const float radiusScale = 0.65F + (patrolUnit(waypointHash) * 0.35F);
+    const float angle = baseAngle
+        + (static_cast<float>(enemy.patrolWaypoint) * goldenAngle);
+    return enemy.patrolOrigin + wkc::core::Vec3{
+        std::cos(angle) * config.radius * radiusScale,
+        0.0F,
+        std::sin(angle) * config.radius * radiusScale,
+    };
+}
+
+bool updateEnemyPatrol(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const float moveSpeed,
+    const float step,
+    PatrolConfig config,
+    const CharacterCollider collider) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    config.radius = std::max(config.radius, 0.0F);
+    config.speedScale = std::max(config.speedScale, 0.0F);
+    config.waypointTimeout = std::max(config.waypointTimeout, 0.1F);
+    config.pauseDuration = std::max(config.pauseDuration, 0.0F);
+    config.arrivalDistance = std::max(config.arrivalDistance, 0.05F);
+
+    if (enemy.patrolPauseTime > 0.0F) {
+        enemy.patrolPauseTime = std::max(
+            0.0F, enemy.patrolPauseTime - step);
+        enemy.behavior = EnemyBehaviorState::Idle;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, collider);
+        return false;
+    }
+
+    if (enemy.patrolWaypointTime >= config.waypointTimeout) {
+        ++enemy.patrolWaypoint;
+        enemy.patrolWaypointTime = 0.0F;
+        enemy.patrolPauseTime = config.pauseDuration * 0.35F;
+        enemy.behavior = EnemyBehaviorState::Idle;
+        return false;
+    }
+
+    const wkc::core::Vec3 target = patrolWaypointPosition(
+        id, roomId, enemy, config);
+    const wkc::core::Vec3 offset = target - entity.transform.position;
+    const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+    const float distance = wkc::core::length(planarOffset);
+    if (distance <= config.arrivalDistance) {
+        const std::uint64_t pauseIdentity = wkc::core::hashCombine(
+            id.packed(), static_cast<std::uint64_t>(enemy.patrolWaypoint));
+        const float pauseScale = 0.75F + (patrolUnit(pauseIdentity) * 0.50F);
+        ++enemy.patrolWaypoint;
+        enemy.patrolWaypointTime = 0.0F;
+        enemy.patrolPauseTime = config.pauseDuration * pauseScale;
+        enemy.behavior = EnemyBehaviorState::Idle;
+        return false;
+    }
+
+    enemy.patrolWaypointTime += step;
+    if (distance <= 1.0e-7F || step <= 0.0F) {
+        enemy.behavior = EnemyBehaviorState::Idle;
+        return false;
+    }
+    const wkc::core::Vec3 previous = entity.transform.position;
+    moveEnemyAndFaceTravel(
+        manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+        planarOffset * (1.0F / distance), moveSpeed * config.speedScale,
+        step, collider);
+    const bool moved = planarDistanceSquared(previous, entity.transform.position)
+        > 1.0e-8F;
+    enemy.behavior = moved
+        ? EnemyBehaviorState::Patrol : EnemyBehaviorState::Idle;
+    return moved;
+}
+
 } // namespace
 
 EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexcept
@@ -367,12 +467,23 @@ EnemyUpdateSummary updateWorkers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive || distance > config.detectionRange) {
+        if (!player.state().alive) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
+            continue;
+        }
+        if (distance > config.detectionRange) {
+            if (updateEnemyPatrol(
+                    manager, enemyIds, collisionWorld, id, roomId,
+                    *enemy, *entity, config.moveSpeed, step, config.patrol,
+                    {.radius = 0.35F, .height = 1.8F})) {
+                ++summary.patrolling;
+            } else {
+                ++summary.idle;
+            }
             continue;
         }
 
@@ -453,12 +564,23 @@ EnemyUpdateSummary updateGuards(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive || distance > config.detectionRange) {
+        if (!player.state().alive) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
+            continue;
+        }
+        if (distance > config.detectionRange) {
+            if (updateEnemyPatrol(
+                    manager, enemyIds, collisionWorld, id, roomId,
+                    *enemy, *entity, config.moveSpeed, step, config.patrol,
+                    {.radius = 0.35F, .height = 1.8F})) {
+                ++summary.patrolling;
+            } else {
+                ++summary.idle;
+            }
             continue;
         }
 
@@ -560,12 +682,23 @@ EnemyUpdateSummary updateOfficers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive || distance > config.detectionRange) {
+        if (!player.state().alive) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
+            continue;
+        }
+        if (distance > config.detectionRange) {
+            if (updateEnemyPatrol(
+                    manager, enemyIds, collisionWorld, id, roomId,
+                    *enemy, *entity, config.moveSpeed, step, config.patrol,
+                    {.radius = 0.35F, .height = 1.8F})) {
+                ++summary.patrolling;
+            } else {
+                ++summary.idle;
+            }
             continue;
         }
 
@@ -774,12 +907,23 @@ EnemyUpdateSummary updateEngineers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive || distance > config.detectionRange) {
+        if (!player.state().alive) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
+            continue;
+        }
+        if (distance > config.detectionRange) {
+            if (updateEnemyPatrol(
+                    manager, enemyIds, collisionWorld, id, roomId,
+                    *enemy, *entity, config.moveSpeed, step, config.patrol,
+                    {.radius = 0.35F, .height = 1.8F})) {
+                ++summary.patrolling;
+            } else {
+                ++summary.idle;
+            }
             continue;
         }
 
@@ -944,12 +1088,23 @@ EnemyUpdateSummary updateIndustrialRobots(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive || distance > config.detectionRange) {
+        if (!player.state().alive) {
             enemy->behavior = EnemyBehaviorState::Idle;
             ++summary.idle;
             separateEnemyIfNeeded(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
                 moveSpeed, step, {.radius = 0.52F, .height = 1.9F});
+            continue;
+        }
+        if (distance > config.detectionRange) {
+            if (updateEnemyPatrol(
+                    manager, enemyIds, collisionWorld, id, roomId,
+                    *enemy, *entity, moveSpeed, step, config.patrol,
+                    {.radius = 0.52F, .height = 1.9F})) {
+                ++summary.patrolling;
+            } else {
+                ++summary.idle;
+            }
             continue;
         }
 
