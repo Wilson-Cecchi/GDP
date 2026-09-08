@@ -526,8 +526,54 @@ void testEnemyRootAnimation()
     const EnemyRootPose dead = sampleEnemyRootPose(
         EnemyAnimationState::Dead, 999U, 111U);
     expect(dead == EnemyRootPose{
-            {0.0F, 0.04F, 0.0F}, {1.15F, 0.18F, 1.15F}},
-        "dead enemies keep the established flattened terminal pose");
+            {0.0F, 0.22F, 0.0F}, {1.0F, 1.0F, 1.0F},
+            {0.0F, 0.0F, 82.0F}},
+        "dead enemies keep rigid proportions in a seeded lateral fall");
+    const EnemyRootPose oppositeDead = sampleEnemyRootPose(
+        EnemyAnimationState::Dead, 999U, 112U);
+    expect(oppositeDead.rotationDegrees.z == -82.0F
+            && oppositeDead.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F},
+        "death direction varies deterministically without silhouette compression");
+
+    EnemyAnimationTransition transition;
+    advanceEnemyAnimationTransition(transition, EnemyAnimationState::Idle);
+    expect(transition.initialized
+            && transition.previousState == EnemyAnimationState::Idle
+            && transition.currentState == EnemyAnimationState::Idle
+            && enemyAnimationTransitionBlend(transition) == 1.0F,
+        "first observed animation state starts without a synthetic transition");
+    advanceEnemyAnimationTransition(transition, EnemyAnimationState::Walk);
+    expect(transition.previousState == EnemyAnimationState::Idle
+            && transition.currentState == EnemyAnimationState::Walk
+            && transition.durationTicks == 6U
+            && enemyAnimationTransitionBlend(transition) > 0.07F
+            && enemyAnimationTransitionBlend(transition) < 0.08F,
+        "Idle to Walk begins a short fixed-tick blend");
+    advanceEnemyAnimationTransition(transition, EnemyAnimationState::Hit);
+    expect(transition.previousState == EnemyAnimationState::Walk
+            && transition.durationTicks == 3U,
+        "Hit interrupts the current target with a faster visual response");
+    advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
+    expect(transition.previousState == EnemyAnimationState::Hit
+            && transition.durationTicks == 18U
+            && enemyAnimationTransitionBlend(transition) > 0.008F
+            && enemyAnimationTransitionBlend(transition) < 0.010F,
+        "Death starts a longer deterministic settling transition");
+    for (std::uint32_t tick = 1U; tick < 18U; ++tick) {
+        advanceEnemyAnimationTransition(transition, EnemyAnimationState::Dead);
+    }
+    expect(enemyAnimationTransitionBlend(transition) == 1.0F,
+        "death settling clamps exactly at its terminal pose");
+
+    const EnemyRootPose halfFall = blendEnemyRootPoses(
+        EnemyRootPose{}, dead, 0.5F);
+    expect(halfFall.offset.y == 0.11F
+            && halfFall.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+            && halfFall.rotationDegrees.z == 41.0F,
+        "death blend rotates a rigid body without squash and stretch");
+    expect(blendEnemyRootPoses(EnemyRootPose{}, dead,
+               std::numeric_limits<float>::quiet_NaN()) == dead,
+        "non-finite transition blends safely select the current pose");
 
     const EnemyRootPose hit = sampleEnemyRootPose(
         EnemyAnimationState::Hit, 999U, 111U);

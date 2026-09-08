@@ -112,6 +112,12 @@ A Fase 95 mantém o mesmo contrato: perfis de movimento são constantes visuais
 selecionadas pelo papel e não são serializados. Regras Campaign/Speedrun seguem
 em 8/7 e o checkpoint permanece no schema 2.
 
+A Fase 96 mantém apenas durante a run um histórico visual por `EntityId`, usado
+para interpolar estado anterior e atual em fixed ticks. O mapa é limpo ao
+inicializar ou repetir a run e não entra em checkpoint, settings ou recorde. A
+queda terminal usa somente a `visualSeed` existente; regras 8/7 e checkpoint
+schema 2 permanecem inalterados.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

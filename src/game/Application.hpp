@@ -3,6 +3,7 @@
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "game/LaunchSeed.hpp"
+#include "game/visual/GdpRenderData.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Campaign.hpp"
 #include "gameplay/Door.hpp"
@@ -69,6 +70,7 @@ private:
     bool initializeRun();
     void processEvents();
     void fixedUpdate(double fixedStepSeconds);
+    void updateEnemyAnimationTransitions(bool deadOnly);
     void render();
     void shutdown();
     void setPaused(bool paused);
@@ -123,6 +125,8 @@ private:
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
     std::unordered_map<world::EdgeId, std::uint64_t> doorAudioEventCounters_;
+    std::unordered_map<std::uint64_t, visual::EnemyAnimationTransition>
+        enemyAnimationTransitions_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<visual::GdpRenderer> renderer_;
     SDL_Window* window_{nullptr};

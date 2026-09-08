@@ -1092,6 +1092,15 @@ encaminha o papel já existente no snapshot; gameplay não conhece os perfis e a
 WKC Forge não recebe tipos novos. A amostragem permanece função pura de estado,
 tick, seed, índice da parte e força do Hit. Regras 8/7 e schema 2 não mudam.
 
+Na Fase 96, `EnemyAnimationTransition` passou a guardar estado anterior, estado
+atual e progresso por fixed tick no lado visual do GDP. A `Application` mantém
+uma entrada por identidade geracional e a descarta a cada nova run; o snapshot
+transporta somente a pose anterior e a fração já calculada. O renderer
+interpola raiz e partes, enquanto Death usa 18 ticks para uma queda lateral de
+`82°` com escala unitária e direção derivada da `visualSeed`. Em estado terminal
+somente transições de mortos avançam. A WKC Forge ganhou apenas a primitiva
+genérica `rotationZMatrix`; gameplay, RNG, persistência e regras 8/7 não mudam.
+
 ---
 
 # 8. Sistema de seed

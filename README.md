@@ -361,6 +361,9 @@ especializados das pastas numeradas.
 - **Fase 95 — Assinaturas de movimento por arquétipo:** Worker, Guard, Officer,
   Engineer e IndustrialRobot agora usam ciclos e amplitudes próprios. Golpes
   corpo a corpo avançam a ferramenta, armas recuam e o Boss responde com massa.
+- **Fase 96 — Transições e queda rígida dos inimigos:** trocas entre Idle, Walk,
+  Attack e Hit agora usam blends curtos por fixed tick. Death interrompe os
+  demais estados e conclui uma queda lateral sem achatar ou alargar o modelo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -816,6 +819,16 @@ tem ciclos mais longos, amplitudes menores e absorve Hit com mais massa. Idle,
 Walk, Attack e Hit possuem períodos e amplitudes próprios, mas continuam
 amostrados apenas de tick fixo, `visualSeed` e força restante do impacto. Não há
 RNG adicional, mutação de gameplay ou mudança nas regras 8/7.
+
+Na Fase 96, a `Application` passou a conservar para cada `EntityId` o estado
+visual anterior, o atual e o avanço da transição. Idle/Walk usam 6 ticks,
+Attack e a saída de Hit usam 4, a entrada de Hit usa 3 e Death conclui a queda
+em 18 ticks. O renderer interpola raiz e partes rígidas com `smoothstep` antes
+de compor as matrizes; a pose terminal mantém escala `1:1:1` e gira lateralmente em `82°`,
+com lado derivado da `visualSeed`. Durante Victory/Defeat somente a acomodação
+de inimigos mortos pode avançar; IA, combate, timers da run e inimigos vivos
+continuam congelados. A WKC Forge recebeu apenas `rotationZMatrix`, operação
+matemática genérica. RNG, gameplay, persistência e regras 8/7 não mudaram.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

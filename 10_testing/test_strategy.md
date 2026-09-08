@@ -315,6 +315,13 @@ avanço positivo da ferramenta corpo a corpo do Worker, recuo negativo da arma
 do Guard e resposta de Hit mais contida no IndustrialRobot. As regressões
 OpenGL e bootstrap continuam cobrindo a aplicação real dos perfis.
 
+O gate da Fase 96 verifica inicialização sem transição sintética e durações
+fixas de 6 ticks para Idle/Walk, 3 para entrada de Hit e 18 para Death. A queda
+precisa terminar exatamente, escolher lados opostos para seeds de paridades
+distintas e preservar escala unitária inclusive no meio do blend. O Core cobre
+`rotationZMatrix` em `90°` e fallback não finito; renderer OpenGL e bootstrap
+offscreen continuam validando a composição real.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

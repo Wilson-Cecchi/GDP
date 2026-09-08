@@ -8,7 +8,8 @@
 > raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
 > deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update e a Fase 93
 > adicionou uma reação Hit de raiz. A Fase 94 separou a hierarquia rígida e
-> articulou os membros; a Fase 95 especializou o movimento por arquétipo.
+> articulou os membros; a Fase 95 especializou o movimento por arquétipo e a
+> Fase 96 suavizou as transições e substituiu a morte achatada por queda rígida.
 > Patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
@@ -71,6 +72,14 @@ diferentes pareçam compartilhar a mesma atuação.
 Os assets procedurais continuam definidos por receitas consolidadas, mas o
 upload preserva cada primitiva como parte rígida articulável. Os perfis ficam no
 conteúdo visual concreto e não formam um sistema universal de animação.
+
+A Fase 96 acrescenta um histórico visual mínimo por entidade. A primeira pose
+observada começa pronta; mudanças seguintes interpolam a pose anterior e a
+atual por fixed ticks e `smoothstep`, com resposta mais rápida para Hit e mais
+longa para Death. A morte tem prioridade, preserva todas as proporções e inclina a raiz
+rigidamente em `82°` para um lado determinado pela paridade da `visualSeed`.
+Esse assentamento continua atrás do resultado, mas nenhum estado vivo, IA ou
+combate volta a avançar. Reiniciar a run descarta integralmente o histórico.
 
 ## Walk
 

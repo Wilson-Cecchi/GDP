@@ -36,6 +36,8 @@
 > independente e a compor poses locais nos pivôs, sem promover animação ao WKC.
 > A Fase 95 adicionou perfis locais distintos por papel visual, ainda dentro do
 > renderer concreto do GDP.
+> A Fase 96 adicionou blends de pose por fixed tick e queda rígida de Death;
+> somente a matriz `rotationZMatrix` foi acrescentada à matemática WKC.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -119,7 +121,10 @@ Fase 94, cada primitiva é cacheada e enviada como mesh rígida independente. O
 draw compõe a pose da raiz com transform local ao redor do pivô de cada parte;
 estado, timing e amplitudes permanecem no renderer concreto do GDP. Na Fase 95,
 o papel visual seleciona a assinatura de movimento sem consultar IA. O teste
-offscreen posiciona os cinco no mesmo ponto e exige pixels distintos.
+offscreen posiciona os cinco no mesmo ponto e exige pixels distintos. Na Fase
+96, o snapshot também informa estado anterior e fração de blend; raiz e partes
+são interpoladas antes do draw. Death mantém escala unitária, perde emissão
+progressivamente e usa uma rotação lateral rígida em vez de deformar a malha.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.
 `PropRenderData` desenha crate, canister e barricade com escala/tint derivados

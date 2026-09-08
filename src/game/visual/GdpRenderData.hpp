@@ -63,6 +63,7 @@ enum class EnemyAnimationState : std::uint8_t {
 struct EnemyRootPose {
     wkc::core::Vec3 offset{};
     wkc::core::Vec3 scale{1.0F, 1.0F, 1.0F};
+    wkc::core::Vec3 rotationDegrees{};
 
     constexpr bool operator==(const EnemyRootPose&) const noexcept = default;
 };
@@ -73,6 +74,31 @@ struct EnemyPartPose {
 
     constexpr bool operator==(const EnemyPartPose&) const noexcept = default;
 };
+
+struct EnemyAnimationTransition {
+    EnemyAnimationState previousState{EnemyAnimationState::Idle};
+    EnemyAnimationState currentState{EnemyAnimationState::Idle};
+    std::uint32_t elapsedTicks{0U};
+    std::uint32_t durationTicks{0U};
+    bool initialized{false};
+};
+
+void advanceEnemyAnimationTransition(
+    EnemyAnimationTransition& transition,
+    EnemyAnimationState requestedState) noexcept;
+
+[[nodiscard]] float enemyAnimationTransitionBlend(
+    const EnemyAnimationTransition& transition) noexcept;
+
+[[nodiscard]] EnemyRootPose blendEnemyRootPoses(
+    const EnemyRootPose& previous,
+    const EnemyRootPose& current,
+    float blend) noexcept;
+
+[[nodiscard]] EnemyPartPose blendEnemyPartPoses(
+    const EnemyPartPose& previous,
+    const EnemyPartPose& current,
+    float blend) noexcept;
 
 [[nodiscard]] EnemyRootPose sampleEnemyRootPose(
     EnemyAnimationState state,
@@ -100,6 +126,8 @@ struct EnemyRenderData {
     std::uint64_t animationTick{0U};
     float yawDegrees{0.0F};
     float hitReactionStrength{0.0F};
+    EnemyAnimationState previousAnimationState{EnemyAnimationState::Idle};
+    float animationTransitionBlend{1.0F};
 };
 
 struct PickupRenderData {

@@ -74,6 +74,25 @@ std::string sdlError(const std::string_view operation)
     return stream.str();
 }
 
+visual::EnemyAnimationState animationStateFor(
+    const entities::EnemyData& enemy) noexcept
+{
+    if (enemy.behavior == entities::EnemyBehaviorState::Dead) {
+        return visual::EnemyAnimationState::Dead;
+    }
+    if (enemy.hitReactionTime > 0.0F) {
+        return visual::EnemyAnimationState::Hit;
+    }
+    if (enemy.behavior == entities::EnemyBehaviorState::Chase
+        || enemy.behavior == entities::EnemyBehaviorState::Reposition) {
+        return visual::EnemyAnimationState::Walk;
+    }
+    if (enemy.behavior == entities::EnemyBehaviorState::Attack) {
+        return visual::EnemyAnimationState::Attack;
+    }
+    return visual::EnemyAnimationState::Idle;
+}
+
 visual::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert)
@@ -521,6 +540,7 @@ bool Application::initialize()
 bool Application::initializeRun()
 {
     enemyAnimationTicks_ = 0U;
+    enemyAnimationTransitions_.clear();
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
@@ -1765,6 +1785,7 @@ void Application::fixedUpdate(const double fixedStep)
     }
     gameplay::updateFeedback(feedback_, step);
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
+        updateEnemyAnimationTransitions(true);
         if (audio_) {
             audio_->update(step);
         }
@@ -2333,8 +2354,25 @@ void Application::fixedUpdate(const double fixedStep)
         }
         audio_->update(step);
     }
+    updateEnemyAnimationTransitions(false);
     ++enemyAnimationTicks_;
     ++fixedUpdates_;
+}
+
+void Application::updateEnemyAnimationTransitions(const bool deadOnly)
+{
+    for (const entities::EntityId id
+        : entities_.query(entities::EntityKind::Enemy)) {
+        const entities::EnemyData* enemy
+            = entities_.findData<entities::EnemyData>(id);
+        if (enemy == nullptr
+            || (deadOnly
+                && enemy->behavior != entities::EnemyBehaviorState::Dead)) {
+            continue;
+        }
+        visual::advanceEnemyAnimationTransition(
+            enemyAnimationTransitions_[id.packed()], animationStateFor(*enemy));
+    }
 }
 
 void Application::render()
@@ -2460,17 +2498,17 @@ void Application::render()
             } else if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
                 role = visual::EnemyVisualRole::IndustrialRobot;
             }
-            visual::EnemyAnimationState animationState
-                = visual::EnemyAnimationState::Idle;
-            if (enemy->behavior == entities::EnemyBehaviorState::Dead) {
-                animationState = visual::EnemyAnimationState::Dead;
-            } else if (enemy->hitReactionTime > 0.0F) {
-                animationState = visual::EnemyAnimationState::Hit;
-            } else if (enemy->behavior == entities::EnemyBehaviorState::Chase
-                || enemy->behavior == entities::EnemyBehaviorState::Reposition) {
-                animationState = visual::EnemyAnimationState::Walk;
-            } else if (enemy->behavior == entities::EnemyBehaviorState::Attack) {
-                animationState = visual::EnemyAnimationState::Attack;
+            const visual::EnemyAnimationState animationState
+                = animationStateFor(*enemy);
+            visual::EnemyAnimationState previousAnimationState = animationState;
+            float animationTransitionBlend = 1.0F;
+            const auto transition
+                = enemyAnimationTransitions_.find(id.packed());
+            if (transition != enemyAnimationTransitions_.end()
+                && transition->second.currentState == animationState) {
+                previousAnimationState = transition->second.previousState;
+                animationTransitionBlend
+                    = visual::enemyAnimationTransitionBlend(transition->second);
             }
             visibleEnemies.push_back({
                 entity->transform.position,
@@ -2484,6 +2522,8 @@ void Application::render()
                 std::clamp(
                     enemy->hitReactionTime / gameplay::enemyHitReactionDuration,
                     0.0F, 1.0F),
+                previousAnimationState,
+                animationTransitionBlend,
             });
         }
     }

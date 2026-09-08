@@ -51,7 +51,105 @@ EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
     return {};
 }
 
+std::uint32_t transitionDurationTicks(
+    const EnemyAnimationState previous,
+    const EnemyAnimationState current) noexcept
+{
+    if (current == EnemyAnimationState::Dead) {
+        return 18U;
+    }
+    if (current == EnemyAnimationState::Hit) {
+        return 3U;
+    }
+    if (previous == EnemyAnimationState::Hit
+        || current == EnemyAnimationState::Attack) {
+        return 4U;
+    }
+    return 6U;
+}
+
+float mix(const float previous, const float current, const float blend) noexcept
+{
+    return previous + ((current - previous) * blend);
+}
+
+wkc::core::Vec3 mix(
+    const wkc::core::Vec3 previous,
+    const wkc::core::Vec3 current,
+    const float blend) noexcept
+{
+    return {
+        mix(previous.x, current.x, blend),
+        mix(previous.y, current.y, blend),
+        mix(previous.z, current.z, blend),
+    };
+}
+
 } // namespace
+
+void advanceEnemyAnimationTransition(
+    EnemyAnimationTransition& transition,
+    const EnemyAnimationState requestedState) noexcept
+{
+    if (!transition.initialized) {
+        transition.previousState = requestedState;
+        transition.currentState = requestedState;
+        transition.elapsedTicks = 0U;
+        transition.durationTicks = 0U;
+        transition.initialized = true;
+        return;
+    }
+    if (requestedState != transition.currentState) {
+        transition.previousState = transition.currentState;
+        transition.currentState = requestedState;
+        transition.elapsedTicks = 0U;
+        transition.durationTicks = transitionDurationTicks(
+            transition.previousState, transition.currentState);
+    }
+    if (transition.elapsedTicks < transition.durationTicks) {
+        ++transition.elapsedTicks;
+    }
+}
+
+float enemyAnimationTransitionBlend(
+    const EnemyAnimationTransition& transition) noexcept
+{
+    if (!transition.initialized || transition.durationTicks == 0U) {
+        return 1.0F;
+    }
+    const float progress = std::clamp(
+        static_cast<float>(transition.elapsedTicks)
+            / static_cast<float>(transition.durationTicks),
+        0.0F, 1.0F);
+    return progress * progress * (3.0F - (2.0F * progress));
+}
+
+EnemyRootPose blendEnemyRootPoses(
+    const EnemyRootPose& previous,
+    const EnemyRootPose& current,
+    const float blend) noexcept
+{
+    const float safeBlend = std::isfinite(blend)
+        ? std::clamp(blend, 0.0F, 1.0F) : 1.0F;
+    return {
+        mix(previous.offset, current.offset, safeBlend),
+        mix(previous.scale, current.scale, safeBlend),
+        mix(previous.rotationDegrees, current.rotationDegrees, safeBlend),
+    };
+}
+
+EnemyPartPose blendEnemyPartPoses(
+    const EnemyPartPose& previous,
+    const EnemyPartPose& current,
+    const float blend) noexcept
+{
+    const float safeBlend = std::isfinite(blend)
+        ? std::clamp(blend, 0.0F, 1.0F) : 1.0F;
+    return {
+        mix(previous.offset, current.offset, safeBlend),
+        mix(previous.rotationDegrees, current.rotationDegrees, safeBlend),
+    };
+}
 
 EnemyRootPose sampleEnemyRootPose(
     const EnemyAnimationState state,
@@ -60,9 +158,11 @@ EnemyRootPose sampleEnemyRootPose(
     const bool active) noexcept
 {
     if (state == EnemyAnimationState::Dead) {
+        const float fallDirection = (visualSeed & 1U) == 0U ? -1.0F : 1.0F;
         return {
-            {0.0F, 0.04F, 0.0F},
-            {1.15F, 0.18F, 1.15F},
+            {0.0F, 0.22F, 0.0F},
+            {1.0F, 1.0F, 1.0F},
+            {0.0F, 0.0F, fallDirection * 82.0F},
         };
     }
     if (!active) {

@@ -84,6 +84,19 @@ int main()
                 gdp::game::visual::EnemyVisualRole::Worker, true,
                 gdp::game::visual::EnemyAnimationState::Hit, 15U, 0.0F, 1.0F},
         };
+        constexpr std::array fallenWorkerOnly{
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, false, 111,
+                gdp::game::visual::EnemyVisualRole::Worker, true,
+                gdp::game::visual::EnemyAnimationState::Dead, 15U},
+        };
+        constexpr std::array fallingWorkerOnly{
+            gdp::game::visual::EnemyRenderData{
+                {1.5F, 0.0F, -0.5F}, false, 111,
+                gdp::game::visual::EnemyVisualRole::Worker, true,
+                gdp::game::visual::EnemyAnimationState::Dead, 15U, 0.0F, 0.0F,
+                gdp::game::visual::EnemyAnimationState::Attack, 0.5F},
+        };
         constexpr std::array rotatedWorkerOnly{
             gdp::game::visual::EnemyRenderData{
                 {1.5F, 0.0F, -0.5F}, true, 111,
@@ -561,6 +574,18 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 hitWorkerPixels.data());
 
+            const bool renderedFallenWorker
+                = renderer.render(width, height, {}, fallenWorkerOnly);
+            std::vector<std::uint8_t> fallenWorkerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                fallenWorkerPixels.data());
+
+            const bool renderedFallingWorker
+                = renderer.render(width, height, {}, fallingWorkerOnly);
+            std::vector<std::uint8_t> fallingWorkerPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                fallingWorkerPixels.data());
+
             const bool renderedRotatedWorker
                 = renderer.render(width, height, {}, rotatedWorkerOnly);
             std::vector<std::uint8_t> rotatedWorkerPixels(baseline.size());
@@ -650,6 +675,7 @@ int main()
             std::size_t workerChangedChannels = 0;
             std::size_t enemyAnimationChangedChannels = 0;
             std::size_t enemyHitChangedChannels = 0;
+            std::size_t enemyDeathTransitionChangedChannels = 0;
             std::size_t enemyFacingChangedChannels = 0;
             std::size_t guardChangedChannels = 0;
             std::size_t officerChangedChannels = 0;
@@ -799,6 +825,10 @@ int main()
                         != workerPixels[index + channel]) {
                         ++enemyHitChangedChannels;
                     }
+                    if (fallingWorkerPixels[index + channel]
+                        != fallenWorkerPixels[index + channel]) {
+                        ++enemyDeathTransitionChangedChannels;
+                    }
                     if (rotatedWorkerPixels[index + channel]
                         != workerPixels[index + channel]) {
                         ++enemyFacingChangedChannels;
@@ -877,6 +907,8 @@ int main()
                 && renderedWorker && workerChangedChannels > 100U
                 && renderedAnimatedWorker && enemyAnimationChangedChannels > 100U
                 && renderedHitWorker && enemyHitChangedChannels > 100U
+                && renderedFallenWorker && renderedFallingWorker
+                && enemyDeathTransitionChangedChannels > 100U
                 && renderedRotatedWorker && enemyFacingChangedChannels > 100U
                 && renderedGuard && guardChangedChannels > 100U
                 && renderedOfficer && officerChangedChannels > 100U
