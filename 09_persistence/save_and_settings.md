@@ -138,6 +138,13 @@ schema 2 e recria o andar pela seed. Como a patrulha muda rotas e tempos,
 Campaign avança das regras 8 para 9 e Speedrun das regras 7 para 8. Checkpoints
 e recordes de regras anteriores são rejeitados pelos contratos existentes.
 
+A Fase 101 mantém última posição conhecida e tempo restante de investigação no
+mesmo estado transitório de `EnemyData`; o checkpoint continua no schema 2 e
+reconstrói os inimigos sem memória ao recriar o andar. Como aquisição visual e
+busca temporária mudam rotas e tempos, Campaign avança das regras 9 para 10 e
+Speedrun das regras 8 para 9. Fixtures das regras imediatamente anteriores
+confirmam o isolamento de checkpoints e recordes.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

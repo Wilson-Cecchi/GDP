@@ -378,6 +378,10 @@ especializados das pastas numeradas.
   waypoints curtos ao redor do spawn enquanto não detectam o jogador, pausam
   entre destinos e reutilizam colisão, desvio e separação. Combate interrompe a
   patrulha imediatamente; Campaign/Speedrun avançam para regras 9/8.
+- **Fase 101 — Memória de investigação:** linha de visão passa a ser obrigatória
+  para adquirir o jogador. Ao perder contato, cada papel busca por tempo
+  limitado a última posição realmente observada e então retorna à patrulha;
+  Campaign/Speedrun avançam para regras 10/9.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -887,6 +891,17 @@ morto, inimigo dormente, outra sala e estado Dead continuam congelados. Como a
 patrulha altera posição e tempo de encontro, `currentCampaignRulesVersion`
 avança para 9 e `currentSpeedrunRulesVersion` para 8; saves e recordes antigos
 ficam isolados.
+
+Na Fase 101, distância sozinha deixa de revelar o jogador através de paredes,
+portas e cobertura. Os cinco arquétipos só entram em combate após confirmar
+linha de visão; cada confirmação atualiza uma posição conhecida e reinicia uma
+janela própria por papel. Ao perder contato, o estado `Investigate` avança até
+esse ponto usando colisão, desvio, separação e giro já existentes, sem consultar
+a posição atual escondida. Chegar ao destino mantém observação até o timer
+terminar; depois a patrulha retorna. Readquirir visão substitui imediatamente a
+memória, e Player morto ou Enemy morto limpa a busca. Como essa percepção muda
+rotas e tempos, as regras passam a Campaign 10 e Speedrun 9; o schema de save
+continua 2.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

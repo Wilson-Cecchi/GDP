@@ -4,7 +4,8 @@
 > validado nas Fases 7–9; Guard, Officer, Engineer e IndustrialRobot
 > funcionais/procedurais validados na Fase 11.
 > A Fase 100 acrescentou patrulha local determinística aos cinco papéis sem
-> alterar seus contratos de combate.
+> alterar seus contratos de combate. A Fase 101 acrescentou percepção visual e
+> investigação temporária da última posição conhecida.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -57,6 +58,14 @@ Enquanto o Player vivo permanece além do alcance de detecção, cada inimigo
 ativo da sala atual alterna `Patrol` e `Idle` ao percorrer e observar waypoints
 locais em torno do spawn. A percepção existente interrompe essa rotina antes de
 Chase/Reposition/Attack; inimigos dormentes e de outras salas não são atualizados.
+
+Alcance sem linha de visão não concede conhecimento da posição. Depois de uma
+aquisição visual, `EnemyData` conserva apenas no runtime a última posição vista
+e um timer por arquétipo. Perder visão ou alcance inicia `Investigate`, que usa
+o mesmo movimento físico até o ponto lembrado; readquirir atualiza a memória e
+retoma o papel de combate, enquanto a expiração devolve o inimigo à patrulha.
+Player morto, Enemy morto, entidades dormentes e salas inativas não sustentam
+uma perseguição oculta.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

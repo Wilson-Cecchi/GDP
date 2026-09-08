@@ -1136,6 +1136,15 @@ imediata; Player morto e entidades dormentes não avançam. Nenhuma API foi
 promovida à WKC Forge. A mudança de rotas eleva Campaign/Speedrun às regras 9/8;
 o schema de checkpoint continua 2.
 
+Na Fase 101, `EnemyData` recebeu memória transitória de percepção: última
+posição observada e tempo restante de investigação. Um helper concreto do GDP
+combina alcance e `hasLineOfSight`; somente essa confirmação atualiza a memória.
+Sem visão, os cinco papéis seguem o ponto lembrado com velocidade e duração por
+arquétipo, reutilizando colisão, desvio, separação e orientação, e retornam à
+patrulha ao expirar. Player ou Enemy morto limpa a busca. Não há RNG adicional,
+pathfinding global nem API nova na WKC Forge. Campaign/Speedrun avançam para
+regras 10/9 e o checkpoint permanece no schema 2.
+
 ---
 
 # 8. Sistema de seed

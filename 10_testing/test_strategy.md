@@ -351,6 +351,14 @@ Também confirma origem inicial no payload e congelamento integral quando o
 Player morreu. Os testes de combate anteriores continuam protegendo detecção,
 prioridade de ataque, desvio e separação.
 
+O gate da Fase 101 cobre Worker, Guard, Officer, Engineer e IndustrialRobot com
+o mesmo ciclo: aquisição em volume aberto, perda de visão por sólido, movimento
+somente até a última posição observada, readquisição imediata e expiração para
+Patrol/Idle. A fixture é repetida exatamente e compara posição, memória, timer e
+estados; casos sem observação anterior também garantem que paredes não iniciem
+Chase. Morte limpa a memória e os testes de persistência isolam regras 10/9 das
+regras 9/8.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

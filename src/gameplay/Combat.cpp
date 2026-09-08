@@ -137,6 +137,8 @@ DamageOutcome applyDamage(
     enemy->avoidanceTime = 0.0F;
     enemy->avoidanceSide = 0;
     enemy->hitReactionTime = 0.0F;
+    enemy->lastKnownPlayerPosition = {};
+    enemy->investigationTime = 0.0F;
     return DamageOutcome::Killed;
 }
 

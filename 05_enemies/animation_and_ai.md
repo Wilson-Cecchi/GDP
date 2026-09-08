@@ -15,7 +15,9 @@
 > A Fase 99 abriu a direção da queda para 360° e tornou o repouso da última
 > parte uma condição explícita do fim da transição visual.
 > A Fase 100 implementou patrulha local determinística nos cinco arquétipos.
-> Investigação e pathfinding global permanecem planejados.
+> A Fase 101 implementou aquisição visual e investigação da última posição
+> conhecida. Ruído recente, Alert dedicado e pathfinding global permanecem
+> planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -123,8 +125,9 @@ alterar o deslocamento lógico da entidade.
 
 ## IA base
 
-Estados: Idle, Patrol, Investigate, Alert, Chase, Attack, Recover, Dead.
-Percepção usa distância, line of sight, ruído recente e estado da sala.
+Estados implementados: Idle, Patrol, Investigate, Chase, Reposition, Attack e
+Dead. Alert/Recover explícitos e percepção por ruído permanecem planejados.
+Aquisição exige alcance e line of sight dentro da sala ativa.
 
 O Worker atual detecta em até `12 m`, persegue a `1,35 m/s`, ataca dentro de
 `1,15 m` com line of sight e causa 10 de dano a cada `1 s`. Movimento reutiliza
@@ -132,8 +135,9 @@ o collider da sala; estado Dead bloqueia movimento e ataque definitivamente.
 
 O Guard detecta em até `16 m`, avança a `1,10 m/s` até seu envelope de `4–8 m`,
 recua abaixo de `4 m` e dispara 8 de dano a cada `0,80 s`. Sem line of sight ele
-entra em Chase; dentro do envelope só entra em Attack quando o ray até a câmera
-não encontra um sólido. Dead bloqueia também Reposition.
+só investiga uma posição adquirida anteriormente; dentro do envelope só entra
+em Attack quando o ray até a câmera não encontra um sólido. Dead bloqueia
+também Reposition.
 
 O Officer detecta em até `18 m`, avança a `0,95 m/s` para seu envelope de
 `6–10 m`, recua abaixo de `6 m` e dispara 6 de dano a cada `1,20 s`, sempre com
@@ -194,3 +198,13 @@ timeout, a rota avança em vez de insistir contra a parede. Detecção assume
 prioridade no mesmo tick. Player morto, Dead, entidades dormentes e outras
 salas não avançam patrulha. Nenhum stream de RNG ou pathfinding global foi
 introduzido.
+
+A Fase 101 separa posição real e conhecimento do inimigo. Uma observação válida
+armazena a posição do Player; ao perder linha de visão ou alcance, o inimigo
+segue somente esse último ponto durante `3,5 s` (Worker), `4,5 s` (Guard),
+`5 s` (Officer), `4 s` (Engineer) ou `6 s` (IndustrialRobot), em velocidade
+reduzida por papel. A memória não acompanha o Player oculto. Chegada antecipa
+Idle, mas mantém a janela de observação; expiração retorna ao ciclo local de
+patrulha e uma nova visão substitui a memória no mesmo tick. Player morto limpa
+o timer, e a morte do inimigo limpa posição e timer. O processo não consome RNG
+nem introduz pathfinding global.

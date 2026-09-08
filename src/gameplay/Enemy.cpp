@@ -405,6 +405,118 @@ bool updateEnemyPatrol(
     return moved;
 }
 
+bool playerVisibleToEnemy(
+    const gdp::entities::Entity& enemy,
+    const Player& player,
+    const float distance,
+    const float detectionRange,
+    const float eyeHeight,
+    const CollisionWorld& collisionWorld) noexcept
+{
+    return player.state().alive && distance <= detectionRange
+        && hasLineOfSight(
+            enemy.transform.position + wkc::core::Vec3{0.0F, eyeHeight, 0.0F},
+            player.cameraPosition(), collisionWorld);
+}
+
+void rememberVisiblePlayer(
+    gdp::entities::EnemyData& enemy,
+    const Player& player,
+    InvestigationConfig config) noexcept
+{
+    config.duration = std::max(config.duration, 0.0F);
+    enemy.lastKnownPlayerPosition = player.state().position;
+    enemy.investigationTime = config.duration;
+}
+
+bool updateEnemyInvestigation(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const float moveSpeed,
+    const float step,
+    InvestigationConfig config,
+    const CharacterCollider collider) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    config.speedScale = std::max(config.speedScale, 0.0F);
+    config.arrivalDistance = std::max(config.arrivalDistance, 0.05F);
+    enemy.investigationTime = std::max(
+        0.0F, enemy.investigationTime - step);
+    if (enemy.investigationTime <= 0.0F) {
+        return false;
+    }
+
+    const wkc::core::Vec3 offset
+        = enemy.lastKnownPlayerPosition - entity.transform.position;
+    const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+    const float distance = wkc::core::length(planarOffset);
+    if (distance <= config.arrivalDistance) {
+        enemy.behavior = EnemyBehaviorState::Idle;
+        return true;
+    }
+    if (distance <= 1.0e-7F || step <= 0.0F) {
+        enemy.behavior = EnemyBehaviorState::Idle;
+        return true;
+    }
+
+    const wkc::core::Vec3 previous = entity.transform.position;
+    moveEnemyAndFaceTravel(
+        manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+        planarOffset * (1.0F / distance), moveSpeed * config.speedScale,
+        step, collider);
+    enemy.behavior = planarDistanceSquared(previous, entity.transform.position)
+            > 1.0e-8F
+        ? EnemyBehaviorState::Investigate : EnemyBehaviorState::Idle;
+    return true;
+}
+
+void updateUnseenEnemy(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const bool playerAlive,
+    const float moveSpeed,
+    const float step,
+    const PatrolConfig patrol,
+    const InvestigationConfig investigation,
+    const CharacterCollider collider,
+    EnemyUpdateSummary& summary) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    if (!playerAlive) {
+        enemy.lastKnownPlayerPosition = {};
+        enemy.investigationTime = 0.0F;
+        enemy.behavior = EnemyBehaviorState::Idle;
+        ++summary.idle;
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, collider);
+        return;
+    }
+    if (updateEnemyInvestigation(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, investigation, collider)) {
+        ++summary.investigating;
+        return;
+    }
+    if (updateEnemyPatrol(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, patrol, collider)) {
+        ++summary.patrolling;
+    } else {
+        ++summary.idle;
+    }
+}
+
 } // namespace
 
 EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexcept
@@ -467,31 +579,18 @@ EnemyUpdateSummary updateWorkers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive) {
-            enemy->behavior = EnemyBehaviorState::Idle;
-            ++summary.idle;
-            separateEnemyIfNeeded(
-                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-            continue;
-        }
-        if (distance > config.detectionRange) {
-            if (updateEnemyPatrol(
-                    manager, enemyIds, collisionWorld, id, roomId,
-                    *enemy, *entity, config.moveSpeed, step, config.patrol,
-                    {.radius = 0.35F, .height = 1.8F})) {
-                ++summary.patrolling;
-            } else {
-                ++summary.idle;
-            }
-            continue;
-        }
-
-        const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
-            player.cameraPosition(),
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.0F,
             collisionWorld);
-        if (distance <= config.attackRange && lineOfSight) {
+        if (!lineOfSight) {
+            updateUnseenEnemy(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
+            continue;
+        }
+        rememberVisiblePlayer(*enemy, player, config.investigation);
+        if (distance <= config.attackRange) {
             enemy->behavior = EnemyBehaviorState::Attack;
             ++summary.attacking;
             separateEnemyIfNeeded(
@@ -564,34 +663,21 @@ EnemyUpdateSummary updateGuards(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive) {
-            enemy->behavior = EnemyBehaviorState::Idle;
-            ++summary.idle;
-            separateEnemyIfNeeded(
-                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-            continue;
-        }
-        if (distance > config.detectionRange) {
-            if (updateEnemyPatrol(
-                    manager, enemyIds, collisionWorld, id, roomId,
-                    *enemy, *entity, config.moveSpeed, step, config.patrol,
-                    {.radius = 0.35F, .height = 1.8F})) {
-                ++summary.patrolling;
-            } else {
-                ++summary.idle;
-            }
-            continue;
-        }
-
-        const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + wkc::core::Vec3{0.0F, 1.35F, 0.0F},
-            player.cameraPosition(),
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.35F,
             collisionWorld);
+        if (!lineOfSight) {
+            updateUnseenEnemy(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
+            continue;
+        }
+        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
-        if (lineOfSight && distance < config.preferredMinimumRange) {
+        if (distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
@@ -607,7 +693,7 @@ EnemyUpdateSummary updateGuards(
             continue;
         }
 
-        if (!lineOfSight || distance > config.preferredMaximumRange) {
+        if (distance > config.preferredMaximumRange) {
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
@@ -682,25 +768,17 @@ EnemyUpdateSummary updateOfficers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive) {
-            enemy->behavior = EnemyBehaviorState::Idle;
-            ++summary.idle;
-            separateEnemyIfNeeded(
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.4F,
+            collisionWorld);
+        if (!lineOfSight) {
+            updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
+                player.state().alive, config.moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
             continue;
         }
-        if (distance > config.detectionRange) {
-            if (updateEnemyPatrol(
-                    manager, enemyIds, collisionWorld, id, roomId,
-                    *enemy, *entity, config.moveSpeed, step, config.patrol,
-                    {.radius = 0.35F, .height = 1.8F})) {
-                ++summary.patrolling;
-            } else {
-                ++summary.idle;
-            }
-            continue;
-        }
+        rememberVisiblePlayer(*enemy, player, config.investigation);
 
         if (enemy->supportCooldown <= 0.0F && config.allyCooldownReduction > 0.0F) {
             std::size_t supported = 0;
@@ -736,14 +814,10 @@ EnemyUpdateSummary updateOfficers(
             }
         }
 
-        const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + wkc::core::Vec3{0.0F, 1.4F, 0.0F},
-            player.cameraPosition(),
-            collisionWorld);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
-        if (lineOfSight && distance < config.preferredMinimumRange) {
+        if (distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
@@ -759,7 +833,7 @@ EnemyUpdateSummary updateOfficers(
             continue;
         }
 
-        if (!lineOfSight || distance > config.preferredMaximumRange) {
+        if (distance > config.preferredMaximumRange) {
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
@@ -907,34 +981,21 @@ EnemyUpdateSummary updateEngineers(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive) {
-            enemy->behavior = EnemyBehaviorState::Idle;
-            ++summary.idle;
-            separateEnemyIfNeeded(
-                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                config.moveSpeed, step, {.radius = 0.35F, .height = 1.8F});
-            continue;
-        }
-        if (distance > config.detectionRange) {
-            if (updateEnemyPatrol(
-                    manager, enemyIds, collisionWorld, id, roomId,
-                    *enemy, *entity, config.moveSpeed, step, config.patrol,
-                    {.radius = 0.35F, .height = 1.8F})) {
-                ++summary.patrolling;
-            } else {
-                ++summary.idle;
-            }
-            continue;
-        }
-
-        const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + wkc::core::Vec3{0.0F, 1.25F, 0.0F},
-            player.cameraPosition(),
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.25F,
             collisionWorld);
+        if (!lineOfSight) {
+            updateUnseenEnemy(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
+            continue;
+        }
+        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
-        if (lineOfSight && distance < config.preferredMinimumRange) {
+        if (distance < config.preferredMinimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
@@ -949,7 +1010,7 @@ EnemyUpdateSummary updateEngineers(
                 step, targetTurnRateDegreesPerSecond);
             continue;
         }
-        if (!lineOfSight || distance > config.preferredMaximumRange) {
+        if (distance > config.preferredMaximumRange) {
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {
@@ -1088,34 +1149,21 @@ EnemyUpdateSummary updateIndustrialRobots(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
-        if (!player.state().alive) {
-            enemy->behavior = EnemyBehaviorState::Idle;
-            ++summary.idle;
-            separateEnemyIfNeeded(
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.45F,
+            collisionWorld);
+        if (!lineOfSight) {
+            updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                moveSpeed, step, {.radius = 0.52F, .height = 1.9F});
+                player.state().alive, moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.52F, .height = 1.9F}, summary);
             continue;
         }
-        if (distance > config.detectionRange) {
-            if (updateEnemyPatrol(
-                    manager, enemyIds, collisionWorld, id, roomId,
-                    *enemy, *entity, moveSpeed, step, config.patrol,
-                    {.radius = 0.52F, .height = 1.9F})) {
-                ++summary.patrolling;
-            } else {
-                ++summary.idle;
-            }
-            continue;
-        }
-
-        const bool lineOfSight = hasLineOfSight(
-            entity->transform.position + wkc::core::Vec3{0.0F, 1.45F, 0.0F},
-            player.cameraPosition(), collisionWorld);
+        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
-        if (phase != IndustrialRobotPhase::Pursuit
-            && lineOfSight && distance < minimumRange) {
+        if (phase != IndustrialRobotPhase::Pursuit && distance < minimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;
             if (step > 0.0F) {
@@ -1130,7 +1178,7 @@ EnemyUpdateSummary updateIndustrialRobots(
                 step, targetTurnRateDegreesPerSecond);
             continue;
         }
-        if (!lineOfSight || distance > maximumRange) {
+        if (distance > maximumRange) {
             enemy->behavior = EnemyBehaviorState::Chase;
             ++summary.chasing;
             if (step > 0.0F) {

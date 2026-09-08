@@ -17,6 +17,12 @@ struct PatrolConfig {
     float arrivalDistance{0.28F};
 };
 
+struct InvestigationConfig {
+    float duration{3.5F};
+    float speedScale{0.78F};
+    float arrivalDistance{0.35F};
+};
+
 struct WorkerConfig {
     float detectionRange{12.0F};
     float attackRange{1.15F};
@@ -24,6 +30,7 @@ struct WorkerConfig {
     float attackDamage{10.0F};
     float attackInterval{1.0F};
     PatrolConfig patrol{};
+    InvestigationConfig investigation{};
 };
 
 struct GuardConfig {
@@ -34,6 +41,7 @@ struct GuardConfig {
     float attackDamage{8.0F};
     float attackInterval{0.80F};
     PatrolConfig patrol{2.2F, 0.38F, 4.5F, 0.70F, 0.30F};
+    InvestigationConfig investigation{4.5F, 0.72F, 0.38F};
 };
 
 struct OfficerConfig {
@@ -47,6 +55,7 @@ struct OfficerConfig {
     float supportInterval{2.50F};
     float allyCooldownReduction{0.35F};
     PatrolConfig patrol{1.8F, 0.32F, 5.0F, 0.85F, 0.28F};
+    InvestigationConfig investigation{5.0F, 0.65F, 0.40F};
 };
 
 struct EngineerConfig {
@@ -60,6 +69,7 @@ struct EngineerConfig {
     float repairInterval{2.0F};
     float repairAmount{12.0F};
     PatrolConfig patrol{2.0F, 0.36F, 4.5F, 0.65F, 0.28F};
+    InvestigationConfig investigation{4.0F, 0.68F, 0.38F};
 };
 
 enum class IndustrialRobotPhase : std::uint8_t {
@@ -87,6 +97,7 @@ struct IndustrialRobotConfig {
     float pressureAttackInterval{0.90F};
     float pursuitAttackInterval{0.65F};
     PatrolConfig patrol{1.6F, 0.25F, 5.5F, 1.0F, 0.35F};
+    InvestigationConfig investigation{6.0F, 0.58F, 0.48F};
 };
 
 struct EnemyDifficultyConfigs {
@@ -103,6 +114,7 @@ struct EnemyDifficultyConfigs {
 struct EnemyUpdateSummary {
     std::size_t idle{0};
     std::size_t patrolling{0};
+    std::size_t investigating{0};
     std::size_t chasing{0};
     std::size_t repositioning{0};
     std::size_t attacking{0};

@@ -163,11 +163,15 @@ void testDamageLifecycle()
     updateEnemyHitReactions(manager, -1.0F);
     expect(near(data->hitReactionTime, 0.0F),
         "negative elapsed time cannot revive a hit reaction");
+    data->lastKnownPlayerPosition = {2.0F, 0.0F, 3.0F};
+    data->investigationTime = 1.0F;
     expect(applyDamage(manager, enemy, 100.0F) == DamageOutcome::Killed,
         "overkill clamps HP and produces one kill");
     expect(data->health == 0.0F && data->behavior == EnemyBehaviorState::Dead
-            && near(data->hitReactionTime, 0.0F),
-        "lethal damage enters Dead and clears the transient hit reaction");
+            && near(data->hitReactionTime, 0.0F)
+            && data->lastKnownPlayerPosition == wkc::core::Vec3{}
+            && near(data->investigationTime, 0.0F),
+        "lethal damage enters Dead and clears transient reaction and awareness");
     expect(applyDamage(manager, enemy, 1.0F) == DamageOutcome::Ignored,
         "dead enemy ignores repeated damage and cannot die twice");
     expect(applyDamage(manager, {}, 10.0F) == DamageOutcome::Ignored,
@@ -397,7 +401,11 @@ void testDeterministicEnemyObstacleAvoidance()
             .moveSpeed = 1.35F,
             .attackDamage = 0.0F,
             .attackInterval = 1.0F,
+            .investigation = {10.0F, 0.78F, 0.35F},
         };
+        const CollisionWorld open{
+            {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+        (void)updateWorkers(manager, player, 1, open, 0.0F, config);
         for (std::size_t step = 0; step < 360U; ++step) {
             (void)updateWorkers(
                 manager, player, 1, blocked, 1.0F / 60.0F, config);
@@ -615,9 +623,11 @@ void testGuardLineOfSight()
         {.detectionRange = 12.0F,
             .preferredMinimumRange = 4.0F,
             .preferredMaximumRange = 8.0F});
-    expect(update.chasing == 1U && update.attacksLanded == 0U
+    expect(update.chasing == 0U && update.investigating == 0U
+            && update.patrolling + update.idle == 1U
+            && update.attacksLanded == 0U
             && player.state().health == 100.0F,
-        "Guard cannot fire through geometry and instead seeks line of sight");
+        "unaware Guard cannot fire or track the player through geometry");
 }
 
 void testOfficerCommandSupport()
@@ -732,8 +742,8 @@ void testOfficerRangedBehaviorAndLineOfSight()
     };
     const EnemyUpdateSummary occluded
         = updateOfficers(manager, player, 1, blocked, 0.1F, config);
-    expect(occluded.chasing == 1U && occluded.attacksLanded == 0U,
-        "Officer cannot fire through solid geometry and seeks line of sight");
+    expect(occluded.investigating == 1U && occluded.attacksLanded == 0U,
+        "alerted Officer investigates its last sighting instead of tracking through geometry");
 
     expect(applyDamage(manager, officer, 500.0F) == DamageOutcome::Killed,
         "Officer uses the shared damage and death pipeline");
@@ -987,15 +997,18 @@ void testIndustrialRobotLineOfSightAndRoomIsolation()
     const wkc::core::Vec3 otherPosition = manager.find(otherRoomRobot)->transform.position;
     const EnemyUpdateSummary update
         = updateIndustrialRobots(manager, player, 3, blocked, 0.5F);
-    expect(update.chasing == 1U && update.attacksLanded == 0U
+    expect(update.chasing == 0U && update.investigating == 0U
+            && update.patrolling + update.idle == 1U
+            && update.attacksLanded == 0U
             && player.state().health == 100.0F,
-        "IndustrialRobot cannot attack through geometry and instead advances");
+        "unaware IndustrialRobot cannot attack or track through geometry");
     expect(manager.find(otherRoomRobot)->transform.position == otherPosition
             && manager.findData<EnemyData>(otherRoomRobot)->behavior
                 == EnemyBehaviorState::Idle,
         "IndustrialRobot update never crosses the active room boundary");
-    expect(manager.findData<EnemyData>(blockedRobot)->behavior == EnemyBehaviorState::Chase,
-        "occluded IndustrialRobot keeps an explicit Chase state");
+    expect(manager.findData<EnemyData>(blockedRobot)->behavior
+            != EnemyBehaviorState::Chase,
+        "occluded IndustrialRobot remains unaware without a prior sighting");
 }
 
 void testEnemyFacingLifecycle()
@@ -1212,14 +1225,157 @@ void testDeterministicLocalPatrol()
         .roomId = 4,
         .archetype = EnemyArchetype::Worker,
     });
+    manager.findData<EnemyData>(worker)->lastKnownPlayerPosition
+        = {3.0F, 0.0F, 3.0F};
+    manager.findData<EnemyData>(worker)->investigationTime = 2.0F;
     const EnemyUpdateSummary inactivePatrol = updateWorkers(
         manager, deadPlayer, 4, room, 1.0F,
         {.detectionRange = 0.5F, .moveSpeed = 2.0F, .attackDamage = 0.0F});
     expect(inactivePatrol.idle == 1U && inactivePatrol.patrolling == 0U
             && manager.find(worker)->transform.position
                 == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
-            && manager.findData<EnemyData>(worker)->patrolWaypointTime == 0.0F,
-        "patrol remains frozen after player death");
+            && manager.findData<EnemyData>(worker)->patrolWaypointTime == 0.0F
+            && manager.findData<EnemyData>(worker)->lastKnownPlayerPosition
+                == wkc::core::Vec3{}
+            && manager.findData<EnemyData>(worker)->investigationTime == 0.0F,
+        "patrol and investigation remain cleared after player death");
+}
+
+void testEnemyInvestigationLifecycle()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    struct InvestigationResult {
+        wkc::core::Vec3 investigationPosition{};
+        wkc::core::Vec3 rememberedPosition{};
+        float remainingTime{0.0F};
+        bool acquired{false};
+        bool investigated{false};
+        bool reacquired{false};
+        bool expiredIntoPatrol{false};
+
+        constexpr bool operator==(const InvestigationResult&) const noexcept = default;
+    };
+
+    const CollisionWorld open{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const CollisionWorld blocked{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-1.0F, 0.0F, 3.0F}, {1.0F, 3.0F, 3.5F}}},
+    };
+    const auto runFixture = [&open, &blocked](const EnemyArchetype archetype) {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 5,
+            .archetype = archetype,
+        });
+        const InvestigationConfig investigation{2.0F, 0.75F, 0.2F};
+        const auto updateRole = [&](const CollisionWorld& world,
+                                    const float step,
+                                    const float detectionRange) {
+            switch (archetype) {
+            case EnemyArchetype::Worker: {
+                WorkerConfig config;
+                config.detectionRange = detectionRange;
+                config.moveSpeed = 1.0F;
+                config.attackDamage = 0.0F;
+                config.investigation = investigation;
+                return updateWorkers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Guard: {
+                GuardConfig config;
+                config.detectionRange = detectionRange;
+                config.moveSpeed = 1.0F;
+                config.attackDamage = 0.0F;
+                config.investigation = investigation;
+                return updateGuards(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Officer: {
+                OfficerConfig config;
+                config.detectionRange = detectionRange;
+                config.moveSpeed = 1.0F;
+                config.attackDamage = 0.0F;
+                config.allyCooldownReduction = 0.0F;
+                config.investigation = investigation;
+                return updateOfficers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Engineer: {
+                EngineerConfig config;
+                config.detectionRange = detectionRange;
+                config.moveSpeed = 1.0F;
+                config.attackDamage = 0.0F;
+                config.repairAmount = 0.0F;
+                config.investigation = investigation;
+                return updateEngineers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::IndustrialRobot: {
+                IndustrialRobotConfig config;
+                config.detectionRange = detectionRange;
+                config.longRangeMoveSpeed = 1.0F;
+                config.pressureMoveSpeed = 1.0F;
+                config.pursuitMoveSpeed = 1.0F;
+                config.longRangeDamage = 0.0F;
+                config.pressureDamage = 0.0F;
+                config.pursuitDamage = 0.0F;
+                config.investigation = investigation;
+                return updateIndustrialRobots(manager, player, 5, world, step, config);
+            }
+            }
+            return EnemyUpdateSummary{};
+        };
+
+        InvestigationResult result;
+        (void)updateRole(open, 0.0F, 20.0F);
+        EnemyData* enemy = manager.findData<EnemyData>(id);
+        result.acquired = enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && near(enemy->investigationTime, investigation.duration);
+
+        (void)player.relocate({0.0F, 0.0F, -2.0F}, -90.0F);
+        const EnemyUpdateSummary search = updateRole(blocked, 0.25F, 20.0F);
+        result.investigationPosition = manager.find(id)->transform.position;
+        result.rememberedPosition = enemy->lastKnownPlayerPosition;
+        result.remainingTime = enemy->investigationTime;
+        result.investigated = search.investigating == 1U
+            && enemy->behavior == EnemyBehaviorState::Investigate
+            && result.investigationPosition.z < 6.0F
+            && result.rememberedPosition == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && near(result.remainingTime, 1.75F);
+
+        (void)player.relocate({2.0F, 0.0F, 0.0F}, -90.0F);
+        (void)updateRole(open, 0.0F, 20.0F);
+        result.reacquired = enemy->behavior != EnemyBehaviorState::Investigate
+            && enemy->lastKnownPlayerPosition == wkc::core::Vec3{2.0F, 0.0F, 0.0F}
+            && near(enemy->investigationTime, investigation.duration);
+
+        (void)player.relocate({0.0F, 0.0F, -2.0F}, -90.0F);
+        const EnemyUpdateSummary expired = updateRole(blocked, 2.1F, 0.1F);
+        result.expiredIntoPatrol = expired.investigating == 0U
+            && expired.patrolling + expired.idle == 1U
+            && near(enemy->investigationTime, 0.0F)
+            && (enemy->behavior == EnemyBehaviorState::Patrol
+                || enemy->behavior == EnemyBehaviorState::Idle);
+        return result;
+    };
+
+    constexpr std::array archetypes{
+        EnemyArchetype::Worker,
+        EnemyArchetype::Guard,
+        EnemyArchetype::Officer,
+        EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot,
+    };
+    for (const EnemyArchetype archetype : archetypes) {
+        const InvestigationResult first = runFixture(archetype);
+        const InvestigationResult repeated = runFixture(archetype);
+        expect(first == repeated && first.acquired && first.investigated
+                && first.reacquired && first.expiredIntoPatrol,
+            "last-known-position investigation is complete and deterministic for every role");
+    }
 }
 
 } // namespace
@@ -1249,6 +1405,7 @@ int main()
     testIndustrialRobotLineOfSightAndRoomIsolation();
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
+    testEnemyInvestigationLifecycle();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";

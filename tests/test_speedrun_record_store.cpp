@@ -96,7 +96,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 1\n"
-        "rules_version = 8\n"
+        "rules_version = 9\n"
         "best_ticks = 0\n"
         "seed = 123\n");
     expect(persistence::loadSpeedrunRecord(path).status
@@ -187,6 +187,15 @@ void testInvalidAndVersionedData()
     writeText(path,
         "version = 1\n"
         "rules_version = 8\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
+        "records from before enemy investigation remain isolated");
+
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 9\n"
         "best_ticks = six hundred\n"
         "seed = 123\n");
     expect(persistence::loadSpeedrunRecord(path).status
@@ -208,7 +217,7 @@ void testCommentsAndFutureFields()
     writeText(path,
         "# local record\n"
         "version = 1\n"
-        "rules_version = 8\n"
+        "rules_version = 9\n"
         "best_ticks = 321 # fixed ticks\n"
         "seed = 987\n"
         "future_field = preserved_by_future_versions\n");

@@ -140,3 +140,12 @@ mesma resolução de paredes, props, desvio e volumes físicos permanece
 autoritativa; chegada gera pausa e timeout troca destinos bloqueados. Detectar
 o Player interrompe a patrulha no mesmo update. Como a posição inicial do
 encontro pode mudar, Campaign/Speedrun passam às regras 9/8.
+
+Na Fase 101, todos os papéis exigem simultaneamente alcance e linha de visão
+para adquirir ou atualizar o Player. Perder contato preserva somente a última
+posição observada por uma janela limitada e entra em `Investigate`; a posição
+real oculta nunca alimenta direção, ataque ou suporte do Officer. Readquirir
+visão retoma o combate no mesmo tick, expirar retorna à patrulha e morte limpa
+a memória transitória. A regressão executa o ciclo completo nos cinco
+arquétipos duas vezes e exige resultados idênticos. Campaign/Speedrun passam às
+regras 10/9.
