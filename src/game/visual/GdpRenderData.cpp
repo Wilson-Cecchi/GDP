@@ -6,6 +6,52 @@
 #include <sstream>
 
 namespace gdp::game::visual {
+namespace {
+
+struct EnemyMotionProfile {
+    std::uint64_t idlePeriod{120U};
+    std::uint64_t walkPeriod{30U};
+    std::uint64_t attackPeriod{26U};
+    float idleHeadYaw{0.8F};
+    float leftArmWalk{8.0F};
+    float rightArmWalk{8.0F};
+    float leftLegWalk{10.0F};
+    float rightLegWalk{10.0F};
+    float attackArmPitch{-10.0F};
+    float attackToolTravel{0.045F};
+    float hitTorsoTravel{-0.014F};
+    float hitTorsoPitch{-3.5F};
+    float hitHeadPitch{4.5F};
+    float hitArmPitch{7.0F};
+    float hitToolTravel{-0.035F};
+};
+
+EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
+{
+    switch (role) {
+    case EnemyVisualRole::Worker:
+        return {};
+    case EnemyVisualRole::Guard:
+        return {150U, 34U, 18U, 0.45F,
+            5.5F, 5.5F, 7.5F, 7.5F,
+            -2.5F, -0.045F, -0.010F, -2.5F, 3.0F, 4.0F, -0.028F};
+    case EnemyVisualRole::Officer:
+        return {180U, 40U, 20U, 0.35F,
+            3.5F, 3.5F, 6.0F, 6.0F,
+            -2.0F, -0.035F, -0.008F, -2.0F, 2.5F, 3.0F, -0.024F};
+    case EnemyVisualRole::Engineer:
+        return {105U, 36U, 24U, 1.0F,
+            4.5F, 7.0F, 7.5F, 8.5F,
+            -5.5F, -0.030F, -0.011F, -3.0F, 4.0F, 6.0F, -0.032F};
+    case EnemyVisualRole::IndustrialRobot:
+        return {210U, 48U, 36U, 0.22F,
+            3.0F, 3.0F, 5.0F, 5.0F,
+            -2.0F, -0.065F, -0.006F, -1.3F, 1.8F, 2.5F, -0.020F};
+    }
+    return {};
+}
+
+} // namespace
 
 EnemyRootPose sampleEnemyRootPose(
     const EnemyAnimationState state,
@@ -74,7 +120,8 @@ EnemyPartPose sampleEnemyPartPose(
     const std::uint32_t partIndex,
     const std::uint32_t partCount,
     const float hitReactionStrength,
-    const bool active) noexcept
+    const bool active,
+    const EnemyVisualRole role) noexcept
 {
     if (!active || state == EnemyAnimationState::Dead
         || partIndex >= partCount || partCount == 0U) {
@@ -83,29 +130,31 @@ EnemyPartPose sampleEnemyPartPose(
 
     const float safeHitStrength = std::isfinite(hitReactionStrength)
         ? std::clamp(hitReactionStrength, 0.0F, 1.0F) : 0.0F;
+    const EnemyMotionProfile profile = motionProfileFor(role);
     if (state == EnemyAnimationState::Hit) {
         if (partIndex == 0U) {
-            return {{0.0F, 0.0F, -0.012F * safeHitStrength},
-                {-3.0F * safeHitStrength, 0.0F, 0.0F}};
+            return {{0.0F, 0.0F, profile.hitTorsoTravel * safeHitStrength},
+                {profile.hitTorsoPitch * safeHitStrength, 0.0F, 0.0F}};
         }
         if (partIndex == 1U) {
-            return {{}, {4.5F * safeHitStrength, 0.0F, 0.0F}};
+            return {{}, {profile.hitHeadPitch * safeHitStrength, 0.0F, 0.0F}};
         }
         if (partIndex == 2U || partIndex == 3U) {
-            return {{}, {7.0F * safeHitStrength, 0.0F, 0.0F}};
+            return {{}, {profile.hitArmPitch * safeHitStrength, 0.0F, 0.0F}};
         }
         if (partIndex + 1U == partCount) {
-            return {{0.0F, 0.0F, -0.035F * safeHitStrength}, {}};
+            return {{0.0F, 0.0F,
+                profile.hitToolTravel * safeHitStrength}, {}};
         }
         return {};
     }
 
     constexpr float tau = 6.28318530717958647692F;
-    std::uint64_t period = 120U;
+    std::uint64_t period = profile.idlePeriod;
     if (state == EnemyAnimationState::Walk) {
-        period = 30U;
+        period = profile.walkPeriod;
     } else if (state == EnemyAnimationState::Attack) {
-        period = 24U;
+        period = profile.attackPeriod;
     }
     const std::uint64_t phaseTick
         = (animationTick + (visualSeed % period)) % period;
@@ -115,31 +164,31 @@ EnemyPartPose sampleEnemyPartPose(
 
     if (state == EnemyAnimationState::Walk) {
         if (partIndex == 2U) {
-            return {{}, {wave * 8.0F, 0.0F, 0.0F}};
+            return {{}, {wave * profile.leftArmWalk, 0.0F, 0.0F}};
         }
         if (partIndex == 3U) {
-            return {{}, {-wave * 8.0F, 0.0F, 0.0F}};
+            return {{}, {-wave * profile.rightArmWalk, 0.0F, 0.0F}};
         }
         if (partIndex == 4U) {
-            return {{}, {-wave * 10.0F, 0.0F, 0.0F}};
+            return {{}, {-wave * profile.leftLegWalk, 0.0F, 0.0F}};
         }
         if (partIndex == 5U) {
-            return {{}, {wave * 10.0F, 0.0F, 0.0F}};
+            return {{}, {wave * profile.rightLegWalk, 0.0F, 0.0F}};
         }
         return {};
     }
     if (state == EnemyAnimationState::Attack) {
         const float impulse = std::max(wave, 0.0F);
         if (partIndex == 2U || partIndex == 3U) {
-            return {{}, {-4.0F * impulse, 0.0F, 0.0F}};
+            return {{}, {profile.attackArmPitch * impulse, 0.0F, 0.0F}};
         }
         if (partIndex + 1U == partCount) {
-            return {{0.0F, 0.0F, -0.055F * impulse}, {}};
+            return {{0.0F, 0.0F, profile.attackToolTravel * impulse}, {}};
         }
         return {};
     }
     if (state == EnemyAnimationState::Idle && partIndex == 1U) {
-        return {{}, {0.0F, wave * 0.8F, 0.0F}};
+        return {{}, {0.0F, wave * profile.idleHeadYaw, 0.0F}};
     }
     return {};
 }

@@ -1011,6 +1011,13 @@ passa a mover partes rígidas com retorno progressivo. A WKC Forge recebe apenas
 `rotationXMatrix`, operação matemática genérica; não recebe hierarquia ou
 estados de animação. Gameplay, persistência e regras 8/7 permanecem inalterados.
 
+Na Fase 95, `sampleEnemyPartPose()` passou a selecionar uma tabela concreta de
+movimento por `EnemyVisualRole`. Cada perfil define períodos, amplitudes de
+membros, recuo/avanço de ferramenta e resposta rígida ao Hit. O renderer apenas
+encaminha o papel já existente no snapshot; gameplay não conhece os perfis e a
+WKC Forge não recebe tipos novos. A amostragem permanece função pura de estado,
+tick, seed, índice da parte e força do Hit. Regras 8/7 e schema 2 não mudam.
+
 ---
 
 # 8. Sistema de seed

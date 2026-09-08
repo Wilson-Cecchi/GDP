@@ -309,6 +309,12 @@ recuo proporcional de Hit e entradas dormentes/inválidas. O Core valida pitch
 de `90°` e fallback não finito; OpenGL e bootstrap offscreen cobrem o draw real
 multipartes.
 
+O gate da Fase 95 amostra todos os cinco papéis no mesmo tick e exige assinaturas
+Walk distintas e ordenadas, assimetria do braço da ferramenta do Engineer,
+avanço positivo da ferramenta corpo a corpo do Worker, recuo negativo da arma
+do Guard e resposta de Hit mais contida no IndustrialRobot. As regressões
+OpenGL e bootstrap continuam cobrindo a aplicação real dos perfis.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

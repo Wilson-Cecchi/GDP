@@ -358,6 +358,9 @@ especializados das pastas numeradas.
   são enviadas à GPU por torso, cabeça, braços, pernas e acessórios, preservando
   pivôs estáveis. Walk/Attack articulam partes com amplitudes contidas e Hit foi
   refinado para recuo mecânico sem compressão cartunesca da silhueta.
+- **Fase 95 — Assinaturas de movimento por arquétipo:** Worker, Guard, Officer,
+  Engineer e IndustrialRobot agora usam ciclos e amplitudes próprios. Golpes
+  corpo a corpo avançam a ferramenta, armas recuam e o Boss responde com massa.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -804,6 +807,15 @@ mecânico curto e progressivamente reduz tint/emissivo. A WKC Forge recebeu
 somente `rotationXMatrix`, primitiva matemática genérica; estados, amplitudes e
 hierarquia continuam concretos do GDP. Gameplay, RNG, colisores e regras 8/7
 permanecem inalterados.
+
+Na Fase 95, a pose local passou a escolher um perfil pelo papel visual já
+presente no snapshot. O Worker usa passada mais marcada e avanço da ferramenta
+no ataque corpo a corpo; Guard e Officer usam balanço e recuo controlados; o
+Engineer enfatiza assimetricamente o braço da ferramenta; o IndustrialRobot
+tem ciclos mais longos, amplitudes menores e absorve Hit com mais massa. Idle,
+Walk, Attack e Hit possuem períodos e amplitudes próprios, mas continuam
+amostrados apenas de tick fixo, `visualSeed` e força restante do impacto. Não há
+RNG adicional, mutação de gameplay ou mudança nas regras 8/7.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -87,7 +87,8 @@ struct EnemyPartPose {
     std::uint32_t partIndex,
     std::uint32_t partCount,
     float hitReactionStrength = 0.0F,
-    bool active = true) noexcept;
+    bool active = true,
+    EnemyVisualRole role = EnemyVisualRole::Worker) noexcept;
 
 struct EnemyRenderData {
     wkc::core::Vec3 position{};

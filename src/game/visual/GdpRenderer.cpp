@@ -1363,7 +1363,7 @@ bool GdpRenderer::render(
                 enemy.alive ? enemy.animationState : EnemyAnimationState::Dead,
                 enemy.animationTick, enemy.visualSeed, part.index,
                 static_cast<std::uint32_t>(visual->second.parts.size()),
-                hitStrength, enemy.active);
+                hitStrength, enemy.active, enemy.role);
             const wkc::core::Vec3 pivot = part.pivot + partPose.offset;
             const wkc::core::Mat4 partModel
                 = wkc::core::translationMatrix(pivot)

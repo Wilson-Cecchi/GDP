@@ -540,10 +540,10 @@ void testEnemyRootAnimation()
         EnemyAnimationState::Hit, 0U, 111U, 0U, 8U, 1.0F);
     const EnemyPartPose fadingHitTorso = sampleEnemyPartPose(
         EnemyAnimationState::Hit, 999U, 222U, 0U, 8U, 0.5F);
-    expect(hitTorso.rotationDegrees.x == -3.0F
-            && hitTorso.offset.z == -0.012F
-            && fadingHitTorso.rotationDegrees.x == -1.5F
-            && fadingHitTorso.offset.z == -0.006F,
+    expect(hitTorso.rotationDegrees.x == -3.5F
+            && hitTorso.offset.z == -0.014F
+            && fadingHitTorso.rotationDegrees.x == -1.75F
+            && fadingHitTorso.offset.z == -0.007F,
         "Hit produces a short strength-scaled mechanical recoil at the torso");
     expect(sampleEnemyPartPose(
                EnemyAnimationState::Hit, 0U, 111U, 1U, 8U, 1.0F)
@@ -579,6 +579,45 @@ void testEnemyRootAnimation()
             && sampleEnemyPartPose(
                 EnemyAnimationState::Walk, 7U, 0U, 8U, 8U) == EnemyPartPose{},
         "dormant enemies and invalid rigid-part indices remain neutral");
+
+    const EnemyPartPose guardWalk = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 2U, 8U, 0.0F, true,
+        EnemyVisualRole::Guard);
+    const EnemyPartPose officerWalk = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 2U, 8U, 0.0F, true,
+        EnemyVisualRole::Officer);
+    const EnemyPartPose engineerLeftWalk = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 2U, 8U, 0.0F, true,
+        EnemyVisualRole::Engineer);
+    const EnemyPartPose engineerRightWalk = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 3U, 8U, 0.0F, true,
+        EnemyVisualRole::Engineer);
+    const EnemyPartPose robotWalk = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 7U, 0U, 2U, 9U, 0.0F, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(peakLeftArm.rotationDegrees.x > guardWalk.rotationDegrees.x
+            && guardWalk.rotationDegrees.x > engineerLeftWalk.rotationDegrees.x
+            && engineerLeftWalk.rotationDegrees.x > officerWalk.rotationDegrees.x
+            && officerWalk.rotationDegrees.x > robotWalk.rotationDegrees.x,
+        "enemy roles expose distinct restrained Walk signatures");
+    expect(std::abs(engineerRightWalk.rotationDegrees.x)
+            > engineerLeftWalk.rotationDegrees.x + 2.0F,
+        "Engineer Walk keeps extra motion on the tool-side arm");
+
+    const EnemyPartPose workerAttackTool = sampleEnemyPartPose(
+        EnemyAnimationState::Attack, 6U, 0U, 7U, 8U);
+    const EnemyPartPose guardAttackTool = sampleEnemyPartPose(
+        EnemyAnimationState::Attack, 4U, 0U, 7U, 8U, 0.0F, true,
+        EnemyVisualRole::Guard);
+    const EnemyPartPose robotHitTorso = sampleEnemyPartPose(
+        EnemyAnimationState::Hit, 0U, 0U, 0U, 9U, 1.0F, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(workerAttackTool.offset.z > 0.04F
+            && guardAttackTool.offset.z < -0.04F,
+        "Worker lunges its tool while ranged roles recoil their weapon");
+    expect(std::abs(robotHitTorso.rotationDegrees.x)
+            < std::abs(hitTorso.rotationDegrees.x) * 0.5F,
+        "IndustrialRobot absorbs Hit with a heavier restrained response");
 
     const EnemyRootPose idle = sampleEnemyRootPose(
         EnemyAnimationState::Idle, 7U, 111U);

@@ -108,6 +108,10 @@ são reconstruídas da receita visual, seed, estado e tick; a força de Hit deri
 do timer transitório já existente. Campaign/Speedrun continuam em 8/7 e o
 checkpoint permanece no schema 2.
 
+A Fase 95 mantém o mesmo contrato: perfis de movimento são constantes visuais
+selecionadas pelo papel e não são serializados. Regras Campaign/Speedrun seguem
+em 8/7 e o checkpoint permanece no schema 2.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

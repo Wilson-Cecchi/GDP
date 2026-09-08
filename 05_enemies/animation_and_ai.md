@@ -8,7 +8,8 @@
 > raiz para Idle, Walk, Attack e Death, e a Fase 91 adicionou orientação pelo
 > deslocamento/alvo. A Fase 92 suavizou o yaw por fixed update e a Fase 93
 > adicionou uma reação Hit de raiz. A Fase 94 separou a hierarquia rígida e
-> articulou os membros; patrulha, investigação e pathfinding global permanecem
+> articulou os membros; a Fase 95 especializou o movimento por arquétipo.
+> Patrulha, investigação e pathfinding global permanecem
 > planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -58,16 +59,24 @@ escalado pela fração restante do timer. Tint e emissivo retornam gradualmente 
 material normal. Não há squash and stretch, deslocamento de collider ou hit
 stun.
 
+A Fase 95 troca o perfil comum por cinco assinaturas determinísticas. Worker
+mantém a maior passada e avança a ferramenta em Attack, coerente com combate
+corpo a corpo. Guard reduz balanço e recua a arma rapidamente; Officer usa a
+postura mais contida. Engineer aumenta o movimento do braço direito para tornar
+a ferramenta legível. IndustrialRobot usa o ciclo Walk mais longo (`48 ticks`),
+amplitudes de `3°/5°`, recuo pesado da arma e apenas `1,3°` de resposta do torso
+ao Hit. Os outros ciclos também usam períodos próprios, evitando que papéis
+diferentes pareçam compartilhar a mesma atuação.
+
 Os assets procedurais continuam definidos por receitas consolidadas, mas o
-upload preserva cada primitiva como parte rígida articulável. A próxima evolução
-visual pode especializar amplitudes e timings por arquétipo sobre esta base, sem
-construir um sistema universal de animação.
+upload preserva cada primitiva como parte rígida articulável. Os perfis ficam no
+conteúdo visual concreto e não formam um sistema universal de animação.
 
 ## Walk
 
 A pose de raiz continua paramétrica por fase e os meshes separados giram ao
-redor dos sockets preservados. Uma evolução posterior pode trocar as amplitudes
-comuns por perfis mecânicos próprios de cada arquétipo.
+redor dos sockets preservados. Cada arquétipo escolhe período e amplitude sem
+alterar o deslocamento lógico da entidade.
 
 ## IA base
 

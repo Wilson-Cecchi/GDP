@@ -34,6 +34,8 @@
 > jogo. A separação permanece no monorepo e é protegida por regressão própria.
 > A Fase 94 passou a enviar cada primitiva dos inimigos como parte rígida
 > independente e a compor poses locais nos pivôs, sem promover animação ao WKC.
+> A Fase 95 adicionou perfis locais distintos por papel visual, ainda dentro do
+> renderer concreto do GDP.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -115,7 +117,8 @@ pixels entre os oito perfis e repetição exata da mesma variante Industrial.
 `EnemyRenderData::role` seleciona mesh/textura sem geração durante draw. Desde a
 Fase 94, cada primitiva é cacheada e enviada como mesh rígida independente. O
 draw compõe a pose da raiz com transform local ao redor do pivô de cada parte;
-estado, timing e amplitudes permanecem no renderer concreto do GDP. O teste
+estado, timing e amplitudes permanecem no renderer concreto do GDP. Na Fase 95,
+o papel visual seleciona a assinatura de movimento sem consultar IA. O teste
 offscreen posiciona os cinco no mesmo ponto e exige pixels distintos.
 `PickupRenderData` desenha Health, Ammo e Key com forma/tint/emissão próprios;
 a regressão também exige contraste separado e composição com inimigos.
