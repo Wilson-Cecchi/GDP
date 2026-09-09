@@ -299,6 +299,40 @@ void testDoorRuntimeOpensHoldsClosesAndLocks()
         "lockdown reports close and lock transitions then rejects interaction");
 }
 
+void testDoorPanelTravelMatchesPassability()
+{
+    using namespace gdp;
+    expect(gameplay::doorPanelTravel(-1.0F) == 0.0F
+            && gameplay::doorPanelTravel(0.0F) == 0.0F
+            && gameplay::doorPanelTravel(0.5F) == 0.5F
+            && gameplay::doorPanelTravel(1.0F) == 1.0F
+            && gameplay::doorPanelTravel(2.0F) == 1.0F,
+        "door panel easing clamps and preserves exact endpoints");
+    expect(gameplay::doorPanelTravel(0.25F) < 0.25F
+            && gameplay::doorPanelTravel(0.75F) > 0.75F
+            && gameplay::doorPanelTravel(
+                std::numeric_limits<float>::quiet_NaN()) == 0.0F,
+        "door panel easing accelerates smoothly and sanitizes invalid progress");
+
+    gameplay::DoorRuntime door = gameplay::makeDoorRuntime(31U);
+    door.state = world::DoorState::Opening;
+    door.openness = 0.80F;
+    expect(!gameplay::isDoorPassable(door),
+        "collision remains closed before the visible aperture reaches ninety percent");
+    door.openness = 0.81F;
+    expect(gameplay::isDoorPassable(door),
+        "collision releases when the same eased aperture visibly reaches ninety percent");
+
+    door.state = world::DoorState::Closing;
+    door.openness = 0.70F;
+    const gameplay::DoorUpdate reversal
+        = gameplay::updateDoor(door, 1.0F / 60.0F, false, true);
+    expect(reversal.startedOpening
+            && door.state == world::DoorState::Opening
+            && door.openness > 0.70F,
+        "an occupied threshold reverses a closing panel without trapping its occupant");
+}
+
 void testPreviouslyBrokenCorridorSeedsTraverseBothWays()
 {
     using namespace gdp;
@@ -515,6 +549,7 @@ int main()
     testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();
     testDoorRuntimeOpensHoldsClosesAndLocks();
+    testDoorPanelTravelMatchesPassability();
     testPreviouslyBrokenCorridorSeedsTraverseBothWays();
     testCorridorTraversalSeedBatch();
     testLockdownEntryKeepsPlayerMobile();

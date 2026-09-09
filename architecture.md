@@ -1136,6 +1136,14 @@ consultar raycast, entidades ou regras de dano. O mesmo ponto alimenta o áudio
 espacial. Essa ponte mantém gameplay, apresentação e som sincronizados sem
 promover conteúdo GDP à WKC Forge ou consumir RNG estrutural.
 
+Na Fase 110, a continuidade já estabelecida das salas ganha uma curva única de
+porta: `DoorRuntime` conserva progresso linear determinístico e
+`doorPanelTravel()` produz o deslocamento suavizado consumido tanto pelo DTO
+visual quanto pelo limiar de colisão. A `Application` agrega ocupação do Player
+e de Enemies ativos/vivos em cada edge antes de atualizar a porta. Assim,
+apresentação e passagem física concordam, e nenhum painel fecha sobre um ator.
+O contrato permanece no gameplay concreto GDP, sem API nova na WKC Forge.
+
 ---
 
 # 8. Sistema de seed

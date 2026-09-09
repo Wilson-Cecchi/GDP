@@ -177,6 +177,11 @@ e lockdown, e
 exige mudança de pixels com a câmera dentro de um corredor conectado e também
 ao trocar somente a chave de material da sala adjacente.
 
+Desde a Fase 110, `DoorRenderData::openFraction` já contém a viagem suavizada
+dos painéis calculada pelo gameplay. O renderer apenas aplica esse snapshot às
+duas folhas; a mesma fração é usada pelo limiar autoritativo de colisão, sem
+duplicar curva ou estado visual na camada gráfica.
+
 Após o blit, `HudRenderData` seleciona overlays bitmap independentes de FOV:
 objetivo no topo e menu central para Victory/Defeat. O estado terminal oferece
 jogar novamente, retornar ao título ou sair, compartilhando `ResultMenuLayout`

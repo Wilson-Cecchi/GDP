@@ -223,6 +223,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before material impact feedback remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 18\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before synchronized door motion remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
@@ -230,7 +235,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 2\n"
-        "rules_version = 18\n"
+        "rules_version = 19\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

@@ -129,7 +129,14 @@ bool isDoorPassable(
     return validConfig(config)
         && door.state != gdp::world::DoorState::Locked
         && door.state != gdp::world::DoorState::Disabled
-        && door.openness >= config.passableOpenness;
+        && doorPanelTravel(door.openness) >= config.passableOpenness;
+}
+
+float doorPanelTravel(const float openness) noexcept
+{
+    const float progress = std::clamp(
+        std::isfinite(openness) ? openness : 0.0F, 0.0F, 1.0F);
+    return progress * progress * (3.0F - (2.0F * progress));
 }
 
 } // namespace gdp::gameplay

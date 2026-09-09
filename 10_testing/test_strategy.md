@@ -390,6 +390,12 @@ cooldown e arma vazia continuam sem impacto. O teste CPU do renderer diferencia
 as três assinaturas, protege o fade monotônico e sanitiza intensidade não
 finita; as suítes OpenGL e bootstrap continuam cobrindo o passe real.
 
+O gate da Fase 110 protege a curva `smoothstep` das portas em 0%, 25%, 50%,
+75% e 100%, incluindo clamp e NaN. Passabilidade deve mudar exatamente quando
+a abertura visual cruza 90%; uma porta em fechamento com passagem ocupada deve
+emitir uma única reversão, voltar a `Opening` e aumentar sua abertura no mesmo
+fixed tick. Travessia, headless e bootstrap OpenGL validam a integração.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

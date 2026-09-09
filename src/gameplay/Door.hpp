@@ -8,7 +8,7 @@ struct DoorConfig {
     float openingSeconds{0.45F};
     float openHoldSeconds{1.60F};
     float closingSeconds{0.60F};
-    float passableOpenness{0.90F};
+    float passableOpenness{0.90F}; // fração visual já suavizada do vão
 };
 
 struct DoorRuntime {
@@ -36,6 +36,7 @@ struct DoorUpdate {
     bool locked,
     bool occupied,
     DoorConfig config = {}) noexcept;
+[[nodiscard]] float doorPanelTravel(float openness) noexcept;
 [[nodiscard]] bool isDoorPassable(
     const DoorRuntime& door,
     DoorConfig config = {}) noexcept;

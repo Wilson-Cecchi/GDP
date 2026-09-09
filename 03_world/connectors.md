@@ -2,7 +2,9 @@
 
 > **Estado:** contrato, transformação, compatibilidade e lifecycle implementados
 > na Fase 4; porta visível, interação, lockdown e travessia entre salas ligados
-> ao gameplay na Fase 13. Animação contínua permanece planejada.
+> ao gameplay na Fase 13. A Fase 15 removeu o teleporte e introduziu animação
+> contínua; a Fase 110 sincronizou curva visual, colisão e ocupação por Player
+> ou inimigos vivos.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -53,12 +55,16 @@ Não criar porta procurando gargalo depois.
 
 ## Segurança
 
-Fechamento consulta volume ocupado; uma porta não pode esmagar/teleportar jogador por bug.
+Fechamento consulta volume ocupado; uma porta não pode esmagar ou teleportar
+Player/inimigos por bug.
 
-Na implementação atual a porta é um portal de sala deliberado: exige proximidade
-e orientação, resolve apenas uma edge com corredor válido e cria o jogador para
-dentro do connector oposto. Não existe fechamento sobre o volume do jogador.
-Durante `RoomEvent` em lockdown, a porta fica vermelha e a travessia é recusada.
+Na implementação atual, interação próxima e orientada solicita `Opening`, mas o
+Player atravessa fisicamente a abertura, percorre o corredor e só troca de
+`roomId` quando seu collider entra inteiro na sala seguinte. `DoorRuntime`
+avança por fixed update; `doorPanelTravel()` aplica `smoothstep` ao snapshot dos
+painéis e o mesmo valor libera colisão a 90%. Player dentro do corredor/próximo
+ao connector ou Enemy ativo e vivo no limiar mantém a porta aberta ou reverte
+`Closing`. Durante `RoomEvent`, lockdown fecha apenas após liberar a passagem.
 
 ## Used connector
 
@@ -70,4 +76,5 @@ gate disponível para a validação do mundo.
 
 ## Debug/testes
 
-Normal, largura, type, edge ID, usado/livre; testar rotação, incompatibilidade, secret, block e clearance.
+Normal, largura, type, edge ID, usado/livre; testar rotação, incompatibilidade,
+secret, block, clearance, curva visual, limiar físico e reversão ocupada.

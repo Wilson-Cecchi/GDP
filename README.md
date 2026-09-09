@@ -414,6 +414,10 @@ especializados das pastas numeradas.
   superfície reais. Metal, compósito e tecido orgânico recebem assinaturas
   visuais distintas e transitórias, sincronizadas com o áudio espacial.
   Campaign/Speedrun avançam para regras 18/17.
+- **Fase 110 — Portas contínuas refinadas:** painéis usam aceleração e frenagem
+  suaves, e o mesmo vão visível governa a colisão. Player ou inimigo vivo na
+  passagem interrompe o fechamento e reabre a porta com segurança.
+  Campaign/Speedrun avançam para regras 19/18.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1014,6 +1018,15 @@ inimigos orgânicos recebem uma marca vermelha curta; robôs e terminais usam
 metal. O áudio de parede passou a usar o mesmo ponto real, em vez de uma
 distância fixa diante da câmera. O efeito usa seed visual derivada e não consome
 RNG estrutural. Campaign/Speedrun passam às regras 18/17.
+
+Na Fase 110, o progresso lógico linear de `DoorRuntime` é convertido por uma
+curva `smoothstep` única antes de mover os dois painéis. O limiar físico de 90%
+consulta essa mesma abertura visual, evitando liberar um corredor cuja imagem
+ainda parece fechada. A ocupação agora inclui o Player no corredor/connector e
+todo Enemy ativo e vivo próximo de qualquer lado da edge; fechamento normal
+reverte para Opening e lockdown espera o vão ficar livre. O teste protege
+endpoints, aceleração, frenagem, NaN, limiar compartilhado e reversão ocupada.
+Campaign/Speedrun passam às regras 19/18; não há RNG ou alteração na WKC Forge.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

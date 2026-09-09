@@ -347,7 +347,7 @@ bool edgeTouchesRoom(
         && (corridor->firstRoom == roomId || corridor->secondRoom == roomId);
 }
 
-bool playerNearDoor(
+bool positionNearDoor(
     const world::World& world,
     const world::EdgeId edge,
     const wkc::core::Vec3 position) noexcept
@@ -1908,11 +1908,26 @@ void Application::fixedUpdate(const double fixedStep)
     std::vector<world::EdgeId> blockedDoorEdges;
     blockedDoorEdges.reserve(doorRuntimes_.size());
     if (world_) {
+        const std::vector<entities::EntityId> enemyIds
+            = entities_.query(entities::EntityKind::Enemy);
         for (auto& [edge, door] : doorRuntimes_) {
             const bool locked = doorsLocked
                 && edgeTouchesRoom(*world_, edge, playerRoom);
             const bool occupied = occupiedCorridorEdge == edge
-                || playerNearDoor(*world_, edge, player_.state().position);
+                || positionNearDoor(*world_, edge, player_.state().position)
+                || std::any_of(
+                    enemyIds.begin(), enemyIds.end(),
+                    [this, edge](const entities::EntityId id) {
+                        const entities::Entity* entity = entities_.find(id);
+                        const entities::EnemyData* enemy
+                            = entities_.findData<entities::EnemyData>(id);
+                        return entity != nullptr && enemy != nullptr
+                            && enemy->active
+                            && enemy->behavior
+                                != entities::EnemyBehaviorState::Dead
+                            && positionNearDoor(
+                                *world_, edge, entity->transform.position);
+                    });
             const gameplay::DoorUpdate update
                 = gameplay::updateDoor(door, step, locked, occupied);
             if (update.startedOpening) {
@@ -2848,7 +2863,8 @@ void Application::render()
                         connector.width,
                         connector.height,
                         edgeIsLocked(*connector.edge),
-                        door == doorRuntimes_.end() ? 0.0F : door->second.openness,
+                        door == doorRuntimes_.end() ? 0.0F
+                            : gameplay::doorPanelTravel(door->second.openness),
                     });
                 }
             }
