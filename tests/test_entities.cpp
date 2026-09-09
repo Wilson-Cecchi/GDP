@@ -74,8 +74,9 @@ void testCreationAndTypedData()
             && enemyData->patrolWaypointTime == 0.0F
             && enemyData->patrolPauseTime == 0.0F
             && enemyData->lastKnownPlayerPosition == wkc::core::Vec3{}
-            && enemyData->investigationTime == 0.0F,
-        "enemy payload initializes patrol and investigation state safely");
+            && enemyData->investigationTime == 0.0F
+            && enemyData->alertTime == 0.0F,
+        "enemy payload initializes patrol, alert, and investigation state safely");
     expect(itemData != nullptr && itemData->type == ItemType::Ammo && itemData->quantity == 1,
         "item payload clamps invalid zero quantity");
     expect(propData != nullptr && propData->type == PropType::Terminal && propData->solid,

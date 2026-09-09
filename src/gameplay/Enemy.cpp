@@ -429,6 +429,39 @@ void rememberVisiblePlayer(
     enemy.investigationTime = config.duration;
 }
 
+bool updateEnemyAlert(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const bool playerAlive,
+    const float moveSpeed,
+    const float step,
+    const CharacterCollider collider) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    if (!playerAlive) {
+        enemy.alertTime = 0.0F;
+        return false;
+    }
+    enemy.alertTime = std::max(0.0F, enemy.alertTime - step);
+    if (enemy.alertTime <= 0.0F) {
+        return false;
+    }
+
+    enemy.behavior = EnemyBehaviorState::Alert;
+    separateEnemyIfNeeded(
+        manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+        moveSpeed, step, collider);
+    turnEnemyToward(
+        entity, enemy.lastKnownPlayerPosition - entity.transform.position,
+        step, targetTurnRateDegreesPerSecond);
+    return true;
+}
+
 bool updateEnemyInvestigation(
     const gdp::entities::EntityManager& manager,
     const std::span<const gdp::entities::EntityId> enemyIds,
@@ -603,8 +636,18 @@ std::size_t alertEnemiesToNoise(
             continue;
         }
 
+        const bool newlyAlerted = enemy->investigationTime <= 0.0F
+            && enemy->alertTime <= 0.0F;
         enemy->lastKnownPlayerPosition = stimulus.position;
         enemy->investigationTime = investigationDuration;
+        if (newlyAlerted) {
+            const float alertDuration = std::isfinite(investigation.alertDuration)
+                ? std::max(investigation.alertDuration, 0.0F) : 0.0F;
+            enemy->alertTime = alertDuration;
+            if (alertDuration > 0.0F) {
+                enemy->behavior = EnemyBehaviorState::Alert;
+            }
+        }
         ++alerted;
     }
     return alerted;
@@ -651,6 +694,16 @@ EnemyUpdateSummary updateWorkers(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange, 1.0F,
             collisionWorld);
+        if (lineOfSight) {
+            rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateEnemyAlert(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step,
+                {.radius = 0.35F, .height = 1.8F})) {
+            ++summary.alerting;
+            continue;
+        }
         if (!lineOfSight) {
             updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -658,7 +711,6 @@ EnemyUpdateSummary updateWorkers(
                 config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
             continue;
         }
-        rememberVisiblePlayer(*enemy, player, config.investigation);
         if (distance <= config.attackRange) {
             enemy->behavior = EnemyBehaviorState::Attack;
             ++summary.attacking;
@@ -735,6 +787,16 @@ EnemyUpdateSummary updateGuards(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange, 1.35F,
             collisionWorld);
+        if (lineOfSight) {
+            rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateEnemyAlert(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step,
+                {.radius = 0.35F, .height = 1.8F})) {
+            ++summary.alerting;
+            continue;
+        }
         if (!lineOfSight) {
             updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -742,7 +804,6 @@ EnemyUpdateSummary updateGuards(
                 config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
             continue;
         }
-        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -840,6 +901,16 @@ EnemyUpdateSummary updateOfficers(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange, 1.4F,
             collisionWorld);
+        if (lineOfSight) {
+            rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateEnemyAlert(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step,
+                {.radius = 0.35F, .height = 1.8F})) {
+            ++summary.alerting;
+            continue;
+        }
         if (!lineOfSight) {
             updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -847,7 +918,6 @@ EnemyUpdateSummary updateOfficers(
                 config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
             continue;
         }
-        rememberVisiblePlayer(*enemy, player, config.investigation);
 
         if (enemy->supportCooldown <= 0.0F && config.allyCooldownReduction > 0.0F) {
             std::size_t supported = 0;
@@ -976,6 +1046,23 @@ EnemyUpdateSummary updateEngineers(
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
         enemy->supportCooldown = std::max(0.0F, enemy->supportCooldown - step);
+        const wkc::core::Vec3 offset
+            = player.state().position - entity->transform.position;
+        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
+        const float distance = wkc::core::length(planarOffset);
+        const bool lineOfSight = playerVisibleToEnemy(
+            *entity, player, distance, config.detectionRange, 1.25F,
+            collisionWorld);
+        if (lineOfSight) {
+            rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateEnemyAlert(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step,
+                {.radius = 0.35F, .height = 1.8F})) {
+            ++summary.alerting;
+            continue;
+        }
         if (enemy->supportCooldown <= 0.0F && config.repairRange > 0.0F) {
             EntityId repairTarget;
             bool targetIsProp = false;
@@ -996,9 +1083,10 @@ EnemyUpdateSummary updateEngineers(
                 }
                 const wkc::core::Vec3 allyOffset
                     = allyEntity->transform.position - entity->transform.position;
-                const float distance = wkc::core::length(
+                const float allyDistance = wkc::core::length(
                     wkc::core::Vec3{allyOffset.x, 0.0F, allyOffset.z});
-                if (distance > config.repairRange || distance >= nearestDistance
+                if (allyDistance > config.repairRange
+                    || allyDistance >= nearestDistance
                     || !hasLineOfSight(
                         repairOrigin,
                         allyEntity->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F},
@@ -1007,7 +1095,7 @@ EnemyUpdateSummary updateEngineers(
                 }
                 repairTarget = allyId;
                 targetIsProp = false;
-                nearestDistance = distance;
+                nearestDistance = allyDistance;
             }
             for (const EntityId propId : manager.query(EntityKind::Prop)) {
                 const Entity* propEntity = manager.find(propId);
@@ -1018,16 +1106,17 @@ EnemyUpdateSummary updateEngineers(
                 }
                 const wkc::core::Vec3 propOffset
                     = propEntity->transform.position - entity->transform.position;
-                const float distance = wkc::core::length(
+                const float propDistance = wkc::core::length(
                     wkc::core::Vec3{propOffset.x, 0.0F, propOffset.z});
-                if (distance > config.repairRange || distance >= nearestDistance
+                if (propDistance > config.repairRange
+                    || propDistance >= nearestDistance
                     || !hasLineOfSightToProp(
                         repairOrigin, manager, propId, collisionWorld)) {
                     continue;
                 }
                 repairTarget = propId;
                 targetIsProp = true;
-                nearestDistance = distance;
+                nearestDistance = propDistance;
             }
             if (repairTarget.isValid()) {
                 if (targetIsProp) {
@@ -1047,12 +1136,6 @@ EnemyUpdateSummary updateEngineers(
             }
         }
 
-        const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
-        const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
-        const float distance = wkc::core::length(planarOffset);
-        const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.25F,
-            collisionWorld);
         if (!lineOfSight) {
             updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1060,7 +1143,6 @@ EnemyUpdateSummary updateEngineers(
                 config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
             continue;
         }
-        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -1221,6 +1303,16 @@ EnemyUpdateSummary updateIndustrialRobots(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange, 1.45F,
             collisionWorld);
+        if (lineOfSight) {
+            rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateEnemyAlert(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, moveSpeed, step,
+                {.radius = 0.52F, .height = 1.9F})) {
+            ++summary.alerting;
+            continue;
+        }
         if (!lineOfSight) {
             updateUnseenEnemy(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1228,7 +1320,6 @@ EnemyUpdateSummary updateIndustrialRobots(
                 config.investigation, {.radius = 0.52F, .height = 1.9F}, summary);
             continue;
         }
-        rememberVisiblePlayer(*enemy, player, config.investigation);
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};

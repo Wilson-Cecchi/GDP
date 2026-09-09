@@ -7,7 +7,8 @@
 > alterar seus contratos de combate. A Fase 101 acrescentou percepção visual e
 > investigação temporária da última posição conhecida. A Fase 102 tornou esse
 > ciclo validável atrás de uma cobertura larga na sala START. A Fase 103
-> acrescentou investigação provocada por ruído de disparo.
+> acrescentou investigação provocada por ruído de disparo e a Fase 104 separou
+> sua reação inicial no estado `Alert`.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -75,6 +76,12 @@ raio do estímulo com a audição específica do arquétipo. A notificação fic
 restrita a inimigos vivos e ativos da sala atual; áudio, renderer e RNG não
 participam desse contrato. Se houver linha de visão no fixed update seguinte,
 a observação real substitui imediatamente a posição apenas ouvida.
+
+Quando a memória estava inativa, esse estímulo começa com `Alert`: movimento e
+ações de papel param enquanto o inimigo gira para a origem por uma janela curta
+específica do arquétipo. Ruídos seguintes atualizam a origem e o tempo de
+investigação, mas não renovam a pausa. A transição evita resposta instantânea
+sem permitir que tiros sucessivos funcionem como controle de grupo.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

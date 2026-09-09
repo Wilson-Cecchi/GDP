@@ -58,6 +58,7 @@ enum class EnemyAnimationState : std::uint8_t {
     Attack,
     Hit,
     Dead,
+    Alert,
 };
 
 struct EnemyRootPose {

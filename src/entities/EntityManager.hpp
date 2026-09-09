@@ -52,6 +52,7 @@ enum class EnemyBehaviorState : std::uint8_t {
     Reposition,
     Patrol,
     Investigate,
+    Alert,
 };
 
 enum class ItemType : std::uint8_t {
@@ -103,6 +104,7 @@ struct EnemyData {
     float patrolPauseTime{0.0F};
     wkc::core::Vec3 lastKnownPlayerPosition{};
     float investigationTime{0.0F};
+    float alertTime{0.0F};
 };
 
 struct ItemData {

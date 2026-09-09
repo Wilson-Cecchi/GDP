@@ -165,3 +165,11 @@ geram estímulo; inimigos mortos, dormentes ou de outra sala são ignorados. A
 visão direta continua prioritária e corrige a memória no mesmo fixed update. A
 regressão cobre os cinco papéis, isolamento, alcance, dados inválidos e
 repetição determinística. Campaign/Speedrun passam às regras 12/11.
+
+Na Fase 104, o primeiro ruído sem memória ativa inicia `Alert` por papel antes
+da investigação. Nesse intervalo não há movimento, ataque, comando ou reparo;
+o inimigo apenas gira para a origem e apresenta a postura visual de prontidão.
+Outro disparo atualiza a posição ouvida e renova a busca, mas não reinicia a
+pausa, impedindo stun lock por cadência. Morte e Player morto limpam o timer. A
+regressão cobre os cinco arquétipos, orientação, imobilidade, término da janela,
+prioridade visual e pose rígida. Campaign/Speedrun passam às regras 13/12.

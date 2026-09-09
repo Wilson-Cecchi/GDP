@@ -16,8 +16,9 @@
 > parte uma condição explícita do fim da transição visual.
 > A Fase 100 implementou patrulha local determinística nos cinco arquétipos.
 > A Fase 101 implementou aquisição visual e investigação da última posição
-> conhecida. A Fase 103 acrescentou percepção por ruído de disparo. Alert
-> dedicado e pathfinding global permanecem planejados.
+> conhecida. A Fase 103 acrescentou percepção por ruído de disparo e a Fase
+> 104 implementou a reação dedicada `Alert`. Recover explícito e pathfinding
+> global permanecem planejados.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -119,6 +120,12 @@ Worker/Engineer usam 48 ticks, Guard 50, Officer 52 e IndustrialRobot 66. Todas
 as partes coincidem exatamente com suas poses terminais quando a transição
 encerra; a morte lógica continua imediata.
 
+A Fase 104 acrescenta uma pose `Alert` rigidamente articulada. A raiz inclina
+`2°` e avança `0,012 m` no Worker; torso, cabeça, braços e equipamento assumem
+uma prontidão curta, escalada por papel até `48%` no IndustrialRobot. A entrada
+usa blend de 3 ticks e a saída, 4, sem alterar colliders ou produzir deformação.
+Hit continua prevalecendo visualmente e Death permanece terminal.
+
 ## Walk
 
 A pose de raiz continua paramétrica por fase e os meshes separados giram ao
@@ -127,8 +134,8 @@ alterar o deslocamento lógico da entidade.
 
 ## IA base
 
-Estados implementados: Idle, Patrol, Investigate, Chase, Reposition, Attack e
-Dead. Alert/Recover explícitos permanecem planejados. A percepção combina visão
+Estados implementados: Idle, Patrol, Alert, Investigate, Chase, Reposition,
+Attack e Dead. Recover explícito permanece planejado. A percepção combina visão
 direta e estímulo de ruído de disparo na sala ativa.
 Aquisição exige alcance e line of sight dentro da sala ativa.
 
@@ -220,3 +227,11 @@ mas não atravessa o limite lógico da sala ativa e ignora inimigos dormentes ou
 mortos. Cooldown e clique seco não produzem estímulo. Uma visão confirmada no
 fixed update sempre substitui a origem ouvida pela posição realmente observada.
 O processo não consome RNG e permanece independente da reprodução de áudio.
+
+A Fase 104 separa a reação inicial em `Alert`. Ao primeiro ruído sem memória
+ativa, o inimigo fica imóvel, vira para a origem e suspende ataque, suporte e
+reparo por `0,18–0,34 s`, conforme o papel. A investigação começa depois dessa
+janela. Um novo ruído atualiza a posição e renova o tempo de busca, mas não
+reinicia `alertTime`; assim, cadência de tiros não paralisa o elenco. Visão
+confirmada atualiza a posição durante Alert e assume o combate quando a reação
+termina. Player morto e morte do inimigo limpam o estado.

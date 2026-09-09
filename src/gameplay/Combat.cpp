@@ -139,6 +139,7 @@ DamageOutcome applyDamage(
     enemy->hitReactionTime = 0.0F;
     enemy->lastKnownPlayerPosition = {};
     enemy->investigationTime = 0.0F;
+    enemy->alertTime = 0.0F;
     return DamageOutcome::Killed;
 }
 

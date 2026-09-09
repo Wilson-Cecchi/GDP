@@ -390,6 +390,10 @@ especializados das pastas numeradas.
   sala ativa um estímulo de `18 m`, limitado pela audição própria de cada papel.
   Inimigos sem visão investigam a origem; visão real continua tendo prioridade.
   Campaign/Speedrun avançam para regras 12/11.
+- **Fase 104 — Alerta de prontidão:** o primeiro ruído interrompe a patrulha,
+  gira o inimigo para a origem e sustenta brevemente uma postura própria antes
+  da investigação. Novos tiros atualizam o alvo sem reiniciar essa reação.
+  Campaign/Speedrun avançam para regras 13/12.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -933,6 +937,17 @@ até a origem ou até o timer expirar, enquanto uma observação visual válida
 substitui imediatamente o ruído. O sinal pertence ao gameplay e não depende do
 sistema de áudio, RNG ou renderer. Campaign/Speedrun passam às regras 12/11; o
 schema do checkpoint permanece 2.
+
+Na Fase 104, o primeiro estímulo ouvido passa por `Alert` antes de
+`Investigate`. Worker reage por `0,18 s`, Guard por `0,24 s`, Officer por
+`0,20 s`, Engineer por `0,28 s` e IndustrialRobot por `0,34 s`. Durante essa
+janela o inimigo interrompe movimento, ataque, comando e reparo, gira suavemente
+para a origem e assume uma postura rígida de prontidão com intensidade reduzida
+nos papéis mais pesados. Disparos seguintes ainda atualizam a posição ouvida e
+renovam a investigação, mas não reiniciam `Alert`, evitando stun lock. Morte ou
+Player morto limpam o timer; Hit visual e visão real preservam suas prioridades.
+O estado é transitório, não usa RNG e não altera o schema do checkpoint.
+Campaign/Speedrun passam às regras 13/12.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

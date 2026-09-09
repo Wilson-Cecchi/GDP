@@ -1088,6 +1088,15 @@ ouvida, e sem visão o mesmo movimento de `Investigate` conduz até ela. Nada fo
 promovido à WKC Forge. Campaign/Speedrun avançam para regras 12/11; checkpoint
 permanece schema 2.
 
+Na Fase 104, `EnemyBehaviorState::Alert` e `EnemyData::alertTime` representam a
+reação transitória ao primeiro ruído sem memória ativa. Um helper comum aos
+cinco updates interrompe movimento e ações, orienta a entidade para o ponto
+ouvido e libera `Investigate` após `0,18–0,34 s`. Estímulos posteriores mudam a
+origem e renovam a busca sem reiniciar a pausa. O renderer concreto mapeia o
+estado para uma pose rígida de prontidão com blends de 3/4 ticks e intensidade
+por massa; colliders e WKC Forge não mudam. Campaign/Speedrun avançam para
+regras 13/12; checkpoint permanece schema 2.
+
 ---
 
 # 8. Sistema de seed

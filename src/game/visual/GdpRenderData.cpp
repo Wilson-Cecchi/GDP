@@ -74,6 +74,23 @@ EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
     return {};
 }
 
+float alertReadinessScale(const EnemyVisualRole role) noexcept
+{
+    switch (role) {
+    case EnemyVisualRole::Worker:
+        return 1.0F;
+    case EnemyVisualRole::Guard:
+        return 0.82F;
+    case EnemyVisualRole::Officer:
+        return 0.68F;
+    case EnemyVisualRole::Engineer:
+        return 0.90F;
+    case EnemyVisualRole::IndustrialRobot:
+        return 0.48F;
+    }
+    return 1.0F;
+}
+
 EnemyDeathProfile deathProfileFor(const EnemyVisualRole role) noexcept
 {
     switch (role) {
@@ -258,6 +275,12 @@ std::uint32_t transitionDurationTicks(
     }
     if (current == EnemyAnimationState::Hit) {
         return 3U;
+    }
+    if (current == EnemyAnimationState::Alert) {
+        return 3U;
+    }
+    if (previous == EnemyAnimationState::Alert) {
+        return 4U;
     }
     if (previous == EnemyAnimationState::Hit
         || current == EnemyAnimationState::Attack) {
@@ -450,6 +473,14 @@ EnemyRootPose sampleEnemyRootPose(
     if (state == EnemyAnimationState::Hit) {
         return {};
     }
+    if (state == EnemyAnimationState::Alert) {
+        const float readiness = alertReadinessScale(role);
+        return {
+            {0.0F, 0.006F * readiness, 0.012F * readiness},
+            {1.0F, 1.0F, 1.0F},
+            {-2.0F * readiness, 0.0F, 0.0F},
+        };
+    }
 
     constexpr float tau = 6.28318530717958647692F;
     std::uint64_t period = 120U;
@@ -529,6 +560,23 @@ EnemyPartPose sampleEnemyPartPose(
         if (partIndex + 1U == partCount) {
             return {{0.0F, 0.0F,
                 profile.hitToolTravel * safeHitStrength}, {}};
+        }
+        return {};
+    }
+    if (state == EnemyAnimationState::Alert) {
+        const float readiness = alertReadinessScale(role);
+        if (partIndex == 0U) {
+            return {{}, {-2.0F * readiness, 0.0F, 0.0F}};
+        }
+        if (partIndex == 1U) {
+            return {{}, {-4.0F * readiness, 0.0F, 0.0F}};
+        }
+        if (partIndex == 2U || partIndex == 3U) {
+            return {{}, {-8.0F * readiness, 0.0F, 0.0F}};
+        }
+        if (partIndex + 1U == partCount) {
+            return {{0.0F, 0.0F,
+                profile.attackToolTravel * 0.35F * readiness}, {}};
         }
         return {};
     }

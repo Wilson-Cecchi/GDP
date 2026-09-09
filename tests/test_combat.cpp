@@ -165,12 +165,14 @@ void testDamageLifecycle()
         "negative elapsed time cannot revive a hit reaction");
     data->lastKnownPlayerPosition = {2.0F, 0.0F, 3.0F};
     data->investigationTime = 1.0F;
+    data->alertTime = 0.2F;
     expect(applyDamage(manager, enemy, 100.0F) == DamageOutcome::Killed,
         "overkill clamps HP and produces one kill");
     expect(data->health == 0.0F && data->behavior == EnemyBehaviorState::Dead
             && near(data->hitReactionTime, 0.0F)
             && data->lastKnownPlayerPosition == wkc::core::Vec3{}
-            && near(data->investigationTime, 0.0F),
+            && near(data->investigationTime, 0.0F)
+            && near(data->alertTime, 0.0F),
         "lethal damage enters Dead and clears transient reaction and awareness");
     expect(applyDamage(manager, enemy, 1.0F) == DamageOutcome::Ignored,
         "dead enemy ignores repeated damage and cannot die twice");
@@ -1228,6 +1230,8 @@ void testDeterministicLocalPatrol()
     manager.findData<EnemyData>(worker)->lastKnownPlayerPosition
         = {3.0F, 0.0F, 3.0F};
     manager.findData<EnemyData>(worker)->investigationTime = 2.0F;
+    manager.findData<EnemyData>(worker)->alertTime = 0.2F;
+    manager.findData<EnemyData>(worker)->behavior = EnemyBehaviorState::Alert;
     const EnemyUpdateSummary inactivePatrol = updateWorkers(
         manager, deadPlayer, 4, room, 1.0F,
         {.detectionRange = 0.5F, .moveSpeed = 2.0F, .attackDamage = 0.0F});
@@ -1237,8 +1241,9 @@ void testDeterministicLocalPatrol()
             && manager.findData<EnemyData>(worker)->patrolWaypointTime == 0.0F
             && manager.findData<EnemyData>(worker)->lastKnownPlayerPosition
                 == wkc::core::Vec3{}
-            && manager.findData<EnemyData>(worker)->investigationTime == 0.0F,
-        "patrol and investigation remain cleared after player death");
+            && manager.findData<EnemyData>(worker)->investigationTime == 0.0F
+            && manager.findData<EnemyData>(worker)->alertTime == 0.0F,
+        "patrol, alert, and investigation remain cleared after player death");
 }
 
 void testEnemyInvestigationLifecycle()
@@ -1388,6 +1393,8 @@ void testEnemyNoisePerception()
         wkc::core::Vec3 rememberedPosition{};
         float remainingTime{0.0F};
         bool heard{false};
+        bool alerted{false};
+        bool repeatedNoiseDidNotRestartAlert{false};
         bool investigated{false};
         bool visionOverrodeNoise{false};
 
@@ -1410,7 +1417,7 @@ void testEnemyNoisePerception()
             .archetype = archetype,
         });
         EnemyDifficultyConfigs configs;
-        configs.worker.investigation = {2.0F, 0.75F, 0.2F, 12.0F};
+        configs.worker.investigation = {2.0F, 0.75F, 0.2F, 12.0F, 0.20F};
         configs.guard.investigation = configs.worker.investigation;
         configs.officer.investigation = configs.worker.investigation;
         configs.engineer.investigation = configs.worker.investigation;
@@ -1464,16 +1471,35 @@ void testEnemyNoisePerception()
             return EnemyUpdateSummary{};
         };
 
-        const EnemyUpdateSummary search = updateRole(blocked, 0.25F);
-        const EnemyData* enemy = manager.findData<EnemyData>(id);
+        const wkc::core::Vec3 initialPosition
+            = manager.find(id)->transform.position;
+        const EnemyUpdateSummary alert = updateRole(blocked, 0.05F);
+        EnemyData* enemy = manager.findData<EnemyData>(id);
+        result.alerted = alert.alerting == 1U
+            && enemy->behavior == EnemyBehaviorState::Alert
+            && manager.find(id)->transform.position == initialPosition
+            && near(enemy->alertTime, 0.15F)
+            && near(std::abs(manager.find(id)->transform.rotationDegrees.y), 36.0F);
+
+        const float alertTimeBeforeRepeatedNoise = enemy->alertTime;
+        result.repeatedNoiseDidNotRestartAlert = alertEnemiesToNoise(
+            manager, 5,
+            {.position = {1.0F, 0.0F, 0.0F}, .radius = 12.0F},
+            configs) == 1U
+            && near(enemy->alertTime, alertTimeBeforeRepeatedNoise)
+            && enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+
+        const EnemyUpdateSummary search = updateRole(blocked, 0.16F);
         result.investigationPosition = manager.find(id)->transform.position;
         result.rememberedPosition = enemy->lastKnownPlayerPosition;
         result.remainingTime = enemy->investigationTime;
         result.investigated = search.investigating == 1U
             && enemy->behavior == EnemyBehaviorState::Investigate
             && result.investigationPosition.z < 6.0F
-            && result.rememberedPosition == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
-            && near(result.remainingTime, 1.75F);
+            && result.investigationPosition.x > 0.0F
+            && result.rememberedPosition == wkc::core::Vec3{1.0F, 0.0F, 0.0F}
+            && near(result.remainingTime, 1.84F);
 
         (void)player.relocate({3.0F, 0.0F, 0.0F}, -90.0F);
         (void)updateRole(open, 0.0F);
@@ -1494,9 +1520,10 @@ void testEnemyNoisePerception()
     for (const EnemyArchetype archetype : archetypes) {
         const NoiseResult first = runFixture(archetype);
         const NoiseResult repeated = runFixture(archetype);
-        expect(first == repeated && first.heard && first.investigated
+        expect(first == repeated && first.heard && first.alerted
+                && first.repeatedNoiseDidNotRestartAlert && first.investigated
                 && first.visionOverrodeNoise,
-            "combat noise starts deterministic investigation for every role");
+            "combat noise produces bounded Alert then deterministic investigation for every role");
     }
 
     EntityManager isolated;
@@ -1528,7 +1555,7 @@ void testEnemyNoisePerception()
     });
     isolated.findData<EnemyData>(dead)->behavior = EnemyBehaviorState::Dead;
     EnemyDifficultyConfigs limited;
-    limited.worker.investigation = {2.0F, 0.75F, 0.2F, 6.0F};
+    limited.worker.investigation = {2.0F, 0.75F, 0.2F, 6.0F, 0.20F};
     const std::size_t heard = alertEnemiesToNoise(
         isolated, 7, {.position = {}, .radius = 8.0F}, limited);
     expect(heard == 1U

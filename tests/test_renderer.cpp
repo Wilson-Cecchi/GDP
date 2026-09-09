@@ -582,6 +582,20 @@ void testEnemyRootAnimation()
             && transition.currentState == EnemyAnimationState::Idle
             && enemyAnimationTransitionBlend(transition) == 1.0F,
         "first observed animation state starts without a synthetic transition");
+    EnemyAnimationTransition alertTransition;
+    advanceEnemyAnimationTransition(
+        alertTransition, EnemyAnimationState::Idle);
+    advanceEnemyAnimationTransition(
+        alertTransition, EnemyAnimationState::Alert);
+    expect(alertTransition.previousState == EnemyAnimationState::Idle
+            && alertTransition.currentState == EnemyAnimationState::Alert
+            && alertTransition.durationTicks == 3U,
+        "Alert raises the readiness pose with a fast fixed-tick blend");
+    advanceEnemyAnimationTransition(
+        alertTransition, EnemyAnimationState::Walk);
+    expect(alertTransition.previousState == EnemyAnimationState::Alert
+            && alertTransition.durationTicks == 4U,
+        "leaving Alert blends into investigation without a visual snap");
     advanceEnemyAnimationTransition(transition, EnemyAnimationState::Walk);
     expect(transition.previousState == EnemyAnimationState::Idle
             && transition.currentState == EnemyAnimationState::Walk
@@ -818,6 +832,23 @@ void testEnemyRootAnimation()
 
     const EnemyRootPose idle = sampleEnemyRootPose(
         EnemyAnimationState::Idle, 7U, 111U);
+    const EnemyRootPose alert = sampleEnemyRootPose(
+        EnemyAnimationState::Alert, 7U, 111U);
+    const EnemyPartPose alertArm = sampleEnemyPartPose(
+        EnemyAnimationState::Alert, 7U, 111U, 2U, 8U);
+    const EnemyPartPose alertTool = sampleEnemyPartPose(
+        EnemyAnimationState::Alert, 7U, 111U, 7U, 8U);
+    const EnemyPartPose robotAlertArm = sampleEnemyPartPose(
+        EnemyAnimationState::Alert, 7U, 111U, 2U, 9U, 0.0F, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(alert.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+            && alert.offset.z > 0.0F
+            && alert.rotationDegrees.x < 0.0F
+            && alertArm.rotationDegrees.x < -7.0F
+            && alertTool.offset.z > 0.0F
+            && std::abs(robotAlertArm.rotationDegrees.x)
+                < std::abs(alertArm.rotationDegrees.x) * 0.5F,
+        "Alert has a restrained role-weighted readiness pose");
     expect(idle == sampleEnemyRootPose(
             EnemyAnimationState::Idle, 7U, 111U),
         "enemy root animation is deterministic for the same tick and visual seed");
@@ -839,7 +870,8 @@ void testEnemyRootAnimation()
         maximumIdleLift = std::max(maximumIdleLift, idlePose.offset.y);
         maximumWalkLift = std::max(maximumWalkLift, walkPose.offset.y);
         maximumAttackReach = std::max(maximumAttackReach, attackPose.scale.z);
-        for (const EnemyRootPose pose : {idlePose, walkPose, attackPose, hit}) {
+        for (const EnemyRootPose pose : {
+                 idlePose, walkPose, attackPose, alert, hit}) {
             finiteAndGrounded = finiteAndGrounded
                 && std::isfinite(pose.offset.y)
                 && std::isfinite(pose.scale.x)
