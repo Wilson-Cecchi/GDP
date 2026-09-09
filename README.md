@@ -427,6 +427,9 @@ especializados das pastas numeradas.
 - **Fase 113 — Luminárias destrutíveis:** cada ponto de luz possui um fixture
   metálico acertável no teto. Dano reduz luz e emissão; destruição apaga ambos
   sem criar loot, bloquear navegação ou permitir reparo por Engineer.
+- **Fase 114 — Sombras dinâmicas:** luzes ativas testam visibilidade contra os
+  volumes de inimigos e props opacos. A oclusão reduz somente a contribuição
+  direta, preserva o ambiente mínimo e acompanha destruição e movimento.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1064,6 +1067,15 @@ escurece a carcaça pelo restante da run. O alvo usa impacto e áudio metálicos
 não gera drop, XP ou reparo de Engineer. A luz ambiente mínima continua ativa
 para impedir softlock visual. Por afetar decisões e tempo da run, Campaign e
 Speedrun avançam para regras 20/19; RNG estrutural e WKC Forge não mudam.
+
+Na Fase 114, o contrato de iluminação recebe até 16 AABBs de oclusão derivados
+de inimigos vivos/ativos e props não destruídos das salas já visíveis. Para cada
+luz ativa, o fragment shader testa o segmento superfície–luminária contra esses
+volumes e reduz a contribuição difusa/especular bloqueada para 16%; ambiente e
+emissão permanecem independentes. As sombras são analíticas, determinísticas e
+acompanham movimento sem framebuffer ou RNG adicional. Uma luminária apagada já
+tem intensidade zero, portanto deixa de produzir luz e sombra no mesmo frame.
+Gameplay, Campaign/Speedrun e WKC Forge permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

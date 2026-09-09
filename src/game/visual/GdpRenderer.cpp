@@ -63,6 +63,11 @@ uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
 uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
+const int MAX_SHADOW_OCCLUDERS = 16;
+uniform int uShadowLightCount;
+uniform int uShadowOccluderCount;
+uniform vec3 uShadowOccluderMinima[MAX_SHADOW_OCCLUDERS];
+uniform vec3 uShadowOccluderMaxima[MAX_SHADOW_OCCLUDERS];
 uniform vec3 uAmbientColor;
 uniform float uAmbientIntensity;
 uniform vec2 uUvScale;
@@ -85,6 +90,59 @@ mat3 cotangentFrame(vec3 normal, vec3 position, vec2 uv)
     vec3 bitangent = perpendicularX * uvX.y + perpendicularY * uvY.y;
     float scale = inversesqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1.0e-8));
     return mat3(tangent * scale, bitangent * scale, normal);
+}
+
+bool segmentIntersectsShadowBox(
+    vec3 origin,
+    vec3 direction,
+    float maximumDistance,
+    vec3 boundsMinimum,
+    vec3 boundsMaximum)
+{
+    vec3 safeDirection = vec3(
+        abs(direction.x) < 0.0001 ? (direction.x < 0.0 ? -0.0001 : 0.0001)
+                                  : direction.x,
+        abs(direction.y) < 0.0001 ? (direction.y < 0.0 ? -0.0001 : 0.0001)
+                                  : direction.y,
+        abs(direction.z) < 0.0001 ? (direction.z < 0.0 ? -0.0001 : 0.0001)
+                                  : direction.z);
+    vec3 first = (boundsMinimum - origin) / safeDirection;
+    vec3 second = (boundsMaximum - origin) / safeDirection;
+    vec3 nearAxes = min(first, second);
+    vec3 farAxes = max(first, second);
+    float nearDistance = max(max(nearAxes.x, nearAxes.y), nearAxes.z);
+    float farDistance = min(min(farAxes.x, farAxes.y), farAxes.z);
+    return farDistance >= max(nearDistance, 0.0)
+        && nearDistance > 0.025
+        && nearDistance < maximumDistance - 0.025;
+}
+
+float directLightVisibility(
+    vec3 position,
+    vec3 normal,
+    vec3 lightPosition,
+    int lightIndex)
+{
+    if (lightIndex >= uShadowLightCount || uShadowOccluderCount <= 0) {
+        return 1.0;
+    }
+    vec3 offset = lightPosition - position;
+    float maximumDistance = length(offset);
+    if (maximumDistance <= 0.05) {
+        return 1.0;
+    }
+    vec3 origin = position + (normal * 0.035);
+    vec3 direction = offset / maximumDistance;
+    for (int index = 0; index < MAX_SHADOW_OCCLUDERS; ++index) {
+        if (index >= uShadowOccluderCount) {
+            break;
+        }
+        if (segmentIntersectsShadowBox(origin, direction, maximumDistance,
+                uShadowOccluderMinima[index], uShadowOccluderMaxima[index])) {
+            return 0.16;
+        }
+    }
+    return 1.0;
 }
 
 void main()
@@ -117,14 +175,16 @@ void main()
         float attenuation = 1.0 / (1.0 + 2.2 * normalizedDistance * normalizedDistance);
         vec3 radiance = uLightColors[index] * attenuation
             * uLightIntensities[index] * 1.9;
-        result += albedo * (1.0 - metalness) * diffuse * radiance;
+        float visibility = directLightVisibility(
+            vWorldPosition, normal, uLightPositions[index], index);
+        result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
         if (uDetailedMaterial != 0 && diffuse > 0.0) {
             vec3 halfway = normalize(lightDirection + viewDirection);
             float exponent = mix(96.0, 8.0, roughness);
             float highlight = pow(max(dot(normal, halfway), 0.0), exponent)
                 * mix(0.90, 0.12, roughness);
             vec3 reflectance = mix(vec3(0.035), albedo, metalness);
-            result += reflectance * highlight * diffuse * radiance;
+            result += reflectance * highlight * diffuse * radiance * visibility;
         }
     }
     float emissiveMask = uUseEmissionMap != 0
@@ -871,6 +931,15 @@ bool GdpRenderer::render(
     shader_.setFloat(gl_, "uAmbientIntensity",
         lighting.alert ? std::max(lighting.ambientIntensity, 0.16F)
                        : lighting.ambientIntensity);
+    const std::uint32_t shadowLightCount = std::min(
+        lighting.shadowLightCount, lightCount);
+    const std::uint32_t shadowOccluderCount = std::min<std::uint32_t>(
+        lighting.shadowOccluderCount,
+        static_cast<std::uint32_t>(maxShadowOccluders));
+    shader_.setInt(gl_, "uShadowLightCount",
+        static_cast<int>(shadowLightCount));
+    shader_.setInt(gl_, "uShadowOccluderCount",
+        static_cast<int>(shadowOccluderCount));
     constexpr std::array positionUniforms{
         "uLightPositions[0]", "uLightPositions[1]",
         "uLightPositions[2]", "uLightPositions[3]",
@@ -895,6 +964,26 @@ bool GdpRenderer::render(
         "uLightRanges[4]", "uLightRanges[5]",
         "uLightRanges[6]", "uLightRanges[7]",
     };
+    constexpr std::array shadowMinimumUniforms{
+        "uShadowOccluderMinima[0]", "uShadowOccluderMinima[1]",
+        "uShadowOccluderMinima[2]", "uShadowOccluderMinima[3]",
+        "uShadowOccluderMinima[4]", "uShadowOccluderMinima[5]",
+        "uShadowOccluderMinima[6]", "uShadowOccluderMinima[7]",
+        "uShadowOccluderMinima[8]", "uShadowOccluderMinima[9]",
+        "uShadowOccluderMinima[10]", "uShadowOccluderMinima[11]",
+        "uShadowOccluderMinima[12]", "uShadowOccluderMinima[13]",
+        "uShadowOccluderMinima[14]", "uShadowOccluderMinima[15]",
+    };
+    constexpr std::array shadowMaximumUniforms{
+        "uShadowOccluderMaxima[0]", "uShadowOccluderMaxima[1]",
+        "uShadowOccluderMaxima[2]", "uShadowOccluderMaxima[3]",
+        "uShadowOccluderMaxima[4]", "uShadowOccluderMaxima[5]",
+        "uShadowOccluderMaxima[6]", "uShadowOccluderMaxima[7]",
+        "uShadowOccluderMaxima[8]", "uShadowOccluderMaxima[9]",
+        "uShadowOccluderMaxima[10]", "uShadowOccluderMaxima[11]",
+        "uShadowOccluderMaxima[12]", "uShadowOccluderMaxima[13]",
+        "uShadowOccluderMaxima[14]", "uShadowOccluderMaxima[15]",
+    };
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
         const wkc::core::Vec3 lightColor = lighting.alert
@@ -905,6 +994,12 @@ bool GdpRenderer::render(
         shader_.setFloat(gl_, intensityUniforms[index],
             lighting.alert ? light.intensity * 1.08F : light.intensity);
         shader_.setFloat(gl_, rangeUniforms[index], light.range);
+    }
+    for (std::size_t index = 0; index < shadowOccluderCount; ++index) {
+        shader_.setVec3(gl_, shadowMinimumUniforms[index],
+            lighting.shadowOccluders[index].bounds.minimum);
+        shader_.setVec3(gl_, shadowMaximumUniforms[index],
+            lighting.shadowOccluders[index].bounds.maximum);
     }
 
     const auto fallbackMaterials = roomMaterials_.find(fallbackRoomMaterialKey_);

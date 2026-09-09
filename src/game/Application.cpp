@@ -2873,6 +2873,37 @@ void Application::render()
             appendConnectedRoomLights(
                 lighting, *world_, roomLighting_, entities_, playerRoom,
                 player_.state().position);
+            lighting.shadowLightCount = lighting.lightCount;
+            const auto appendShadowOccluder
+                = [&lighting](const wkc::core::Aabb bounds) {
+                      if (lighting.shadowOccluderCount
+                          >= visual::maxShadowOccluders || !bounds.isValid()) {
+                          return;
+                      }
+                      lighting.shadowOccluders[lighting.shadowOccluderCount++]
+                          = {bounds};
+                  };
+            for (const visual::EnemyRenderData& enemy : visibleEnemies) {
+                if (!enemy.active || !enemy.alive) {
+                    continue;
+                }
+                appendShadowOccluder({
+                    enemy.position + wkc::core::Vec3{-0.38F, 0.0F, -0.30F},
+                    enemy.position + wkc::core::Vec3{0.38F, 1.80F, 0.30F},
+                });
+            }
+            for (const visual::PropRenderData& prop : visibleProps) {
+                if (prop.state == visual::PropVisualState::Destroyed) {
+                    continue;
+                }
+                const wkc::core::Vec3 half{
+                    prop.scale.x * 0.5F, 0.0F, prop.scale.z * 0.5F};
+                appendShadowOccluder({
+                    prop.position - half,
+                    prop.position + wkc::core::Vec3{
+                        half.x, prop.scale.y, half.z},
+                });
+            }
             if (session_.state().phase == gameplay::SessionPhase::Victory) {
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
                 lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);

@@ -258,6 +258,27 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 destroyedFixturePixels.data());
 
+            gdp::game::visual::RoomLightingRenderData shadowBaselineLighting
+                = proceduralLighting;
+            shadowBaselineLighting.shadowLightCount = 0U;
+            const bool renderedShadowBaseline = renderer.render(
+                width, height, {}, {}, {}, {}, shadowBaselineLighting);
+            std::vector<std::uint8_t> shadowBaselinePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                shadowBaselinePixels.data());
+
+            gdp::game::visual::RoomLightingRenderData shadowedLighting
+                = shadowBaselineLighting;
+            shadowedLighting.shadowLightCount = shadowedLighting.lightCount;
+            shadowedLighting.shadowOccluderCount = 1U;
+            shadowedLighting.shadowOccluders[0].bounds = {
+                {-1.10F, 0.0F, -2.80F}, {1.10F, 0.70F, -1.60F}};
+            const bool renderedDynamicShadows = renderer.render(
+                width, height, {}, {}, {}, {}, shadowedLighting);
+            std::vector<std::uint8_t> shadowedPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                shadowedPixels.data());
+
             proceduralLighting.alert = true;
             const bool renderedAlertLighting = renderer.render(
                 width, height, {}, {}, {}, {}, proceduralLighting);
@@ -745,6 +766,7 @@ int main()
             std::size_t lightingChangedChannels = 0;
             std::size_t damagedFixtureChangedChannels = 0;
             std::size_t destroyedFixtureChangedChannels = 0;
+            std::size_t dynamicShadowChangedChannels = 0;
             std::size_t alertLightingChangedChannels = 0;
             std::size_t doorStateChangedChannels = 0;
             std::size_t doorMotionChangedChannels = 0;
@@ -831,6 +853,10 @@ int main()
                     if (destroyedFixturePixels[index + channel]
                         != damagedFixturePixels[index + channel]) {
                         ++destroyedFixtureChangedChannels;
+                    }
+                    if (shadowedPixels[index + channel]
+                        != shadowBaselinePixels[index + channel]) {
+                        ++dynamicShadowChangedChannels;
                     }
                     if (alertLightingPixels[index + channel]
                         != lightingPixels[index + channel]) {
@@ -997,6 +1023,8 @@ int main()
                 && damagedFixtureChangedChannels > 100U
                 && renderedDestroyedFixture
                 && destroyedFixtureChangedChannels > 100U
+                && renderedShadowBaseline && renderedDynamicShadows
+                && dynamicShadowChangedChannels > 100U
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U
@@ -1064,6 +1092,7 @@ int main()
                           << " doorState=" << doorStateChangedChannels
                           << " fixture=" << damagedFixtureChangedChannels
                           << '/' << destroyedFixtureChangedChannels
+                          << " shadow=" << dynamicShadowChangedChannels
                           << " impact=" << impactChangedChannels
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels

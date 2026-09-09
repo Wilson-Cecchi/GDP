@@ -4,7 +4,8 @@
 > sala, alerta e budgets integrados na Fase 12; mistura ambiente entre salas
 > conectadas integrada na Fase 14. A Fase 113 vinculou cada ponto a uma
 > luminária acertável com estados persistentes de dano. Flicker temporal
-> permanece planejado.
+> permanece planejado. A Fase 114 adicionou sombras dinâmicas analíticas de
+> inimigos e props.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -79,6 +80,18 @@ Seed nunca pode tornar objetivo/saída obrigatória ilegível. Iluminação pode
 ## Budget
 
 Limitar luzes por sala e raio de influência.
+
+## Sombras dinâmicas
+
+O frame fornece até 16 AABBs de inimigos vivos/ativos e props opacos não
+destruídos. O shader lança um segmento analítico do fragmento até cada ponto de
+luz habilitado; interseção reduz a parcela difusa e especular para 16%, enquanto
+ambiente e emissão continuam legíveis. O bias de origem evita auto-oclusão.
+
+Essa solução acompanha movimento e destruição sem shadow map ou passe de depth
+adicional, adequada à geometria modular baseada em boxes. Luz com intensidade
+zero não executa contribuição visível. O budget de luzes sombreadas e a seleção
+dos oclusores serão refinados na fase de otimização.
 
 ## Emissive
 

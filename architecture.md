@@ -1166,6 +1166,13 @@ de intensidade/emissão e aparência intacta, danificada ou destruída. A regra
 eleva Campaign/Speedrun para versões 20/19 sem alterar seeds estruturais ou a
 WKC Forge.
 
+Na Fase 114, a `Application` extrai AABBs de inimigos ativos e props opacos já
+visíveis e os anexa ao snapshot de iluminação. O renderer concreto executa no
+fragment shader uma interseção analítica superfície–luz e atenua somente as
+parcelas difusa e especular ocluídas. Não existe shadow map, ownership temporal
+ou consulta reversa a entidades; ambiente mantém legibilidade. A solução é
+visual e não altera regras, persistência, seeds ou APIs da WKC Forge.
+
 ---
 
 # 8. Sistema de seed

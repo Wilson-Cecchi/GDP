@@ -50,6 +50,8 @@
 > sem alterar os contratos de input ou os layouts compartilhados.
 > A Fase 112 implementou o viewmodel de Pistol e Carbine depois do mundo e antes
 > do HUD, consumindo somente snapshots visuais de animação.
+> A Fase 114 integrou oclusão analítica de luz direta por AABBs dinâmicos, sem
+> adicionar regra de gameplay ao renderer.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -167,6 +169,11 @@ e nunca consulta o gerador. As luminárias são volumes emissivos nas posições
 plano. O flag `alert` mistura ambiente, pontos e fixtures com vermelho enquanto
 o evento mantém a sala em lockdown; a regressão offscreen exige saídas distintas
 para iluminação padrão, procedural e alerta.
+
+Desde a Fase 114, o snapshot também inclui uma lista limitada de AABBs visuais.
+O fragment shader testa esses volumes no segmento até as luzes marcadas para
+sombra e atenua apenas luz direta bloqueada. Inimigos e props continuam sendo
+desenhados pelo fluxo normal; os AABBs não criam geometria nem alteram colisão.
 
 `RoomRenderData` aplica origem, quarter-turn e uma chave de material à shell da
 sala ocupada e das salas diretamente adjacentes. Todos os perfis do mundo são

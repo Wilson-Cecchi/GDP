@@ -416,6 +416,12 @@ regressão OpenGL compara iluminação intacta, reduzida e apagada, exigindo mud
 real de pixels nos dois estados e ausência de erro GL. Bootstrap headless cobre
 a materialização determinística dos fixtures junto ao mundo.
 
+O gate da Fase 114 renderiza a mesma sala e o mesmo plano de oito luzes com o
+budget de sombras desligado e depois com um AABB conhecido. Mais de 100 canais
+do framebuffer precisam mudar, sem alterar geometria, luzes ou câmera e sem erro
+OpenGL. CPU/bootstrap continuam protegendo limites, defaults sem sombra e a
+integração da aplicação.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

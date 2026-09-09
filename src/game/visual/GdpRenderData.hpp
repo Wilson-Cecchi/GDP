@@ -483,6 +483,14 @@ struct HudRenderData {
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;
+inline constexpr std::size_t maxShadowOccluders = 16U;
+
+struct ShadowOccluderRenderData {
+    wkc::core::Aabb bounds{};
+
+    constexpr bool operator==(const ShadowOccluderRenderData&) const noexcept
+        = default;
+};
 
 struct PointLightRenderData {
     wkc::core::Vec3 position{};
@@ -500,6 +508,9 @@ struct RoomLightingRenderData {
         PointLightRenderData{{0.0F, 3.4F, 1.0F}, {0.78F, 0.88F, 1.0F}, 1.0F, 6.0F},
     };
     std::uint32_t lightCount{1U};
+    std::array<ShadowOccluderRenderData, maxShadowOccluders> shadowOccluders{};
+    std::uint32_t shadowOccluderCount{0U};
+    std::uint32_t shadowLightCount{0U};
     float fixtureEmissive{0.75F};
     bool alert{false};
 };
