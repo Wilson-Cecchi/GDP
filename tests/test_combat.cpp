@@ -425,6 +425,59 @@ void testDeterministicEnemyObstacleAvoidance()
         "obstacle avoidance reproduces the same route for the same entity seed");
 }
 
+void testDeterministicEnemyGlobalPathfinding()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld trapped{
+        {{-9.0F, 0.0F, -9.0F}, {9.0F, 4.0F, 9.0F}},
+        {
+            {{-3.2F, 0.0F, 3.5F}, {3.2F, 3.0F, 4.0F}},
+            {{-3.2F, 0.0F, 3.5F}, {-2.8F, 3.0F, 7.0F}},
+            {{2.8F, 0.0F, 3.5F}, {3.2F, 3.0F, 7.0F}},
+        },
+    };
+    const auto runFixture = [&trapped] {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId worker = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 1,
+            .archetype = EnemyArchetype::Worker,
+            .visualSeed = 0x106U,
+        });
+        WorkerConfig config;
+        config.detectionRange = 20.0F;
+        config.attackRange = 1.15F;
+        config.moveSpeed = 2.0F;
+        config.attackDamage = 0.0F;
+        config.investigation.duration = 20.0F;
+        const CollisionWorld open{
+            {{-9.0F, 0.0F, -9.0F}, {9.0F, 4.0F, 9.0F}}};
+        (void)updateWorkers(manager, player, 1, open, 0.0F, config);
+
+        bool exitedTrap = false;
+        for (std::size_t tick = 0U; tick < 720U; ++tick) {
+            (void)updateWorkers(
+                manager, player, 1, trapped, 1.0F / 60.0F, config);
+            const wkc::core::Vec3 position
+                = manager.find(worker)->transform.position;
+            exitedTrap = exitedTrap
+                || (std::abs(position.x) > 3.55F && position.z > 3.0F);
+        }
+        return std::pair{manager.find(worker)->transform.position, exitedTrap};
+    };
+
+    const auto first = runFixture();
+    const auto repeated = runFixture();
+    expect(first.second && first.first.z < 3.2F,
+        "global pathfinding leaves a U-shaped trap before approaching the target");
+    expect(first == repeated,
+        "global pathfinding keeps route selection deterministic");
+}
+
 void testDeterministicEnemySeparation()
 {
     using namespace gdp::entities;
@@ -1656,6 +1709,7 @@ int main()
     testWorkerBehavior();
     testWorkerLineOfSight();
     testDeterministicEnemyObstacleAvoidance();
+    testDeterministicEnemyGlobalPathfinding();
     testDeterministicEnemySeparation();
     testDenseEnemyVolumesDoNotCross();
     testGuardRangedBehavior();

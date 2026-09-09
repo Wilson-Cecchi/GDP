@@ -1107,6 +1107,14 @@ postura residual rígidas com blends de 5 ticks. Não há RNG consumido nem API
 nova na WKC Forge. Campaign/Speedrun avançam para regras 14/13; checkpoint
 permanece schema 2.
 
+Na Fase 106, o gameplay concreto constrói sob demanda um grafo de visibilidade
+com origem, destino e cantos seguros dos sólidos/volumes do `CollisionWorld`.
+Arestas exigem ocupação válida em todo o segmento e Dijkstra usa ordem estável,
+permitindo que Chase, Investigate e Patrol contornem obstáculos compostos. O
+movimento final ainda passa por steering, separação e colisão, e uma rota
+impossível conserva o desvio local como fallback. Não há RNG, mudança de world
+fingerprint ou API WKC Forge. Campaign/Speedrun passam às regras 15/14.
+
 ---
 
 # 8. Sistema de seed

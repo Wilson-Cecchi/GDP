@@ -398,6 +398,10 @@ especializados das pastas numeradas.
   uma varredura curta e determinística antes de voltar à patrulha. Visão ou novo
   ruído interrompem a saída sem repetir o alerta. Campaign/Speedrun avançam para
   regras 14/13.
+- **Fase 106 — Pathfinding global local à sala:** perseguição, investigação e
+  patrulha usam um grafo de visibilidade determinístico para atravessar rotas com
+  múltiplos obstáculos. O desvio curto permanece como fallback físico.
+  Campaign/Speedrun avançam para regras 15/14.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -963,6 +967,15 @@ papéis pesados. Visão confirmada cancela Recover e retoma combate no mesmo tic
 novo ruído cancela a varredura e volta a `Investigate` sem repetir `Alert`.
 Ao terminar, a memória é apagada e a patrulha retorna. Não há consumo de RNG,
 mudança de collider ou schema novo. Campaign/Speedrun passam às regras 14/13.
+
+Na Fase 106, todo deslocamento dirigido a um ponto consulta uma rota global
+dentro dos volumes navegáveis da sala. O grafo é formado pela origem, destino e
+cantos seguros de sólidos/volumes; conexões só existem quando o collider cabe em
+todo o segmento. Dijkstra escolhe o menor caminho com ordem estável e entrega o
+próximo ponto visível. Isso permite sair inclusive de obstáculos em U, sem RNG,
+navmesh universal ou mudança nos fingerprints do mundo. O steering local,
+separação e colisão contínua continuam autoritativos como acabamento e fallback.
+Campaign/Speedrun passam às regras 15/14.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -9,7 +9,7 @@
 > ciclo validável atrás de uma cobertura larga na sala START. A Fase 103
 > acrescentou investigação provocada por ruído de disparo e a Fase 104 separou
 > sua reação inicial no estado `Alert`. A Fase 105 acrescentou `Recover` antes
-> do retorno à patrulha.
+> do retorno à patrulha. A Fase 106 acrescentou rotas globais dentro da sala.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -89,6 +89,11 @@ ação ofensiva antes de apagar a memória e retornar à patrulha. A direção i
 é derivada da identidade estável e inverte na metade da janela. Visão direta
 cancela o estado em favor do papel de combate; novo ruído volta à investigação
 sem repetir a pausa inicial.
+
+Movimentos com destino — patrulha, investigação e perseguição — usam desde a
+Fase 106 um grafo de visibilidade local à sala. Ele encontra desvios completos
+ao redor de conjuntos de AABBs, mas não move inimigos entre salas nem substitui
+o `CollisionWorld`, a separação física ou as regras específicas dos papéis.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

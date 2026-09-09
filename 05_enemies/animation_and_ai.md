@@ -18,7 +18,7 @@
 > A Fase 101 implementou aquisição visual e investigação da última posição
 > conhecida. A Fase 103 acrescentou percepção por ruído de disparo e a Fase
 > 104 implementou a reação dedicada `Alert`. A Fase 105 acrescentou `Recover`
-> ao fim da busca; pathfinding global permanece planejado.
+> ao fim da busca e a Fase 106 implementou pathfinding global dentro da sala.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -142,7 +142,7 @@ alterar o deslocamento lógico da entidade.
 
 Estados implementados: Idle, Patrol, Alert, Investigate, Recover, Chase,
 Reposition, Attack e Dead. A percepção combina visão direta e estímulo de ruído
-de disparo na sala ativa; pathfinding global permanece planejado.
+de disparo na sala ativa; a navegação global permanece confinada à sala atual.
 Aquisição exige alcance e line of sight dentro da sala ativa.
 
 O Worker atual detecta em até `12 m`, persegue a `1,35 m/s`, ataca dentro de
@@ -248,3 +248,10 @@ permanece entre `0,65 s` e `1,20 s` em uma varredura estacionária: o yaw gira a
 janela. Ao final, a posição lembrada é apagada e a patrulha retorna. Linha de
 visão cancela a recuperação com prioridade imediata; ruído novo retoma a busca
 sem repetir `Alert`. Player morto e morte do inimigo limpam o timer.
+
+A Fase 106 substitui a dependência exclusiva do desvio reativo por um grafo de
+visibilidade reconstruído deterministicamente quando o caminho direto está
+bloqueado. Origem, destino e cantos com folga física formam os nós; somente
+segmentos inteiramente ocupáveis viram arestas. O menor caminho orienta Chase,
+Investigate e Patrol, enquanto steering, separação e colisão resolvem o
+movimento final. Rotas inexistentes mantêm o fallback local e seus timeouts.

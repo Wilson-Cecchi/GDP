@@ -180,3 +180,10 @@ confirmada retoma combate imediatamente e ruído novo retoma `Investigate` sem
 novo Alert. O término limpa a última posição conhecida e libera a patrulha. A
 regressão cobre os cinco papéis, imobilidade, giro determinístico, interrupções,
 limpeza por morte e pose rígida. Campaign/Speedrun passam às regras 14/13.
+
+Na Fase 106, Chase, Investigate e Patrol calculam o próximo ponto por um grafo
+de visibilidade restrito ao `CollisionWorld`. Cantos recebem a margem do
+collider e arestas são amostradas integralmente, portanto sólidos e limites
+continuam autoritativos. A regressão usa uma barreira em U que exige primeiro
+afastar-se do Player para depois alcançá-lo, além de repetir a rota exatamente.
+Campaign/Speedrun passam às regras 15/14.

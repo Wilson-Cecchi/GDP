@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -20,6 +21,160 @@ float planarDistanceSquared(
     const float x = first.x - second.x;
     const float z = first.z - second.z;
     return (x * x) + (z * z);
+}
+
+bool navigationSegmentClear(
+    const CollisionWorld& collisionWorld,
+    const wkc::core::Vec3 start,
+    const wkc::core::Vec3 end,
+    const CharacterCollider collider) noexcept
+{
+    const wkc::core::Vec3 offset = end - start;
+    const float distance = std::sqrt(
+        (offset.x * offset.x) + (offset.z * offset.z));
+    if (!std::isfinite(distance)) {
+        return false;
+    }
+    if (distance <= 1.0e-6F) {
+        return collisionWorld.canOccupy(end, collider);
+    }
+    constexpr float sampleSpacing = 0.18F;
+    const std::size_t sampleCount = static_cast<std::size_t>(
+        std::ceil(distance / sampleSpacing));
+    for (std::size_t sample = 1U; sample <= sampleCount; ++sample) {
+        const float fraction = static_cast<float>(sample)
+            / static_cast<float>(sampleCount);
+        if (!collisionWorld.canOccupy(start + (offset * fraction), collider)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void appendNavigationCorner(
+    std::vector<wkc::core::Vec3>& nodes,
+    const CollisionWorld& collisionWorld,
+    const wkc::core::Vec3 candidate,
+    const CharacterCollider collider)
+{
+    if (!collisionWorld.canOccupy(candidate, collider)) {
+        return;
+    }
+    const bool duplicate = std::any_of(
+        nodes.begin(), nodes.end(), [candidate](const wkc::core::Vec3 node) {
+            return planarDistanceSquared(node, candidate) <= 1.0e-6F;
+        });
+    if (!duplicate) {
+        nodes.push_back(candidate);
+    }
+}
+
+std::optional<wkc::core::Vec3> navigationWaypoint(
+    const CollisionWorld& collisionWorld,
+    const wkc::core::Vec3 start,
+    const wkc::core::Vec3 target,
+    const CharacterCollider collider)
+{
+    if (!collisionWorld.canOccupy(start, collider)
+        || !collisionWorld.canOccupy(target, collider)) {
+        return std::nullopt;
+    }
+    if (navigationSegmentClear(collisionWorld, start, target, collider)) {
+        return target;
+    }
+
+    std::vector<wkc::core::Vec3> nodes{start, target};
+    nodes.reserve(2U + (collisionWorld.solids().size() * 4U)
+        + (collisionWorld.walkableVolumes().size() * 4U));
+    const float clearance = std::max(collider.radius, 0.0F) + 0.10F;
+    for (const wkc::core::Aabb solid : collisionWorld.solids()) {
+        appendNavigationCorner(nodes, collisionWorld,
+            {solid.minimum.x - clearance, start.y,
+                solid.minimum.z - clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {solid.minimum.x - clearance, start.y,
+                solid.maximum.z + clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {solid.maximum.x + clearance, start.y,
+                solid.minimum.z - clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {solid.maximum.x + clearance, start.y,
+                solid.maximum.z + clearance}, collider);
+    }
+    for (const wkc::core::Aabb volume : collisionWorld.walkableVolumes()) {
+        appendNavigationCorner(nodes, collisionWorld,
+            {volume.minimum.x + clearance, start.y,
+                volume.minimum.z + clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {volume.minimum.x + clearance, start.y,
+                volume.maximum.z - clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {volume.maximum.x - clearance, start.y,
+                volume.minimum.z + clearance}, collider);
+        appendNavigationCorner(nodes, collisionWorld,
+            {volume.maximum.x - clearance, start.y,
+                volume.maximum.z - clearance}, collider);
+    }
+
+    constexpr std::size_t noNode = std::numeric_limits<std::size_t>::max();
+    std::vector<float> distances(
+        nodes.size(), std::numeric_limits<float>::infinity());
+    std::vector<std::size_t> previous(nodes.size(), noNode);
+    std::vector<bool> visited(nodes.size(), false);
+    distances.front() = 0.0F;
+    for (std::size_t iteration = 0U; iteration < nodes.size(); ++iteration) {
+        std::size_t current = noNode;
+        for (std::size_t candidate = 0U; candidate < nodes.size(); ++candidate) {
+            if (!visited[candidate]
+                && (current == noNode
+                    || distances[candidate] < distances[current])) {
+                current = candidate;
+            }
+        }
+        if (current == noNode || !std::isfinite(distances[current])) {
+            break;
+        }
+        if (current == 1U) {
+            break;
+        }
+        visited[current] = true;
+        for (std::size_t next = 1U; next < nodes.size(); ++next) {
+            if (visited[next] || next == current
+                || !navigationSegmentClear(
+                    collisionWorld, nodes[current], nodes[next], collider)) {
+                continue;
+            }
+            const float edgeDistance = std::sqrt(
+                planarDistanceSquared(nodes[current], nodes[next]));
+            const float candidateDistance = distances[current] + edgeDistance;
+            if (candidateDistance + 1.0e-5F < distances[next]) {
+                distances[next] = candidateDistance;
+                previous[next] = current;
+            }
+        }
+    }
+    if (previous[1U] == noNode) {
+        return std::nullopt;
+    }
+    std::size_t waypoint = 1U;
+    while (previous[waypoint] != 0U && previous[waypoint] != noNode) {
+        waypoint = previous[waypoint];
+    }
+    return previous[waypoint] == 0U
+        ? std::optional<wkc::core::Vec3>{nodes[waypoint]} : std::nullopt;
+}
+
+wkc::core::Vec3 navigationDirection(
+    const CollisionWorld& collisionWorld,
+    const wkc::core::Vec3 start,
+    const wkc::core::Vec3 target,
+    const CharacterCollider collider) noexcept
+{
+    const wkc::core::Vec3 waypoint
+        = navigationWaypoint(collisionWorld, start, target, collider)
+            .value_or(target);
+    const wkc::core::Vec3 offset = waypoint - start;
+    return wkc::core::normalized({offset.x, 0.0F, offset.z});
 }
 
 wkc::core::Vec3 avoidanceDirection(
@@ -267,12 +422,14 @@ void moveEnemyAndFaceTravel(
     const std::uint32_t roomId,
     gdp::entities::EnemyData& enemy,
     gdp::entities::Entity& entity,
-    const wkc::core::Vec3 desiredDirection,
+    const wkc::core::Vec3 target,
     const float speed,
     const float step,
     const CharacterCollider collider) noexcept
 {
     const wkc::core::Vec3 previous = entity.transform.position;
+    const wkc::core::Vec3 desiredDirection = navigationDirection(
+        collisionWorld, previous, target, collider);
     entity.transform.position = moveEnemy(
         manager, enemyIds, collisionWorld, id, roomId, enemy,
         previous, desiredDirection, speed, step, collider);
@@ -396,7 +553,7 @@ bool updateEnemyPatrol(
     const wkc::core::Vec3 previous = entity.transform.position;
     moveEnemyAndFaceTravel(
         manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
-        planarOffset * (1.0F / distance), moveSpeed * config.speedScale,
+        target, moveSpeed * config.speedScale,
         step, collider);
     const bool moved = planarDistanceSquared(previous, entity.transform.position)
         > 1.0e-8F;
@@ -542,7 +699,7 @@ bool updateEnemyInvestigation(
     const wkc::core::Vec3 previous = entity.transform.position;
     moveEnemyAndFaceTravel(
         manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
-        planarOffset * (1.0F / distance), moveSpeed * config.speedScale,
+        enemy.lastKnownPlayerPosition, moveSpeed * config.speedScale,
         step, collider);
     enemy.behavior = planarDistanceSquared(previous, entity.transform.position)
             > 1.0e-8F
@@ -795,10 +952,9 @@ EnemyUpdateSummary updateWorkers(
         if (distance <= 1.0e-7F || step <= 0.0F) {
             continue;
         }
-        const wkc::core::Vec3 direction = planarOffset * (1.0F / distance);
         moveEnemyAndFaceTravel(
             manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-            direction, config.moveSpeed, step,
+            player.state().position, config.moveSpeed, step,
             {.radius = 0.35F, .height = 1.8F});
     }
     return summary;
@@ -891,7 +1047,7 @@ EnemyUpdateSummary updateGuards(
             if (step > 0.0F) {
                 moveEnemyAndFaceTravel(
                     manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                    towardPlayer, config.moveSpeed, step,
+                    player.state().position, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
             continue;
@@ -1040,7 +1196,7 @@ EnemyUpdateSummary updateOfficers(
             if (step > 0.0F) {
                 moveEnemyAndFaceTravel(
                     manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                    towardPlayer, config.moveSpeed, step,
+                    player.state().position, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
             continue;
@@ -1229,7 +1385,7 @@ EnemyUpdateSummary updateEngineers(
             if (step > 0.0F) {
                 moveEnemyAndFaceTravel(
                     manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                    towardPlayer, config.moveSpeed, step,
+                    player.state().position, config.moveSpeed, step,
                     {.radius = 0.35F, .height = 1.8F});
             }
             continue;
@@ -1406,7 +1562,7 @@ EnemyUpdateSummary updateIndustrialRobots(
             if (step > 0.0F) {
                 moveEnemyAndFaceTravel(
                     manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                    towardPlayer, moveSpeed, step,
+                    player.state().position, moveSpeed, step,
                     {.radius = 0.52F, .height = 1.9F});
             }
             continue;

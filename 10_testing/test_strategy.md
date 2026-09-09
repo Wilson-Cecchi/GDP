@@ -367,6 +367,12 @@ que sair pela borda restaura visão e que o Player percorre o lado oculto sem
 colidir. O headless de 900 ticks continua inicializando e encerrando a run sem
 falha; regras anteriores 10/9 permanecem isoladas.
 
+O gate da Fase 106 fecha uma barreira em U ao redor de um Worker e exige uma
+rota que inicialmente se afaste do Player, saia pela abertura e só então se
+aproxime. A simulação de 720 fixed ticks precisa atravessar o lado externo,
+alcançar a frente da barreira e repetir posição e decisão exatamente. Os testes
+anteriores continuam protegendo o desvio local e os volumes entre inimigos.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
