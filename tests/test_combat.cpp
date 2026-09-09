@@ -568,6 +568,76 @@ void testDeterministicEnemyGlobalPathfinding()
         "global pathfinding keeps route selection deterministic");
 }
 
+void testDeterministicGroupRouteDiversity()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld blocked{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-2.0F, 0.0F, 2.7F}, {2.0F, 3.0F, 3.3F}}},
+    };
+    struct RouteResult {
+        std::array<wkc::core::Vec3, 2> positions{};
+        bool usedLeft{false};
+        bool usedRight{false};
+
+        constexpr bool operator==(const RouteResult&) const noexcept = default;
+    };
+    const auto runFixture = [&blocked] {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        std::array<EntityId, 2> workers{
+            manager.createEnemy({
+                .transform = {.position = {-0.4F, 0.0F, 6.0F},
+                    .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+                .roomId = 1,
+                .archetype = EnemyArchetype::Worker,
+                .visualSeed = 0x108U,
+            }),
+            manager.createEnemy({
+                .transform = {.position = {0.4F, 0.0F, 6.0F},
+                    .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+                .roomId = 1,
+                .archetype = EnemyArchetype::Worker,
+                .visualSeed = 0x108U,
+            }),
+        };
+        WorkerConfig config;
+        config.detectionRange = 20.0F;
+        config.attackRange = 1.15F;
+        config.moveSpeed = 2.0F;
+        config.attackDamage = 0.0F;
+        config.investigation.duration = 12.0F;
+        const CollisionWorld open{
+            {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+        (void)updateWorkers(manager, player, 1, open, 0.0F, config);
+
+        RouteResult result;
+        for (std::size_t tick = 0U; tick < 300U; ++tick) {
+            (void)updateWorkers(
+                manager, player, 1, blocked, 1.0F / 60.0F, config);
+            for (const EntityId worker : workers) {
+                const float x = manager.find(worker)->transform.position.x;
+                result.usedLeft = result.usedLeft || x < -2.30F;
+                result.usedRight = result.usedRight || x > 2.30F;
+            }
+        }
+        for (std::size_t index = 0U; index < workers.size(); ++index) {
+            result.positions[index] = manager.find(workers[index])->transform.position;
+        }
+        return result;
+    };
+
+    const RouteResult first = runFixture();
+    const RouteResult repeated = runFixture();
+    expect(first.usedLeft && first.usedRight,
+        "group pathfinding distributes equivalent routes across both obstacle sides");
+    expect(first == repeated,
+        "group route preferences remain deterministic for stable entity identities");
+}
+
 void testDeterministicEnemySeparation()
 {
     using namespace gdp::entities;
@@ -1807,6 +1877,7 @@ int main()
     testDirectionalEnemyVision();
     testDeterministicEnemyObstacleAvoidance();
     testDeterministicEnemyGlobalPathfinding();
+    testDeterministicGroupRouteDiversity();
     testDeterministicEnemySeparation();
     testDenseEnemyVolumesDoNotCross();
     testGuardRangedBehavior();

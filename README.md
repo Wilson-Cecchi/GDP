@@ -406,6 +406,10 @@ especializados das pastas numeradas.
   presença no cone frontal próprio de cada papel. Patrulha e busca orientam esse
   cone, enquanto ruído continua podendo alertar pelas costas. Campaign/Speedrun
   avançam para regras 16/15.
+- **Fase 108 — Navegação de grupos:** rotas simétricas distribuem inimigos por
+  preferências laterais derivadas da identidade, e bloqueios físicos podem
+  inverter a escolha. Grupos deixam de insistir todos no mesmo lado.
+  Campaign/Speedrun avançam para regras 17/16.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -988,6 +992,14 @@ IndustrialRobot `85°`. Ruído continua omnidirecional dentro do alcance auditiv
 e pode girar o inimigo para uma futura aquisição visual. O Worker inicial da
 START nasce orientado para o Player, preservando o tutorial e o teste headless.
 Campaign/Speedrun passam às regras 16/15.
+
+Na Fase 108, rotas de custo equivalente deixam de concentrar todo o grupo no
+mesmo canto. A preferência esquerda/direita vem de `visualSeed + EntityId` e
+ordena os candidatos do grafo sem consumir RNG ou escolher um caminho mais
+longo quando não há empate útil. Se a colisão ativa o desvio local, essa escolha
+passa a seguir o lado de evasão e pode replanejar no tick seguinte. A regressão
+coloca dois Workers atrás da mesma barreira e exige uso dos dois lados, volumes
+físicos e repetição exata. Campaign/Speedrun passam às regras 17/16.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

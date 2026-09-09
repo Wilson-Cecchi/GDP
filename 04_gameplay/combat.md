@@ -194,3 +194,10 @@ papel antes de consultar line of sight. Um alvo visível pelas costas não cria
 memória; à frente, todos os cinco papéis retomam seu comportamento no mesmo
 tick. Audição permanece independente dessa restrição. Campaign/Speedrun passam
 às regras 16/15.
+
+Na Fase 108, o grafo ordena cantos simétricos pela preferência lateral estável
+de cada entidade. Identidades vizinhas distribuem rotas equivalentes e o lado
+de desvio físico substitui temporariamente essa preferência quando há bloqueio,
+permitindo replanejamento sem sobreposição. A regressão exige dois lados usados
+e resultado idêntico em simulações repetidas. Campaign/Speedrun passam às regras
+17/16.

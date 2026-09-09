@@ -213,6 +213,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before directional enemy vision remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 16\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before group route diversity remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
@@ -220,7 +225,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 2\n"
-        "rules_version = 16\n"
+        "rules_version = 17\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

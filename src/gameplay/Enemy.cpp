@@ -73,7 +73,8 @@ std::optional<wkc::core::Vec3> navigationWaypoint(
     const CollisionWorld& collisionWorld,
     const wkc::core::Vec3 start,
     const wkc::core::Vec3 target,
-    const CharacterCollider collider)
+    const CharacterCollider collider,
+    const std::int8_t preferredSide)
 {
     if (!collisionWorld.canOccupy(start, collider)
         || !collisionWorld.canOccupy(target, collider)) {
@@ -88,18 +89,16 @@ std::optional<wkc::core::Vec3> navigationWaypoint(
         + (collisionWorld.walkableVolumes().size() * 4U));
     const float clearance = std::max(collider.radius, 0.0F) + 0.10F;
     for (const wkc::core::Aabb solid : collisionWorld.solids()) {
-        appendNavigationCorner(nodes, collisionWorld,
-            {solid.minimum.x - clearance, start.y,
-                solid.minimum.z - clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {solid.minimum.x - clearance, start.y,
-                solid.maximum.z + clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {solid.maximum.x + clearance, start.y,
-                solid.minimum.z - clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {solid.maximum.x + clearance, start.y,
-                solid.maximum.z + clearance}, collider);
+        const float firstX = preferredSide < 0
+            ? solid.minimum.x - clearance : solid.maximum.x + clearance;
+        const float secondX = preferredSide < 0
+            ? solid.maximum.x + clearance : solid.minimum.x - clearance;
+        for (const float x : {firstX, secondX}) {
+            appendNavigationCorner(nodes, collisionWorld,
+                {x, start.y, solid.minimum.z - clearance}, collider);
+            appendNavigationCorner(nodes, collisionWorld,
+                {x, start.y, solid.maximum.z + clearance}, collider);
+        }
     }
     for (const wkc::core::Aabb volume : collisionWorld.walkableVolumes()) {
         appendNavigationCorner(nodes, collisionWorld,
@@ -168,10 +167,12 @@ wkc::core::Vec3 navigationDirection(
     const CollisionWorld& collisionWorld,
     const wkc::core::Vec3 start,
     const wkc::core::Vec3 target,
-    const CharacterCollider collider) noexcept
+    const CharacterCollider collider,
+    const std::int8_t preferredSide) noexcept
 {
     const wkc::core::Vec3 waypoint
-        = navigationWaypoint(collisionWorld, start, target, collider)
+        = navigationWaypoint(
+            collisionWorld, start, target, collider, preferredSide)
             .value_or(target);
     const wkc::core::Vec3 offset = waypoint - start;
     return wkc::core::normalized({offset.x, 0.0F, offset.z});
@@ -428,8 +429,11 @@ void moveEnemyAndFaceTravel(
     const CharacterCollider collider) noexcept
 {
     const wkc::core::Vec3 previous = entity.transform.position;
+    const std::int8_t preferredSide = enemy.avoidanceSide != 0
+        ? enemy.avoidanceSide
+        : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
     const wkc::core::Vec3 desiredDirection = navigationDirection(
-        collisionWorld, previous, target, collider);
+        collisionWorld, previous, target, collider, preferredSide);
     entity.transform.position = moveEnemy(
         manager, enemyIds, collisionWorld, id, roomId, enemy,
         previous, desiredDirection, speed, step, collider);

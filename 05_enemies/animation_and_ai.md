@@ -20,6 +20,7 @@
 > 104 implementou a reação dedicada `Alert`. A Fase 105 acrescentou `Recover`
 > ao fim da busca, a Fase 106 implementou pathfinding global dentro da sala e a
 > Fase 107 limitou aquisição ao cone de visão de cada papel.
+> A Fase 108 distribuiu grupos por rotas equivalentes e replanejamento lateral.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -263,3 +264,9 @@ Worker/Guard/Officer/Engineer/IndustrialRobot. Alcance e line of sight continuam
 obrigatórios. Patrulha, Chase, Investigate, Alert e Recover já giram o corpo e,
 portanto, varrem o cone sem estado visual paralelo. Ruído pode chegar por trás e
 usa Alert para orientar o inimigo antes da confirmação visual.
+
+A Fase 108 acrescenta diversidade determinística ao mesmo grafo. A paridade da
+identidade define qual lado de um sólido entra primeiro no desempate; quando a
+colisão ativa `avoidanceSide`, o próximo cálculo usa esse lado e consegue
+replanejar. Separação e teste contínuo dos volumes permanecem no movimento
+final, portanto a escolha de rota não permite atravessar aliados.

@@ -100,6 +100,11 @@ Cada papel possui meia abertura explícita entre `65°` e `85°`; um alvo fora
 desse cone não atualiza a memória mesmo com alcance e geometria livres. Audição
 continua omnidirecional e pode iniciar Alert sem conceder visão automática.
 
+Na Fase 108, inimigos com o mesmo destino recebem lados preferenciais estáveis
+no desempate do pathfinding. Um bloqueio real pode trocar essa preferência por
+meio do desvio existente. O resultado reduz concentração em uma única rota sem
+reservas globais, RNG ou alteração da ordem de atualização das entidades.
+
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no
 mesmo `EntityManager`/`RoomInstance` e só atualiza a partir do fixed update

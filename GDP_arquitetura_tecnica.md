@@ -1197,6 +1197,12 @@ Worker inicial diretamente para o Player, preservando o tutorial em qualquer
 rotação do módulo. Sem RNG ou API WKC Forge nova, Campaign/Speedrun avançam para
 regras 16/15.
 
+Na Fase 108, a identidade estável de cada Enemy ordena os cantos simétricos do
+grafo de visibilidade. `avoidanceSide` assume essa preferência após uma colisão,
+conectando o fallback físico ao replanejamento seguinte. A mudança distribui
+grupos por rotas equivalentes sem estado global, RNG ou alteração na WKC Forge.
+Campaign/Speedrun avançam para regras 17/16.
+
 ---
 
 # 8. Sistema de seed

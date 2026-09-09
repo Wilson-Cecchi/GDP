@@ -379,6 +379,11 @@ nenhuma memória ou ação de combate pode surgir; no cone frontal a aquisição
 acontecer no mesmo tick. A população também confirma que o Worker da START nasce
 orientado para o Player independentemente da rotação da sala.
 
+O gate da Fase 108 envia dois Workers de identidades consecutivas contra uma
+barreira simétrica. Durante 300 fixed ticks o conjunto precisa registrar
+passagem pelos lados esquerdo e direito, manter os volumes físicos e reproduzir
+as posições finais e decisões laterais em uma segunda execução.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
