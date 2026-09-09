@@ -409,6 +409,13 @@ exigindo mudança material de pixels e ausência de erro GL. Builds headless
 continuam garantindo que o novo contrato visual não cria dependência gráfica no
 combate.
 
+O gate da Fase 113 cria uma luminária não sólida diante de um ray horizontal:
+o primeiro disparo precisa produzir dano e impacto metálico, o segundo deve
+destruí-la sem loot e o terceiro precisa atravessar seu volume antigo. A
+regressão OpenGL compara iluminação intacta, reduzida e apagada, exigindo mudança
+real de pixels nos dois estados e ausência de erro GL. Bootstrap headless cobre
+a materialização determinística dos fixtures junto ao mundo.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

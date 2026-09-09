@@ -1157,6 +1157,15 @@ passe. A apresentação não consulta `Weapon`, não direciona o hitscan e não 
 seus temporizadores. A variação de metal usa hash cosmético; gameplay,
 persistência, RNG estrutural e WKC Forge permanecem inalterados.
 
+Na Fase 113, a criação do runtime materializa cada ponto do plano de iluminação
+como uma entidade GDP `CeilingFixture`. Sua presença no `EntityManager` fornece
+identidade, vida e persistência dentro da run; o collider permanece fora do
+mundo de navegação, mas é consultado pelo hitscan. A `Application` reconcilia o
+estado da entidade com `PointLightRenderData`, e o renderer apenas aplica escala
+de intensidade/emissão e aparência intacta, danificada ou destruída. A regra
+eleva Campaign/Speedrun para versões 20/19 sem alterar seeds estruturais ou a
+WKC Forge.
+
 ---
 
 # 8. Sistema de seed

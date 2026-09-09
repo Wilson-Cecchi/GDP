@@ -10,7 +10,8 @@
 > adicionou o Overdrive temporário encontrado em Arenas. A Fase 93 adicionou
 > reação visual transitória ao dano de inimigos e a Fase 109 passou a publicar
 > ponto, normal e material de cada impacto. A Fase 112 conectou eventos já
-> aceitos de disparo, recarga e equip aos snapshots do viewmodel. A fila
+> aceitos de disparo, recarga e equip aos snapshots do viewmodel. A Fase 113
+> tornou luminárias alvos metálicos destrutíveis. A fila
 > desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
@@ -84,6 +85,11 @@ dano não positivo e alvos terminais, faz clamp de HP em zero e produz uma únic
 transição terminal. Props passam por `Damaged`, perdem colisão em `Destroyed` e
 um crate cria somente seu drop controlado. Weak points entram quando forem
 visualmente legíveis.
+
+`CeilingFixture` é a exceção alvo/navegação: não bloqueia personagens, mas seu
+AABB centrado no modelo intercepta hitscan. Possui 24 HP, impacto metálico e não
+gera drop ou progressão. Ao ser destruída, deixa de interceptar tiros seguintes
+e permanece apagada durante a run; Engineers não restauram luminárias.
 
 Acertos não letais em Enemy também reiniciam `hitReactionTime` em `0,12 s`.
 Esse timer é avançado uma única vez por fixed update, não interrompe IA,

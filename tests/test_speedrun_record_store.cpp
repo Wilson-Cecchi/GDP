@@ -298,7 +298,7 @@ void testCommentsAndFutureFields()
     writeText(path,
         "# local record\n"
         "version = 1\n"
-        "rules_version = 18\n"
+        "rules_version = 19\n"
         "best_ticks = 321 # fixed ticks\n"
         "seed = 987\n"
         "future_field = preserved_by_future_versions\n");

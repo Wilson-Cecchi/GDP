@@ -286,6 +286,56 @@ void testTallCoverSupportsHiddenMovement()
         "the player can traverse the concealed side without colliding with cover");
 }
 
+void testDestructibleCeilingFixture()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    EntityManager manager;
+    const EntityId fixture = manager.createProp({
+        .transform = {
+            .position = {0.0F, 3.80F, -2.0F},
+            .scale = {1.20F, 0.18F, 0.28F},
+        },
+        .roomId = 12,
+        .type = PropType::CeilingFixture,
+        .solid = false,
+        .health = 24.0F,
+        .maximumHealth = 24.0F,
+        .visualSeed = 991U,
+    });
+    const CollisionWorld room{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    expect(collisionWorldWithProps(room, manager, 12).solids().empty(),
+        "ceiling fixture is targetable without blocking character navigation");
+
+    Weapon weapon({.damage = 12.0F, .fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult damaged = fireHitscan(
+        weapon, {0.0F, 3.80F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        12, room, manager);
+    expect(damaged.outcome == ShotOutcome::Hit && damaged.hit
+            && damaged.hit->target == fixture && damaged.impact
+            && damaged.impact->material == ImpactMaterial::Metal
+            && manager.findData<PropData>(fixture)->state == PropState::Damaged,
+        "first fixture hit produces a metallic impact and persistent damage");
+
+    const ShotResult destroyed = fireHitscan(
+        weapon, {0.0F, 3.80F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        12, room, manager);
+    expect(destroyed.outcome == ShotOutcome::Destroyed && destroyed.hit
+            && destroyed.hit->target == fixture
+            && !destroyed.spawnedItem.isValid()
+            && manager.findData<PropData>(fixture)->state == PropState::Destroyed,
+        "second fixture hit permanently disables it without generating loot");
+
+    const ShotResult afterDestruction = fireHitscan(
+        weapon, {0.0F, 3.80F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        12, room, manager);
+    expect(afterDestruction.outcome == ShotOutcome::ImpactWorld
+            && (!afterDestruction.hit || afterDestruction.hit->target != fixture),
+        "destroyed fixture no longer intercepts subsequent shots");
+}
+
 } // namespace
 
 int main()
@@ -295,6 +345,7 @@ int main()
     testPropDamageCollisionAndDrops();
     testHitscanPropPriority();
     testTallCoverSupportsHiddenMovement();
+    testDestructibleCeilingFixture();
     if (failures != 0) {
         std::cerr << failures << " prop test(s) failed\n";
         return 1;

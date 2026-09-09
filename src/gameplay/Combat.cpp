@@ -122,6 +122,7 @@ ImpactMaterial propImpactMaterial(
     case PropType::Terminal:
     case PropType::Door:
     case PropType::Canister:
+    case PropType::CeilingFixture:
         return ImpactMaterial::Metal;
     }
     return ImpactMaterial::Composite;
@@ -233,8 +234,12 @@ ShotResult fireHitscan(
         const gdp::entities::Entity* entity = manager.find(id);
         const gdp::entities::PropData* prop
             = manager.findData<gdp::entities::PropData>(id);
+        const bool targetable = prop != nullptr
+            && (prop->solid
+                || prop->type == gdp::entities::PropType::CeilingFixture);
         if (entity == nullptr || prop == nullptr || entity->roomId != roomId
-            || !prop->solid || prop->state == gdp::entities::PropState::Destroyed) {
+            || !targetable
+            || prop->state == gdp::entities::PropState::Destroyed) {
             continue;
         }
         const auto interval = rayAabbInterval(

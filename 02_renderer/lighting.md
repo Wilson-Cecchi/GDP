@@ -2,7 +2,9 @@
 
 > **Estado:** luz pontual mínima implementada na Fase 2; planos procedurais por
 > sala, alerta e budgets integrados na Fase 12; mistura ambiente entre salas
-> conectadas integrada na Fase 14. Flicker e estados persistentes permanecem planejados.
+> conectadas integrada na Fase 14. A Fase 113 vinculou cada ponto a uma
+> luminária acertável com estados persistentes de dano. Flicker temporal
+> permanece planejado.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -61,6 +63,14 @@ Define quantidade, zonas, cor/temperatura, intensidade, chance de falha e luzes 
 `ON`, `OFF`, `FLICKER`, `DAMAGED`, `EMERGENCY`.
 
 Flicker usa tempo para animação; frequência/fase podem vir da seed sem consumir RNG por frame.
+
+Desde a Fase 113, `Intact`, `Damaged` e `Destroyed` já são estados funcionais.
+Cada ponto da sala cria um `CeilingFixture` de 24 HP no mesmo transform. O alvo
+não é sólido para movimento, mas o hitscan usa seu AABB metálico. `Damaged`
+mantém 45% da intensidade e da emissão; `Destroyed` zera ambas e preserva uma
+carcaça escura. Não há loot nem reparo por Engineer. A iluminação ambiente não
+é removida, mantendo portas, objetivos e rotas legíveis mesmo após destruir
+todas as luminárias.
 
 ## Legibilidade
 

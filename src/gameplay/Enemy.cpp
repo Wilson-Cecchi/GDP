@@ -1353,7 +1353,8 @@ EnemyUpdateSummary updateEngineers(
                 const Entity* propEntity = manager.find(propId);
                 const PropData* prop = manager.findData<PropData>(propId);
                 if (propEntity == nullptr || prop == nullptr || propEntity->roomId != roomId
-                    || prop->state != PropState::Damaged) {
+                    || prop->state != PropState::Damaged
+                    || prop->type == gdp::entities::PropType::CeilingFixture) {
                     continue;
                 }
                 const wkc::core::Vec3 propOffset

@@ -424,6 +424,9 @@ especializados das pastas numeradas.
 - **Fase 112 — Armas em primeira pessoa:** Pistol e Carbine recebem silhuetas
   próprias no viewmodel, com entrada ao equipar, arco de recarga, recuo e flash
   de disparo ligados ao estado real da arma. Overdrive altera o detalhe emissivo.
+- **Fase 113 — Luminárias destrutíveis:** cada ponto de luz possui um fixture
+  metálico acertável no teto. Dano reduz luz e emissão; destruição apaga ambos
+  sem criar loot, bloquear navegação ou permitir reparo por Engineer.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1052,6 +1055,15 @@ altera o hitscan da câmera. Pistol e Carbine têm comprimentos, empunhaduras e
 detalhes próprios; Overdrive troca apenas o detalhe emissivo para magenta. Seed
 visual varia discretamente o metal sem consumir RNG estrutural. Gameplay,
 persistência, WKC Forge e regras de Campaign/Speedrun permanecem inalterados.
+
+Na Fase 113, cada `RoomPointLight` ganha uma entidade `CeilingFixture` não
+sólida, com AABB centrado no modelo, 24 HP e seed visual derivada do domínio de
+iluminação. O hitscan considera esse tipo mesmo sem colisão de navegação: dano
+abaixo de 50% reduz intensidade/emissão para 45%, e destruição apaga a luz e
+escurece a carcaça pelo restante da run. O alvo usa impacto e áudio metálicos,
+não gera drop, XP ou reparo de Engineer. A luz ambiente mínima continua ativa
+para impedir softlock visual. Por afetar decisões e tempo da run, Campaign e
+Speedrun avançam para regras 20/19; RNG estrutural e WKC Forge não mudam.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

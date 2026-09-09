@@ -489,6 +489,8 @@ struct PointLightRenderData {
     wkc::core::Vec3 color{1.0F, 1.0F, 1.0F};
     float intensity{1.0F};
     float range{6.0F};
+    PropVisualState fixtureState{PropVisualState::Intact};
+    float fixtureEmissionScale{1.0F};
 };
 
 struct RoomLightingRenderData {

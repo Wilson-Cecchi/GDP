@@ -9,6 +9,13 @@ wkc::core::Aabb propCollisionBounds(
     const gdp::entities::PropData& prop) noexcept
 {
     wkc::core::Vec3 scale = entity.transform.scale;
+    if (prop.type == gdp::entities::PropType::CeilingFixture) {
+        const wkc::core::Vec3 half = scale * 0.5F;
+        return {
+            entity.transform.position - half,
+            entity.transform.position + half,
+        };
+    }
     if (prop.state == gdp::entities::PropState::Destroyed) {
         scale.y = std::min(scale.y, 0.12F);
     }

@@ -234,6 +234,30 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lightingPixels.data());
 
+            gdp::game::visual::RoomLightingRenderData damagedFixtureLighting
+                = proceduralLighting;
+            damagedFixtureLighting.lights[0].intensity *= 0.45F;
+            damagedFixtureLighting.lights[0].fixtureState
+                = gdp::game::visual::PropVisualState::Damaged;
+            damagedFixtureLighting.lights[0].fixtureEmissionScale = 0.45F;
+            const bool renderedDamagedFixture = renderer.render(
+                width, height, {}, {}, {}, {}, damagedFixtureLighting);
+            std::vector<std::uint8_t> damagedFixturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                damagedFixturePixels.data());
+
+            gdp::game::visual::RoomLightingRenderData destroyedFixtureLighting
+                = damagedFixtureLighting;
+            destroyedFixtureLighting.lights[0].intensity = 0.0F;
+            destroyedFixtureLighting.lights[0].fixtureState
+                = gdp::game::visual::PropVisualState::Destroyed;
+            destroyedFixtureLighting.lights[0].fixtureEmissionScale = 0.0F;
+            const bool renderedDestroyedFixture = renderer.render(
+                width, height, {}, {}, {}, {}, destroyedFixtureLighting);
+            std::vector<std::uint8_t> destroyedFixturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                destroyedFixturePixels.data());
+
             proceduralLighting.alert = true;
             const bool renderedAlertLighting = renderer.render(
                 width, height, {}, {}, {}, {}, proceduralLighting);
@@ -719,6 +743,8 @@ int main()
             std::size_t securityChangedChannels = 0;
             std::size_t centralHubChangedChannels = 0;
             std::size_t lightingChangedChannels = 0;
+            std::size_t damagedFixtureChangedChannels = 0;
+            std::size_t destroyedFixtureChangedChannels = 0;
             std::size_t alertLightingChangedChannels = 0;
             std::size_t doorStateChangedChannels = 0;
             std::size_t doorMotionChangedChannels = 0;
@@ -797,6 +823,14 @@ int main()
                     if (lightingPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++lightingChangedChannels;
+                    }
+                    if (damagedFixturePixels[index + channel]
+                        != lightingPixels[index + channel]) {
+                        ++damagedFixtureChangedChannels;
+                    }
+                    if (destroyedFixturePixels[index + channel]
+                        != damagedFixturePixels[index + channel]) {
+                        ++destroyedFixtureChangedChannels;
                     }
                     if (alertLightingPixels[index + channel]
                         != lightingPixels[index + channel]) {
@@ -959,6 +993,10 @@ int main()
                 && renderedSecurityVariant && securityChangedChannels > 100U
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
+                && renderedDamagedFixture
+                && damagedFixtureChangedChannels > 100U
+                && renderedDestroyedFixture
+                && destroyedFixtureChangedChannels > 100U
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U
@@ -1024,6 +1062,8 @@ int main()
                           << " changed=" << corridorChangedChannels
                           << " cornerCyan=" << cornerCyanPixels
                           << " doorState=" << doorStateChangedChannels
+                          << " fixture=" << damagedFixtureChangedChannels
+                          << '/' << destroyedFixtureChangedChannels
                           << " impact=" << impactChangedChannels
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels

@@ -70,6 +70,8 @@ wkc::core::Vec3 scaleFor(const gdp::entities::PropType type) noexcept
         return {0.46F, 1.02F, 0.46F};
     case PropType::Barricade:
         return {1.16F, 0.92F, 0.34F};
+    case PropType::CeilingFixture:
+        return {1.20F, 0.18F, 0.28F};
     case PropType::Terminal:
     case PropType::Door:
     case PropType::Decoration:
@@ -88,6 +90,8 @@ float healthFor(const gdp::entities::PropType type) noexcept
         return 35.0F;
     case PropType::Barricade:
         return 90.0F;
+    case PropType::CeilingFixture:
+        return 24.0F;
     case PropType::Terminal:
     case PropType::Door:
     case PropType::Decoration:

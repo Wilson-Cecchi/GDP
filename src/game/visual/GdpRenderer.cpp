@@ -1334,8 +1334,10 @@ bool GdpRenderer::render(
         const PointLightRenderData& light = lighting.lights[index];
         const wkc::core::Vec3 fixtureColor = lighting.alert
             ? fixtureAlertColor : light.color;
-        const float lensEmission = lighting.alert
+        const float baseLensEmission = lighting.alert
             ? lighting.fixtureEmissive * 1.35F : lighting.fixtureEmissive;
+        const float lensEmission
+            = baseLensEmission * light.fixtureEmissionScale;
         const wkc::core::Vec3 lensTint = lensEmission > 0.01F
             ? fixtureColor : wkc::core::Vec3{0.42F, 0.44F, 0.43F};
         const auto drawFixturePiece = [this, &light](
@@ -1354,13 +1356,18 @@ bool GdpRenderer::render(
             shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
             box_.draw(gl_);
         };
-        constexpr wkc::core::Vec3 neutralTint{1.0F, 1.0F, 1.0F};
+        const wkc::core::Vec3 housingTint
+            = light.fixtureState == PropVisualState::Destroyed
+            ? wkc::core::Vec3{0.30F, 0.32F, 0.31F}
+            : light.fixtureState == PropVisualState::Damaged
+                ? wkc::core::Vec3{0.70F, 0.56F, 0.40F}
+                : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
         drawFixturePiece({0.0F, 0.095F, 0.0F}, {1.20F, 0.12F, 0.28F},
-            {0.46F, 0.96F}, {0.02F, 0.02F}, neutralTint, 0.0F);
+            {0.46F, 0.96F}, {0.02F, 0.02F}, housingTint, 0.0F);
         drawFixturePiece({0.0F, 0.015F, 0.0F}, {1.17F, 0.055F, 0.255F},
-            {0.14F, 0.96F}, {0.52F, 0.02F}, neutralTint, 0.0F);
+            {0.14F, 0.96F}, {0.52F, 0.02F}, housingTint, 0.0F);
         drawFixturePiece({0.0F, -0.022F, 0.0F}, {1.10F, 0.040F, 0.215F},
-            {0.05F, 0.96F}, {0.69F, 0.02F}, neutralTint, 0.0F);
+            {0.05F, 0.96F}, {0.69F, 0.02F}, housingTint, 0.0F);
         drawFixturePiece({0.0F, -0.052F, 0.0F}, {1.03F, 0.030F, 0.170F},
             {0.21F, 0.96F}, {0.77F, 0.02F}, lensTint, lensEmission);
 
@@ -1372,7 +1379,7 @@ bool GdpRenderer::render(
         };
         for (const wkc::core::Vec3 fastenerOffset : fastenerOffsets) {
             drawFixturePiece(fastenerOffset, {0.045F, 0.018F, 0.045F},
-                {0.14F, 0.96F}, {0.52F, 0.02F}, neutralTint, 0.0F);
+                {0.14F, 0.96F}, {0.52F, 0.02F}, housingTint, 0.0F);
         }
     }
     shader_.setInt(gl_, "uUseEmissionMap", 0);

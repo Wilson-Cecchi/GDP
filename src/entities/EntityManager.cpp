@@ -18,6 +18,8 @@ float defaultPropHealth(const PropType type) noexcept
         return 35.0F;
     case PropType::Barricade:
         return 90.0F;
+    case PropType::CeilingFixture:
+        return 24.0F;
     case PropType::Terminal:
     case PropType::Door:
     case PropType::Decoration:
