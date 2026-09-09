@@ -1189,6 +1189,14 @@ movimento final ainda passa por steering, separação e colisão, e uma rota
 impossível conserva o desvio local como fallback. Não há RNG, mudança de world
 fingerprint ou API WKC Forge. Campaign/Speedrun passam às regras 15/14.
 
+Na Fase 107, `InvestigationConfig::visionHalfAngleDegrees` torna a orientação
+lógica parte da aquisição visual. O helper compartilhado deriva o forward do
+yaw, testa o produto escalar contra a meia abertura específica do papel e só
+então consulta line of sight. Audição não usa esse cone. A START orienta seu
+Worker inicial diretamente para o Player, preservando o tutorial em qualquer
+rotação do módulo. Sem RNG ou API WKC Forge nova, Campaign/Speedrun avançam para
+regras 16/15.
+
 ---
 
 # 8. Sistema de seed

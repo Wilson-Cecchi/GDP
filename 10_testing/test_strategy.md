@@ -373,6 +373,12 @@ aproxime. A simulação de 720 fixed ticks precisa atravessar o lado externo,
 alcançar a frente da barreira e repetir posição e decisão exatamente. Os testes
 anteriores continuam protegendo o desvio local e os volumes entre inimigos.
 
+O gate da Fase 107 posiciona o Player primeiro atrás e depois à frente de cada
+um dos cinco arquétipos, com geometria livre e sem avanço de tempo. Pelas costas
+nenhuma memória ou ação de combate pode surgir; no cone frontal a aquisição deve
+acontecer no mesmo tick. A população também confirma que o Worker da START nasce
+orientado para o Player independentemente da rotação da sala.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

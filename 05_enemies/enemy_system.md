@@ -95,6 +95,11 @@ Fase 106 um grafo de visibilidade local à sala. Ele encontra desvios completos
 ao redor de conjuntos de AABBs, mas não move inimigos entre salas nem substitui
 o `CollisionWorld`, a separação física ou as regras específicas dos papéis.
 
+Desde a Fase 107, aquisição visual também respeita a orientação corporal.
+Cada papel possui meia abertura explícita entre `65°` e `85°`; um alvo fora
+desse cone não atualiza a memória mesmo com alcance e geometria livres. Audição
+continua omnidirecional e pode iniciar Alert sem conceder visão automática.
+
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no
 mesmo `EntityManager`/`RoomInstance` e só atualiza a partir do fixed update

@@ -567,13 +567,32 @@ bool playerVisibleToEnemy(
     const Player& player,
     const float distance,
     const float detectionRange,
+    const float visionHalfAngleDegrees,
     const float eyeHeight,
     const CollisionWorld& collisionWorld) noexcept
 {
-    return player.state().alive && distance <= detectionRange
-        && hasLineOfSight(
-            enemy.transform.position + wkc::core::Vec3{0.0F, eyeHeight, 0.0F},
-            player.cameraPosition(), collisionWorld);
+    if (!player.state().alive || distance > detectionRange) {
+        return false;
+    }
+    const wkc::core::Vec3 offset
+        = player.state().position - enemy.transform.position;
+    const wkc::core::Vec3 towardPlayer
+        = wkc::core::normalized({offset.x, 0.0F, offset.z});
+    const float safeHalfAngle = std::clamp(
+        std::isfinite(visionHalfAngleDegrees) ? visionHalfAngleDegrees : 0.0F,
+        0.0F, 180.0F);
+    constexpr float degreesToRadians = 0.01745329251994329577F;
+    const float yawRadians = std::isfinite(enemy.transform.rotationDegrees.y)
+        ? enemy.transform.rotationDegrees.y * degreesToRadians : 0.0F;
+    const wkc::core::Vec3 forward{
+        std::sin(yawRadians), 0.0F, std::cos(yawRadians)};
+    if (wkc::core::dot(forward, towardPlayer)
+        + 1.0e-5F < std::cos(safeHalfAngle * degreesToRadians)) {
+        return false;
+    }
+    return hasLineOfSight(
+        enemy.transform.position + wkc::core::Vec3{0.0F, eyeHeight, 0.0F},
+        player.cameraPosition(), collisionWorld);
 }
 
 void rememberVisiblePlayer(
@@ -911,7 +930,8 @@ EnemyUpdateSummary updateWorkers(
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
         const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.0F,
+            *entity, player, distance, config.detectionRange,
+            config.investigation.visionHalfAngleDegrees, 1.0F,
             collisionWorld);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
@@ -1003,7 +1023,8 @@ EnemyUpdateSummary updateGuards(
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
         const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.35F,
+            *entity, player, distance, config.detectionRange,
+            config.investigation.visionHalfAngleDegrees, 1.35F,
             collisionWorld);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
@@ -1117,7 +1138,8 @@ EnemyUpdateSummary updateOfficers(
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
         const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.4F,
+            *entity, player, distance, config.detectionRange,
+            config.investigation.visionHalfAngleDegrees, 1.4F,
             collisionWorld);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
@@ -1269,7 +1291,8 @@ EnemyUpdateSummary updateEngineers(
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
         const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.25F,
+            *entity, player, distance, config.detectionRange,
+            config.investigation.visionHalfAngleDegrees, 1.25F,
             collisionWorld);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
@@ -1519,7 +1542,8 @@ EnemyUpdateSummary updateIndustrialRobots(
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
         const bool lineOfSight = playerVisibleToEnemy(
-            *entity, player, distance, config.detectionRange, 1.45F,
+            *entity, player, distance, config.detectionRange,
+            config.investigation.visionHalfAngleDegrees, 1.45F,
             collisionWorld);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);

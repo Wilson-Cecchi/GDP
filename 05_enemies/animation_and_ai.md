@@ -18,7 +18,8 @@
 > A Fase 101 implementou aquisição visual e investigação da última posição
 > conhecida. A Fase 103 acrescentou percepção por ruído de disparo e a Fase
 > 104 implementou a reação dedicada `Alert`. A Fase 105 acrescentou `Recover`
-> ao fim da busca e a Fase 106 implementou pathfinding global dentro da sala.
+> ao fim da busca, a Fase 106 implementou pathfinding global dentro da sala e a
+> Fase 107 limitou aquisição ao cone de visão de cada papel.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -255,3 +256,10 @@ bloqueado. Origem, destino e cantos com folga física formam os nós; somente
 segmentos inteiramente ocupáveis viram arestas. O menor caminho orienta Chase,
 Investigate e Patrol, enquanto steering, separação e colisão resolvem o
 movimento final. Rotas inexistentes mantêm o fallback local e seus timeouts.
+
+A Fase 107 combina orientação e percepção: o yaw lógico define o vetor frontal
+usado por uma meia abertura de `65°/75°/80°/70°/85°` para
+Worker/Guard/Officer/Engineer/IndustrialRobot. Alcance e line of sight continuam
+obrigatórios. Patrulha, Chase, Investigate, Alert e Recover já giram o corpo e,
+portanto, varrem o cone sem estado visual paralelo. Ruído pode chegar por trás e
+usa Alert para orientar o inimigo antes da confirmação visual.

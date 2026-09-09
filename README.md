@@ -402,6 +402,10 @@ especializados das pastas numeradas.
   patrulha usam um grafo de visibilidade determinístico para atravessar rotas com
   múltiplos obstáculos. O desvio curto permanece como fallback físico.
   Campaign/Speedrun avançam para regras 15/14.
+- **Fase 107 — Percepção direcional:** visão agora exige alcance, linha livre e
+  presença no cone frontal próprio de cada papel. Patrulha e busca orientam esse
+  cone, enquanto ruído continua podendo alertar pelas costas. Campaign/Speedrun
+  avançam para regras 16/15.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -976,6 +980,14 @@ próximo ponto visível. Isso permite sair inclusive de obstáculos em U, sem RN
 navmesh universal ou mudança nos fingerprints do mundo. O steering local,
 separação e colisão contínua continuam autoritativos como acabamento e fallback.
 Campaign/Speedrun passam às regras 15/14.
+
+Na Fase 107, os cinco papéis deixam de possuir visão de 360°. O vetor frontal é
+derivado do yaw lógico e comparado ao alvo antes do raycast: Worker usa meia
+abertura de `65°`, Guard `75°`, Officer `80°`, Engineer `70°` e
+IndustrialRobot `85°`. Ruído continua omnidirecional dentro do alcance auditivo
+e pode girar o inimigo para uma futura aquisição visual. O Worker inicial da
+START nasce orientado para o Player, preservando o tutorial e o teste headless.
+Campaign/Speedrun passam às regras 16/15.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

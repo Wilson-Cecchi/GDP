@@ -8,6 +8,15 @@
 #include <cmath>
 
 namespace gdp::world {
+namespace {
+
+float yawForDirection(const wkc::core::Vec3 direction) noexcept
+{
+    constexpr float radiansToDegrees = 57.29577951308232F;
+    return std::atan2(direction.x, direction.z) * radiansToDegrees;
+}
+
+} // namespace
 
 bool InitialEntitySet::isValid() const noexcept
 {
@@ -108,8 +117,15 @@ InitialEntitySet populateInitialEntities(
             });
             addToRoom(result.terminal);
 
+            const wkc::core::Vec3 workerPosition
+                = positionInRoom(room, {2.4F, 0.0F, -0.5F});
             addToRoom(manager.createEnemy({
-                .transform = {.position = positionInRoom(room, {2.4F, 0.0F, -0.5F})},
+                .transform = {
+                    .position = workerPosition,
+                    .rotationDegrees = {0.0F,
+                        yawForDirection(player.transform.position - workerPosition),
+                        0.0F},
+                },
                 .roomId = room.id,
                 .archetype = EnemyArchetype::Worker,
                 .health = 68.0F * safeDifficulty,

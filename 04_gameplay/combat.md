@@ -187,3 +187,10 @@ collider e arestas são amostradas integralmente, portanto sólidos e limites
 continuam autoritativos. A regressão usa uma barreira em U que exige primeiro
 afastar-se do Player para depois alcançá-lo, além de repetir a rota exatamente.
 Campaign/Speedrun passam às regras 15/14.
+
+Na Fase 107, aquisição visual exige também o cone frontal definido no perfil de
+investigação. O cálculo usa yaw lógico, produto escalar e meia abertura por
+papel antes de consultar line of sight. Um alvo visível pelas costas não cria
+memória; à frente, todos os cinco papéis retomam seu comportamento no mesmo
+tick. Audição permanece independente dessa restrição. Campaign/Speedrun passam
+às regras 16/15.

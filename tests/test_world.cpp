@@ -409,11 +409,26 @@ void testInitialEntityPopulation()
     bool bossRobotValid = false;
     bool startCoverValid = false;
     bool startCoverSpawnClear = false;
+    bool startWorkerFacesPlayer = false;
     for (const RoomInstance& room : generated.world->rooms) {
         for (const EntityId id : room.entities) {
             const EnemyData* enemy = manager.findData<EnemyData>(id);
             const Entity* entity = manager.find(id);
             const PropData* prop = manager.findData<PropData>(id);
+            if (room.role == RoomRole::Start && entity != nullptr
+                && enemy != nullptr
+                && enemy->archetype == EnemyArchetype::Worker) {
+                constexpr float degreesToRadians = 0.01745329251994329577F;
+                const float yaw
+                    = entity->transform.rotationDegrees.y * degreesToRadians;
+                const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
+                const Entity* playerEntity = manager.find(initial.player);
+                const wkc::core::Vec3 towardPlayer = playerEntity == nullptr
+                    ? wkc::core::Vec3{}
+                    : wkc::core::normalized(
+                        playerEntity->transform.position - entity->transform.position);
+                startWorkerFacesPlayer = wkc::core::dot(forward, towardPlayer) > 0.99F;
+            }
             startCoverValid = startCoverValid || (room.role == RoomRole::Start
                 && entity != nullptr && prop != nullptr
                 && prop->type == PropType::Barricade && prop->solid
@@ -480,6 +495,8 @@ void testInitialEntityPopulation()
         "START includes one tall and wide cover volume for perception validation");
     expect(startCoverSpawnClear,
         "START cover stays inside the room without enclosing any initial entity");
+    expect(startWorkerFacesPlayer,
+        "START Worker initially faces the Player for the perception tutorial");
 
     const auto collectEnemyVisualSeeds = [](const EntityManager& entities) {
         std::vector<wkc::core::Seed> seeds;

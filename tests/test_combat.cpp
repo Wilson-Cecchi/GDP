@@ -320,7 +320,8 @@ void testWorkerBehavior()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId worker = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 5.0F}},
+        .transform = {.position = {0.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Worker,
     });
@@ -380,6 +381,93 @@ void testWorkerLineOfSight()
         "Worker cannot attack through blocking geometry");
 }
 
+void testDirectionalEnemyVision()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    expect(WorkerConfig{}.investigation.visionHalfAngleDegrees == 65.0F
+            && GuardConfig{}.investigation.visionHalfAngleDegrees == 75.0F
+            && OfficerConfig{}.investigation.visionHalfAngleDegrees == 80.0F
+            && EngineerConfig{}.investigation.visionHalfAngleDegrees == 70.0F
+            && IndustrialRobotConfig{}.investigation.visionHalfAngleDegrees
+                == 85.0F,
+        "every enemy role has an explicit directional vision profile");
+
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const auto updateRole = [&room](const EnemyArchetype archetype,
+                                    EntityManager& manager,
+                                    Player& player) {
+        switch (archetype) {
+        case EnemyArchetype::Worker: {
+            WorkerConfig config;
+            config.detectionRange = 20.0F;
+            config.attackDamage = 0.0F;
+            return updateWorkers(manager, player, 1, room, 0.0F, config);
+        }
+        case EnemyArchetype::Guard: {
+            GuardConfig config;
+            config.detectionRange = 20.0F;
+            config.attackDamage = 0.0F;
+            return updateGuards(manager, player, 1, room, 0.0F, config);
+        }
+        case EnemyArchetype::Officer: {
+            OfficerConfig config;
+            config.detectionRange = 20.0F;
+            config.attackDamage = 0.0F;
+            config.allyCooldownReduction = 0.0F;
+            return updateOfficers(manager, player, 1, room, 0.0F, config);
+        }
+        case EnemyArchetype::Engineer: {
+            EngineerConfig config;
+            config.detectionRange = 20.0F;
+            config.attackDamage = 0.0F;
+            config.repairAmount = 0.0F;
+            return updateEngineers(manager, player, 1, room, 0.0F, config);
+        }
+        case EnemyArchetype::IndustrialRobot: {
+            IndustrialRobotConfig config;
+            config.detectionRange = 20.0F;
+            config.longRangeDamage = 0.0F;
+            return updateIndustrialRobots(
+                manager, player, 1, room, 0.0F, config);
+        }
+        }
+        return EnemyUpdateSummary{};
+    };
+
+    constexpr std::array archetypes{
+        EnemyArchetype::Worker,
+        EnemyArchetype::Guard,
+        EnemyArchetype::Officer,
+        EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot,
+    };
+    for (const EnemyArchetype archetype : archetypes) {
+        Player player;
+        player.spawn({0.0F, 0.0F, -4.0F});
+        EntityManager manager;
+        const EntityId enemyId = manager.createEnemy({
+            .transform = {
+                .position = {0.0F, 0.0F, 0.0F},
+                .rotationDegrees = {0.0F, 0.0F, 0.0F},
+            },
+            .roomId = 1,
+            .archetype = archetype,
+        });
+        const EnemyUpdateSummary rear = updateRole(archetype, manager, player);
+        expect(manager.findData<EnemyData>(enemyId)->investigationTime == 0.0F
+                && rear.chasing == 0U && rear.attacking == 0U,
+            "an unaware enemy does not acquire a visible player behind it");
+
+        (void)player.relocate({0.0F, 0.0F, 4.0F}, 0.0F);
+        const EnemyUpdateSummary front = updateRole(archetype, manager, player);
+        expect(manager.findData<EnemyData>(enemyId)->investigationTime > 0.0F
+                && front.chasing + front.repositioning + front.attacking == 1U,
+            "every role acquires a player inside its forward vision cone");
+    }
+}
+
 void testDeterministicEnemyObstacleAvoidance()
 {
     using namespace gdp::entities;
@@ -394,7 +482,8 @@ void testDeterministicEnemyObstacleAvoidance()
         player.spawn({0.0F, 0.0F, 0.0F});
         EntityManager manager;
         const EntityId worker = manager.createEnemy({
-            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .transform = {.position = {0.0F, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
             .roomId = 1,
             .archetype = EnemyArchetype::Worker,
             .visualSeed = 0xA11CEU,
@@ -443,7 +532,8 @@ void testDeterministicEnemyGlobalPathfinding()
         player.spawn({0.0F, 0.0F, 0.0F});
         EntityManager manager;
         const EntityId worker = manager.createEnemy({
-            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .transform = {.position = {0.0F, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
             .roomId = 1,
             .archetype = EnemyArchetype::Worker,
             .visualSeed = 0x106U,
@@ -607,7 +697,8 @@ void testGuardRangedBehavior()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId guard = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 10.0F}},
+        .transform = {.position = {0.0F, 0.0F, 10.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Guard,
     });
@@ -697,7 +788,8 @@ void testOfficerCommandSupport()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId officer = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 8.0F}},
+        .transform = {.position = {0.0F, 0.0F, 8.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Officer,
     });
@@ -761,7 +853,8 @@ void testOfficerRangedBehaviorAndLineOfSight()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId officer = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 12.0F}},
+        .transform = {.position = {0.0F, 0.0F, 12.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Officer,
     });
@@ -819,7 +912,8 @@ void testEngineerRepairSystem()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId engineer = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 5.0F}},
+        .transform = {.position = {0.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Engineer,
     });
@@ -890,7 +984,8 @@ void testEngineerRangedBehaviorAndRepairOcclusion()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId engineer = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 8.0F}},
+        .transform = {.position = {0.0F, 0.0F, 8.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 1,
         .archetype = EnemyArchetype::Engineer,
     });
@@ -974,7 +1069,8 @@ void testIndustrialRobotPhases()
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId robot = manager.createEnemy({
-        .transform = {.position = {0.0F, 0.0F, 14.0F}},
+        .transform = {.position = {0.0F, 0.0F, 14.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
         .roomId = 7,
         .archetype = EnemyArchetype::IndustrialRobot,
         .health = 250.0F,
@@ -1097,13 +1193,14 @@ void testEnemyFacingLifecycle()
         .roomId = 1,
         .archetype = EnemyArchetype::Worker,
     });
-    const WorkerConfig workerConfig{
+    WorkerConfig workerConfig{
         .detectionRange = 10.0F,
         .attackRange = 1.1F,
         .moveSpeed = 1.0F,
         .attackDamage = 0.0F,
         .attackInterval = 1.0F,
     };
+    workerConfig.investigation.visionHalfAngleDegrees = 180.0F;
 
     (void)updateWorkers(manager, player, 1, room, 0.05F, workerConfig);
     expect(near(manager.find(worker)->transform.rotationDegrees.y, -7.0F),
@@ -1150,23 +1247,21 @@ void testEnemyFacingLifecycle()
         .roomId = 2,
         .archetype = EnemyArchetype::Guard,
     });
+    GuardConfig retreatConfig{
+        .detectionRange = 20.0F,
+        .preferredMinimumRange = 4.0F,
+        .preferredMaximumRange = 8.0F,
+        .moveSpeed = 1.0F,
+        .attackDamage = 0.0F,
+    };
+    retreatConfig.investigation.visionHalfAngleDegrees = 180.0F;
     (void)updateGuards(
-        retreatManager, retreatPlayer, 2, room, 0.05F,
-        {.detectionRange = 20.0F,
-            .preferredMinimumRange = 4.0F,
-            .preferredMaximumRange = 8.0F,
-            .moveSpeed = 1.0F,
-            .attackDamage = 0.0F});
+        retreatManager, retreatPlayer, 2, room, 0.05F, retreatConfig);
     expect(retreatManager.find(guard)->transform.position.x > 1.01F
             && near(retreatManager.find(guard)->transform.rotationDegrees.y, -36.0F),
         "Reposition backs away while turning smoothly toward the player");
     (void)updateGuards(
-        retreatManager, retreatPlayer, 2, room, 0.2F,
-        {.detectionRange = 20.0F,
-            .preferredMinimumRange = 4.0F,
-            .preferredMaximumRange = 8.0F,
-            .moveSpeed = 1.0F,
-            .attackDamage = 0.0F});
+        retreatManager, retreatPlayer, 2, room, 0.2F, retreatConfig);
     expect(near(retreatManager.find(guard)->transform.rotationDegrees.y, -90.0F),
         "Reposition converges to the target after enough deterministic time");
 }
@@ -1345,7 +1440,8 @@ void testEnemyInvestigationLifecycle()
         player.spawn({0.0F, 0.0F, 0.0F});
         EntityManager manager;
         const EntityId id = manager.createEnemy({
-            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .transform = {.position = {0.0F, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
             .roomId = 5,
             .archetype = archetype,
         });
@@ -1708,6 +1804,7 @@ int main()
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testWorkerBehavior();
     testWorkerLineOfSight();
+    testDirectionalEnemyVision();
     testDeterministicEnemyObstacleAvoidance();
     testDeterministicEnemyGlobalPathfinding();
     testDeterministicEnemySeparation();
