@@ -46,6 +46,8 @@
 > o fim visual ao repouso de todas as partes rígidas.
 > A Fase 109 adicionou impactos materiais transitórios como snapshots puros,
 > sem transferir dano, raycast ou ownership temporal ao renderer.
+> A Fase 111 centralizou a paleta e a moldura industrial de todos os overlays,
+> sem alterar os contratos de input ou os layouts compartilhados.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -187,6 +189,10 @@ objetivo no topo e menu central para Victory/Defeat. O estado terminal oferece
 jogar novamente, retornar ao título ou sair, compartilhando `ResultMenuLayout`
 entre desenho e hit test. A regressão OpenGL exige alteração de pixels para o
 estado terminal e ao trocar sua seleção.
+
+Na Fase 111, o passe bitmap consulta `industrialUiTheme()` e usa compositores
+locais de painel e seleção. A ornamentação permanece no renderer concreto do
+GDP; `UiRect` continua sendo a única geometria compartilhada com hit tests.
 
 ## Separação
 

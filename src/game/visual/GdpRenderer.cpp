@@ -1539,9 +1539,36 @@ bool GdpRenderer::render(
     const int hudMargin = 6 * hudScale;
     const int hudPadding = 4 * hudScale;
     const int hudLineHeight = 9 * hudScale;
-    const wkc::core::Vec3 panelColor{0.018F, 0.032F, 0.040F};
-    const wkc::core::Vec3 textColor{0.76F, 0.86F, 0.90F};
-    const wkc::core::Vec3 cyanColor{0.22F, 0.84F, 0.90F};
+    const UiVisualTheme uiTheme = industrialUiTheme();
+    const wkc::core::Vec3 panelColor = uiTheme.panel;
+    const wkc::core::Vec3 textColor = uiTheme.text;
+    const wkc::core::Vec3 cyanColor = uiTheme.accent;
+    const auto drawIndustrialPanel = [&](const UiRect panel,
+                                         const int scale,
+                                         const wkc::core::Vec3 accent) {
+        const int border = std::max(1, scale);
+        drawSolidRect(panel.x + border, panel.y - border,
+            panel.width, panel.height, {0.002F, 0.005F, 0.007F});
+        drawSolidRect(panel.x, panel.y, panel.width, panel.height,
+            uiTheme.panelBorder);
+        drawSolidRect(panel.x + border, panel.y + border,
+            std::max(0, panel.width - (border * 2)),
+            std::max(0, panel.height - (border * 2)), panelColor);
+        drawSolidRect(panel.x, panel.y + panel.height - (2 * border),
+            panel.width, 2 * border, accent);
+        const int corner = std::min(panel.height, 7 * scale);
+        drawSolidRect(panel.x, panel.y, 2 * border, corner, accent);
+        drawSolidRect(panel.x + panel.width - (2 * border), panel.y,
+            2 * border, corner, accent);
+    };
+    const auto drawSelectedRow = [&](const UiRect row,
+                                     const int scale,
+                                     const wkc::core::Vec3 accent) {
+        drawSolidRect(row.x, row.y, row.width, row.height, uiTheme.selection);
+        drawSolidRect(row.x, row.y, 2 * scale, row.height, accent);
+        drawSolidRect(row.x + row.width - (2 * scale), row.y,
+            2 * scale, row.height, accent);
+    };
     const auto drawExitConfirmation = [&]() {
         if (!hud.exitConfirmation) {
             return;
@@ -1549,13 +1576,8 @@ bool GdpRenderer::render(
         const ExitConfirmationLayout layout
             = makeExitConfirmationLayout(width, height);
         const int scale = layout.scale;
-        const wkc::core::Vec3 dangerColor{0.96F, 0.26F, 0.16F};
-        drawSolidRect(layout.panel.x, layout.panel.y,
-            layout.panel.width, layout.panel.height,
-            {0.012F, 0.020F, 0.024F});
-        drawSolidRect(layout.panel.x,
-            layout.panel.y + layout.panel.height - (2 * scale),
-            layout.panel.width, 2 * scale, dangerColor);
+        const wkc::core::Vec3 dangerColor = uiTheme.danger;
+        drawIndustrialPanel(layout.panel, scale, dangerColor);
         constexpr std::string_view title = "EXIT GAME?";
         drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (22 * scale),
@@ -1574,10 +1596,8 @@ bool GdpRenderer::render(
         for (std::size_t index = 0U; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
             if (index == selected) {
-                drawSolidRect(button.x, button.y, button.width, button.height,
-                    index == 0U
-                        ? wkc::core::Vec3{0.06F, 0.18F, 0.21F}
-                        : wkc::core::Vec3{0.24F, 0.06F, 0.04F});
+                drawSelectedRow(button, scale,
+                    index == 0U ? cyanColor : dangerColor);
             }
             drawBitmapText(
                 button.x
@@ -1590,18 +1610,14 @@ bool GdpRenderer::render(
         constexpr std::string_view controls = "WASD  ARROWS  ENTER  ESC  MOUSE";
         drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
             layout.panel.y + (5 * scale), 1, controls,
-            {0.48F, 0.62F, 0.66F});
+            uiTheme.mutedText);
     };
 
     if (hud.settingsMenu) {
         const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(0, 0, width, height, {0.006F, 0.012F, 0.016F});
-        drawSolidRect(layout.panel.x, layout.panel.y,
-            layout.panel.width, layout.panel.height, panelColor);
-        drawSolidRect(layout.panel.x,
-            layout.panel.y + layout.panel.height - (2 * scale),
-            layout.panel.width, 2 * scale, cyanColor);
+        drawSolidRect(0, 0, width, height, uiTheme.background);
+        drawIndustrialPanel(layout.panel, scale, cyanColor);
         constexpr std::string_view title = "SETTINGS";
         drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (22 * scale),
@@ -1630,10 +1646,7 @@ bool GdpRenderer::render(
             const bool selected = index
                 == static_cast<std::size_t>(hud.settingsSelection);
             if (selected) {
-                drawSolidRect(row.x, row.y, row.width, row.height,
-                    {0.06F, 0.18F, 0.21F});
-                drawSolidRect(row.x, row.y, 2 * scale,
-                    row.height, cyanColor);
+                drawSelectedRow(row, scale, cyanColor);
             }
             if (index == static_cast<std::size_t>(HudSettingsSelection::Back)) {
                 drawBitmapText(
@@ -1695,7 +1708,7 @@ bool GdpRenderer::render(
             : "W S  A D  ENTER  MOUSE";
         drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
             layout.panel.y + (7 * scale), 1, controls,
-            {0.48F, 0.62F, 0.66F});
+            uiTheme.mutedText);
 
         glDisable(GL_SCISSOR_TEST);
         glEnable(GL_DEPTH_TEST);
@@ -1713,12 +1726,13 @@ bool GdpRenderer::render(
     if (hud.mainMenu) {
         const MainMenuLayout layout = makeMainMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(0, 0, width, height, {0.006F, 0.012F, 0.016F});
-        drawSolidRect(layout.panel.x, layout.panel.y,
-            layout.panel.width, layout.panel.height, panelColor);
-        drawSolidRect(layout.panel.x,
-            layout.panel.y + layout.panel.height - (2 * scale),
-            layout.panel.width, 2 * scale, cyanColor);
+        drawSolidRect(0, 0, width, height, uiTheme.background);
+        const int railWidth = std::max(2, 2 * scale);
+        drawSolidRect(layout.panel.x - (5 * scale), layout.panel.y,
+            railWidth, layout.panel.height, uiTheme.panelBorder);
+        drawSolidRect(layout.panel.x + layout.panel.width + (3 * scale),
+            layout.panel.y, railWidth, layout.panel.height, uiTheme.panelBorder);
+        drawIndustrialPanel(layout.panel, scale, cyanColor);
 
         constexpr std::string_view title = "GDP";
         constexpr std::string_view subtitle = "GENERATED DUNGEON PROTOCOL";
@@ -1761,10 +1775,7 @@ bool GdpRenderer::render(
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
             if (index == selected) {
-                drawSolidRect(button.x, button.y, button.width, button.height,
-                    {0.06F, 0.18F, 0.21F});
-                drawSolidRect(button.x, button.y, 2 * scale,
-                    button.height, cyanColor);
+                drawSelectedRow(button, scale, cyanColor);
             }
             const int textWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - textWidth) / 2,
@@ -1780,7 +1791,7 @@ bool GdpRenderer::render(
             : "W S  ENTER  MOUSE";
         drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
             layout.panel.y + (7 * scale), 1, controls,
-            {0.48F, 0.62F, 0.66F});
+            uiTheme.mutedText);
 
         drawExitConfirmation();
 
@@ -1847,8 +1858,8 @@ bool GdpRenderer::render(
             + (8 * hudScale);
         const int statusX = hudMargin;
         const int statusY = hudMargin;
-        drawSolidRect(statusX, statusY, statusWidth, statusHeight, panelColor);
-        drawSolidRect(statusX, statusY, 2 * hudScale, statusHeight, cyanColor);
+        drawIndustrialPanel(
+            {statusX, statusY, statusWidth, statusHeight}, hudScale, cyanColor);
         const int statusTextX = statusX + hudPadding;
         const int healthTextY = statusY + statusHeight - hudPadding - (7 * hudScale);
         const float healthRatio = std::clamp(
@@ -1904,9 +1915,9 @@ bool GdpRenderer::render(
             + (4 * hudScale);
         const int progressX = std::max(hudMargin, width - hudMargin - progressWidth);
         const int progressY = hudMargin;
-        drawSolidRect(progressX, progressY, progressWidth, progressHeight, panelColor);
-        drawSolidRect(progressX + progressWidth - (2 * hudScale), progressY,
-            2 * hudScale, progressHeight, cyanColor);
+        drawIndustrialPanel(
+            {progressX, progressY, progressWidth, progressHeight},
+            hudScale, cyanColor);
         const int progressTextX = progressX + hudPadding;
         const int levelTextY = progressY + progressHeight - hudPadding - (7 * hudScale);
         drawBitmapText(progressTextX, levelTextY, hudScale, levelText, cyanColor);
@@ -1946,7 +1957,8 @@ bool GdpRenderer::render(
             const int eventX = std::max(hudMargin, width - hudMargin - eventWidth);
             const int eventY = std::max(hudMargin,
                 height - hudMargin - eventHeight - (13 * hudScale));
-            drawSolidRect(eventX, eventY, eventWidth, eventHeight, panelColor);
+            drawIndustrialPanel(
+                {eventX, eventY, eventWidth, eventHeight}, hudScale, eventColor);
             drawBitmapText(eventX + hudPadding, eventY + hudPadding,
                 hudScale, eventText, eventColor);
         }
@@ -1970,7 +1982,8 @@ bool GdpRenderer::render(
             const int promptHeight = (7 * hudScale) + (hudPadding * 2);
             const int promptX = (width - promptWidth) / 2;
             const int promptY = std::max(hudMargin, height / 5);
-            drawSolidRect(promptX, promptY, promptWidth, promptHeight, panelColor);
+            drawIndustrialPanel(
+                {promptX, promptY, promptWidth, promptHeight}, hudScale, promptColor);
             drawBitmapText(promptX + hudPadding, promptY + hudPadding,
                 hudScale, promptText, promptColor);
         }
@@ -2029,7 +2042,8 @@ bool GdpRenderer::render(
             const int noticeX = (width - noticeWidth) / 2;
             const int noticeY = std::max(hudMargin,
                 height - hudMargin - noticeHeight - (18 * hudScale));
-            drawSolidRect(noticeX, noticeY, noticeWidth, noticeHeight, panelColor);
+            drawIndustrialPanel(
+                {noticeX, noticeY, noticeWidth, noticeHeight}, hudScale, noticeColor);
             drawBitmapText(noticeX + hudPadding, noticeY + hudPadding,
                 hudScale, noticeText,
                 noticeColor * (0.42F + (0.58F * noticeStrength)));
@@ -2084,15 +2098,9 @@ bool GdpRenderer::render(
             : victory ? "VICTORY" : "DEFEAT";
         const ResultMenuLayout layout = makeResultMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(layout.panel.x, layout.panel.y,
-            layout.panel.width, layout.panel.height,
-            {0.015F, 0.025F, 0.030F});
         const wkc::core::Vec3 resultColor = victory
-            ? wkc::core::Vec3{0.22F, 0.92F, 0.62F}
-            : wkc::core::Vec3{0.96F, 0.18F, 0.10F};
-        drawSolidRect(layout.panel.x,
-            layout.panel.y + layout.panel.height - (2 * scale),
-            layout.panel.width, 2 * scale, resultColor);
+            ? uiTheme.success : uiTheme.danger;
+        drawIndustrialPanel(layout.panel, scale, resultColor);
         drawBitmapText((width - bitmapTextWidth(result, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (24 * scale),
             2 * scale, result, resultColor);
@@ -2133,10 +2141,7 @@ bool GdpRenderer::render(
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
             if (index == selected) {
-                drawSolidRect(button.x, button.y, button.width, button.height,
-                    {0.06F, 0.18F, 0.21F});
-                drawSolidRect(button.x, button.y, 2 * scale,
-                    button.height, resultColor);
+                drawSelectedRow(button, scale, resultColor);
             }
             const int optionWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - optionWidth) / 2,
@@ -2148,17 +2153,12 @@ bool GdpRenderer::render(
             : "W S  ENTER  MOUSE";
         drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
             layout.panel.y + (7 * scale), 1, controls,
-            {0.48F, 0.62F, 0.66F});
+            uiTheme.mutedText);
     }
     if (hud.paused) {
         const PauseMenuLayout layout = makePauseMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(layout.panel.x, layout.panel.y,
-            layout.panel.width, layout.panel.height,
-            {0.012F, 0.024F, 0.030F});
-        drawSolidRect(layout.panel.x,
-            layout.panel.y + layout.panel.height - (2 * scale),
-            layout.panel.width, 2 * scale, cyanColor);
+        drawIndustrialPanel(layout.panel, scale, cyanColor);
         constexpr std::string_view pauseTitle = "PAUSED";
         const int titleWidth = bitmapTextWidth(pauseTitle, scale);
         drawBitmapText((width - titleWidth) / 2,
@@ -2186,8 +2186,7 @@ bool GdpRenderer::render(
             const UiRect button = buttons[index];
             const int optionWidth = bitmapTextWidth(options[index], scale);
             if (index == selected) {
-                drawSolidRect(button.x, button.y, button.width, button.height,
-                    {0.06F, 0.18F, 0.21F});
+                drawSelectedRow(button, scale, cyanColor);
             }
             drawBitmapText((width - optionWidth) / 2,
                 button.y + (2 * scale), scale, options[index],
@@ -2199,7 +2198,7 @@ bool GdpRenderer::render(
         const int controlsWidth = bitmapTextWidth(controls, 1);
         drawBitmapText((width - controlsWidth) / 2,
             layout.panel.y + (6 * scale),
-            1, controls, {0.48F, 0.62F, 0.66F});
+            1, controls, uiTheme.mutedText);
     } else {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
         glScissor((width / 2) - 7, (height / 2) - 1, 15, 3);

@@ -298,6 +298,21 @@ struct UiRect {
     [[nodiscard]] bool contains(int pointX, int pointY) const noexcept;
 };
 
+struct UiVisualTheme {
+    wkc::core::Vec3 background{};
+    wkc::core::Vec3 panel{};
+    wkc::core::Vec3 panelBorder{};
+    wkc::core::Vec3 selection{};
+    wkc::core::Vec3 text{};
+    wkc::core::Vec3 mutedText{};
+    wkc::core::Vec3 accent{};
+    wkc::core::Vec3 warning{};
+    wkc::core::Vec3 danger{};
+    wkc::core::Vec3 success{};
+};
+
+[[nodiscard]] UiVisualTheme industrialUiTheme() noexcept;
+
 struct MainMenuLayout {
     int scale{1};
     UiRect panel{};

@@ -396,6 +396,12 @@ a abertura visual cruza 90%; uma porta em fechamento com passagem ocupada deve
 emitir uma única reversão, voltar a `Opening` e aumentar sua abertura no mesmo
 fixed tick. Travessia, headless e bootstrap OpenGL validam a integração.
 
+O gate da Fase 111 valida que fundo, painel, borda e seleção possuem hierarquia
+de contraste, que texto primário supera instruções secundárias e que ciano,
+vermelho e verde preservam semânticas distintas. As regressões OpenGL existentes
+continuam exigindo pixels diferentes para telas, seleções e valores, enquanto
+os testes de layout/mouse garantem que a revisão não deslocou hit targets.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

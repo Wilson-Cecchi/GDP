@@ -13,10 +13,18 @@
 > Campanha de três andares ao título, HUD e resultado.
 > A Fase 80 passou a preservar recursos e progressão em `NEXT FLOOR`.
 > A Fase 81 adicionou `CONTINUE` persistente no início do andar atual.
+> A Fase 111 aplicou uma linguagem industrial única ao título, pausa, resultado,
+> configurações e confirmação, preservando os layouts usados pelo mouse.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Menu principal funcional
+
+Todos os menus compartilham `UiVisualTheme` e o mesmo compositor de painel:
+sombra, aro técnico, faixa semântica superior e cantos marcados. A seleção usa
+fundo ciano escuro e barras nas duas extremidades, mantendo leitura clara tanto
+por teclado quanto por hover. Perigo e sucesso substituem apenas a cor de
+ênfase; posição e dimensões continuam vindo dos layouts funcionais existentes.
 
 O bootstrap gráfico mostra `START RUN`, `CONTINUE`, `CAMPAIGN`, `SPEEDRUN`,
 `BEST SEED`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.

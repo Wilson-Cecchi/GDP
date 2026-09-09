@@ -5,7 +5,8 @@
 > a Fase 18 acrescenta feedback temporário de combate e eventos e a Fase 58
 > integra Armor. A Fase 82 expõe a pressão do andar da Campanha, a Fase 84
 > identifica Pistol ou Carbine e a Fase 85 indica Overdrive ativo. O título permanece somente
-> como apoio de diagnóstico.
+> como apoio de diagnóstico. A Fase 111 unificou o acabamento industrial do HUD
+> e dos menus sem alterar sua geometria funcional.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -39,6 +40,12 @@ ocupam o canto inferior esquerdo; nível e XP, o inferior direito; objetivo e
 evento, o superior direito. `VICTORY`/`DEFEAT` preservam o banner central. Os
 prompts `E OPEN DOOR`, `DOOR LOCKED`, `E USE TERMINAL` e `R RELOAD` aparecem
 somente quando a mesma ação é válida ou necessária na simulação.
+
+`UiVisualTheme` define uma única hierarquia: fundo quase preto, painel azul
+grafite, aro técnico, texto principal, texto secundário e ciano de interação.
+Aviso, perigo e sucesso têm laranja, vermelho e verde exclusivos. Os blocos usam
+sombra curta, moldura de um pixel lógico, faixa superior e cantos inferiores;
+essa ornamentação não amplia hit targets nem ocupa o centro do combate.
 
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o

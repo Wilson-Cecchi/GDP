@@ -418,6 +418,9 @@ especializados das pastas numeradas.
   suaves, e o mesmo vão visível governa a colisão. Player ou inimigo vivo na
   passagem interrompe o fechamento e reabre a porta com segurança.
   Campaign/Speedrun avançam para regras 19/18.
+- **Fase 111 — Interface industrial revisada:** HUD, título, pausa, resultado,
+  configurações e confirmação compartilham uma paleta semântica, molduras em
+  camadas e seleção bilateral mais legível, preservando layouts e mouse.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1027,6 +1030,15 @@ todo Enemy ativo e vivo próximo de qualquer lado da edge; fechamento normal
 reverte para Opening e lockdown espera o vão ficar livre. O teste protege
 endpoints, aceleração, frenagem, NaN, limiar compartilhado e reversão ocupada.
 Campaign/Speedrun passam às regras 19/18; não há RNG ou alteração na WKC Forge.
+
+Na Fase 111, `UiVisualTheme` centraliza fundo, painel, borda, seleção, texto e
+cores semânticas de alerta, perigo e sucesso. Um único compositor de moldura
+industrial aplica sombra, aro técnico, faixa superior e cantos marcados a todos
+os menus e blocos do HUD; linhas selecionadas recebem marcadores nos dois lados.
+O menu principal ganha trilhos laterais e instruções secundárias usam contraste
+próprio. Geometria de `*MenuLayout`, hit tests, inputs, gameplay e versões de
+Campaign/Speedrun permanecem inalterados. CPU protege a hierarquia da paleta e
+OpenGL continua cobrindo cada tela e seleção.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

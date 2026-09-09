@@ -664,6 +664,22 @@ bool UiRect::contains(const int pointX, const int pointY) const noexcept
         && pointY >= y && pointY < y + height;
 }
 
+UiVisualTheme industrialUiTheme() noexcept
+{
+    return {
+        .background = {0.004F, 0.010F, 0.014F},
+        .panel = {0.014F, 0.028F, 0.035F},
+        .panelBorder = {0.075F, 0.145F, 0.165F},
+        .selection = {0.055F, 0.205F, 0.225F},
+        .text = {0.78F, 0.88F, 0.90F},
+        .mutedText = {0.42F, 0.56F, 0.60F},
+        .accent = {0.18F, 0.88F, 0.94F},
+        .warning = {0.98F, 0.62F, 0.14F},
+        .danger = {0.96F, 0.20F, 0.10F},
+        .success = {0.24F, 0.92F, 0.56F},
+    };
+}
+
 MainMenuLayout makeMainMenuLayout(const int width, const int height) noexcept
 {
     const int safeWidth = std::max(width, 1);

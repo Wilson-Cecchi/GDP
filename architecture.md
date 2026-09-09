@@ -1144,6 +1144,12 @@ e de Enemies ativos/vivos em cada edge antes de atualizar a porta. Assim,
 apresentação e passagem física concordam, e nenhum painel fecha sobre um ator.
 O contrato permanece no gameplay concreto GDP, sem API nova na WKC Forge.
 
+Na Fase 111, a apresentação concreta passa a possuir `UiVisualTheme` como fonte
+única de paleta para HUD e menus. `GdpRenderer` compõe moldura, seleção e cores
+semânticas depois do blit; layouts e hit tests permanecem DTOs puros, e nenhuma
+decisão visual entra em Gameplay ou Platform. A mudança não requer textura nova,
+RNG, persistência ou API WKC Forge.
+
 ---
 
 # 8. Sistema de seed

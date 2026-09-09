@@ -943,6 +943,25 @@ void testImpactVisualData()
         "impact color sanitizes non-finite lifetime strength");
 }
 
+void testIndustrialUiTheme()
+{
+    using namespace gdp::game::visual;
+    const UiVisualTheme theme = industrialUiTheme();
+    expect(theme.background.x < theme.panel.x
+            && theme.panel.x < theme.panelBorder.x
+            && theme.selection.x > theme.panel.x,
+        "industrial UI establishes layered backdrop, panel, border and selection");
+    expect(theme.accent.x < theme.accent.y
+            && theme.accent.z > theme.accent.y
+            && theme.danger.x > theme.danger.y * 3.0F
+            && theme.success.y > theme.success.x * 2.0F,
+        "industrial UI reserves cyan, danger red and success green semantics");
+    expect(theme.text.x > theme.mutedText.x
+            && theme.text.y > theme.mutedText.y
+            && theme.text.z > theme.mutedText.z,
+        "primary interface text remains brighter than secondary instructions");
+}
+
 } // namespace
 
 int main()
@@ -957,6 +976,7 @@ int main()
     testRunTimeFormatting();
     testEnemyRootAnimation();
     testImpactVisualData();
+    testIndustrialUiTheme();
     testSettingsMenuLayout();
 
     if (failures != 0) {
