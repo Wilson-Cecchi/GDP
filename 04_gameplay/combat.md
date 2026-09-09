@@ -8,7 +8,8 @@
 > integrada na Fase 58. A Fase 82 adicionou pressão progressiva por andar na
 > Campanha, a Fase 84 integrou a Carbine encontrada em salas Secret e a Fase 85
 > adicionou o Overdrive temporário encontrado em Arenas. A Fase 93 adicionou
-> reação visual transitória ao dano de inimigos. A fila
+> reação visual transitória ao dano de inimigos e a Fase 109 passou a publicar
+> ponto, normal e material de cada impacto. A fila
 > desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
@@ -34,7 +35,10 @@ define a direção real do tiro.
 `fireHitscan()` normaliza a direção, limita pelo alcance, consulta somente
 Enemies vivos e Props sólidos no `roomId` do jogador e compara o primeiro AABB
 de alvo com o primeiro solid ou limite da sala. O resultado distingue cooldown,
-vazio, miss, impacto no mundo, prop protegido, hit, kill e prop destruído.
+vazio, miss, impacto no mundo, prop protegido, hit, kill e prop destruído. Todo
+resultado que realmente toca uma superfície inclui `ImpactResult`: posição do
+primeiro contato, normal oposta ao raio e material `Metal`, `Composite` ou
+`Flesh`. Miss, cooldown e arma vazia não fabricam impacto.
 
 ## WeaponDefinition
 
@@ -91,7 +95,9 @@ Standard e Speedrun usam sempre `1.00x`.
 
 ## Eventos
 
-`ShotResult` já separa os resultados lógicos consumidos pela aplicação. A fila
+`ShotResult` já separa os resultados lógicos consumidos pela aplicação e, desde
+a Fase 109, fornece o contrato de impacto usado diretamente por apresentação e
+áudio. A fila
 desacoplada `WeaponFired`, `EntityHit`, `EntityDamaged`, `EntityKilled` e
 `ImpactWorld` permanece planejada para renderer e áudio. O sistema atual de
 eventos de sala é independente dessa futura fila: ele consome estado de
@@ -100,7 +106,7 @@ encontro e produz ondas, lockdown e recompensa determinísticos.
 Enquanto a fila genérica permanece planejada, `Application` traduz resultados
 já consolidados em cues procedurais: tiro/arma vazia, recarga, hit/morte,
 impacto/destruição de prop, impacto no mundo, coleta, dano recebido e
-ativação/conclusão de evento. Cues espaciais usam o ponto do hitscan; nenhum som
+ativação/conclusão de evento. Cues espaciais usam o ponto real do impacto; nenhum som
 altera resultado, RNG estrutural ou ordem de combate.
 
 ## Testes
@@ -121,6 +127,9 @@ Overdrive acrescenta ativação única, aumento de dano, cadência, expiração 
 fixed update, bloqueio de duplicata e restauração do perfil-base.
 Hit acrescenta início e reinício do timer em dano não letal, avanço por fixed
 step, clamp em zero e limpeza imediata na morte.
+Impactos acrescentam ponto exato em parede, limite de volume, Enemy e Prop,
+classe material para orgânicos, robôs, crates e terminais, além da ausência de
+dados em disparos sem contato.
 O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
 e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
 na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.

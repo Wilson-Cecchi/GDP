@@ -223,8 +223,10 @@ void testHitscanPropPriority()
     const ShotResult first = fireHitscan(
         weapon, {0.0F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, collision, manager);
     expect(first.outcome == ShotOutcome::Destroyed && first.hit
-            && first.hit->target == crate && first.spawnedItem.isValid(),
-        "hitscan destroys the nearer prop before an enemy behind it");
+            && first.hit->target == crate && first.spawnedItem.isValid()
+            && first.impact
+            && first.impact->material == ImpactMaterial::Composite,
+        "hitscan destroys the nearer composite prop before an enemy behind it");
     expect(manager.findData<EnemyData>(enemy)->health == 100.0F,
         "prop cover prevents damage to the enemy behind it");
 
@@ -244,8 +246,9 @@ void testHitscanPropPriority()
     const ShotResult protectedHit = fireHitscan(
         weapon, {2.0F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, base, manager);
     expect(protectedHit.outcome == ShotOutcome::ImpactProp && protectedHit.hit
-            && protectedHit.hit->target == terminal,
-        "protected terminal absorbs hits without entering a damage state");
+            && protectedHit.hit->target == terminal && protectedHit.impact
+            && protectedHit.impact->material == ImpactMaterial::Metal,
+        "protected metal terminal absorbs hits and exposes its impact material");
 }
 
 void testTallCoverSupportsHiddenMovement()

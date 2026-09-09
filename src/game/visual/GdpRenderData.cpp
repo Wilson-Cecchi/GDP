@@ -1052,4 +1052,32 @@ std::string runTimeText(const std::uint64_t elapsedTicks)
     return text.str();
 }
 
+wkc::core::Vec3 impactVisualColor(
+    const ImpactVisualMaterial material,
+    const float strength) noexcept
+{
+    const float safeStrength = std::clamp(
+        std::isfinite(strength) ? strength : 0.0F, 0.0F, 1.0F);
+    wkc::core::Vec3 color;
+    switch (material) {
+    case ImpactVisualMaterial::Metal:
+        color = {1.0F, 0.68F, 0.22F};
+        break;
+    case ImpactVisualMaterial::Composite:
+        color = {0.72F, 0.48F, 0.25F};
+        break;
+    case ImpactVisualMaterial::Flesh:
+        color = {0.78F, 0.10F, 0.07F};
+        break;
+    }
+    return color * (0.35F + (safeStrength * 0.65F));
+}
+
+float impactVisualSize(const float strength) noexcept
+{
+    const float safeStrength = std::clamp(
+        std::isfinite(strength) ? strength : 0.0F, 0.0F, 1.0F);
+    return 0.025F + (safeStrength * 0.055F);
+}
+
 } // namespace gdp::game::visual

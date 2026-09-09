@@ -103,6 +103,30 @@ float firstWorldDistance(
     return nearest;
 }
 
+ImpactMaterial enemyImpactMaterial(
+    const gdp::entities::EnemyData& enemy) noexcept
+{
+    return enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot
+        ? ImpactMaterial::Metal : ImpactMaterial::Flesh;
+}
+
+ImpactMaterial propImpactMaterial(
+    const gdp::entities::PropData& prop) noexcept
+{
+    using gdp::entities::PropType;
+    switch (prop.type) {
+    case PropType::Crate:
+    case PropType::Barricade:
+    case PropType::Decoration:
+        return ImpactMaterial::Composite;
+    case PropType::Terminal:
+    case PropType::Door:
+    case PropType::Canister:
+        return ImpactMaterial::Metal;
+    }
+    return ImpactMaterial::Composite;
+}
+
 } // namespace
 
 DamageOutcome applyDamage(
@@ -171,16 +195,16 @@ ShotResult fireHitscan(
 {
     const FireReadiness readiness = weapon.tryFire();
     if (readiness == FireReadiness::Cooldown) {
-        return {ShotOutcome::Cooldown, std::nullopt};
+        return {ShotOutcome::Cooldown, std::nullopt, {}, std::nullopt};
     }
     if (readiness == FireReadiness::Empty) {
-        return {ShotOutcome::Empty, std::nullopt};
+        return {ShotOutcome::Empty, std::nullopt, {}, std::nullopt};
     }
 
     direction = wkc::core::normalized(direction);
     const float range = weapon.definition().range;
     if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
-        return {ShotOutcome::Miss, std::nullopt};
+        return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
     }
 
     const float worldDistance = firstWorldDistance(origin, direction, range, collisionWorld);
@@ -230,6 +254,23 @@ ShotResult fireHitscan(
         const gdp::entities::Entity* target = manager.find(nearestHit->target);
         const bool targetIsProp = target != nullptr
             && target->kind == gdp::entities::EntityKind::Prop;
+        ImpactMaterial material = ImpactMaterial::Flesh;
+        if (targetIsProp) {
+            const gdp::entities::PropData* prop
+                = manager.findData<gdp::entities::PropData>(nearestHit->target);
+            material = prop == nullptr
+                ? ImpactMaterial::Composite : propImpactMaterial(*prop);
+        } else {
+            const gdp::entities::EnemyData* enemy
+                = manager.findData<gdp::entities::EnemyData>(nearestHit->target);
+            material = enemy == nullptr
+                ? ImpactMaterial::Flesh : enemyImpactMaterial(*enemy);
+        }
+        const ImpactResult impact{
+            nearestHit->point,
+            direction * -1.0F,
+            material,
+        };
         if (targetIsProp) {
             const PropDamageResult damage
                 = damageProp(manager, nearestHit->target, weapon.damage());
@@ -237,19 +278,30 @@ ShotResult fireHitscan(
                 ? ShotOutcome::Destroyed
                 : damage.outcome == PropDamageOutcome::Damaged ? ShotOutcome::Hit
                                                                : ShotOutcome::ImpactProp;
-            return {outcome, nearestHit, damage.spawnedDrop};
+            return {outcome, nearestHit, damage.spawnedDrop, impact};
         }
         const DamageOutcome damage = applyDamage(
             manager, nearestHit->target, weapon.damage());
         return {
             damage == DamageOutcome::Killed ? ShotOutcome::Killed : ShotOutcome::Hit,
             nearestHit,
+            {},
+            impact,
         };
     }
     if (worldDistance <= range) {
-        return {ShotOutcome::ImpactWorld, std::nullopt};
+        return {
+            ShotOutcome::ImpactWorld,
+            std::nullopt,
+            {},
+            ImpactResult{
+                origin + (direction * worldDistance),
+                direction * -1.0F,
+                ImpactMaterial::Metal,
+            },
+        };
     }
-    return {ShotOutcome::Miss, std::nullopt};
+    return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
 }
 
 bool hasLineOfSight(

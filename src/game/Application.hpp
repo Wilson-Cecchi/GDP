@@ -66,6 +66,12 @@ public:
     int run();
 
 private:
+    struct ActiveImpact {
+        visual::ImpactRenderData render{};
+        std::uint32_t roomId{0U};
+        float remaining{0.0F};
+    };
+
     bool initialize();
     bool initializeRun();
     void processEvents();
@@ -127,6 +133,7 @@ private:
     std::unordered_map<world::EdgeId, std::uint64_t> doorAudioEventCounters_;
     std::unordered_map<std::uint64_t, visual::EnemyAnimationTransition>
         enemyAnimationTransitions_;
+    std::vector<ActiveImpact> activeImpacts_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<visual::GdpRenderer> renderer_;
     SDL_Window* window_{nullptr};
@@ -146,6 +153,7 @@ private:
     std::uint64_t enemyAnimationTicks_{0};
     std::uint64_t audioEventCounter_{0};
     std::uint64_t uiAudioEventCounter_{0};
+    std::uint64_t impactVisualCounter_{0};
 };
 
 } // namespace gdp::game

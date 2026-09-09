@@ -60,7 +60,8 @@ public:
         std::span<const DoorRenderData> doors = {},
         std::span<const CorridorRenderData> corridors = {},
         std::span<const RoomRenderData> connectedRooms = {},
-        HudRenderData hud = {});
+        HudRenderData hud = {},
+        std::span<const ImpactRenderData> impacts = {});
 
 private:
     struct EnemyGpuPart {

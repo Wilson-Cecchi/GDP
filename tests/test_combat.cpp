@@ -200,9 +200,11 @@ void testDormantEnemyIgnoresCombat()
     const ShotResult shot = fireHitscan(
         weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
         1, openRoom, manager);
-    expect(shot.outcome == ShotOutcome::ImpactWorld && !shot.hit
+    expect(shot.outcome == ShotOutcome::ImpactWorld && !shot.hit && shot.impact
+            && shot.impact->material == ImpactMaterial::Metal
+            && near(shot.impact->point.z, -10.0F)
             && manager.findData<EnemyData>(dormant)->health == 50.0F,
-        "hitscan passes over dormant event previews without changing their health");
+        "hitscan passes dormant previews and reports the actual wall impact");
     Player player;
     player.spawn({0.0F, 0.0F, 0.0F});
     const wkc::core::Vec3 dormantPosition = manager.find(dormant)->transform.position;
@@ -241,6 +243,10 @@ void testHitscanSelectionAndBlocking()
         weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F}, 1, openRoom, manager);
     expect(first.outcome == ShotOutcome::Hit && first.hit && first.hit->target == nearest,
         "hitscan selects the nearest live enemy in the current room");
+    expect(first.impact && first.impact->material == ImpactMaterial::Flesh
+            && first.impact->point == first.hit->point
+            && first.impact->normal == wkc::core::Vec3{0.0F, 0.0F, 1.0F},
+        "organic enemy hits expose a positioned flesh impact to presentation");
     expect(manager.findData<EnemyData>(nearest)->health == 25.0F
             && manager.findData<EnemyData>(farther)->health == 60.0F,
         "hitscan damages only the selected target");
@@ -272,15 +278,31 @@ void testHitscanSelectionAndBlocking()
         1,
         blockedRoom,
         blockedManager);
-    expect(blocked.outcome == ShotOutcome::ImpactWorld
+    expect(blocked.outcome == ShotOutcome::ImpactWorld && blocked.impact
+            && blocked.impact->material == ImpactMaterial::Metal
+            && near(blocked.impact->point.z, -1.5F)
             && blockedManager.findData<EnemyData>(blockedEnemy)->health == 50.0F,
-        "solid geometry stops a shot before the enemy");
+        "solid geometry stops a shot and reports its exact surface impact");
 
     Weapon shortRange({.fireInterval = 0.0F, .range = 1.0F});
     const ShotResult miss = fireHitscan(
         shortRange, {0.0F, 1.0F, 0.0F}, {1.0F, 0.0F, 0.0F}, 1, openRoom, manager);
-    expect(miss.outcome == ShotOutcome::Miss,
-        "shot with no target or world impact inside its range reports a miss");
+    expect(miss.outcome == ShotOutcome::Miss && !miss.impact,
+        "shot with no contact inside its range reports a miss without impact");
+
+    EntityManager robotManager;
+    (void)robotManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -3.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::IndustrialRobot,
+    });
+    Weapon robotWeapon({.fireInterval = 0.0F, .range = 20.0F});
+    const ShotResult robot = fireHitscan(
+        robotWeapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1, openRoom, robotManager);
+    expect(robot.outcome == ShotOutcome::Hit && robot.impact
+            && robot.impact->material == ImpactMaterial::Metal,
+        "IndustrialRobot exposes a metal impact instead of an organic one");
 }
 
 void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
@@ -302,9 +324,10 @@ void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
     const ShotResult shot = fireHitscan(
         weapon, {0.0F, 1.0F, 0.0F}, {1.0F, 0.0F, 0.0F},
         1, disconnected, manager);
-    expect(shot.outcome == ShotOutcome::ImpactWorld
+    expect(shot.outcome == ShotOutcome::ImpactWorld && shot.impact
+            && near(shot.impact->point.x, 2.0F)
             && manager.findData<EnemyData>(enemy)->health == 50.0F,
-        "hitscan stops at the first gap in a walkable-volume union");
+        "hitscan stops at and reports the first gap in a walkable-volume union");
     expect(!hasLineOfSight(
             {0.0F, 1.0F, 0.0F}, {6.0F, 1.0F, 0.0F}, disconnected),
         "line of sight cannot cross disconnected navigable volumes");

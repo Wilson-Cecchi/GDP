@@ -161,6 +161,25 @@ struct PropRenderData {
     wkc::core::Seed visualSeed{0};
 };
 
+enum class ImpactVisualMaterial : std::uint8_t {
+    Metal,
+    Composite,
+    Flesh,
+};
+
+struct ImpactRenderData {
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 normal{0.0F, 0.0F, 1.0F};
+    ImpactVisualMaterial material{ImpactVisualMaterial::Metal};
+    float strength{1.0F};
+    wkc::core::Seed visualSeed{0U};
+};
+
+[[nodiscard]] wkc::core::Vec3 impactVisualColor(
+    ImpactVisualMaterial material,
+    float strength = 1.0F) noexcept;
+[[nodiscard]] float impactVisualSize(float strength) noexcept;
+
 struct RoomRenderData {
     wkc::core::Vec3 origin{};
     wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};

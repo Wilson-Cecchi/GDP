@@ -35,10 +35,23 @@ struct HitResult {
     float distance{0.0F};
 };
 
+enum class ImpactMaterial : std::uint8_t {
+    Metal,
+    Composite,
+    Flesh,
+};
+
+struct ImpactResult {
+    wkc::core::Vec3 point{};
+    wkc::core::Vec3 normal{};
+    ImpactMaterial material{ImpactMaterial::Metal};
+};
+
 struct ShotResult {
     ShotOutcome outcome{ShotOutcome::Miss};
     std::optional<HitResult> hit;
     gdp::entities::EntityId spawnedItem{};
+    std::optional<ImpactResult> impact;
 };
 
 [[nodiscard]] DamageOutcome applyDamage(

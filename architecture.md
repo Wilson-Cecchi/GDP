@@ -1129,6 +1129,13 @@ conectando o fallback físico ao replanejamento seguinte. A mudança distribui
 grupos por rotas equivalentes sem estado global, RNG ou alteração na WKC Forge.
 Campaign/Speedrun avançam para regras 17/16.
 
+Na Fase 109, `Combat` passa a expor em cada contato um snapshot de impacto com
+ponto, normal e classe material. A `Application` possui somente o tempo de vida
+transitório e deriva a seed cosmética; `GdpRenderer` consome DTOs visuais sem
+consultar raycast, entidades ou regras de dano. O mesmo ponto alimenta o áudio
+espacial. Essa ponte mantém gameplay, apresentação e som sincronizados sem
+promover conteúdo GDP à WKC Forge ou consumir RNG estrutural.
+
 ---
 
 # 8. Sistema de seed

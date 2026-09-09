@@ -1,5 +1,6 @@
 #include "game/visual/GdpRenderer.hpp"
 
+#include "core/Hash.hpp"
 #include "core/Log.hpp"
 #include "core/Math.hpp"
 #include "game/visual/EnemyGenerator.hpp"
@@ -810,7 +811,8 @@ bool GdpRenderer::render(
     const std::span<const DoorRenderData> doors,
     const std::span<const CorridorRenderData> corridors,
     const std::span<const RoomRenderData> connectedRooms,
-    const HudRenderData hud)
+    const HudRenderData hud,
+    const std::span<const ImpactRenderData> impacts)
 {
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
@@ -1250,6 +1252,56 @@ bool GdpRenderer::render(
             panelScale, panelColor, panelEmissive);
         drawDoorPiece(panelCenter - (transverse * panelOffset),
             panelScale, panelColor, panelEmissive);
+    }
+
+    fallbackTexture_.bind(gl_);
+    shader_.setInt(gl_, "uDetailedMaterial", 0);
+    shader_.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+    shader_.setVec2(gl_, "uUvOffset", {});
+    for (const ImpactRenderData& impact : impacts) {
+        const float strength = std::clamp(
+            std::isfinite(impact.strength) ? impact.strength : 0.0F,
+            0.0F, 1.0F);
+        if (strength <= 0.0F) {
+            continue;
+        }
+        const wkc::core::Vec3 color
+            = impactVisualColor(impact.material, strength);
+        const float size = impactVisualSize(strength);
+        const wkc::core::Vec3 normal = wkc::core::normalized(impact.normal);
+        const wkc::core::Vec3 center
+            = impact.position + (normal * 0.018F);
+        shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(center)
+                * wkc::core::scaleMatrix({size, size, size}));
+        shader_.setVec3(gl_, "uTint", color);
+        shader_.setFloat(gl_, "uEmissiveStrength",
+            impact.material == ImpactVisualMaterial::Metal ? 0.75F : 0.12F);
+        box_.draw(gl_);
+
+        const std::size_t particleCount
+            = impact.material == ImpactVisualMaterial::Metal ? 4U
+            : impact.material == ImpactVisualMaterial::Composite ? 3U : 2U;
+        constexpr float tau = 6.28318530717958647692F;
+        for (std::size_t particle = 0U; particle < particleCount; ++particle) {
+            const std::uint64_t phaseBits = wkc::core::mix64(
+                impact.visualSeed + static_cast<std::uint64_t>(particle));
+            const float phase = static_cast<float>(phaseBits & 0xffffU)
+                / 65535.0F * tau;
+            const float travel = (1.0F - strength)
+                * (0.10F + (static_cast<float>(particle) * 0.035F));
+            const wkc::core::Vec3 particleOffset{
+                std::cos(phase) * travel,
+                (0.04F + (0.02F * static_cast<float>(particle))) * strength,
+                std::sin(phase) * travel,
+            };
+            const float particleSize = size * (0.34F + (strength * 0.18F));
+            shader_.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(center + particleOffset)
+                    * wkc::core::scaleMatrix(
+                        {particleSize, particleSize, particleSize}));
+            shader_.setVec3(gl_, "uTint", color);
+            box_.draw(gl_);
+        }
     }
 
     ceilingFixtureMaterial_.albedo.bind(gl_, 0U);

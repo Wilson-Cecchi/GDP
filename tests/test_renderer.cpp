@@ -921,6 +921,28 @@ void testEnemyRootAnimation()
         "Attack produces a distinct axial impulse at its peak");
 }
 
+void testImpactVisualData()
+{
+    using namespace gdp::game::visual;
+    const wkc::core::Vec3 metal
+        = impactVisualColor(ImpactVisualMaterial::Metal, 1.0F);
+    const wkc::core::Vec3 composite
+        = impactVisualColor(ImpactVisualMaterial::Composite, 1.0F);
+    const wkc::core::Vec3 flesh
+        = impactVisualColor(ImpactVisualMaterial::Flesh, 1.0F);
+    expect(metal != composite && metal != flesh && composite != flesh,
+        "impact materials retain distinct visual signatures");
+    expect(impactVisualSize(0.0F) < impactVisualSize(1.0F)
+            && impactVisualSize(-1.0F) == impactVisualSize(0.0F)
+            && impactVisualSize(std::numeric_limits<float>::quiet_NaN())
+                == impactVisualSize(0.0F),
+        "impact size fades monotonically and sanitizes invalid strength");
+    expect(impactVisualColor(ImpactVisualMaterial::Metal,
+               std::numeric_limits<float>::quiet_NaN())
+            == impactVisualColor(ImpactVisualMaterial::Metal, 0.0F),
+        "impact color sanitizes non-finite lifetime strength");
+}
+
 } // namespace
 
 int main()
@@ -934,6 +956,7 @@ int main()
     testExitConfirmationLayout();
     testRunTimeFormatting();
     testEnemyRootAnimation();
+    testImpactVisualData();
     testSettingsMenuLayout();
 
     if (failures != 0) {

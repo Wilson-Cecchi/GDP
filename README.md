@@ -410,6 +410,10 @@ especializados das pastas numeradas.
   preferências laterais derivadas da identidade, e bloqueios físicos podem
   inverter a escolha. Grupos deixam de insistir todos no mesmo lado.
   Campaign/Speedrun avançam para regras 17/16.
+- **Fase 109 — Impactos materiais:** todo acerto consumido expõe ponto, normal e
+  superfície reais. Metal, compósito e tecido orgânico recebem assinaturas
+  visuais distintas e transitórias, sincronizadas com o áudio espacial.
+  Campaign/Speedrun avançam para regras 18/17.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1000,6 +1004,16 @@ longo quando não há empate útil. Se a colisão ativa o desvio local, essa esc
 passa a seguir o lado de evasão e pode replanejar no tick seguinte. A regressão
 coloca dois Workers atrás da mesma barreira e exige uso dos dois lados, volumes
 físicos e repetição exata. Campaign/Speedrun passam às regras 17/16.
+
+Na Fase 109, `ShotResult` transporta um `ImpactResult` independente do alvo,
+com posição real do raycast, normal contrária ao disparo e classe `Metal`,
+`Composite` ou `Flesh`. A Application conserva cada impacto por `0,32 s`, filtra
+pelo `roomId` atual e entrega ao renderer um snapshot sem regra de dano. Metal
+gera fagulhas quentes e mais emissivas, compósitos usam fragmentos ocres e
+inimigos orgânicos recebem uma marca vermelha curta; robôs e terminais usam
+metal. O áudio de parede passou a usar o mesmo ponto real, em vez de uma
+distância fixa diante da câmera. O efeito usa seed visual derivada e não consome
+RNG estrutural. Campaign/Speedrun passam às regras 18/17.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -624,6 +624,27 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 propPixels.data());
 
+            const bool renderedImpactBaseline = renderer.render(width, height);
+            std::vector<std::uint8_t> impactBaselinePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                impactBaselinePixels.data());
+            constexpr std::array impacts{
+                gdp::game::visual::ImpactRenderData{
+                    {-0.22F, 1.62F, 3.0F}, {0.0F, 0.0F, 1.0F},
+                    gdp::game::visual::ImpactVisualMaterial::Metal, 1.0F, 81U},
+                gdp::game::visual::ImpactRenderData{
+                    {0.0F, 1.62F, 3.0F}, {0.0F, 0.0F, 1.0F},
+                    gdp::game::visual::ImpactVisualMaterial::Composite, 1.0F, 82U},
+                gdp::game::visual::ImpactRenderData{
+                    {0.22F, 1.62F, 3.0F}, {0.0F, 0.0F, 1.0F},
+                    gdp::game::visual::ImpactVisualMaterial::Flesh, 1.0F, 83U},
+            };
+            const bool renderedImpacts = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, impacts);
+            std::vector<std::uint8_t> impactPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                impactPixels.data());
+
             const bool renderedEnemies = renderer.prepareWorkerVisual(111)
                 && renderer.prepareWorkerVisual(222)
                 && renderer.prepareGuardVisual(333)
@@ -683,6 +704,7 @@ int main()
             std::size_t industrialRobotChangedChannels = 0;
             std::size_t pickupChangedChannels = 0;
             std::size_t propChangedChannels = 0;
+            std::size_t impactChangedChannels = 0;
             std::size_t enemyChangedChannels = 0;
             for (std::size_t index = 0; index < pixels.size(); index += 4U) {
                 darkest = std::min(darkest, pixels[index]);
@@ -853,6 +875,10 @@ int main()
                     if (propPixels[index + channel] != pickupPixels[index + channel]) {
                         ++propChangedChannels;
                     }
+                    if (impactPixels[index + channel]
+                        != impactBaselinePixels[index + channel]) {
+                        ++impactChangedChannels;
+                    }
                     if (pixels[index + channel] != propPixels[index + channel]) {
                         ++enemyChangedChannels;
                     }
@@ -916,6 +942,8 @@ int main()
                 && renderedIndustrialRobot && industrialRobotChangedChannels > 100U
                 && renderedPickups && pickupChangedChannels > 100U
                 && renderedProps && propChangedChannels > 100U
+                && renderedImpactBaseline && renderedImpacts
+                && impactChangedChannels > 10U
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
                 && glGetError() == GL_NO_ERROR;
             if (!passed) {
@@ -924,7 +952,9 @@ int main()
                           << " openDoor=" << renderedOpenDoor
                           << " changed=" << corridorChangedChannels
                           << " cornerCyan=" << cornerCyanPixels
-                          << " doorState=" << doorStateChangedChannels << '\n';
+                          << " doorState=" << doorStateChangedChannels
+                          << " impact=" << impactChangedChannels
+                          << " impactRendered=" << renderedImpacts << '\n';
             }
         }
     }

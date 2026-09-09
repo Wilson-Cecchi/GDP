@@ -1,6 +1,7 @@
 #include "game/Application.hpp"
 
 #include "game/audio/AudioSystem.hpp"
+#include "core/Hash.hpp"
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
@@ -41,6 +42,22 @@ using wkc::platform::Input;
 using wkc::platform::Key;
 using wkc::platform::MouseButton;
 namespace {
+
+constexpr float impactVisualDuration = 0.32F;
+
+visual::ImpactVisualMaterial impactVisualMaterial(
+    const gameplay::ImpactMaterial material) noexcept
+{
+    switch (material) {
+    case gameplay::ImpactMaterial::Metal:
+        return visual::ImpactVisualMaterial::Metal;
+    case gameplay::ImpactMaterial::Composite:
+        return visual::ImpactVisualMaterial::Composite;
+    case gameplay::ImpactMaterial::Flesh:
+        return visual::ImpactVisualMaterial::Flesh;
+    }
+    return visual::ImpactVisualMaterial::Metal;
+}
 
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::MasterVolume)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::MasterVolume));
@@ -567,6 +584,8 @@ bool Application::initializeRun()
 {
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
+    activeImpacts_.clear();
+    impactVisualCounter_ = 0U;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
@@ -1441,6 +1460,7 @@ bool Application::returnToMainMenu()
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
+    activeImpacts_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};
@@ -1461,6 +1481,7 @@ bool Application::returnToMainMenu()
     restartRequested_ = false;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
+    impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
     clock_.reset();
@@ -1810,6 +1831,13 @@ void Application::fixedUpdate(const double fixedStep)
         return;
     }
     gameplay::updateFeedback(feedback_, step);
+    for (ActiveImpact& impact : activeImpacts_) {
+        impact.remaining = std::max(0.0F, impact.remaining - step);
+        impact.render.strength = impact.remaining / impactVisualDuration;
+    }
+    std::erase_if(activeImpacts_, [](const ActiveImpact& impact) {
+        return impact.remaining <= 0.0F;
+    });
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
         updateEnemyAnimationTransitions(true);
         if (audio_) {
@@ -2061,6 +2089,20 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_);
+        if (shot.impact) {
+            activeImpacts_.push_back({
+                .render = {
+                    .position = shot.impact->point,
+                    .normal = shot.impact->normal,
+                    .material = impactVisualMaterial(shot.impact->material),
+                    .strength = 1.0F,
+                    .visualSeed = wkc::core::hashCombine(
+                        config_.worldSeed, impactVisualCounter_++),
+                },
+                .roomId = playerRoom,
+                .remaining = impactVisualDuration,
+            });
+        }
         if (shot.outcome != gameplay::ShotOutcome::Cooldown
             && shot.outcome != gameplay::ShotOutcome::Empty) {
             (void)gameplay::alertEnemiesToNoise(
@@ -2117,7 +2159,7 @@ void Application::fixedUpdate(const double fixedStep)
         } else if (audio_ && shot.outcome == gameplay::ShotOutcome::ImpactWorld) {
             audio_->playAt(gdp::audio::AudioEventKind::PropImpact,
                 config_.worldSeed, audioEventCounter_++,
-                player_.cameraPosition() + (player_.forwardDirection() * 4.0F),
+                shot.impact ? shot.impact->point : player_.cameraPosition(),
                 player_.cameraPosition(), player_.forwardDirection());
         }
         if (shot.outcome == gameplay::ShotOutcome::Killed && shot.hit) {
@@ -2959,10 +3001,18 @@ void Application::render()
             hud.prompt = visual::HudPrompt::Reload;
         }
     }
+    std::vector<visual::ImpactRenderData> visibleImpacts;
+    visibleImpacts.reserve(activeImpacts_.size());
+    for (const ActiveImpact& impact : activeImpacts_) {
+        if (impact.roomId == playerRoom) {
+            visibleImpacts.push_back(impact.render);
+        }
+    }
     if (renderer_ == nullptr
         || !renderer_->render(
             width, height, camera, visibleEnemies, visiblePickups, visibleProps,
-            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms, hud)) {
+            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
+            hud, visibleImpacts)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         fatalError_ = true;
         running_ = false;
@@ -2986,6 +3036,7 @@ void Application::shutdown()
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
+    activeImpacts_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};
@@ -3005,6 +3056,7 @@ void Application::shutdown()
     reloadPending_ = false;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
+    impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
 

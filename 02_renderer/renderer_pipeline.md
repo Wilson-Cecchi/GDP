@@ -44,6 +44,8 @@
 > visual apontar sincronização excessiva entre raiz e membros.
 > A Fase 99 generalizou a direção concreta para todo o plano XZ e condicionou
 > o fim visual ao repouso de todas as partes rígidas.
+> A Fase 109 adicionou impactos materiais transitórios como snapshots puros,
+> sem transferir dano, raycast ou ownership temporal ao renderer.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -147,6 +149,12 @@ a regressão também exige contraste separado e composição com inimigos.
 `PropRenderData` desenha crate, canister e barricade com escala/tint derivados
 do papel e da `visualSeed`; `Damaged` escurece e `Destroyed` achata o volume. A
 regressão offscreen cobre os três papéis, os três estados e a composição final.
+
+`ImpactRenderData` recebe posição, normal, material, intensidade e seed visual.
+O renderer desenha um núcleo curto e fragmentos determinísticos: metal é quente
+e emissivo, compósito é ocre e Flesh é vermelho com menos partículas. O tempo
+de vida pertence à `Application`; o draw não guarda impactos nem consulta
+`Combat`. Intensidade não finita é sanitizada e tamanhos permanecem limitados.
 
 `RoomLightingRenderData` fornece ambiente e até quatro pontos com posição, cor,
 intensidade e alcance. O shader acumula Lambert difuso com atenuação por alcance
