@@ -1378,6 +1378,174 @@ void testEnemyInvestigationLifecycle()
     }
 }
 
+void testEnemyNoisePerception()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    struct NoiseResult {
+        wkc::core::Vec3 investigationPosition{};
+        wkc::core::Vec3 rememberedPosition{};
+        float remainingTime{0.0F};
+        bool heard{false};
+        bool investigated{false};
+        bool visionOverrodeNoise{false};
+
+        constexpr bool operator==(const NoiseResult&) const noexcept = default;
+    };
+
+    const CollisionWorld open{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const CollisionWorld blocked{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-1.5F, 0.0F, 2.5F}, {1.5F, 3.0F, 3.5F}}},
+    };
+    const auto runFixture = [&open, &blocked](const EnemyArchetype archetype) {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F}},
+            .roomId = 5,
+            .archetype = archetype,
+        });
+        EnemyDifficultyConfigs configs;
+        configs.worker.investigation = {2.0F, 0.75F, 0.2F, 12.0F};
+        configs.guard.investigation = configs.worker.investigation;
+        configs.officer.investigation = configs.worker.investigation;
+        configs.engineer.investigation = configs.worker.investigation;
+        configs.industrialRobot.investigation = configs.worker.investigation;
+
+        NoiseResult result;
+        result.heard = alertEnemiesToNoise(
+            manager, 5, {.position = player.state().position, .radius = 12.0F},
+            configs) == 1U;
+
+        const auto updateRole = [&](const CollisionWorld& world, const float step) {
+            switch (archetype) {
+            case EnemyArchetype::Worker:
+                configs.worker.detectionRange = 20.0F;
+                configs.worker.moveSpeed = 1.0F;
+                configs.worker.attackDamage = 0.0F;
+                return updateWorkers(
+                    manager, player, 5, world, step, configs.worker);
+            case EnemyArchetype::Guard:
+                configs.guard.detectionRange = 20.0F;
+                configs.guard.moveSpeed = 1.0F;
+                configs.guard.attackDamage = 0.0F;
+                return updateGuards(
+                    manager, player, 5, world, step, configs.guard);
+            case EnemyArchetype::Officer:
+                configs.officer.detectionRange = 20.0F;
+                configs.officer.moveSpeed = 1.0F;
+                configs.officer.attackDamage = 0.0F;
+                configs.officer.allyCooldownReduction = 0.0F;
+                return updateOfficers(
+                    manager, player, 5, world, step, configs.officer);
+            case EnemyArchetype::Engineer:
+                configs.engineer.detectionRange = 20.0F;
+                configs.engineer.moveSpeed = 1.0F;
+                configs.engineer.attackDamage = 0.0F;
+                configs.engineer.repairAmount = 0.0F;
+                return updateEngineers(
+                    manager, player, 5, world, step, configs.engineer);
+            case EnemyArchetype::IndustrialRobot:
+                configs.industrialRobot.detectionRange = 20.0F;
+                configs.industrialRobot.longRangeMoveSpeed = 1.0F;
+                configs.industrialRobot.pressureMoveSpeed = 1.0F;
+                configs.industrialRobot.pursuitMoveSpeed = 1.0F;
+                configs.industrialRobot.longRangeDamage = 0.0F;
+                configs.industrialRobot.pressureDamage = 0.0F;
+                configs.industrialRobot.pursuitDamage = 0.0F;
+                return updateIndustrialRobots(
+                    manager, player, 5, world, step,
+                    configs.industrialRobot);
+            }
+            return EnemyUpdateSummary{};
+        };
+
+        const EnemyUpdateSummary search = updateRole(blocked, 0.25F);
+        const EnemyData* enemy = manager.findData<EnemyData>(id);
+        result.investigationPosition = manager.find(id)->transform.position;
+        result.rememberedPosition = enemy->lastKnownPlayerPosition;
+        result.remainingTime = enemy->investigationTime;
+        result.investigated = search.investigating == 1U
+            && enemy->behavior == EnemyBehaviorState::Investigate
+            && result.investigationPosition.z < 6.0F
+            && result.rememberedPosition == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && near(result.remainingTime, 1.75F);
+
+        (void)player.relocate({3.0F, 0.0F, 0.0F}, -90.0F);
+        (void)updateRole(open, 0.0F);
+        result.visionOverrodeNoise = enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{3.0F, 0.0F, 0.0F}
+            && near(enemy->investigationTime, 2.0F)
+            && enemy->behavior != EnemyBehaviorState::Investigate;
+        return result;
+    };
+
+    constexpr std::array archetypes{
+        EnemyArchetype::Worker,
+        EnemyArchetype::Guard,
+        EnemyArchetype::Officer,
+        EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot,
+    };
+    for (const EnemyArchetype archetype : archetypes) {
+        const NoiseResult first = runFixture(archetype);
+        const NoiseResult repeated = runFixture(archetype);
+        expect(first == repeated && first.heard && first.investigated
+                && first.visionOverrodeNoise,
+            "combat noise starts deterministic investigation for every role");
+    }
+
+    EntityManager isolated;
+    const EntityId nearby = isolated.createEnemy({
+        .transform = {.position = {5.0F, 0.0F, 0.0F}},
+        .roomId = 7,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId tooFar = isolated.createEnemy({
+        .transform = {.position = {7.0F, 0.0F, 0.0F}},
+        .roomId = 7,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId otherRoom = isolated.createEnemy({
+        .transform = {.position = {5.0F, 0.0F, 0.0F}},
+        .roomId = 8,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId dormant = isolated.createEnemy({
+        .transform = {.position = {5.0F, 0.0F, 0.0F}},
+        .roomId = 7,
+        .archetype = EnemyArchetype::Worker,
+        .active = false,
+    });
+    const EntityId dead = isolated.createEnemy({
+        .transform = {.position = {5.0F, 0.0F, 0.0F}},
+        .roomId = 7,
+        .archetype = EnemyArchetype::Worker,
+    });
+    isolated.findData<EnemyData>(dead)->behavior = EnemyBehaviorState::Dead;
+    EnemyDifficultyConfigs limited;
+    limited.worker.investigation = {2.0F, 0.75F, 0.2F, 6.0F};
+    const std::size_t heard = alertEnemiesToNoise(
+        isolated, 7, {.position = {}, .radius = 8.0F}, limited);
+    expect(heard == 1U
+            && near(isolated.findData<EnemyData>(nearby)->investigationTime, 2.0F)
+            && near(isolated.findData<EnemyData>(tooFar)->investigationTime, 0.0F)
+            && near(isolated.findData<EnemyData>(otherRoom)->investigationTime, 0.0F)
+            && near(isolated.findData<EnemyData>(dormant)->investigationTime, 0.0F)
+            && near(isolated.findData<EnemyData>(dead)->investigationTime, 0.0F),
+        "noise respects hearing range, active room, dormancy, and death");
+    expect(alertEnemiesToNoise(
+               isolated, 7,
+               {.position = {},
+                   .radius = std::numeric_limits<float>::quiet_NaN()},
+               limited) == 0U,
+        "invalid noise stimuli are ignored safely");
+}
+
 } // namespace
 
 int main()
@@ -1406,6 +1574,7 @@ int main()
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();
+    testEnemyNoisePerception();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";

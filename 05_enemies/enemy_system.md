@@ -6,7 +6,8 @@
 > A Fase 100 acrescentou patrulha local determinística aos cinco papéis sem
 > alterar seus contratos de combate. A Fase 101 acrescentou percepção visual e
 > investigação temporária da última posição conhecida. A Fase 102 tornou esse
-> ciclo validável atrás de uma cobertura larga na sala START.
+> ciclo validável atrás de uma cobertura larga na sala START. A Fase 103
+> acrescentou investigação provocada por ruído de disparo.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -67,6 +68,13 @@ o mesmo movimento físico até o ponto lembrado; readquirir atualiza a memória 
 retoma o papel de combate, enquanto a expiração devolve o inimigo à patrulha.
 Player morto, Enemy morto, entidades dormentes e salas inativas não sustentam
 uma perseguição oculta.
+
+Um disparo consumido também pode preencher essa memória sem conceder visão. A
+origem é a posição do Player no instante do tiro e o alcance efetivo combina o
+raio do estímulo com a audição específica do arquétipo. A notificação fica
+restrita a inimigos vivos e ativos da sala atual; áudio, renderer e RNG não
+participam desse contrato. Se houver linha de visão no fixed update seguinte,
+a observação real substitui imediatamente a posição apenas ouvida.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

@@ -156,3 +156,12 @@ O mesmo AABB autoritativo bloqueia visão, hitscan e movimento; há espaço para
 Player percorrer dois metros pelo lado oculto e reaparecer pela extremidade. A
 peça fica fora do fluxo central e pode ser destruída com 180 HP. A alteração de
 conteúdo avança Campaign/Speedrun para regras 11/10.
+
+Na Fase 103, todo resultado de disparo que consumiu munição — acerto, morte,
+impacto em prop/mundo ou miss — gera um estímulo de gameplay de `18 m` na sala
+ativa. Cada papel limita esse raio pela própria audição e grava a origem na
+memória de investigação mesmo sem line of sight. Cooldown e arma vazia não
+geram estímulo; inimigos mortos, dormentes ou de outra sala são ignorados. A
+visão direta continua prioritária e corrige a memória no mesmo fixed update. A
+regressão cobre os cinco papéis, isolamento, alcance, dados inválidos e
+repetição determinística. Campaign/Speedrun passam às regras 12/11.

@@ -386,6 +386,10 @@ especializados das pastas numeradas.
   alta e larga, fora da rota de portas e do terminal, permitindo ocultar-se do
   primeiro Worker, mover-se atrás dela e reaparecer pela borda. Campaign e
   Speedrun avançam para regras 11/10.
+- **Fase 103 — Percepção por ruído de combate:** cada disparo consumido cria na
+  sala ativa um estímulo de `18 m`, limitado pela audição própria de cada papel.
+  Inimigos sem visão investigam a origem; visão real continua tendo prioridade.
+  Campaign/Speedrun avançam para regras 12/11.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -918,6 +922,17 @@ hitscan e render usam o mesmo volume. O visual funcional de Barricade já
 existente é reutilizado; o acabamento HD definitivo continua sujeito à aprovação
 visual antes de qualquer textura nova. Como a cobertura altera conteúdo e rota,
 Campaign/Speedrun passam às regras 11/10.
+
+Na Fase 103, um disparo que realmente consome munição publica um estímulo de
+gameplay na posição do Player. O raio-base de `18 m` é limitado pela audição de
+Worker (`10 m`), Guard (`15 m`), Officer (`17 m`), Engineer (`13 m`) e
+IndustrialRobot (`22 m`); cooldown e clique seco não revelam posição. Somente
+inimigos vivos e ativos da sala atual recebem a memória, sem exigir linha de
+visão através da cobertura. No fixed update seguinte eles usam `Investigate`
+até a origem ou até o timer expirar, enquanto uma observação visual válida
+substitui imediatamente o ruído. O sinal pertence ao gameplay e não depende do
+sistema de áudio, RNG ou renderer. Campaign/Speedrun passam às regras 12/11; o
+schema do checkpoint permanece 2.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

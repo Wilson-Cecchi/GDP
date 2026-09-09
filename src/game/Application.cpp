@@ -2055,6 +2055,12 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_);
+        if (shot.outcome != gameplay::ShotOutcome::Cooldown
+            && shot.outcome != gameplay::ShotOutcome::Empty) {
+            (void)gameplay::alertEnemiesToNoise(
+                entities_, playerRoom,
+                {.position = player_.state().position});
+        }
         if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown) {
             const gdp::audio::AudioEventKind fireKind
                 = shot.outcome == gameplay::ShotOutcome::Empty

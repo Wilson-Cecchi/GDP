@@ -16,8 +16,8 @@
 > parte uma condição explícita do fim da transição visual.
 > A Fase 100 implementou patrulha local determinística nos cinco arquétipos.
 > A Fase 101 implementou aquisição visual e investigação da última posição
-> conhecida. Ruído recente, Alert dedicado e pathfinding global permanecem
-> planejados.
+> conhecida. A Fase 103 acrescentou percepção por ruído de disparo. Alert
+> dedicado e pathfinding global permanecem planejados.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -128,7 +128,8 @@ alterar o deslocamento lógico da entidade.
 ## IA base
 
 Estados implementados: Idle, Patrol, Investigate, Chase, Reposition, Attack e
-Dead. Alert/Recover explícitos e percepção por ruído permanecem planejados.
+Dead. Alert/Recover explícitos permanecem planejados. A percepção combina visão
+direta e estímulo de ruído de disparo na sala ativa.
 Aquisição exige alcance e line of sight dentro da sala ativa.
 
 O Worker atual detecta em até `12 m`, persegue a `1,35 m/s`, ataca dentro de
@@ -210,3 +211,12 @@ Idle, mas mantém a janela de observação; expiração retorna ao ciclo local d
 patrulha e uma nova visão substitui a memória no mesmo tick. Player morto limpa
 o timer, e a morte do inimigo limpa posição e timer. O processo não consome RNG
 nem introduz pathfinding global.
+
+A Fase 103 permite iniciar a mesma investigação sem aquisição visual. Disparos
+consumidos geram um estímulo de raio-base `18 m`; o alcance efetivo é o menor
+entre esse raio e a audição do papel: `10 m` Worker, `15 m` Guard, `17 m`
+Officer, `13 m` Engineer e `22 m` IndustrialRobot. O sinal atravessa cobertura,
+mas não atravessa o limite lógico da sala ativa e ignora inimigos dormentes ou
+mortos. Cooldown e clique seco não produzem estímulo. Uma visão confirmada no
+fixed update sempre substitui a origem ouvida pela posição realmente observada.
+O processo não consome RNG e permanece independente da reprodução de áudio.

@@ -21,6 +21,7 @@ struct InvestigationConfig {
     float duration{3.5F};
     float speedScale{0.78F};
     float arrivalDistance{0.35F};
+    float hearingRange{10.0F};
 };
 
 struct WorkerConfig {
@@ -30,7 +31,7 @@ struct WorkerConfig {
     float attackDamage{10.0F};
     float attackInterval{1.0F};
     PatrolConfig patrol{};
-    InvestigationConfig investigation{};
+    InvestigationConfig investigation{3.5F, 0.78F, 0.35F, 10.0F};
 };
 
 struct GuardConfig {
@@ -41,7 +42,7 @@ struct GuardConfig {
     float attackDamage{8.0F};
     float attackInterval{0.80F};
     PatrolConfig patrol{2.2F, 0.38F, 4.5F, 0.70F, 0.30F};
-    InvestigationConfig investigation{4.5F, 0.72F, 0.38F};
+    InvestigationConfig investigation{4.5F, 0.72F, 0.38F, 15.0F};
 };
 
 struct OfficerConfig {
@@ -55,7 +56,7 @@ struct OfficerConfig {
     float supportInterval{2.50F};
     float allyCooldownReduction{0.35F};
     PatrolConfig patrol{1.8F, 0.32F, 5.0F, 0.85F, 0.28F};
-    InvestigationConfig investigation{5.0F, 0.65F, 0.40F};
+    InvestigationConfig investigation{5.0F, 0.65F, 0.40F, 17.0F};
 };
 
 struct EngineerConfig {
@@ -69,7 +70,7 @@ struct EngineerConfig {
     float repairInterval{2.0F};
     float repairAmount{12.0F};
     PatrolConfig patrol{2.0F, 0.36F, 4.5F, 0.65F, 0.28F};
-    InvestigationConfig investigation{4.0F, 0.68F, 0.38F};
+    InvestigationConfig investigation{4.0F, 0.68F, 0.38F, 13.0F};
 };
 
 enum class IndustrialRobotPhase : std::uint8_t {
@@ -97,7 +98,7 @@ struct IndustrialRobotConfig {
     float pressureAttackInterval{0.90F};
     float pursuitAttackInterval{0.65F};
     PatrolConfig patrol{1.6F, 0.25F, 5.5F, 1.0F, 0.35F};
-    InvestigationConfig investigation{6.0F, 0.58F, 0.48F};
+    InvestigationConfig investigation{6.0F, 0.58F, 0.48F, 22.0F};
 };
 
 struct EnemyDifficultyConfigs {
@@ -110,6 +111,17 @@ struct EnemyDifficultyConfigs {
 
 [[nodiscard]] EnemyDifficultyConfigs makeEnemyDifficultyConfigs(
     float multiplier) noexcept;
+
+struct EnemyNoiseStimulus {
+    wkc::core::Vec3 position{};
+    float radius{18.0F};
+};
+
+[[nodiscard]] std::size_t alertEnemiesToNoise(
+    gdp::entities::EntityManager& manager,
+    std::uint32_t roomId,
+    EnemyNoiseStimulus stimulus,
+    EnemyDifficultyConfigs configs = {}) noexcept;
 
 struct EnemyUpdateSummary {
     std::size_t idle{0};

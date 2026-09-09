@@ -1079,6 +1079,15 @@ stream procedural de props. A peça reutiliza os contratos existentes de
 Entity/Prop, colisão, hitscan e render, sem generalização na WKC Forge nem textura
 nova. Campaign/Speedrun avançam para regras 11/10; checkpoint permanece schema 2.
 
+Na Fase 103, `alertEnemiesToNoise()` traduz um estímulo concreto de disparo em
+memória de investigação somente para inimigos vivos e ativos da sala atual. O
+raio-base de `18 m` é limitado por `InvestigationConfig::hearingRange` de cada
+papel; não há consulta a line of sight, reprodução de áudio ou RNG. O fixed
+update existente continua autoritativo: visão confirmada sobrescreve a origem
+ouvida, e sem visão o mesmo movimento de `Investigate` conduz até ela. Nada foi
+promovido à WKC Forge. Campaign/Speedrun avançam para regras 12/11; checkpoint
+permanece schema 2.
+
 ---
 
 # 8. Sistema de seed

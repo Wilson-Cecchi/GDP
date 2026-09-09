@@ -541,6 +541,75 @@ EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexce
     return configs;
 }
 
+std::size_t alertEnemiesToNoise(
+    gdp::entities::EntityManager& manager,
+    const std::uint32_t roomId,
+    const EnemyNoiseStimulus stimulus,
+    const EnemyDifficultyConfigs configs) noexcept
+{
+    using gdp::entities::EnemyArchetype;
+    using gdp::entities::EnemyBehaviorState;
+    using gdp::entities::EnemyData;
+    using gdp::entities::EntityKind;
+
+    const float stimulusRadius = std::isfinite(stimulus.radius)
+        ? std::max(stimulus.radius, 0.0F) : 0.0F;
+    if (stimulusRadius <= 0.0F
+        || !std::isfinite(stimulus.position.x)
+        || !std::isfinite(stimulus.position.y)
+        || !std::isfinite(stimulus.position.z)) {
+        return 0U;
+    }
+
+    std::size_t alerted = 0U;
+    const std::vector<gdp::entities::EntityId> enemyIds
+        = manager.query(EntityKind::Enemy);
+    for (const gdp::entities::EntityId id : enemyIds) {
+        const gdp::entities::Entity* entity = manager.find(id);
+        EnemyData* enemy = manager.findData<EnemyData>(id);
+        if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
+            || !enemy->active || enemy->behavior == EnemyBehaviorState::Dead) {
+            continue;
+        }
+
+        InvestigationConfig investigation;
+        switch (enemy->archetype) {
+        case EnemyArchetype::Worker:
+            investigation = configs.worker.investigation;
+            break;
+        case EnemyArchetype::Guard:
+            investigation = configs.guard.investigation;
+            break;
+        case EnemyArchetype::Officer:
+            investigation = configs.officer.investigation;
+            break;
+        case EnemyArchetype::Engineer:
+            investigation = configs.engineer.investigation;
+            break;
+        case EnemyArchetype::IndustrialRobot:
+            investigation = configs.industrialRobot.investigation;
+            break;
+        }
+
+        const float hearingRange = std::isfinite(investigation.hearingRange)
+            ? std::max(investigation.hearingRange, 0.0F) : 0.0F;
+        const float investigationDuration = std::isfinite(investigation.duration)
+            ? std::max(investigation.duration, 0.0F) : 0.0F;
+        const float effectiveRadius = std::min(stimulusRadius, hearingRange);
+        if (effectiveRadius <= 0.0F || investigationDuration <= 0.0F
+            || planarDistanceSquared(
+                   entity->transform.position, stimulus.position)
+                > effectiveRadius * effectiveRadius) {
+            continue;
+        }
+
+        enemy->lastKnownPlayerPosition = stimulus.position;
+        enemy->investigationTime = investigationDuration;
+        ++alerted;
+    }
+    return alerted;
+}
+
 EnemyUpdateSummary updateWorkers(
     gdp::entities::EntityManager& manager,
     Player& player,
