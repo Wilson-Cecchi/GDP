@@ -1096,4 +1096,29 @@ float impactVisualSize(const float strength) noexcept
     return 0.025F + (safeStrength * 0.055F);
 }
 
+WeaponViewmodelPose sampleWeaponViewmodelPose(
+    const WeaponViewmodelRenderData& weapon) noexcept
+{
+    const auto sanitized = [](const float value) {
+        return std::clamp(std::isfinite(value) ? value : 0.0F, 0.0F, 1.0F);
+    };
+    const float recoil = sanitized(weapon.recoilStrength);
+    const float reload = sanitized(weapon.reloadProgress);
+    const float equip = sanitized(weapon.equipStrength);
+    const float reloadArc = std::sin(reload * 3.14159265358979323846F);
+    const float mass = weapon.role == HudWeaponRole::Carbine ? 0.72F : 1.0F;
+    return {
+        .offset = {
+            -0.09F * reloadArc,
+            (-0.34F * equip) - (0.18F * reloadArc) + (0.025F * recoil),
+            (-0.12F * recoil * mass) - (0.05F * reloadArc),
+        },
+        .rotationDegrees = {
+            (-8.0F * recoil * mass) + (12.0F * reloadArc),
+            -8.0F * reloadArc,
+            34.0F * reloadArc,
+        },
+    };
+}
+
 } // namespace gdp::game::visual

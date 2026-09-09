@@ -48,6 +48,8 @@
 > sem transferir dano, raycast ou ownership temporal ao renderer.
 > A Fase 111 centralizou a paleta e a moldura industrial de todos os overlays,
 > sem alterar os contratos de input ou os layouts compartilhados.
+> A Fase 112 implementou o viewmodel de Pistol e Carbine depois do mundo e antes
+> do HUD, consumindo somente snapshots visuais de animação.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -96,7 +98,8 @@ shader, box GPU, texturas procedurais e framebuffer. O fluxo atual é:
 room transforms + corridor paths + per-room material keys + lighting plan
 → current/adjacent room shells + corridor segments + doors/fixtures/decor
 → enemy variants → pickup markers → props
-→ framebuffer color+depth → blit → objective/result overlay → SDL window
+→ impactos → viewmodel com depth próprio → framebuffer color+depth
+→ blit → HUD/menus → SDL window
 ```
 
 O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
@@ -208,7 +211,18 @@ Primeira versão: frustum culling por AABB. Occlusion culling é opcional futuro
 
 ## Viewmodel
 
-Pode possuir FOV/projeção própria, mas hitscan usa a câmera lógica de gameplay.
+`WeaponViewmodelRenderData` informa visibilidade, papel Pistol/Carbine, frações
+de recuo, recarga, entrada e flash, estado de Overdrive e uma seed cosmética. O
+renderer limpa somente o depth depois do mundo, ancora volumes metálicos na base
+da câmera e desenha o resultado antes do blit/HUD. Isso mantém a arma visível sem
+atravessar paredes visualmente e conserva o cenário já desenhado.
+
+`sampleWeaponViewmodelPose()` limita e sanitiza os valores recebidos. Recoil
+desloca a arma em direção ao jogador, reload usa um arco que retorna ao repouso
+e equip introduz a silhueta por baixo. Pistol e Carbine possuem geometria,
+comprimento e resposta de massa distintos; flash e detalhe de Overdrive são
+emissivos. O viewmodel não consulta munição, cooldown, loot ou raycast. O
+hitscan continua partindo exclusivamente da câmera lógica de gameplay.
 
 ## Retro visual
 

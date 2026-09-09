@@ -125,6 +125,10 @@ private:
     bool interactionPending_{false};
     bool firePending_{false};
     bool reloadPending_{false};
+    float weaponRecoilRemaining_{0.0F};
+    float weaponMuzzleFlashRemaining_{0.0F};
+    float weaponReloadRemaining_{0.0F};
+    float weaponEquipRemaining_{0.0F};
     std::optional<world::World> world_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;

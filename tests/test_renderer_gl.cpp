@@ -645,6 +645,56 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 impactPixels.data());
 
+            constexpr gdp::game::visual::WeaponViewmodelRenderData pistolViewmodel{
+                .visible = true,
+                .role = gdp::game::visual::HudWeaponRole::Pistol,
+                .visualSeed = 1717U,
+            };
+            const bool renderedPistolViewmodel = renderer.render(
+                width, height,
+                {}, // camera
+                {}, // enemies
+                {}, // pickups
+                {}, // props
+                {}, // lighting
+                {}, // room
+                {}, // doors
+                {}, // corridors
+                {}, // connected rooms
+                {}, // HUD
+                {}, // impacts
+                pistolViewmodel);
+            std::vector<std::uint8_t> pistolViewmodelPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pistolViewmodelPixels.data());
+
+            constexpr gdp::game::visual::WeaponViewmodelRenderData carbineViewmodel{
+                .visible = true,
+                .role = gdp::game::visual::HudWeaponRole::Carbine,
+                .visualSeed = 1717U,
+            };
+            const bool renderedCarbineViewmodel = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                carbineViewmodel);
+            std::vector<std::uint8_t> carbineViewmodelPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                carbineViewmodelPixels.data());
+
+            constexpr gdp::game::visual::WeaponViewmodelRenderData firingViewmodel{
+                .visible = true,
+                .role = gdp::game::visual::HudWeaponRole::Pistol,
+                .recoilStrength = 1.0F,
+                .muzzleFlashStrength = 1.0F,
+                .overdrive = true,
+                .visualSeed = 1717U,
+            };
+            const bool renderedFiringViewmodel = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                firingViewmodel);
+            std::vector<std::uint8_t> firingViewmodelPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                firingViewmodelPixels.data());
+
             const bool renderedEnemies = renderer.prepareWorkerVisual(111)
                 && renderer.prepareWorkerVisual(222)
                 && renderer.prepareGuardVisual(333)
@@ -705,6 +755,9 @@ int main()
             std::size_t pickupChangedChannels = 0;
             std::size_t propChangedChannels = 0;
             std::size_t impactChangedChannels = 0;
+            std::size_t pistolViewmodelChangedChannels = 0;
+            std::size_t carbineViewmodelChangedChannels = 0;
+            std::size_t firingViewmodelChangedChannels = 0;
             std::size_t enemyChangedChannels = 0;
             for (std::size_t index = 0; index < pixels.size(); index += 4U) {
                 darkest = std::min(darkest, pixels[index]);
@@ -879,6 +932,18 @@ int main()
                         != impactBaselinePixels[index + channel]) {
                         ++impactChangedChannels;
                     }
+                    if (pistolViewmodelPixels[index + channel]
+                        != impactBaselinePixels[index + channel]) {
+                        ++pistolViewmodelChangedChannels;
+                    }
+                    if (carbineViewmodelPixels[index + channel]
+                        != pistolViewmodelPixels[index + channel]) {
+                        ++carbineViewmodelChangedChannels;
+                    }
+                    if (firingViewmodelPixels[index + channel]
+                        != pistolViewmodelPixels[index + channel]) {
+                        ++firingViewmodelChangedChannels;
+                    }
                     if (pixels[index + channel] != propPixels[index + channel]) {
                         ++enemyChangedChannels;
                     }
@@ -944,6 +1009,12 @@ int main()
                 && renderedProps && propChangedChannels > 100U
                 && renderedImpactBaseline && renderedImpacts
                 && impactChangedChannels > 10U
+                && renderedPistolViewmodel
+                && pistolViewmodelChangedChannels > 100U
+                && renderedCarbineViewmodel
+                && carbineViewmodelChangedChannels > 100U
+                && renderedFiringViewmodel
+                && firingViewmodelChangedChannels > 100U
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
                 && glGetError() == GL_NO_ERROR;
             if (!passed) {
@@ -954,6 +1025,9 @@ int main()
                           << " cornerCyan=" << cornerCyanPixels
                           << " doorState=" << doorStateChangedChannels
                           << " impact=" << impactChangedChannels
+                          << " pistol=" << pistolViewmodelChangedChannels
+                          << " carbine=" << carbineViewmodelChangedChannels
+                          << " firing=" << firingViewmodelChangedChannels
                           << " impactRendered=" << renderedImpacts << '\n';
             }
         }

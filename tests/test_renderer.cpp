@@ -943,6 +943,68 @@ void testImpactVisualData()
         "impact color sanitizes non-finite lifetime strength");
 }
 
+void testWeaponViewmodelPose()
+{
+    using namespace gdp::game::visual;
+    using wkc::core::nearlyEqual;
+
+    const WeaponViewmodelPose idle
+        = sampleWeaponViewmodelPose({.visible = true});
+    expect(idle == WeaponViewmodelPose{},
+        "idle weapon viewmodel keeps its authored camera anchor");
+
+    const WeaponViewmodelPose pistolRecoil = sampleWeaponViewmodelPose({
+        .visible = true,
+        .role = HudWeaponRole::Pistol,
+        .recoilStrength = 1.0F,
+    });
+    const WeaponViewmodelPose carbineRecoil = sampleWeaponViewmodelPose({
+        .visible = true,
+        .role = HudWeaponRole::Carbine,
+        .recoilStrength = 1.0F,
+    });
+    expect(pistolRecoil.offset.z < 0.0F
+            && pistolRecoil.rotationDegrees.x < 0.0F,
+        "shot recoil moves and pitches the viewmodel toward the player");
+    expect(std::abs(carbineRecoil.offset.z) < std::abs(pistolRecoil.offset.z)
+            && std::abs(carbineRecoil.rotationDegrees.x)
+                < std::abs(pistolRecoil.rotationDegrees.x),
+        "carbine mass produces a more restrained recoil impulse than the pistol");
+
+    const WeaponViewmodelPose reloadPeak = sampleWeaponViewmodelPose({
+        .visible = true,
+        .reloadProgress = 0.5F,
+    });
+    const WeaponViewmodelPose reloadEnd = sampleWeaponViewmodelPose({
+        .visible = true,
+        .reloadProgress = 1.0F,
+    });
+    expect(reloadPeak.offset.x < 0.0F && reloadPeak.offset.y < 0.0F
+            && reloadPeak.rotationDegrees.z > 30.0F,
+        "reload follows a readable lowered side arc");
+    expect(nearlyEqual(reloadEnd.offset.x, idle.offset.x, 1.0e-5F)
+            && nearlyEqual(reloadEnd.offset.y, idle.offset.y, 1.0e-5F)
+            && nearlyEqual(reloadEnd.rotationDegrees.z,
+                idle.rotationDegrees.z, 1.0e-4F),
+        "reload arc returns smoothly to the idle anchor");
+
+    const WeaponViewmodelPose equip = sampleWeaponViewmodelPose({
+        .visible = true,
+        .equipStrength = 1.0F,
+    });
+    expect(equip.offset.y < -0.3F,
+        "equip animation introduces the weapon from below the frame");
+
+    const WeaponViewmodelPose invalid = sampleWeaponViewmodelPose({
+        .visible = true,
+        .recoilStrength = std::numeric_limits<float>::quiet_NaN(),
+        .reloadProgress = std::numeric_limits<float>::infinity(),
+        .equipStrength = -4.0F,
+    });
+    expect(invalid == idle,
+        "weapon pose sanitizes non-finite and out-of-range animation input");
+}
+
 void testIndustrialUiTheme()
 {
     using namespace gdp::game::visual;
@@ -976,6 +1038,7 @@ int main()
     testRunTimeFormatting();
     testEnemyRootAnimation();
     testImpactVisualData();
+    testWeaponViewmodelPose();
     testIndustrialUiTheme();
     testSettingsMenuLayout();
 

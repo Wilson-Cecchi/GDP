@@ -421,6 +421,9 @@ especializados das pastas numeradas.
 - **Fase 111 — Interface industrial revisada:** HUD, título, pausa, resultado,
   configurações e confirmação compartilham uma paleta semântica, molduras em
   camadas e seleção bilateral mais legível, preservando layouts e mouse.
+- **Fase 112 — Armas em primeira pessoa:** Pistol e Carbine recebem silhuetas
+  próprias no viewmodel, com entrada ao equipar, arco de recarga, recuo e flash
+  de disparo ligados ao estado real da arma. Overdrive altera o detalhe emissivo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1039,6 +1042,16 @@ O menu principal ganha trilhos laterais e instruções secundárias usam contras
 próprio. Geometria de `*MenuLayout`, hit tests, inputs, gameplay e versões de
 Campaign/Speedrun permanecem inalterados. CPU protege a hierarquia da paleta e
 OpenGL continua cobrindo cada tela e seleção.
+
+Na Fase 112, `WeaponViewmodelRenderData` leva ao renderer somente a identidade
+da Pistol/Carbine e frações transitórias de recuo, recarga, equip e flash. A
+`Application` inicia essas frações quando o evento lógico já foi aceito e as
+avança no fixed update; o renderer amostra uma pose limitada e desenha volumes
+metálicos após o mundo, com depth limpo, antes do HUD. Assim, o cano visual nunca
+altera o hitscan da câmera. Pistol e Carbine têm comprimentos, empunhaduras e
+detalhes próprios; Overdrive troca apenas o detalhe emissivo para magenta. Seed
+visual varia discretamente o metal sem consumir RNG estrutural. Gameplay,
+persistência, WKC Forge e regras de Campaign/Speedrun permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

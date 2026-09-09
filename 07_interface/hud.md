@@ -6,7 +6,8 @@
 > integra Armor. A Fase 82 expõe a pressão do andar da Campanha, a Fase 84
 > identifica Pistol ou Carbine e a Fase 85 indica Overdrive ativo. O título permanece somente
 > como apoio de diagnóstico. A Fase 111 unificou o acabamento industrial do HUD
-> e dos menus sem alterar sua geometria funcional.
+> e dos menus sem alterar sua geometria funcional. A Fase 112 acrescentou o
+> viewmodel metálico da arma sem ocupar a camada de hit tests da interface.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -54,6 +55,12 @@ pickup é aceito.
 Durante Overdrive, a mesma linha acrescenta `OD` entre a identidade da arma e a
 munição. O título diagnóstico mostra também os segundos inteiros restantes; o
 renderer recebe apenas o booleano de apresentação e nunca avança o timer.
+
+O viewmodel é composto em perspectiva antes deste passe 2D: Pistol e Carbine
+possuem silhuetas próprias, recuo e flash acompanham disparos consumidos, recarga
+faz um arco curto e a troca de arma entra por baixo. O detalhe ciano passa a
+magenta durante Overdrive. A retícula e os painéis permanecem por cima, e menus
+pausam a animação junto com a simulação.
 
 Durante a Campanha, a linha do cronômetro inclui `FLOOR n/3` e `THREAT 100%`,
 `110%` ou `120%`. O renderer recebe o percentual pronto em `HudRenderData`; ele

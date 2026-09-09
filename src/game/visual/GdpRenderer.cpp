@@ -254,6 +254,24 @@ void drawBitmapText(
     }
 }
 
+wkc::core::Mat4 basisMatrix(
+    const wkc::core::Vec3 right,
+    const wkc::core::Vec3 up,
+    const wkc::core::Vec3 forward) noexcept
+{
+    wkc::core::Mat4 result = wkc::core::Mat4::identity();
+    result.elements[0] = right.x;
+    result.elements[1] = right.y;
+    result.elements[2] = right.z;
+    result.elements[4] = up.x;
+    result.elements[5] = up.y;
+    result.elements[6] = up.z;
+    result.elements[8] = forward.x;
+    result.elements[9] = forward.y;
+    result.elements[10] = forward.z;
+    return result;
+}
+
 } // namespace
 
 bool GdpRenderer::initialize(const int width, const int height)
@@ -812,7 +830,8 @@ bool GdpRenderer::render(
     const std::span<const CorridorRenderData> corridors,
     const std::span<const RoomRenderData> connectedRooms,
     const HudRenderData hud,
-    const std::span<const ImpactRenderData> impacts)
+    const std::span<const ImpactRenderData> impacts,
+    const WeaponViewmodelRenderData weaponViewmodel)
 {
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
@@ -1530,6 +1549,116 @@ bool GdpRenderer::render(
         shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
         box_.draw(gl_);
+    }
+
+    if (weaponViewmodel.visible) {
+        glClear(GL_DEPTH_BUFFER_BIT);
+        fallbackTexture_.bind(gl_);
+        shader_.setInt(gl_, "uDetailedMaterial", 0);
+        shader_.setInt(gl_, "uUseEmissionMap", 0);
+        shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader_.setVec2(gl_, "uUvOffset", {});
+
+        const wkc::core::Vec3 forward = wkc::core::normalized(camera.forward);
+        wkc::core::Vec3 right = wkc::core::normalized(
+            wkc::core::cross(forward, {0.0F, 1.0F, 0.0F}));
+        if (wkc::core::length(right) <= 1.0e-7F) {
+            right = {1.0F, 0.0F, 0.0F};
+        }
+        const wkc::core::Vec3 up = wkc::core::normalized(
+            wkc::core::cross(right, forward));
+        const WeaponViewmodelPose pose
+            = sampleWeaponViewmodelPose(weaponViewmodel);
+        const wkc::core::Vec3 baseOffset{
+            weaponViewmodel.role == HudWeaponRole::Carbine ? 0.27F : 0.32F,
+            weaponViewmodel.role == HudWeaponRole::Carbine ? -0.27F : -0.25F,
+            weaponViewmodel.role == HudWeaponRole::Carbine ? 0.72F : 0.62F,
+        };
+        const wkc::core::Vec3 localOffset = baseOffset + pose.offset;
+        const wkc::core::Vec3 anchor = camera.position
+            + (right * localOffset.x) + (up * localOffset.y)
+            + (forward * localOffset.z);
+        constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
+        const wkc::core::Mat4 root
+            = wkc::core::translationMatrix(anchor)
+            * basisMatrix(right, up, forward)
+            * wkc::core::rotationZMatrix(
+                pose.rotationDegrees.z * degreesToRadians)
+            * wkc::core::rotationYMatrix(
+                pose.rotationDegrees.y * degreesToRadians)
+            * wkc::core::rotationXMatrix(
+                pose.rotationDegrees.x * degreesToRadians);
+        const float seedTone = static_cast<float>(
+            (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.05F;
+        const wkc::core::Vec3 metal{
+            0.20F + seedTone, 0.25F + seedTone, 0.27F + seedTone};
+        const wkc::core::Vec3 darkMetal{0.075F, 0.095F, 0.105F};
+        const wkc::core::Vec3 grip{0.11F, 0.12F, 0.115F};
+        const wkc::core::Vec3 accent = weaponViewmodel.overdrive
+            ? wkc::core::Vec3{0.96F, 0.18F, 0.52F}
+            : wkc::core::Vec3{0.12F, 0.72F, 0.80F};
+        const auto drawWeaponPiece = [&](const wkc::core::Vec3 offset,
+                                         const wkc::core::Vec3 scale,
+                                         const wkc::core::Vec3 rotationDegrees,
+                                         const wkc::core::Vec3 color,
+                                         const float emissive = 0.0F) {
+            const wkc::core::Mat4 model = root
+                * wkc::core::translationMatrix(offset)
+                * wkc::core::rotationZMatrix(rotationDegrees.z * degreesToRadians)
+                * wkc::core::rotationYMatrix(rotationDegrees.y * degreesToRadians)
+                * wkc::core::rotationXMatrix(rotationDegrees.x * degreesToRadians)
+                * wkc::core::scaleMatrix(scale);
+            shader_.setMat4(gl_, "uModel", model);
+            shader_.setVec3(gl_, "uTint", color);
+            shader_.setFloat(gl_, "uEmissiveStrength", emissive);
+            box_.draw(gl_);
+        };
+
+        float muzzlePosition = 0.48F;
+        if (weaponViewmodel.role == HudWeaponRole::Carbine) {
+            drawWeaponPiece({}, {0.22F, 0.18F, 0.52F}, {}, metal);
+            drawWeaponPiece({0.0F, 0.01F, 0.40F},
+                {0.17F, 0.13F, 0.42F}, {}, darkMetal);
+            drawWeaponPiece({0.0F, 0.0F, 0.70F},
+                {0.055F, 0.055F, 0.34F}, {}, metal);
+            drawWeaponPiece({0.0F, -0.01F, -0.35F},
+                {0.19F, 0.16F, 0.30F}, {}, darkMetal);
+            drawWeaponPiece({0.0F, -0.20F, -0.04F},
+                {0.12F, 0.31F, 0.16F}, {-12.0F, 0.0F, 0.0F}, grip);
+            drawWeaponPiece({0.0F, 0.14F, 0.02F},
+                {0.07F, 0.09F, 0.14F}, {}, accent, 0.28F);
+            drawWeaponPiece({0.0F, 0.02F, 0.30F},
+                {0.235F, 0.035F, 0.18F}, {}, accent, 0.10F);
+            muzzlePosition = 0.88F;
+        } else {
+            drawWeaponPiece({}, {0.16F, 0.14F, 0.43F}, {}, metal);
+            drawWeaponPiece({0.0F, 0.075F, 0.04F},
+                {0.145F, 0.085F, 0.36F}, {}, darkMetal);
+            drawWeaponPiece({0.0F, -0.17F, -0.11F},
+                {0.12F, 0.28F, 0.15F}, {-14.0F, 0.0F, 0.0F}, grip);
+            drawWeaponPiece({0.0F, 0.0F, 0.31F},
+                {0.07F, 0.07F, 0.20F}, {}, metal);
+            drawWeaponPiece({0.0F, 0.13F, -0.02F},
+                {0.035F, 0.045F, 0.08F}, {}, accent, 0.24F);
+        }
+
+        const float flash = std::clamp(
+            std::isfinite(weaponViewmodel.muzzleFlashStrength)
+                ? weaponViewmodel.muzzleFlashStrength : 0.0F,
+            0.0F, 1.0F);
+        if (flash > 0.0F) {
+            const wkc::core::Vec3 flashColor{1.0F, 0.56F, 0.10F};
+            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + (0.07F * flash)},
+                {0.07F + (0.08F * flash), 0.07F + (0.08F * flash),
+                    0.18F + (0.12F * flash)}, {}, flashColor, 1.8F);
+            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + 0.04F},
+                {0.20F * flash, 0.025F, 0.055F},
+                {0.0F, 0.0F, 45.0F}, flashColor, 1.5F);
+            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + 0.04F},
+                {0.20F * flash, 0.025F, 0.055F},
+                {0.0F, 0.0F, -45.0F}, flashColor, 1.5F);
+        }
+        shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
     }
 
     framebuffer_.presentToDefault(gl_, width, height);

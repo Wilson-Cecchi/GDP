@@ -44,6 +44,10 @@ using wkc::platform::MouseButton;
 namespace {
 
 constexpr float impactVisualDuration = 0.32F;
+constexpr float weaponRecoilDuration = 0.12F;
+constexpr float weaponMuzzleFlashDuration = 0.055F;
+constexpr float weaponReloadDuration = 0.42F;
+constexpr float weaponEquipDuration = 0.48F;
 
 visual::ImpactVisualMaterial impactVisualMaterial(
     const gameplay::ImpactMaterial material) noexcept
@@ -586,6 +590,10 @@ bool Application::initializeRun()
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
     impactVisualCounter_ = 0U;
+    weaponRecoilRemaining_ = 0.0F;
+    weaponMuzzleFlashRemaining_ = 0.0F;
+    weaponReloadRemaining_ = 0.0F;
+    weaponEquipRemaining_ = weaponEquipDuration;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
@@ -1478,6 +1486,10 @@ bool Application::returnToMainMenu()
     interactionPending_ = false;
     firePending_ = false;
     reloadPending_ = false;
+    weaponRecoilRemaining_ = 0.0F;
+    weaponMuzzleFlashRemaining_ = 0.0F;
+    weaponReloadRemaining_ = 0.0F;
+    weaponEquipRemaining_ = 0.0F;
     restartRequested_ = false;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
@@ -1831,6 +1843,14 @@ void Application::fixedUpdate(const double fixedStep)
         return;
     }
     gameplay::updateFeedback(feedback_, step);
+    weaponRecoilRemaining_
+        = std::max(0.0F, weaponRecoilRemaining_ - step);
+    weaponMuzzleFlashRemaining_
+        = std::max(0.0F, weaponMuzzleFlashRemaining_ - step);
+    weaponReloadRemaining_
+        = std::max(0.0F, weaponReloadRemaining_ - step);
+    weaponEquipRemaining_
+        = std::max(0.0F, weaponEquipRemaining_ - step);
     for (ActiveImpact& impact : activeImpacts_) {
         impact.remaining = std::max(0.0F, impact.remaining - step);
         impact.render.strength = impact.remaining / impactVisualDuration;
@@ -2039,6 +2059,8 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
 
+    const gameplay::WeaponArchetype weaponBeforeLoot
+        = weapon_.definition().archetype;
     const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
         entities_, player_, weapon_, playerRoom);
     if (loot.collected > 0U) {
@@ -2079,11 +2101,15 @@ void Application::fixedUpdate(const double fixedStep)
                 config_.worldSeed, audioEventCounter_++);
         }
         gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
+        if (weapon_.definition().archetype != weaponBeforeLoot) {
+            weaponEquipRemaining_ = weaponEquipDuration;
+        }
         awardProgress(gameplay::ProgressionEvent::LootCollected,
             static_cast<std::uint32_t>(loot.collected));
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
+            weaponReloadRemaining_ = weaponReloadDuration;
             std::ostringstream message;
             message << "Weapon reloaded: " << weapon_.magazineAmmo() << '/'
                     << weapon_.reserveAmmo();
@@ -2120,6 +2146,8 @@ void Application::fixedUpdate(const double fixedStep)
         }
         if (shot.outcome != gameplay::ShotOutcome::Cooldown
             && shot.outcome != gameplay::ShotOutcome::Empty) {
+            weaponRecoilRemaining_ = weaponRecoilDuration;
+            weaponMuzzleFlashRemaining_ = weaponMuzzleFlashDuration;
             (void)gameplay::alertEnemiesToNoise(
                 entities_, playerRoom,
                 {.position = player_.state().position});
@@ -3024,11 +3052,27 @@ void Application::render()
             visibleImpacts.push_back(impact.render);
         }
     }
+    const visual::WeaponViewmodelRenderData weaponViewmodel{
+        .visible = player_.state().alive
+            && session_.state().phase == gameplay::SessionPhase::Playing,
+        .role = hud.weapon,
+        .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
+        .reloadProgress = weaponReloadRemaining_ > 0.0F
+            ? 1.0F - (weaponReloadRemaining_ / weaponReloadDuration) : 0.0F,
+        .equipStrength = weaponEquipRemaining_ / weaponEquipDuration,
+        .muzzleFlashStrength
+            = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
+        .overdrive = weapon_.overdriveActive(),
+        .visualSeed = wkc::core::hashCombine(
+            config_.worldSeed,
+            hud.weapon == visual::HudWeaponRole::Carbine ? 0x43415242494e45ULL
+                                                         : 0x504953544f4cULL),
+    };
     if (renderer_ == nullptr
         || !renderer_->render(
             width, height, camera, visibleEnemies, visiblePickups, visibleProps,
             lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
-            hud, visibleImpacts)) {
+            hud, visibleImpacts, weaponViewmodel)) {
         log(LogLevel::Error, "Renderer failed while drawing the frame");
         fatalError_ = true;
         running_ = false;
@@ -3070,6 +3114,10 @@ void Application::shutdown()
     interactionPending_ = false;
     firePending_ = false;
     reloadPending_ = false;
+    weaponRecoilRemaining_ = 0.0F;
+    weaponMuzzleFlashRemaining_ = 0.0F;
+    weaponReloadRemaining_ = 0.0F;
+    weaponEquipRemaining_ = 0.0F;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
     impactVisualCounter_ = 0U;

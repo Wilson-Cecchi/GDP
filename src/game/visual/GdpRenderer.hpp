@@ -61,7 +61,8 @@ public:
         std::span<const CorridorRenderData> corridors = {},
         std::span<const RoomRenderData> connectedRooms = {},
         HudRenderData hud = {},
-        std::span<const ImpactRenderData> impacts = {});
+        std::span<const ImpactRenderData> impacts = {},
+        WeaponViewmodelRenderData weaponViewmodel = {});
 
 private:
     struct EnemyGpuPart {

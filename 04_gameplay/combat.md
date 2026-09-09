@@ -9,7 +9,8 @@
 > Campanha, a Fase 84 integrou a Carbine encontrada em salas Secret e a Fase 85
 > adicionou o Overdrive temporário encontrado em Arenas. A Fase 93 adicionou
 > reação visual transitória ao dano de inimigos e a Fase 109 passou a publicar
-> ponto, normal e material de cada impacto. A fila
+> ponto, normal e material de cada impacto. A Fase 112 conectou eventos já
+> aceitos de disparo, recarga e equip aos snapshots do viewmodel. A fila
 > desacoplada de sinais de combate, além de spread
 > e weak points, permanece
 > para fases posteriores.
@@ -68,6 +69,13 @@ O Special da Fase 85 ativa Overdrive por `12 s`. Enquanto o timer está ativo,
 da arma equipada. O timer e o cooldown avançam pelo mesmo fixed update; ao
 expirar, o perfil-base volta sem mutar `WeaponDefinition`. Um segundo Special
 não reinicia nem acumula duração, evitando extensão infinita do efeito.
+
+Na Fase 112, a `Application` traduz somente ações já aceitas em temporizadores
+visuais: um tiro que consumiu munição inicia recuo e flash, uma recarga válida
+inicia o arco de recarga e a troca efetiva para Carbine inicia a entrada da arma.
+Cooldown, dry fire e pickup recusado não fabricam movimento. Esses timers não
+alteram `Weapon`, dano, cadência, munição ou direção do hitscan e congelam junto
+com o gameplay quando um menu pausa a run.
 
 ## Dano
 

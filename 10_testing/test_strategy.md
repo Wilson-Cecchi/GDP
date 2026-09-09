@@ -402,6 +402,13 @@ vermelho e verde preservam semânticas distintas. As regressões OpenGL existent
 continuam exigindo pixels diferentes para telas, seleções e valores, enquanto
 os testes de layout/mouse garantem que a revisão não deslocou hit targets.
 
+O gate da Fase 112 amostra em CPU repouso, recuo específico de Pistol/Carbine,
+pico e retorno da recarga, entrada por baixo e sanitização de valores inválidos.
+A regressão OpenGL compara cenário sem arma, Pistol, Carbine e disparo com flash,
+exigindo mudança material de pixels e ausência de erro GL. Builds headless
+continuam garantindo que o novo contrato visual não cria dependência gráfica no
+combate.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

@@ -1150,6 +1150,13 @@ semânticas depois do blit; layouts e hit tests permanecem DTOs puros, e nenhuma
 decisão visual entra em Gameplay ou Platform. A mudança não requer textura nova,
 RNG, persistência ou API WKC Forge.
 
+Na Fase 112, a `Application` traduz disparo, recarga e troca já aceitos em
+frações temporais de `WeaponViewmodelRenderData`. `GdpRenderer` amostra a pose e
+compõe Pistol/Carbine após o mundo e antes do HUD, limpando apenas o depth desse
+passe. A apresentação não consulta `Weapon`, não direciona o hitscan e não possui
+seus temporizadores. A variação de metal usa hash cosmético; gameplay,
+persistência, RNG estrutural e WKC Forge permanecem inalterados.
+
 ---
 
 # 8. Sistema de seed

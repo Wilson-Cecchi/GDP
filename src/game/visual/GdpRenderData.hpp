@@ -180,6 +180,27 @@ struct ImpactRenderData {
     float strength = 1.0F) noexcept;
 [[nodiscard]] float impactVisualSize(float strength) noexcept;
 
+struct WeaponViewmodelRenderData {
+    bool visible{false};
+    HudWeaponRole role{HudWeaponRole::Pistol};
+    float recoilStrength{0.0F};
+    float reloadProgress{0.0F};
+    float equipStrength{0.0F};
+    float muzzleFlashStrength{0.0F};
+    bool overdrive{false};
+    wkc::core::Seed visualSeed{0U};
+};
+
+struct WeaponViewmodelPose {
+    wkc::core::Vec3 offset{};
+    wkc::core::Vec3 rotationDegrees{};
+
+    constexpr bool operator==(const WeaponViewmodelPose&) const noexcept = default;
+};
+
+[[nodiscard]] WeaponViewmodelPose sampleWeaponViewmodelPose(
+    const WeaponViewmodelRenderData& weapon) noexcept;
+
 struct RoomRenderData {
     wkc::core::Vec3 origin{};
     wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
