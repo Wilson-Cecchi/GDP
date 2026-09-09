@@ -596,6 +596,20 @@ void testEnemyRootAnimation()
     expect(alertTransition.previousState == EnemyAnimationState::Alert
             && alertTransition.durationTicks == 4U,
         "leaving Alert blends into investigation without a visual snap");
+    EnemyAnimationTransition recoverTransition;
+    advanceEnemyAnimationTransition(
+        recoverTransition, EnemyAnimationState::Walk);
+    advanceEnemyAnimationTransition(
+        recoverTransition, EnemyAnimationState::Recover);
+    expect(recoverTransition.previousState == EnemyAnimationState::Walk
+            && recoverTransition.currentState == EnemyAnimationState::Recover
+            && recoverTransition.durationTicks == 5U,
+        "Recover enters its scanning pose with a restrained blend");
+    advanceEnemyAnimationTransition(
+        recoverTransition, EnemyAnimationState::Idle);
+    expect(recoverTransition.previousState == EnemyAnimationState::Recover
+            && recoverTransition.durationTicks == 5U,
+        "Recover returns to Idle without snapping");
     advanceEnemyAnimationTransition(transition, EnemyAnimationState::Walk);
     expect(transition.previousState == EnemyAnimationState::Idle
             && transition.currentState == EnemyAnimationState::Walk
@@ -849,6 +863,21 @@ void testEnemyRootAnimation()
             && std::abs(robotAlertArm.rotationDegrees.x)
                 < std::abs(alertArm.rotationDegrees.x) * 0.5F,
         "Alert has a restrained role-weighted readiness pose");
+    const EnemyRootPose recover = sampleEnemyRootPose(
+        EnemyAnimationState::Recover, 18U, 0U);
+    const EnemyPartPose recoverHead = sampleEnemyPartPose(
+        EnemyAnimationState::Recover, 18U, 0U, 1U, 8U);
+    const EnemyPartPose recoverArm = sampleEnemyPartPose(
+        EnemyAnimationState::Recover, 18U, 0U, 2U, 8U);
+    const EnemyPartPose robotRecoverHead = sampleEnemyPartPose(
+        EnemyAnimationState::Recover, 18U, 0U, 1U, 9U, 0.0F, true,
+        EnemyVisualRole::IndustrialRobot);
+    expect(recover.scale == wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+            && recoverHead.rotationDegrees.y > 13.9F
+            && recoverArm.rotationDegrees.x == -2.0F
+            && robotRecoverHead.rotationDegrees.y
+                < recoverHead.rotationDegrees.y * 0.5F,
+        "Recover scans with the head while preserving role-weighted mass");
     expect(idle == sampleEnemyRootPose(
             EnemyAnimationState::Idle, 7U, 111U),
         "enemy root animation is deterministic for the same tick and visual seed");
@@ -871,7 +900,7 @@ void testEnemyRootAnimation()
         maximumWalkLift = std::max(maximumWalkLift, walkPose.offset.y);
         maximumAttackReach = std::max(maximumAttackReach, attackPose.scale.z);
         for (const EnemyRootPose pose : {
-                 idlePose, walkPose, attackPose, alert, hit}) {
+                 idlePose, walkPose, attackPose, alert, recover, hit}) {
             finiteAndGrounded = finiteAndGrounded
                 && std::isfinite(pose.offset.y)
                 && std::isfinite(pose.scale.x)

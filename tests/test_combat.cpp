@@ -166,13 +166,15 @@ void testDamageLifecycle()
     data->lastKnownPlayerPosition = {2.0F, 0.0F, 3.0F};
     data->investigationTime = 1.0F;
     data->alertTime = 0.2F;
+    data->recoverTime = 0.4F;
     expect(applyDamage(manager, enemy, 100.0F) == DamageOutcome::Killed,
         "overkill clamps HP and produces one kill");
     expect(data->health == 0.0F && data->behavior == EnemyBehaviorState::Dead
             && near(data->hitReactionTime, 0.0F)
             && data->lastKnownPlayerPosition == wkc::core::Vec3{}
             && near(data->investigationTime, 0.0F)
-            && near(data->alertTime, 0.0F),
+            && near(data->alertTime, 0.0F)
+            && near(data->recoverTime, 0.0F),
         "lethal damage enters Dead and clears transient reaction and awareness");
     expect(applyDamage(manager, enemy, 1.0F) == DamageOutcome::Ignored,
         "dead enemy ignores repeated damage and cannot die twice");
@@ -867,6 +869,18 @@ void testEngineerRangedBehaviorAndRepairOcclusion()
                 manager.findData<EnemyData>(damagedWorker)->health, 20.0F),
         "Engineer neither repairs nor attacks through blocking geometry");
 
+    manager.find(damagedWorker)->transform.position = {0.0F, 0.0F, 7.0F};
+    EnemyData* engineerData = manager.findData<EnemyData>(engineer);
+    engineerData->behavior = EnemyBehaviorState::Recover;
+    engineerData->recoverTime = 0.4F;
+    engineerData->supportCooldown = 0.0F;
+    const EnemyUpdateSummary recovering
+        = updateEngineers(manager, player, 1, blocked, 0.1F, config);
+    expect(recovering.recovering == 1U && recovering.repairsPerformed == 0U
+            && wkc::core::nearlyEqual(
+                manager.findData<EnemyData>(damagedWorker)->health, 20.0F),
+        "Engineer suspends repairs while Recover scans after a lost target");
+
     const CollisionWorld open{{{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}}};
     manager.find(damagedWorker)->transform.position = {10.0F, 0.0F, 10.0F};
     const EnemyUpdateSummary approach
@@ -1231,6 +1245,7 @@ void testDeterministicLocalPatrol()
         = {3.0F, 0.0F, 3.0F};
     manager.findData<EnemyData>(worker)->investigationTime = 2.0F;
     manager.findData<EnemyData>(worker)->alertTime = 0.2F;
+    manager.findData<EnemyData>(worker)->recoverTime = 0.4F;
     manager.findData<EnemyData>(worker)->behavior = EnemyBehaviorState::Alert;
     const EnemyUpdateSummary inactivePatrol = updateWorkers(
         manager, deadPlayer, 4, room, 1.0F,
@@ -1242,8 +1257,9 @@ void testDeterministicLocalPatrol()
             && manager.findData<EnemyData>(worker)->lastKnownPlayerPosition
                 == wkc::core::Vec3{}
             && manager.findData<EnemyData>(worker)->investigationTime == 0.0F
-            && manager.findData<EnemyData>(worker)->alertTime == 0.0F,
-        "patrol, alert, and investigation remain cleared after player death");
+            && manager.findData<EnemyData>(worker)->alertTime == 0.0F
+            && manager.findData<EnemyData>(worker)->recoverTime == 0.0F,
+        "patrol and awareness remain cleared after player death");
 }
 
 void testEnemyInvestigationLifecycle()
@@ -1258,7 +1274,9 @@ void testEnemyInvestigationLifecycle()
         bool acquired{false};
         bool investigated{false};
         bool reacquired{false};
-        bool expiredIntoPatrol{false};
+        bool enteredRecover{false};
+        bool scanned{false};
+        bool recoveredIntoPatrol{false};
 
         constexpr bool operator==(const InvestigationResult&) const noexcept = default;
     };
@@ -1278,7 +1296,8 @@ void testEnemyInvestigationLifecycle()
             .roomId = 5,
             .archetype = archetype,
         });
-        const InvestigationConfig investigation{2.0F, 0.75F, 0.2F};
+        const InvestigationConfig investigation{
+            2.0F, 0.75F, 0.2F, 12.0F, 0.20F, 0.60F};
         const auto updateRole = [&](const CollisionWorld& world,
                                     const float step,
                                     const float detectionRange) {
@@ -1359,9 +1378,25 @@ void testEnemyInvestigationLifecycle()
 
         (void)player.relocate({0.0F, 0.0F, -2.0F}, -90.0F);
         const EnemyUpdateSummary expired = updateRole(blocked, 2.1F, 0.1F);
-        result.expiredIntoPatrol = expired.investigating == 0U
-            && expired.patrolling + expired.idle == 1U
+        const wkc::core::Vec3 recoverPosition
+            = manager.find(id)->transform.position;
+        const float recoverYaw = manager.find(id)->transform.rotationDegrees.y;
+        result.enteredRecover = expired.investigating == 0U
+            && expired.recovering == 1U
             && near(enemy->investigationTime, 0.0F)
+            && near(enemy->recoverTime, investigation.recoverDuration)
+            && enemy->behavior == EnemyBehaviorState::Recover;
+        const EnemyUpdateSummary scan = updateRole(blocked, 0.2F, 0.1F);
+        result.scanned = scan.recovering == 1U
+            && manager.find(id)->transform.position == recoverPosition
+            && manager.find(id)->transform.rotationDegrees.y != recoverYaw
+            && near(enemy->recoverTime, 0.4F)
+            && enemy->behavior == EnemyBehaviorState::Recover;
+        const EnemyUpdateSummary patrol = updateRole(blocked, 0.5F, 0.1F);
+        result.recoveredIntoPatrol = patrol.recovering == 0U
+            && patrol.patrolling + patrol.idle == 1U
+            && near(enemy->recoverTime, 0.0F)
+            && enemy->lastKnownPlayerPosition == wkc::core::Vec3{}
             && (enemy->behavior == EnemyBehaviorState::Patrol
                 || enemy->behavior == EnemyBehaviorState::Idle);
         return result;
@@ -1378,8 +1413,9 @@ void testEnemyInvestigationLifecycle()
         const InvestigationResult first = runFixture(archetype);
         const InvestigationResult repeated = runFixture(archetype);
         expect(first == repeated && first.acquired && first.investigated
-                && first.reacquired && first.expiredIntoPatrol,
-            "last-known-position investigation is complete and deterministic for every role");
+                && first.reacquired && first.enteredRecover && first.scanned
+                && first.recoveredIntoPatrol,
+            "investigation, Recover scan, and patrol return are deterministic for every role");
     }
 }
 
@@ -1571,6 +1607,38 @@ void testEnemyNoisePerception()
                    .radius = std::numeric_limits<float>::quiet_NaN()},
                limited) == 0U,
         "invalid noise stimuli are ignored safely");
+
+    Player hiddenPlayer;
+    hiddenPlayer.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager recoveringManager;
+    const EntityId recoveringWorker = recoveringManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 6.0F}},
+        .roomId = 5,
+        .archetype = EnemyArchetype::Worker,
+    });
+    EnemyData* recovering
+        = recoveringManager.findData<EnemyData>(recoveringWorker);
+    recovering->behavior = EnemyBehaviorState::Recover;
+    recovering->recoverTime = 0.4F;
+    EnemyDifficultyConfigs resumeConfigs;
+    resumeConfigs.worker.detectionRange = 20.0F;
+    resumeConfigs.worker.moveSpeed = 1.0F;
+    resumeConfigs.worker.attackDamage = 0.0F;
+    resumeConfigs.worker.investigation
+        = {2.0F, 0.75F, 0.2F, 12.0F, 0.20F, 0.60F};
+    expect(alertEnemiesToNoise(
+               recoveringManager, 5,
+               {.position = hiddenPlayer.state().position, .radius = 12.0F},
+               resumeConfigs) == 1U
+            && recovering->recoverTime == 0.0F
+            && recovering->alertTime == 0.0F,
+        "new noise interrupts Recover without repeating Alert");
+    const EnemyUpdateSummary resumed = updateWorkers(
+        recoveringManager, hiddenPlayer, 5, blocked, 0.1F,
+        resumeConfigs.worker);
+    expect(resumed.investigating == 1U && resumed.alerting == 0U
+            && recovering->behavior == EnemyBehaviorState::Investigate,
+        "interrupted Recover resumes investigation immediately");
 }
 
 } // namespace

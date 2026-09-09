@@ -198,6 +198,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before the dedicated Alert state remain isolated");
 
+    writeText(path, "version = 2\nrules_version = 13\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before the Recover state remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
@@ -205,7 +210,7 @@ void testInvalidAndVersionedData()
 
     writeText(path,
         "version = 2\n"
-        "rules_version = 13\n"
+        "rules_version = 14\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::Invalid,

@@ -394,6 +394,10 @@ especializados das pastas numeradas.
   gira o inimigo para a origem e sustenta brevemente uma postura própria antes
   da investigação. Novos tiros atualizam o alvo sem reiniciar essa reação.
   Campaign/Speedrun avançam para regras 13/12.
+- **Fase 105 — Recuperação da busca:** ao esgotar a memória, cada papel executa
+  uma varredura curta e determinística antes de voltar à patrulha. Visão ou novo
+  ruído interrompem a saída sem repetir o alerta. Campaign/Speedrun avançam para
+  regras 14/13.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -948,6 +952,17 @@ renovam a investigação, mas não reiniciam `Alert`, evitando stun lock. Morte 
 Player morto limpam o timer; Hit visual e visão real preservam suas prioridades.
 O estado é transitório, não usa RNG e não altera o schema do checkpoint.
 Campaign/Speedrun passam às regras 13/12.
+
+Na Fase 105, o fim de `Investigate` entra em `Recover` em vez de retornar
+diretamente à patrulha. Worker varre o ambiente por `0,65 s`, Guard por
+`0,85 s`, Officer por `1 s`, Engineer por `0,75 s` e IndustrialRobot por
+`1,20 s`. A entidade interrompe locomoção tática e ações, gira primeiro para um
+lado derivado de `visualSeed + EntityId` e então retorna, enquanto cabeça,
+braços e equipamento usam uma pose rígida de busca com menor amplitude nos
+papéis pesados. Visão confirmada cancela Recover e retoma combate no mesmo tick;
+novo ruído cancela a varredura e volta a `Investigate` sem repetir `Alert`.
+Ao terminar, a memória é apagada e a patrulha retorna. Não há consumo de RNG,
+mudança de collider ou schema novo. Campaign/Speedrun passam às regras 14/13.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

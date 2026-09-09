@@ -427,6 +427,7 @@ void rememberVisiblePlayer(
     config.duration = std::max(config.duration, 0.0F);
     enemy.lastKnownPlayerPosition = player.state().position;
     enemy.investigationTime = config.duration;
+    enemy.recoverTime = 0.0F;
 }
 
 bool updateEnemyAlert(
@@ -459,6 +460,47 @@ bool updateEnemyAlert(
     turnEnemyToward(
         entity, enemy.lastKnownPlayerPosition - entity.transform.position,
         step, targetTurnRateDegreesPerSecond);
+    return true;
+}
+
+bool updateEnemyRecover(
+    const gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const CollisionWorld& collisionWorld,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::EnemyData& enemy,
+    gdp::entities::Entity& entity,
+    const float moveSpeed,
+    const float step,
+    InvestigationConfig config,
+    const CharacterCollider collider) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    config.recoverDuration = std::isfinite(config.recoverDuration)
+        ? std::max(config.recoverDuration, 0.0F) : 0.0F;
+    enemy.recoverTime = std::max(0.0F, enemy.recoverTime - step);
+    if (enemy.recoverTime <= 0.0F || config.recoverDuration <= 0.0F) {
+        enemy.recoverTime = 0.0F;
+        enemy.lastKnownPlayerPosition = {};
+        return false;
+    }
+
+    enemy.behavior = EnemyBehaviorState::Recover;
+    separateEnemyIfNeeded(
+        manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+        moveSpeed, step, collider);
+    if (step > 0.0F) {
+        const float direction
+            = ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1.0F : 1.0F;
+        const float scanDirection = enemy.recoverTime
+                > config.recoverDuration * 0.5F
+            ? direction : -direction;
+        const float currentYaw = std::isfinite(entity.transform.rotationDegrees.y)
+            ? entity.transform.rotationDegrees.y : 0.0F;
+        entity.transform.rotationDegrees.y = std::remainder(
+            currentYaw + (scanDirection * 70.0F * step), 360.0F);
+    }
     return true;
 }
 
@@ -528,6 +570,7 @@ void updateUnseenEnemy(
     if (!playerAlive) {
         enemy.lastKnownPlayerPosition = {};
         enemy.investigationTime = 0.0F;
+        enemy.recoverTime = 0.0F;
         enemy.behavior = EnemyBehaviorState::Idle;
         ++summary.idle;
         separateEnemyIfNeeded(
@@ -535,10 +578,28 @@ void updateUnseenEnemy(
             moveSpeed, step, collider);
         return;
     }
+    const bool investigationWasActive = enemy.investigationTime > 0.0F;
     if (updateEnemyInvestigation(
             manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
             moveSpeed, step, investigation, collider)) {
         ++summary.investigating;
+        return;
+    }
+    if (investigationWasActive) {
+        const float recoverDuration = std::isfinite(investigation.recoverDuration)
+            ? std::max(investigation.recoverDuration, 0.0F) : 0.0F;
+        enemy.recoverTime = recoverDuration;
+        if (recoverDuration > 0.0F) {
+            enemy.behavior = EnemyBehaviorState::Recover;
+            ++summary.recovering;
+            return;
+        }
+        enemy.lastKnownPlayerPosition = {};
+    }
+    if (updateEnemyRecover(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, investigation, collider)) {
+        ++summary.recovering;
         return;
     }
     if (updateEnemyPatrol(
@@ -637,9 +698,10 @@ std::size_t alertEnemiesToNoise(
         }
 
         const bool newlyAlerted = enemy->investigationTime <= 0.0F
-            && enemy->alertTime <= 0.0F;
+            && enemy->alertTime <= 0.0F && enemy->recoverTime <= 0.0F;
         enemy->lastKnownPlayerPosition = stimulus.position;
         enemy->investigationTime = investigationDuration;
+        enemy->recoverTime = 0.0F;
         if (newlyAlerted) {
             const float alertDuration = std::isfinite(investigation.alertDuration)
                 ? std::max(investigation.alertDuration, 0.0F) : 0.0F;
@@ -1063,6 +1125,13 @@ EnemyUpdateSummary updateEngineers(
             ++summary.alerting;
             continue;
         }
+        if (!lineOfSight) {
+            updateUnseenEnemy(
+                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
+                player.state().alive, config.moveSpeed, step, config.patrol,
+                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
+            continue;
+        }
         if (enemy->supportCooldown <= 0.0F && config.repairRange > 0.0F) {
             EntityId repairTarget;
             bool targetIsProp = false;
@@ -1136,13 +1205,6 @@ EnemyUpdateSummary updateEngineers(
             }
         }
 
-        if (!lineOfSight) {
-            updateUnseenEnemy(
-                manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
-                player.state().alive, config.moveSpeed, step, config.patrol,
-                config.investigation, {.radius = 0.35F, .height = 1.8F}, summary);
-            continue;
-        }
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};

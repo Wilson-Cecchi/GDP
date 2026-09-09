@@ -173,3 +173,10 @@ Outro disparo atualiza a posição ouvida e renova a busca, mas não reinicia a
 pausa, impedindo stun lock por cadência. Morte e Player morto limpam o timer. A
 regressão cobre os cinco arquétipos, orientação, imobilidade, término da janela,
 prioridade visual e pose rígida. Campaign/Speedrun passam às regras 13/12.
+
+Na Fase 105, a expiração da investigação inicia `Recover` por `0,65–1,20 s`.
+Durante a varredura não há locomoção tática, ataque, comando ou reparo; visão
+confirmada retoma combate imediatamente e ruído novo retoma `Investigate` sem
+novo Alert. O término limpa a última posição conhecida e libera a patrulha. A
+regressão cobre os cinco papéis, imobilidade, giro determinístico, interrupções,
+limpeza por morte e pose rígida. Campaign/Speedrun passam às regras 14/13.

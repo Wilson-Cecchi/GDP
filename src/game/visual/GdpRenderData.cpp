@@ -282,6 +282,10 @@ std::uint32_t transitionDurationTicks(
     if (previous == EnemyAnimationState::Alert) {
         return 4U;
     }
+    if (current == EnemyAnimationState::Recover
+        || previous == EnemyAnimationState::Recover) {
+        return 5U;
+    }
     if (previous == EnemyAnimationState::Hit
         || current == EnemyAnimationState::Attack) {
         return 4U;
@@ -488,6 +492,8 @@ EnemyRootPose sampleEnemyRootPose(
         period = 30U;
     } else if (state == EnemyAnimationState::Attack) {
         period = 24U;
+    } else if (state == EnemyAnimationState::Recover) {
+        period = 72U;
     }
     const std::uint64_t phaseTick
         = (animationTick + (visualSeed % period)) % period;
@@ -495,6 +501,13 @@ EnemyRootPose sampleEnemyRootPose(
         / static_cast<float>(period) * tau;
     const float wave = std::sin(phase);
 
+    if (state == EnemyAnimationState::Recover) {
+        const float readiness = alertReadinessScale(role);
+        return {
+            {0.0F, ((wave + 1.0F) * 0.003F) * readiness, 0.0F},
+            {1.0F, 1.0F, 1.0F},
+        };
+    }
     if (state == EnemyAnimationState::Walk) {
         const float stride = std::abs(wave);
         return {
@@ -587,12 +600,32 @@ EnemyPartPose sampleEnemyPartPose(
         period = profile.walkPeriod;
     } else if (state == EnemyAnimationState::Attack) {
         period = profile.attackPeriod;
+    } else if (state == EnemyAnimationState::Recover) {
+        period = 72U;
     }
     const std::uint64_t phaseTick
         = (animationTick + (visualSeed % period)) % period;
     const float phase = static_cast<float>(phaseTick)
         / static_cast<float>(period) * tau;
     const float wave = std::sin(phase);
+
+    if (state == EnemyAnimationState::Recover) {
+        const float readiness = alertReadinessScale(role);
+        if (partIndex == 0U) {
+            return {{}, {-0.8F * readiness, 0.0F, 0.0F}};
+        }
+        if (partIndex == 1U) {
+            return {{}, {0.0F, wave * 14.0F * readiness, 0.0F}};
+        }
+        if (partIndex == 2U || partIndex == 3U) {
+            return {{}, {-2.0F * readiness, 0.0F, 0.0F}};
+        }
+        if (partIndex + 1U == partCount) {
+            return {{0.0F, 0.0F,
+                profile.attackToolTravel * 0.10F * readiness}, {}};
+        }
+        return {};
+    }
 
     if (state == EnemyAnimationState::Walk) {
         if (partIndex == 2U) {

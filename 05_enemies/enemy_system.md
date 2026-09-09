@@ -8,7 +8,8 @@
 > investigação temporária da última posição conhecida. A Fase 102 tornou esse
 > ciclo validável atrás de uma cobertura larga na sala START. A Fase 103
 > acrescentou investigação provocada por ruído de disparo e a Fase 104 separou
-> sua reação inicial no estado `Alert`.
+> sua reação inicial no estado `Alert`. A Fase 105 acrescentou `Recover` antes
+> do retorno à patrulha.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -82,6 +83,12 @@ ações de papel param enquanto o inimigo gira para a origem por uma janela curt
 específica do arquétipo. Ruídos seguintes atualizam a origem e o tempo de
 investigação, mas não renovam a pausa. A transição evita resposta instantânea
 sem permitir que tiros sucessivos funcionem como controle de grupo.
+
+Quando a busca expira, `Recover` conserva o inimigo em uma varredura curta sem
+ação ofensiva antes de apagar a memória e retornar à patrulha. A direção inicial
+é derivada da identidade estável e inverte na metade da janela. Visão direta
+cancela o estado em favor do papel de combate; novo ruído volta à investigação
+sem repetir a pausa inicial.
 
 Na Fase 12, `RoomEventPlan` pode acrescentar Workers/Guards em ondas. Cada spawn
 usa posição, HP e `visualSeed` precomputados pela substream `Events`, entra no

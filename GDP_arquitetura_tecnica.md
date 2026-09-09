@@ -1171,6 +1171,16 @@ estado para uma pose rígida de prontidão com blends de 3/4 ticks e intensidade
 por massa; colliders e WKC Forge não mudam. Campaign/Speedrun avançam para
 regras 13/12; checkpoint permanece schema 2.
 
+Na Fase 105, `EnemyBehaviorState::Recover` e `EnemyData::recoverTime` modelam a
+saída da investigação. Ao expirar a memória, um helper compartilhado mantém a
+entidade sem locomoção tática por `0,65–1,20 s`, varre o yaw em duas metades com
+sentido derivado de `visualSeed + EntityId` e então limpa a posição conhecida.
+Visão cancela Recover antes das ações do papel; ruído cancela a varredura e
+reativa Investigate sem reiniciar Alert. O renderer concreto usa cabeça e
+postura residual rígidas com blends de 5 ticks. Não há RNG consumido nem API
+nova na WKC Forge. Campaign/Speedrun avançam para regras 14/13; checkpoint
+permanece schema 2.
+
 ---
 
 # 8. Sistema de seed

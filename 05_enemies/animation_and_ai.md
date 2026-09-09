@@ -17,8 +17,8 @@
 > A Fase 100 implementou patrulha local determinística nos cinco arquétipos.
 > A Fase 101 implementou aquisição visual e investigação da última posição
 > conhecida. A Fase 103 acrescentou percepção por ruído de disparo e a Fase
-> 104 implementou a reação dedicada `Alert`. Recover explícito e pathfinding
-> global permanecem planejados.
+> 104 implementou a reação dedicada `Alert`. A Fase 105 acrescentou `Recover`
+> ao fim da busca; pathfinding global permanece planejado.
 > A Fase 102 acrescentou na START uma cobertura larga para validar visualmente
 > aquisição, perda de contato, investigação e readquisição no primeiro combate.
 >
@@ -126,6 +126,12 @@ uma prontidão curta, escalada por papel até `48%` no IndustrialRobot. A entrad
 usa blend de 3 ticks e a saída, 4, sem alterar colliders ou produzir deformação.
 Hit continua prevalecendo visualmente e Death permanece terminal.
 
+A Fase 105 acrescenta uma pose `Recover` de proporções rígidas. A cabeça varre
+até `14°` para cada lado enquanto torso e braços preservam prontidão residual;
+o perfil de massa reduz a amplitude até `48%` no IndustrialRobot. Entrada e
+saída usam blends de 5 ticks. A raiz conserva escala `1:1:1`, e nenhuma parte
+visual altera orientação lógica, collider ou alcance de combate.
+
 ## Walk
 
 A pose de raiz continua paramétrica por fase e os meshes separados giram ao
@@ -134,9 +140,9 @@ alterar o deslocamento lógico da entidade.
 
 ## IA base
 
-Estados implementados: Idle, Patrol, Alert, Investigate, Chase, Reposition,
-Attack e Dead. Recover explícito permanece planejado. A percepção combina visão
-direta e estímulo de ruído de disparo na sala ativa.
+Estados implementados: Idle, Patrol, Alert, Investigate, Recover, Chase,
+Reposition, Attack e Dead. A percepção combina visão direta e estímulo de ruído
+de disparo na sala ativa; pathfinding global permanece planejado.
 Aquisição exige alcance e line of sight dentro da sala ativa.
 
 O Worker atual detecta em até `12 m`, persegue a `1,35 m/s`, ataca dentro de
@@ -235,3 +241,10 @@ janela. Um novo ruído atualiza a posição e renova o tempo de busca, mas não
 reinicia `alertTime`; assim, cadência de tiros não paralisa o elenco. Visão
 confirmada atualiza a posição durante Alert e assume o combate quando a reação
 termina. Player morto e morte do inimigo limpam o estado.
+
+A Fase 105 insere `Recover` quando o timer de investigação expira. Cada papel
+permanece entre `0,65 s` e `1,20 s` em uma varredura estacionária: o yaw gira a
+`70°/s` para um lado derivado de `visualSeed + EntityId` e inverte na metade da
+janela. Ao final, a posição lembrada é apagada e a patrulha retorna. Linha de
+visão cancela a recuperação com prioridade imediata; ruído novo retoma a busca
+sem repetir `Alert`. Player morto e morte do inimigo limpam o timer.
