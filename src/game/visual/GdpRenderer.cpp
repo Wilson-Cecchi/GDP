@@ -269,6 +269,8 @@ constexpr Glyph glyphFor(const char character) noexcept
     case '-': return {0x00U, 0x00U, 0x00U, 0x0EU, 0x00U, 0x00U, 0x00U};
     case '/': return {0x01U, 0x02U, 0x02U, 0x04U, 0x08U, 0x08U, 0x10U};
     case ':': return {0x00U, 0x04U, 0x04U, 0x00U, 0x04U, 0x04U, 0x00U};
+    case '.': return {0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x06U, 0x06U};
+    case '%': return {0x11U, 0x02U, 0x04U, 0x08U, 0x11U, 0x00U, 0x00U};
     default: return {};
     }
 }
@@ -882,6 +884,16 @@ bool GdpRenderer::uploadEnemyGpuVisual(
     return true;
 }
 
+void GdpRenderer::drawMesh(const wkc::render::Mesh& mesh) noexcept
+{
+    if (!mesh.isValid()) {
+        return;
+    }
+    mesh.draw(gl_);
+    ++lastFrameStats_.drawCalls;
+    lastFrameStats_.triangles += mesh.indexCount() / 3U;
+}
+
 bool GdpRenderer::render(
     const int width,
     const int height,
@@ -898,9 +910,12 @@ bool GdpRenderer::render(
     const std::span<const ImpactRenderData> impacts,
     const WeaponViewmodelRenderData weaponViewmodel)
 {
+    lastFrameStats_ = {};
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
     }
+    lastFrameStats_.meshCacheEntries = meshCache_.stats().entries;
+    lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
     if (!framebuffer_.resize(gl_, width, height)) {
         return false;
     }
@@ -1095,7 +1110,7 @@ bool GdpRenderer::render(
                 ? detailedUvOffset + materialUvOffset
                 : wkc::core::Vec2{});
         shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
-        box_.draw(gl_);
+        drawMesh(box_);
     };
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
@@ -1329,7 +1344,7 @@ bool GdpRenderer::render(
             shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
             shader_.setVec2(gl_, "uUvOffset", {});
             shader_.setFloat(gl_, "uEmissiveStrength", emissive);
-            box_.draw(gl_);
+            drawMesh(box_);
         };
         constexpr float frameThickness = 0.14F;
         const wkc::core::Vec3 frameColor = door.locked
@@ -1398,7 +1413,7 @@ bool GdpRenderer::render(
         shader_.setVec3(gl_, "uTint", color);
         shader_.setFloat(gl_, "uEmissiveStrength",
             impact.material == ImpactVisualMaterial::Metal ? 0.75F : 0.12F);
-        box_.draw(gl_);
+        drawMesh(box_);
 
         const std::size_t particleCount
             = impact.material == ImpactVisualMaterial::Metal ? 4U
@@ -1422,7 +1437,7 @@ bool GdpRenderer::render(
                     * wkc::core::scaleMatrix(
                         {particleSize, particleSize, particleSize}));
             shader_.setVec3(gl_, "uTint", color);
-            box_.draw(gl_);
+            drawMesh(box_);
         }
     }
 
@@ -1457,7 +1472,7 @@ bool GdpRenderer::render(
             shader_.setVec2(gl_, "uUvScale", uvScale);
             shader_.setVec2(gl_, "uUvOffset", uvOffset);
             shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
-            box_.draw(gl_);
+            drawMesh(box_);
         };
         const wkc::core::Vec3 housingTint
             = light.fixtureState == PropVisualState::Destroyed
@@ -1591,7 +1606,7 @@ bool GdpRenderer::render(
                 * wkc::core::translationMatrix(
                     {-part.pivot.x, -part.pivot.y, -part.pivot.z});
             shader_.setMat4(gl_, "uModel", rootModel * partModel);
-            part.mesh.draw(gl_);
+            drawMesh(part.mesh);
         }
     }
 
@@ -1625,7 +1640,7 @@ bool GdpRenderer::render(
         shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
         shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength", 0.16F);
-        box_.draw(gl_);
+        drawMesh(box_);
     }
 
     for (const PropRenderData& prop : props) {
@@ -1658,7 +1673,7 @@ bool GdpRenderer::render(
         shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
         shader_.setVec2(gl_, "uUvOffset", {});
         shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
-        box_.draw(gl_);
+        drawMesh(box_);
     }
 
     if (weaponViewmodel.visible) {
@@ -1721,7 +1736,7 @@ bool GdpRenderer::render(
             shader_.setMat4(gl_, "uModel", model);
             shader_.setVec3(gl_, "uTint", color);
             shader_.setFloat(gl_, "uEmissiveStrength", emissive);
-            box_.draw(gl_);
+            drawMesh(box_);
         };
 
         float muzzlePosition = 0.48F;
@@ -2286,6 +2301,66 @@ bool GdpRenderer::render(
             drawBitmapText(noticeX + hudPadding, noticeY + hudPadding,
                 hudScale, noticeText,
                 noticeColor * (0.42F + (0.58F * noticeStrength)));
+        }
+    }
+
+    if (hud.performanceOverlay) {
+        const wkc::core::Vec3 performanceColor
+            = hud.percentile95FrameMilliseconds <= 17U
+            ? uiTheme.success
+            : hud.percentile95FrameMilliseconds <= 34U
+                ? wkc::core::Vec3{0.98F, 0.62F, 0.14F}
+                : uiTheme.danger;
+        const std::array<std::string, 7> lines{
+            "FPS " + std::to_string(hud.performanceFramesPerSecond)
+                + " FRAME " + std::to_string(hud.averageFrameMilliseconds)
+                + "MS P95 " + std::to_string(hud.percentile95FrameMilliseconds)
+                + "MS",
+            "WORST " + std::to_string(hud.worstFrameMilliseconds)
+                + "MS SLOW " + std::to_string(hud.framesOverBudgetPercent)
+                + "%",
+            "UPDATE " + std::to_string(hud.averageUpdateMilliseconds)
+                + "MS RENDER " + std::to_string(hud.averageRenderMilliseconds)
+                + "MS WAIT " + std::to_string(hud.averagePresentMilliseconds)
+                + "MS",
+            "DRAW " + std::to_string(hud.performanceDrawCalls)
+                + " TRI " + std::to_string(hud.performanceTriangles),
+            "VISIBLE E " + std::to_string(hud.performanceVisibleEnemies)
+                + " P " + std::to_string(hud.performanceVisibleProps)
+                + " R " + std::to_string(hud.performanceVisibleRooms),
+            "LIGHT " + std::to_string(hud.performanceActiveLights)
+                + " SHADOW " + std::to_string(hud.performanceShadowLights)
+                + "X" + std::to_string(hud.performanceShadowOccluders),
+            "CACHE M " + std::to_string(hud.performanceMeshCacheEntries)
+                + " T " + std::to_string(hud.performanceTextureCacheEntries)
+                + " LOAD " + std::to_string(hud.worldGenerationMilliseconds)
+                + "/" + std::to_string(hud.assetPreparationMilliseconds)
+                + "MS",
+        };
+        constexpr std::string_view title = "F3 PERFORMANCE";
+        int textWidth = bitmapTextWidth(title, 1);
+        for (const std::string& line : lines) {
+            textWidth = std::max(textWidth, bitmapTextWidth(line, 1));
+        }
+        const int performancePadding = 4;
+        const int lineHeight = 9;
+        const int panelWidth = std::min(
+            std::max(1, width - (hudMargin * 2)),
+            textWidth + (performancePadding * 2));
+        const int panelHeight = (static_cast<int>(lines.size()) + 1)
+            * lineHeight + (performancePadding * 2);
+        const int panelX = hudMargin;
+        const int panelY = std::max(
+            hudMargin, height - hudMargin - panelHeight);
+        drawIndustrialPanel(
+            {panelX, panelY, panelWidth, panelHeight}, 1, performanceColor);
+        int textY = panelY + panelHeight - performancePadding - 7;
+        drawBitmapText(panelX + performancePadding, textY, 1,
+            title, performanceColor);
+        for (const std::string& line : lines) {
+            textY -= lineHeight;
+            drawBitmapText(panelX + performancePadding, textY, 1,
+                line, textColor);
         }
     }
 

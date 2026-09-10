@@ -29,6 +29,8 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -49,6 +51,16 @@ constexpr float weaponRecoilDuration = 0.12F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
 constexpr float weaponReloadDuration = 0.42F;
 constexpr float weaponEquipDuration = 0.48F;
+
+std::uint32_t roundedPerformanceMetric(const double value) noexcept
+{
+    if (!std::isfinite(value) || value <= 0.0) {
+        return 0U;
+    }
+    const double maximum = static_cast<double>(
+        std::numeric_limits<std::uint32_t>::max());
+    return static_cast<std::uint32_t>(std::lround(std::min(value, maximum)));
+}
 
 visual::ImpactVisualMaterial impactVisualMaterial(
     const gameplay::ImpactMaterial material) noexcept
@@ -454,6 +466,8 @@ int Application::run()
         fatalError_ = false;
         renderedFrames_ = 0U;
         fixedUpdates_ = 0U;
+        performanceMonitor_.reset();
+        currentFramePerformance_ = {};
         if (!initialize()) {
             return 1;
         }
@@ -474,6 +488,8 @@ int Application::run()
                 ? clock_.fixedStepSeconds() : elapsed.count();
             clock_.advanceBy(frameDelta);
 
+            currentFramePerformance_ = {};
+            const auto updateStart = Clock::now();
             input_.beginFrame();
             processEvents();
             if (!running_) {
@@ -485,11 +501,23 @@ int Application::run()
                 player_.applyLook(input_.mouseDelta());
             }
 
+            std::uint32_t fixedStepsThisFrame = 0U;
             while (clock_.consumeFixedStep()) {
                 fixedUpdate(clock_.fixedStepSeconds());
+                ++fixedStepsThisFrame;
             }
+            const auto updateEnd = Clock::now();
+            currentFramePerformance_.updateMilliseconds
+                = std::chrono::duration<double, std::milli>(
+                    updateEnd - updateStart).count();
+            currentFramePerformance_.fixedUpdates = fixedStepsThisFrame;
 
             render();
+            const auto frameEnd = Clock::now();
+            currentFramePerformance_.frameMilliseconds
+                = std::chrono::duration<double, std::milli>(
+                    frameEnd - currentTime).count();
+            performanceMonitor_.record(currentFramePerformance_);
             ++renderedFrames_;
 
             if (config_.frameLimit && renderedFrames_ >= *config_.frameLimit) {
@@ -508,6 +536,20 @@ int Application::run()
         summary << " after " << renderedFrames_ << " frame(s) and "
                 << fixedUpdates_ << " fixed update(s)";
         log(LogLevel::Info, summary.str());
+        const PerformanceSnapshot performance = performanceMonitor_.snapshot();
+        if (performance.sampleCount > 0U) {
+            std::ostringstream performanceSummary;
+            performanceSummary << std::fixed << std::setprecision(2)
+                << "Performance " << performance.sampleCount << " frame window: avg "
+                << performance.averageFrameMilliseconds << " ms, P95 "
+                << performance.percentile95FrameMilliseconds << " ms, update "
+                << performance.averageUpdateMilliseconds << " ms, render "
+                << performance.averageRenderMilliseconds << " ms, present "
+                << performance.averagePresentMilliseconds << " ms, load "
+                << performance.worldGenerationMilliseconds << "/"
+                << performance.assetPreparationMilliseconds << " ms";
+            log(LogLevel::Info, performanceSummary.str());
+        }
         beginAnotherRun = restartRequested_;
         shutdown();
         if (fatalError_) {
@@ -617,6 +659,9 @@ bool Application::initialize()
 
 bool Application::initializeRun()
 {
+    using Clock = std::chrono::steady_clock;
+    performanceMonitor_.reset();
+    currentFramePerformance_ = {};
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
@@ -630,7 +675,11 @@ bool Application::initializeRun()
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
         : 1.0F;
+    const auto worldGenerationStart = Clock::now();
     world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
+    performanceMonitor_.setWorldGenerationMilliseconds(
+        std::chrono::duration<double, std::milli>(
+            Clock::now() - worldGenerationStart).count());
     if (!generation.succeeded()) {
         log(LogLevel::Error, "World generation exhausted all deterministic attempts");
         return false;
@@ -766,6 +815,7 @@ bool Application::initializeRun()
     if (audio_) {
         audio_->setAmbience(startRoom->seed, static_cast<std::uint64_t>(startRoom->theme));
     }
+    const auto assetPreparationStart = Clock::now();
     if (!config_.headless) {
         if (renderer_ == nullptr) {
             log(LogLevel::Error, "Run initialization requires an active renderer");
@@ -804,6 +854,9 @@ bool Application::initializeRun()
             log(LogLevel::Warning, sdlError("Relative mouse mode unavailable"));
         }
     }
+    performanceMonitor_.setAssetPreparationMilliseconds(
+        std::chrono::duration<double, std::milli>(
+            Clock::now() - assetPreparationStart).count());
     if (session_.state().mode == gameplay::RunMode::Campaign
         && !saveCurrentCampaignCheckpoint()) {
         log(LogLevel::Warning,
@@ -840,6 +893,13 @@ void Application::processEvents()
 
     if (!running_) {
         return;
+    }
+
+    if (input_.wasKeyPressed(Key::F3)) {
+        performanceOverlayVisible_ = !performanceOverlayVisible_;
+        log(LogLevel::Info, performanceOverlayVisible_
+                ? "Performance overlay enabled"
+                : "Performance overlay disabled");
     }
 
     const auto playUiAudio = [this](const gdp::audio::AudioEventKind kind) {
@@ -2566,6 +2626,39 @@ void Application::render()
         return;
     }
 
+    const auto renderAndPresent = [this](auto&& drawFrame,
+                                      const std::string_view errorMessage) {
+        using Clock = std::chrono::steady_clock;
+        const auto renderStart = Clock::now();
+        const bool rendered = renderer_ != nullptr && drawFrame();
+        const auto renderEnd = Clock::now();
+        currentFramePerformance_.renderMilliseconds
+            = std::chrono::duration<double, std::milli>(
+                renderEnd - renderStart).count();
+        if (!rendered) {
+            log(LogLevel::Error, errorMessage);
+            fatalError_ = true;
+            running_ = false;
+            return false;
+        }
+        const visual::RendererFrameStats rendererStats
+            = renderer_->lastFrameStats();
+        currentFramePerformance_.drawCalls = rendererStats.drawCalls;
+        currentFramePerformance_.triangles = rendererStats.triangles;
+        currentFramePerformance_.meshCacheEntries = static_cast<std::uint32_t>(
+            std::min<std::size_t>(rendererStats.meshCacheEntries,
+                std::numeric_limits<std::uint32_t>::max()));
+        currentFramePerformance_.textureCacheEntries = static_cast<std::uint32_t>(
+            std::min<std::size_t>(rendererStats.textureCacheEntries,
+                std::numeric_limits<std::uint32_t>::max()));
+        const auto presentStart = Clock::now();
+        SDL_GL_SwapWindow(window_);
+        currentFramePerformance_.presentMilliseconds
+            = std::chrono::duration<double, std::milli>(
+                Clock::now() - presentStart).count();
+        return true;
+    };
+
     if (settingsMenu_.active) {
         SDL_SetWindowTitle(window_, "GDP | SETTINGS");
         visual::HudRenderData hud;
@@ -2585,14 +2678,12 @@ void Application::render()
         hud.windowHeight = windowSize.height;
         hud.fullscreen = runtimeSettings_.fullscreen;
         hud.verticalSync = runtimeSettings_.verticalSync;
-        if (renderer_ == nullptr || !renderer_->render(
-                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
-            log(LogLevel::Error, "Renderer failed while drawing settings");
-            fatalError_ = true;
-            running_ = false;
+        if (!renderAndPresent([&] {
+                return renderer_->render(
+                    width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            }, "Renderer failed while drawing settings")) {
             return;
         }
-        SDL_GL_SwapWindow(window_);
         return;
     }
 
@@ -2627,14 +2718,12 @@ void Application::render()
             hud.exitConfirmationSelection
                 = visual::HudExitConfirmationSelection::ExitGame;
         }
-        if (renderer_ == nullptr || !renderer_->render(
-                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud)) {
-            log(LogLevel::Error, "Renderer failed while drawing the main menu");
-            fatalError_ = true;
-            running_ = false;
+        if (!renderAndPresent([&] {
+                return renderer_->render(
+                    width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            }, "Renderer failed while drawing the main menu")) {
             return;
         }
-        SDL_GL_SwapWindow(window_);
         return;
     }
 
@@ -3003,6 +3092,39 @@ void Application::render()
     SDL_SetWindowTitle(window_, title.str().c_str());
     visual::HudRenderData hud;
     hud.visible = true;
+    const PerformanceSnapshot performance = performanceMonitor_.snapshot();
+    hud.performanceOverlay
+        = performanceOverlayVisible_ && performance.sampleCount > 0U;
+    hud.performanceFramesPerSecond = roundedPerformanceMetric(
+        performance.estimatedFramesPerSecond);
+    hud.averageFrameMilliseconds = roundedPerformanceMetric(
+        performance.averageFrameMilliseconds);
+    hud.percentile95FrameMilliseconds = roundedPerformanceMetric(
+        performance.percentile95FrameMilliseconds);
+    hud.worstFrameMilliseconds = roundedPerformanceMetric(
+        performance.worstFrameMilliseconds);
+    hud.averageUpdateMilliseconds = roundedPerformanceMetric(
+        performance.averageUpdateMilliseconds);
+    hud.averageRenderMilliseconds = roundedPerformanceMetric(
+        performance.averageRenderMilliseconds);
+    hud.averagePresentMilliseconds = roundedPerformanceMetric(
+        performance.averagePresentMilliseconds);
+    hud.framesOverBudgetPercent = roundedPerformanceMetric(
+        performance.framesOverBudgetPercent);
+    hud.worldGenerationMilliseconds = roundedPerformanceMetric(
+        performance.worldGenerationMilliseconds);
+    hud.assetPreparationMilliseconds = roundedPerformanceMetric(
+        performance.assetPreparationMilliseconds);
+    hud.performanceDrawCalls = performance.latest.drawCalls;
+    hud.performanceTriangles = performance.latest.triangles;
+    hud.performanceVisibleEnemies = performance.latest.visibleEnemies;
+    hud.performanceVisibleProps = performance.latest.visibleProps;
+    hud.performanceVisibleRooms = performance.latest.visibleRooms;
+    hud.performanceActiveLights = performance.latest.activeLights;
+    hud.performanceShadowLights = performance.latest.shadowLights;
+    hud.performanceShadowOccluders = performance.latest.shadowOccluders;
+    hud.performanceMeshCacheEntries = performance.latest.meshCacheEntries;
+    hud.performanceTextureCacheEntries = performance.latest.textureCacheEntries;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
     hud.armor = player_.state().armor;
@@ -3162,17 +3284,23 @@ void Application::render()
             hud.weapon == visual::HudWeaponRole::Carbine ? 0x43415242494e45ULL
                                                          : 0x504953544f4cULL),
     };
-    if (renderer_ == nullptr
-        || !renderer_->render(
-            width, height, camera, visibleEnemies, visiblePickups, visibleProps,
-            lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
-            hud, visibleImpacts, weaponViewmodel)) {
-        log(LogLevel::Error, "Renderer failed while drawing the frame");
-        fatalError_ = true;
-        running_ = false;
+    currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
+        visibleEnemies.size());
+    currentFramePerformance_.visibleProps = static_cast<std::uint32_t>(
+        visibleProps.size());
+    currentFramePerformance_.visibleRooms = static_cast<std::uint32_t>(
+        connectedRooms.size() + (world_ ? 1U : 0U));
+    currentFramePerformance_.activeLights = lighting.lightCount;
+    currentFramePerformance_.shadowLights = lighting.shadowLightCount;
+    currentFramePerformance_.shadowOccluders = lighting.shadowOccluderCount;
+    if (!renderAndPresent([&] {
+            return renderer_->render(
+                width, height, camera, visibleEnemies, visiblePickups, visibleProps,
+                lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
+                hud, visibleImpacts, weaponViewmodel);
+        }, "Renderer failed while drawing the frame")) {
         return;
     }
-    SDL_GL_SwapWindow(window_);
 }
 
 void Application::shutdown()

@@ -490,6 +490,36 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::game::visual::HudRenderData performanceHud = functionalHud;
+            performanceHud.performanceOverlay = true;
+            performanceHud.performanceFramesPerSecond = 58U;
+            performanceHud.averageFrameMilliseconds = 17U;
+            performanceHud.percentile95FrameMilliseconds = 22U;
+            performanceHud.worstFrameMilliseconds = 31U;
+            performanceHud.averageUpdateMilliseconds = 2U;
+            performanceHud.averageRenderMilliseconds = 7U;
+            performanceHud.averagePresentMilliseconds = 8U;
+            performanceHud.framesOverBudgetPercent = 15U;
+            performanceHud.worldGenerationMilliseconds = 12U;
+            performanceHud.assetPreparationMilliseconds = 84U;
+            performanceHud.performanceDrawCalls = 93U;
+            performanceHud.performanceTriangles = 1'116U;
+            performanceHud.performanceVisibleEnemies = 6U;
+            performanceHud.performanceVisibleProps = 4U;
+            performanceHud.performanceVisibleRooms = 3U;
+            performanceHud.performanceActiveLights = 8U;
+            performanceHud.performanceShadowLights = 2U;
+            performanceHud.performanceShadowOccluders = 8U;
+            performanceHud.performanceMeshCacheEntries = 34U;
+            performanceHud.performanceTextureCacheEntries = 27U;
+            const bool renderedPerformanceOverlay = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
+            const gdp::game::visual::RendererFrameStats performanceFrameStats
+                = renderer.lastFrameStats();
+            std::vector<std::uint8_t> performanceOverlayPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                performanceOverlayPixels.data());
+
             gdp::game::visual::HudRenderData timedHud = functionalHud;
             timedHud.runTimerVisible = true;
             timedHud.elapsedRunTicks = 4'567U;
@@ -789,6 +819,7 @@ int main()
             std::size_t campaignResultChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t performanceOverlayChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
             std::size_t campaignTimerChangedChannels = 0;
             std::size_t speedrunRecordChangedChannels = 0;
@@ -908,6 +939,10 @@ int main()
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
+                    }
+                    if (performanceOverlayPixels[index + channel]
+                        != functionalHudPixels[index + channel]) {
+                        ++performanceOverlayChangedChannels;
                     }
                     if (runTimerPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
@@ -1054,6 +1089,13 @@ int main()
                 && campaignResultChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedPerformanceOverlay
+                && performanceOverlayChangedChannels > 500U
+                && performanceFrameStats.drawCalls > 0U
+                && performanceFrameStats.triangles
+                    >= performanceFrameStats.drawCalls
+                && performanceFrameStats.meshCacheEntries > 0U
+                && performanceFrameStats.textureCacheEntries > 0U
                 && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedCampaignTimer && campaignTimerChangedChannels > 50U
                 && renderedSpeedrunRecord

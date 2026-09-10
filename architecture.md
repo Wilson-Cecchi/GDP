@@ -1191,6 +1191,16 @@ exigem o driver offscreen Linux permanecem condicionados a `UNIX`, sem simular
 suporte gráfico que o runner Windows não oferece. Nenhuma camada de plataforma
 Windows invade gameplay, geração ou renderer concreto.
 
+Na Fase 117, a aplicação passa a observar o custo do próprio loop sem transferir
+tempo, política ou estado para gameplay. `PerformanceMonitor` agrega uma janela
+fixa de 120 amostras e produz média, P95, pior frame e violações do budget de
+60 Hz; geração de mundo e preparação visual permanecem medições isoladas. O
+renderer concreto reporta draw calls, triângulos e ocupação dos caches depois
+de cada frame, enquanto `HudRenderData` transporta apenas o snapshot pronto ao
+overlay. O tempo de renderização representa submissão na CPU e a espera de
+apresentação é medida à parte, evitando um `glFinish` que distorceria o perfil.
+Nenhuma medição participa de RNG, fixed update, IA, colisão ou persistência.
+
 ---
 
 # 8. Sistema de seed

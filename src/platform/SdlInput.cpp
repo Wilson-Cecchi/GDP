@@ -23,6 +23,8 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::E;
     case SDL_SCANCODE_R:
         return Key::R;
+    case SDL_SCANCODE_F3:
+        return Key::F3;
     case SDL_SCANCODE_ESCAPE:
         return Key::Escape;
     case SDL_SCANCODE_RETURN:

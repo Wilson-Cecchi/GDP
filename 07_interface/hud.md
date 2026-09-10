@@ -8,6 +8,8 @@
 > como apoio de diagnóstico. A Fase 111 unificou o acabamento industrial do HUD
 > e dos menus sem alterar sua geometria funcional. A Fase 112 acrescentou o
 > viewmodel metálico da arma sem ocupar a camada de hit tests da interface.
+> A Fase 117 acrescenta um overlay técnico opcional de desempenho, alternado
+> por `F3`, sem interferir no HUD normal ou na simulação.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -65,6 +67,15 @@ pausam a animação junto com a simulação.
 Durante a Campanha, a linha do cronômetro inclui `FLOOR n/3` e `THREAT 100%`,
 `110%` ou `120%`. O renderer recebe o percentual pronto em `HudRenderData`; ele
 não calcula dificuldade nem altera a simulação.
+
+## Diagnóstico de desempenho
+
+`F3` alterna um painel no canto superior esquerdo com FPS estimado, média, P95,
+pior frame, percentual fora do budget de 60 Hz, update, render, espera de
+apresentação, draw calls, triângulos, entidades visíveis, luzes, sombras, caches
+e tempos de carga. Verde indica P95 de até 17 ms; laranja, até 34 ms; vermelho,
+acima disso. O overlay recebe valores agregados prontos e não mede, consulta ou
+altera o gameplay.
 
 ## Feedback temporário
 

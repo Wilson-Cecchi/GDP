@@ -436,6 +436,10 @@ especializados das pastas numeradas.
 - **Fase 116 — Pacote Windows x64:** preset MSVC, runtime SDL ao lado do
   executável e CPack produzem `GDP-Windows-x64.zip`. A CI compila, executa os
   testes portáveis e valida o executável extraído antes de publicar o artefato.
+- **Fase 117 — Diagnóstico de desempenho:** uma janela móvel de 120 frames mede
+  média, P95, pior frame, update, render e espera de apresentação. `F3` alterna
+  um overlay com FPS, budget, draw calls, triângulos, entidades, luzes, sombras,
+  caches e tempos de preparação; headless emite o mesmo resumo no log.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -458,7 +462,8 @@ cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, dispara com o botão esquerdo
-e recarrega com `R`. Pickups próximos são coletados automaticamente; objetivo e
+e recarrega com `R`; `F3` alterna o diagnóstico de desempenho. Pickups próximos
+são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
 mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
 run; `W/S` ou setas navegam, `Enter` confirma, o mouse seleciona/clica e `Esc`
@@ -1100,6 +1105,16 @@ Windows da CI extrai esse ZIP e executa um smoke test headless a partir do pacot
 impedindo a publicação de um artefato sem executável ou DLL. O código-fonte
 continua portátil e as rotas Linux permanecem inalteradas. Instruções de uso e
 diagnóstico estão em `README_WINDOWS.md`.
+
+Na Fase 117, `PerformanceMonitor` recebe amostras sanitizadas da orquestração,
+mantém uma janela fixa de 120 frames e calcula média, P95, pior caso, FPS e
+percentual acima do budget de 60 Hz. A `Application` mede processamento/update,
+submissão do renderer e espera de apresentação separadamente; o renderer expõe
+somente contadores observáveis de draw calls, triângulos e caches. `F3` alterna
+o painel sem pausar ou alterar a simulação. O resumo headless usa seed e número
+de frames explícitos para comparações reproduzíveis. A instrumentação ainda não
+reduz qualidade: os presets gráficos serão definidos na fase seguinte a partir
+de medições em hardware real.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

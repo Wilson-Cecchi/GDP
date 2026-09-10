@@ -3,6 +3,7 @@
 #include "core/Time.hpp"
 #include "entities/EntityManager.hpp"
 #include "game/LaunchSeed.hpp"
+#include "game/PerformanceMonitor.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Campaign.hpp"
@@ -160,6 +161,9 @@ private:
     std::uint64_t audioEventCounter_{0};
     std::uint64_t uiAudioEventCounter_{0};
     std::uint64_t impactVisualCounter_{0};
+    PerformanceMonitor performanceMonitor_{};
+    FramePerformanceSample currentFramePerformance_{};
+    bool performanceOverlayVisible_{false};
 };
 
 } // namespace gdp::game

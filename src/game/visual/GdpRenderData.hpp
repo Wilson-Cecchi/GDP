@@ -480,6 +480,27 @@ struct HudRenderData {
     std::uint16_t windowHeight{720U};
     bool fullscreen{false};
     bool verticalSync{true};
+    bool performanceOverlay{false};
+    std::uint32_t performanceFramesPerSecond{0U};
+    std::uint32_t averageFrameMilliseconds{0U};
+    std::uint32_t percentile95FrameMilliseconds{0U};
+    std::uint32_t worstFrameMilliseconds{0U};
+    std::uint32_t averageUpdateMilliseconds{0U};
+    std::uint32_t averageRenderMilliseconds{0U};
+    std::uint32_t averagePresentMilliseconds{0U};
+    std::uint32_t framesOverBudgetPercent{0U};
+    std::uint32_t worldGenerationMilliseconds{0U};
+    std::uint32_t assetPreparationMilliseconds{0U};
+    std::uint64_t performanceDrawCalls{0U};
+    std::uint64_t performanceTriangles{0U};
+    std::uint32_t performanceVisibleEnemies{0U};
+    std::uint32_t performanceVisibleProps{0U};
+    std::uint32_t performanceVisibleRooms{0U};
+    std::uint32_t performanceActiveLights{0U};
+    std::uint32_t performanceShadowLights{0U};
+    std::uint32_t performanceShadowOccluders{0U};
+    std::uint32_t performanceMeshCacheEntries{0U};
+    std::uint32_t performanceTextureCacheEntries{0U};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

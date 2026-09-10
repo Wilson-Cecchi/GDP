@@ -94,6 +94,13 @@ Gerar mundo temporário → validar → criar recursos → commit atômico.
 
 Frame time, fixed updates/frame, geração, upload GPU, entidades, draw calls e memória.
 
+Na Fase 117, `PerformanceMonitor` implementa a primeira instrumentação concreta:
+uma janela de 120 frames calcula média, P95, pior frame, FPS estimado e percentual
+acima de `1/60 s`. A aplicação mede update, submissão visual e espera de
+apresentação separadamente, além dos tempos únicos de geração do mundo e
+preparação de assets. O benchmark `--headless --frames N --seed N` escreve um
+resumo reproduzível sem misturar relógio ou telemetria à simulação determinística.
+
 ## Testes
 
 - 10 s simulados com 30/60/144 FPS de render produzem estado equivalente;

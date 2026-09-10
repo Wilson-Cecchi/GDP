@@ -20,6 +20,16 @@
 
 namespace gdp::game::visual {
 
+struct RendererFrameStats {
+    std::uint64_t drawCalls{0U};
+    std::uint64_t triangles{0U};
+    std::size_t meshCacheEntries{0U};
+    std::size_t textureCacheEntries{0U};
+
+    constexpr bool operator==(const RendererFrameStats&) const noexcept
+        = default;
+};
+
 class GdpRenderer {
 public:
     GdpRenderer() = default;
@@ -63,8 +73,14 @@ public:
         HudRenderData hud = {},
         std::span<const ImpactRenderData> impacts = {},
         WeaponViewmodelRenderData weaponViewmodel = {});
+    [[nodiscard]] RendererFrameStats lastFrameStats() const noexcept
+    {
+        return lastFrameStats_;
+    }
 
 private:
+    void drawMesh(const wkc::render::Mesh& mesh) noexcept;
+
     struct EnemyGpuPart {
         wkc::render::Mesh mesh;
         wkc::core::Vec3 pivot{};
@@ -129,6 +145,7 @@ private:
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};
+    RendererFrameStats lastFrameStats_{};
     bool initialized_{false};
 };
 

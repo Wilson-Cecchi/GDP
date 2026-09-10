@@ -435,6 +435,13 @@ offscreen Unix, gera `GDP-Windows-x64.zip`, verifica a presença de `gdp.exe` e
 `SDL3.dll` e inicia três frames headless usando somente o conteúdo extraído.
 Assim, sucesso de compilação não é confundido com um pacote realmente executável.
 
+O gate da Fase 117 alimenta o monitor com valores conhecidos e verifica janela
+fixa, média, P95, pior frame, violações do budget, reset e sanitização de NaN,
+infinito e tempos negativos. Input neutro e SDL protegem o atalho `F3`. A
+regressão OpenGL exige mudança real de pixels com o overlay ativo e confirma que
+draw calls, triângulos e caches são contabilizados. Os bootstraps headless passam
+a imprimir um resumo de desempenho sem depender de janela ou alterar a seed.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
