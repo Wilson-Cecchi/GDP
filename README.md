@@ -1264,3 +1264,6 @@ Executar uma seed específica:
 ```bash
 build/debug/gdp --seed 12345
 ```
+$dll = Get-ChildItem .\build -Recurse -Filter SDL3.dll | Select-Object -First 1
+Copy-Item $dll.FullName .\build\release\
+.\build\release\gdp.exe
