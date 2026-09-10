@@ -433,6 +433,9 @@ especializados das pastas numeradas.
 - **Fase 115 — Orçamento e limpeza de iluminação:** o renderer limita sombras
   às duas luzes ativas mais próximas e aos oito oclusores relevantes mais
   próximos. Fixtures usam índice direto por sala, sem varrer todos os props.
+- **Fase 116 — Pacote Windows x64:** preset MSVC, runtime SDL ao lado do
+  executável e CPack produzem `GDP-Windows-x64.zip`. A CI compila, executa os
+  testes portáveis e valida o executável extraído antes de publicar o artefato.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -443,11 +446,11 @@ não está instalado, o build baixa a versão 3.4.14 oficial com hash SHA-256
 fixado.
 
 O renderer atual desenha a sala ocupada e a geometria alcançável em até duas
-conexões usando origem e rotação reais, com cubo indexado reutilizado e materiais procedurais próprios de
-parede/piso/teto derivados da seed da sala, aberturas e molduras ciano nas
-portas, painéis vermelhos durante lockdown, corredores com piso, teto e paredes,
-até oito luzes pontuais combinadas entre a sala atual e as duas camadas vizinhas,
-luminárias emissivas, ambiente por tema,
+conexões usando origem e rotação reais, com cubo indexado reutilizado e materiais 
+procedurais próprios de parede/piso/teto derivados da seed da sala, aberturas e 
+molduras ciano nas portas, painéis vermelhos durante lockdown, corredores com piso, 
+teto e paredes, até oito luzes pontuais combinadas entre a sala atual e as duas 
+camadas vizinhas, luminárias emissivas, ambiente por tema,
 câmera em perspectiva e retícula. Parede com grandes placas e rodapé
 amarelo/preto, piso de placas com
 faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
@@ -511,10 +514,10 @@ mesmos contratos determinísticos do restante do elenco.
 
 O primeiro incremento da Fase 12 deriva loot exclusivamente da substream
 `Loot`, combinando papel, tema, profundidade, dificuldade, orçamento e as zonas
-válidas da sala. `Health`, `Ammo`, `Key`, `Armor`, `Weapon` e `Special` recebem quantidade e posição
-determinísticas, sem ocupar connectors. A START contém uma caixa de munição
-para teste imediato; recursos cheios não consomem pickups, enquanto coleta
-válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
+válidas da sala. `Health`, `Ammo`, `Key`, `Armor`, `Weapon` e `Special` recebem 
+quantidade e posição determinísticas, sem ocupar connectors. A START contém uma 
+caixa de munição para teste imediato; recursos cheios não consomem pickups, 
+enquanto coleta válida atualiza Player/Weapon e conclui o ciclo de vida da entidade.
 
 O segundo incremento usa exclusivamente a substream `Props` para distribuir
 crates, canisters e barricadas nas `propZones` transformadas, com orçamento por
@@ -893,10 +896,10 @@ Na Fase 96, a `Application` passou a conservar para cada `EntityId` o estado
 visual anterior, o atual e o avanço da transição. Idle/Walk usam 6 ticks,
 Attack e a saída de Hit usam 4, a entrada de Hit usa 3 e Death conclui a queda
 em 18 ticks. O renderer interpola raiz e partes rígidas com `smoothstep` antes
-de compor as matrizes; a pose terminal mantém escala `1:1:1` e gira lateralmente em `82°`,
-com lado derivado da `visualSeed`. Durante Victory/Defeat somente a acomodação
-de inimigos mortos pode avançar; IA, combate, timers da run e inimigos vivos
-continuam congelados. A WKC Forge recebeu apenas `rotationZMatrix`, operação
+de compor as matrizes; a pose terminal mantém escala `1:1:1` e gira lateralmente 
+em `82°`, com lado derivado da `visualSeed`. Durante Victory/Defeat somente a 
+acomodação de inimigos mortos pode avançar; IA, combate, timers da run e inimigos 
+vivos continuam congelados. A WKC Forge recebeu apenas `rotationZMatrix`, operação
 matemática genérica. RNG, gameplay, persistência e regras 8/7 não mudaram.
 
 Na Fase 97, Death passou a usar um ragdoll procedural visual sobre os pivôs já
@@ -1090,6 +1093,14 @@ mantém IDs alinhados ao plano de cada sala. Testes protegem seleção, repetiç
 fallback escuro e equivalência de pixels sob entrada acima do budget. Não houve
 mudança visual intencional, de gameplay, regras ou WKC Forge.
 
+Na Fase 116, `windows-release` configura MSVC x64 e testa os sistemas que não
+dependem de uma sessão gráfica. O runtime MSVC é ligado estaticamente e o CMake
+copia/instala `SDL3.dll` junto de `gdp.exe`; CPack gera um ZIP autocontido. O job
+Windows da CI extrai esse ZIP e executa um smoke test headless a partir do pacote,
+impedindo a publicação de um artefato sem executável ou DLL. O código-fonte
+continua portátil e as rotas Linux permanecem inalteradas. Instruções de uso e
+diagnóstico estão em `README_WINDOWS.md`.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -1180,8 +1191,8 @@ gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu
 responsivo com `START RUN`, `CONTINUE`, `CAMPAIGN`, `SPEEDRUN`, `BEST SEED`,
 `SETTINGS` e `EXIT GAME`;
 `W/S` ou setas mudam a
-seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, suas
-entidades, eventos, iluminação e materiais específicos só são preparados ao
+seleção com wrap, `Enter` confirma, o mouse seleciona/clica e `Esc` sai. A dungeon, 
+suas entidades, eventos, iluminação e materiais específicos só são preparados ao
 confirmar `START RUN`.
 
 O modo `--headless` ignora apenas essa espera interativa e inicia a run
@@ -1250,6 +1261,11 @@ Executar normalmente:
 build/debug/gdp
 ```
 
+No Windows 11 x64, use o pacote `GDP-Windows-x64` produzido pela CI ou siga o
+guia de compilação em [`README_WINDOWS.md`](README_WINDOWS.md). O ZIP contém
+`gdp.exe`, `SDL3.dll` e o próprio guia, sem exigir CMake ou Visual Studio no
+computador que apenas executará o jogo.
+
 Cada nova abertura gráfica sem argumentos escolhe uma seed inicial diferente.
 O valor usado aparece no log e pode ser reproduzido com `--seed`.
 
@@ -1264,6 +1280,3 @@ Executar uma seed específica:
 ```bash
 build/debug/gdp --seed 12345
 ```
-$dll = Get-ChildItem .\build -Recurse -Filter SDL3.dll | Select-Object -First 1
-Copy-Item $dll.FullName .\build\release\
-.\build\release\gdp.exe
