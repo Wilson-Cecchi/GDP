@@ -1182,6 +1182,15 @@ eliminando queries e varreduras repetidas de props a cada sala visível. A
 otimização permanece concreta do GDP e não altera imagem pretendida, gameplay,
 persistência ou WKC Forge.
 
+Na Fase 116, a portabilidade Windows torna-se um contrato de distribuição. O
+preset `windows-release` usa MSVC x64; o runtime C++ é estático, enquanto o SDL3
+compartilhado é instalado ao lado do executável. CPack reúne `gdp.exe`,
+`SDL3.dll` e `README_WINDOWS.md` em um ZIP. A CI Windows compila, executa a suíte
+portátil e repete um bootstrap headless a partir do arquivo extraído. Testes que
+exigem o driver offscreen Linux permanecem condicionados a `UNIX`, sem simular
+suporte gráfico que o runner Windows não oferece. Nenhuma camada de plataforma
+Windows invade gameplay, geração ou renderer concreto.
+
 ---
 
 # 8. Sistema de seed

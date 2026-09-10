@@ -53,6 +53,7 @@
 - `GDP_arquitetura_tecnica.md`
 - `MANIFEST.json`
 - `README.md`
+- `README_WINDOWS.md`
 - `architecture.md`
 - `src/audio/AudioFoundation.cpp`
 - `src/audio/AudioFoundation.hpp`

@@ -37,6 +37,21 @@
         "GDP_BUILD_TESTS": "ON",
         "GDP_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "GDP Windows x64 Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "GDP_BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -51,6 +66,16 @@
     {
       "name": "sanitizers",
       "configurePreset": "sanitizers"
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "configuration": "Release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     }
   ],
   "testPresets": [
@@ -74,6 +99,19 @@
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
         "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "configuration": "Release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       },
       "output": {
         "outputOnFailure": true

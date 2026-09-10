@@ -1,11 +1,19 @@
 cmake_minimum_required(VERSION 3.24)
 
+cmake_policy(SET CMP0091 NEW)
+
 project(
     GDP
     VERSION 0.1.0
     DESCRIPTION "GDP procedural retro-industrial FPS"
     LANGUAGES CXX
 )
+
+if(MSVC)
+    # Keep the downloadable Windows package independent from a separately
+    # installed Visual C++ runtime. This also applies to fetched dependencies.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 include(FetchContent)
 
@@ -309,6 +317,45 @@ target_link_libraries(
 )
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
+
+if(WIN32)
+    install(TARGETS gdp RUNTIME DESTINATION .)
+
+    set(GDP_SDL_SHARED_TARGET "")
+    if(TARGET SDL3::SDL3-shared)
+        set(GDP_SDL_SHARED_TARGET SDL3::SDL3-shared)
+    elseif(TARGET SDL3-shared)
+        set(GDP_SDL_SHARED_TARGET SDL3-shared)
+    endif()
+
+    if(GDP_SDL_SHARED_TARGET)
+        add_custom_command(
+            TARGET gdp
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:${GDP_SDL_SHARED_TARGET}>"
+                "$<TARGET_FILE_DIR:gdp>"
+            COMMENT "Copying the SDL3 runtime beside gdp.exe"
+            VERBATIM
+        )
+        install(
+            FILES "$<TARGET_FILE:${GDP_SDL_SHARED_TARGET}>"
+            DESTINATION .
+        )
+    endif()
+
+    install(FILES README_WINDOWS.md DESTINATION .)
+
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(GDP_WINDOWS_ARCHITECTURE x64)
+    else()
+        set(GDP_WINDOWS_ARCHITECTURE x86)
+    endif()
+    set(CPACK_GENERATOR ZIP)
+    set(CPACK_PACKAGE_FILE_NAME "GDP-Windows-${GDP_WINDOWS_ARCHITECTURE}")
+    set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
+    include(CPack)
+endif()
 
 if(GDP_BUILD_TESTS)
     include(CTest)

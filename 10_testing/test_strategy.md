@@ -429,6 +429,12 @@ exatos. Um plano inteiramente apagado precisa produzir budget zero. OpenGL
 solicita deliberadamente oito luzes de sombra e exige pixels idênticos ao pedido
 já limitado em duas, provando o clamp defensivo do renderer.
 
+O gate da Fase 116 adiciona `windows-release` à CI. O runner Windows x64 compila
+com MSVC, executa todos os testes registrados que não dependem do backend
+offscreen Unix, gera `GDP-Windows-x64.zip`, verifica a presença de `gdp.exe` e
+`SDL3.dll` e inicia três frames headless usando somente o conteúdo extraído.
+Assim, sucesso de compilação não é confundido com um pacote realmente executável.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

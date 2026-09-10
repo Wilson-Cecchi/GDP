@@ -73,3 +73,54 @@ jobs:
 
       - name: Test
         run: ctest --preset sanitizers --output-on-failure
+
+  windows-package:
+    name: Windows x64 package
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Configure
+        run: cmake --preset windows-release
+
+      - name: Build
+        run: cmake --build --preset windows-release --parallel 2
+
+      - name: Test portable systems
+        run: ctest --preset windows-release --output-on-failure
+
+      - name: Package
+        run: >-
+          cpack --config build/windows-release/CPackConfig.cmake
+          -C Release -B dist
+
+      - name: Verify packaged executable
+        shell: pwsh
+        run: |
+          $archive = "dist/GDP-Windows-x64.zip"
+          if (-not (Test-Path $archive)) {
+            throw "Windows package was not generated: $archive"
+          }
+          $destination = "dist/artifact"
+          Expand-Archive -Path $archive -DestinationPath $destination
+          $executable = Get-ChildItem $destination -Recurse -Filter gdp.exe |
+            Select-Object -First 1
+          $runtime = Get-ChildItem $destination -Recurse -Filter SDL3.dll |
+            Select-Object -First 1
+          if ($null -eq $executable -or $null -eq $runtime) {
+            throw "Package must contain gdp.exe and SDL3.dll"
+          }
+          & $executable.FullName --headless --frames 3
+          if ($LASTEXITCODE -ne 0) {
+            throw "Packaged headless smoke test failed with $LASTEXITCODE"
+          }
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GDP-Windows-x64
+          path: dist/artifact/**
+          if-no-files-found: error
+          retention-days: 30
