@@ -90,6 +90,8 @@ static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::InvertMous
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::InvertMouseY));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::FieldOfView)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::FieldOfView));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::GraphicsQuality)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::GraphicsQuality));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::WindowResolution)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::WindowResolution));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Fullscreen)
@@ -100,6 +102,10 @@ static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Back)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Back));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Count)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Count));
+static_assert(static_cast<std::uint8_t>(gameplay::GraphicsQuality::Potato)
+    == static_cast<std::uint8_t>(visual::HudGraphicsQuality::Potato));
+static_assert(static_cast<std::uint8_t>(gameplay::GraphicsQuality::Ultra)
+    == static_cast<std::uint8_t>(visual::HudGraphicsQuality::Ultra));
 
 std::string sdlError(const std::string_view operation)
 {
@@ -645,6 +651,22 @@ bool Application::initialize()
                   << (fullscreen ? "fullscreen" : "windowed")
                   << " mode at " << actualWindowWidth << 'x' << actualWindowHeight;
     log(LogLevel::Info, windowSummary.str());
+    const gameplay::GraphicsQualitySettings initializedQuality
+        = gameplay::graphicsQualitySettings(runtimeSettings_.graphicsQuality);
+    std::ostringstream qualitySummary;
+    qualitySummary << "Graphics quality "
+                   << gameplay::graphicsQualityName(runtimeSettings_.graphicsQuality)
+                   << ": scale " << initializedQuality.renderScalePercent
+                   << "%, lights " << static_cast<unsigned>(initializedQuality.maximumLights)
+                   << ", shadows "
+                   << static_cast<unsigned>(initializedQuality.maximumShadowLights)
+                   << 'x'
+                   << static_cast<unsigned>(initializedQuality.maximumShadowOccluders)
+                   << ", rooms "
+                   << static_cast<unsigned>(initializedQuality.visibleRoomDepth)
+                   << ", detailed materials "
+                   << (initializedQuality.detailedMaterials ? "on" : "off");
+    log(LogLevel::Info, qualitySummary.str());
     int swapInterval = 0;
     if (SDL_GL_GetSwapInterval(&swapInterval)) {
         log(LogLevel::Info, swapInterval > 0
@@ -2625,6 +2647,10 @@ void Application::render()
         log(LogLevel::Warning, sdlError("SDL_GetWindowSizeInPixels failed"));
         return;
     }
+    const gameplay::GraphicsQualitySettings graphicsQuality
+        = gameplay::graphicsQualitySettings(runtimeSettings_.graphicsQuality);
+    const visual::HudGraphicsQuality hudGraphicsQuality
+        = static_cast<visual::HudGraphicsQuality>(runtimeSettings_.graphicsQuality);
 
     const auto renderAndPresent = [this](auto&& drawFrame,
                                       const std::string_view errorMessage) {
@@ -2672,6 +2698,7 @@ void Application::render()
         hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
         hud.invertMouseY = runtimeSettings_.invertMouseY;
         hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
+        hud.graphicsQuality = hudGraphicsQuality;
         const gameplay::WindowResolutionSize windowSize
             = gameplay::windowResolutionSize(runtimeSettings_.windowResolution);
         hud.windowWidth = windowSize.width;
@@ -2968,35 +2995,49 @@ void Application::render()
             appendConnectedRoomLights(
                 lighting, *world_, roomLighting_, entities_,
                 roomFixtureEntities_, playerRoom, player_.state().position);
-            std::vector<visual::ShadowOccluderRenderData> shadowCandidates;
-            shadowCandidates.reserve(visibleEnemies.size() + visibleProps.size());
-            const auto appendShadowOccluder
-                = [&shadowCandidates](const wkc::core::Aabb bounds) {
-                      shadowCandidates.push_back({bounds});
-                  };
-            for (const visual::EnemyRenderData& enemy : visibleEnemies) {
-                if (!enemy.active || !enemy.alive) {
-                    continue;
+            lighting.lightCount = std::min<std::uint32_t>(
+                lighting.lightCount, graphicsQuality.maximumLights);
+            if (graphicsQuality.maximumShadowLights > 0U
+                && graphicsQuality.maximumShadowOccluders > 0U) {
+                std::vector<visual::ShadowOccluderRenderData> shadowCandidates;
+                shadowCandidates.reserve(visibleEnemies.size() + visibleProps.size());
+                const auto appendShadowOccluder
+                    = [&shadowCandidates](const wkc::core::Aabb bounds) {
+                          shadowCandidates.push_back({bounds});
+                      };
+                for (const visual::EnemyRenderData& enemy : visibleEnemies) {
+                    if (!enemy.active || !enemy.alive) {
+                        continue;
+                    }
+                    appendShadowOccluder({
+                        enemy.position + wkc::core::Vec3{-0.38F, 0.0F, -0.30F},
+                        enemy.position + wkc::core::Vec3{0.38F, 1.80F, 0.30F},
+                    });
                 }
-                appendShadowOccluder({
-                    enemy.position + wkc::core::Vec3{-0.38F, 0.0F, -0.30F},
-                    enemy.position + wkc::core::Vec3{0.38F, 1.80F, 0.30F},
-                });
-            }
-            for (const visual::PropRenderData& prop : visibleProps) {
-                if (prop.state == visual::PropVisualState::Destroyed) {
-                    continue;
+                for (const visual::PropRenderData& prop : visibleProps) {
+                    if (prop.state == visual::PropVisualState::Destroyed) {
+                        continue;
+                    }
+                    const wkc::core::Vec3 half{
+                        prop.scale.x * 0.5F, 0.0F, prop.scale.z * 0.5F};
+                    appendShadowOccluder({
+                        prop.position - half,
+                        prop.position + wkc::core::Vec3{
+                            half.x, prop.scale.y, half.z},
+                    });
                 }
-                const wkc::core::Vec3 half{
-                    prop.scale.x * 0.5F, 0.0F, prop.scale.z * 0.5F};
-                appendShadowOccluder({
-                    prop.position - half,
-                    prop.position + wkc::core::Vec3{
-                        half.x, prop.scale.y, half.z},
-                });
+                (void)visual::optimizeShadowBudget(
+                    lighting, player_.state().position, shadowCandidates);
+                lighting.shadowLightCount = std::min<std::uint32_t>(
+                    lighting.shadowLightCount,
+                    graphicsQuality.maximumShadowLights);
+                lighting.shadowOccluderCount = std::min<std::uint32_t>(
+                    lighting.shadowOccluderCount,
+                    graphicsQuality.maximumShadowOccluders);
+            } else {
+                lighting.shadowLightCount = 0U;
+                lighting.shadowOccluderCount = 0U;
             }
-            (void)visual::optimizeShadowBudget(
-                lighting, player_.state().position, shadowCandidates);
             if (session_.state().phase == gameplay::SessionPhase::Victory) {
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
                 lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);
@@ -3006,8 +3047,13 @@ void Application::render()
                 lighting.ambientIntensity = 0.14F;
                 lighting.alert = true;
             }
+            const std::uint32_t geometryDepth
+                = graphicsQuality.visibleRoomDepth;
+            const std::uint32_t corridorAnchorDepth
+                = geometryDepth > 0U ? geometryDepth - 1U : 0U;
             const std::vector<world::RoomId> geometryAnchors
-                = roomsWithinGraphDistance(*world_, playerRoom, 1U);
+                = roomsWithinGraphDistance(
+                    *world_, playerRoom, corridorAnchorDepth);
             std::vector<world::EdgeId> visibleEdges;
             for (const world::CorridorPath& corridor : world_->corridors) {
                 const bool touchesAnchor = std::find(
@@ -3029,7 +3075,7 @@ void Application::render()
                 });
             }
             const std::vector<world::RoomId> geometryRooms
-                = roomsWithinGraphDistance(*world_, playerRoom, 2U);
+                = roomsWithinGraphDistance(*world_, playerRoom, geometryDepth);
             for (const world::RoomInstance& renderedRoom : world_->rooms) {
                 if (renderedRoom.id == playerRoom
                     || std::find(geometryRooms.begin(), geometryRooms.end(), renderedRoom.id)
@@ -3092,6 +3138,9 @@ void Application::render()
     SDL_SetWindowTitle(window_, title.str().c_str());
     visual::HudRenderData hud;
     hud.visible = true;
+    hud.graphicsQuality = hudGraphicsQuality;
+    hud.worldRenderScalePercent = graphicsQuality.renderScalePercent;
+    hud.detailedMaterials = graphicsQuality.detailedMaterials;
     const PerformanceSnapshot performance = performanceMonitor_.snapshot();
     hud.performanceOverlay
         = performanceOverlayVisible_ && performance.sampleCount > 0U;

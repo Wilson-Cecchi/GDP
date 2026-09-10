@@ -80,6 +80,8 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "invert_mouse_y = "
            << (settings.invertMouseY ? "true" : "false") << '\n'
            << "field_of_view = " << settings.fieldOfViewDegrees << '\n'
+           << "graphics_quality = "
+           << gameplay::graphicsQualityName(settings.graphicsQuality) << '\n'
            << "window_width = "
            << gameplay::windowResolutionSize(settings.windowResolution).width << '\n'
            << "window_height = "
@@ -166,6 +168,14 @@ SettingsLoadResult loadRuntimeSettings(
                 recovered = !assignClamped(
                     result.settings.fieldOfViewDegrees, value, 60U, 100U)
                     || recovered;
+            } else if (key == "graphics_quality") {
+                const std::optional<gameplay::GraphicsQuality> quality
+                    = gameplay::graphicsQualityForName(value);
+                if (quality) {
+                    result.settings.graphicsQuality = *quality;
+                } else {
+                    recovered = true;
+                }
             } else if (key == "window_width") {
                 windowWidth = parseUnsigned(value);
                 recovered = !windowWidth || recovered;
@@ -230,6 +240,10 @@ SettingsLoadResult loadRuntimeSettings(
         }
         if (*version <= 4U) {
             result.settings.verticalSync = true;
+        }
+        if (*version <= 5U) {
+            // Preserve the exact pre-preset renderer for existing players.
+            result.settings.graphicsQuality = gameplay::GraphicsQuality::Ultra;
         }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {

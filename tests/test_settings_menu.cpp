@@ -92,6 +92,35 @@ void testRuntimeSettingsClamps()
         "right enables vertical synchronization");
 
     expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::GraphicsQuality, -1)
+            && settings.graphicsQuality == GraphicsQuality::Low,
+        "left selects a lighter graphics quality profile");
+    for (int index = 0; index < 10; ++index) {
+        (void)adjustRuntimeSetting(
+            settings, SettingsMenuOption::GraphicsQuality, 1);
+    }
+    expect(settings.graphicsQuality == GraphicsQuality::Ultra
+            && !adjustRuntimeSetting(
+                settings, SettingsMenuOption::GraphicsQuality, 1),
+        "graphics quality clamps at Ultra");
+
+    expect(graphicsQualitySettings(GraphicsQuality::Potato)
+            == GraphicsQualitySettings{50U, 2U, 0U, 0U, 1U, false}
+            && graphicsQualitySettings(GraphicsQuality::Low)
+                == GraphicsQualitySettings{67U, 4U, 0U, 0U, 1U, false}
+            && graphicsQualitySettings(GraphicsQuality::Medium)
+                == GraphicsQualitySettings{85U, 6U, 1U, 3U, 2U, true}
+            && graphicsQualitySettings(GraphicsQuality::High)
+                == GraphicsQualitySettings{100U, 8U, 1U, 6U, 2U, true}
+            && graphicsQualitySettings(GraphicsQuality::Ultra)
+                == GraphicsQualitySettings{100U, 8U, 2U, 8U, 2U, true},
+        "graphics profiles expose deterministic rendering budgets");
+    expect(graphicsQualityName(GraphicsQuality::Potato) == "POTATO"
+            && graphicsQualityForName("HIGH") == GraphicsQuality::High
+            && !graphicsQualityForName("UNKNOWN"),
+        "graphics profile names round-trip without accepting unknown values");
+
+    expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::WindowResolution, -1)
             && settings.windowResolution == WindowResolution::R960x540,
         "left selects the previous window resolution preset");
@@ -126,9 +155,11 @@ void testRuntimeSettingsClamps()
         "volume normalization clamps invalid percentages");
 
     settings.windowResolution = static_cast<WindowResolution>(99U);
-    expect(sanitizeRuntimeSettings(settings).windowResolution
-            == WindowResolution::R1280x720,
-        "invalid resolution enum recovers to the default preset");
+    settings.graphicsQuality = static_cast<GraphicsQuality>(99U);
+    const RuntimeSettings sanitized = sanitizeRuntimeSettings(settings);
+    expect(sanitized.windowResolution == WindowResolution::R1280x720
+            && sanitized.graphicsQuality == GraphicsQuality::Medium,
+        "invalid video enums recover to their default presets");
 }
 
 } // namespace

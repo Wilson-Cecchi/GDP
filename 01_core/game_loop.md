@@ -101,6 +101,12 @@ apresentação separadamente, além dos tempos únicos de geração do mundo e
 preparação de assets. O benchmark `--headless --frames N --seed N` escreve um
 resumo reproduzível sem misturar relógio ou telemetria à simulação determinística.
 
+Na Fase 118, a medição no W541/K2100M confirmou que o fixed update permanecia
+em cerca de 2 ms enquanto renderização e apresentação dominavam o frame. Os
+cinco perfis de qualidade passaram a fornecer budgets visuais fixos e
+persistentes. A seleção não participa do relógio, RNG ou simulação; somente o
+snapshot entregue ao renderer recebe escala interna e limites de iluminação.
+
 ## Testes
 
 - 10 s simulados com 30/60/144 FPS de render produzem estado equivalente;

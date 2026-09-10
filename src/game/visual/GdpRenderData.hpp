@@ -303,11 +303,20 @@ enum class HudSettingsSelection : std::uint8_t {
     MouseSensitivity,
     InvertMouseY,
     FieldOfView,
+    GraphicsQuality,
     WindowResolution,
     Fullscreen,
     VerticalSync,
     Back,
     Count,
+};
+
+enum class HudGraphicsQuality : std::uint8_t {
+    Potato,
+    Low,
+    Medium,
+    High,
+    Ultra,
 };
 
 struct UiRect {
@@ -476,6 +485,9 @@ struct HudRenderData {
     std::uint16_t mouseSensitivityPercent{100U};
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
+    HudGraphicsQuality graphicsQuality{HudGraphicsQuality::Medium};
+    std::uint16_t worldRenderScalePercent{100U};
+    bool detailedMaterials{true};
     std::uint16_t windowWidth{1280U};
     std::uint16_t windowHeight{720U};
     bool fullscreen{false};

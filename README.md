@@ -440,6 +440,11 @@ especializados das pastas numeradas.
   média, P95, pior frame, update, render e espera de apresentação. `F3` alterna
   um overlay com FPS, budget, draw calls, triângulos, entidades, luzes, sombras,
   caches e tempos de preparação; headless emite o mesmo resumo no log.
+- **Fase 118 — Perfis gráficos escaláveis:** `QUALITY` oferece `POTATO`, `LOW`,
+  `MEDIUM`, `HIGH` e `ULTRA`. Cada perfil aplica um orçamento determinístico de
+  escala interna, luzes, sombras e materiais detalhados sem mudar HUD, menus,
+  resolução da janela ou regras de gameplay. Configurações antigas migram para
+  `ULTRA`, preservando exatamente o renderer anterior.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1115,6 +1120,18 @@ o painel sem pausar ou alterar a simulação. O resumo headless usa seed e núme
 de frames explícitos para comparações reproduzíveis. A instrumentação ainda não
 reduz qualidade: os presets gráficos serão definidos na fase seguinte a partir
 de medições em hardware real.
+
+Na Fase 118, uma coleta no ThinkPad W541/K2100M registrou aproximadamente
+9 FPS, P95 de 127 ms, `UPDATE` de 2 ms, `RENDER` de 84 ms e `WAIT` de 29 ms
+com oito luzes, duas luzes de sombra e oito oclusores. A medição confirmou
+pressão gráfica, não de simulação. `QUALITY` passou a selecionar cinco budgets:
+`POTATO` usa escala interna de 50%, duas luzes, nenhuma sombra e materiais
+simples, mantendo a sala vizinha direta; `LOW`, 67%, quatro luzes e o mesmo
+alcance de salas; `MEDIUM`, 85%, seis luzes e sombra 1×3; `HIGH`, resolução
+interna integral e sombra 1×6; `ULTRA`
+preserva o caminho anterior, integral e 2×8. O mundo é ampliado para o
+framebuffer real antes de HUD e menus, que continuam nítidos e com hit tests na
+resolução nativa. O painel `F3` identifica o perfil e a escala ativos.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

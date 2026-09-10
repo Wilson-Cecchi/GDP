@@ -442,6 +442,13 @@ regressão OpenGL exige mudança real de pixels com o overlay ativo e confirma q
 draw calls, triângulos e caches são contabilizados. Os bootstraps headless passam
 a imprimir um resumo de desempenho sem depender de janela ou alterar a seed.
 
+O gate da Fase 118 valida os cinco perfis, seus budgets exatos, clamps e nomes
+persistentes. A regressão OpenGL renderiza o mesmo conteúdo a 100% e em
+`POTATO`/50%, exigindo mudança real de pixels e ausência de erro GL; o retorno ao
+framebuffer nativo antes do HUD protege legibilidade e coordenadas de interface.
+O playtest no W541 permanece o gate de calibração de FPS para `POTATO`, `LOW` e
+`MEDIUM`, sem transformar uma máquina rápida de CI em referência de hardware.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela
@@ -457,20 +464,20 @@ resultado, preservando o menu de origem até cancelar ou confirmar.
 O gate de configurações cobre origem título/pausa, wrap, seleção direta, retorno,
 passos e clamps de todos os valores. Input neutro e adaptador SDL protegem as
 novas setas laterais; gameplay confirma a aplicação da sensibilidade. O teste
-CPU percorre as onze linhas do layout em resoluções ampla, compacta e mínima, e
+CPU percorre as doze linhas do layout em resoluções ampla, compacta e mínima, e
 a regressão OpenGL exige pixels distintos para tela, seleção e valor de
 `VSYNC`.
 
-A regressão de setas percorre todas as dez linhas ajustáveis e confirma que os
+A regressão de setas percorre todas as onze linhas ajustáveis e confirma que os
 dois hit targets ficam dentro da linha: `<` sempre retorna direção negativa e
 `>` sempre retorna positiva. Cliques no label, no valor, fora do painel ou com
 dimensões inválidas não ajustam configurações. Layouts de 640×360 e 320×200
-também verificam que as onze linhas não se sobrepõem quando há espaço disponível.
+também verificam que as doze linhas não se sobrepõem quando há espaço disponível.
 
 O gate de persistência usa diretório temporário isolado e cobre arquivo ausente,
-round-trip das dez configurações/onze campos, substituição de arquivo existente,
+round-trip das onze configurações/doze campos, substituição de arquivo existente,
 remoção do temporário, campos ausentes/desconhecidos, corrupção parcial, clamps, versão
-ausente, migração v1/v2/v3/v4→v5 e versão incompatível. Gameplay compara deltas
+ausente, migração v1/v2/v3/v4/v5→v6 e versão incompatível. Gameplay compara deltas
 verticais normal e invertido, garantindo yaw inalterado. Os bootstraps headless
 e OpenGL confirmam que a integração não altera o ciclo de inicialização; headless
 não toca nas preferências reais do usuário. Um bootstrap adicional configura um

@@ -103,6 +103,15 @@ bool adjustRuntimeSetting(
     case SettingsMenuOption::FieldOfView:
         return adjustPercent(
             settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);
+    case SettingsMenuOption::GraphicsQuality: {
+        const GraphicsQuality previous = settings.graphicsQuality;
+        const int maximum = static_cast<int>(GraphicsQuality::Count) - 1;
+        const int adjusted = std::clamp(
+            static_cast<int>(previous) + (direction > 0 ? 1 : -1),
+            0, maximum);
+        settings.graphicsQuality = static_cast<GraphicsQuality>(adjusted);
+        return settings.graphicsQuality != previous;
+    }
     case SettingsMenuOption::WindowResolution: {
         const WindowResolution previous = settings.windowResolution;
         const int maximum = static_cast<int>(WindowResolution::Count) - 1;
@@ -155,6 +164,63 @@ float mouseSensitivity(const RuntimeSettings& settings) noexcept
     return baseSensitivity * (static_cast<float>(percent) / 100.0F);
 }
 
+GraphicsQualitySettings graphicsQualitySettings(
+    const GraphicsQuality quality) noexcept
+{
+    switch (quality) {
+    case GraphicsQuality::Potato:
+        return {50U, 2U, 0U, 0U, 1U, false};
+    case GraphicsQuality::Low:
+        return {67U, 4U, 0U, 0U, 1U, false};
+    case GraphicsQuality::Medium:
+        return {85U, 6U, 1U, 3U, 2U, true};
+    case GraphicsQuality::High:
+        return {100U, 8U, 1U, 6U, 2U, true};
+    case GraphicsQuality::Ultra:
+        return {100U, 8U, 2U, 8U, 2U, true};
+    case GraphicsQuality::Count:
+        break;
+    }
+    return graphicsQualitySettings(GraphicsQuality::Medium);
+}
+
+std::string_view graphicsQualityName(const GraphicsQuality quality) noexcept
+{
+    switch (quality) {
+    case GraphicsQuality::Potato:
+        return "POTATO";
+    case GraphicsQuality::Low:
+        return "LOW";
+    case GraphicsQuality::Medium:
+        return "MEDIUM";
+    case GraphicsQuality::High:
+        return "HIGH";
+    case GraphicsQuality::Ultra:
+        return "ULTRA";
+    case GraphicsQuality::Count:
+        break;
+    }
+    return "MEDIUM";
+}
+
+std::optional<GraphicsQuality> graphicsQualityForName(
+    const std::string_view name) noexcept
+{
+    constexpr std::array qualities{
+        GraphicsQuality::Potato,
+        GraphicsQuality::Low,
+        GraphicsQuality::Medium,
+        GraphicsQuality::High,
+        GraphicsQuality::Ultra,
+    };
+    for (const GraphicsQuality quality : qualities) {
+        if (name == graphicsQualityName(quality)) {
+            return quality;
+        }
+    }
+    return std::nullopt;
+}
+
 RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
 {
     settings.masterVolumePercent = std::min<std::uint16_t>(
@@ -169,6 +235,9 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
         settings.mouseSensitivityPercent, 30U, 200U);
     settings.fieldOfViewDegrees = std::clamp<std::uint16_t>(
         settings.fieldOfViewDegrees, 60U, 100U);
+    if (settings.graphicsQuality >= GraphicsQuality::Count) {
+        settings.graphicsQuality = GraphicsQuality::Medium;
+    }
     if (settings.windowResolution >= WindowResolution::Count) {
         settings.windowResolution = WindowResolution::R1280x720;
     }

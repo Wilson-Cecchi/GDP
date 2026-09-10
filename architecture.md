@@ -1201,6 +1201,15 @@ overlay. O tempo de renderização representa submissão na CPU e a espera de
 apresentação é medida à parte, evitando um `glFinish` que distorceria o perfil.
 Nenhuma medição participa de RNG, fixed update, IA, colisão ou persistência.
 
+Na Fase 118, `GraphicsQuality` permanece uma preferência do jogo e é convertido
+pela `Application` em um budget visual imutável por frame. A aplicação limita
+luzes e candidatos de sombra antes de montar o snapshot; `GdpRenderer` aplica
+escala somente ao framebuffer 3D e preserva HUD e menus no framebuffer nativo.
+O shader recebe uma chave uniforme para omitir normal/material maps nos perfis
+mais leves. Assim, presets não entram em WKC Forge, geração, entidades, RNG,
+colisão ou balanceamento. O schema de settings v6 migra v1–v5 para `ULTRA`,
+mantendo a imagem histórica, enquanto uma instalação nova usa `MEDIUM`.
+
 ---
 
 # 8. Sistema de seed

@@ -21,6 +21,11 @@ não assinados.
 Configurações, recordes e checkpoints são gravados pelo SDL no diretório de
 preferências do usuário, fora da pasta extraída.
 
+Em hardware antigo, abra `SETTINGS` e selecione primeiro `QUALITY: POTATO`.
+Esse perfil mantém HUD e menus nítidos, mas reduz o custo do mundo 3D. `F3`
+mostra FPS, P95 e o perfil ativo; se houver margem estável, avance para `LOW` ou
+`MEDIUM`. Em notebooks híbridos, faça a comparação usando a GPU dedicada.
+
 ## Compilar localmente
 
 Requisitos:

@@ -74,6 +74,7 @@ void testMissingAndRoundTrip()
     settings.mouseSensitivityPercent = 130U;
     settings.invertMouseY = true;
     settings.fieldOfViewDegrees = 82U;
+    settings.graphicsQuality = gdp::gameplay::GraphicsQuality::Low;
     settings.windowResolution
         = gdp::gameplay::WindowResolution::R1600x900;
     settings.fullscreen = true;
@@ -100,13 +101,14 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 5\n"
+        "version = 6\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
         "mouse_sensitivity = 400\n"
         "invert_mouse_y = maybe\n"
         "field_of_view = 20\n"
+        "graphics_quality = impossible\n"
         "window_width = 1111\n"
         "window_height = 777\n"
         "fullscreen = maybe\n"
@@ -123,6 +125,8 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.mouseSensitivityPercent == 200U
             && !recovered.settings.invertMouseY
             && recovered.settings.fieldOfViewDegrees == 60U
+            && recovered.settings.graphicsQuality
+                == gdp::gameplay::GraphicsQuality::Medium
             && recovered.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720
             && !recovered.settings.fullscreen
@@ -130,13 +134,16 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 5\n"
+        "version = 6\n"
         "master_volume = 35\n"
+        "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
     const SettingsLoadResult forwardCompatible = loadRuntimeSettings(path);
     expect(forwardCompatible.status == SettingsLoadStatus::Loaded
             && forwardCompatible.settings.masterVolumePercent == 35U
             && forwardCompatible.settings.effectsVolumePercent == 100U
+            && forwardCompatible.settings.graphicsQuality
+                == gdp::gameplay::GraphicsQuality::High
             && forwardCompatible.settings.verticalSync,
         "unknown and missing fields remain forward compatible");
 
@@ -193,8 +200,22 @@ void testRecoveryAndForwardCompatibility()
             && migratedV4.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R960x540
             && migratedV4.settings.fullscreen
-            && migratedV4.settings.verticalSync,
-        "schema version 4 preserves video settings and defaults VSync on");
+            && migratedV4.settings.verticalSync
+            && migratedV4.settings.graphicsQuality
+                == gdp::gameplay::GraphicsQuality::Ultra,
+        "schema version 4 preserves video settings and migrates legacy visuals");
+
+    writeText(path,
+        "version = 5\n"
+        "window_width = 1280\n"
+        "window_height = 720\n"
+        "vertical_sync = false\n");
+    const SettingsLoadResult migratedV5 = loadRuntimeSettings(path);
+    expect(migratedV5.status == SettingsLoadStatus::Migrated
+            && !migratedV5.settings.verticalSync
+            && migratedV5.settings.graphicsQuality
+                == gdp::gameplay::GraphicsQuality::Ultra,
+        "schema version 5 preserves the former renderer as Ultra");
 }
 
 void testInvalidAndUnsupportedFiles()
@@ -221,6 +242,8 @@ void testInvalidAndUnsupportedFiles()
     invalidSource.fieldOfViewDegrees = 500U;
     invalidSource.windowResolution
         = static_cast<gdp::gameplay::WindowResolution>(99U);
+    invalidSource.graphicsQuality
+        = static_cast<gdp::gameplay::GraphicsQuality>(99U);
     expect(saveRuntimeSettings(path, invalidSource),
         "save accepts runtime values that require canonicalization");
     const SettingsLoadResult canonical = loadRuntimeSettings(path);
@@ -229,7 +252,9 @@ void testInvalidAndUnsupportedFiles()
             && canonical.settings.mouseSensitivityPercent == 30U
             && canonical.settings.fieldOfViewDegrees == 100U
             && canonical.settings.windowResolution
-                == gdp::gameplay::WindowResolution::R1280x720,
+                == gdp::gameplay::WindowResolution::R1280x720
+            && canonical.settings.graphicsQuality
+                == gdp::gameplay::GraphicsQuality::Medium,
         "save persists only canonical settings ranges");
 }
 

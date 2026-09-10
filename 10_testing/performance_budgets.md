@@ -1,8 +1,8 @@
 # Testing — Performance budgets
 
-> **Estado:** instrumentação inicial implementada na Fase 117; budgets gerais
-> ainda precisam ser calibrados em hardware real. A Fase 115 aplicou e validou
-> o primeiro budget rígido do passe de sombras.
+> **Estado:** instrumentação inicial implementada na Fase 117 e primeira
+> calibração por hardware aplicada na Fase 118. A Fase 115 introduziu o primeiro
+> budget rígido do passe de sombras.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -54,3 +54,23 @@ Sala cheia de props; maior encontro; Boss; muitas luzes; cache frio; cache quent
 - os futuros presets de desempenho serão escolhidos somente após comparar uma
   sala comum, o maior encontro e o Boss em pelo menos um hardware fraco e um
   hardware forte.
+
+## Perfis da Fase 118
+
+Uma coleta no ThinkPad W541 com Quadro K2100M, no caminho visual legado,
+registrou 9 FPS, média de 115 ms, P95 de 127 ms, pior frame de 201 ms,
+`UPDATE 2 ms`, `RENDER 84 ms` e `WAIT 29 ms`. A cena apresentou 273 draws,
+8.420 triângulos, oito luzes e budget de sombra 2×8. Isso localizou a pressão no
+caminho gráfico e justificou perfis que não alteram lógica ou conteúdo.
+
+| Perfil | Escala | Luzes | Sombras | Profundidade de salas | Material detalhado |
+|---|---:|---:|---:|---:|---|
+| POTATO | 50% | 2 | 0×0 | 1 | não |
+| LOW | 67% | 4 | 0×0 | 1 | não |
+| MEDIUM | 85% | 6 | 1×3 | 2 | sim |
+| HIGH | 100% | 8 | 1×6 | 2 | sim |
+| ULTRA | 100% | 8 | 2×8 | 2 | sim |
+
+O HUD e os menus não usam a escala interna. O próximo playtest no W541 deve
+comparar `POTATO`, `LOW` e `MEDIUM` na mesma cena com `F3`, preferencialmente
+com VSync desligado, antes de promover qualquer perfil automaticamente.

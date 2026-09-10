@@ -361,7 +361,7 @@ void testSettingsMenuLayout()
 
     const SettingsMenuLayout medium = makeSettingsMenuLayout(640, 360);
     expect(medium.scale == 1,
-        "medium settings menu keeps all eleven rows at base bitmap scale");
+        "medium settings menu keeps all twelve rows at base bitmap scale");
     for (std::size_t index = 1U; index < medium.rows.size(); ++index) {
         expect(medium.rows[index].y + medium.rows[index].height
                 <= medium.rows[index - 1U].y,

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace gdp::gameplay {
 
@@ -18,11 +19,33 @@ enum class SettingsMenuOption : std::uint8_t {
     MouseSensitivity,
     InvertMouseY,
     FieldOfView,
+    GraphicsQuality,
     WindowResolution,
     Fullscreen,
     VerticalSync,
     Back,
     Count,
+};
+
+enum class GraphicsQuality : std::uint8_t {
+    Potato,
+    Low,
+    Medium,
+    High,
+    Ultra,
+    Count,
+};
+
+struct GraphicsQualitySettings {
+    std::uint16_t renderScalePercent{85U};
+    std::uint8_t maximumLights{6U};
+    std::uint8_t maximumShadowLights{1U};
+    std::uint8_t maximumShadowOccluders{3U};
+    std::uint8_t visibleRoomDepth{2U};
+    bool detailedMaterials{true};
+
+    constexpr bool operator==(const GraphicsQualitySettings&) const noexcept
+        = default;
 };
 
 enum class WindowResolution : std::uint8_t {
@@ -54,6 +77,7 @@ struct RuntimeSettings {
     std::uint16_t mouseSensitivityPercent{100U};
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
+    GraphicsQuality graphicsQuality{GraphicsQuality::Medium};
     WindowResolution windowResolution{WindowResolution::R1280x720};
     bool fullscreen{false};
     bool verticalSync{true};
@@ -85,6 +109,12 @@ void selectSettingsMenuOption(
     SettingsMenuState& state) noexcept;
 [[nodiscard]] float normalizedVolume(std::uint16_t percent) noexcept;
 [[nodiscard]] float mouseSensitivity(const RuntimeSettings& settings) noexcept;
+[[nodiscard]] GraphicsQualitySettings graphicsQualitySettings(
+    GraphicsQuality quality) noexcept;
+[[nodiscard]] std::string_view graphicsQualityName(
+    GraphicsQuality quality) noexcept;
+[[nodiscard]] std::optional<GraphicsQuality> graphicsQualityForName(
+    std::string_view name) noexcept;
 [[nodiscard]] RuntimeSettings sanitizeRuntimeSettings(
     RuntimeSettings settings) noexcept;
 [[nodiscard]] WindowResolutionSize windowResolutionSize(

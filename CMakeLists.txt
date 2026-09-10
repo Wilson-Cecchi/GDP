@@ -762,5 +762,15 @@ if(GDP_BUILD_TESTS)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_vsync_setting.cmake
         )
         set_tests_properties(vsync_setting_bootstrap PROPERTIES TIMEOUT 30)
+
+        add_test(
+            NAME graphics_quality_setting_bootstrap
+            COMMAND ${CMAKE_COMMAND}
+                -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+                -DGDP_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_graphics_quality.cmake
+        )
+        set_tests_properties(
+            graphics_quality_setting_bootstrap PROPERTIES TIMEOUT 30)
     endif()
 endif()

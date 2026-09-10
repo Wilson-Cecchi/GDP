@@ -74,6 +74,7 @@ uniform vec2 uUvScale;
 uniform vec2 uUvOffset;
 uniform float uEmissiveStrength;
 uniform int uDetailedMaterial;
+uniform int uDetailedMaterialsEnabled;
 uniform int uUseEmissionMap;
 
 out vec4 fragmentColor;
@@ -153,7 +154,7 @@ void main()
     float roughness = 0.72;
     float metalness = 0.0;
     float ambientOcclusion = 1.0;
-    if (uDetailedMaterial != 0) {
+    if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
         vec3 tangentNormal = texture(uNormalMap, materialUv).xyz * 2.0 - 1.0;
         normal = normalize(cotangentFrame(normal, vWorldPosition, materialUv) * tangentNormal);
         vec3 material = texture(uMaterialMap, materialUv).rgb;
@@ -183,7 +184,8 @@ void main()
                 vWorldPosition, normal, uLightPositions[index], index)
             : 1.0;
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
-        if (uDetailedMaterial != 0 && diffuse > 0.0) {
+        if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0
+            && diffuse > 0.0) {
             vec3 halfway = normalize(lightDirection + viewDirection);
             float exponent = mix(96.0, 8.0, roughness);
             float highlight = pow(max(dot(normal, halfway), 0.0), exponent)
@@ -914,14 +916,18 @@ bool GdpRenderer::render(
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
     }
+    const int renderScalePercent = std::clamp(
+        static_cast<int>(hud.worldRenderScalePercent), 50, 100);
+    const int renderWidth = std::max(1, (width * renderScalePercent) / 100);
+    const int renderHeight = std::max(1, (height * renderScalePercent) / 100);
     lastFrameStats_.meshCacheEntries = meshCache_.stats().entries;
     lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
-    if (!framebuffer_.resize(gl_, width, height)) {
+    if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
         return false;
     }
 
     framebuffer_.bind(gl_);
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, renderWidth, renderHeight);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.018F, 0.025F, 0.03F, 1.0F);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -934,12 +940,15 @@ bool GdpRenderer::render(
     shader_.setInt(gl_, "uMaterialMap", 2);
     shader_.setInt(gl_, "uEmissionMap", 3);
     shader_.setInt(gl_, "uUseEmissionMap", 0);
+    shader_.setInt(gl_, "uDetailedMaterialsEnabled",
+        hud.detailedMaterials ? 1 : 0);
     shader_.setVec3(gl_, "uCameraPosition", camera.position);
     shader_.setMat4(gl_, "uView", camera_.viewMatrix());
     shader_.setMat4(
         gl_,
         "uProjection",
-        camera_.projectionMatrix(static_cast<float>(width) / static_cast<float>(height)));
+        camera_.projectionMatrix(
+            static_cast<float>(renderWidth) / static_cast<float>(renderHeight)));
     const std::uint32_t lightCount = std::min<std::uint32_t>(
         lighting.lightCount, static_cast<std::uint32_t>(maxRenderedRoomLights));
     const wkc::core::Vec3 alertColor{1.0F, 0.12F, 0.06F};
@@ -1787,6 +1796,7 @@ bool GdpRenderer::render(
     }
 
     framebuffer_.presentToDefault(gl_, width, height);
+    glViewport(0, 0, width, height);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
     const int hudScale = width >= 640 && height >= 360 ? 2 : 1;
@@ -1877,12 +1887,12 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (22 * scale),
             2 * scale, title, cyanColor);
 
-        constexpr std::array<std::string_view, 11> labels{
+        constexpr std::array<std::string_view, 12> labels{
             "MASTER", "EFFECTS", "AMBIENT", "UI VOLUME",
-            "SENSITIVITY", "INVERT Y", "FOV", "RESOLUTION",
+            "SENSITIVITY", "INVERT Y", "FOV", "QUALITY", "RESOLUTION",
             "FULLSCREEN", "VSYNC", "BACK",
         };
-        const std::array<std::uint16_t, 11> numbers{
+        const std::array<std::uint16_t, 12> numbers{
             hud.masterVolumePercent,
             hud.effectsVolumePercent,
             hud.ambientVolumePercent,
@@ -1890,6 +1900,7 @@ bool GdpRenderer::render(
             hud.mouseSensitivityPercent,
             0U,
             hud.fieldOfViewDegrees,
+            0U,
             0U,
             0U,
             0U,
@@ -1919,6 +1930,25 @@ bool GdpRenderer::render(
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::VerticalSync)) {
                 value = hud.verticalSync ? "ON" : "OFF";
+            } else if (index
+                == static_cast<std::size_t>(HudSettingsSelection::GraphicsQuality)) {
+                switch (hud.graphicsQuality) {
+                case HudGraphicsQuality::Potato:
+                    value = "POTATO";
+                    break;
+                case HudGraphicsQuality::Low:
+                    value = "LOW";
+                    break;
+                case HudGraphicsQuality::Medium:
+                    value = "MEDIUM";
+                    break;
+                case HudGraphicsQuality::High:
+                    value = "HIGH";
+                    break;
+                case HudGraphicsQuality::Ultra:
+                    value = "ULTRA";
+                    break;
+                }
             } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::WindowResolution)) {
                 value = std::to_string(hud.windowWidth) + "X"
@@ -2311,7 +2341,26 @@ bool GdpRenderer::render(
             : hud.percentile95FrameMilliseconds <= 34U
                 ? wkc::core::Vec3{0.98F, 0.62F, 0.14F}
                 : uiTheme.danger;
-        const std::array<std::string, 7> lines{
+        std::string qualityName = "MEDIUM";
+        switch (hud.graphicsQuality) {
+        case HudGraphicsQuality::Potato:
+            qualityName = "POTATO";
+            break;
+        case HudGraphicsQuality::Low:
+            qualityName = "LOW";
+            break;
+        case HudGraphicsQuality::Medium:
+            break;
+        case HudGraphicsQuality::High:
+            qualityName = "HIGH";
+            break;
+        case HudGraphicsQuality::Ultra:
+            qualityName = "ULTRA";
+            break;
+        }
+        const std::array<std::string, 8> lines{
+            "QUALITY " + qualityName + " SCALE "
+                + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
                 + " FRAME " + std::to_string(hud.averageFrameMilliseconds)
                 + "MS P95 " + std::to_string(hud.percentile95FrameMilliseconds)

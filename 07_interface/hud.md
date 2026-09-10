@@ -9,7 +9,8 @@
 > e dos menus sem alterar sua geometria funcional. A Fase 112 acrescentou o
 > viewmodel metálico da arma sem ocupar a camada de hit tests da interface.
 > A Fase 117 acrescenta um overlay técnico opcional de desempenho, alternado
-> por `F3`, sem interferir no HUD normal ou na simulação.
+> por `F3`, sem interferir no HUD normal ou na simulação. Na Fase 118, o painel
+> também identifica o perfil gráfico e a escala interna ativos.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 

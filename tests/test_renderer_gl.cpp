@@ -234,6 +234,18 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lightingPixels.data());
 
+            gdp::game::visual::HudRenderData potatoQuality;
+            potatoQuality.graphicsQuality
+                = gdp::game::visual::HudGraphicsQuality::Potato;
+            potatoQuality.worldRenderScalePercent = 50U;
+            potatoQuality.detailedMaterials = false;
+            const bool renderedPotatoQuality = renderer.render(
+                width, height, {}, {}, {}, {}, proceduralLighting,
+                {}, {}, {}, {}, potatoQuality);
+            std::vector<std::uint8_t> potatoQualityPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                potatoQualityPixels.data());
+
             gdp::game::visual::RoomLightingRenderData damagedFixtureLighting
                 = proceduralLighting;
             damagedFixtureLighting.lights[0].intensity *= 0.45F;
@@ -492,6 +504,10 @@ int main()
 
             gdp::game::visual::HudRenderData performanceHud = functionalHud;
             performanceHud.performanceOverlay = true;
+            performanceHud.graphicsQuality
+                = gdp::game::visual::HudGraphicsQuality::Potato;
+            performanceHud.worldRenderScalePercent = 50U;
+            performanceHud.detailedMaterials = false;
             performanceHud.performanceFramesPerSecond = 58U;
             performanceHud.averageFrameMilliseconds = 17U;
             performanceHud.percentile95FrameMilliseconds = 22U;
@@ -805,6 +821,7 @@ int main()
             std::size_t securityChangedChannels = 0;
             std::size_t centralHubChangedChannels = 0;
             std::size_t lightingChangedChannels = 0;
+            std::size_t potatoQualityChangedChannels = 0;
             std::size_t damagedFixtureChangedChannels = 0;
             std::size_t destroyedFixtureChangedChannels = 0;
             std::size_t dynamicShadowChangedChannels = 0;
@@ -887,6 +904,10 @@ int main()
                     if (lightingPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++lightingChangedChannels;
+                    }
+                    if (potatoQualityPixels[index + channel]
+                        != lightingPixels[index + channel]) {
+                        ++potatoQualityChangedChannels;
                     }
                     if (damagedFixturePixels[index + channel]
                         != lightingPixels[index + channel]) {
@@ -1065,6 +1086,7 @@ int main()
                 && renderedSecurityVariant && securityChangedChannels > 100U
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
+                && renderedPotatoQuality && potatoQualityChangedChannels > 100U
                 && renderedDamagedFixture
                 && damagedFixtureChangedChannels > 100U
                 && renderedDestroyedFixture

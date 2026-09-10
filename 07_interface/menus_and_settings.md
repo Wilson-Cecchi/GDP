@@ -131,6 +131,7 @@ mostrando `BEST`. A informação não aparece em Standard.
 - sensibilidade: 30–200% da base de 0,12, passos de 10%;
 - Invert Y: `OFF/ON`, com esquerda/direita escolhendo o estado;
 - FOV vertical: 60–100 graus, passos de 2 graus;
+- qualidade: `POTATO`, `LOW`, `MEDIUM`, `HIGH` ou `ULTRA`;
 - resolução: 960×540, 1280×720, 1600×900 ou 1920×1080;
 - Fullscreen: `OFF/ON`, aplicado à janela sem reiniciar a run;
 - VSync: `OFF/ON`, aplicado ao contexto OpenGL ativo sem reiniciar a run.
@@ -154,7 +155,12 @@ o preset escolhido para aplicá-lo ao voltar ao modo janela. A troca de preset
 redimensiona e recentraliza a janela; o renderer consulta o framebuffer real a
 cada quadro. VSync solicita intervalo de troca 1 quando ligado e 0 quando
 desligado; se o backend não oferecer o modo pedido, a falha é registrada sem
-encerrar a aplicação. Remapeamento continua para uma fase posterior.
+encerrar a aplicação. Qualidade altera imediatamente somente o orçamento visual
+do mundo; HUD, menus, simulação, colisão e geração permanecem iguais. `POTATO` e
+`LOW` desativam sombras e materiais detalhados; os demais perfis aumentam escala,
+luzes e sombras progressivamente. Os dois perfis mínimos ainda desenham a sala
+vizinha direta, preservando a continuidade ao atravessar portas. Remapeamento
+continua para uma fase posterior.
 
 ## Confirmações
 
