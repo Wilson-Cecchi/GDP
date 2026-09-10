@@ -79,7 +79,11 @@ Seed nunca pode tornar objetivo/saída obrigatória ilegível. Iluminação pode
 
 ## Budget
 
-Limitar luzes por sala e raio de influência.
+Desde a Fase 115, somente as duas luzes ativas mais próximas do observador
+calculam sombra. Candidatos inválidos ou fora do alcance dessas luzes são
+descartados; os oito AABBs relevantes mais próximos são enviados ao shader.
+O renderer reaplica os dois limites mesmo para snapshots externos e ignora cedo
+luzes apagadas e faces sem contribuição difusa.
 
 ## Sombras dinâmicas
 
@@ -90,8 +94,8 @@ ambiente e emissão continuam legíveis. O bias de origem evita auto-oclusão.
 
 Essa solução acompanha movimento e destruição sem shadow map ou passe de depth
 adicional, adequada à geometria modular baseada em boxes. Luz com intensidade
-zero não executa contribuição visível. O budget de luzes sombreadas e a seleção
-dos oclusores serão refinados na fase de otimização.
+zero não executa contribuição visível. Com duas luzes e oito oclusores, o pior
+caso passa de 128 para 16 interseções por fragmento iluminado.
 
 ## Emissive
 

@@ -484,6 +484,8 @@ struct HudRenderData {
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;
 inline constexpr std::size_t maxShadowOccluders = 16U;
+inline constexpr std::size_t maxShadowCastingLights = 2U;
+inline constexpr std::size_t maxActiveShadowOccluders = 8U;
 
 struct ShadowOccluderRenderData {
     wkc::core::Aabb bounds{};
@@ -514,5 +516,18 @@ struct RoomLightingRenderData {
     float fixtureEmissive{0.75F};
     bool alert{false};
 };
+
+struct ShadowBudgetResult {
+    std::uint32_t activeLights{0U};
+    std::uint32_t candidateOccluders{0U};
+    std::uint32_t selectedOccluders{0U};
+
+    constexpr bool operator==(const ShadowBudgetResult&) const noexcept = default;
+};
+
+[[nodiscard]] ShadowBudgetResult optimizeShadowBudget(
+    RoomLightingRenderData& lighting,
+    wkc::core::Vec3 observerPosition,
+    std::span<const ShadowOccluderRenderData> candidates) noexcept;
 
 } // namespace gdp::game::visual

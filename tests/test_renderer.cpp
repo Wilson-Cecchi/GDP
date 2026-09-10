@@ -1005,6 +1005,62 @@ void testWeaponViewmodelPose()
         "weapon pose sanitizes non-finite and out-of-range animation input");
 }
 
+void testOptimizedShadowBudget()
+{
+    using namespace gdp::game::visual;
+
+    RoomLightingRenderData lighting;
+    lighting.lightCount = static_cast<std::uint32_t>(maxRenderedRoomLights);
+    for (std::size_t index = 0U; index < maxRenderedRoomLights; ++index) {
+        lighting.lights[index] = {
+            {static_cast<float>(index), 3.5F, 0.0F},
+            {0.8F, 0.9F, 1.0F},
+            index == 3U ? 0.0F : 1.0F,
+            12.0F,
+        };
+    }
+    std::array<ShadowOccluderRenderData, 11U> candidates{};
+    for (std::size_t index = 0U; index < 9U; ++index) {
+        const float x = static_cast<float>(index) * 0.4F;
+        candidates[index].bounds = {
+            {x, 0.0F, -0.3F}, {x + 0.25F, 1.0F, 0.3F}};
+    }
+    candidates[9].bounds = {
+        {100.0F, 0.0F, 100.0F}, {101.0F, 1.0F, 101.0F}};
+    candidates[10].bounds = {
+        {std::numeric_limits<float>::quiet_NaN(), 0.0F, 0.0F},
+        {1.0F, 1.0F, 1.0F}};
+
+    RoomLightingRenderData repeated = lighting;
+    const ShadowBudgetResult result
+        = optimizeShadowBudget(lighting, {}, candidates);
+    const ShadowBudgetResult repeatedResult
+        = optimizeShadowBudget(repeated, {}, candidates);
+    expect(result.activeLights == 7U
+            && lighting.shadowLightCount == maxShadowCastingLights,
+        "shadow optimization selects only two nearest active lights");
+    expect(result.candidateOccluders == candidates.size()
+            && result.selectedOccluders == maxActiveShadowOccluders
+            && lighting.shadowOccluderCount == maxActiveShadowOccluders,
+        "shadow optimization caps valid nearby occluders at the active budget");
+    expect(lighting.lights[0].position.x == 0.0F
+            && lighting.lights[1].position.x == 1.0F,
+        "nearest active lights are ordered before shadow evaluation");
+    expect(result == repeatedResult
+            && lighting.shadowOccluders == repeated.shadowOccluders,
+        "shadow budget selection is deterministic for identical snapshots");
+
+    for (std::size_t index = 0U; index < lighting.lightCount; ++index) {
+        lighting.lights[index].intensity = 0.0F;
+    }
+    const ShadowBudgetResult dark
+        = optimizeShadowBudget(lighting, {}, candidates);
+    expect(dark.activeLights == 0U && dark.selectedOccluders == 0U
+            && lighting.shadowLightCount == 0U
+            && lighting.shadowOccluderCount == 0U,
+        "fully dark lighting bypasses every shadow intersection");
+}
+
 void testIndustrialUiTheme()
 {
     using namespace gdp::game::visual;
@@ -1039,6 +1095,7 @@ int main()
     testEnemyRootAnimation();
     testImpactVisualData();
     testWeaponViewmodelPose();
+    testOptimizedShadowBudget();
     testIndustrialUiTheme();
     testSettingsMenuLayout();
 

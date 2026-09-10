@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace gdp::game::visual {
 namespace {
@@ -1118,6 +1119,96 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
             -8.0F * reloadArc,
             34.0F * reloadArc,
         },
+    };
+}
+
+ShadowBudgetResult optimizeShadowBudget(
+    RoomLightingRenderData& lighting,
+    const wkc::core::Vec3 observerPosition,
+    const std::span<const ShadowOccluderRenderData> candidates) noexcept
+{
+    const std::size_t lightCount = std::min<std::size_t>(
+        lighting.lightCount, maxRenderedRoomLights);
+    std::stable_sort(
+        lighting.lights.begin(), lighting.lights.begin() + lightCount,
+        [observerPosition](const PointLightRenderData& left,
+            const PointLightRenderData& right) {
+            const bool leftActive = std::isfinite(left.intensity)
+                && left.intensity > 1.0e-4F;
+            const bool rightActive = std::isfinite(right.intensity)
+                && right.intensity > 1.0e-4F;
+            if (leftActive != rightActive) {
+                return leftActive;
+            }
+            const wkc::core::Vec3 leftOffset = left.position - observerPosition;
+            const wkc::core::Vec3 rightOffset = right.position - observerPosition;
+            return wkc::core::dot(leftOffset, leftOffset)
+                < wkc::core::dot(rightOffset, rightOffset);
+        });
+
+    std::size_t activeLights = 0U;
+    while (activeLights < lightCount
+        && std::isfinite(lighting.lights[activeLights].intensity)
+        && lighting.lights[activeLights].intensity > 1.0e-4F) {
+        ++activeLights;
+    }
+    lighting.shadowLightCount = static_cast<std::uint32_t>(
+        std::min(activeLights, maxShadowCastingLights));
+
+    struct RankedOccluder {
+        ShadowOccluderRenderData occluder{};
+        float distanceSquared{0.0F};
+    };
+    std::vector<RankedOccluder> ranked;
+    ranked.reserve(candidates.size());
+    const auto finiteVec3 = [](const wkc::core::Vec3 value) {
+        return std::isfinite(value.x) && std::isfinite(value.y)
+            && std::isfinite(value.z);
+    };
+    for (const ShadowOccluderRenderData candidate : candidates) {
+        if (!candidate.bounds.isValid()
+            || !finiteVec3(candidate.bounds.minimum)
+            || !finiteVec3(candidate.bounds.maximum)) {
+            continue;
+        }
+        const wkc::core::Vec3 center
+            = (candidate.bounds.minimum + candidate.bounds.maximum) * 0.5F;
+        bool influencesShadowLight = false;
+        for (std::size_t lightIndex = 0U;
+             lightIndex < lighting.shadowLightCount; ++lightIndex) {
+            const PointLightRenderData& light = lighting.lights[lightIndex];
+            const wkc::core::Vec3 lightOffset = center - light.position;
+            const float extentRadius = wkc::core::length(
+                (candidate.bounds.maximum - candidate.bounds.minimum) * 0.5F);
+            const float influenceRange = std::max(light.range, 0.0F) + extentRadius;
+            if (wkc::core::dot(lightOffset, lightOffset)
+                <= influenceRange * influenceRange) {
+                influencesShadowLight = true;
+                break;
+            }
+        }
+        if (!influencesShadowLight) {
+            continue;
+        }
+        const wkc::core::Vec3 observerOffset = center - observerPosition;
+        ranked.push_back({candidate,
+            wkc::core::dot(observerOffset, observerOffset)});
+    }
+    std::stable_sort(ranked.begin(), ranked.end(),
+        [](const RankedOccluder& left, const RankedOccluder& right) {
+            return left.distanceSquared < right.distanceSquared;
+        });
+
+    const std::size_t selected = std::min({
+        ranked.size(), maxActiveShadowOccluders, maxShadowOccluders});
+    for (std::size_t index = 0U; index < selected; ++index) {
+        lighting.shadowOccluders[index] = ranked[index].occluder;
+    }
+    lighting.shadowOccluderCount = static_cast<std::uint32_t>(selected);
+    return {
+        static_cast<std::uint32_t>(activeLights),
+        static_cast<std::uint32_t>(candidates.size()),
+        static_cast<std::uint32_t>(selected),
     };
 }
 

@@ -279,6 +279,17 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 shadowedPixels.data());
 
+            gdp::game::visual::RoomLightingRenderData clampedShadowLighting
+                = shadowedLighting;
+            clampedShadowLighting.shadowLightCount
+                = static_cast<std::uint32_t>(
+                    gdp::game::visual::maxShadowCastingLights);
+            const bool renderedClampedShadowBudget = renderer.render(
+                width, height, {}, {}, {}, {}, clampedShadowLighting);
+            std::vector<std::uint8_t> clampedShadowPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                clampedShadowPixels.data());
+
             proceduralLighting.alert = true;
             const bool renderedAlertLighting = renderer.render(
                 width, height, {}, {}, {}, {}, proceduralLighting);
@@ -1024,7 +1035,9 @@ int main()
                 && renderedDestroyedFixture
                 && destroyedFixtureChangedChannels > 100U
                 && renderedShadowBaseline && renderedDynamicShadows
-                && dynamicShadowChangedChannels > 100U
+                && dynamicShadowChangedChannels > 64U
+                && renderedClampedShadowBudget
+                && clampedShadowPixels == shadowedPixels
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U

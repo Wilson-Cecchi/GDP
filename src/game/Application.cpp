@@ -145,6 +145,8 @@ visual::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert,
     const entities::EntityManager& entities,
+    const std::unordered_map<gdp::world::RoomId,
+        std::vector<entities::EntityId>>& roomFixtureEntities,
     const gdp::world::RoomId roomId)
 {
     static_assert(gdp::world::maxRoomLights <= visual::maxRenderedRoomLights);
@@ -154,27 +156,22 @@ visual::RoomLightingRenderData makeRenderLighting(
     lighting.lightCount = static_cast<std::uint32_t>(plan.lights.size());
     lighting.fixtureEmissive = plan.fixtureEmissive;
     lighting.alert = alert && plan.supportsAlert;
-    const std::vector<entities::EntityId> propIds
-        = entities.query(entities::EntityKind::Prop);
+    const auto fixtureIds = roomFixtureEntities.find(roomId);
     for (std::size_t index = 0; index < plan.lights.size(); ++index) {
         const gdp::world::RoomPointLight& source = plan.lights[index];
         visual::PropVisualState fixtureState = visual::PropVisualState::Intact;
-        for (const entities::EntityId id : propIds) {
-            const entities::Entity* entity = entities.find(id);
-            const entities::PropData* prop
-                = entities.findData<entities::PropData>(id);
-            if (entity == nullptr || prop == nullptr || entity->roomId != roomId
-                || prop->type != entities::PropType::CeilingFixture
-                || wkc::core::length(entity->transform.position - source.position)
-                    > 1.0e-4F) {
-                continue;
+        if (fixtureIds != roomFixtureEntities.end()
+            && index < fixtureIds->second.size()) {
+            const entities::PropData* prop = entities.findData<entities::PropData>(
+                fixtureIds->second[index]);
+            if (prop != nullptr
+                && prop->type == entities::PropType::CeilingFixture) {
+                if (prop->state == entities::PropState::Destroyed) {
+                    fixtureState = visual::PropVisualState::Destroyed;
+                } else if (prop->state == entities::PropState::Damaged) {
+                    fixtureState = visual::PropVisualState::Damaged;
+                }
             }
-            if (prop->state == entities::PropState::Destroyed) {
-                fixtureState = visual::PropVisualState::Destroyed;
-            } else if (prop->state == entities::PropState::Damaged) {
-                fixtureState = visual::PropVisualState::Damaged;
-            }
-            break;
         }
         const float outputScale
             = fixtureState == visual::PropVisualState::Destroyed ? 0.0F
@@ -233,6 +230,8 @@ void appendConnectedRoomLights(
     const gdp::world::World& world,
     const std::vector<gdp::world::RoomLightingPlan>& roomLighting,
     const entities::EntityManager& entities,
+    const std::unordered_map<gdp::world::RoomId,
+        std::vector<entities::EntityId>>& roomFixtureEntities,
     const gdp::world::RoomId currentRoomId,
     const wkc::core::Vec3 observerPosition)
 {
@@ -266,7 +265,8 @@ void appendConnectedRoomLights(
         }
         const gdp::world::RoomLightingPlan& plan = roomLighting[roomIndex];
         const visual::RoomLightingRenderData rendered
-            = makeRenderLighting(plan, false, entities, roomId);
+            = makeRenderLighting(
+                plan, false, entities, roomFixtureEntities, roomId);
         for (std::size_t lightIndex = 0; lightIndex < rendered.lightCount; ++lightIndex) {
             const visual::PointLightRenderData& source = rendered.lights[lightIndex];
             const wkc::core::Vec3 offset = source.position - observerPosition;
@@ -620,6 +620,7 @@ bool Application::initializeRun()
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
+    roomFixtureEntities_.clear();
     impactVisualCounter_ = 0U;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
@@ -723,7 +724,7 @@ bool Application::initializeRun()
         for (std::size_t fixtureIndex = 0U;
              fixtureIndex < lighting.lights.size(); ++fixtureIndex) {
             const world::RoomPointLight& fixture = lighting.lights[fixtureIndex];
-            room.entities.push_back(entities_.createProp({
+            const entities::EntityId fixtureEntity = entities_.createProp({
                 .transform = {
                     .position = fixture.position,
                     .scale = {1.20F, 0.18F, 0.28F},
@@ -736,7 +737,9 @@ bool Application::initializeRun()
                 .visualSeed = wkc::core::deriveSeed(
                     lighting.seed, gdp::game::SeedDomain::Lighting,
                     100U + fixtureIndex),
-            }));
+            });
+            room.entities.push_back(fixtureEntity);
+            roomFixtureEntities_[room.id].push_back(fixtureEntity);
         }
         roomLighting_.push_back(std::move(lighting));
     }
@@ -1514,6 +1517,7 @@ bool Application::returnToMainMenu()
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
@@ -2824,7 +2828,8 @@ void Application::render()
                 const bool alert = activeEvent != roomEvents_.end()
                     && gameplay::isRoomLocked(*activeEvent);
                 lighting = makeRenderLighting(
-                    roomLighting_[roomIndex], alert, entities_, currentRoom->id);
+                    roomLighting_[roomIndex], alert, entities_,
+                    roomFixtureEntities_, currentRoom->id);
             }
             if (!gameplay::roomContainingPosition(*world_, player_.state().position)) {
                 for (const world::CorridorPath& corridor : world_->corridors) {
@@ -2858,7 +2863,8 @@ void Application::render()
                     otherWeight = otherWeight * otherWeight * (3.0F - (2.0F * otherWeight));
                     const visual::RoomLightingRenderData otherLighting
                         = makeRenderLighting(
-                            roomLighting_[otherIndex], false, entities_, otherRoomId);
+                            roomLighting_[otherIndex], false, entities_,
+                            roomFixtureEntities_, otherRoomId);
                     lighting.ambientColor = (lighting.ambientColor * (1.0F - otherWeight))
                         + (otherLighting.ambientColor * otherWeight);
                     lighting.ambientIntensity
@@ -2871,17 +2877,13 @@ void Application::render()
                 }
             }
             appendConnectedRoomLights(
-                lighting, *world_, roomLighting_, entities_, playerRoom,
-                player_.state().position);
-            lighting.shadowLightCount = lighting.lightCount;
+                lighting, *world_, roomLighting_, entities_,
+                roomFixtureEntities_, playerRoom, player_.state().position);
+            std::vector<visual::ShadowOccluderRenderData> shadowCandidates;
+            shadowCandidates.reserve(visibleEnemies.size() + visibleProps.size());
             const auto appendShadowOccluder
-                = [&lighting](const wkc::core::Aabb bounds) {
-                      if (lighting.shadowOccluderCount
-                          >= visual::maxShadowOccluders || !bounds.isValid()) {
-                          return;
-                      }
-                      lighting.shadowOccluders[lighting.shadowOccluderCount++]
-                          = {bounds};
+                = [&shadowCandidates](const wkc::core::Aabb bounds) {
+                      shadowCandidates.push_back({bounds});
                   };
             for (const visual::EnemyRenderData& enemy : visibleEnemies) {
                 if (!enemy.active || !enemy.alive) {
@@ -2904,6 +2906,8 @@ void Application::render()
                         half.x, prop.scale.y, half.z},
                 });
             }
+            (void)visual::optimizeShadowBudget(
+                lighting, player_.state().position, shadowCandidates);
             if (session_.state().phase == gameplay::SessionPhase::Victory) {
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
                 lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);
@@ -3183,6 +3187,7 @@ void Application::shutdown()
     entities_.clear();
     roomEvents_.clear();
     roomLighting_.clear();
+    roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();

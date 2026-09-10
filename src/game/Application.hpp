@@ -132,6 +132,8 @@ private:
     std::optional<world::World> world_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
+    std::unordered_map<world::RoomId, std::vector<entities::EntityId>>
+        roomFixtureEntities_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
     std::unordered_map<world::EdgeId, std::uint64_t> doorAudioEventCounters_;

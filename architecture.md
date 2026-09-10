@@ -1173,6 +1173,15 @@ parcelas difusa e especular ocluídas. Não existe shadow map, ownership tempora
 ou consulta reversa a entidades; ambiente mantém legibilidade. A solução é
 visual e não altera regras, persistência, seeds ou APIs da WKC Forge.
 
+Na Fase 115, a preparação do snapshot passa por `optimizeShadowBudget()`: luzes
+ativas são ordenadas por proximidade, AABBs fora do alcance são descartados e o
+renderer impõe novamente os limites 2 × 8. Isso reduz o pior caso analítico de
+128 para 16 interseções por fragmento. A associação entre plano e luminárias
+agora usa `roomFixtureEntities_`, alinhado por índice e limpo junto ao runtime,
+eliminando queries e varreduras repetidas de props a cada sala visível. A
+otimização permanece concreta do GDP e não altera imagem pretendida, gameplay,
+persistência ou WKC Forge.
+
 ---
 
 # 8. Sistema de seed

@@ -167,6 +167,9 @@ void main()
         if (index >= uLightCount) {
             break;
         }
+        if (uLightIntensities[index] <= 0.0001) {
+            continue;
+        }
         vec3 toLight = uLightPositions[index] - vWorldPosition;
         float distanceToLight = length(toLight);
         vec3 lightDirection = normalize(toLight);
@@ -175,8 +178,10 @@ void main()
         float attenuation = 1.0 / (1.0 + 2.2 * normalizedDistance * normalizedDistance);
         vec3 radiance = uLightColors[index] * attenuation
             * uLightIntensities[index] * 1.9;
-        float visibility = directLightVisibility(
-            vWorldPosition, normal, uLightPositions[index], index);
+        float visibility = diffuse > 0.0
+            ? directLightVisibility(
+                vWorldPosition, normal, uLightPositions[index], index)
+            : 1.0;
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
         if (uDetailedMaterial != 0 && diffuse > 0.0) {
             vec3 halfway = normalize(lightDirection + viewDirection);
@@ -931,11 +936,14 @@ bool GdpRenderer::render(
     shader_.setFloat(gl_, "uAmbientIntensity",
         lighting.alert ? std::max(lighting.ambientIntensity, 0.16F)
                        : lighting.ambientIntensity);
-    const std::uint32_t shadowLightCount = std::min(
-        lighting.shadowLightCount, lightCount);
-    const std::uint32_t shadowOccluderCount = std::min<std::uint32_t>(
+    const std::uint32_t shadowLightCount = std::min({
+        lighting.shadowLightCount,
+        lightCount,
+        static_cast<std::uint32_t>(maxShadowCastingLights)});
+    const std::uint32_t shadowOccluderCount = std::min({
         lighting.shadowOccluderCount,
-        static_cast<std::uint32_t>(maxShadowOccluders));
+        static_cast<std::uint32_t>(maxActiveShadowOccluders),
+        static_cast<std::uint32_t>(maxShadowOccluders)});
     shader_.setInt(gl_, "uShadowLightCount",
         static_cast<int>(shadowLightCount));
     shader_.setInt(gl_, "uShadowOccluderCount",

@@ -430,6 +430,9 @@ especializados das pastas numeradas.
 - **Fase 114 — Sombras dinâmicas:** luzes ativas testam visibilidade contra os
   volumes de inimigos e props opacos. A oclusão reduz somente a contribuição
   direta, preserva o ambiente mínimo e acompanha destruição e movimento.
+- **Fase 115 — Orçamento e limpeza de iluminação:** o renderer limita sombras
+  às duas luzes ativas mais próximas e aos oito oclusores relevantes mais
+  próximos. Fixtures usam índice direto por sala, sem varrer todos os props.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1076,6 +1079,16 @@ emissão permanecem independentes. As sombras são analíticas, determinísticas
 acompanham movimento sem framebuffer ou RNG adicional. Uma luminária apagada já
 tem intensidade zero, portanto deixa de produzir luz e sombra no mesmo frame.
 Gameplay, Campaign/Speedrun e WKC Forge permanecem inalterados.
+
+Na Fase 115, `optimizeShadowBudget()` ordena luzes ativas pela distância ao
+observador, descarta oclusores inválidos ou fora do alcance e conserva no máximo
+duas luzes e oito AABBs relevantes. O teto teórico cai de 128 para 16 testes de
+segmento por fragmento iluminado; o renderer repete esses clamps como barreira
+de segurança e pula luzes apagadas ou superfícies sem difusa. A reconciliação
+de luminárias deixou de alocar/varrer todos os props: `roomFixtureEntities_`
+mantém IDs alinhados ao plano de cada sala. Testes protegem seleção, repetição,
+fallback escuro e equivalência de pixels sob entrada acima do budget. Não houve
+mudança visual intencional, de gameplay, regras ou WKC Forge.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

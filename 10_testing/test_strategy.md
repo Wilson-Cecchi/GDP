@@ -422,6 +422,13 @@ do framebuffer precisam mudar, sem alterar geometria, luzes ou câmera e sem err
 OpenGL. CPU/bootstrap continuam protegendo limites, defaults sem sombra e a
 integração da aplicação.
 
+O gate da Fase 115 fornece oito luzes, uma apagada, nove AABBs próximos, um fora
+do alcance e um inválido. A seleção deve conservar sete luzes ativas, habilitar
+sombras somente nas duas mais próximas, enviar oito volumes e repetir bytes
+exatos. Um plano inteiramente apagado precisa produzir budget zero. OpenGL
+solicita deliberadamente oito luzes de sombra e exige pixels idênticos ao pedido
+já limitado em duas, provando o clamp defensivo do renderer.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

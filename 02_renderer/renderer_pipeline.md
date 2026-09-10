@@ -52,6 +52,8 @@
 > do HUD, consumindo somente snapshots visuais de animação.
 > A Fase 114 integrou oclusão analítica de luz direta por AABBs dinâmicos, sem
 > adicionar regra de gameplay ao renderer.
+> A Fase 115 aplicou seleção espacial e limites rígidos de duas luzes e oito
+> oclusores ao passe de sombras.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -174,6 +176,9 @@ Desde a Fase 114, o snapshot também inclui uma lista limitada de AABBs visuais.
 O fragment shader testa esses volumes no segmento até as luzes marcadas para
 sombra e atenua apenas luz direta bloqueada. Inimigos e props continuam sendo
 desenhados pelo fluxo normal; os AABBs não criam geometria nem alteram colisão.
+Na Fase 115, `optimizeShadowBudget()` prioriza luzes e volumes próximos, filtra
+alcance e garante ordem determinística. O shader nunca avalia acima de 2 × 8
+segmentos e evita a consulta quando intensidade ou difusa são zero.
 
 `RoomRenderData` aplica origem, quarter-turn e uma chave de material à shell da
 sala ocupada e das salas diretamente adjacentes. Todos os perfis do mundo são
