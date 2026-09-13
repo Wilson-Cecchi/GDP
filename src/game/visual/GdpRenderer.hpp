@@ -7,6 +7,7 @@
 #include "render/Camera.hpp"
 #include "render/Framebuffer.hpp"
 #include "render/GlApi.hpp"
+#include "render/GpuTimer.hpp"
 #include "render/Mesh.hpp"
 #include "render/Shader.hpp"
 #include "render/Texture.hpp"
@@ -25,6 +26,8 @@ struct RendererFrameStats {
     std::uint64_t triangles{0U};
     std::size_t meshCacheEntries{0U};
     std::size_t textureCacheEntries{0U};
+    double gpuMilliseconds{0.0};
+    bool gpuTimingAvailable{false};
 
     constexpr bool operator==(const RendererFrameStats&) const noexcept
         = default;
@@ -123,6 +126,7 @@ private:
     };
 
     wkc::render::GlApi gl_{};
+    wkc::render::GpuTimer gpuTimer_{};
     wkc::render::Camera camera_{};
     wkc::render::Framebuffer framebuffer_{};
     wkc::render::Shader shader_{};

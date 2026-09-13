@@ -133,6 +133,16 @@ void testCameraAndMatrices()
         "projection uses OpenGL perspective convention");
 }
 
+void testGpuTimerFallback()
+{
+    wkc::render::GpuTimer timer;
+    expect(!timer.isSupported() && !timer.beginFrame()
+            && !timer.latestMilliseconds(),
+        "GPU timer remains an optional no-op before OpenGL initialization");
+    timer.endFrame();
+    timer.reset();
+}
+
 void testConservativeVisibilityCulling()
 {
     using namespace gdp::game::visual;
@@ -1130,6 +1140,7 @@ int main()
     testMesh();
     testTextureData();
     testCameraAndMatrices();
+    testGpuTimerFallback();
     testConservativeVisibilityCulling();
     testMainMenuLayout();
     testPauseMenuLayout();

@@ -551,7 +551,12 @@ int Application::run()
                 << performance.percentile95FrameMilliseconds << " ms, update "
                 << performance.averageUpdateMilliseconds << " ms, render "
                 << performance.averageRenderMilliseconds << " ms, present "
-                << performance.averagePresentMilliseconds << " ms, load "
+                << performance.averagePresentMilliseconds << " ms";
+            if (performance.gpuSampleCount > 0U) {
+                performanceSummary << ", GPU "
+                    << performance.averageGpuMilliseconds << " ms";
+            }
+            performanceSummary << ", load "
                 << performance.worldGenerationMilliseconds << "/"
                 << performance.assetPreparationMilliseconds << " ms";
             log(LogLevel::Info, performanceSummary.str());
@@ -2671,6 +2676,10 @@ void Application::render()
             = renderer_->lastFrameStats();
         currentFramePerformance_.drawCalls = rendererStats.drawCalls;
         currentFramePerformance_.triangles = rendererStats.triangles;
+        currentFramePerformance_.gpuMilliseconds
+            = rendererStats.gpuMilliseconds;
+        currentFramePerformance_.gpuTimingAvailable
+            = rendererStats.gpuTimingAvailable;
         currentFramePerformance_.meshCacheEntries = static_cast<std::uint32_t>(
             std::min<std::size_t>(rendererStats.meshCacheEntries,
                 std::numeric_limits<std::uint32_t>::max()));
@@ -3207,6 +3216,9 @@ void Application::render()
         performance.averageRenderMilliseconds);
     hud.averagePresentMilliseconds = roundedPerformanceMetric(
         performance.averagePresentMilliseconds);
+    hud.averageGpuMilliseconds = roundedPerformanceMetric(
+        performance.averageGpuMilliseconds);
+    hud.gpuTimingAvailable = performance.gpuSampleCount > 0U;
     hud.framesOverBudgetPercent = roundedPerformanceMetric(
         performance.framesOverBudgetPercent);
     hud.worldGenerationMilliseconds = roundedPerformanceMetric(

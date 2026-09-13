@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <vector>
@@ -515,6 +516,8 @@ int main()
             performanceHud.averageUpdateMilliseconds = 2U;
             performanceHud.averageRenderMilliseconds = 7U;
             performanceHud.averagePresentMilliseconds = 8U;
+            performanceHud.averageGpuMilliseconds = 6U;
+            performanceHud.gpuTimingAvailable = true;
             performanceHud.framesOverBudgetPercent = 15U;
             performanceHud.worldGenerationMilliseconds = 12U;
             performanceHud.assetPreparationMilliseconds = 84U;
@@ -532,6 +535,10 @@ int main()
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
             const gdp::game::visual::RendererFrameStats performanceFrameStats
                 = renderer.lastFrameStats();
+            const bool measuredGpuFrame
+                = performanceFrameStats.gpuTimingAvailable
+                && std::isfinite(performanceFrameStats.gpuMilliseconds)
+                && performanceFrameStats.gpuMilliseconds >= 0.0;
             std::vector<std::uint8_t> performanceOverlayPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 performanceOverlayPixels.data());
@@ -1118,6 +1125,7 @@ int main()
                     >= performanceFrameStats.drawCalls
                 && performanceFrameStats.meshCacheEntries > 0U
                 && performanceFrameStats.textureCacheEntries > 0U
+                && measuredGpuFrame
                 && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedCampaignTimer && campaignTimerChangedChannels > 50U
                 && renderedSpeedrunRecord

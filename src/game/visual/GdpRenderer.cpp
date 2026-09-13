@@ -341,6 +341,29 @@ wkc::core::Mat4 basisMatrix(
     return result;
 }
 
+class ScopedGpuTimer {
+public:
+    explicit ScopedGpuTimer(wkc::render::GpuTimer& timer) noexcept
+        : timer_(timer)
+        , active_(timer_.beginFrame())
+    {
+    }
+
+    ~ScopedGpuTimer()
+    {
+        if (active_) {
+            timer_.endFrame();
+        }
+    }
+
+    ScopedGpuTimer(const ScopedGpuTimer&) = delete;
+    ScopedGpuTimer& operator=(const ScopedGpuTimer&) = delete;
+
+private:
+    wkc::render::GpuTimer& timer_;
+    bool active_{false};
+};
+
 } // namespace
 
 bool GdpRenderer::initialize(const int width, const int height)
@@ -371,6 +394,10 @@ bool GdpRenderer::initialize(const int width, const int height)
     }
     if (!framebuffer_.resize(gl_, width, height)) {
         return false;
+    }
+    if (!gpuTimer_.initialize(gl_)) {
+        wkc::core::log(wkc::core::LogLevel::Warning,
+            "OpenGL GPU timer queries unavailable; diagnostics will use CPU timings");
     }
 
     camera_.setPerspective(68.0F, 0.05F, 100.0F);
@@ -924,6 +951,12 @@ bool GdpRenderer::render(
     lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
     if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
         return false;
+    }
+    const ScopedGpuTimer gpuFrameTimer{gpuTimer_};
+    if (const std::optional<double> gpuMilliseconds
+        = gpuTimer_.latestMilliseconds()) {
+        lastFrameStats_.gpuMilliseconds = *gpuMilliseconds;
+        lastFrameStats_.gpuTimingAvailable = true;
     }
 
     framebuffer_.bind(gl_);
@@ -2358,7 +2391,10 @@ bool GdpRenderer::render(
             qualityName = "ULTRA";
             break;
         }
-        const std::array<std::string, 8> lines{
+        const std::string gpuTime = hud.gpuTimingAvailable
+            ? std::to_string(hud.averageGpuMilliseconds) + "MS"
+            : "--";
+        const std::array<std::string, 9> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2368,10 +2404,11 @@ bool GdpRenderer::render(
             "WORST " + std::to_string(hud.worstFrameMilliseconds)
                 + "MS SLOW " + std::to_string(hud.framesOverBudgetPercent)
                 + "%",
-            "UPDATE " + std::to_string(hud.averageUpdateMilliseconds)
+            "CPU UPDATE " + std::to_string(hud.averageUpdateMilliseconds)
                 + "MS RENDER " + std::to_string(hud.averageRenderMilliseconds)
-                + "MS WAIT " + std::to_string(hud.averagePresentMilliseconds)
                 + "MS",
+            "GPU " + gpuTime + " WAIT "
+                + std::to_string(hud.averagePresentMilliseconds) + "MS",
             "DRAW " + std::to_string(hud.performanceDrawCalls)
                 + " TRI " + std::to_string(hud.performanceTriangles),
             "VISIBLE E " + std::to_string(hud.performanceVisibleEnemies)

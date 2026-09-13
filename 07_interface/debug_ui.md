@@ -1,13 +1,14 @@
 # Interface — Debug UI
 
-> **Estado:** especificação técnica inicial do novo GDP.
+> **Estado:** painel funcional de desempenho implementado nas Fases 117–120;
+> overlays espaciais detalhados permanecem planejados.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
 ## Painéis
 
 Seed tree; room ID/role/theme; connectors; spawn zones; EnemyVisualGenome; part IDs;
-material IDs; asset hash; FPS; draw calls; cache.
+material IDs; asset hash; FPS; tempos de CPU/GPU/present; draw calls; cache.
 
 ## Overlays
 

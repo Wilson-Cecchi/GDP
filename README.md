@@ -449,6 +449,10 @@ especializados das pastas numeradas.
   entidades totalmente fora do campo visual deixam de entrar na fila de draw.
   A sala atual nunca é removida, bounds inválidos falham abertos e uma margem
   angular protege portas e continuidade durante giros rápidos.
+- **Fase 120 — Tempo real de GPU:** quatro timer queries OpenGL medem o trabalho
+  gráfico sem bloquear o frame. `F3` separa `CPU RENDER`, `GPU` e `WAIT`, usa
+  fallback seguro quando o driver não oferece a extensão e ignora o aquecimento
+  inicial ao calcular a média.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1146,6 +1150,15 @@ são removidos e dados inválidos mantêm o draw como fallback seguro. Luzes nã
 são descartadas por direção, pois ainda podem iluminar superfícies visíveis.
 Essa etapa reduz submissão fora da tela sem alterar geração, colisão, IA ou RNG.
 
+Na Fase 120, `wkc::render::GpuTimer` mantém quatro consultas `GL_TIME_ELAPSED`
+em rotação. O renderer nunca espera um resultado: se a consulta que seria
+reutilizada ainda estiver ocupada, aquele frame não recebe nova amostra. Valores
+prontos chegam ao `PerformanceMonitor` com disponibilidade explícita, de modo
+que frames de aquecimento e drivers sem suporte não entram como zero na média.
+O painel `F3` passa a exibir `CPU RENDER`, `GPU` e `WAIT` separadamente. Assim,
+o próximo perfil de otimização pode distinguir custo real da placa, submissão
+da CPU e sincronização da apresentação sem alterar pixels ou simulação.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -1171,9 +1184,9 @@ Na Fase 19, `PauseMenuState` mantém seleção segura em `RESUME`, navegação c
 wrap e comandos separados para retomar, reconstruir a run ou sair. Enquanto
 pausado, look, input pendente, IA, portas, arma, eventos, áudio atualizado pelo
 game loop e timers de HUD não avançam. Somente o bus UI continua para responder
-à navegação, sem avançar efeitos ou ambiência. O mouse relativo é liberado na abertura
-e restaurado no retorno; o renderer oculta mira e feedback transitório sob o
-overlay central.
+à navegação, sem avançar efeitos ou ambiência. O mouse relativo é liberado na
+abertura e restaurado no retorno; o renderer oculta mira e feedback transitório
+sob o overlay central.
 
 Na estabilização posterior à Fase 19, `CorridorPath` passou a permitir contato
 com a sala de origem apenas no primeiro stub e com a sala destino apenas no

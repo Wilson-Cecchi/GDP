@@ -21,6 +21,13 @@ FramePerformanceSample sanitizeSample(FramePerformanceSample sample) noexcept
     sample.updateMilliseconds = sanitizeMilliseconds(sample.updateMilliseconds);
     sample.renderMilliseconds = sanitizeMilliseconds(sample.renderMilliseconds);
     sample.presentMilliseconds = sanitizeMilliseconds(sample.presentMilliseconds);
+    if (!std::isfinite(sample.gpuMilliseconds)
+        || sample.gpuMilliseconds < 0.0) {
+        sample.gpuMilliseconds = 0.0;
+        sample.gpuTimingAvailable = false;
+    } else {
+        sample.gpuMilliseconds = sanitizeMilliseconds(sample.gpuMilliseconds);
+    }
     return sample;
 }
 
@@ -77,6 +84,10 @@ PerformanceSnapshot PerformanceMonitor::snapshot() const noexcept
         result.averageUpdateMilliseconds += sample.updateMilliseconds;
         result.averageRenderMilliseconds += sample.renderMilliseconds;
         result.averagePresentMilliseconds += sample.presentMilliseconds;
+        if (sample.gpuTimingAvailable) {
+            result.averageGpuMilliseconds += sample.gpuMilliseconds;
+            ++result.gpuSampleCount;
+        }
         result.worstFrameMilliseconds = std::max(
             result.worstFrameMilliseconds, sample.frameMilliseconds);
         if (sample.frameMilliseconds > sixtyFpsFrameBudgetMilliseconds) {
@@ -89,6 +100,10 @@ PerformanceSnapshot PerformanceMonitor::snapshot() const noexcept
     result.averageUpdateMilliseconds /= divisor;
     result.averageRenderMilliseconds /= divisor;
     result.averagePresentMilliseconds /= divisor;
+    if (result.gpuSampleCount > 0U) {
+        result.averageGpuMilliseconds
+            /= static_cast<double>(result.gpuSampleCount);
+    }
     result.estimatedFramesPerSecond = result.averageFrameMilliseconds > 0.0
         ? 1000.0 / result.averageFrameMilliseconds : 0.0;
     result.framesOverBudgetPercent

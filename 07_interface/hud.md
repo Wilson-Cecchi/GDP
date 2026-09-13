@@ -10,7 +10,8 @@
 > viewmodel metálico da arma sem ocupar a camada de hit tests da interface.
 > A Fase 117 acrescenta um overlay técnico opcional de desempenho, alternado
 > por `F3`, sem interferir no HUD normal ou na simulação. Na Fase 118, o painel
-> também identifica o perfil gráfico e a escala interna ativos.
+> também identifica o perfil gráfico e a escala interna ativos. Na Fase 120,
+> ele separa submissão da CPU, execução da GPU e espera de apresentação.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -73,10 +74,11 @@ não calcula dificuldade nem altera a simulação.
 
 `F3` alterna um painel no canto superior esquerdo com FPS estimado, média, P95,
 pior frame, percentual fora do budget de 60 Hz, update, render, espera de
-apresentação, draw calls, triângulos, entidades visíveis, luzes, sombras, caches
-e tempos de carga. Verde indica P95 de até 17 ms; laranja, até 34 ms; vermelho,
-acima disso. O overlay recebe valores agregados prontos e não mede, consulta ou
-altera o gameplay.
+apresentação, tempo real da GPU, draw calls, triângulos, entidades visíveis,
+luzes, sombras, caches e tempos de carga. Verde indica P95 de até 17 ms;
+laranja, até 34 ms; vermelho, acima disso. `GPU --` indica driver sem suporte ou
+os quatro frames iniciais de aquecimento. O overlay recebe valores agregados
+prontos e não mede, consulta ou altera o gameplay.
 
 ## Feedback temporário
 

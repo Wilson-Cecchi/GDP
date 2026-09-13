@@ -33,6 +33,8 @@ void testRollingStatistics()
             .updateMilliseconds = 1.0,
             .renderMilliseconds = 2.0,
             .presentMilliseconds = 3.0,
+            .gpuMilliseconds = 4.0,
+            .gpuTimingAvailable = true,
             .fixedUpdates = 1U,
             .drawCalls = 70U + index,
             .triangles = 900U + index,
@@ -49,7 +51,9 @@ void testRollingStatistics()
         "rolling window reports average, P95 and worst frame time");
     expect(near(snapshot.averageUpdateMilliseconds, 1.0)
             && near(snapshot.averageRenderMilliseconds, 2.0)
-            && near(snapshot.averagePresentMilliseconds, 3.0),
+            && near(snapshot.averagePresentMilliseconds, 3.0)
+            && near(snapshot.averageGpuMilliseconds, 4.0)
+            && snapshot.gpuSampleCount == 20U,
         "frame stages are averaged independently");
     expect(near(snapshot.estimatedFramesPerSecond, 1000.0 / 10.5)
             && near(snapshot.framesOverBudgetPercent, 20.0),
@@ -79,12 +83,29 @@ void testCapacityResetAndSanitization()
         .frameMilliseconds = std::numeric_limits<double>::quiet_NaN(),
         .updateMilliseconds = -5.0,
         .renderMilliseconds = std::numeric_limits<double>::infinity(),
+        .gpuMilliseconds = std::numeric_limits<double>::infinity(),
+        .gpuTimingAvailable = true,
     });
     const gdp::game::PerformanceSnapshot sanitized = monitor.snapshot();
     expect(sanitized.latest.frameMilliseconds == 0.0
             && sanitized.latest.updateMilliseconds == 0.0
-            && sanitized.latest.renderMilliseconds == 0.0,
+            && sanitized.latest.renderMilliseconds == 0.0
+            && sanitized.latest.gpuMilliseconds == 0.0
+            && !sanitized.latest.gpuTimingAvailable,
         "invalid or negative timings cannot poison diagnostics");
+
+    gdp::game::PerformanceMonitor delayedGpuMonitor;
+    delayedGpuMonitor.record({.frameMilliseconds = 10.0});
+    delayedGpuMonitor.record({
+        .frameMilliseconds = 10.0,
+        .gpuMilliseconds = 8.0,
+        .gpuTimingAvailable = true,
+    });
+    const gdp::game::PerformanceSnapshot delayedGpu
+        = delayedGpuMonitor.snapshot();
+    expect(delayedGpu.gpuSampleCount == 1U
+            && near(delayedGpu.averageGpuMilliseconds, 8.0),
+        "asynchronous GPU warm-up frames do not dilute the average");
 
     monitor.reset();
     const gdp::game::PerformanceSnapshot reset = monitor.snapshot();

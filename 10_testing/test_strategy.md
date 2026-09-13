@@ -456,6 +456,12 @@ rejeitados. As 48 suítes existentes continuam protegendo geração, gameplay,
 pixels OpenGL e os cinco perfis. O gate manual verifica portas durante giro e a
 queda dos contadores de draw ao olhar para fora do conteúdo visível.
 
+O gate da Fase 120 valida sanitização e média exclusiva de amostras GPU
+disponíveis no monitor. A regressão OpenGL executa frames suficientes para
+percorrer o anel de quatro queries, sincroniza somente pela leitura de pixels já
+existente e exige tempo finito e não negativo. Debug, Release, ASan/UBSan e o
+pacote Windows continuam cobrindo fallback, lifecycle e portabilidade.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

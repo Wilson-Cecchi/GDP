@@ -1,8 +1,9 @@
 # Testing — Performance budgets
 
 > **Estado:** instrumentação inicial implementada na Fase 117 e primeira
-> calibração por hardware aplicada na Fase 118. A Fase 115 introduziu o primeiro
-> budget rígido do passe de sombras.
+> calibração por hardware aplicada na Fase 118, culling conservador na Fase 119
+> e tempo real da GPU na Fase 120. A Fase 115 introduziu o primeiro budget
+> rígido do passe de sombras.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -15,11 +16,12 @@ pendente de instrumentação caso o update seja identificado como gargalo.
 
 ## Métricas GPU
 
-Submissão do renderer e espera de apresentação são medidas separadamente, sem
-forçar sincronização da GPU. Draw calls e triângulos vêm do caminho real de
-draw; contagem de entradas nos caches de mesh/textura complementa o diagnóstico.
-Tempo GPU por query e memória aproximada de texturas/buffers permanecem pendentes
-até uma medição exigir esse detalhamento.
+Submissão do renderer, execução da GPU e espera de apresentação são medidas
+separadamente. Quatro timer queries assíncronas evitam forçar sincronização; a
+média ignora aquecimento, slots ainda ocupados e drivers sem suporte. Draw calls
+e triângulos vêm do caminho real de draw; contagem de entradas nos caches de
+mesh/textura complementa o diagnóstico. Memória aproximada de texturas/buffers
+permanece pendente até uma medição exigir esse detalhamento.
 
 Sombras analíticas usam no máximo duas luzes e oito AABBs por frame. O custo
 combinatório máximo é 16 interseções de segmento por fragmento com contribuição
@@ -87,3 +89,11 @@ No playtest, girar lentamente diante de uma porta aberta não pode revelar
 buracos, entidades sem shell ou aparecimento tardio dentro do campo visual. Com
 `F3`, os contadores de entidades e draws devem cair ao olhar para uma parede e
 subir novamente ao retornar para a sala, sem mudança nos ticks de gameplay.
+
+## Timer da Fase 120
+
+`CPU RENDER` mede a chamada do renderer no processador; `GPU` mede comandos
+executados pela placa; `WAIT` mede `SDL_GL_SwapWindow`. Como a leitura da GPU é
+assíncrona, sua média representa resultados de frames anteriores e não precisa
+somar exatamente ao frame atual. Se `GPU --` persistir depois de alguns frames,
+o driver não publicou timer queries e as métricas de CPU continuam válidas.

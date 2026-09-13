@@ -14,6 +14,8 @@ struct FramePerformanceSample {
     double updateMilliseconds{0.0};
     double renderMilliseconds{0.0};
     double presentMilliseconds{0.0};
+    double gpuMilliseconds{0.0};
+    bool gpuTimingAvailable{false};
     std::uint32_t fixedUpdates{0U};
     std::uint64_t drawCalls{0U};
     std::uint64_t triangles{0U};
@@ -39,6 +41,8 @@ struct PerformanceSnapshot {
     double averageUpdateMilliseconds{0.0};
     double averageRenderMilliseconds{0.0};
     double averagePresentMilliseconds{0.0};
+    double averageGpuMilliseconds{0.0};
+    std::size_t gpuSampleCount{0U};
     double estimatedFramesPerSecond{0.0};
     double framesOverBudgetPercent{0.0};
     double worldGenerationMilliseconds{0.0};

@@ -5,7 +5,7 @@
 > e 10; iluminação procedural integrada na Fase 12; transform da sala ativa e
 > portas, shells adjacentes e corredores conectados integrados na Fase 13;
 > materiais/decor multissala e overlay bitmap integrados na Fase 14. Filas completas,
-> culling, transparência, HUD final e pós-processamento
+> transparência, HUD final e pós-processamento
 > permanecem planejados.
 > A Fase 30 separou os targets de fundação gráfica, assets procedurais, conteúdo
 > visual GDP e renderer concreto sem alterar a imagem produzida.
@@ -56,6 +56,8 @@
 > oclusores ao passe de sombras.
 > A Fase 119 implementou culling conservador por câmera na coleta visual do GDP,
 > preservando a sala atual e a continuidade imediata das conexões.
+> A Fase 120 adicionou timer queries assíncronas à fundação WKC e expôs o tempo
+> real da GPU no diagnóstico concreto do GDP.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -110,7 +112,7 @@ room transforms + corridor paths + per-room material keys + lighting plan
 
 O resize recria os anexos quando necessário. O depth test usa `GL_LESS`, erros
 OpenGL encerram o frame com log e recursos GPU são destruídos antes do contexto.
-Camera, Framebuffer, GlApi, Mesh, Shader e Texture são compilados em
+Camera, Framebuffer, GlApi, GpuTimer, Mesh, Shader e Texture são compilados em
 `wkc_forge_render`. Receitas e geradores reutilizáveis ficam em
 `wkc_forge_procedural`, enquanto `wkc_forge_resources` publica o `AssetCache`;
 definições Worker, materiais de sala e assets concretos do GDP ficam em
@@ -229,6 +231,15 @@ câmera ou dados inválidos. A profundidade do grafo vem do perfil gráfico e é
 mesma para shells e entidades, evitando conteúdo sem a sala correspondente.
 Luzes continuam selecionadas por distância, não por direção, para preservar sua
 contribuição em superfícies visíveis. Occlusion culling permanece opcional.
+
+## Tempo de GPU
+
+`wkc::render::GpuTimer` usa um anel de quatro queries `GL_TIME_ELAPSED`. O início
+de um frame consulta apenas um slot já concluído e nunca solicita
+`GL_QUERY_RESULT` antes de `GL_QUERY_RESULT_AVAILABLE`; se a GPU estiver mais de
+quatro frames atrasada, a amostragem pula o frame em vez de bloquear. Falta de
+suporte deixa a métrica indisponível sem impedir o renderer. A Application
+agrega somente amostras válidas e o GDP mostra a média atrasada no painel `F3`.
 
 ## Viewmodel
 

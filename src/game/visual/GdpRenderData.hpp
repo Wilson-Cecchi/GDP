@@ -512,6 +512,8 @@ struct HudRenderData {
     std::uint32_t averageUpdateMilliseconds{0U};
     std::uint32_t averageRenderMilliseconds{0U};
     std::uint32_t averagePresentMilliseconds{0U};
+    std::uint32_t averageGpuMilliseconds{0U};
+    bool gpuTimingAvailable{false};
     std::uint32_t framesOverBudgetPercent{0U};
     std::uint32_t worldGenerationMilliseconds{0U};
     std::uint32_t assetPreparationMilliseconds{0U};

@@ -20,6 +20,12 @@ bool loadFunction(Function& destination, const char* const name) noexcept
     return true;
 }
 
+template<typename Function>
+void loadOptionalFunction(Function& destination, const char* const name) noexcept
+{
+    destination = reinterpret_cast<Function>(SDL_GL_GetProcAddress(name));
+}
+
 } // namespace
 
 bool loadGlApi(GlApi& api) noexcept
@@ -56,6 +62,12 @@ bool loadGlApi(GlApi& api) noexcept
     GDP_LOAD_GL(uniform1i, "glUniform1i");
     GDP_LOAD_GL(activeTexture, "glActiveTexture");
     GDP_LOAD_GL(generateMipmap, "glGenerateMipmap");
+    loadOptionalFunction(api.genQueries, "glGenQueries");
+    loadOptionalFunction(api.deleteQueries, "glDeleteQueries");
+    loadOptionalFunction(api.beginQuery, "glBeginQuery");
+    loadOptionalFunction(api.endQuery, "glEndQuery");
+    loadOptionalFunction(api.getQueryObjectuiv, "glGetQueryObjectuiv");
+    loadOptionalFunction(api.getQueryObjectui64v, "glGetQueryObjectui64v");
     GDP_LOAD_GL(genFramebuffers, "glGenFramebuffers");
     GDP_LOAD_GL(bindFramebuffer, "glBindFramebuffer");
     GDP_LOAD_GL(framebufferTexture2D, "glFramebufferTexture2D");

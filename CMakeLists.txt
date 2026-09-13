@@ -188,6 +188,7 @@ add_library(
     src/render/Camera.cpp
     src/render/Framebuffer.cpp
     src/render/GlApi.cpp
+    src/render/GpuTimer.cpp
     src/render/Mesh.cpp
     src/render/Shader.cpp
     src/render/Texture.cpp
