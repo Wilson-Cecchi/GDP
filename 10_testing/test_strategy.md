@@ -449,6 +449,13 @@ framebuffer nativo antes do HUD protege legibilidade e coordenadas de interface.
 O playtest no W541 permanece o gate de calibração de FPS para `POTATO`, `LOW` e
 `MEDIUM`, sem transformar uma máquina rápida de CI em referência de hardware.
 
+O gate da Fase 119 testa câmera à frente, volume atrás, lateral fora da margem,
+volume contendo a câmera e fallback para bounds inválidos. Bounds de corredor
+devem incluir largura, altura e toda a linha central; caminhos vazios são
+rejeitados. As 48 suítes existentes continuam protegendo geração, gameplay,
+pixels OpenGL e os cinco perfis. O gate manual verifica portas durante giro e a
+queda dos contadores de draw ao olhar para fora do conteúdo visível.
+
 O comando `MAIN MENU` é protegido nos estados puros de pausa e resultado. A
 integração mantém `SessionSystem` como dono do encerramento/restart e reinicializa
 o renderer no contexto existente; a validação manual deve confirmar que a janela

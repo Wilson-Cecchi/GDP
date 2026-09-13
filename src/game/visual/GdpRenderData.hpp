@@ -227,6 +227,18 @@ struct CorridorRenderData {
     std::uint64_t materialKey{0};
 };
 
+[[nodiscard]] bool isSpherePotentiallyVisible(
+    const CameraData& camera,
+    wkc::core::Vec3 center,
+    float radius,
+    float aspectRatio) noexcept;
+[[nodiscard]] bool isAabbPotentiallyVisible(
+    const CameraData& camera,
+    const wkc::core::Aabb& bounds,
+    float aspectRatio) noexcept;
+[[nodiscard]] std::optional<wkc::core::Aabb> corridorRenderBounds(
+    const CorridorRenderData& corridor) noexcept;
+
 enum class ObjectiveRenderState : std::uint8_t {
     None,
     ReachBoss,

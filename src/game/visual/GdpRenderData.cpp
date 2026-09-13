@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <numbers>
 #include <sstream>
 #include <vector>
 
@@ -1045,6 +1046,102 @@ std::optional<int> settingsMenuAdjustmentDirectionAt(
         }
     }
     return std::nullopt;
+}
+
+bool isSpherePotentiallyVisible(
+    const CameraData& camera,
+    const wkc::core::Vec3 center,
+    const float radius,
+    const float aspectRatio) noexcept
+{
+    const auto finiteVec3 = [](const wkc::core::Vec3 value) {
+        return std::isfinite(value.x) && std::isfinite(value.y)
+            && std::isfinite(value.z);
+    };
+    if (!finiteVec3(camera.position) || !finiteVec3(camera.forward)
+        || !finiteVec3(center) || !std::isfinite(radius) || radius < 0.0F
+        || !std::isfinite(aspectRatio) || aspectRatio <= 0.0F
+        || !std::isfinite(camera.verticalFieldOfViewDegrees)) {
+        return true;
+    }
+
+    const wkc::core::Vec3 forward = wkc::core::normalized(camera.forward);
+    if (wkc::core::dot(forward, forward) <= 1.0e-6F) {
+        return true;
+    }
+    const wkc::core::Vec3 offset = center - camera.position;
+    const float distance = wkc::core::length(offset);
+    if (distance <= radius + 1.0e-4F) {
+        return true;
+    }
+
+    constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
+    constexpr float safetyMarginDegrees = 14.0F;
+    const float verticalHalfAngle = std::clamp(
+        camera.verticalFieldOfViewDegrees * 0.5F, 1.0F, 89.0F)
+        * degreesToRadians;
+    const float horizontalHalfAngle = std::atan(
+        std::tan(verticalHalfAngle) * aspectRatio);
+    const float viewHalfAngle = std::min(
+        std::max(verticalHalfAngle, horizontalHalfAngle)
+            + (safetyMarginDegrees * degreesToRadians),
+        0.75F * std::numbers::pi_v<float>);
+    const float angularRadius = std::asin(std::clamp(radius / distance, 0.0F, 1.0F));
+    const float directionCosine = std::clamp(
+        wkc::core::dot(offset * (1.0F / distance), forward), -1.0F, 1.0F);
+    const float centerAngle = std::acos(directionCosine);
+    return centerAngle <= viewHalfAngle + angularRadius;
+}
+
+bool isAabbPotentiallyVisible(
+    const CameraData& camera,
+    const wkc::core::Aabb& bounds,
+    const float aspectRatio) noexcept
+{
+    if (!bounds.isValid()) {
+        return true;
+    }
+    const wkc::core::Vec3 center
+        = (bounds.minimum + bounds.maximum) * 0.5F;
+    const float radius = wkc::core::length(
+        (bounds.maximum - bounds.minimum) * 0.5F);
+    return isSpherePotentiallyVisible(camera, center, radius, aspectRatio);
+}
+
+std::optional<wkc::core::Aabb> corridorRenderBounds(
+    const CorridorRenderData& corridor) noexcept
+{
+    if (corridor.points.empty() || !std::isfinite(corridor.width)
+        || !std::isfinite(corridor.height) || corridor.width <= 0.0F
+        || corridor.height <= 0.0F) {
+        return std::nullopt;
+    }
+    const auto finiteVec3 = [](const wkc::core::Vec3 value) {
+        return std::isfinite(value.x) && std::isfinite(value.y)
+            && std::isfinite(value.z);
+    };
+    if (!finiteVec3(corridor.points.front())) {
+        return std::nullopt;
+    }
+    wkc::core::Vec3 minimum = corridor.points.front();
+    wkc::core::Vec3 maximum = corridor.points.front();
+    for (const wkc::core::Vec3 point : corridor.points) {
+        if (!finiteVec3(point)) {
+            return std::nullopt;
+        }
+        minimum.x = std::min(minimum.x, point.x);
+        minimum.y = std::min(minimum.y, point.y);
+        minimum.z = std::min(minimum.z, point.z);
+        maximum.x = std::max(maximum.x, point.x);
+        maximum.y = std::max(maximum.y, point.y);
+        maximum.z = std::max(maximum.z, point.z);
+    }
+    const float halfWidth = corridor.width * 0.5F;
+    return wkc::core::Aabb{
+        {minimum.x - halfWidth, minimum.y, minimum.z - halfWidth},
+        {maximum.x + halfWidth, maximum.y + corridor.height,
+            maximum.z + halfWidth},
+    };
 }
 
 std::string runTimeText(const std::uint64_t elapsedTicks)

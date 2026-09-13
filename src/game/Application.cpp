@@ -2761,14 +2761,42 @@ void Application::render()
         player_.forwardDirection(),
         static_cast<float>(runtimeSettings_.fieldOfViewDegrees),
     };
+    const float cameraAspect = height > 0
+        ? static_cast<float>(width) / static_cast<float>(height)
+        : 1.0F;
+    const auto sphereIsVisible = [&camera, cameraAspect](
+                                     const wkc::core::Vec3 center,
+                                     const float radius) {
+        return visual::isSpherePotentiallyVisible(
+            camera, center, radius, cameraAspect);
+    };
     std::vector<visual::EnemyRenderData> visibleEnemies;
     std::vector<visual::PickupRenderData> visiblePickups;
     std::vector<visual::PropRenderData> visibleProps;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     std::vector<world::RoomId> visibleRoomIds = world_
-        ? roomsWithinGraphDistance(*world_, playerRoom, 2U)
+        ? roomsWithinGraphDistance(
+            *world_, playerRoom, graphicsQuality.visibleRoomDepth)
         : std::vector<world::RoomId>{playerRoom};
+    if (world_) {
+        visibleRoomIds.erase(std::remove_if(
+            visibleRoomIds.begin(), visibleRoomIds.end(),
+            [this, playerRoom, &camera, cameraAspect](const world::RoomId roomId) {
+                if (roomId == playerRoom) {
+                    return false;
+                }
+                const auto room = std::find_if(
+                    world_->rooms.begin(), world_->rooms.end(),
+                    [roomId](const world::RoomInstance& candidate) {
+                        return candidate.id == roomId;
+                    });
+                return room != world_->rooms.end()
+                    && !visual::isAabbPotentiallyVisible(
+                        camera, room->worldBounds, cameraAspect);
+            }),
+            visibleRoomIds.end());
+    }
     const auto isVisibleRoom = [&visibleRoomIds](const world::RoomId roomId) {
         return std::find(visibleRoomIds.begin(), visibleRoomIds.end(), roomId)
             != visibleRoomIds.end();
@@ -2777,6 +2805,9 @@ void Application::render()
         const entities::Entity* entity = entities_.find(id);
         const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
         if (entity != nullptr && enemy != nullptr && isVisibleRoom(entity->roomId)
+            && sphereIsVisible(
+                entity->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F},
+                1.5F)
             && (enemy->archetype == entities::EnemyArchetype::Worker
                 || enemy->archetype == entities::EnemyArchetype::Guard
                 || enemy->archetype == entities::EnemyArchetype::Officer
@@ -2815,7 +2846,10 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Item)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::ItemData* item = entities_.findData<entities::ItemData>(id);
-        if (entity == nullptr || item == nullptr || !isVisibleRoom(entity->roomId)) {
+        if (entity == nullptr || item == nullptr || !isVisibleRoom(entity->roomId)
+            || !sphereIsVisible(
+                entity->transform.position + wkc::core::Vec3{0.0F, 0.35F, 0.0F},
+                0.75F)) {
             continue;
         }
         visual::PickupVisualRole role = visual::PickupVisualRole::Health;
@@ -2836,6 +2870,12 @@ void Application::render()
         const entities::Entity* entity = entities_.find(id);
         const entities::PropData* prop = entities_.findData<entities::PropData>(id);
         if (entity == nullptr || prop == nullptr || !isVisibleRoom(entity->roomId)
+            || !sphereIsVisible(
+                entity->transform.position
+                    + wkc::core::Vec3{
+                        0.0F, entity->transform.scale.y * 0.5F, 0.0F},
+                std::max(0.75F,
+                    wkc::core::length(entity->transform.scale) * 0.65F))
             || (prop->type != entities::PropType::Crate
                 && prop->type != entities::PropType::Canister
                 && prop->type != entities::PropType::Barricade)) {
@@ -3065,21 +3105,30 @@ void Application::render()
                 if (!touchesAnchor) {
                     continue;
                 }
-                visibleEdges.push_back(corridor.edge);
-                visibleCorridors.push_back({
+                const visual::CorridorRenderData renderedCorridor{
                     std::span<const wkc::core::Vec3>{corridor.points},
                     corridor.width,
                     corridor.height,
                     roomMaterialKeys_.contains(corridor.firstRoom)
                         ? roomMaterialKeys_.at(corridor.firstRoom) : 0U,
-                });
+                };
+                const std::optional<wkc::core::Aabb> corridorBounds
+                    = visual::corridorRenderBounds(renderedCorridor);
+                if (corridorBounds
+                    && !visual::isAabbPotentiallyVisible(
+                        camera, *corridorBounds, cameraAspect)) {
+                    continue;
+                }
+                visibleEdges.push_back(corridor.edge);
+                visibleCorridors.push_back(renderedCorridor);
             }
-            const std::vector<world::RoomId> geometryRooms
-                = roomsWithinGraphDistance(*world_, playerRoom, geometryDepth);
+            const std::vector<world::RoomId>& geometryRooms = visibleRoomIds;
             for (const world::RoomInstance& renderedRoom : world_->rooms) {
                 if (renderedRoom.id == playerRoom
                     || std::find(geometryRooms.begin(), geometryRooms.end(), renderedRoom.id)
-                        == geometryRooms.end()) {
+                        == geometryRooms.end()
+                    || !visual::isAabbPotentiallyVisible(
+                        camera, renderedRoom.worldBounds, cameraAspect)) {
                     continue;
                 }
                 connectedRooms.push_back({
@@ -3313,7 +3362,8 @@ void Application::render()
     std::vector<visual::ImpactRenderData> visibleImpacts;
     visibleImpacts.reserve(activeImpacts_.size());
     for (const ActiveImpact& impact : activeImpacts_) {
-        if (impact.roomId == playerRoom) {
+        if (impact.roomId == playerRoom
+            && sphereIsVisible(impact.render.position, 0.25F)) {
             visibleImpacts.push_back(impact.render);
         }
     }

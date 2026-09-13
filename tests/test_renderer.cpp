@@ -6,6 +6,7 @@
 #include "game/visual/GdpRenderer.hpp"
 #include "render/Texture.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -130,6 +131,48 @@ void testCameraAndMatrices()
         "perspective focal terms are positive");
     expect(nearlyEqual(projection.elements[11], -1.0F),
         "projection uses OpenGL perspective convention");
+}
+
+void testConservativeVisibilityCulling()
+{
+    using namespace gdp::game::visual;
+    using namespace wkc::core;
+
+    const CameraData camera{};
+    constexpr float wideAspect = 16.0F / 9.0F;
+    expect(isSpherePotentiallyVisible(
+               camera, {0.0F, 1.0F, -4.0F}, 0.5F, wideAspect),
+        "visibility culling retains geometry in front of the camera");
+    expect(!isSpherePotentiallyVisible(
+               camera, {0.0F, 1.0F, 20.0F}, 0.5F, wideAspect),
+        "visibility culling rejects geometry fully behind the camera");
+    expect(isSpherePotentiallyVisible(
+               camera, camera.position, 1.0F, wideAspect),
+        "visibility culling retains geometry containing the camera");
+    expect(!isSpherePotentiallyVisible(
+               camera, {100.0F, 1.0F, -4.0F}, 0.5F, wideAspect),
+        "visibility culling rejects geometry beyond the horizontal margin");
+
+    const Aabb front{{-1.0F, 0.0F, -5.0F}, {1.0F, 3.0F, -3.0F}};
+    const Aabb behind{{-1.0F, 0.0F, 12.0F}, {1.0F, 3.0F, 14.0F}};
+    expect(isAabbPotentiallyVisible(camera, front, wideAspect),
+        "room bounds in front of the camera remain visible");
+    expect(!isAabbPotentiallyVisible(camera, behind, wideAspect),
+        "room bounds fully behind the camera are culled");
+    expect(isAabbPotentiallyVisible(
+               camera, {{1.0F, 1.0F, 1.0F}, {-1.0F, -1.0F, -1.0F}}, wideAspect),
+        "invalid bounds fail open instead of hiding geometry");
+
+    const std::array<Vec3, 2U> corridorPoints{
+        Vec3{0.0F, 0.0F, 0.0F}, Vec3{2.0F, 0.0F, -3.0F}};
+    const auto corridorBounds = corridorRenderBounds({
+        std::span<const Vec3>{corridorPoints}, 2.0F, 3.0F, 0U});
+    expect(corridorBounds
+            && *corridorBounds
+                == Aabb{{-1.0F, 0.0F, -4.0F}, {3.0F, 3.0F, 1.0F}},
+        "corridor bounds include path width and height");
+    expect(!corridorRenderBounds({{}, 2.0F, 3.0F, 0U}),
+        "empty corridor paths cannot produce misleading bounds");
 }
 
 void testMainMenuLayout()
@@ -1087,6 +1130,7 @@ int main()
     testMesh();
     testTextureData();
     testCameraAndMatrices();
+    testConservativeVisibilityCulling();
     testMainMenuLayout();
     testPauseMenuLayout();
     testResultMenuLayout();

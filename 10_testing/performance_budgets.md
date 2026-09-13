@@ -74,3 +74,16 @@ caminho gráfico e justificou perfis que não alteram lógica ou conteúdo.
 O HUD e os menus não usam a escala interna. O próximo playtest no W541 deve
 comparar `POTATO`, `LOW` e `MEDIUM` na mesma cena com `F3`, preferencialmente
 com VSync desligado, antes de promover qualquer perfil automaticamente.
+
+## Culling da Fase 119
+
+Salas conectadas, corredores, inimigos, pickups, props e impactos fora da câmera
+são removidos antes da fila de draw. O filtro usa bounds conservadores e margem
+angular; a sala atual e entradas inválidas falham abertas. A profundidade do
+perfil é compartilhada entre geometria e entidades. As luzes permanecem fora
+desse filtro direcional para não remover iluminação que alcança a visão.
+
+No playtest, girar lentamente diante de uma porta aberta não pode revelar
+buracos, entidades sem shell ou aparecimento tardio dentro do campo visual. Com
+`F3`, os contadores de entidades e draws devem cair ao olhar para uma parede e
+subir novamente ao retornar para a sala, sem mudança nos ticks de gameplay.

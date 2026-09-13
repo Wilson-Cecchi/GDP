@@ -54,6 +54,8 @@
 > adicionar regra de gameplay ao renderer.
 > A Fase 115 aplicou seleção espacial e limites rígidos de duas luzes e oito
 > oclusores ao passe de sombras.
+> A Fase 119 implementou culling conservador por câmera na coleta visual do GDP,
+> preservando a sala atual e a continuidade imediata das conexões.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -219,7 +221,14 @@ Mundo/entidades opacas usam depth test. Transparência é exceção e fila separ
 
 ## Culling
 
-Primeira versão: frustum culling por AABB. Occlusion culling é opcional futuro.
+A coleta visual usa bounds de esfera conservadores derivados de AABBs para
+descartar somente salas conectadas, corredores e entidades totalmente fora da
+direção útil da câmera. O teste considera FOV vertical e horizontal, acrescenta
+14 graus de margem e nunca descarta a sala ocupada, um volume que contém a
+câmera ou dados inválidos. A profundidade do grafo vem do perfil gráfico e é a
+mesma para shells e entidades, evitando conteúdo sem a sala correspondente.
+Luzes continuam selecionadas por distância, não por direção, para preservar sua
+contribuição em superfícies visíveis. Occlusion culling permanece opcional.
 
 ## Viewmodel
 

@@ -445,6 +445,10 @@ especializados das pastas numeradas.
   escala interna, luzes, sombras e materiais detalhados sem mudar HUD, menus,
   resolução da janela ou regras de gameplay. Configurações antigas migram para
   `ULTRA`, preservando exatamente o renderer anterior.
+- **Fase 119 — Culling conservador por câmera:** salas vizinhas, corredores e
+  entidades totalmente fora do campo visual deixam de entrar na fila de draw.
+  A sala atual nunca é removida, bounds inválidos falham abertos e uma margem
+  angular protege portas e continuidade durante giros rápidos.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1132,6 +1136,15 @@ interna integral e sombra 1×6; `ULTRA`
 preserva o caminho anterior, integral e 2×8. O mundo é ampliado para o
 framebuffer real antes de HUD e menus, que continuam nítidos e com hit tests na
 resolução nativa. O painel `F3` identifica o perfil e a escala ativos.
+
+Na Fase 119, a mesma profundidade de salas do perfil gráfico governa shells,
+inimigos, pickups e props. Antes de formar a fila visual, bounds de salas e
+corredores são convertidos em esferas conservadoras e comparados à direção e ao
+FOV da câmera com uma margem de 14 graus. Objetos individuais passam pelo mesmo
+filtro; a sala ocupada é sempre preservada, volumes que contêm a câmera nunca
+são removidos e dados inválidos mantêm o draw como fallback seguro. Luzes não
+são descartadas por direção, pois ainda podem iluminar superfícies visíveis.
+Essa etapa reduz submissão fora da tela sem alterar geração, colisão, IA ou RNG.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
