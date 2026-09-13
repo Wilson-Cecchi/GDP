@@ -41,6 +41,42 @@ GLuint compileStage(
 
 } // namespace
 
+GLint ShaderUniformLocationCache::resolve(
+    const GlApi& gl,
+    const GLuint program,
+    const char* const name) noexcept
+{
+    ++requests_;
+    const std::string_view key{name};
+    if (const auto found = locations_.find(key); found != locations_.end()) {
+        ++hits_;
+        return found->second;
+    }
+
+    ++driverLookups_;
+    const GLint location = gl.getUniformLocation(program, name);
+    try {
+        locations_.emplace(key, location);
+    } catch (...) {
+        // Allocation failure must not prevent a uniform update. The next request
+        // safely falls back to another driver lookup.
+    }
+    return location;
+}
+
+void ShaderUniformLocationCache::reset() noexcept
+{
+    locations_.clear();
+    requests_ = 0U;
+    hits_ = 0U;
+    driverLookups_ = 0U;
+}
+
+ShaderUniformCacheStats ShaderUniformLocationCache::stats() const noexcept
+{
+    return {requests_, hits_, driverLookups_, locations_.size()};
+}
+
 Shader::~Shader()
 {
     reset();
@@ -50,6 +86,7 @@ Shader::Shader(Shader&& other) noexcept
     : gl_(std::exchange(other.gl_, nullptr))
     , program_(std::exchange(other.program_, 0))
 {
+    other.uniformLocations_.reset();
 }
 
 Shader& Shader::operator=(Shader&& other) noexcept
@@ -58,6 +95,7 @@ Shader& Shader::operator=(Shader&& other) noexcept
         reset();
         gl_ = std::exchange(other.gl_, nullptr);
         program_ = std::exchange(other.program_, 0);
+        other.uniformLocations_.reset();
     }
     return *this;
 }
@@ -114,7 +152,7 @@ void Shader::setMat4(
     const char* const name,
     const wkc::core::Mat4& value) const noexcept
 {
-    const GLint location = gl.getUniformLocation(program_, name);
+    const GLint location = uniformLocations_.resolve(gl, program_, name);
     if (location >= 0) {
         gl.uniformMatrix4fv(location, 1, GL_FALSE, value.data());
     }
@@ -125,7 +163,7 @@ void Shader::setVec3(
     const char* const name,
     const wkc::core::Vec3 value) const noexcept
 {
-    const GLint location = gl.getUniformLocation(program_, name);
+    const GLint location = uniformLocations_.resolve(gl, program_, name);
     if (location >= 0) {
         gl.uniform3f(location, value.x, value.y, value.z);
     }
@@ -136,7 +174,7 @@ void Shader::setVec2(
     const char* const name,
     const wkc::core::Vec2 value) const noexcept
 {
-    const GLint location = gl.getUniformLocation(program_, name);
+    const GLint location = uniformLocations_.resolve(gl, program_, name);
     if (location >= 0) {
         gl.uniform2f(location, value.x, value.y);
     }
@@ -147,7 +185,7 @@ void Shader::setInt(
     const char* const name,
     const int value) const noexcept
 {
-    const GLint location = gl.getUniformLocation(program_, name);
+    const GLint location = uniformLocations_.resolve(gl, program_, name);
     if (location >= 0) {
         gl.uniform1i(location, value);
     }
@@ -158,7 +196,7 @@ void Shader::setFloat(
     const char* const name,
     const float value) const noexcept
 {
-    const GLint location = gl.getUniformLocation(program_, name);
+    const GLint location = uniformLocations_.resolve(gl, program_, name);
     if (location >= 0) {
         gl.uniform1f(location, value);
     }
@@ -171,6 +209,7 @@ void Shader::reset() noexcept
     }
     gl_ = nullptr;
     program_ = 0;
+    uniformLocations_.reset();
 }
 
 bool Shader::isValid() const noexcept

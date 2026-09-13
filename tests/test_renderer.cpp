@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -17,6 +18,17 @@
 namespace {
 
 int failures = 0;
+int uniformDriverLookupCalls = 0;
+
+GLint APIENTRY fakeGetUniformLocation(
+    const GLuint program, const GLchar* const name)
+{
+    ++uniformDriverLookupCalls;
+    if (program == 17U && std::strcmp(name, "uModel") == 0) {
+        return 4;
+    }
+    return -1;
+}
 
 void expect(const bool condition, const std::string_view message)
 {
@@ -141,6 +153,33 @@ void testGpuTimerFallback()
         "GPU timer remains an optional no-op before OpenGL initialization");
     timer.endFrame();
     timer.reset();
+}
+
+void testShaderUniformLocationCache()
+{
+    wkc::render::GlApi gl{};
+    gl.getUniformLocation = fakeGetUniformLocation;
+    wkc::render::ShaderUniformLocationCache cache;
+    uniformDriverLookupCalls = 0;
+
+    expect(cache.resolve(gl, 17U, "uModel") == 4
+            && cache.resolve(gl, 17U, "uModel") == 4,
+        "shader uniform cache preserves valid locations");
+    expect(cache.resolve(gl, 17U, "uUnused") == -1
+            && cache.resolve(gl, 17U, "uUnused") == -1,
+        "shader uniform cache also preserves inactive locations");
+    const wkc::render::ShaderUniformCacheStats warmStats = cache.stats();
+    expect(uniformDriverLookupCalls == 2 && warmStats.requests == 4U
+            && warmStats.hits == 2U && warmStats.driverLookups == 2U
+            && warmStats.entries == 2U,
+        "repeated uniforms reach the OpenGL driver only once per name");
+
+    cache.reset();
+    expect(cache.stats() == wkc::render::ShaderUniformCacheStats{},
+        "shader uniform cache reset clears entries and metrics");
+    expect(cache.resolve(gl, 17U, "uModel") == 4
+            && uniformDriverLookupCalls == 3,
+        "shader uniform cache resolves names again after program reset");
 }
 
 void testConservativeVisibilityCulling()
@@ -1141,6 +1180,7 @@ int main()
     testTextureData();
     testCameraAndMatrices();
     testGpuTimerFallback();
+    testShaderUniformLocationCache();
     testConservativeVisibilityCulling();
     testMainMenuLayout();
     testPauseMenuLayout();

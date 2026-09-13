@@ -453,6 +453,10 @@ especializados das pastas numeradas.
   gráfico sem bloquear o frame. `F3` separa `CPU RENDER`, `GPU` e `WAIT`, usa
   fallback seguro quando o driver não oferece a extensão e ignora o aquecimento
   inicial ao calcular a média.
+- **Fase 121 — Cache de uniforms OpenGL:** `Shader` resolve cada nome de uniform
+  somente uma vez por programa e reutiliza a localização nas submissões
+  seguintes. Localizações inativas também são cacheadas, o cache é invalidado
+  em recompilação/reset e métricas protegem o comportamento sem mudar pixels.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1158,6 +1162,15 @@ que frames de aquecimento e drivers sem suporte não entram como zero na média.
 O painel `F3` passa a exibir `CPU RENDER`, `GPU` e `WAIT` separadamente. Assim,
 o próximo perfil de otimização pode distinguir custo real da placa, submissão
 da CPU e sincronização da apresentação sem alterar pixels ou simulação.
+
+Na Fase 121, `wkc::render::ShaderUniformLocationCache` elimina consultas
+repetidas de `glGetUniformLocation` no caminho de draw. O primeiro uso de cada
+nome consulta o driver; usos seguintes reutilizam a localização, inclusive
+quando ela é `-1`. O cache pertence ao programa, é limpo em reset/recompilação e
+preserva o fallback funcional caso não consiga armazenar uma nova entrada. Uma
+regressão isolada verifica requests, hits, consultas reais e invalidação, e o
+teste OpenGL por pixels protege a aparência já aprovada. Nenhum preset, material,
+luz, textura, regra de gameplay ou stream de RNG foi alterado.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

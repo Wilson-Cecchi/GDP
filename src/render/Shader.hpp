@@ -3,9 +3,47 @@
 #include "core/Math.hpp"
 #include "render/GlApi.hpp"
 
+#include <cstdint>
+#include <functional>
+#include <string>
 #include <string_view>
+#include <unordered_map>
 
 namespace wkc::render {
+
+struct ShaderUniformCacheStats {
+    std::uint64_t requests{0U};
+    std::uint64_t hits{0U};
+    std::uint64_t driverLookups{0U};
+    std::size_t entries{0U};
+
+    constexpr bool operator==(const ShaderUniformCacheStats&) const noexcept
+        = default;
+};
+
+class ShaderUniformLocationCache {
+public:
+    [[nodiscard]] GLint resolve(
+        const GlApi& gl, GLuint program, const char* name) noexcept;
+    void reset() noexcept;
+    [[nodiscard]] ShaderUniformCacheStats stats() const noexcept;
+
+private:
+    struct TransparentStringHash {
+        using is_transparent = void;
+
+        [[nodiscard]] std::size_t operator()(std::string_view value) const noexcept
+        {
+            return std::hash<std::string_view>{}(value);
+        }
+    };
+
+    std::unordered_map<std::string, GLint,
+        TransparentStringHash, std::equal_to<>> locations_{};
+    std::uint64_t requests_{0U};
+    std::uint64_t hits_{0U};
+    std::uint64_t driverLookups_{0U};
+};
 
 class Shader {
 public:
@@ -30,10 +68,15 @@ public:
     void reset() noexcept;
 
     [[nodiscard]] bool isValid() const noexcept;
+    [[nodiscard]] ShaderUniformCacheStats uniformCacheStats() const noexcept
+    {
+        return uniformLocations_.stats();
+    }
 
 private:
     const GlApi* gl_{nullptr};
     GLuint program_{0};
+    mutable ShaderUniformLocationCache uniformLocations_{};
 };
 
 } // namespace wkc::render
