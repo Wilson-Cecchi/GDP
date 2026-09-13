@@ -457,6 +457,10 @@ especializados das pastas numeradas.
   somente uma vez por programa e reutiliza a localização nas submissões
   seguintes. Localizações inativas também são cacheadas, o cache é invalidado
   em recompilação/reset e métricas protegem o comportamento sem mudar pixels.
+- **Fase 122 — Deduplicação de uniforms:** valores idênticos consecutivos deixam
+  de gerar chamadas `glUniform`. O cache tipado cobre matrizes, vetores, floats e
+  inteiros, sobrevive entre frames, invalida com o programa e expõe no `F3` as
+  submissões realizadas e evitadas sem alterar a qualidade visual.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1171,6 +1175,16 @@ preserva o fallback funcional caso não consiga armazenar uma nova entrada. Uma
 regressão isolada verifica requests, hits, consultas reais e invalidação, e o
 teste OpenGL por pixels protege a aparência já aprovada. Nenhum preset, material,
 luz, textura, regra de gameplay ou stream de RNG foi alterado.
+
+Na Fase 122, `wkc::render::ShaderUniformValueCache` compara o último valor
+enviado a cada localização antes de atravessar a API OpenGL. Matrizes, vetores,
+floats e inteiros mantêm tipos separados e comparação exata; valores realmente
+novos continuam sendo enviados, enquanto repetições são omitidas. Os valores
+permanecem válidos entre frames, as métricas reiniciam por frame e recompilar ou
+destruir o programa invalida tudo. `F3` mostra `UNIFORM UP` e `SKIP`, permitindo
+medir o ganho no hardware real. Regressões cobrem mudança de tipo, persistência,
+invalidação, contadores e pixels OpenGL. Os cinco perfis gráficos, materiais,
+iluminação, gameplay e RNG permanecem iguais.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

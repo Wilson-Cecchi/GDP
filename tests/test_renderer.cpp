@@ -182,6 +182,37 @@ void testShaderUniformLocationCache()
         "shader uniform cache resolves names again after program reset");
 }
 
+void testShaderUniformValueCache()
+{
+    wkc::render::ShaderUniformValueCache cache;
+    const wkc::core::Mat4 identity = wkc::core::Mat4::identity();
+
+    expect(cache.needsUpload(4, 1) && !cache.needsUpload(4, 1)
+            && cache.needsUpload(4, 2),
+        "shader uniform value cache skips only repeated integer values");
+    expect(cache.needsUpload(4, 2.0F) && !cache.needsUpload(4, 2.0F),
+        "shader uniform value cache distinguishes uniform types");
+    expect(cache.needsUpload(5, wkc::core::Vec2{1.0F, 2.0F})
+            && !cache.needsUpload(5, wkc::core::Vec2{1.0F, 2.0F})
+            && cache.needsUpload(6, wkc::core::Vec3{1.0F, 2.0F, 3.0F})
+            && cache.needsUpload(7, identity)
+            && !cache.needsUpload(7, identity),
+        "shader uniform value cache handles vectors and matrices exactly");
+    const wkc::render::ShaderUniformValueCacheStats warmStats = cache.stats();
+    expect(warmStats.requests == 10U && warmStats.uploads == 6U
+            && warmStats.skips == 4U && warmStats.entries == 4U,
+        "shader uniform value cache exposes uploads avoided per frame");
+
+    cache.beginFrame();
+    expect(cache.stats()
+            == wkc::render::ShaderUniformValueCacheStats{0U, 0U, 0U, 4U}
+            && !cache.needsUpload(7, identity),
+        "new frame clears metrics while preserving reusable values");
+    cache.reset();
+    expect(cache.stats() == wkc::render::ShaderUniformValueCacheStats{},
+        "shader uniform value cache reset invalidates values and metrics");
+}
+
 void testConservativeVisibilityCulling()
 {
     using namespace gdp::game::visual;
@@ -1181,6 +1212,7 @@ int main()
     testCameraAndMatrices();
     testGpuTimerFallback();
     testShaderUniformLocationCache();
+    testShaderUniformValueCache();
     testConservativeVisibilityCulling();
     testMainMenuLayout();
     testPauseMenuLayout();

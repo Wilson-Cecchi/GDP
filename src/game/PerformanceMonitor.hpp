@@ -27,6 +27,8 @@ struct FramePerformanceSample {
     std::uint32_t shadowOccluders{0U};
     std::uint32_t meshCacheEntries{0U};
     std::uint32_t textureCacheEntries{0U};
+    std::uint64_t uniformUploads{0U};
+    std::uint64_t uniformSkips{0U};
 
     constexpr bool operator==(const FramePerformanceSample&) const noexcept
         = default;

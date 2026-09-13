@@ -527,6 +527,8 @@ struct HudRenderData {
     std::uint32_t performanceShadowOccluders{0U};
     std::uint32_t performanceMeshCacheEntries{0U};
     std::uint32_t performanceTextureCacheEntries{0U};
+    std::uint64_t performanceUniformUploads{0U};
+    std::uint64_t performanceUniformSkips{0U};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

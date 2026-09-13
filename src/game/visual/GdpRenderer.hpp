@@ -26,6 +26,8 @@ struct RendererFrameStats {
     std::uint64_t triangles{0U};
     std::size_t meshCacheEntries{0U};
     std::size_t textureCacheEntries{0U};
+    std::uint64_t uniformUploads{0U};
+    std::uint64_t uniformSkips{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -78,7 +80,12 @@ public:
         WeaponViewmodelRenderData weaponViewmodel = {});
     [[nodiscard]] RendererFrameStats lastFrameStats() const noexcept
     {
-        return lastFrameStats_;
+        RendererFrameStats stats = lastFrameStats_;
+        const wkc::render::ShaderUniformValueCacheStats uniformStats
+            = shader_.uniformValueCacheStats();
+        stats.uniformUploads = uniformStats.uploads;
+        stats.uniformSkips = uniformStats.skips;
+        return stats;
     }
 
 private:

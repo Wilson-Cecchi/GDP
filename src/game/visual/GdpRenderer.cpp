@@ -943,6 +943,7 @@ bool GdpRenderer::render(
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
     }
+    shader_.beginUniformFrame();
     const int renderScalePercent = std::clamp(
         static_cast<int>(hud.worldRenderScalePercent), 50, 100);
     const int renderWidth = std::max(1, (width * renderScalePercent) / 100);
@@ -2394,7 +2395,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 9> lines{
+        const std::array<std::string, 10> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2417,6 +2418,8 @@ bool GdpRenderer::render(
             "LIGHT " + std::to_string(hud.performanceActiveLights)
                 + " SHADOW " + std::to_string(hud.performanceShadowLights)
                 + "X" + std::to_string(hud.performanceShadowOccluders),
+            "UNIFORM UP " + std::to_string(hud.performanceUniformUploads)
+                + " SKIP " + std::to_string(hud.performanceUniformSkips),
             "CACHE M " + std::to_string(hud.performanceMeshCacheEntries)
                 + " T " + std::to_string(hud.performanceTextureCacheEntries)
                 + " LOAD " + std::to_string(hud.worldGenerationMilliseconds)

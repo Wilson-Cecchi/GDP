@@ -77,6 +77,95 @@ ShaderUniformCacheStats ShaderUniformLocationCache::stats() const noexcept
     return {requests_, hits_, driverLookups_, locations_.size()};
 }
 
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const wkc::core::Mat4& value) noexcept
+{
+    UniformValue cached;
+    cached.kind = ValueKind::Mat4;
+    cached.components = value.elements;
+    return needsUpload(location, cached);
+}
+
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const wkc::core::Vec2 value) noexcept
+{
+    UniformValue cached;
+    cached.kind = ValueKind::Vec2;
+    cached.components[0] = value.x;
+    cached.components[1] = value.y;
+    return needsUpload(location, cached);
+}
+
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const wkc::core::Vec3 value) noexcept
+{
+    UniformValue cached;
+    cached.kind = ValueKind::Vec3;
+    cached.components[0] = value.x;
+    cached.components[1] = value.y;
+    cached.components[2] = value.z;
+    return needsUpload(location, cached);
+}
+
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const int value) noexcept
+{
+    UniformValue cached;
+    cached.kind = ValueKind::Int;
+    cached.integer = value;
+    return needsUpload(location, cached);
+}
+
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const float value) noexcept
+{
+    UniformValue cached;
+    cached.kind = ValueKind::Float;
+    cached.components[0] = value;
+    return needsUpload(location, cached);
+}
+
+bool ShaderUniformValueCache::needsUpload(
+    const GLint location, const UniformValue& value) noexcept
+{
+    ++requests_;
+    if (const auto found = values_.find(location); found != values_.end()) {
+        if (found->second == value) {
+            ++skips_;
+            return false;
+        }
+        found->second = value;
+        ++uploads_;
+        return true;
+    }
+
+    ++uploads_;
+    try {
+        values_.emplace(location, value);
+    } catch (...) {
+        // Allocation failure only disables this optimization for the value.
+    }
+    return true;
+}
+
+void ShaderUniformValueCache::beginFrame() noexcept
+{
+    requests_ = 0U;
+    uploads_ = 0U;
+    skips_ = 0U;
+}
+
+void ShaderUniformValueCache::reset() noexcept
+{
+    values_.clear();
+    beginFrame();
+}
+
+ShaderUniformValueCacheStats ShaderUniformValueCache::stats() const noexcept
+{
+    return {requests_, uploads_, skips_, values_.size()};
+}
+
 Shader::~Shader()
 {
     reset();
@@ -87,6 +176,7 @@ Shader::Shader(Shader&& other) noexcept
     , program_(std::exchange(other.program_, 0))
 {
     other.uniformLocations_.reset();
+    other.uniformValues_.reset();
 }
 
 Shader& Shader::operator=(Shader&& other) noexcept
@@ -96,6 +186,7 @@ Shader& Shader::operator=(Shader&& other) noexcept
         gl_ = std::exchange(other.gl_, nullptr);
         program_ = std::exchange(other.program_, 0);
         other.uniformLocations_.reset();
+        other.uniformValues_.reset();
     }
     return *this;
 }
@@ -153,7 +244,7 @@ void Shader::setMat4(
     const wkc::core::Mat4& value) const noexcept
 {
     const GLint location = uniformLocations_.resolve(gl, program_, name);
-    if (location >= 0) {
+    if (location >= 0 && uniformValues_.needsUpload(location, value)) {
         gl.uniformMatrix4fv(location, 1, GL_FALSE, value.data());
     }
 }
@@ -164,7 +255,7 @@ void Shader::setVec3(
     const wkc::core::Vec3 value) const noexcept
 {
     const GLint location = uniformLocations_.resolve(gl, program_, name);
-    if (location >= 0) {
+    if (location >= 0 && uniformValues_.needsUpload(location, value)) {
         gl.uniform3f(location, value.x, value.y, value.z);
     }
 }
@@ -175,7 +266,7 @@ void Shader::setVec2(
     const wkc::core::Vec2 value) const noexcept
 {
     const GLint location = uniformLocations_.resolve(gl, program_, name);
-    if (location >= 0) {
+    if (location >= 0 && uniformValues_.needsUpload(location, value)) {
         gl.uniform2f(location, value.x, value.y);
     }
 }
@@ -186,7 +277,7 @@ void Shader::setInt(
     const int value) const noexcept
 {
     const GLint location = uniformLocations_.resolve(gl, program_, name);
-    if (location >= 0) {
+    if (location >= 0 && uniformValues_.needsUpload(location, value)) {
         gl.uniform1i(location, value);
     }
 }
@@ -197,7 +288,7 @@ void Shader::setFloat(
     const float value) const noexcept
 {
     const GLint location = uniformLocations_.resolve(gl, program_, name);
-    if (location >= 0) {
+    if (location >= 0 && uniformValues_.needsUpload(location, value)) {
         gl.uniform1f(location, value);
     }
 }
@@ -210,6 +301,7 @@ void Shader::reset() noexcept
     gl_ = nullptr;
     program_ = 0;
     uniformLocations_.reset();
+    uniformValues_.reset();
 }
 
 bool Shader::isValid() const noexcept
