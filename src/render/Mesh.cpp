@@ -24,6 +24,30 @@ void setReason(std::string* const reason, const char* const text)
 
 } // namespace
 
+bool MeshBindingCache::needsBind(const GLuint vertexArray) noexcept
+{
+    ++stats_.requests;
+    if (vertexArrayKnown_ && vertexArray_ == vertexArray) {
+        ++stats_.skippedVertexArrayBinds;
+        return false;
+    }
+    vertexArray_ = vertexArray;
+    vertexArrayKnown_ = true;
+    ++stats_.vertexArrayBinds;
+    return true;
+}
+
+void MeshBindingCache::beginFrame() noexcept
+{
+    vertexArrayKnown_ = false;
+    stats_ = {};
+}
+
+MeshBindingCacheStats MeshBindingCache::stats() const noexcept
+{
+    return stats_;
+}
+
 MeshData makeBoxMesh()
 {
     constexpr float low = -0.5F;
@@ -183,6 +207,18 @@ void Mesh::draw(const GlApi& gl) const noexcept
     gl.bindVertexArray(vertexArray_);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount_), GL_UNSIGNED_INT, nullptr);
     gl.bindVertexArray(0);
+}
+
+void Mesh::draw(const GlApi& gl, MeshBindingCache& cache) const noexcept
+{
+    if (!isValid()) {
+        return;
+    }
+    if (cache.needsBind(vertexArray_)) {
+        gl.bindVertexArray(vertexArray_);
+    }
+    glDrawElements(
+        GL_TRIANGLES, static_cast<GLsizei>(indexCount_), GL_UNSIGNED_INT, nullptr);
 }
 
 void Mesh::reset() noexcept

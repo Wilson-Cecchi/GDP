@@ -25,6 +25,27 @@ struct MeshData {
 [[nodiscard]] MeshData makeBoxMesh();
 [[nodiscard]] bool validateMeshData(const MeshData& data, std::string* reason = nullptr);
 
+struct MeshBindingCacheStats {
+    std::uint64_t requests{0U};
+    std::uint64_t vertexArrayBinds{0U};
+    std::uint64_t skippedVertexArrayBinds{0U};
+
+    constexpr bool operator==(const MeshBindingCacheStats&) const noexcept
+        = default;
+};
+
+class MeshBindingCache {
+public:
+    [[nodiscard]] bool needsBind(GLuint vertexArray) noexcept;
+    void beginFrame() noexcept;
+    [[nodiscard]] MeshBindingCacheStats stats() const noexcept;
+
+private:
+    GLuint vertexArray_{0U};
+    bool vertexArrayKnown_{false};
+    MeshBindingCacheStats stats_{};
+};
+
 class Mesh {
 public:
     Mesh() = default;
@@ -37,6 +58,7 @@ public:
 
     [[nodiscard]] bool upload(const GlApi& gl, const MeshData& data);
     void draw(const GlApi& gl) const noexcept;
+    void draw(const GlApi& gl, MeshBindingCache& cache) const noexcept;
     void reset() noexcept;
 
     [[nodiscard]] bool isValid() const noexcept;

@@ -2693,6 +2693,8 @@ void Application::render()
         currentFramePerformance_.textureBinds = rendererStats.textureBinds;
         currentFramePerformance_.textureBindSkips
             = rendererStats.textureBindSkips;
+        currentFramePerformance_.meshBinds = rendererStats.meshBinds;
+        currentFramePerformance_.meshBindSkips = rendererStats.meshBindSkips;
         const auto presentStart = Clock::now();
         SDL_GL_SwapWindow(window_);
         currentFramePerformance_.presentMilliseconds
@@ -3248,6 +3250,8 @@ void Application::render()
         = performance.latest.textureUnitActivations;
     hud.performanceTextureBinds = performance.latest.textureBinds;
     hud.performanceTextureBindSkips = performance.latest.textureBindSkips;
+    hud.performanceMeshBinds = performance.latest.meshBinds;
+    hud.performanceMeshBindSkips = performance.latest.meshBindSkips;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
     hud.armor = player_.state().armor;

@@ -465,6 +465,9 @@ especializados das pastas numeradas.
   ativa e as texturas já ligadas durante o frame, omitindo `glActiveTexture` e
   `glBindTexture` redundantes. O `F3` expõe binds, skips e trocas de unidade;
   estado externo é invalidado conservadoramente a cada frame.
+- **Fase 124 — Cache de VAO/mesh:** draws consecutivos do mesmo mesh reutilizam
+  o vertex array já ligado, sem executar bind e unbind em cada peça. O caminho
+  tradicional permanece disponível, e `F3` informa binds realizados e evitados.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1199,6 +1202,15 @@ invalida todo estado conhecido depois de operações externas de framebuffer e
 reinicia as métricas. `F3` mostra `TEXTURE BIND`, `SKIP` e `UNIT`; testes cobrem
 troca de unidade, troca de textura, repetição, fallback, invalidação, métricas e
 pixels OpenGL. Perfis, imagens, amostragem, iluminação, gameplay e RNG não mudam.
+
+Na Fase 124, `wkc::render::MeshBindingCache` acompanha o vertex array atualmente
+ligado. O renderer GDP usa o novo caminho de draw cacheado e mantém o VAO entre
+peças consecutivas do mesmo mesh; a API tradicional de `Mesh::draw` continua
+fazendo bind/unbind para consumidores que não controlam estado. O começo de cada
+frame invalida o conhecimento do cache para tolerar operações OpenGL externas.
+`F3` mostra `MESH BIND` e `SKIP`; testes cobrem repetição, troca, invalidação,
+métricas e pixels reais. Geometria, ordem dos draws, materiais, perfis gráficos,
+gameplay e RNG permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

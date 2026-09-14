@@ -31,6 +31,8 @@ struct RendererFrameStats {
     std::uint64_t textureUnitActivations{0U};
     std::uint64_t textureBinds{0U};
     std::uint64_t textureBindSkips{0U};
+    std::uint64_t meshBinds{0U};
+    std::uint64_t meshBindSkips{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -93,6 +95,10 @@ public:
         stats.textureUnitActivations = textureStats.unitActivations;
         stats.textureBinds = textureStats.textureBinds;
         stats.textureBindSkips = textureStats.skippedTextureBinds;
+        const wkc::render::MeshBindingCacheStats meshStats
+            = meshBindings_.stats();
+        stats.meshBinds = meshStats.vertexArrayBinds;
+        stats.meshBindSkips = meshStats.skippedVertexArrayBinds;
         return stats;
     }
 
@@ -146,6 +152,7 @@ private:
     wkc::render::Framebuffer framebuffer_{};
     wkc::render::Shader shader_{};
     wkc::render::Mesh box_{};
+    wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::Texture fallbackTexture_{};
     wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};

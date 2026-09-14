@@ -918,7 +918,7 @@ void GdpRenderer::drawMesh(const wkc::render::Mesh& mesh) noexcept
     if (!mesh.isValid()) {
         return;
     }
-    mesh.draw(gl_);
+    mesh.draw(gl_, meshBindings_);
     ++lastFrameStats_.drawCalls;
     lastFrameStats_.triangles += mesh.indexCount() / 3U;
 }
@@ -954,6 +954,7 @@ bool GdpRenderer::render(
         return false;
     }
     textureBindings_.beginFrame();
+    meshBindings_.beginFrame();
     const ScopedGpuTimer gpuFrameTimer{gpuTimer_};
     if (const std::optional<double> gpuMilliseconds
         = gpuTimer_.latestMilliseconds()) {
@@ -2396,7 +2397,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 11> lines{
+        const std::array<std::string, 12> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2425,6 +2426,8 @@ bool GdpRenderer::render(
                 + " SKIP " + std::to_string(hud.performanceTextureBindSkips)
                 + " UNIT "
                 + std::to_string(hud.performanceTextureUnitActivations),
+            "MESH BIND " + std::to_string(hud.performanceMeshBinds)
+                + " SKIP " + std::to_string(hud.performanceMeshBindSkips),
             "CACHE M " + std::to_string(hud.performanceMeshCacheEntries)
                 + " T " + std::to_string(hud.performanceTextureCacheEntries)
                 + " LOAD " + std::to_string(hud.worldGenerationMilliseconds)

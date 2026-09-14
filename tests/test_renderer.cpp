@@ -72,6 +72,22 @@ void testMesh()
     expect(!validateMeshData(empty, &reason), "empty mesh is rejected safely");
 }
 
+void testMeshBindingCache()
+{
+    wkc::render::MeshBindingCache cache;
+    expect(cache.needsBind(11U) && !cache.needsBind(11U)
+            && cache.needsBind(12U) && !cache.needsBind(12U),
+        "mesh binding cache binds only when the vertex array changes");
+    expect(cache.stats()
+            == wkc::render::MeshBindingCacheStats{4U, 2U, 2U},
+        "mesh binding cache exposes real and avoided VAO binds");
+
+    cache.beginFrame();
+    expect(cache.stats() == wkc::render::MeshBindingCacheStats{}
+            && cache.needsBind(12U),
+        "new frame invalidates external vertex-array state conservatively");
+}
+
 void testTextureData()
 {
     using namespace wkc::render;
@@ -1245,6 +1261,7 @@ void testIndustrialUiTheme()
 int main()
 {
     testMesh();
+    testMeshBindingCache();
     testTextureData();
     testTextureBindingCache();
     testCameraAndMatrices();
