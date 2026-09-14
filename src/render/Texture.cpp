@@ -18,6 +18,48 @@ bool validateImageData(const ImageData& image) noexcept
     return image.rgba.size() == expectedSize;
 }
 
+TextureBindingDecision TextureBindingCache::prepare(
+    const unsigned int unit, const GLuint texture) noexcept
+{
+    ++stats_.requests;
+    TextureBindingDecision decision;
+    decision.activateUnit = !activeUnitKnown_ || activeUnit_ != unit;
+    if (decision.activateUnit) {
+        activeUnit_ = unit;
+        activeUnitKnown_ = true;
+        ++stats_.unitActivations;
+    }
+
+    if (unit < trackedTextureUnitCount) {
+        decision.bindTexture = !knownTextures_[unit]
+            || textures_[unit] != texture;
+        if (decision.bindTexture) {
+            textures_[unit] = texture;
+            knownTextures_[unit] = true;
+        }
+    } else {
+        decision.bindTexture = true;
+    }
+    if (decision.bindTexture) {
+        ++stats_.textureBinds;
+    } else {
+        ++stats_.skippedTextureBinds;
+    }
+    return decision;
+}
+
+void TextureBindingCache::beginFrame() noexcept
+{
+    knownTextures_.fill(false);
+    activeUnitKnown_ = false;
+    stats_ = {};
+}
+
+TextureBindingCacheStats TextureBindingCache::stats() const noexcept
+{
+    return stats_;
+}
+
 Texture::~Texture()
 {
     reset();
@@ -79,6 +121,20 @@ void Texture::bind(const GlApi& gl, const unsigned int unit) const noexcept
 {
     gl.activeTexture(static_cast<GLenum>(GL_TEXTURE0 + unit));
     glBindTexture(GL_TEXTURE_2D, texture_);
+}
+
+void Texture::bind(
+    const GlApi& gl,
+    TextureBindingCache& cache,
+    const unsigned int unit) const noexcept
+{
+    const TextureBindingDecision decision = cache.prepare(unit, texture_);
+    if (decision.activateUnit) {
+        gl.activeTexture(static_cast<GLenum>(GL_TEXTURE0 + unit));
+    }
+    if (decision.bindTexture) {
+        glBindTexture(GL_TEXTURE_2D, texture_);
+    }
 }
 
 void Texture::reset() noexcept

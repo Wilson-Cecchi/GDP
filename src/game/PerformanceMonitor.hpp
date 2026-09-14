@@ -29,6 +29,9 @@ struct FramePerformanceSample {
     std::uint32_t textureCacheEntries{0U};
     std::uint64_t uniformUploads{0U};
     std::uint64_t uniformSkips{0U};
+    std::uint64_t textureUnitActivations{0U};
+    std::uint64_t textureBinds{0U};
+    std::uint64_t textureBindSkips{0U};
 
     constexpr bool operator==(const FramePerformanceSample&) const noexcept
         = default;

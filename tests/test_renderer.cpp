@@ -116,6 +116,43 @@ void testTextureData()
     expect(!validateImageData(malformed), "malformed texture data is rejected");
 }
 
+void testTextureBindingCache()
+{
+    wkc::render::TextureBindingCache cache;
+    const wkc::render::TextureBindingDecision first = cache.prepare(0U, 11U);
+    const wkc::render::TextureBindingDecision repeated = cache.prepare(0U, 11U);
+    const wkc::render::TextureBindingDecision changed = cache.prepare(0U, 12U);
+    const wkc::render::TextureBindingDecision secondUnit = cache.prepare(1U, 12U);
+    const wkc::render::TextureBindingDecision repeatedSecond
+        = cache.prepare(1U, 12U);
+    const wkc::render::TextureBindingDecision untracked
+        = cache.prepare(17U, 31U);
+    const wkc::render::TextureBindingDecision repeatedUntracked
+        = cache.prepare(17U, 31U);
+
+    expect(first == wkc::render::TextureBindingDecision{true, true}
+            && repeated == wkc::render::TextureBindingDecision{false, false}
+            && changed == wkc::render::TextureBindingDecision{false, true},
+        "texture binding cache skips a repeated texture on the active unit");
+    expect(secondUnit == wkc::render::TextureBindingDecision{true, true}
+            && repeatedSecond
+                == wkc::render::TextureBindingDecision{false, false},
+        "texture binding cache tracks independent texture units");
+    expect(untracked == wkc::render::TextureBindingDecision{true, true}
+            && repeatedUntracked
+                == wkc::render::TextureBindingDecision{false, true},
+        "untracked high units fail safely by preserving texture binds");
+    expect(cache.stats()
+            == wkc::render::TextureBindingCacheStats{7U, 3U, 5U, 2U},
+        "texture binding cache exposes activations, binds and avoided binds");
+
+    cache.beginFrame();
+    expect(cache.stats() == wkc::render::TextureBindingCacheStats{}
+            && cache.prepare(0U, 11U)
+                == wkc::render::TextureBindingDecision{true, true},
+        "new frame invalidates external OpenGL texture state conservatively");
+}
+
 void testCameraAndMatrices()
 {
     using namespace wkc::core;
@@ -1209,6 +1246,7 @@ int main()
 {
     testMesh();
     testTextureData();
+    testTextureBindingCache();
     testCameraAndMatrices();
     testGpuTimerFallback();
     testShaderUniformLocationCache();

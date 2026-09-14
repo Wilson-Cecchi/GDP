@@ -953,6 +953,7 @@ bool GdpRenderer::render(
     if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
         return false;
     }
+    textureBindings_.beginFrame();
     const ScopedGpuTimer gpuFrameTimer{gpuTimer_};
     if (const std::optional<double> gpuMilliseconds
         = gpuTimer_.latestMilliseconds()) {
@@ -1100,9 +1101,9 @@ bool GdpRenderer::render(
                     *roomMaterials.industrialWallCondition);
                 const auto& wallMaterial = industrialWallMaterials_[conditionIndex];
                 if (wallMaterial) {
-                    wallMaterial->albedo.bind(gl_, 0U);
-                    wallMaterial->normal.bind(gl_, 1U);
-                    wallMaterial->properties.bind(gl_, 2U);
+                    wallMaterial->albedo.bind(gl_, textureBindings_, 0U);
+                    wallMaterial->normal.bind(gl_, textureBindings_, 1U);
+                    wallMaterial->properties.bind(gl_, textureBindings_, 2U);
                     detailedMaterial = true;
                     resolvedTint = tint * roomMaterials.wallTone;
                     materialUvOffset = roomMaterials.wallUvOffset;
@@ -1110,12 +1111,12 @@ bool GdpRenderer::render(
             }
             if (!detailedMaterial) {
                 roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Wall)].bind(gl_);
+                    IndustrialSurface::Wall)].bind(gl_, textureBindings_);
             }
             break;
         case RoomMaterialChannel::Floor:
             roomMaterials.textures[static_cast<std::size_t>(
-                IndustrialSurface::Floor)].bind(gl_);
+                IndustrialSurface::Floor)].bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::Ceiling:
             if (roomMaterials.industrialCeilingCondition) {
@@ -1123,9 +1124,9 @@ bool GdpRenderer::render(
                     *roomMaterials.industrialCeilingCondition);
                 const auto& ceilingMaterial = industrialCeilingMaterials_[conditionIndex];
                 if (ceilingMaterial) {
-                    ceilingMaterial->albedo.bind(gl_, 0U);
-                    ceilingMaterial->normal.bind(gl_, 1U);
-                    ceilingMaterial->properties.bind(gl_, 2U);
+                    ceilingMaterial->albedo.bind(gl_, textureBindings_, 0U);
+                    ceilingMaterial->normal.bind(gl_, textureBindings_, 1U);
+                    ceilingMaterial->properties.bind(gl_, textureBindings_, 2U);
                     detailedMaterial = true;
                     resolvedTint = tint * roomMaterials.ceilingTone;
                     materialUvOffset = roomMaterials.ceilingUvOffset;
@@ -1133,11 +1134,11 @@ bool GdpRenderer::render(
             }
             if (!detailedMaterial) {
                 roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Ceiling)].bind(gl_);
+                    IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
             }
             break;
         case RoomMaterialChannel::Generic:
-            fallbackTexture_.bind(gl_);
+            fallbackTexture_.bind(gl_, textureBindings_);
             break;
         }
         shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
@@ -1371,7 +1372,7 @@ bool GdpRenderer::render(
         drawRoomParts(connectedRoom);
     }
 
-    fallbackTexture_.bind(gl_);
+    fallbackTexture_.bind(gl_, textureBindings_);
     for (const DoorRenderData& door : doors) {
         const bool facesX = std::abs(door.outwardNormal.x) > 0.5F;
         const wkc::core::Vec3 insetPosition
@@ -1434,7 +1435,7 @@ bool GdpRenderer::render(
             panelScale, panelColor, panelEmissive);
     }
 
-    fallbackTexture_.bind(gl_);
+    fallbackTexture_.bind(gl_, textureBindings_);
     shader_.setInt(gl_, "uDetailedMaterial", 0);
     shader_.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
     shader_.setVec2(gl_, "uUvOffset", {});
@@ -1484,10 +1485,10 @@ bool GdpRenderer::render(
         }
     }
 
-    ceilingFixtureMaterial_.albedo.bind(gl_, 0U);
-    ceilingFixtureMaterial_.normal.bind(gl_, 1U);
-    ceilingFixtureMaterial_.properties.bind(gl_, 2U);
-    ceilingFixtureMaterial_.emission.bind(gl_, 3U);
+    ceilingFixtureMaterial_.albedo.bind(gl_, textureBindings_, 0U);
+    ceilingFixtureMaterial_.normal.bind(gl_, textureBindings_, 1U);
+    ceilingFixtureMaterial_.properties.bind(gl_, textureBindings_, 2U);
+    ceilingFixtureMaterial_.emission.bind(gl_, textureBindings_, 3U);
     shader_.setInt(gl_, "uDetailedMaterial", 1);
     shader_.setInt(gl_, "uUseEmissionMap", 1);
     constexpr wkc::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
@@ -1565,7 +1566,7 @@ bool GdpRenderer::render(
         if (visual == visuals->end()) {
             return false;
         }
-        visual->second.texture.bind(gl_);
+        visual->second.texture.bind(gl_, textureBindings_);
         const EnemyAnimationState currentAnimationState
             = enemy.alive ? enemy.animationState : EnemyAnimationState::Dead;
         const EnemyRootPose currentPose = sampleEnemyRootPose(
@@ -1653,7 +1654,7 @@ bool GdpRenderer::render(
         }
     }
 
-    fallbackTexture_.bind(gl_);
+    fallbackTexture_.bind(gl_, textureBindings_);
     for (const PickupRenderData& pickup : pickups) {
         wkc::core::Vec3 tint{0.20F, 0.85F, 0.32F};
         wkc::core::Vec3 scale{0.30F, 0.22F, 0.30F};
@@ -1721,7 +1722,7 @@ bool GdpRenderer::render(
 
     if (weaponViewmodel.visible) {
         glClear(GL_DEPTH_BUFFER_BIT);
-        fallbackTexture_.bind(gl_);
+        fallbackTexture_.bind(gl_, textureBindings_);
         shader_.setInt(gl_, "uDetailedMaterial", 0);
         shader_.setInt(gl_, "uUseEmissionMap", 0);
         shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
@@ -2395,7 +2396,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 10> lines{
+        const std::array<std::string, 11> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2420,6 +2421,10 @@ bool GdpRenderer::render(
                 + "X" + std::to_string(hud.performanceShadowOccluders),
             "UNIFORM UP " + std::to_string(hud.performanceUniformUploads)
                 + " SKIP " + std::to_string(hud.performanceUniformSkips),
+            "TEXTURE BIND " + std::to_string(hud.performanceTextureBinds)
+                + " SKIP " + std::to_string(hud.performanceTextureBindSkips)
+                + " UNIT "
+                + std::to_string(hud.performanceTextureUnitActivations),
             "CACHE M " + std::to_string(hud.performanceMeshCacheEntries)
                 + " T " + std::to_string(hud.performanceTextureCacheEntries)
                 + " LOAD " + std::to_string(hud.worldGenerationMilliseconds)

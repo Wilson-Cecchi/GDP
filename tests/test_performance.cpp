@@ -42,6 +42,9 @@ void testRollingStatistics()
             .activeLights = 4U,
             .uniformUploads = 180U,
             .uniformSkips = 420U,
+            .textureUnitActivations = 15U,
+            .textureBinds = 28U,
+            .textureBindSkips = 90U,
         });
     }
 
@@ -65,7 +68,10 @@ void testRollingStatistics()
             && snapshot.latest.visibleEnemies == 5U
             && snapshot.latest.activeLights == 4U
             && snapshot.latest.uniformUploads == 180U
-            && snapshot.latest.uniformSkips == 420U,
+            && snapshot.latest.uniformSkips == 420U
+            && snapshot.latest.textureUnitActivations == 15U
+            && snapshot.latest.textureBinds == 28U
+            && snapshot.latest.textureBindSkips == 90U,
         "latest workload counters remain available to the overlay");
     expect(near(snapshot.worldGenerationMilliseconds, 42.5)
             && near(snapshot.assetPreparationMilliseconds, 185.0),

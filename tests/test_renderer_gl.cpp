@@ -533,6 +533,9 @@ int main()
             performanceHud.performanceTextureCacheEntries = 27U;
             performanceHud.performanceUniformUploads = 180U;
             performanceHud.performanceUniformSkips = 420U;
+            performanceHud.performanceTextureUnitActivations = 15U;
+            performanceHud.performanceTextureBinds = 28U;
+            performanceHud.performanceTextureBindSkips = 90U;
             const bool renderedPerformanceOverlay = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
             const gdp::game::visual::RendererFrameStats performanceFrameStats
@@ -1129,6 +1132,9 @@ int main()
                 && performanceFrameStats.textureCacheEntries > 0U
                 && performanceFrameStats.uniformUploads > 0U
                 && performanceFrameStats.uniformSkips > 0U
+                && performanceFrameStats.textureUnitActivations > 0U
+                && performanceFrameStats.textureBinds > 0U
+                && performanceFrameStats.textureBindSkips > 0U
                 && measuredGpuFrame
                 && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedCampaignTimer && campaignTimerChangedChannels > 50U

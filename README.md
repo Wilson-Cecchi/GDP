@@ -461,6 +461,10 @@ especializados das pastas numeradas.
   de gerar chamadas `glUniform`. O cache tipado cobre matrizes, vetores, floats e
   inteiros, sobrevive entre frames, invalida com o programa e expõe no `F3` as
   submissões realizadas e evitadas sem alterar a qualidade visual.
+- **Fase 123 — Cache de bindings de textura:** o renderer acompanha a unidade
+  ativa e as texturas já ligadas durante o frame, omitindo `glActiveTexture` e
+  `glBindTexture` redundantes. O `F3` expõe binds, skips e trocas de unidade;
+  estado externo é invalidado conservadoramente a cada frame.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1185,6 +1189,16 @@ destruir o programa invalida tudo. `F3` mostra `UNIFORM UP` e `SKIP`, permitindo
 medir o ganho no hardware real. Regressões cobrem mudança de tipo, persistência,
 invalidação, contadores e pixels OpenGL. Os cinco perfis gráficos, materiais,
 iluminação, gameplay e RNG permanecem iguais.
+
+Na Fase 123, `wkc::render::TextureBindingCache` mantém o estado conhecido das
+16 primeiras unidades de textura, acima das quatro usadas pelo renderer atual.
+Cada pedido informa separadamente se precisa ativar a unidade e ligar o objeto;
+repetições na mesma unidade não atravessam a API OpenGL. Unidades acima do limite
+continuam corretas pelo fallback que sempre executa o bind. O começo do frame
+invalida todo estado conhecido depois de operações externas de framebuffer e
+reinicia as métricas. `F3` mostra `TEXTURE BIND`, `SKIP` e `UNIT`; testes cobrem
+troca de unidade, troca de textura, repetição, fallback, invalidação, métricas e
+pixels OpenGL. Perfis, imagens, amostragem, iluminação, gameplay e RNG não mudam.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

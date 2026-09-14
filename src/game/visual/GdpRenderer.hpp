@@ -28,6 +28,9 @@ struct RendererFrameStats {
     std::size_t textureCacheEntries{0U};
     std::uint64_t uniformUploads{0U};
     std::uint64_t uniformSkips{0U};
+    std::uint64_t textureUnitActivations{0U};
+    std::uint64_t textureBinds{0U};
+    std::uint64_t textureBindSkips{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -85,6 +88,11 @@ public:
             = shader_.uniformValueCacheStats();
         stats.uniformUploads = uniformStats.uploads;
         stats.uniformSkips = uniformStats.skips;
+        const wkc::render::TextureBindingCacheStats textureStats
+            = textureBindings_.stats();
+        stats.textureUnitActivations = textureStats.unitActivations;
+        stats.textureBinds = textureStats.textureBinds;
+        stats.textureBindSkips = textureStats.skippedTextureBinds;
         return stats;
     }
 
@@ -139,6 +147,7 @@ private:
     wkc::render::Shader shader_{};
     wkc::render::Mesh box_{};
     wkc::render::Texture fallbackTexture_{};
+    wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
     wkc::resources::AssetCache<wkc::render::MeshData> meshCache_{};
     wkc::resources::AssetCache<wkc::render::ImageData> textureCache_{};

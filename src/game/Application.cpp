@@ -2688,6 +2688,11 @@ void Application::render()
                 std::numeric_limits<std::uint32_t>::max()));
         currentFramePerformance_.uniformUploads = rendererStats.uniformUploads;
         currentFramePerformance_.uniformSkips = rendererStats.uniformSkips;
+        currentFramePerformance_.textureUnitActivations
+            = rendererStats.textureUnitActivations;
+        currentFramePerformance_.textureBinds = rendererStats.textureBinds;
+        currentFramePerformance_.textureBindSkips
+            = rendererStats.textureBindSkips;
         const auto presentStart = Clock::now();
         SDL_GL_SwapWindow(window_);
         currentFramePerformance_.presentMilliseconds
@@ -3239,6 +3244,10 @@ void Application::render()
     hud.performanceTextureCacheEntries = performance.latest.textureCacheEntries;
     hud.performanceUniformUploads = performance.latest.uniformUploads;
     hud.performanceUniformSkips = performance.latest.uniformSkips;
+    hud.performanceTextureUnitActivations
+        = performance.latest.textureUnitActivations;
+    hud.performanceTextureBinds = performance.latest.textureBinds;
+    hud.performanceTextureBindSkips = performance.latest.textureBindSkips;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
     hud.armor = player_.state().armor;
