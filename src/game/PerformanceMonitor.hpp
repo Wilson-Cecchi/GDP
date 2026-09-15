@@ -35,6 +35,8 @@ struct FramePerformanceSample {
     std::uint64_t meshBinds{0U};
     std::uint64_t meshBindSkips{0U};
     bool lowSpecShader{false};
+    std::uint64_t backfaceCulledDraws{0U};
+    std::uint64_t cullStateChanges{0U};
 
     constexpr bool operator==(const FramePerformanceSample&) const noexcept
         = default;

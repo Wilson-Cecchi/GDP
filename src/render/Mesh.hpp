@@ -20,6 +20,7 @@ struct MeshData {
     std::vector<Vertex> vertices;
     std::vector<std::uint32_t> indices;
     wkc::core::Aabb bounds{};
+    bool backfaceCullingSafe{false};
 };
 
 [[nodiscard]] MeshData makeBoxMesh();
@@ -63,6 +64,7 @@ public:
 
     [[nodiscard]] bool isValid() const noexcept;
     [[nodiscard]] std::uint32_t indexCount() const noexcept;
+    [[nodiscard]] bool backfaceCullingSafe() const noexcept;
 
 private:
     const GlApi* gl_{nullptr};
@@ -70,6 +72,7 @@ private:
     GLuint vertexBuffer_{0};
     GLuint indexBuffer_{0};
     std::uint32_t indexCount_{0};
+    bool backfaceCullingSafe_{false};
 };
 
 } // namespace wkc::render

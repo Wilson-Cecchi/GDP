@@ -473,6 +473,11 @@ especializados das pastas numeradas.
   sombras. O shader remove em compilação normal mapping, especular e testes de
   oclusão que esses perfis já mantinham desligados; entradas fora do contrato
   voltam ao shader completo e o `F3` identifica `LOW SPEC` ou `FULL`.
+- **Fase 126 — Back-face culling seguro:** meshes declaram explicitamente se
+  permitem descartar faces traseiras. Caixas e composições só de caixas evitam
+  rasterização invisível; geometrias legadas de cilindro continuam dupla face.
+  Um cache troca o estado OpenGL somente quando necessário e o `F3` mostra
+  quantos draws receberam culling e quantas mudanças de estado ocorreram.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1226,6 +1231,19 @@ desligados, até quatro luzes e contadores de sombra zerados; qualquer chamada
 inconsistente falha conservadoramente para `FULL`. Uma regressão OpenGL desenha
 a mesma cena pelos dois programas e exige pixels byte a byte idênticos. Os
 orçamentos, texturas, cores, iluminação efetiva, gameplay e RNG não mudam.
+
+Na Fase 126, `wkc::render::MeshData` passa a transportar a permissão explícita
+de back-face culling até o objeto GPU. `makeBoxMesh` marca sua geometria fechada
+e com winding consistente como segura; o gerador procedural conserva a marca
+somente quando todas as primitivas de uma composição são seguras. Cilindros
+legados permanecem deliberadamente dupla face, evitando tornar invisíveis seus
+lados até que o winding deles seja revisado em uma etapa própria. O cache
+genérico `BackfaceCullingStateCache` invalida o conhecimento a cada frame e
+omite `glEnable`/`glDisable` repetidos. O GDP conta draws protegidos no `F3`,
+enquanto a suíte OpenGL continua verificando salas, corredores, inimigos,
+objetos, arma, HUD e menus. Ordem, triângulos submetidos, texturas, perfis,
+gameplay e RNG permanecem iguais; a GPU apenas deixa de rasterizar faces
+traseiras de volumes declarados seguros.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

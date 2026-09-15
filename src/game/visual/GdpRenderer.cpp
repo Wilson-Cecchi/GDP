@@ -435,6 +435,8 @@ bool GdpRenderer::initialize(const int width, const int height)
     camera_.lookAt({0.0F, 1.7F, 6.5F}, {0.0F, 1.5F, -1.5F});
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glFrontFace(GL_CCW);
+    glCullFace(GL_BACK);
     initialized_ = true;
     if (!prepareIndustrialRoomMaterials(0) || !prepareWorkerVisual(0)
         || !prepareGuardVisual(0) || !prepareOfficerVisual(0)
@@ -949,6 +951,17 @@ void GdpRenderer::drawMesh(const wkc::render::Mesh& mesh) noexcept
     if (!mesh.isValid()) {
         return;
     }
+    const bool cullingEnabled = mesh.backfaceCullingSafe();
+    if (backfaceCulling_.needsUpdate(cullingEnabled)) {
+        if (cullingEnabled) {
+            glEnable(GL_CULL_FACE);
+        } else {
+            glDisable(GL_CULL_FACE);
+        }
+    }
+    if (cullingEnabled) {
+        ++lastFrameStats_.backfaceCulledDraws;
+    }
     mesh.draw(gl_, meshBindings_);
     ++lastFrameStats_.drawCalls;
     lastFrameStats_.triangles += mesh.indexCount() / 3U;
@@ -1002,6 +1015,7 @@ bool GdpRenderer::render(
     }
     textureBindings_.beginFrame();
     meshBindings_.beginFrame();
+    backfaceCulling_.beginFrame();
     const ScopedGpuTimer gpuFrameTimer{gpuTimer_};
     if (const std::optional<double> gpuMilliseconds
         = gpuTimer_.latestMilliseconds()) {
@@ -1872,6 +1886,9 @@ bool GdpRenderer::render(
 
     framebuffer_.presentToDefault(gl_, width, height);
     glViewport(0, 0, width, height);
+    if (backfaceCulling_.needsUpdate(false)) {
+        glDisable(GL_CULL_FACE);
+    }
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
     const int hudScale = width >= 640 && height >= 360 ? 2 : 1;
@@ -2436,7 +2453,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 13> lines{
+        const std::array<std::string, 14> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2461,6 +2478,10 @@ bool GdpRenderer::render(
                 + "X" + std::to_string(hud.performanceShadowOccluders),
             std::string{"SHADER "}
                 + (hud.performanceLowSpecShader ? "LOW SPEC" : "FULL"),
+            "CULL DRAW "
+                + std::to_string(hud.performanceBackfaceCulledDraws)
+                + " STATE "
+                + std::to_string(hud.performanceCullStateChanges),
             "UNIFORM UP " + std::to_string(hud.performanceUniformUploads)
                 + " SKIP " + std::to_string(hud.performanceUniformSkips),
             "TEXTURE BIND " + std::to_string(hud.performanceTextureBinds)

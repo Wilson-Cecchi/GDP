@@ -3,6 +3,7 @@
 #include "game/visual/VisualAssets.hpp"
 #include "render/Camera.hpp"
 #include "render/Mesh.hpp"
+#include "render/RasterState.hpp"
 #include "game/visual/GdpRenderer.hpp"
 #include "render/Texture.hpp"
 
@@ -57,6 +58,8 @@ void testMesh()
     expect(validateMeshData(box, &reason), "box mesh validates");
     expect(box.vertices.size() == 24, "box has hard-edge vertices");
     expect(box.indices.size() == 36, "box has twelve indexed triangles");
+    expect(box.backfaceCullingSafe,
+        "closed box explicitly permits back-face culling");
     expect(box.bounds == wkc::core::Aabb{{-0.5F, -0.5F, -0.5F}, {0.5F, 0.5F, 0.5F}},
         "box bounds are exact");
 
@@ -70,6 +73,22 @@ void testMesh()
 
     MeshData empty;
     expect(!validateMeshData(empty, &reason), "empty mesh is rejected safely");
+}
+
+void testBackfaceCullingStateCache()
+{
+    wkc::render::BackfaceCullingStateCache cache;
+    expect(cache.needsUpdate(true) && !cache.needsUpdate(true)
+            && cache.needsUpdate(false) && !cache.needsUpdate(false),
+        "back-face culling cache updates only when raster state changes");
+    expect(cache.stats()
+            == wkc::render::BackfaceCullingStateStats{4U, 2U, 2U},
+        "back-face culling cache reports changes and avoided updates");
+
+    cache.beginFrame();
+    expect(cache.stats() == wkc::render::BackfaceCullingStateStats{}
+            && cache.needsUpdate(false),
+        "new frame invalidates externally mutable culling state");
 }
 
 void testMeshBindingCache()
@@ -1283,6 +1302,7 @@ int main()
 {
     testMesh();
     testMeshBindingCache();
+    testBackfaceCullingStateCache();
     testRendererShaderPathSelection();
     testTextureData();
     testTextureBindingCache();

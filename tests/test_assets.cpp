@@ -129,7 +129,8 @@ void testMeshGeneration()
     const auto builtRotated = generateMesh(rotated);
     expect(builtRotated
             && wkc::core::nearlyEqual(builtRotated->mesh.bounds.minimum, {0.5F, -0.5F, -1.0F})
-            && wkc::core::nearlyEqual(builtRotated->mesh.bounds.maximum, {1.5F, 0.5F, 1.0F}),
+            && wkc::core::nearlyEqual(builtRotated->mesh.bounds.maximum, {1.5F, 0.5F, 1.0F})
+            && builtRotated->mesh.backfaceCullingSafe,
         "mesh generation applies local scale, rotation and translation");
 
     MeshRecipe cylinder;
@@ -141,7 +142,8 @@ void testMeshGeneration()
     const auto builtCylinder = generateMesh(cylinder);
     expect(builtCylinder && wkc::render::validateMeshData(builtCylinder->mesh)
             && builtCylinder->mesh.vertices.size() == 54U
-            && builtCylinder->mesh.indices.size() == 144U,
+            && builtCylinder->mesh.indices.size() == 144U
+            && !builtCylinder->mesh.backfaceCullingSafe,
         "twelve-segment Cylinder generates valid side and cap geometry");
     expect(builtCylinder
             && wkc::core::nearlyEqual(

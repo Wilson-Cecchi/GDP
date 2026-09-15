@@ -88,6 +88,7 @@ MeshData makeBoxMesh()
         20, 21, 22, 20, 22, 23,
     };
     data.bounds = {{low, low, low}, {high, high, high}};
+    data.backfaceCullingSafe = true;
     return data;
 }
 
@@ -137,6 +138,7 @@ Mesh::Mesh(Mesh&& other) noexcept
     , vertexBuffer_(std::exchange(other.vertexBuffer_, 0))
     , indexBuffer_(std::exchange(other.indexBuffer_, 0))
     , indexCount_(std::exchange(other.indexCount_, 0))
+    , backfaceCullingSafe_(std::exchange(other.backfaceCullingSafe_, false))
 {
 }
 
@@ -149,6 +151,8 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept
         vertexBuffer_ = std::exchange(other.vertexBuffer_, 0);
         indexBuffer_ = std::exchange(other.indexBuffer_, 0);
         indexCount_ = std::exchange(other.indexCount_, 0);
+        backfaceCullingSafe_
+            = std::exchange(other.backfaceCullingSafe_, false);
     }
     return *this;
 }
@@ -196,6 +200,7 @@ bool Mesh::upload(const GlApi& gl, const MeshData& data)
     gl.bindVertexArray(0);
 
     indexCount_ = static_cast<std::uint32_t>(data.indices.size());
+    backfaceCullingSafe_ = data.backfaceCullingSafe;
     return vertexArray_ != 0 && vertexBuffer_ != 0 && indexBuffer_ != 0;
 }
 
@@ -239,6 +244,7 @@ void Mesh::reset() noexcept
     vertexBuffer_ = 0;
     indexBuffer_ = 0;
     indexCount_ = 0;
+    backfaceCullingSafe_ = false;
 }
 
 bool Mesh::isValid() const noexcept
@@ -249,6 +255,11 @@ bool Mesh::isValid() const noexcept
 std::uint32_t Mesh::indexCount() const noexcept
 {
     return indexCount_;
+}
+
+bool Mesh::backfaceCullingSafe() const noexcept
+{
+    return backfaceCullingSafe_;
 }
 
 } // namespace wkc::render

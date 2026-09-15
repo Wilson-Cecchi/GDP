@@ -190,6 +190,7 @@ add_library(
     src/render/GlApi.cpp
     src/render/GpuTimer.cpp
     src/render/Mesh.cpp
+    src/render/RasterState.cpp
     src/render/Shader.cpp
     src/render/Texture.cpp
 )

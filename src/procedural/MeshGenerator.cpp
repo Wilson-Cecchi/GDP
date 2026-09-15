@@ -143,12 +143,16 @@ std::optional<MeshBuildResult> generateMesh(const MeshRecipe& recipe)
     }
 
     MeshBuildResult result;
+    result.mesh.backfaceCullingSafe = true;
     const float infinity = std::numeric_limits<float>::infinity();
     result.mesh.bounds = {{infinity, infinity, infinity}, {-infinity, -infinity, -infinity}};
     result.ranges.reserve(recipe.primitives.size());
 
     for (const PrimitiveRecipe& primitive : recipe.primitives) {
         const wkc::render::MeshData baseMesh = primitiveMesh(primitive.type);
+        result.mesh.backfaceCullingSafe
+            = result.mesh.backfaceCullingSafe
+            && baseMesh.backfaceCullingSafe;
         const std::uint32_t vertexOffset = static_cast<std::uint32_t>(result.mesh.vertices.size());
         const std::uint32_t firstIndex = static_cast<std::uint32_t>(result.mesh.indices.size());
         const wkc::core::Vec3 dimensions = componentMultiply(

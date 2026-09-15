@@ -2696,6 +2696,10 @@ void Application::render()
         currentFramePerformance_.meshBinds = rendererStats.meshBinds;
         currentFramePerformance_.meshBindSkips = rendererStats.meshBindSkips;
         currentFramePerformance_.lowSpecShader = rendererStats.lowSpecShader;
+        currentFramePerformance_.backfaceCulledDraws
+            = rendererStats.backfaceCulledDraws;
+        currentFramePerformance_.cullStateChanges
+            = rendererStats.cullStateChanges;
         const auto presentStart = Clock::now();
         SDL_GL_SwapWindow(window_);
         currentFramePerformance_.presentMilliseconds
@@ -3254,6 +3258,10 @@ void Application::render()
     hud.performanceMeshBinds = performance.latest.meshBinds;
     hud.performanceMeshBindSkips = performance.latest.meshBindSkips;
     hud.performanceLowSpecShader = performance.latest.lowSpecShader;
+    hud.performanceBackfaceCulledDraws
+        = performance.latest.backfaceCulledDraws;
+    hud.performanceCullStateChanges
+        = performance.latest.cullStateChanges;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
     hud.armor = player_.state().armor;

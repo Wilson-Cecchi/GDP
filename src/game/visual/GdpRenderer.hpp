@@ -9,6 +9,7 @@
 #include "render/GlApi.hpp"
 #include "render/GpuTimer.hpp"
 #include "render/Mesh.hpp"
+#include "render/RasterState.hpp"
 #include "render/Shader.hpp"
 #include "render/Texture.hpp"
 
@@ -34,6 +35,8 @@ struct RendererFrameStats {
     std::uint64_t meshBinds{0U};
     std::uint64_t meshBindSkips{0U};
     bool lowSpecShader{false};
+    std::uint64_t backfaceCulledDraws{0U};
+    std::uint64_t cullStateChanges{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -116,6 +119,9 @@ public:
             = meshBindings_.stats();
         stats.meshBinds = meshStats.vertexArrayBinds;
         stats.meshBindSkips = meshStats.skippedVertexArrayBinds;
+        const wkc::render::BackfaceCullingStateStats cullingStats
+            = backfaceCulling_.stats();
+        stats.cullStateChanges = cullingStats.stateChanges;
         return stats;
     }
 
@@ -179,6 +185,7 @@ private:
     wkc::render::Shader lowSpecShader_{};
     wkc::render::Mesh box_{};
     wkc::render::MeshBindingCache meshBindings_{};
+    wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};
     wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
