@@ -468,6 +468,11 @@ especializados das pastas numeradas.
 - **Fase 124 — Cache de VAO/mesh:** draws consecutivos do mesmo mesh reutilizam
   o vertex array já ligado, sem executar bind e unbind em cada peça. O caminho
   tradicional permanece disponível, e `F3` informa binds realizados e evitados.
+- **Fase 125 — Shader de baixo custo:** `POTATO` e `LOW` usam uma variante
+  especializada quando respeitam o orçamento de até quatro luzes e zero
+  sombras. O shader remove em compilação normal mapping, especular e testes de
+  oclusão que esses perfis já mantinham desligados; entradas fora do contrato
+  voltam ao shader completo e o `F3` identifica `LOW SPEC` ou `FULL`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1211,6 +1216,16 @@ frame invalida o conhecimento do cache para tolerar operações OpenGL externas.
 `F3` mostra `MESH BIND` e `SKIP`; testes cobrem repetição, troca, invalidação,
 métricas e pixels reais. Geometria, ordem dos draws, materiais, perfis gráficos,
 gameplay e RNG permanecem inalterados.
+
+Na Fase 125, o GDP mantém dois programas sobre a mesma infraestrutura genérica
+de `wkc::render::Shader`. A variante `LOW SPEC` limita o laço a quatro luzes e
+retira do fragment shader, por compilação condicional, os caminhos de normal
+mapping, reflexão especular e interseção de sombras que já não participavam do
+resultado de `POTATO` e `LOW`. A seleção só acontece com materiais detalhados
+desligados, até quatro luzes e contadores de sombra zerados; qualquer chamada
+inconsistente falha conservadoramente para `FULL`. Uma regressão OpenGL desenha
+a mesma cena pelos dois programas e exige pixels byte a byte idênticos. Os
+orçamentos, texturas, cores, iluminação efetiva, gameplay e RNG não mudam.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

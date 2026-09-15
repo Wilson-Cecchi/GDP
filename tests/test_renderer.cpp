@@ -88,6 +88,27 @@ void testMeshBindingCache()
         "new frame invalidates external vertex-array state conservatively");
 }
 
+void testRendererShaderPathSelection()
+{
+    using gdp::game::visual::RendererShaderPath;
+    using gdp::game::visual::selectRendererShaderPath;
+
+    expect(selectRendererShaderPath(false, 2U, 0U, 0U)
+            == RendererShaderPath::LowSpec
+            && selectRendererShaderPath(false, 4U, 0U, 0U)
+                == RendererShaderPath::LowSpec,
+        "low-spec shader covers the Potato and Low light budgets");
+    expect(selectRendererShaderPath(true, 2U, 0U, 0U)
+            == RendererShaderPath::Full
+            && selectRendererShaderPath(false, 5U, 0U, 0U)
+                == RendererShaderPath::Full
+            && selectRendererShaderPath(false, 2U, 1U, 0U)
+                == RendererShaderPath::Full
+            && selectRendererShaderPath(false, 2U, 0U, 1U)
+                == RendererShaderPath::Full,
+        "unsupported detail, light and shadow inputs fail back to the full shader");
+}
+
 void testTextureData()
 {
     using namespace wkc::render;
@@ -1262,6 +1283,7 @@ int main()
 {
     testMesh();
     testMeshBindingCache();
+    testRendererShaderPathSelection();
     testTextureData();
     testTextureBindingCache();
     testCameraAndMatrices();

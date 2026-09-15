@@ -47,6 +47,10 @@ void main()
 )glsl";
 
 constexpr std::string_view fragmentShaderSource = R"glsl(#version 330 core
+#ifndef GDP_LOW_SPEC
+#define GDP_LOW_SPEC 0
+#endif
+
 in vec3 vWorldPosition;
 in vec3 vNormal;
 in vec2 vUv;
@@ -57,17 +61,23 @@ uniform sampler2D uMaterialMap;
 uniform sampler2D uEmissionMap;
 uniform vec3 uTint;
 uniform vec3 uCameraPosition;
+#if GDP_LOW_SPEC
+const int MAX_LIGHTS = 4;
+#else
 const int MAX_LIGHTS = 8;
+#endif
 uniform int uLightCount;
 uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
 uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
 const int MAX_SHADOW_OCCLUDERS = 16;
+#if !GDP_LOW_SPEC
 uniform int uShadowLightCount;
 uniform int uShadowOccluderCount;
 uniform vec3 uShadowOccluderMinima[MAX_SHADOW_OCCLUDERS];
 uniform vec3 uShadowOccluderMaxima[MAX_SHADOW_OCCLUDERS];
+#endif
 uniform vec3 uAmbientColor;
 uniform float uAmbientIntensity;
 uniform vec2 uUvScale;
@@ -93,6 +103,7 @@ mat3 cotangentFrame(vec3 normal, vec3 position, vec2 uv)
     return mat3(tangent * scale, bitangent * scale, normal);
 }
 
+#if !GDP_LOW_SPEC
 bool segmentIntersectsShadowBox(
     vec3 origin,
     vec3 direction,
@@ -145,6 +156,7 @@ float directLightVisibility(
     }
     return 1.0;
 }
+#endif
 
 void main()
 {
@@ -154,6 +166,7 @@ void main()
     float roughness = 0.72;
     float metalness = 0.0;
     float ambientOcclusion = 1.0;
+#if !GDP_LOW_SPEC
     if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
         vec3 tangentNormal = texture(uNormalMap, materialUv).xyz * 2.0 - 1.0;
         normal = normalize(cotangentFrame(normal, vWorldPosition, materialUv) * tangentNormal);
@@ -162,8 +175,11 @@ void main()
         metalness = clamp(material.g, 0.0, 1.0);
         ambientOcclusion = clamp(material.b, 0.0, 1.0);
     }
+#endif
     vec3 result = albedo * uAmbientColor * uAmbientIntensity * ambientOcclusion;
+#if !GDP_LOW_SPEC
     vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
+#endif
     for (int index = 0; index < MAX_LIGHTS; ++index) {
         if (index >= uLightCount) {
             break;
@@ -179,11 +195,15 @@ void main()
         float attenuation = 1.0 / (1.0 + 2.2 * normalizedDistance * normalizedDistance);
         vec3 radiance = uLightColors[index] * attenuation
             * uLightIntensities[index] * 1.9;
-        float visibility = diffuse > 0.0
+        float visibility = 1.0;
+#if !GDP_LOW_SPEC
+        visibility = diffuse > 0.0
             ? directLightVisibility(
                 vWorldPosition, normal, uLightPositions[index], index)
             : 1.0;
+#endif
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
+#if !GDP_LOW_SPEC
         if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0
             && diffuse > 0.0) {
             vec3 halfway = normalize(lightDirection + viewDirection);
@@ -193,6 +213,7 @@ void main()
             vec3 reflectance = mix(vec3(0.035), albedo, metalness);
             result += reflectance * highlight * diffuse * radiance * visibility;
         }
+#endif
     }
     float emissiveMask = uUseEmissionMap != 0
         ? texture(uEmissionMap, materialUv).r
@@ -200,6 +221,14 @@ void main()
     fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength), 1.0);
 }
 )glsl";
+
+std::string makeLowSpecFragmentShaderSource()
+{
+    std::string source{fragmentShaderSource};
+    constexpr std::string_view versionLine{"#version 330 core\n"};
+    source.insert(versionLine.size(), "#define GDP_LOW_SPEC 1\n");
+    return source;
+}
 
 enum class RoomMaterialChannel : std::uint8_t {
     Wall,
@@ -371,7 +400,9 @@ bool GdpRenderer::initialize(const int width, const int height)
     if (!loadGlApi(gl_)) {
         return false;
     }
-    if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)) {
+    if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)
+        || !lowSpecShader_.compile(
+            gl_, vertexShaderSource, makeLowSpecFragmentShaderSource())) {
         return false;
     }
     if (!box_.upload(gl_, wkc::render::makeBoxMesh())) {
@@ -943,11 +974,27 @@ bool GdpRenderer::render(
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
     }
-    shader_.beginUniformFrame();
     const int renderScalePercent = std::clamp(
         static_cast<int>(hud.worldRenderScalePercent), 50, 100);
     const int renderWidth = std::max(1, (width * renderScalePercent) / 100);
     const int renderHeight = std::max(1, (height * renderScalePercent) / 100);
+    const std::uint32_t lightCount = std::min<std::uint32_t>(
+        lighting.lightCount, static_cast<std::uint32_t>(maxRenderedRoomLights));
+    const std::uint32_t shadowLightCount = std::min({
+        lighting.shadowLightCount,
+        lightCount,
+        static_cast<std::uint32_t>(maxShadowCastingLights)});
+    const std::uint32_t shadowOccluderCount = std::min({
+        lighting.shadowOccluderCount,
+        static_cast<std::uint32_t>(maxActiveShadowOccluders),
+        static_cast<std::uint32_t>(maxShadowOccluders)});
+    lowSpecShaderActive_ = selectRendererShaderPath(
+        hud.detailedMaterials, lightCount,
+        shadowLightCount, shadowOccluderCount)
+        == RendererShaderPath::LowSpec;
+    lastFrameStats_.lowSpecShader = lowSpecShaderActive_;
+    wkc::render::Shader& shader = activeShader();
+    shader.beginUniformFrame();
     lastFrameStats_.meshCacheEntries = meshCache_.stats().entries;
     lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
     if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
@@ -968,46 +1015,38 @@ bool GdpRenderer::render(
     glClearColor(0.018F, 0.025F, 0.03F, 1.0F);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    shader_.use(gl_);
+    shader.use(gl_);
     camera_.setPerspective(camera.verticalFieldOfViewDegrees, 0.05F, 100.0F);
     camera_.lookAt(camera.position, camera.position + camera.forward);
-    shader_.setInt(gl_, "uAlbedo", 0);
-    shader_.setInt(gl_, "uNormalMap", 1);
-    shader_.setInt(gl_, "uMaterialMap", 2);
-    shader_.setInt(gl_, "uEmissionMap", 3);
-    shader_.setInt(gl_, "uUseEmissionMap", 0);
-    shader_.setInt(gl_, "uDetailedMaterialsEnabled",
+    shader.setInt(gl_, "uAlbedo", 0);
+    shader.setInt(gl_, "uNormalMap", 1);
+    shader.setInt(gl_, "uMaterialMap", 2);
+    shader.setInt(gl_, "uEmissionMap", 3);
+    shader.setInt(gl_, "uUseEmissionMap", 0);
+    shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
-    shader_.setVec3(gl_, "uCameraPosition", camera.position);
-    shader_.setMat4(gl_, "uView", camera_.viewMatrix());
-    shader_.setMat4(
+    shader.setVec3(gl_, "uCameraPosition", camera.position);
+    shader.setMat4(gl_, "uView", camera_.viewMatrix());
+    shader.setMat4(
         gl_,
         "uProjection",
         camera_.projectionMatrix(
             static_cast<float>(renderWidth) / static_cast<float>(renderHeight)));
-    const std::uint32_t lightCount = std::min<std::uint32_t>(
-        lighting.lightCount, static_cast<std::uint32_t>(maxRenderedRoomLights));
     const wkc::core::Vec3 alertColor{1.0F, 0.12F, 0.06F};
     const wkc::core::Vec3 ambientColor = lighting.alert
         ? (lighting.ambientColor * 0.28F) + (alertColor * 0.72F)
         : lighting.ambientColor;
-    shader_.setInt(gl_, "uLightCount", static_cast<int>(lightCount));
-    shader_.setVec3(gl_, "uAmbientColor", ambientColor);
-    shader_.setFloat(gl_, "uAmbientIntensity",
+    shader.setInt(gl_, "uLightCount", static_cast<int>(lightCount));
+    shader.setVec3(gl_, "uAmbientColor", ambientColor);
+    shader.setFloat(gl_, "uAmbientIntensity",
         lighting.alert ? std::max(lighting.ambientIntensity, 0.16F)
                        : lighting.ambientIntensity);
-    const std::uint32_t shadowLightCount = std::min({
-        lighting.shadowLightCount,
-        lightCount,
-        static_cast<std::uint32_t>(maxShadowCastingLights)});
-    const std::uint32_t shadowOccluderCount = std::min({
-        lighting.shadowOccluderCount,
-        static_cast<std::uint32_t>(maxActiveShadowOccluders),
-        static_cast<std::uint32_t>(maxShadowOccluders)});
-    shader_.setInt(gl_, "uShadowLightCount",
-        static_cast<int>(shadowLightCount));
-    shader_.setInt(gl_, "uShadowOccluderCount",
-        static_cast<int>(shadowOccluderCount));
+    if (!lowSpecShaderActive_) {
+        shader.setInt(gl_, "uShadowLightCount",
+            static_cast<int>(shadowLightCount));
+        shader.setInt(gl_, "uShadowOccluderCount",
+            static_cast<int>(shadowOccluderCount));
+    }
     constexpr std::array positionUniforms{
         "uLightPositions[0]", "uLightPositions[1]",
         "uLightPositions[2]", "uLightPositions[3]",
@@ -1057,16 +1096,16 @@ bool GdpRenderer::render(
         const wkc::core::Vec3 lightColor = lighting.alert
             ? (light.color * 0.24F) + (alertColor * 0.76F)
             : light.color;
-        shader_.setVec3(gl_, positionUniforms[index], light.position);
-        shader_.setVec3(gl_, colorUniforms[index], lightColor);
-        shader_.setFloat(gl_, intensityUniforms[index],
+        shader.setVec3(gl_, positionUniforms[index], light.position);
+        shader.setVec3(gl_, colorUniforms[index], lightColor);
+        shader.setFloat(gl_, intensityUniforms[index],
             lighting.alert ? light.intensity * 1.08F : light.intensity);
-        shader_.setFloat(gl_, rangeUniforms[index], light.range);
+        shader.setFloat(gl_, rangeUniforms[index], light.range);
     }
     for (std::size_t index = 0; index < shadowOccluderCount; ++index) {
-        shader_.setVec3(gl_, shadowMinimumUniforms[index],
+        shader.setVec3(gl_, shadowMinimumUniforms[index],
             lighting.shadowOccluders[index].bounds.minimum);
-        shader_.setVec3(gl_, shadowMaximumUniforms[index],
+        shader.setVec3(gl_, shadowMaximumUniforms[index],
             lighting.shadowOccluders[index].bounds.maximum);
     }
 
@@ -1082,7 +1121,7 @@ bool GdpRenderer::render(
             ? fallbackMaterials->second : materials->second;
     };
 
-    const auto drawSurface = [this](
+    const auto drawSurface = [this, &shader](
         const RoomGpuMaterials& roomMaterials,
         const wkc::core::Vec3 position,
         const wkc::core::Vec3 scale,
@@ -1142,19 +1181,19 @@ bool GdpRenderer::render(
             fallbackTexture_.bind(gl_, textureBindings_);
             break;
         }
-        shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
+        shader.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
                 * wkc::core::scaleMatrix(scale));
-        shader_.setVec3(gl_, "uTint", resolvedTint);
-        shader_.setInt(gl_, "uDetailedMaterial", detailedMaterial ? 1 : 0);
+        shader.setVec3(gl_, "uTint", resolvedTint);
+        shader.setInt(gl_, "uDetailedMaterial", detailedMaterial ? 1 : 0);
         const bool customUv = detailedMaterial
             && detailedUvScale.x > 0.0F && detailedUvScale.y > 0.0F;
-        shader_.setVec2(gl_, "uUvScale",
+        shader.setVec2(gl_, "uUvScale",
             customUv ? detailedUvScale : wkc::core::Vec2{uvScale, uvScale});
-        shader_.setVec2(gl_, "uUvOffset",
+        shader.setVec2(gl_, "uUvOffset",
             customUv
                 ? detailedUvOffset + materialUvOffset
                 : wkc::core::Vec2{});
-        shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
+        shader.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
         drawMesh(box_);
     };
 
@@ -1382,13 +1421,13 @@ bool GdpRenderer::render(
                                        const wkc::core::Vec3 scale,
                                        const wkc::core::Vec3 tint,
                                        const float emissive) {
-            shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
+            shader.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
                     * wkc::core::scaleMatrix(scale));
-            shader_.setVec3(gl_, "uTint", tint);
-            shader_.setInt(gl_, "uDetailedMaterial", 0);
-            shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
-            shader_.setVec2(gl_, "uUvOffset", {});
-            shader_.setFloat(gl_, "uEmissiveStrength", emissive);
+            shader.setVec3(gl_, "uTint", tint);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
         constexpr float frameThickness = 0.14F;
@@ -1437,9 +1476,9 @@ bool GdpRenderer::render(
     }
 
     fallbackTexture_.bind(gl_, textureBindings_);
-    shader_.setInt(gl_, "uDetailedMaterial", 0);
-    shader_.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
-    shader_.setVec2(gl_, "uUvOffset", {});
+    shader.setInt(gl_, "uDetailedMaterial", 0);
+    shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+    shader.setVec2(gl_, "uUvOffset", {});
     for (const ImpactRenderData& impact : impacts) {
         const float strength = std::clamp(
             std::isfinite(impact.strength) ? impact.strength : 0.0F,
@@ -1453,10 +1492,10 @@ bool GdpRenderer::render(
         const wkc::core::Vec3 normal = wkc::core::normalized(impact.normal);
         const wkc::core::Vec3 center
             = impact.position + (normal * 0.018F);
-        shader_.setMat4(gl_, "uModel", wkc::core::translationMatrix(center)
+        shader.setMat4(gl_, "uModel", wkc::core::translationMatrix(center)
                 * wkc::core::scaleMatrix({size, size, size}));
-        shader_.setVec3(gl_, "uTint", color);
-        shader_.setFloat(gl_, "uEmissiveStrength",
+        shader.setVec3(gl_, "uTint", color);
+        shader.setFloat(gl_, "uEmissiveStrength",
             impact.material == ImpactVisualMaterial::Metal ? 0.75F : 0.12F);
         drawMesh(box_);
 
@@ -1477,11 +1516,11 @@ bool GdpRenderer::render(
                 std::sin(phase) * travel,
             };
             const float particleSize = size * (0.34F + (strength * 0.18F));
-            shader_.setMat4(gl_, "uModel",
+            shader.setMat4(gl_, "uModel",
                 wkc::core::translationMatrix(center + particleOffset)
                     * wkc::core::scaleMatrix(
                         {particleSize, particleSize, particleSize}));
-            shader_.setVec3(gl_, "uTint", color);
+            shader.setVec3(gl_, "uTint", color);
             drawMesh(box_);
         }
     }
@@ -1490,8 +1529,8 @@ bool GdpRenderer::render(
     ceilingFixtureMaterial_.normal.bind(gl_, textureBindings_, 1U);
     ceilingFixtureMaterial_.properties.bind(gl_, textureBindings_, 2U);
     ceilingFixtureMaterial_.emission.bind(gl_, textureBindings_, 3U);
-    shader_.setInt(gl_, "uDetailedMaterial", 1);
-    shader_.setInt(gl_, "uUseEmissionMap", 1);
+    shader.setInt(gl_, "uDetailedMaterial", 1);
+    shader.setInt(gl_, "uUseEmissionMap", 1);
     constexpr wkc::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
@@ -1503,20 +1542,20 @@ bool GdpRenderer::render(
             = baseLensEmission * light.fixtureEmissionScale;
         const wkc::core::Vec3 lensTint = lensEmission > 0.01F
             ? fixtureColor : wkc::core::Vec3{0.42F, 0.44F, 0.43F};
-        const auto drawFixturePiece = [this, &light](
+        const auto drawFixturePiece = [this, &light, &shader](
             const wkc::core::Vec3 offset,
             const wkc::core::Vec3 scale,
             const wkc::core::Vec2 uvScale,
             const wkc::core::Vec2 uvOffset,
             const wkc::core::Vec3 tint,
             const float emissiveStrength) {
-            shader_.setMat4(gl_, "uModel",
+            shader.setMat4(gl_, "uModel",
                 wkc::core::translationMatrix(light.position + offset)
                     * wkc::core::scaleMatrix(scale));
-            shader_.setVec3(gl_, "uTint", tint);
-            shader_.setVec2(gl_, "uUvScale", uvScale);
-            shader_.setVec2(gl_, "uUvOffset", uvOffset);
-            shader_.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
+            shader.setVec3(gl_, "uTint", tint);
+            shader.setVec2(gl_, "uUvScale", uvScale);
+            shader.setVec2(gl_, "uUvOffset", uvOffset);
+            shader.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
             drawMesh(box_);
         };
         const wkc::core::Vec3 housingTint
@@ -1545,9 +1584,9 @@ bool GdpRenderer::render(
                 {0.14F, 0.96F}, {0.52F, 0.02F}, housingTint, 0.0F);
         }
     }
-    shader_.setInt(gl_, "uUseEmissionMap", 0);
-    shader_.setInt(gl_, "uDetailedMaterial", 0);
-    shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
+    shader.setInt(gl_, "uUseEmissionMap", 0);
+    shader.setInt(gl_, "uDetailedMaterial", 0);
+    shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
 
     for (const EnemyRenderData& enemy : enemies) {
         auto* visuals = &workerVisuals_;
@@ -1598,7 +1637,7 @@ bool GdpRenderer::render(
         const float visibleHitStrength
             = hit ? hitStrength * transitionBlend : hitStrength;
         const float deathBlend = !enemy.alive ? transitionBlend : 0.0F;
-        shader_.setVec3(
+        shader.setVec3(
             gl_, "uTint", !enemy.alive
                 ? wkc::core::Vec3{
                     1.0F - (deathBlend * 0.70F),
@@ -1611,10 +1650,10 @@ bool GdpRenderer::render(
                 : enemy.active
                 ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                 : wkc::core::Vec3{0.68F, 0.72F, 0.78F});
-        shader_.setInt(gl_, "uDetailedMaterial", 0);
-        shader_.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
-        shader_.setVec2(gl_, "uUvOffset", {});
-        shader_.setFloat(gl_, "uEmissiveStrength",
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setFloat(gl_, "uEmissiveStrength",
             enemy.alive
                 ? visual->second.emissiveStrength
                     * (hit ? 1.0F + (visibleHitStrength * 0.15F)
@@ -1650,7 +1689,7 @@ bool GdpRenderer::render(
                     partPose.rotationDegrees.z * degreesToRadians)
                 * wkc::core::translationMatrix(
                     {-part.pivot.x, -part.pivot.y, -part.pivot.z});
-            shader_.setMat4(gl_, "uModel", rootModel * partModel);
+            shader.setMat4(gl_, "uModel", rootModel * partModel);
             drawMesh(part.mesh);
         }
     }
@@ -1679,12 +1718,12 @@ bool GdpRenderer::render(
             = wkc::core::translationMatrix(
                 pickup.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
             * wkc::core::scaleMatrix(scale);
-        shader_.setMat4(gl_, "uModel", model);
-        shader_.setVec3(gl_, "uTint", tint);
-        shader_.setInt(gl_, "uDetailedMaterial", 0);
-        shader_.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
-        shader_.setVec2(gl_, "uUvOffset", {});
-        shader_.setFloat(gl_, "uEmissiveStrength", 0.16F);
+        shader.setMat4(gl_, "uModel", model);
+        shader.setVec3(gl_, "uTint", tint);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setFloat(gl_, "uEmissiveStrength", 0.16F);
         drawMesh(box_);
     }
 
@@ -1712,22 +1751,22 @@ bool GdpRenderer::render(
         const wkc::core::Mat4 model = wkc::core::translationMatrix(
             prop.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
             * wkc::core::scaleMatrix(scale);
-        shader_.setMat4(gl_, "uModel", model);
-        shader_.setVec3(gl_, "uTint", tint);
-        shader_.setInt(gl_, "uDetailedMaterial", 0);
-        shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
-        shader_.setVec2(gl_, "uUvOffset", {});
-        shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setMat4(gl_, "uModel", model);
+        shader.setVec3(gl_, "uTint", tint);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
         drawMesh(box_);
     }
 
     if (weaponViewmodel.visible) {
         glClear(GL_DEPTH_BUFFER_BIT);
         fallbackTexture_.bind(gl_, textureBindings_);
-        shader_.setInt(gl_, "uDetailedMaterial", 0);
-        shader_.setInt(gl_, "uUseEmissionMap", 0);
-        shader_.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
-        shader_.setVec2(gl_, "uUvOffset", {});
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setInt(gl_, "uUseEmissionMap", 0);
+        shader.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
 
         const wkc::core::Vec3 forward = wkc::core::normalized(camera.forward);
         wkc::core::Vec3 right = wkc::core::normalized(
@@ -1778,9 +1817,9 @@ bool GdpRenderer::render(
                 * wkc::core::rotationYMatrix(rotationDegrees.y * degreesToRadians)
                 * wkc::core::rotationXMatrix(rotationDegrees.x * degreesToRadians)
                 * wkc::core::scaleMatrix(scale);
-            shader_.setMat4(gl_, "uModel", model);
-            shader_.setVec3(gl_, "uTint", color);
-            shader_.setFloat(gl_, "uEmissiveStrength", emissive);
+            shader.setMat4(gl_, "uModel", model);
+            shader.setVec3(gl_, "uTint", color);
+            shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
 
@@ -1828,7 +1867,7 @@ bool GdpRenderer::render(
                 {0.20F * flash, 0.025F, 0.055F},
                 {0.0F, 0.0F, -45.0F}, flashColor, 1.5F);
         }
-        shader_.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
     }
 
     framebuffer_.presentToDefault(gl_, width, height);
@@ -2397,7 +2436,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 12> lines{
+        const std::array<std::string, 13> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2420,6 +2459,8 @@ bool GdpRenderer::render(
             "LIGHT " + std::to_string(hud.performanceActiveLights)
                 + " SHADOW " + std::to_string(hud.performanceShadowLights)
                 + "X" + std::to_string(hud.performanceShadowOccluders),
+            std::string{"SHADER "}
+                + (hud.performanceLowSpecShader ? "LOW SPEC" : "FULL"),
             "UNIFORM UP " + std::to_string(hud.performanceUniformUploads)
                 + " SKIP " + std::to_string(hud.performanceUniformSkips),
             "TEXTURE BIND " + std::to_string(hud.performanceTextureBinds)

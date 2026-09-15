@@ -240,12 +240,30 @@ int main()
                 = gdp::game::visual::HudGraphicsQuality::Potato;
             potatoQuality.worldRenderScalePercent = 50U;
             potatoQuality.detailedMaterials = false;
+            gdp::game::visual::RoomLightingRenderData potatoLighting
+                = proceduralLighting;
+            potatoLighting.lightCount = 2U;
+            potatoLighting.shadowLightCount = 0U;
+            potatoLighting.shadowOccluderCount = 0U;
             const bool renderedPotatoQuality = renderer.render(
-                width, height, {}, {}, {}, {}, proceduralLighting,
+                width, height, {}, {}, {}, {}, potatoLighting,
                 {}, {}, {}, {}, potatoQuality);
+            const gdp::game::visual::RendererFrameStats potatoFrameStats
+                = renderer.lastFrameStats();
             std::vector<std::uint8_t> potatoQualityPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 potatoQualityPixels.data());
+            gdp::game::visual::RoomLightingRenderData potatoReferenceLighting
+                = potatoLighting;
+            potatoReferenceLighting.shadowOccluderCount = 1U;
+            const bool renderedPotatoReference = renderer.render(
+                width, height, {}, {}, {}, {}, potatoReferenceLighting,
+                {}, {}, {}, {}, potatoQuality);
+            const gdp::game::visual::RendererFrameStats potatoReferenceStats
+                = renderer.lastFrameStats();
+            std::vector<std::uint8_t> potatoReferencePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                potatoReferencePixels.data());
 
             gdp::game::visual::RoomLightingRenderData damagedFixtureLighting
                 = proceduralLighting;
@@ -538,6 +556,7 @@ int main()
             performanceHud.performanceTextureBindSkips = 90U;
             performanceHud.performanceMeshBinds = 12U;
             performanceHud.performanceMeshBindSkips = 81U;
+            performanceHud.performanceLowSpecShader = true;
             const bool renderedPerformanceOverlay = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
             const gdp::game::visual::RendererFrameStats performanceFrameStats
@@ -1101,6 +1120,10 @@ int main()
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
                 && renderedPotatoQuality && potatoQualityChangedChannels > 100U
+                && potatoFrameStats.lowSpecShader
+                && renderedPotatoReference
+                && !potatoReferenceStats.lowSpecShader
+                && potatoReferencePixels == potatoQualityPixels
                 && renderedDamagedFixture
                 && damagedFixtureChangedChannels > 100U
                 && renderedDestroyedFixture

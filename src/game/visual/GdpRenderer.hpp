@@ -33,12 +33,29 @@ struct RendererFrameStats {
     std::uint64_t textureBindSkips{0U};
     std::uint64_t meshBinds{0U};
     std::uint64_t meshBindSkips{0U};
+    bool lowSpecShader{false};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
     constexpr bool operator==(const RendererFrameStats&) const noexcept
         = default;
 };
+
+enum class RendererShaderPath : std::uint8_t {
+    Full,
+    LowSpec,
+};
+
+[[nodiscard]] constexpr RendererShaderPath selectRendererShaderPath(
+    const bool detailedMaterials,
+    const std::uint32_t lightCount,
+    const std::uint32_t shadowLightCount,
+    const std::uint32_t shadowOccluderCount) noexcept
+{
+    return !detailedMaterials && lightCount <= 4U
+            && shadowLightCount == 0U && shadowOccluderCount == 0U
+        ? RendererShaderPath::LowSpec : RendererShaderPath::Full;
+}
 
 class GdpRenderer {
 public:
@@ -87,7 +104,7 @@ public:
     {
         RendererFrameStats stats = lastFrameStats_;
         const wkc::render::ShaderUniformValueCacheStats uniformStats
-            = shader_.uniformValueCacheStats();
+            = activeShader().uniformValueCacheStats();
         stats.uniformUploads = uniformStats.uploads;
         stats.uniformSkips = uniformStats.skips;
         const wkc::render::TextureBindingCacheStats textureStats
@@ -104,6 +121,14 @@ public:
 
 private:
     void drawMesh(const wkc::render::Mesh& mesh) noexcept;
+    [[nodiscard]] wkc::render::Shader& activeShader() noexcept
+    {
+        return lowSpecShaderActive_ ? lowSpecShader_ : shader_;
+    }
+    [[nodiscard]] const wkc::render::Shader& activeShader() const noexcept
+    {
+        return lowSpecShaderActive_ ? lowSpecShader_ : shader_;
+    }
 
     struct EnemyGpuPart {
         wkc::render::Mesh mesh;
@@ -151,6 +176,7 @@ private:
     wkc::render::Camera camera_{};
     wkc::render::Framebuffer framebuffer_{};
     wkc::render::Shader shader_{};
+    wkc::render::Shader lowSpecShader_{};
     wkc::render::Mesh box_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::Texture fallbackTexture_{};
@@ -173,6 +199,7 @@ private:
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};
     RendererFrameStats lastFrameStats_{};
+    bool lowSpecShaderActive_{false};
     bool initialized_{false};
 };
 
