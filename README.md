@@ -1,6 +1,8 @@
 # GDP Technical Bible
 
-Pacote modular de documentação técnica do novo GDP.
+GDP é um FPS procedural jogável, desenvolvido em C++20, SDL3 e OpenGL sobre
+uma engine própria. Este repositório reúne a implementação, os testes e a
+documentação técnica modular que orienta a evolução do projeto.
 
 `architecture.md` é o documento-mestre canônico. O arquivo
 `GDP_arquitetura_tecnica.md` preserva a versão-fonte consolidada usada nesta
