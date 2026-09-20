@@ -49,6 +49,7 @@ namespace gdp::game {
 struct ApplicationConfig {
     bool headless{false};
     std::optional<std::uint64_t> frameLimit;
+    std::optional<gameplay::GraphicsQuality> benchmarkQuality;
     int windowWidth{1280};
     int windowHeight{720};
     wkc::core::Seed worldSeed{deterministicDefaultWorldSeed};

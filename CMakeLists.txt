@@ -321,6 +321,16 @@ target_link_libraries(
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
 
+add_custom_target(
+    graphics-benchmark
+    COMMAND ${CMAKE_COMMAND}
+        -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_graphics_benchmark.cmake
+    DEPENDS gdp
+    USES_TERMINAL
+    COMMENT "Benchmarking all GDP graphics profiles"
+)
+
 if(WIN32)
     install(TARGETS gdp RUNTIME DESTINATION .)
 
@@ -718,6 +728,18 @@ if(GDP_BUILD_TESTS)
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy"
                 PASS_REGULAR_EXPRESSION "Main menu initialized before world generation"
                 TIMEOUT 20
+        )
+
+        add_test(
+            NAME graphics_benchmark_smoke
+            COMMAND ${CMAKE_COMMAND}
+                -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+                -DGDP_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_graphics_benchmark.cmake)
+        set_tests_properties(
+            graphics_benchmark_smoke
+            PROPERTIES
+                TIMEOUT 180
         )
 
         add_test(

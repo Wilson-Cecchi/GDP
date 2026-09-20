@@ -464,8 +464,9 @@ Application::~Application()
 int Application::run()
 {
     using Clock = std::chrono::steady_clock;
+    const bool benchmarkMode = config_.benchmarkQuality.has_value();
     bool beginAnotherRun = false;
-    bool launchRunImmediately = config_.headless;
+    bool launchRunImmediately = config_.headless || benchmarkMode;
     do {
         restartRequested_ = false;
         restartMode_ = gameplay::RunRestartMode::NextSeed;
@@ -490,14 +491,24 @@ int Application::run()
             const std::chrono::duration<double> elapsed = currentTime - previousTime;
             previousTime = currentTime;
 
-            const double frameDelta = config_.headless
+            const double frameDelta = (config_.headless || benchmarkMode)
                 ? clock_.fixedStepSeconds() : elapsed.count();
             clock_.advanceBy(frameDelta);
 
             currentFramePerformance_ = {};
             const auto updateStart = Clock::now();
             input_.beginFrame();
-            processEvents();
+            if (benchmarkMode) {
+                SDL_Event event;
+                while (SDL_PollEvent(&event)) {
+                    if (event.type == SDL_EVENT_QUIT) {
+                        running_ = false;
+                    }
+                }
+                input_ = Input{};
+            } else {
+                processEvents();
+            }
             if (!running_) {
                 continue;
             }
@@ -561,6 +572,44 @@ int Application::run()
                 << performance.assetPreparationMilliseconds << " ms";
             log(LogLevel::Info, performanceSummary.str());
         }
+        if (benchmarkMode && performance.sampleCount > 0U) {
+            int benchmarkWidth = config_.windowWidth;
+            int benchmarkHeight = config_.windowHeight;
+            if (window_ != nullptr) {
+                (void)SDL_GetWindowSizeInPixels(
+                    window_, &benchmarkWidth, &benchmarkHeight);
+            }
+            const FramePerformanceSample& latest = performance.latest;
+            std::ostringstream benchmarkSummary;
+            benchmarkSummary << std::fixed << std::setprecision(2)
+                << "BENCHMARK profile="
+                << gameplay::graphicsQualityName(*config_.benchmarkQuality)
+                << " seed=" << config_.worldSeed
+                << " resolution=" << benchmarkWidth << 'x' << benchmarkHeight
+                << " frames=" << renderedFrames_
+                << " samples=" << performance.sampleCount
+                << " avg_ms=" << performance.averageFrameMilliseconds
+                << " p95_ms=" << performance.percentile95FrameMilliseconds
+                << " worst_ms=" << performance.worstFrameMilliseconds
+                << " fps=" << performance.estimatedFramesPerSecond
+                << " over_budget_pct=" << performance.framesOverBudgetPercent
+                << " update_ms=" << performance.averageUpdateMilliseconds
+                << " render_ms=" << performance.averageRenderMilliseconds
+                << " present_ms=" << performance.averagePresentMilliseconds
+                << " gpu_ms=" << performance.averageGpuMilliseconds
+                << " gpu_samples=" << performance.gpuSampleCount
+                << " draws=" << latest.drawCalls
+                << " triangles=" << latest.triangles
+                << " rooms=" << latest.visibleRooms
+                << " enemies=" << latest.visibleEnemies
+                << " props=" << latest.visibleProps
+                << " lights=" << latest.activeLights
+                << " shadow_lights=" << latest.shadowLights
+                << " shadow_occluders=" << latest.shadowOccluders
+                << " low_spec=" << (latest.lowSpecShader ? 1 : 0)
+                << " culled_draws=" << latest.backfaceCulledDraws;
+            log(LogLevel::Info, benchmarkSummary.str());
+        }
         beginAnotherRun = restartRequested_;
         shutdown();
         if (fatalError_) {
@@ -595,7 +644,7 @@ bool Application::initialize()
     loadPersistedCampaignCheckpoint();
 
     audio_ = std::make_unique<gdp::audio::AudioSystem>();
-    (void)audio_->initialize(!config_.headless);
+    (void)audio_->initialize(!config_.headless && !config_.benchmarkQuality);
     applyRuntimeSettings();
 
     if (config_.headless) {
@@ -1737,6 +1786,17 @@ void Application::loadPersistedSettings()
         return;
     }
     settingsLoaded_ = true;
+    if (config_.benchmarkQuality) {
+        runtimeSettings_ = {};
+        runtimeSettings_.graphicsQuality = *config_.benchmarkQuality;
+        runtimeSettings_.windowResolution
+            = gameplay::WindowResolution::R1280x720;
+        runtimeSettings_.fullscreen = false;
+        runtimeSettings_.verticalSync = false;
+        log(LogLevel::Info,
+            "Benchmark settings isolated from persisted player preferences");
+        return;
+    }
     if (config_.headless) {
         return;
     }
@@ -1807,7 +1867,7 @@ void Application::loadPersistedSpeedrunRecord()
         return;
     }
     speedrunRecordLoaded_ = true;
-    if (config_.headless) {
+    if (config_.headless || config_.benchmarkQuality) {
         return;
     }
 
@@ -1870,7 +1930,7 @@ void Application::loadPersistedCampaignCheckpoint()
         return;
     }
     campaignCheckpointLoaded_ = true;
-    if (config_.headless) {
+    if (config_.headless || config_.benchmarkQuality) {
         return;
     }
 

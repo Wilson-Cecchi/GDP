@@ -15,11 +15,13 @@ namespace {
 
 void printUsage(const std::string_view executable)
 {
-    std::cout << "Usage: " << executable << " [--headless] [--frames N] [--seed N] [--help]\n"
-              << "  --headless  Run without creating a window or OpenGL context.\n"
-              << "  --frames N  Stop after exactly N rendered loop iterations.\n"
-              << "  --seed N    Generate a deterministic world from unsigned integer N.\n"
-              << "  --help      Show this message.\n";
+    std::cout << "Usage: " << executable
+              << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N] [--help]\n"
+              << "  --headless           Run without creating a window or OpenGL context.\n"
+              << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
+              << "  --frames N           Stop after exactly N rendered loop iterations.\n"
+              << "  --seed N             Generate a deterministic world from unsigned integer N.\n"
+              << "  --help               Show this message.\n";
 }
 
 std::optional<std::uint64_t> parseSeed(const std::string_view value)
@@ -87,6 +89,22 @@ int main(const int argc, char* argv[])
             continue;
         }
 
+        if (argument == "--benchmark") {
+            if (index + 1 >= argc) {
+                std::cerr << "Missing value after --benchmark\n";
+                return 2;
+            }
+            const auto quality
+                = gdp::gameplay::graphicsQualityForName(argv[++index]);
+            if (!quality) {
+                std::cerr << "Invalid benchmark profile: " << argv[index]
+                          << " (expected POTATO, LOW, MEDIUM, HIGH, or ULTRA)\n";
+                return 2;
+            }
+            config.benchmarkQuality = *quality;
+            continue;
+        }
+
         if (argument == "--frames") {
             if (index + 1 >= argc) {
                 std::cerr << "Missing value after --frames\n";
@@ -122,10 +140,20 @@ int main(const int argc, char* argv[])
         return 2;
     }
 
+    if (config.headless && config.benchmarkQuality) {
+        std::cerr << "--headless and --benchmark cannot be used together\n";
+        return 2;
+    }
+    if (config.benchmarkQuality && !config.frameLimit) {
+        config.frameLimit = gdp::game::performanceSampleWindow * 2U;
+    }
+
+    const bool deterministicLaunch
+        = config.headless || config.benchmarkQuality.has_value();
     const wkc::core::Seed launchEntropy
-        = !config.headless && !requestedSeed ? collectLaunchEntropy() : 0U;
+        = !deterministicLaunch && !requestedSeed ? collectLaunchEntropy() : 0U;
     config.worldSeed = gdp::game::selectLaunchSeed(
-        config.headless, requestedSeed, launchEntropy);
+        deterministicLaunch, requestedSeed, launchEntropy);
 
     gdp::game::Application application{config};
     return application.run();

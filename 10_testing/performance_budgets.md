@@ -1,9 +1,9 @@
 # Testing — Performance budgets
 
-> **Estado:** instrumentação inicial implementada na Fase 117 e primeira
-> calibração por hardware aplicada na Fase 118, culling conservador na Fase 119
-> e tempo real da GPU na Fase 120. A Fase 115 introduziu o primeiro budget
-> rígido do passe de sombras.
+> **Estado:** instrumentação inicial implementada na Fase 117, primeira
+> calibração por hardware aplicada na Fase 118, culling conservador na Fase 119,
+> tempo real da GPU na Fase 120 e protocolo reproduzível na Fase 128. A Fase 115
+> introduziu o primeiro budget rígido do passe de sombras.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -97,3 +97,36 @@ executados pela placa; `WAIT` mede `SDL_GL_SwapWindow`. Como a leitura da GPU é
 assíncrona, sua média representa resultados de frames anteriores e não precisa
 somar exatamente ao frame atual. Se `GPU --` persistir depois de alguns frames,
 o driver não publicou timer queries e as métricas de CPU continuam válidas.
+
+## Protocolo reproduzível da Fase 128
+
+`--benchmark PROFILE` isola a coleta das preferências persistidas e usa:
+
+- seed determinística (`12345` no executor dos cinco perfis);
+- 1280×720 em janela, VSync desligado e áudio sem dispositivo físico;
+- um fixed update por frame e nenhuma entrada de gameplay;
+- 240 frames por padrão, preservando no resumo a janela móvel final de 120;
+- uma linha `BENCHMARK` legível por máquina com tempos e carga do renderer.
+
+Executar a matriz comparável em build Release:
+
+```bash
+cmake --preset release
+cmake --build --preset release --target graphics-benchmark
+```
+
+O runner mede os perfis na ordem `POTATO`, `LOW`, `MEDIUM`, `HIGH` e `ULTRA`
+com a mesma seed. Para variar a amostra de forma explícita:
+
+```bash
+cmake -DGDP_EXECUTABLE=build/release/gdp \
+  -DGDP_SEED=67890 -DGDP_FRAMES=360 \
+  -P tools/run_graphics_benchmark.cmake
+```
+
+Resultados produzidos com `GDP_OFFSCREEN=ON` verificam inicialização, formato e
+comparabilidade estrutural, mas não são baseline de GPU. Um baseline aceito deve
+registrar build/commit, sistema, CPU, GPU/driver, perfil, seed, resolução e a
+linha completa emitida pelo executável. A vista inicial reproduzível detecta
+regressões gerais; sala cheia, maior encontro e Boss continuam sendo coletas
+separadas antes de mudar budgets ou promover um perfil automaticamente.

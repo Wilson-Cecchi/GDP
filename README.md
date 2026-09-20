@@ -484,6 +484,10 @@ especializados das pastas numeradas.
   corrigido para manter todas as faces orientadas para fora. Cilindros e meshes
   compostos por caixas/cilindros agora também descartam faces traseiras, com
   regressão geométrica explícita e sem alterar receitas, seeds ou hashes.
+- **Fase 128 — Benchmark gráfico reproduzível:** `--benchmark PROFILE` executa
+  a mesma seed e câmera inicial em passo fixo, 1280×720 e VSync desligado, sem
+  ler ou gravar preferências pessoais. Um executor percorre os cinco perfis e
+  coleta uma linha estável com tempos, FPS e carga real do renderer.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1261,6 +1265,22 @@ positivo entre a normal geométrica e as normais dos vértices; as regressões
 OpenGL protegem o resultado final. Contagem de vértices/índices, bounds, receitas,
 seeds, hashes, materiais e gameplay permanecem inalterados.
 
+Na Fase 128, a medição deixa de depender de navegar manualmente até uma cena
+parecida. O argumento `--benchmark PROFILE` inicia diretamente a seed solicitada,
+descarta input de gameplay, avança exatamente um fixed update por frame e força
+janela 1280×720, modo janela e VSync desligado. Se `--frames` não for informado,
+240 frames são executados: os 120 primeiros aquecem caches e queries, enquanto a
+janela móvel final conserva as 120 amostras comparáveis. O modo não consulta nem
+altera `settings.toml`, recordes ou checkpoints.
+
+Ao terminar, uma linha `BENCHMARK` informa perfil, seed, resolução, frames,
+amostras, média, P95, pior frame, FPS, percentual acima de 16,67 ms, tempos de
+update/render/present/GPU e contadores da última cena. A execução automatizada
+dos cinco perfis usa a mesma seed e os mesmos frames; ela estabelece um baseline
+repetível da vista inicial, mas não substitui os stress cases de sala cheia,
+maior encontro e Boss. O driver offscreen serve somente para validar o pipeline:
+seus tempos não representam uma GPU física.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -1439,4 +1459,26 @@ Executar uma seed específica:
 
 ```bash
 build/debug/gdp --seed 12345
+```
+
+Medir um perfil gráfico isolado com o protocolo reproduzível:
+
+```bash
+build/release/gdp --benchmark POTATO --seed 12345
+```
+
+Medir `POTATO`, `LOW`, `MEDIUM`, `HIGH` e `ULTRA` em sequência:
+
+```bash
+cmake --preset release
+cmake --build --preset release --target graphics-benchmark
+```
+
+Durante essa execução, entradas de gameplay são descartadas; o evento de fechar
+a janela ainda é respeitado. Para validar apenas a automação em ambiente sem
+display, sem tratar os números como resultado de hardware:
+
+```bash
+cmake -DGDP_EXECUTABLE=build/release/gdp -DGDP_OFFSCREEN=ON \
+  -P tools/run_graphics_benchmark.cmake
 ```
