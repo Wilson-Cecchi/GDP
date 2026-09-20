@@ -1281,6 +1281,13 @@ repetível da vista inicial, mas não substitui os stress cases de sala cheia,
 maior encontro e Boss. O driver offscreen serve somente para validar o pipeline:
 seus tempos não representam uma GPU física.
 
+O baseline real de 2026-09-20 no ThinkPad W541/Quadro K2100M confirmou
+`POTATO` em 79,44 FPS (P95 15,13 ms), `LOW` em 74,76 FPS (P95 16,96 ms) e
+`MEDIUM` em 29,35 FPS (P95 40,41 ms). Como o update ficou abaixo de 0,11 ms e o
+tempo cresceu na GPU/apresentação, a próxima otimização deve atacar submissões e
+geometria repetida. A tabela completa está em
+[`10_testing/performance_budgets.md`](10_testing/performance_budgets.md).
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano

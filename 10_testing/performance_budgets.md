@@ -130,3 +130,25 @@ registrar build/commit, sistema, CPU, GPU/driver, perfil, seed, resolução e a
 linha completa emitida pelo executável. A vista inicial reproduzível detecta
 regressões gerais; sala cheia, maior encontro e Boss continuam sendo coletas
 separadas antes de mudar budgets ou promover um perfil automaticamente.
+
+### Baseline W541 validado em 2026-09-20
+
+O protocolo foi executado no ThinkPad W541 com Quadro K2100M, commit `edc791e`,
+seed `12345`, 240 frames e 1280×720. Cada linha abaixo resume a janela final de
+120 amostras:
+
+| Perfil | FPS | Média | P95 | Pior | Acima de 16,67 ms | GPU | Draws |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| POTATO | 79,44 | 12,59 ms | 15,13 ms | 15,78 ms | 0,00% | 10,62 ms | 80 |
+| LOW | 74,76 | 13,38 ms | 16,96 ms | 22,58 ms | 6,67% | 11,48 ms | 96 |
+| MEDIUM | 29,35 | 34,07 ms | 40,41 ms | 50,25 ms | 100,00% | 31,95 ms | 265 |
+| HIGH | 20,19 | 49,53 ms | 54,61 ms | 56,34 ms | 100,00% | 47,33 ms | 281 |
+| ULTRA | 19,05 | 52,48 ms | 58,50 ms | 62,91 ms | 100,00% | 50,43 ms | 281 |
+
+`UPDATE` permaneceu entre 0,07 e 0,11 ms. O salto ocorre no trabalho gráfico e
+na apresentação: `POTATO` e `LOW` usam duas salas, zero sombras e shader de baixo
+custo, enquanto `MEDIUM` passa a cinco salas, 265 draws, materiais completos e
+sombras. Assim, `POTATO` é o perfil estável de 60 FPS para esse hardware; `LOW`
+é a alternativa visual ainda próxima do budget, e `MEDIUM` ou superior não deve
+ser promovido automaticamente no W541. O próximo ganho deve reduzir submissões
+e trabalho repetido de geometria antes de diminuir novamente a qualidade.
