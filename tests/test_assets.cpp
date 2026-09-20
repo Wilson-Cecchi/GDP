@@ -31,6 +31,24 @@ bool containsError(
     return std::find(result.errors.begin(), result.errors.end(), error) != result.errors.end();
 }
 
+bool hasOutwardWinding(const wkc::render::MeshData& mesh)
+{
+    for (std::size_t index = 0; index < mesh.indices.size(); index += 3U) {
+        const auto& first = mesh.vertices[mesh.indices[index]];
+        const auto& second = mesh.vertices[mesh.indices[index + 1U]];
+        const auto& third = mesh.vertices[mesh.indices[index + 2U]];
+        const wkc::core::Vec3 faceNormal = wkc::core::cross(
+            second.position - first.position,
+            third.position - first.position);
+        const wkc::core::Vec3 vertexNormal
+            = first.normal + second.normal + third.normal;
+        if (wkc::core::dot(faceNormal, vertexNormal) <= 1.0e-5F) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void testRecipeValidationAndHashing()
 {
     using namespace wkc::procedural;
@@ -143,8 +161,10 @@ void testMeshGeneration()
     expect(builtCylinder && wkc::render::validateMeshData(builtCylinder->mesh)
             && builtCylinder->mesh.vertices.size() == 54U
             && builtCylinder->mesh.indices.size() == 144U
-            && !builtCylinder->mesh.backfaceCullingSafe,
+            && builtCylinder->mesh.backfaceCullingSafe,
         "twelve-segment Cylinder generates valid side and cap geometry");
+    expect(builtCylinder && hasOutwardWinding(builtCylinder->mesh),
+        "Cylinder triangles use outward counter-clockwise winding");
     expect(builtCylinder
             && wkc::core::nearlyEqual(
                 builtCylinder->mesh.bounds.minimum, {-0.5F, -1.0F, -0.5F})

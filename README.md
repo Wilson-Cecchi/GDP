@@ -480,6 +480,10 @@ especializados das pastas numeradas.
   rasterização invisível; geometrias legadas de cilindro continuam dupla face.
   Um cache troca o estado OpenGL somente quando necessário e o `F3` mostra
   quantos draws receberam culling e quantas mudanças de estado ocorreram.
+- **Fase 127 — Culling dos cilindros:** o winding lateral dos cilindros foi
+  corrigido para manter todas as faces orientadas para fora. Cilindros e meshes
+  compostos por caixas/cilindros agora também descartam faces traseiras, com
+  regressão geométrica explícita e sem alterar receitas, seeds ou hashes.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1246,6 +1250,16 @@ enquanto a suíte OpenGL continua verificando salas, corredores, inimigos,
 objetos, arma, HUD e menus. Ordem, triângulos submetidos, texturas, perfis,
 gameplay e RNG permanecem iguais; a GPU apenas deixa de rasterizar faces
 traseiras de volumes declarados seguros.
+
+Na Fase 127, a lateral de `makeCylinderMesh` passa a usar winding anti-horário
+visto pelo lado externo, alinhado às normais já existentes e às tampas. Como as
+receitas aceitam somente escalas e dimensões positivas, suas transformações
+preservam essa orientação. O cilindro passa a declarar back-face culling seguro,
+permitindo que composições de inimigos feitas de caixas e cilindros usem o mesmo
+caminho otimizado. Um teste percorre cada triângulo e exige produto escalar
+positivo entre a normal geométrica e as normais dos vértices; as regressões
+OpenGL protegem o resultado final. Contagem de vértices/índices, bounds, receitas,
+seeds, hashes, materiais e gameplay permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

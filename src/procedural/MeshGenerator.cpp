@@ -72,8 +72,8 @@ wkc::render::MeshData makeCylinderMesh()
         const std::uint32_t bottom = segment * 2U;
         const std::uint32_t top = bottom + 1U;
         mesh.indices.insert(mesh.indices.end(), {
-            bottom, bottom + 2U, top + 2U,
-            bottom, top + 2U, top,
+            bottom, top, top + 2U,
+            bottom, top + 2U, bottom + 2U,
         });
     }
 
@@ -124,6 +124,7 @@ wkc::render::MeshData makeCylinderMesh()
         });
     }
     mesh.bounds = {{-radius, -halfHeight, -radius}, {radius, halfHeight, radius}};
+    mesh.backfaceCullingSafe = true;
     return mesh;
 }
 
