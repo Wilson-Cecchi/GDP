@@ -39,8 +39,13 @@ bool MeshBindingCache::needsBind(const GLuint vertexArray) noexcept
 
 void MeshBindingCache::beginFrame() noexcept
 {
-    vertexArrayKnown_ = false;
+    invalidate();
     stats_ = {};
+}
+
+void MeshBindingCache::invalidate() noexcept
+{
+    vertexArrayKnown_ = false;
 }
 
 MeshBindingCacheStats MeshBindingCache::stats() const noexcept
@@ -127,6 +132,28 @@ bool validateMeshData(const MeshData& data, std::string* const reason)
     return true;
 }
 
+bool validateInstanceTransforms(
+    const std::span<const wkc::core::Mat4> transforms,
+    std::string* const reason)
+{
+    if (transforms.size()
+            > static_cast<std::size_t>(std::numeric_limits<GLsizei>::max())
+        || transforms.size_bytes()
+            > static_cast<std::size_t>(
+                std::numeric_limits<GLsizeiptr>::max())) {
+        setReason(reason, "instance data exceeds the OpenGL size range");
+        return false;
+    }
+    for (const wkc::core::Mat4& transform : transforms) {
+        if (!std::all_of(transform.elements.begin(), transform.elements.end(),
+                [](const float component) { return std::isfinite(component); })) {
+            setReason(reason, "instance transform contains a non-finite component");
+            return false;
+        }
+    }
+    return true;
+}
+
 Mesh::~Mesh()
 {
     reset();
@@ -137,7 +164,11 @@ Mesh::Mesh(Mesh&& other) noexcept
     , vertexArray_(std::exchange(other.vertexArray_, 0))
     , vertexBuffer_(std::exchange(other.vertexBuffer_, 0))
     , indexBuffer_(std::exchange(other.indexBuffer_, 0))
+    , instanceBuffer_(std::exchange(other.instanceBuffer_, 0))
     , indexCount_(std::exchange(other.indexCount_, 0))
+    , instanceCount_(std::exchange(other.instanceCount_, 0))
+    , instanceAttributesConfigured_(
+          std::exchange(other.instanceAttributesConfigured_, false))
     , backfaceCullingSafe_(std::exchange(other.backfaceCullingSafe_, false))
 {
 }
@@ -150,7 +181,11 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept
         vertexArray_ = std::exchange(other.vertexArray_, 0);
         vertexBuffer_ = std::exchange(other.vertexBuffer_, 0);
         indexBuffer_ = std::exchange(other.indexBuffer_, 0);
+        instanceBuffer_ = std::exchange(other.instanceBuffer_, 0);
         indexCount_ = std::exchange(other.indexCount_, 0);
+        instanceCount_ = std::exchange(other.instanceCount_, 0);
+        instanceAttributesConfigured_
+            = std::exchange(other.instanceAttributesConfigured_, false);
         backfaceCullingSafe_
             = std::exchange(other.backfaceCullingSafe_, false);
     }
@@ -204,6 +239,62 @@ bool Mesh::upload(const GlApi& gl, const MeshData& data)
     return vertexArray_ != 0 && vertexBuffer_ != 0 && indexBuffer_ != 0;
 }
 
+bool Mesh::uploadInstanceTransforms(
+    const GlApi& gl,
+    const std::span<const wkc::core::Mat4> transforms,
+    MeshBindingCache& cache)
+{
+    std::string reason;
+    if (!isValid() || gl_ != &gl) {
+        wkc::core::log(wkc::core::LogLevel::Error,
+            "Instance upload requires its mesh's active OpenGL context");
+        return false;
+    }
+    if (!validateInstanceTransforms(transforms, &reason)) {
+        wkc::core::log(wkc::core::LogLevel::Error,
+            "Instance upload rejected: " + reason);
+        return false;
+    }
+    if (transforms.empty()) {
+        instanceCount_ = 0U;
+        return true;
+    }
+
+    if (instanceBuffer_ == 0U) {
+        gl.genBuffers(1, &instanceBuffer_);
+        if (instanceBuffer_ == 0U) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Instance buffer allocation failed");
+            return false;
+        }
+    }
+    gl.bindBuffer(GL_ARRAY_BUFFER, instanceBuffer_);
+    gl.bufferData(GL_ARRAY_BUFFER,
+        static_cast<GLsizeiptr>(transforms.size_bytes()), transforms.data(),
+        GL_DYNAMIC_DRAW);
+
+    if (!instanceAttributesConfigured_) {
+        gl.bindVertexArray(vertexArray_);
+        constexpr std::size_t columnComponents = 4U;
+        for (GLuint column = 0U; column < 4U; ++column) {
+            const GLuint attribute
+                = meshInstanceTransformFirstAttribute + column;
+            gl.enableVertexAttribArray(attribute);
+            gl.vertexAttribPointer(attribute, 4, GL_FLOAT, GL_FALSE,
+                static_cast<GLsizei>(sizeof(wkc::core::Mat4)),
+                reinterpret_cast<const void*>(
+                    column * columnComponents * sizeof(float)));
+            gl.vertexAttribDivisor(attribute, 1U);
+        }
+        gl.bindVertexArray(0U);
+        cache.invalidate();
+        instanceAttributesConfigured_ = true;
+    }
+    gl.bindBuffer(GL_ARRAY_BUFFER, 0U);
+    instanceCount_ = static_cast<std::uint32_t>(transforms.size());
+    return true;
+}
+
 void Mesh::draw(const GlApi& gl) const noexcept
 {
     if (!isValid()) {
@@ -226,9 +317,26 @@ void Mesh::draw(const GlApi& gl, MeshBindingCache& cache) const noexcept
         GL_TRIANGLES, static_cast<GLsizei>(indexCount_), GL_UNSIGNED_INT, nullptr);
 }
 
+void Mesh::drawInstanced(
+    const GlApi& gl, MeshBindingCache& cache) const noexcept
+{
+    if (!isValid() || instanceCount_ == 0U) {
+        return;
+    }
+    if (cache.needsBind(vertexArray_)) {
+        gl.bindVertexArray(vertexArray_);
+    }
+    gl.drawElementsInstanced(GL_TRIANGLES,
+        static_cast<GLsizei>(indexCount_), GL_UNSIGNED_INT, nullptr,
+        static_cast<GLsizei>(instanceCount_));
+}
+
 void Mesh::reset() noexcept
 {
     if (gl_ != nullptr) {
+        if (instanceBuffer_ != 0) {
+            gl_->deleteBuffers(1, &instanceBuffer_);
+        }
         if (indexBuffer_ != 0) {
             gl_->deleteBuffers(1, &indexBuffer_);
         }
@@ -243,7 +351,10 @@ void Mesh::reset() noexcept
     vertexArray_ = 0;
     vertexBuffer_ = 0;
     indexBuffer_ = 0;
+    instanceBuffer_ = 0;
     indexCount_ = 0;
+    instanceCount_ = 0;
+    instanceAttributesConfigured_ = false;
     backfaceCullingSafe_ = false;
 }
 
@@ -255,6 +366,11 @@ bool Mesh::isValid() const noexcept
 std::uint32_t Mesh::indexCount() const noexcept
 {
     return indexCount_;
+}
+
+std::uint32_t Mesh::instanceCount() const noexcept
+{
+    return instanceCount_;
 }
 
 bool Mesh::backfaceCullingSafe() const noexcept

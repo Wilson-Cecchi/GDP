@@ -41,6 +41,8 @@ bool loadGlApi(GlApi& api) noexcept
     GDP_LOAD_GL(deleteBuffers, "glDeleteBuffers");
     GDP_LOAD_GL(enableVertexAttribArray, "glEnableVertexAttribArray");
     GDP_LOAD_GL(vertexAttribPointer, "glVertexAttribPointer");
+    GDP_LOAD_GL(vertexAttribDivisor, "glVertexAttribDivisor");
+    GDP_LOAD_GL(drawElementsInstanced, "glDrawElementsInstanced");
     GDP_LOAD_GL(createShader, "glCreateShader");
     GDP_LOAD_GL(shaderSource, "glShaderSource");
     GDP_LOAD_GL(compileShader, "glCompileShader");

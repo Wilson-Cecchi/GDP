@@ -713,9 +713,28 @@ if(GDP_BUILD_TESTS)
         gdp_enable_warnings(gdp_renderer_gl_tests)
         gdp_enable_sanitizers(gdp_renderer_gl_tests)
 
+        add_executable(
+            wkc_forge_instancing_gl_tests
+            tests/test_instancing_gl.cpp
+        )
+        target_link_libraries(
+            wkc_forge_instancing_gl_tests PRIVATE wkc_forge_render)
+        gdp_enable_warnings(wkc_forge_instancing_gl_tests)
+        gdp_enable_sanitizers(wkc_forge_instancing_gl_tests)
+
         add_test(NAME renderer_opengl_pixels COMMAND gdp_renderer_gl_tests)
         set_tests_properties(
             renderer_opengl_pixels
+            PROPERTIES
+                ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+                TIMEOUT 20
+        )
+
+        add_test(
+            NAME renderer_instancing_opengl
+            COMMAND wkc_forge_instancing_gl_tests)
+        set_tests_properties(
+            renderer_instancing_opengl
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
                 TIMEOUT 20

@@ -101,10 +101,37 @@ void testMeshBindingCache()
             == wkc::render::MeshBindingCacheStats{4U, 2U, 2U},
         "mesh binding cache exposes real and avoided VAO binds");
 
+    cache.invalidate();
+    expect(cache.needsBind(12U),
+        "external VAO mutation invalidates the cached binding");
+
     cache.beginFrame();
     expect(cache.stats() == wkc::render::MeshBindingCacheStats{}
             && cache.needsBind(12U),
         "new frame invalidates external vertex-array state conservatively");
+}
+
+void testInstanceTransforms()
+{
+    using wkc::core::Mat4;
+    using wkc::render::validateInstanceTransforms;
+
+    constexpr std::array transforms{
+        Mat4::identity(),
+        wkc::core::translationMatrix({2.0F, 0.0F, -1.0F}),
+    };
+    std::string reason;
+    expect(validateInstanceTransforms(transforms, &reason),
+        "finite instance transforms are accepted");
+    expect(validateInstanceTransforms({}, &reason),
+        "an empty instance batch safely clears the active batch");
+
+    std::array invalidTransforms{Mat4::identity()};
+    invalidTransforms.front().elements[7]
+        = std::numeric_limits<float>::quiet_NaN();
+    expect(!validateInstanceTransforms(invalidTransforms, &reason)
+            && reason == "instance transform contains a non-finite component",
+        "non-finite instance transforms are rejected with a stable reason");
 }
 
 void testRendererShaderPathSelection()
@@ -1302,6 +1329,7 @@ int main()
 {
     testMesh();
     testMeshBindingCache();
+    testInstanceTransforms();
     testBackfaceCullingStateCache();
     testRendererShaderPathSelection();
     testTextureData();

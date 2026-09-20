@@ -15,6 +15,8 @@ struct GlApi {
     PFNGLDELETEBUFFERSPROC deleteBuffers{};
     PFNGLENABLEVERTEXATTRIBARRAYPROC enableVertexAttribArray{};
     PFNGLVERTEXATTRIBPOINTERPROC vertexAttribPointer{};
+    PFNGLVERTEXATTRIBDIVISORPROC vertexAttribDivisor{};
+    PFNGLDRAWELEMENTSINSTANCEDPROC drawElementsInstanced{};
 
     PFNGLCREATESHADERPROC createShader{};
     PFNGLSHADERSOURCEPROC shaderSource{};

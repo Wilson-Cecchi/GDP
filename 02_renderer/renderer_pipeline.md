@@ -58,6 +58,8 @@
 > preservando a sala atual e a continuidade imediata das conexões.
 > A Fase 120 adicionou timer queries assíncronas à fundação WKC e expôs o tempo
 > real da GPU no diagnóstico concreto do GDP.
+> A Fase 129 adicionou buffers de transform e draw instanciado à fundação WKC,
+> ainda sem trocar as submissões concretas do GDP.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -127,6 +129,15 @@ passou a `gdp::game::visual`, enquanto as primitivas reutilizáveis continuam em
 `wkc::render` desde a Fase 48. Na Fase 36, a classe concreta também passou a
 `gdp::game::visual::GdpRenderer`, consumindo a fundação gráfica por nomes
 qualificados.
+
+Desde a Fase 129, `wkc::render::Mesh` pode manter opcionalmente um lote dinâmico
+de `Mat4`. As quatro colunas ocupam as locations 4–7 com divisor 1 e
+`drawInstanced()` envia todas as cópias por `glDrawElementsInstanced`. O upload
+valida finitude e limites OpenGL antes de alterar o lote; zero instâncias é um
+estado válido que não emite draw. A configuração inicial invalida explicitamente
+o conhecimento de VAO do `MeshBindingCache`. A API tradicional `draw()` não
+muda, permitindo adoção incremental pelo renderer concreto. Uma regressão com
+contexto OpenGL real protege posições, contagem, lote vazio e ausência de erro.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

@@ -488,6 +488,10 @@ especializados das pastas numeradas.
   a mesma seed e câmera inicial em passo fixo, 1280×720 e VSync desligado, sem
   ler ou gravar preferências pessoais. Um executor percorre os cinco perfis e
   coleta uma linha estável com tempos, FPS e carga real do renderer.
+- **Fase 129 — Fundação de instancing:** meshes WKC aceitam lotes validados de
+  matrizes, configuram atributos divisores e emitem `glDrawElementsInstanced`.
+  O caminho tradicional permanece intacto e uma regressão OpenGL comprova duas
+  instâncias reais antes da integração concreta do GDP.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1287,6 +1291,21 @@ O baseline real de 2026-09-20 no ThinkPad W541/Quadro K2100M confirmou
 tempo cresceu na GPU/apresentação, a próxima otimização deve atacar submissões e
 geometria repetida. A tabela completa está em
 [`10_testing/performance_budgets.md`](10_testing/performance_budgets.md).
+
+Na Fase 129, `wkc::render::Mesh` recebeu um buffer opcional de transforms por
+instância. Matrizes finitas usam quatro atributos consecutivos a partir da
+location 4, cada coluna com divisor 1; lotes vazios desativam o draw e entradas
+não finitas são rejeitadas sem substituir o lote válido anterior. O carregador
+OpenGL 3.3 passa a exigir `glVertexAttribDivisor` e
+`glDrawElementsInstanced`, enquanto `MeshBindingCache::invalidate()` mantém o
+cache coerente quando a configuração do VAO muda fora do draw comum.
+
+A regressão offscreen da fundação desenha duas caixas separadas com uma única
+submissão, verifica pixels nas duas posições e ausência no intervalo, testa o
+lote vazio e preserva o caminho não instanciado existente. O renderer concreto
+do GDP ainda não usa o novo draw nesta fase; imagens, contadores, gameplay e RNG
+permanecem iguais. O agrupamento das peças repetidas de salas e corredores fica
+para a Fase 130, sobre uma API já validada isoladamente.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

@@ -4,6 +4,7 @@
 #include "render/GlApi.hpp"
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,11 @@ struct MeshData {
 
 [[nodiscard]] MeshData makeBoxMesh();
 [[nodiscard]] bool validateMeshData(const MeshData& data, std::string* reason = nullptr);
+[[nodiscard]] bool validateInstanceTransforms(
+    std::span<const wkc::core::Mat4> transforms,
+    std::string* reason = nullptr);
+
+inline constexpr GLuint meshInstanceTransformFirstAttribute = 4U;
 
 struct MeshBindingCacheStats {
     std::uint64_t requests{0U};
@@ -38,6 +44,7 @@ struct MeshBindingCacheStats {
 class MeshBindingCache {
 public:
     [[nodiscard]] bool needsBind(GLuint vertexArray) noexcept;
+    void invalidate() noexcept;
     void beginFrame() noexcept;
     [[nodiscard]] MeshBindingCacheStats stats() const noexcept;
 
@@ -58,12 +65,19 @@ public:
     Mesh& operator=(Mesh&& other) noexcept;
 
     [[nodiscard]] bool upload(const GlApi& gl, const MeshData& data);
+    [[nodiscard]] bool uploadInstanceTransforms(
+        const GlApi& gl,
+        std::span<const wkc::core::Mat4> transforms,
+        MeshBindingCache& cache);
     void draw(const GlApi& gl) const noexcept;
     void draw(const GlApi& gl, MeshBindingCache& cache) const noexcept;
+    void drawInstanced(
+        const GlApi& gl, MeshBindingCache& cache) const noexcept;
     void reset() noexcept;
 
     [[nodiscard]] bool isValid() const noexcept;
     [[nodiscard]] std::uint32_t indexCount() const noexcept;
+    [[nodiscard]] std::uint32_t instanceCount() const noexcept;
     [[nodiscard]] bool backfaceCullingSafe() const noexcept;
 
 private:
@@ -71,7 +85,10 @@ private:
     GLuint vertexArray_{0};
     GLuint vertexBuffer_{0};
     GLuint indexBuffer_{0};
+    GLuint instanceBuffer_{0};
     std::uint32_t indexCount_{0};
+    std::uint32_t instanceCount_{0};
+    bool instanceAttributesConfigured_{false};
     bool backfaceCullingSafe_{false};
 };
 
