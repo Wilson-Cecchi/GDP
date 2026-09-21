@@ -27,8 +27,10 @@ constexpr std::string_view vertexShaderSource = R"glsl(#version 330 core
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aUv;
+layout(location = 4) in mat4 aInstanceModel;
 
 uniform mat4 uModel;
+uniform int uInstanced;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
@@ -38,9 +40,10 @@ out vec2 vUv;
 
 void main()
 {
-    vec4 worldPosition = uModel * vec4(aPosition, 1.0);
+    mat4 model = uInstanced != 0 ? aInstanceModel : uModel;
+    vec4 worldPosition = model * vec4(aPosition, 1.0);
     vWorldPosition = worldPosition.xyz;
-    vNormal = normalize(mat3(uModel) * aNormal);
+    vNormal = normalize(mat3(model) * aNormal);
     vUv = aUv;
     gl_Position = uProjection * uView * worldPosition;
 }
@@ -967,6 +970,30 @@ void GdpRenderer::drawMesh(const wkc::render::Mesh& mesh) noexcept
     lastFrameStats_.triangles += mesh.indexCount() / 3U;
 }
 
+void GdpRenderer::drawMeshInstanced(const wkc::render::Mesh& mesh) noexcept
+{
+    if (!mesh.isValid() || mesh.instanceCount() == 0U) {
+        return;
+    }
+    const bool cullingEnabled = mesh.backfaceCullingSafe();
+    if (backfaceCulling_.needsUpdate(cullingEnabled)) {
+        if (cullingEnabled) {
+            glEnable(GL_CULL_FACE);
+        } else {
+            glDisable(GL_CULL_FACE);
+        }
+    }
+    if (cullingEnabled) {
+        ++lastFrameStats_.backfaceCulledDraws;
+    }
+    mesh.drawInstanced(gl_, meshBindings_);
+    ++lastFrameStats_.drawCalls;
+    ++lastFrameStats_.instancedDrawCalls;
+    lastFrameStats_.renderedInstances += mesh.instanceCount();
+    lastFrameStats_.avoidedDrawCalls += mesh.instanceCount() - 1U;
+    lastFrameStats_.triangles += (mesh.indexCount() / 3U) * mesh.instanceCount();
+}
+
 bool GdpRenderer::render(
     const int width,
     const int height,
@@ -1037,6 +1064,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uMaterialMap", 2);
     shader.setInt(gl_, "uEmissionMap", 3);
     shader.setInt(gl_, "uUseEmissionMap", 0);
+    shader.setInt(gl_, "uInstanced", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
     shader.setVec3(gl_, "uCameraPosition", camera.position);
@@ -1135,7 +1163,22 @@ bool GdpRenderer::render(
             ? fallbackMaterials->second : materials->second;
     };
 
-    const auto drawSurface = [this, &shader](
+    struct SurfaceStyle {
+        const RoomGpuMaterials* roomMaterials{nullptr};
+        RoomMaterialChannel material{RoomMaterialChannel::Generic};
+        wkc::core::Vec3 tint{1.0F, 1.0F, 1.0F};
+        wkc::core::Vec2 uvScale{1.0F, 1.0F};
+        wkc::core::Vec2 uvOffset{};
+        bool detailedMaterial{false};
+
+        constexpr bool operator==(const SurfaceStyle&) const noexcept = default;
+    };
+    struct SurfaceCommand {
+        SurfaceStyle style{};
+        wkc::core::Mat4 model{wkc::core::Mat4::identity()};
+    };
+    std::vector<SurfaceCommand> surfaceCommands;
+    const auto queueSurface = [this, &surfaceCommands](
         const RoomGpuMaterials& roomMaterials,
         const wkc::core::Vec3 position,
         const wkc::core::Vec3 scale,
@@ -1144,7 +1187,9 @@ bool GdpRenderer::render(
         const wkc::core::Vec3 tint = {1.0F, 1.0F, 1.0F},
         const wkc::core::Vec2 detailedUvScale = {},
         const wkc::core::Vec2 detailedUvOffset = {}) {
-        float emissiveStrength = 0.0F;
+        SurfaceStyle style;
+        style.roomMaterials = &roomMaterials;
+        style.material = material;
         bool detailedMaterial = false;
         wkc::core::Vec3 resolvedTint = tint;
         wkc::core::Vec2 materialUvOffset{};
@@ -1155,22 +1200,13 @@ bool GdpRenderer::render(
                     *roomMaterials.industrialWallCondition);
                 const auto& wallMaterial = industrialWallMaterials_[conditionIndex];
                 if (wallMaterial) {
-                    wallMaterial->albedo.bind(gl_, textureBindings_, 0U);
-                    wallMaterial->normal.bind(gl_, textureBindings_, 1U);
-                    wallMaterial->properties.bind(gl_, textureBindings_, 2U);
                     detailedMaterial = true;
                     resolvedTint = tint * roomMaterials.wallTone;
                     materialUvOffset = roomMaterials.wallUvOffset;
                 }
             }
-            if (!detailedMaterial) {
-                roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Wall)].bind(gl_, textureBindings_);
-            }
             break;
         case RoomMaterialChannel::Floor:
-            roomMaterials.textures[static_cast<std::size_t>(
-                IndustrialSurface::Floor)].bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::Ceiling:
             if (roomMaterials.industrialCeilingCondition) {
@@ -1178,37 +1214,28 @@ bool GdpRenderer::render(
                     *roomMaterials.industrialCeilingCondition);
                 const auto& ceilingMaterial = industrialCeilingMaterials_[conditionIndex];
                 if (ceilingMaterial) {
-                    ceilingMaterial->albedo.bind(gl_, textureBindings_, 0U);
-                    ceilingMaterial->normal.bind(gl_, textureBindings_, 1U);
-                    ceilingMaterial->properties.bind(gl_, textureBindings_, 2U);
                     detailedMaterial = true;
                     resolvedTint = tint * roomMaterials.ceilingTone;
                     materialUvOffset = roomMaterials.ceilingUvOffset;
                 }
             }
-            if (!detailedMaterial) {
-                roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
-            }
             break;
         case RoomMaterialChannel::Generic:
-            fallbackTexture_.bind(gl_, textureBindings_);
             break;
         }
-        shader.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
-                * wkc::core::scaleMatrix(scale));
-        shader.setVec3(gl_, "uTint", resolvedTint);
-        shader.setInt(gl_, "uDetailedMaterial", detailedMaterial ? 1 : 0);
         const bool customUv = detailedMaterial
             && detailedUvScale.x > 0.0F && detailedUvScale.y > 0.0F;
-        shader.setVec2(gl_, "uUvScale",
-            customUv ? detailedUvScale : wkc::core::Vec2{uvScale, uvScale});
-        shader.setVec2(gl_, "uUvOffset",
-            customUv
-                ? detailedUvOffset + materialUvOffset
-                : wkc::core::Vec2{});
-        shader.setFloat(gl_, "uEmissiveStrength", emissiveStrength);
-        drawMesh(box_);
+        style.tint = resolvedTint;
+        style.detailedMaterial = detailedMaterial;
+        style.uvScale = customUv
+            ? detailedUvScale : wkc::core::Vec2{uvScale, uvScale};
+        style.uvOffset = customUv
+            ? detailedUvOffset + materialUvOffset : wkc::core::Vec2{};
+        surfaceCommands.push_back({
+            style,
+            wkc::core::translationMatrix(position)
+                * wkc::core::scaleMatrix(scale),
+        });
     };
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
@@ -1223,12 +1250,12 @@ bool GdpRenderer::render(
             (bounds.minimum.z + bounds.maximum.z) * 0.5F,
         };
         constexpr float shellThickness = 0.20F;
-        drawSurface(roomMaterials,
+        queueSurface(roomMaterials,
             roomCenter + wkc::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
             {roomWidth + shellThickness, shellThickness,
                 roomDepth + shellThickness},
             RoomMaterialChannel::Floor, 4.0F);
-        drawSurface(roomMaterials,
+        queueSurface(roomMaterials,
             roomCenter
                 + wkc::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
             {roomWidth + shellThickness, shellThickness,
@@ -1277,7 +1304,7 @@ bool GdpRenderer::render(
                         shellThickness, top - bottom, maximum - minimum}
                     : wkc::core::Vec3{
                         maximum - minimum, top - bottom, shellThickness};
-                drawSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall,
+                queueSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall,
                     1.0F, {1.0F, 1.0F, 1.0F},
                     {(maximum - minimum) / 4.0F, (top - bottom) / roomHeight},
                     {minimum / 4.0F, bottom / roomHeight});
@@ -1323,11 +1350,11 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 corner = corridor.points[index];
             const wkc::core::Vec3 cornerScale{
                 corridor.width, corridorShellThickness, corridor.width};
-            drawSurface(roomMaterials,
+            queueSurface(roomMaterials,
                 corner + wkc::core::Vec3{
                     0.0F, -corridorShellThickness * 0.5F, 0.0F},
                 cornerScale, RoomMaterialChannel::Floor, 2.0F);
-            drawSurface(roomMaterials,
+            queueSurface(roomMaterials,
                 corner + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 cornerScale, RoomMaterialChannel::Ceiling, 1.0F,
@@ -1348,10 +1375,10 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 floorScale = alongX
                 ? wkc::core::Vec3{length, corridorShellThickness, corridor.width}
                 : wkc::core::Vec3{corridor.width, corridorShellThickness, length};
-            drawSurface(roomMaterials,
+            queueSurface(roomMaterials,
                 center + wkc::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Floor, 2.0F);
-            drawSurface(roomMaterials, center + wkc::core::Vec3{
+            queueSurface(roomMaterials, center + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Ceiling, 1.0F,
                 {1.0F, 1.0F, 1.0F},
@@ -1397,7 +1424,7 @@ bool GdpRenderer::render(
                 const wkc::core::Vec3 wallCenter = (wallStart + wallEnd) * 0.5F
                     + side * corridorHalfWidth
                     + wkc::core::Vec3{0.0F, corridor.height * 0.5F, 0.0F};
-                drawSurface(roomMaterials, wallCenter,
+                queueSurface(roomMaterials, wallCenter,
                     wallScale, RoomMaterialChannel::Wall,
                     1.0F, {1.0F, 1.0F, 1.0F},
                     {wallLength / 4.0F, 1.0F},
@@ -1417,13 +1444,121 @@ bool GdpRenderer::render(
                 || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
                 std::swap(scale.x, scale.z);
             }
-            drawSurface(roomMaterials, position, scale, part.material,
+            queueSurface(roomMaterials, position, scale, part.material,
                 part.uvScale, part.tint);
         }
     };
     drawRoomParts(room);
     for (const RoomRenderData& connectedRoom : connectedRooms) {
         drawRoomParts(connectedRoom);
+    }
+
+    const auto bindSurfaceStyle = [this, &shader](const SurfaceStyle& style) {
+        if (style.roomMaterials == nullptr) {
+            return false;
+        }
+        const RoomGpuMaterials& roomMaterials = *style.roomMaterials;
+        switch (style.material) {
+        case RoomMaterialChannel::Wall:
+            if (style.detailedMaterial) {
+                if (!roomMaterials.industrialWallCondition) {
+                    return false;
+                }
+                const auto& material = industrialWallMaterials_[
+                    static_cast<std::size_t>(
+                        *roomMaterials.industrialWallCondition)];
+                if (!material) {
+                    return false;
+                }
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else {
+                roomMaterials.textures[static_cast<std::size_t>(
+                    IndustrialSurface::Wall)].bind(gl_, textureBindings_);
+            }
+            break;
+        case RoomMaterialChannel::Floor:
+            roomMaterials.textures[static_cast<std::size_t>(
+                IndustrialSurface::Floor)].bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::Ceiling:
+            if (style.detailedMaterial) {
+                if (!roomMaterials.industrialCeilingCondition) {
+                    return false;
+                }
+                const auto& material = industrialCeilingMaterials_[
+                    static_cast<std::size_t>(
+                        *roomMaterials.industrialCeilingCondition)];
+                if (!material) {
+                    return false;
+                }
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else {
+                roomMaterials.textures[static_cast<std::size_t>(
+                    IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
+            }
+            break;
+        case RoomMaterialChannel::Generic:
+            fallbackTexture_.bind(gl_, textureBindings_);
+            break;
+        }
+        shader.setVec3(gl_, "uTint", style.tint);
+        shader.setInt(gl_, "uDetailedMaterial",
+            style.detailedMaterial ? 1 : 0);
+        shader.setVec2(gl_, "uUvScale", style.uvScale);
+        shader.setVec2(gl_, "uUvOffset", style.uvOffset);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        return true;
+    };
+
+    if (!surfaceInstancingEnabled_) {
+        shader.setInt(gl_, "uInstanced", 0);
+        for (const SurfaceCommand& command : surfaceCommands) {
+            if (!bindSurfaceStyle(command.style)) {
+                return false;
+            }
+            shader.setMat4(gl_, "uModel", command.model);
+            drawMesh(box_);
+        }
+    } else {
+        struct SurfaceBatch {
+            SurfaceStyle style{};
+            std::vector<wkc::core::Mat4> models;
+        };
+        std::vector<SurfaceBatch> surfaceBatches;
+        surfaceBatches.reserve(surfaceCommands.size());
+        for (const SurfaceCommand& command : surfaceCommands) {
+            const auto batch = std::find_if(surfaceBatches.begin(),
+                surfaceBatches.end(), [&command](const SurfaceBatch& candidate) {
+                    return candidate.style == command.style;
+                });
+            if (batch == surfaceBatches.end()) {
+                surfaceBatches.push_back({command.style, {command.model}});
+            } else {
+                batch->models.push_back(command.model);
+            }
+        }
+        for (const SurfaceBatch& batch : surfaceBatches) {
+            if (!bindSurfaceStyle(batch.style)) {
+                return false;
+            }
+            if (batch.models.size() > 1U) {
+                shader.setInt(gl_, "uInstanced", 1);
+                if (!box_.uploadInstanceTransforms(
+                        gl_, batch.models, meshBindings_)) {
+                    return false;
+                }
+                drawMeshInstanced(box_);
+            } else {
+                shader.setInt(gl_, "uInstanced", 0);
+                shader.setMat4(gl_, "uModel", batch.models.front());
+                drawMesh(box_);
+            }
+        }
+        shader.setInt(gl_, "uInstanced", 0);
     }
 
     fallbackTexture_.bind(gl_, textureBindings_);
@@ -2453,7 +2588,7 @@ bool GdpRenderer::render(
         const std::string gpuTime = hud.gpuTimingAvailable
             ? std::to_string(hud.averageGpuMilliseconds) + "MS"
             : "--";
-        const std::array<std::string, 14> lines{
+        const std::array<std::string, 15> lines{
             "QUALITY " + qualityName + " SCALE "
                 + std::to_string(hud.worldRenderScalePercent) + "%",
             "FPS " + std::to_string(hud.performanceFramesPerSecond)
@@ -2482,6 +2617,12 @@ bool GdpRenderer::render(
                 + std::to_string(hud.performanceBackfaceCulledDraws)
                 + " STATE "
                 + std::to_string(hud.performanceCullStateChanges),
+            "INSTANCE DRAW "
+                + std::to_string(hud.performanceInstancedDrawCalls)
+                + " COUNT "
+                + std::to_string(hud.performanceRenderedInstances)
+                + " SAVE "
+                + std::to_string(hud.performanceAvoidedDrawCalls),
             "UNIFORM UP " + std::to_string(hud.performanceUniformUploads)
                 + " SKIP " + std::to_string(hud.performanceUniformSkips),
             "TEXTURE BIND " + std::to_string(hud.performanceTextureBinds)

@@ -37,6 +37,9 @@ struct FramePerformanceSample {
     bool lowSpecShader{false};
     std::uint64_t backfaceCulledDraws{0U};
     std::uint64_t cullStateChanges{0U};
+    std::uint64_t instancedDrawCalls{0U};
+    std::uint64_t renderedInstances{0U};
+    std::uint64_t avoidedDrawCalls{0U};
 
     constexpr bool operator==(const FramePerformanceSample&) const noexcept
         = default;

@@ -2,8 +2,9 @@
 
 > **Estado:** instrumentação inicial implementada na Fase 117, primeira
 > calibração por hardware aplicada na Fase 118, culling conservador na Fase 119,
-> tempo real da GPU na Fase 120 e protocolo reproduzível na Fase 128. A Fase 115
-> introduziu o primeiro budget rígido do passe de sombras.
+> tempo real da GPU na Fase 120, protocolo reproduzível na Fase 128 e instancing
+> estrutural na Fase 130. A Fase 115 introduziu o primeiro budget rígido do passe
+> de sombras.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -152,3 +153,22 @@ sombras. Assim, `POTATO` é o perfil estável de 60 FPS para esse hardware; `LOW
 é a alternativa visual ainda próxima do budget, e `MEDIUM` ou superior não deve
 ser promovido automaticamente no W541. O próximo ganho deve reduzir submissões
 e trabalho repetido de geometria antes de diminuir novamente a qualidade.
+
+## Instancing da Fase 130
+
+O agrupamento atua somente em superfícies opacas de salas e corredores com
+estado visual idêntico. A seed `12345` mantém os mesmos triângulos e registra:
+
+| Perfil | Draws anteriores | Draws atuais | Draws evitados | Lotes | Instâncias |
+|---|---:|---:|---:|---:|---:|
+| POTATO | 80 | 67 | 13 | 8 | 21 |
+| LOW | 96 | 83 | 13 | 8 | 21 |
+| MEDIUM | 265 | 185 | 80 | 16 | 96 |
+| HIGH | 281 | 201 | 80 | 16 | 96 |
+| ULTRA | 281 | 201 | 80 | 16 | 96 |
+
+Esses contadores são determinísticos e independem do driver. Os tempos
+offscreen continuam inadequados como baseline de hardware; o ganho real deve ser
+medido novamente no W541 pelo protocolo da Fase 128. A regressão OpenGL renderiza
+o mesmo corredor com instancing desligado e ligado, exige pixels byte a byte
+iguais, triângulos iguais e a diferença exata de draws reportada por `SAVE`.

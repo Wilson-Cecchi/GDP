@@ -393,12 +393,36 @@ int main()
                     storageMaterialKey,
                     {{-5.85F, 0.0F, -21.70F}, {5.85F, 5.0F, -10.0F}}},
             };
+            renderer.setSurfaceInstancingEnabled(false);
+            const bool renderedCorridorReference = renderer.render(
+                width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
+                corridorGeometry, connectedRoomGeometry);
+            const gdp::game::visual::RendererFrameStats corridorReferenceStats
+                = renderer.lastFrameStats();
+            std::vector<std::uint8_t> corridorReferencePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                corridorReferencePixels.data());
+            renderer.setSurfaceInstancingEnabled(true);
             const bool renderedCorridor = renderer.render(
                 width, height, corridorCamera, {}, {}, {}, {}, {}, corridorDoors,
                 corridorGeometry, connectedRoomGeometry);
+            const gdp::game::visual::RendererFrameStats corridorInstancedStats
+                = renderer.lastFrameStats();
             std::vector<std::uint8_t> corridorPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 corridorPixels.data());
+            const bool corridorInstancingPreservedPixels
+                = corridorPixels == corridorReferencePixels;
+            const bool corridorInstancingReducedDraws
+                = corridorInstancedStats.drawCalls < corridorReferenceStats.drawCalls
+                && corridorInstancedStats.triangles
+                    == corridorReferenceStats.triangles
+                && corridorInstancedStats.instancedDrawCalls > 0U
+                && corridorInstancedStats.renderedInstances
+                    > corridorInstancedStats.instancedDrawCalls
+                && corridorInstancedStats.avoidedDrawCalls
+                    == corridorReferenceStats.drawCalls
+                        - corridorInstancedStats.drawCalls;
             const std::array connectedRoomCentralHub{
                 gdp::game::visual::RoomRenderData{
                     {0.0F, 0.0F, -14.85F}, wkc::core::QuarterTurn::Degrees0,
@@ -559,6 +583,9 @@ int main()
             performanceHud.performanceLowSpecShader = true;
             performanceHud.performanceBackfaceCulledDraws = 72U;
             performanceHud.performanceCullStateChanges = 4U;
+            performanceHud.performanceInstancedDrawCalls = 9U;
+            performanceHud.performanceRenderedInstances = 42U;
+            performanceHud.performanceAvoidedDrawCalls = 33U;
             const bool renderedPerformanceOverlay = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
             const gdp::game::visual::RendererFrameStats performanceFrameStats
@@ -1138,7 +1165,9 @@ int main()
                 && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U
                 && doorMotionChangedChannels > 100U
-                && renderedOpenDoor && renderedCorridor
+                && renderedOpenDoor && renderedCorridorReference
+                && renderedCorridor && corridorInstancingPreservedPixels
+                && corridorInstancingReducedDraws
                 && corridorChangedChannels > 100U
                 && renderedConnectedRoomMaterial
                 && connectedRoomMaterialChangedChannels > 100U
@@ -1166,6 +1195,10 @@ int main()
                 && performanceFrameStats.meshBindSkips > 0U
                 && performanceFrameStats.backfaceCulledDraws > 0U
                 && performanceFrameStats.cullStateChanges > 0U
+                && performanceFrameStats.instancedDrawCalls > 0U
+                && performanceFrameStats.renderedInstances
+                    > performanceFrameStats.instancedDrawCalls
+                && performanceFrameStats.avoidedDrawCalls > 0U
                 && measuredGpuFrame
                 && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedCampaignTimer && campaignTimerChangedChannels > 50U

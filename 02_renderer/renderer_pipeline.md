@@ -60,6 +60,8 @@
 > real da GPU no diagnóstico concreto do GDP.
 > A Fase 129 adicionou buffers de transform e draw instanciado à fundação WKC,
 > ainda sem trocar as submissões concretas do GDP.
+> A Fase 130 adotou essa fundação nas superfícies compatíveis de salas e
+> corredores, mantendo comparação byte a byte com o caminho individual.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -138,6 +140,20 @@ estado válido que não emite draw. A configuração inicial invalida explicitam
 o conhecimento de VAO do `MeshBindingCache`. A API tradicional `draw()` não
 muda, permitindo adoção incremental pelo renderer concreto. Uma regressão com
 contexto OpenGL real protege posições, contagem, lote vazio e ausência de erro.
+
+Desde a Fase 130, o `GdpRenderer` coleta os comandos opacos de shells,
+corredores e `roomParts` antes da submissão. A chave de lote exige a mesma
+instância de materiais, canal, modo detalhado, tint, escala de UV e offset; a
+transform é o único dado variável. Grupos com mais de uma transform usam
+instancing e grupos unitários continuam no draw comum. Uma chave diferente nunca
+compartilha textura ou uniforms, e o fallback de teste reproduz a ordem original.
+Portas e objetos dinâmicos permanecem fora do agrupamento nesta etapa.
+
+`RendererFrameStats` separa draws instanciados, instâncias renderizadas e draws
+evitados. Triângulos contam todas as instâncias, enquanto `drawCalls` representa
+submissões reais ao driver. Na cena determinística de benchmark, `MEDIUM` mantém
+3.360 triângulos e reduz 265 draws para 185; a regressão OpenGL exige pixels
+idênticos entre os caminhos.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

@@ -37,6 +37,9 @@ struct RendererFrameStats {
     bool lowSpecShader{false};
     std::uint64_t backfaceCulledDraws{0U};
     std::uint64_t cullStateChanges{0U};
+    std::uint64_t instancedDrawCalls{0U};
+    std::uint64_t renderedInstances{0U};
+    std::uint64_t avoidedDrawCalls{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -83,6 +86,10 @@ public:
     {
         return activeRoomMaterialKey_;
     }
+    void setSurfaceInstancingEnabled(const bool enabled) noexcept
+    {
+        surfaceInstancingEnabled_ = enabled;
+    }
     [[nodiscard]] bool prepareWorkerVisual(wkc::core::Seed visualSeed);
     [[nodiscard]] bool prepareGuardVisual(wkc::core::Seed visualSeed);
     [[nodiscard]] bool prepareOfficerVisual(wkc::core::Seed visualSeed);
@@ -127,6 +134,7 @@ public:
 
 private:
     void drawMesh(const wkc::render::Mesh& mesh) noexcept;
+    void drawMeshInstanced(const wkc::render::Mesh& mesh) noexcept;
     [[nodiscard]] wkc::render::Shader& activeShader() noexcept
     {
         return lowSpecShaderActive_ ? lowSpecShader_ : shader_;
@@ -207,6 +215,7 @@ private:
     std::uint64_t fallbackRoomMaterialKey_{0};
     RendererFrameStats lastFrameStats_{};
     bool lowSpecShaderActive_{false};
+    bool surfaceInstancingEnabled_{true};
     bool initialized_{false};
 };
 

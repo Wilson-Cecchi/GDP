@@ -537,6 +537,9 @@ struct HudRenderData {
     bool performanceLowSpecShader{false};
     std::uint64_t performanceBackfaceCulledDraws{0U};
     std::uint64_t performanceCullStateChanges{0U};
+    std::uint64_t performanceInstancedDrawCalls{0U};
+    std::uint64_t performanceRenderedInstances{0U};
+    std::uint64_t performanceAvoidedDrawCalls{0U};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;

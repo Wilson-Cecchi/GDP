@@ -492,6 +492,10 @@ especializados das pastas numeradas.
   matrizes, configuram atributos divisores e emitem `glDrawElementsInstanced`.
   O caminho tradicional permanece intacto e uma regressão OpenGL comprova duas
   instâncias reais antes da integração concreta do GDP.
+- **Fase 130 — Instancing de salas e corredores:** superfícies opacas com o
+  mesmo material, tint e UV são agrupadas em um draw. A cena de benchmark reduz
+  de 265 para 185 draws em `MEDIUM`, preservando pixels e triângulos; F3 e o
+  resumo registram lotes, instâncias e submissões evitadas.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1306,6 +1310,21 @@ lote vazio e preserva o caminho não instanciado existente. O renderer concreto
 do GDP ainda não usa o novo draw nesta fase; imagens, contadores, gameplay e RNG
 permanecem iguais. O agrupamento das peças repetidas de salas e corredores fica
 para a Fase 130, sobre uma API já validada isoladamente.
+
+Na Fase 130, o renderer concreto reúne primeiro as superfícies de shells,
+corredores e peças estruturais na ordem tradicional. A execução otimizada agrupa
+somente comandos com o mesmo material GPU, modo detalhado, tint, escala de UV e
+offset; apenas a matriz varia por instância. Portas, luminárias, entidades,
+impactos e viewmodel continuam no caminho individual. Um fallback interno
+mantém a ordem e os draws anteriores para a regressão comparar os dois caminhos.
+
+Na seed `12345`, os perfis `POTATO/LOW` evitam 13 submissões e passam de 80/96
+para 67/83 draws. `MEDIUM/HIGH/ULTRA` evitam 80 e passam de 265/281/281 para
+185/201/201, sem alterar a contagem de 3.360/3.552 triângulos. O teste OpenGL
+exige pixels byte a byte idênticos entre referência e instancing. O F3 mostra
+`INSTANCE DRAW`, `COUNT` e `SAVE`; a linha `BENCHMARK` publica os mesmos campos
+como `instanced_draws`, `instances` e `saved_draws`. Gameplay, visibilidade,
+materiais, RNG e conteúdo permanecem inalterados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
