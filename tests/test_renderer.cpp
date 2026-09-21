@@ -138,6 +138,7 @@ void testRendererShaderPathSelection()
 {
     using gdp::game::visual::RendererShaderPath;
     using gdp::game::visual::selectRendererShaderPath;
+    using gdp::game::visual::shadowShaderOccluderCapacity;
 
     expect(selectRendererShaderPath(false, 2U, 0U, 0U)
             == RendererShaderPath::LowSpec
@@ -145,14 +146,23 @@ void testRendererShaderPathSelection()
                 == RendererShaderPath::LowSpec,
         "low-spec shader covers the Potato and Low light budgets");
     expect(selectRendererShaderPath(true, 2U, 0U, 0U)
-            == RendererShaderPath::Full
+            == RendererShaderPath::FullShadow3
             && selectRendererShaderPath(false, 5U, 0U, 0U)
-                == RendererShaderPath::Full
+                == RendererShaderPath::FullShadow3
             && selectRendererShaderPath(false, 2U, 1U, 0U)
-                == RendererShaderPath::Full
+                == RendererShaderPath::FullShadow3
             && selectRendererShaderPath(false, 2U, 0U, 1U)
-                == RendererShaderPath::Full,
+                == RendererShaderPath::FullShadow3,
         "unsupported detail, light and shadow inputs fail back to the full shader");
+    expect(selectRendererShaderPath(true, 8U, 1U, 4U)
+            == RendererShaderPath::FullShadow6
+            && selectRendererShaderPath(true, 8U, 2U, 7U)
+                == RendererShaderPath::FullShadow8
+            && shadowShaderOccluderCapacity(RendererShaderPath::LowSpec) == 0U
+            && shadowShaderOccluderCapacity(RendererShaderPath::FullShadow3) == 3U
+            && shadowShaderOccluderCapacity(RendererShaderPath::FullShadow6) == 6U
+            && shadowShaderOccluderCapacity(RendererShaderPath::FullShadow8) == 8U,
+        "full shader variants select the smallest safe shadow budget");
 }
 
 void testTextureData()

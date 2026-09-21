@@ -53,6 +53,7 @@ void testRollingStatistics()
             .instancedDrawCalls = 9U,
             .renderedInstances = 42U,
             .avoidedDrawCalls = 33U,
+            .shadowShaderOccluderCapacity = 6U,
         });
     }
 
@@ -87,7 +88,8 @@ void testRollingStatistics()
             && snapshot.latest.cullStateChanges == 4U
             && snapshot.latest.instancedDrawCalls == 9U
             && snapshot.latest.renderedInstances == 42U
-            && snapshot.latest.avoidedDrawCalls == 33U,
+            && snapshot.latest.avoidedDrawCalls == 33U
+            && snapshot.latest.shadowShaderOccluderCapacity == 6U,
         "latest workload counters remain available to the overlay");
     expect(near(snapshot.worldGenerationMilliseconds, 42.5)
             && near(snapshot.assetPreparationMilliseconds, 185.0),

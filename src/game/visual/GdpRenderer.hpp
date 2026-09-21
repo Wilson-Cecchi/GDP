@@ -40,6 +40,7 @@ struct RendererFrameStats {
     std::uint64_t instancedDrawCalls{0U};
     std::uint64_t renderedInstances{0U};
     std::uint64_t avoidedDrawCalls{0U};
+    std::uint32_t shadowShaderOccluderCapacity{0U};
     double gpuMilliseconds{0.0};
     bool gpuTimingAvailable{false};
 
@@ -48,8 +49,10 @@ struct RendererFrameStats {
 };
 
 enum class RendererShaderPath : std::uint8_t {
-    Full,
     LowSpec,
+    FullShadow3,
+    FullShadow6,
+    FullShadow8,
 };
 
 [[nodiscard]] constexpr RendererShaderPath selectRendererShaderPath(
@@ -58,9 +61,33 @@ enum class RendererShaderPath : std::uint8_t {
     const std::uint32_t shadowLightCount,
     const std::uint32_t shadowOccluderCount) noexcept
 {
-    return !detailedMaterials && lightCount <= 4U
-            && shadowLightCount == 0U && shadowOccluderCount == 0U
-        ? RendererShaderPath::LowSpec : RendererShaderPath::Full;
+    if (!detailedMaterials && lightCount <= 4U
+        && shadowLightCount == 0U && shadowOccluderCount == 0U) {
+        return RendererShaderPath::LowSpec;
+    }
+    if (shadowOccluderCount <= 3U) {
+        return RendererShaderPath::FullShadow3;
+    }
+    if (shadowOccluderCount <= 6U) {
+        return RendererShaderPath::FullShadow6;
+    }
+    return RendererShaderPath::FullShadow8;
+}
+
+[[nodiscard]] constexpr std::uint32_t shadowShaderOccluderCapacity(
+    const RendererShaderPath path) noexcept
+{
+    switch (path) {
+    case RendererShaderPath::LowSpec:
+        return 0U;
+    case RendererShaderPath::FullShadow3:
+        return 3U;
+    case RendererShaderPath::FullShadow6:
+        return 6U;
+    case RendererShaderPath::FullShadow8:
+        return 8U;
+    }
+    return 8U;
 }
 
 class GdpRenderer {
@@ -89,6 +116,10 @@ public:
     void setSurfaceInstancingEnabled(const bool enabled) noexcept
     {
         surfaceInstancingEnabled_ = enabled;
+    }
+    void setShadowShaderSpecializationEnabled(const bool enabled) noexcept
+    {
+        shadowShaderSpecializationEnabled_ = enabled;
     }
     [[nodiscard]] bool prepareWorkerVisual(wkc::core::Seed visualSeed);
     [[nodiscard]] bool prepareGuardVisual(wkc::core::Seed visualSeed);
@@ -137,11 +168,31 @@ private:
     void drawMeshInstanced(const wkc::render::Mesh& mesh) noexcept;
     [[nodiscard]] wkc::render::Shader& activeShader() noexcept
     {
-        return lowSpecShaderActive_ ? lowSpecShader_ : shader_;
+        switch (activeShaderPath_) {
+        case RendererShaderPath::LowSpec:
+            return lowSpecShader_;
+        case RendererShaderPath::FullShadow3:
+            return shadow3Shader_;
+        case RendererShaderPath::FullShadow6:
+            return shadow6Shader_;
+        case RendererShaderPath::FullShadow8:
+            return shader_;
+        }
+        return shader_;
     }
     [[nodiscard]] const wkc::render::Shader& activeShader() const noexcept
     {
-        return lowSpecShaderActive_ ? lowSpecShader_ : shader_;
+        switch (activeShaderPath_) {
+        case RendererShaderPath::LowSpec:
+            return lowSpecShader_;
+        case RendererShaderPath::FullShadow3:
+            return shadow3Shader_;
+        case RendererShaderPath::FullShadow6:
+            return shadow6Shader_;
+        case RendererShaderPath::FullShadow8:
+            return shader_;
+        }
+        return shader_;
     }
 
     struct EnemyGpuPart {
@@ -190,6 +241,8 @@ private:
     wkc::render::Camera camera_{};
     wkc::render::Framebuffer framebuffer_{};
     wkc::render::Shader shader_{};
+    wkc::render::Shader shadow3Shader_{};
+    wkc::render::Shader shadow6Shader_{};
     wkc::render::Shader lowSpecShader_{};
     wkc::render::Mesh box_{};
     wkc::render::MeshBindingCache meshBindings_{};
@@ -214,8 +267,10 @@ private:
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};
     RendererFrameStats lastFrameStats_{};
+    RendererShaderPath activeShaderPath_{RendererShaderPath::FullShadow8};
     bool lowSpecShaderActive_{false};
     bool surfaceInstancingEnabled_{true};
+    bool shadowShaderSpecializationEnabled_{true};
     bool initialized_{false};
 };
 

@@ -304,11 +304,26 @@ int main()
             shadowedLighting.shadowOccluderCount = 1U;
             shadowedLighting.shadowOccluders[0].bounds = {
                 {-1.10F, 0.0F, -2.80F}, {1.10F, 0.70F, -1.60F}};
+            renderer.setShadowShaderSpecializationEnabled(false);
+            const bool renderedFullShadowReference = renderer.render(
+                width, height, {}, {}, {}, {}, shadowedLighting);
+            const gdp::game::visual::RendererFrameStats fullShadowReferenceStats
+                = renderer.lastFrameStats();
+            std::vector<std::uint8_t> fullShadowReferencePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                fullShadowReferencePixels.data());
+            renderer.setShadowShaderSpecializationEnabled(true);
             const bool renderedDynamicShadows = renderer.render(
                 width, height, {}, {}, {}, {}, shadowedLighting);
+            const gdp::game::visual::RendererFrameStats specializedShadowStats
+                = renderer.lastFrameStats();
             std::vector<std::uint8_t> shadowedPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 shadowedPixels.data());
+            const bool shadowSpecializationPreservedPixels
+                = shadowedPixels == fullShadowReferencePixels
+                && fullShadowReferenceStats.shadowShaderOccluderCapacity == 8U
+                && specializedShadowStats.shadowShaderOccluderCapacity == 3U;
 
             gdp::game::visual::RoomLightingRenderData clampedShadowLighting
                 = shadowedLighting;
@@ -320,6 +335,34 @@ int main()
             std::vector<std::uint8_t> clampedShadowPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 clampedShadowPixels.data());
+
+            gdp::game::visual::RoomLightingRenderData shadow6Lighting
+                = shadowedLighting;
+            shadow6Lighting.shadowOccluderCount = 4U;
+            for (std::size_t index = 1U; index < 4U; ++index) {
+                const float offset = static_cast<float>(index) * 0.25F;
+                shadow6Lighting.shadowOccluders[index].bounds = {
+                    {-1.10F + offset, 0.0F, -2.80F},
+                    {1.10F + offset, 0.70F, -1.60F}};
+            }
+            const bool renderedShadow6Variant = renderer.render(
+                width, height, {}, {}, {}, {}, shadow6Lighting);
+            const gdp::game::visual::RendererFrameStats shadow6Stats
+                = renderer.lastFrameStats();
+
+            gdp::game::visual::RoomLightingRenderData shadow8Lighting
+                = shadow6Lighting;
+            shadow8Lighting.shadowOccluderCount = 7U;
+            for (std::size_t index = 4U; index < 7U; ++index) {
+                const float offset = static_cast<float>(index) * 0.25F;
+                shadow8Lighting.shadowOccluders[index].bounds = {
+                    {-1.10F + offset, 0.0F, -2.80F},
+                    {1.10F + offset, 0.70F, -1.60F}};
+            }
+            const bool renderedShadow8Variant = renderer.render(
+                width, height, {}, {}, {}, {}, shadow8Lighting);
+            const gdp::game::visual::RendererFrameStats shadow8Stats
+                = renderer.lastFrameStats();
 
             proceduralLighting.alert = true;
             const bool renderedAlertLighting = renderer.render(
@@ -586,6 +629,7 @@ int main()
             performanceHud.performanceInstancedDrawCalls = 9U;
             performanceHud.performanceRenderedInstances = 42U;
             performanceHud.performanceAvoidedDrawCalls = 33U;
+            performanceHud.performanceShadowShaderOccluderCapacity = 3U;
             const bool renderedPerformanceOverlay = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, performanceHud);
             const gdp::game::visual::RendererFrameStats performanceFrameStats
@@ -1157,10 +1201,15 @@ int main()
                 && damagedFixtureChangedChannels > 100U
                 && renderedDestroyedFixture
                 && destroyedFixtureChangedChannels > 100U
-                && renderedShadowBaseline && renderedDynamicShadows
+                && renderedShadowBaseline && renderedFullShadowReference
+                && renderedDynamicShadows && shadowSpecializationPreservedPixels
                 && dynamicShadowChangedChannels > 64U
                 && renderedClampedShadowBudget
                 && clampedShadowPixels == shadowedPixels
+                && renderedShadow6Variant
+                && shadow6Stats.shadowShaderOccluderCapacity == 6U
+                && renderedShadow8Variant
+                && shadow8Stats.shadowShaderOccluderCapacity == 8U
                 && renderedAlertLighting && alertLightingChangedChannels > 100U
                 && renderedTranslatedDoor && renderedLockedDoor && renderedMovingDoor
                 && doorStateChangedChannels > 100U
@@ -1199,6 +1248,7 @@ int main()
                 && performanceFrameStats.renderedInstances
                     > performanceFrameStats.instancedDrawCalls
                 && performanceFrameStats.avoidedDrawCalls > 0U
+                && performanceFrameStats.shadowShaderOccluderCapacity == 0U
                 && measuredGpuFrame
                 && renderedRunTimer && runTimerChangedChannels > 50U
                 && renderedCampaignTimer && campaignTimerChangedChannels > 50U
@@ -1252,6 +1302,11 @@ int main()
                           << " fixture=" << damagedFixtureChangedChannels
                           << '/' << destroyedFixtureChangedChannels
                           << " shadow=" << dynamicShadowChangedChannels
+                          << " shadowRef=" << renderedFullShadowReference
+                          << " shadowExact=" << shadowSpecializationPreservedPixels
+                          << " shadowCap="
+                          << fullShadowReferenceStats.shadowShaderOccluderCapacity
+                          << '/' << specializedShadowStats.shadowShaderOccluderCapacity
                           << " impact=" << impactChangedChannels
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels

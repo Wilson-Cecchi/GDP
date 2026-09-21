@@ -44,6 +44,11 @@ if(NOT combined_output MATCHES
     message(FATAL_ERROR
         "Benchmark summary is absent or malformed:\n${combined_output}")
 endif()
+if(NOT combined_output MATCHES "shadow_capacity=0")
+    file(REMOVE_RECURSE "${preference_root}")
+    message(FATAL_ERROR
+        "Benchmark summary omitted the active shader shadow capacity:\n${combined_output}")
+endif()
 
 file(READ "${settings_file}" settings_after)
 file(REMOVE_RECURSE "${preference_root}")

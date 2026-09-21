@@ -40,6 +40,7 @@ struct FramePerformanceSample {
     std::uint64_t instancedDrawCalls{0U};
     std::uint64_t renderedInstances{0U};
     std::uint64_t avoidedDrawCalls{0U};
+    std::uint32_t shadowShaderOccluderCapacity{0U};
 
     constexpr bool operator==(const FramePerformanceSample&) const noexcept
         = default;

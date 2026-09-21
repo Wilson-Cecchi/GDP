@@ -4,7 +4,7 @@
 > calibração por hardware aplicada na Fase 118, culling conservador na Fase 119,
 > tempo real da GPU na Fase 120, protocolo reproduzível na Fase 128 e instancing
 > estrutural na Fase 130. A Fase 115 introduziu o primeiro budget rígido do passe
-> de sombras.
+> de sombras, especializado no shader na Fase 131.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -194,3 +194,23 @@ amostra valida a integração e a redução de submissões, mas não sustenta pr
 um perfil nem declarar ganho uniforme de FPS. Comparações de desempenho menores
 que a variação observada precisam de múltiplas passagens antes de orientar outro
 budget.
+
+## Especialização de sombras da Fase 131
+
+O renderer nunca envia mais de oito oclusores, mas o shader completo ainda
+declarava e compilava um laço com teto 16. Há agora variantes com capacidade 3,
+6 e 8, selecionadas pelo número efetivo de oclusores do frame. Assim, o budget
+`MEDIUM` cabe normalmente em 3, `HIGH` em até 6 e `ULTRA` em até 8 sem alterar
+os limites de qualidade ou o resultado visual.
+
+O contador `shadow_capacity` torna a escolha observável no benchmark e
+`SHADOW CAP` faz o mesmo no F3. A regressão OpenGL compara a capacidade 3 com a
+referência 8 e exige pixels byte a byte idênticos; casos com quatro e sete
+oclusores garantem a seleção e execução das variantes 6 e 8. A próxima matriz no
+W541 deve avaliar o ganho real, pois somente o driver da K2100M pode demonstrar
+se os limites estáticos menores reduzem o custo do fragment shader.
+
+Na cena determinística da seed `12345`, `POTATO/LOW` registram capacidade zero e
+`MEDIUM/HIGH/ULTRA` selecionam capacidade 3, pois os três oclusores efetivos já
+cabem na menor variante completa. Esses valores estruturais foram confirmados
+offscreen; os tempos dessa execução não são baseline de hardware.

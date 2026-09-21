@@ -496,6 +496,10 @@ especializados das pastas numeradas.
   mesmo material, tint e UV são agrupadas em um draw. A cena de benchmark reduz
   de 265 para 185 draws em `MEDIUM`, preservando pixels e triângulos; F3 e o
   resumo registram lotes, instâncias e submissões evitadas.
+- **Fase 131 — Especialização do budget de sombras:** o shader completo possui
+  variantes para 3, 6 e 8 oclusores e seleciona a menor capacidade suficiente
+  por frame. O caminho de referência com capacidade 8 permanece disponível à
+  regressão, que exige pixels idênticos para a mesma cena.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1331,6 +1335,17 @@ passagem, `MEDIUM` avançou de 29,35 para 30,14 FPS e `HIGH` de 20,19 para 21,02
 mas `LOW` e `ULTRA` oscilaram para pior. O resultado comprova a redução de draws,
 não um ganho uniforme de frame time; o gargalo principal continua em GPU e
 apresentação e exige amostras repetidas para comparar otimizações pequenas.
+
+Na Fase 131, o limite estático de 16 oclusores no fragment shader foi alinhado
+ao teto real de 8 do renderer. O shader completo passou a ter variantes com
+capacidade 3, 6 e 8; o renderer escolhe a menor que comporta o frame, enquanto
+`POTATO/LOW` continuam no shader simplificado sem sombras. Isso permite que o
+driver compile laços e arrays menores para os budgets comuns sem remover luz,
+sombra ou material. A regressão OpenGL força a variante de capacidade 8 como
+referência e exige framebuffer byte a byte idêntico à variante 3, além de
+executar casos reais das capacidades 6 e 8. F3 mostra `SHADOW CAP`, e o resumo
+de benchmark publica `shadow_capacity`. O impacto real no W541 continua sujeito
+à matriz de hardware; os tempos offscreen não são usados como evidência de FPS.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

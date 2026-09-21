@@ -69,12 +69,15 @@ const int MAX_LIGHTS = 4;
 #else
 const int MAX_LIGHTS = 8;
 #endif
+#ifndef GDP_MAX_SHADOW_OCCLUDERS
+#define GDP_MAX_SHADOW_OCCLUDERS 8
+#endif
 uniform int uLightCount;
 uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
 uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
-const int MAX_SHADOW_OCCLUDERS = 16;
+const int MAX_SHADOW_OCCLUDERS = GDP_MAX_SHADOW_OCCLUDERS;
 #if !GDP_LOW_SPEC
 uniform int uShadowLightCount;
 uniform int uShadowOccluderCount;
@@ -230,6 +233,15 @@ std::string makeLowSpecFragmentShaderSource()
     std::string source{fragmentShaderSource};
     constexpr std::string_view versionLine{"#version 330 core\n"};
     source.insert(versionLine.size(), "#define GDP_LOW_SPEC 1\n");
+    return source;
+}
+
+std::string makeShadowBudgetFragmentShaderSource(const std::uint32_t capacity)
+{
+    std::string source{fragmentShaderSource};
+    constexpr std::string_view versionLine{"#version 330 core\n"};
+    source.insert(versionLine.size(),
+        "#define GDP_MAX_SHADOW_OCCLUDERS " + std::to_string(capacity) + "\n");
     return source;
 }
 
@@ -404,6 +416,10 @@ bool GdpRenderer::initialize(const int width, const int height)
         return false;
     }
     if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)
+        || !shadow3Shader_.compile(gl_, vertexShaderSource,
+            makeShadowBudgetFragmentShaderSource(3U))
+        || !shadow6Shader_.compile(gl_, vertexShaderSource,
+            makeShadowBudgetFragmentShaderSource(6U))
         || !lowSpecShader_.compile(
             gl_, vertexShaderSource, makeLowSpecFragmentShaderSource())) {
         return false;
@@ -1028,11 +1044,17 @@ bool GdpRenderer::render(
         lighting.shadowOccluderCount,
         static_cast<std::uint32_t>(maxActiveShadowOccluders),
         static_cast<std::uint32_t>(maxShadowOccluders)});
-    lowSpecShaderActive_ = selectRendererShaderPath(
+    activeShaderPath_ = selectRendererShaderPath(
         hud.detailedMaterials, lightCount,
-        shadowLightCount, shadowOccluderCount)
-        == RendererShaderPath::LowSpec;
+        shadowLightCount, shadowOccluderCount);
+    if (!shadowShaderSpecializationEnabled_
+        && activeShaderPath_ != RendererShaderPath::LowSpec) {
+        activeShaderPath_ = RendererShaderPath::FullShadow8;
+    }
+    lowSpecShaderActive_ = activeShaderPath_ == RendererShaderPath::LowSpec;
     lastFrameStats_.lowSpecShader = lowSpecShaderActive_;
+    lastFrameStats_.shadowShaderOccluderCapacity
+        = shadowShaderOccluderCapacity(activeShaderPath_);
     wkc::render::Shader& shader = activeShader();
     shader.beginUniformFrame();
     lastFrameStats_.meshCacheEntries = meshCache_.stats().entries;
@@ -2612,7 +2634,10 @@ bool GdpRenderer::render(
                 + " SHADOW " + std::to_string(hud.performanceShadowLights)
                 + "X" + std::to_string(hud.performanceShadowOccluders),
             std::string{"SHADER "}
-                + (hud.performanceLowSpecShader ? "LOW SPEC" : "FULL"),
+                + (hud.performanceLowSpecShader ? "LOW SPEC" : "FULL")
+                + " SHADOW CAP "
+                + std::to_string(
+                    hud.performanceShadowShaderOccluderCapacity),
             "CULL DRAW "
                 + std::to_string(hud.performanceBackfaceCulledDraws)
                 + " STATE "

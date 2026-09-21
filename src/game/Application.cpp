@@ -610,7 +610,9 @@ int Application::run()
                 << " culled_draws=" << latest.backfaceCulledDraws
                 << " instanced_draws=" << latest.instancedDrawCalls
                 << " instances=" << latest.renderedInstances
-                << " saved_draws=" << latest.avoidedDrawCalls;
+                << " saved_draws=" << latest.avoidedDrawCalls
+                << " shadow_capacity="
+                << latest.shadowShaderOccluderCapacity;
             log(LogLevel::Info, benchmarkSummary.str());
         }
         beginAnotherRun = restartRequested_;
@@ -2769,6 +2771,8 @@ void Application::render()
             = rendererStats.renderedInstances;
         currentFramePerformance_.avoidedDrawCalls
             = rendererStats.avoidedDrawCalls;
+        currentFramePerformance_.shadowShaderOccluderCapacity
+            = rendererStats.shadowShaderOccluderCapacity;
         const auto presentStart = Clock::now();
         SDL_GL_SwapWindow(window_);
         currentFramePerformance_.presentMilliseconds
@@ -3337,6 +3341,8 @@ void Application::render()
         = performance.latest.renderedInstances;
     hud.performanceAvoidedDrawCalls
         = performance.latest.avoidedDrawCalls;
+    hud.performanceShadowShaderOccluderCapacity
+        = performance.latest.shadowShaderOccluderCapacity;
     hud.health = player_.state().health;
     hud.maximumHealth = player_.state().maximumHealth;
     hud.armor = player_.state().armor;

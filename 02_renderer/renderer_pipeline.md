@@ -62,6 +62,8 @@
 > ainda sem trocar as submissões concretas do GDP.
 > A Fase 130 adotou essa fundação nas superfícies compatíveis de salas e
 > corredores, mantendo comparação byte a byte com o caminho individual.
+> A Fase 131 especializou o shader completo para budgets de 3, 6 e 8 oclusores,
+> escolhendo a menor variante capaz de representar o frame atual.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -154,6 +156,15 @@ evitados. Triângulos contam todas as instâncias, enquanto `drawCalls` represen
 submissões reais ao driver. Na cena determinística de benchmark, `MEDIUM` mantém
 3.360 triângulos e reduz 265 draws para 185; a regressão OpenGL exige pixels
 idênticos entre os caminhos.
+
+O passe completo de iluminação também possui variantes de fragment shader com
+arrays e teto de laço para 3, 6 ou 8 oclusores. A escolha usa o número já
+limitado pelo budget do frame; entradas de 0–3 usam a primeira variante, 4–6 a
+segunda e 7–8 a terceira. O shader `LowSpec` continua compilando sombras para
+fora. A capacidade selecionada aparece em `RendererFrameStats`, e um modo de
+referência interno permite comparar a variante 3 com a variante 8 sem mudar a
+cena. Testes exercitam as três capacidades e exigem equivalência byte a byte no
+caso comparável.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e
