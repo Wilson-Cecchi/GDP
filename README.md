@@ -500,6 +500,10 @@ especializados das pastas numeradas.
   variantes para 3, 6 e 8 oclusores e seleciona a menor capacidade suficiente
   por frame. O caminho de referência com capacidade 8 permanece disponível à
   regressão, que exige pixels idênticos para a mesma cena.
+- **Fase 132 — Benchmark estável por mediana:** o runner aceita um número ímpar
+  de repetições, preserva cada amostra, rejeita mudanças nos contadores
+  estruturais e publica a mediana de cada métrica. O alvo estável executa três
+  matrizes sem substituir o benchmark rápido de uma passagem.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1347,6 +1351,17 @@ executar casos reais das capacidades 6 e 8. F3 mostra `SHADOW CAP`, e o resumo
 de benchmark publica `shadow_capacity`. O impacto real no W541 continua sujeito
 à matriz de hardware; os tempos offscreen não são usados como evidência de FPS.
 
+Na Fase 132, `tools/run_graphics_benchmark.cmake` aceita `GDP_REPEATS` ímpar e
+executa matrizes completas na mesma ordem. Cada amostra continua disponível em
+uma linha `RUN N/TOTAL BENCHMARK`; ao final, `BENCHMARK_MEDIAN` publica a mediana
+independente de média, P95, pior frame, FPS, percentual fora do budget e tempos
+de update/render/present/GPU. Draws, triângulos, visibilidade, luzes, sombras e
+contadores de instancing precisam permanecer idênticos entre as passagens ou o
+runner falha, evitando comparar cenas diferentes. O alvo
+`graphics-benchmark-stable` usa três repetições; o alvo anterior conserva uma
+para iteração rápida. Essa fase altera apenas medição, sem tocar em renderização,
+gameplay, RNG ou qualidade visual.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
@@ -1538,6 +1553,13 @@ Medir `POTATO`, `LOW`, `MEDIUM`, `HIGH` e `ULTRA` em sequência:
 ```bash
 cmake --preset release
 cmake --build --preset release --target graphics-benchmark
+```
+
+Para uma comparação de desempenho mais resistente a picos, executar três
+matrizes e usar as linhas finais `BENCHMARK_MEDIAN`:
+
+```bash
+cmake --build --preset release --target graphics-benchmark-stable
 ```
 
 Durante essa execução, entradas de gameplay são descartadas; o evento de fechar

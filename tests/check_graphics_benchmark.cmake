@@ -55,3 +55,70 @@ file(REMOVE_RECURSE "${preference_root}")
 if(NOT settings_after STREQUAL settings_before)
     message(FATAL_ERROR "Benchmark modified persisted player settings")
 endif()
+
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env
+        "XDG_DATA_HOME=${preference_root}"
+        "${CMAKE_COMMAND}"
+        -DGDP_EXECUTABLE=${GDP_EXECUTABLE}
+        -DGDP_FRAMES=8
+        -DGDP_SEED=12345
+        -DGDP_REPEATS=3
+        -DGDP_PROFILES=POTATO
+        -DGDP_OFFSCREEN=ON
+        -P ${CMAKE_CURRENT_LIST_DIR}/../tools/run_graphics_benchmark.cmake
+    RESULT_VARIABLE repeated_result
+    OUTPUT_VARIABLE repeated_output
+    ERROR_VARIABLE repeated_error
+    TIMEOUT 120
+)
+set(repeated_combined_output "${repeated_output}\n${repeated_error}")
+file(REMOVE_RECURSE "${preference_root}")
+if(NOT repeated_result EQUAL 0)
+    message(FATAL_ERROR
+        "Repeated graphics benchmark failed (${repeated_result}):\n${repeated_combined_output}")
+endif()
+if(NOT repeated_combined_output MATCHES
+        "RUN 1/3 BENCHMARK profile=POTATO"
+        OR NOT repeated_combined_output MATCHES
+        "RUN 3/3 BENCHMARK profile=POTATO")
+    message(FATAL_ERROR
+        "Repeated benchmark omitted an individual run:\n${repeated_combined_output}")
+endif()
+if(NOT repeated_combined_output MATCHES
+        "BENCHMARK_MEDIAN profile=POTATO seed=12345 frames=8 repeats=3"
+        OR NOT repeated_combined_output MATCHES
+        "draws=[0-9]+.*shadow_capacity=0")
+    message(FATAL_ERROR
+        "Repeated benchmark omitted its median or stable counters:\n${repeated_combined_output}")
+endif()
+
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+        -DGDP_EXECUTABLE=${GDP_EXECUTABLE}
+        -DGDP_REPEATS=2
+        -P ${CMAKE_CURRENT_LIST_DIR}/../tools/run_graphics_benchmark.cmake
+    RESULT_VARIABLE even_repeats_result
+    OUTPUT_VARIABLE even_repeats_output
+    ERROR_VARIABLE even_repeats_error
+)
+if(even_repeats_result EQUAL 0
+        OR NOT "${even_repeats_output}\n${even_repeats_error}" MATCHES
+            "GDP_REPEATS must be odd")
+    message(FATAL_ERROR "Runner accepted an ambiguous even repeat count")
+endif()
+
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+        -DGDP_EXECUTABLE=${GDP_EXECUTABLE}
+        -DGDP_PROFILES=UNKNOWN
+        -P ${CMAKE_CURRENT_LIST_DIR}/../tools/run_graphics_benchmark.cmake
+    RESULT_VARIABLE unknown_profile_result
+    OUTPUT_VARIABLE unknown_profile_output
+    ERROR_VARIABLE unknown_profile_error
+)
+if(unknown_profile_result EQUAL 0
+        OR NOT "${unknown_profile_output}\n${unknown_profile_error}" MATCHES
+            "Unknown GDP benchmark profile")
+    message(FATAL_ERROR "Runner accepted an unknown graphics profile")
+endif()

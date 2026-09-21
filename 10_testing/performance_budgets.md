@@ -4,7 +4,8 @@
 > calibração por hardware aplicada na Fase 118, culling conservador na Fase 119,
 > tempo real da GPU na Fase 120, protocolo reproduzível na Fase 128 e instancing
 > estrutural na Fase 130. A Fase 115 introduziu o primeiro budget rígido do passe
-> de sombras, especializado no shader na Fase 131.
+> de sombras, especializado no shader na Fase 131; a Fase 132 adicionou mediana
+> de múltiplas matrizes para comparar ganhos pequenos.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -124,6 +125,19 @@ cmake -DGDP_EXECUTABLE=build/release/gdp \
   -DGDP_SEED=67890 -DGDP_FRAMES=360 \
   -P tools/run_graphics_benchmark.cmake
 ```
+
+Para validação de desempenho, o alvo estável repete a matriz três vezes:
+
+```bash
+cmake --build --preset release --target graphics-benchmark-stable
+```
+
+Cada passagem emite `RUN N/3 BENCHMARK`; ao final, `BENCHMARK_MEDIAN` contém a
+mediana independente de cada métrica temporal. Contadores estruturais precisam
+ser idênticos nas três passagens ou o runner encerra com erro. O alvo
+`graphics-benchmark` continua executando uma passagem rápida. Chamadas manuais
+podem definir qualquer `GDP_REPEATS` positivo e ímpar e limitar perfis com
+`GDP_PROFILES`, por exemplo `-DGDP_REPEATS=5 -DGDP_PROFILES=POTATO`.
 
 Resultados produzidos com `GDP_OFFSCREEN=ON` verificam inicialização, formato e
 comparabilidade estrutural, mas não são baseline de GPU. Um baseline aceito deve

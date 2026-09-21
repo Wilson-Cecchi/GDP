@@ -331,6 +331,17 @@ add_custom_target(
     COMMENT "Benchmarking all GDP graphics profiles"
 )
 
+add_custom_target(
+    graphics-benchmark-stable
+    COMMAND ${CMAKE_COMMAND}
+        -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+        -DGDP_REPEATS=3
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_graphics_benchmark.cmake
+    DEPENDS gdp
+    USES_TERMINAL
+    COMMENT "Benchmarking all GDP graphics profiles three times"
+)
+
 if(WIN32)
     install(TARGETS gdp RUNTIME DESTINATION .)
 

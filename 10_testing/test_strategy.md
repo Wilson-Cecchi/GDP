@@ -501,6 +501,12 @@ no log, cobrindo a aplicação do preset sem acessar preferências do usuário.
 Um terceiro grava `vertical_sync = false`, inicia o contexto OpenGL offscreen e
 exige no log que o intervalo de troca efetivo permaneça desativado.
 
+O gate da Fase 132 executa três benchmarks curtos de `POTATO` em isolamento,
+exige as amostras `RUN 1/3` e `RUN 3/3`, uma linha `BENCHMARK_MEDIAN` e os
+contadores estruturais estáveis. O runner rejeita repetição zero/par ou perfil
+desconhecido, e uma divergência de draws, triângulos, conteúdo visível, luzes,
+sombras ou instancing invalida a comparação antes de publicar a mediana.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
