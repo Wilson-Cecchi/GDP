@@ -172,3 +172,25 @@ offscreen continuam inadequados como baseline de hardware; o ganho real deve ser
 medido novamente no W541 pelo protocolo da Fase 128. A regressão OpenGL renderiza
 o mesmo corredor com instancing desligado e ligado, exige pixels byte a byte
 iguais, triângulos iguais e a diferença exata de draws reportada por `SAVE`.
+
+### Validação no W541 em 2026-09-21
+
+O mesmo protocolo foi repetido no ThinkPad W541 após o commit `93804f4`. A
+redução estrutural apareceu integralmente no driver real: 13 draws evitados em
+`POTATO/LOW` e 80 em `MEDIUM/HIGH/ULTRA`, com triângulos inalterados.
+
+| Perfil | FPS anterior | FPS atual | Média anterior | Média atual | GPU anterior | GPU atual | P95 atual |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| POTATO | 79,44 | 80,05 | 12,59 ms | 12,49 ms | 10,62 ms | 10,59 ms | 16,10 ms |
+| LOW | 74,76 | 66,33 | 13,38 ms | 15,08 ms | 11,48 ms | 12,93 ms | 19,50 ms |
+| MEDIUM | 29,35 | 30,14 | 34,07 ms | 33,18 ms | 31,95 ms | 31,06 ms | 37,58 ms |
+| HIGH | 20,19 | 21,02 | 49,53 ms | 47,56 ms | 47,33 ms | 45,49 ms | 53,99 ms |
+| ULTRA | 19,05 | 18,85 | 52,48 ms | 53,04 ms | 50,43 ms | 50,97 ms | 65,94 ms |
+
+Uma única passagem mostra ganho modesto em `MEDIUM` e `HIGH`, estabilidade em
+`POTATO` e regressão acompanhada de picos em `LOW` e `ULTRA`. Como a carga de
+geometria não mudou e o tempo continua concentrado em `GPU/PRESENT`, essa
+amostra valida a integração e a redução de submissões, mas não sustenta promover
+um perfil nem declarar ganho uniforme de FPS. Comparações de desempenho menores
+que a variação observada precisam de múltiplas passagens antes de orientar outro
+budget.

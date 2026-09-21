@@ -1326,6 +1326,12 @@ exige pixels byte a byte idênticos entre referência e instancing. O F3 mostra
 como `instanced_draws`, `instances` e `saved_draws`. Gameplay, visibilidade,
 materiais, RNG e conteúdo permanecem inalterados.
 
+A repetição em hardware real no W541 confirmou todos os contadores. Nessa
+passagem, `MEDIUM` avançou de 29,35 para 30,14 FPS e `HIGH` de 20,19 para 21,02,
+mas `LOW` e `ULTRA` oscilaram para pior. O resultado comprova a redução de draws,
+não um ganho uniforme de frame time; o gargalo principal continua em GPU e
+apresentação e exige amostras repetidas para comparar otimizações pequenas.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano
