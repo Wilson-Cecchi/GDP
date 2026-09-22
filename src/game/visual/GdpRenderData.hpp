@@ -266,6 +266,8 @@ enum class HudHitFeedback : std::uint8_t {
     None,
     Hit,
     Kill,
+    WeakHit,
+    WeakKill,
 };
 
 enum class HudNotice : std::uint8_t {

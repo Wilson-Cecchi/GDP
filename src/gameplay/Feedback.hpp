@@ -12,6 +12,8 @@ enum class HitFeedbackKind : std::uint8_t {
     None,
     Hit,
     Kill,
+    WeakHit,
+    WeakKill,
 };
 
 enum class NoticeFeedbackKind : std::uint8_t {
@@ -35,7 +37,10 @@ struct FeedbackState {
 
 void updateFeedback(FeedbackState& state, float fixedStepSeconds) noexcept;
 void signalPlayerDamage(FeedbackState& state) noexcept;
-void signalHit(FeedbackState& state, bool killed) noexcept;
+void signalHit(
+    FeedbackState& state,
+    bool killed,
+    bool weakPoint = false) noexcept;
 void signalNotice(FeedbackState& state, NoticeFeedbackKind notice) noexcept;
 void clearFeedback(FeedbackState& state) noexcept;
 

@@ -305,6 +305,76 @@ void testHitscanSelectionAndBlocking()
         "IndustrialRobot exposes a metal impact instead of an organic one");
 }
 
+void testWeakPointDamageAndClassification()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld room{{{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    EntityManager manager;
+    const EntityId organic = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -3.0F}},
+        .roomId = 1,
+        .health = 100.0F,
+    });
+    Weapon weakPointWeapon({
+        .damage = 40.0F,
+        .fireInterval = 0.0F,
+        .range = 20.0F,
+    });
+    const ShotResult weakPoint = fireHitscan(
+        weakPointWeapon, {0.0F, 1.62F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1, room, manager);
+    expect(weakPoint.outcome == ShotOutcome::Hit && weakPoint.hit
+            && weakPoint.hit->target == organic
+            && weakPoint.hit->zone == HitZone::WeakPoint
+            && near(manager.findData<EnemyData>(organic)->health,
+                100.0F - (40.0F * weakPointDamageMultiplier)),
+        "head-sized enemy weak point reports its zone and applies the documented multiplier");
+
+    EntityManager standardManager;
+    const EntityId standardTarget = standardManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -3.0F}},
+        .roomId = 1,
+        .health = 100.0F,
+    });
+    Weapon standardWeapon({
+        .damage = 40.0F,
+        .fireInterval = 0.0F,
+        .range = 20.0F,
+    });
+    const ShotResult standard = fireHitscan(
+        standardWeapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1, room, standardManager);
+    expect(standard.outcome == ShotOutcome::Hit && standard.hit
+            && standard.hit->zone == HitZone::Standard
+            && near(standardManager.findData<EnemyData>(standardTarget)->health,
+                60.0F),
+        "torso hit keeps the base damage and standard hit classification");
+
+    EntityManager robotManager;
+    const EntityId robot = robotManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -3.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 100.0F,
+    });
+    Weapon robotWeapon({
+        .damage = 40.0F,
+        .fireInterval = 0.0F,
+        .range = 20.0F,
+    });
+    const ShotResult robotCore = fireHitscan(
+        robotWeapon, {0.0F, 1.48F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1, room, robotManager);
+    expect(robotCore.outcome == ShotOutcome::Hit && robotCore.hit
+            && robotCore.hit->target == robot
+            && robotCore.hit->zone == HitZone::WeakPoint
+            && robotCore.impact
+            && robotCore.impact->material == ImpactMaterial::Metal,
+        "IndustrialRobot sensor core is a metal weak point");
+}
+
 void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
 {
     using namespace gdp::entities;
@@ -1894,6 +1964,7 @@ int main()
     testDamageLifecycle();
     testDormantEnemyIgnoresCombat();
     testHitscanSelectionAndBlocking();
+    testWeakPointDamageAndClassification();
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testWorkerBehavior();
     testWorkerLineOfSight();

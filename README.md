@@ -508,6 +508,10 @@ especializados das pastas numeradas.
   e versão OpenGL; as linhas de benchmark carregam a mesma identidade em formato
   legível por máquina. Matrizes repetidas falham se o dispositivo mudar entre
   passagens, impedindo comparar Intel, NVIDIA ou renderização por software.
+- **Fase 134 — Weak points:** inimigos orgânicos recebem um volume menor na
+  cabeça e o IndustrialRobot no sensor superior. Acertos aplicam `1,75x` de
+  dano, publicam a zona no resultado do hitscan e usam confirmação dourada
+  própria no HUD, sem RNG ou mudança em tiros no torso.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1385,6 +1389,15 @@ da CPU estava em 85 °C, acima do limite `high` de 84 °C, e o `nouveau` não ex
 temperatura ou clock da GPU. O resultado confirma a seleção `NVE6`, mas não é
 baseline válido para reduzir qualidade: driver, reclocking e condição térmica
 precisam ser resolvidos ou isolados primeiro.
+
+Na Fase 134, o hitscan passou a classificar o contato de Enemy como `Standard`
+ou `WeakPoint`. O volume fraco é deliberadamente menor que o collider geral:
+cabeça nos quatro papéis orgânicos e sensor superior metálico no
+IndustrialRobot. A distância e o ponto do impacto usam a superfície desse
+volume, continuam competindo normalmente com paredes e outros alvos e aplicam
+`1,75x` de dano somente após um disparo aceito. O HUD traduz weak hit e weak
+kill em um marcador dourado com detalhe interno; torso, Props, luminárias,
+munição, cooldown, áudio, progressão e RNG preservam os contratos anteriores.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

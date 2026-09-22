@@ -2539,10 +2539,14 @@ bool GdpRenderer::render(
         const float hitStrength = std::clamp(hud.hitFeedbackStrength, 0.0F, 1.0F);
         if (!hud.paused && hud.hitFeedback != HudHitFeedback::None
             && hitStrength > 0.0F) {
-            const bool killed = hud.hitFeedback == HudHitFeedback::Kill;
-            const wkc::core::Vec3 baseColor = killed
-                ? wkc::core::Vec3{1.0F, 0.26F, 0.10F}
-                : wkc::core::Vec3{0.82F, 0.94F, 0.96F};
+            const bool killed = hud.hitFeedback == HudHitFeedback::Kill
+                || hud.hitFeedback == HudHitFeedback::WeakKill;
+            const bool weakPoint = hud.hitFeedback == HudHitFeedback::WeakHit
+                || hud.hitFeedback == HudHitFeedback::WeakKill;
+            const wkc::core::Vec3 baseColor = weakPoint
+                ? wkc::core::Vec3{1.0F, 0.78F, 0.16F}
+                : killed ? wkc::core::Vec3{1.0F, 0.26F, 0.10F}
+                         : wkc::core::Vec3{0.82F, 0.94F, 0.96F};
             const wkc::core::Vec3 markerColor = baseColor
                 * (0.32F + (0.68F * hitStrength));
             const int centerX = width / 2;
@@ -2561,6 +2565,16 @@ bool GdpRenderer::render(
                 markerLength, markerColor);
             drawSolidRect(centerX - (markerThickness / 2), centerY + gap,
                 markerThickness, markerLength, markerColor);
+            if (weakPoint) {
+                const int innerGap = 5 * hudScale;
+                const int innerLength = 2 * hudScale;
+                drawSolidRect(centerX - innerGap - innerLength,
+                    centerY - (markerThickness / 2), innerLength,
+                    markerThickness, markerColor);
+                drawSolidRect(centerX + innerGap,
+                    centerY - (markerThickness / 2), innerLength,
+                    markerThickness, markerColor);
+            }
         }
 
         std::string_view noticeText;

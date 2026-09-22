@@ -11,6 +11,7 @@
 namespace gdp::gameplay {
 
 inline constexpr float enemyHitReactionDuration = 0.12F;
+inline constexpr float weakPointDamageMultiplier = 1.75F;
 
 enum class DamageOutcome : std::uint8_t {
     Ignored,
@@ -29,10 +30,16 @@ enum class ShotOutcome : std::uint8_t {
     Destroyed,
 };
 
+enum class HitZone : std::uint8_t {
+    Standard,
+    WeakPoint,
+};
+
 struct HitResult {
     gdp::entities::EntityId target{};
     wkc::core::Vec3 point{};
     float distance{0.0F};
+    HitZone zone{HitZone::Standard};
 };
 
 enum class ImpactMaterial : std::uint8_t {

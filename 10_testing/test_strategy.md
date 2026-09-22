@@ -513,6 +513,13 @@ quanto na mediana; o runner inclui a identidade na assinatura invariável das
 repetições. Validação offscreen comprova o contrato, mas seleção Intel/NVIDIA é
 confirmada somente em janela real.
 
+O gate da Fase 134 dispara contra cabeça, torso e sensor do IndustrialRobot.
+Ele exige classificação `WeakPoint`, multiplicador exato de `1,75x`, dano-base
+inalterado no torso e material metálico preservado no robô. O teste de feedback
+também distingue weak hit e weak kill dos marcadores comuns. A suíte completa
+protege seleção do alvo mais próximo, bloqueio por parede, impacto, progressão e
+pixels do HUD; o playtest confirma se o volume menor é legível durante combate.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

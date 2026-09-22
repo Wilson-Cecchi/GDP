@@ -37,6 +37,14 @@ void testDamageAndHitTimers()
             && hitFeedbackStrength(feedback) == 1.0F,
         "kill confirmation replaces and refreshes an existing hit marker");
 
+    signalHit(feedback, false, true);
+    expect(feedback.hit == HitFeedbackKind::WeakHit
+            && hitFeedbackStrength(feedback) == 1.0F,
+        "weak-point hit receives a distinct full-strength confirmation");
+    signalHit(feedback, true, true);
+    expect(feedback.hit == HitFeedbackKind::WeakKill,
+        "weak-point kill remains distinct from an ordinary kill");
+
     updateFeedback(feedback, 10.0F);
     expect(feedback.hit == HitFeedbackKind::None
             && hitFeedbackStrength(feedback) == 0.0F

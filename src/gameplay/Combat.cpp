@@ -62,6 +62,23 @@ wkc::core::Aabb enemyBounds(const gdp::entities::Entity& enemy) noexcept
     };
 }
 
+wkc::core::Aabb enemyWeakPointBounds(
+    const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy) noexcept
+{
+    const wkc::core::Vec3 position = entity.transform.position;
+    if (enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot) {
+        return {
+            {position.x - 0.20F, position.y + 1.30F, position.z - 0.22F},
+            {position.x + 0.20F, position.y + 1.68F, position.z + 0.22F},
+        };
+    }
+    return {
+        {position.x - 0.22F, position.y + 1.42F, position.z - 0.24F},
+        {position.x + 0.22F, position.y + 1.80F, position.z + 0.24F},
+    };
+}
+
 float firstWorldDistance(
     const wkc::core::Vec3 origin,
     const wkc::core::Vec3 direction,
@@ -219,14 +236,22 @@ ShotResult fireHitscan(
             continue;
         }
         const auto interval = rayAabbInterval(origin, direction, enemyBounds(*entity), range);
-        if (!interval || interval->nearDistance >= worldDistance
-            || (nearestHit && interval->nearDistance >= nearestHit->distance)) {
+        if (!interval) {
+            continue;
+        }
+        const auto weakPointInterval = rayAabbInterval(
+            origin, direction, enemyWeakPointBounds(*entity, *enemy), range);
+        const float hitDistance = weakPointInterval
+            ? weakPointInterval->nearDistance : interval->nearDistance;
+        if (hitDistance >= worldDistance
+            || (nearestHit && hitDistance >= nearestHit->distance)) {
             continue;
         }
         nearestHit = HitResult{
             id,
-            origin + (direction * interval->nearDistance),
-            interval->nearDistance,
+            origin + (direction * hitDistance),
+            hitDistance,
+            weakPointInterval ? HitZone::WeakPoint : HitZone::Standard,
         };
     }
 
@@ -286,7 +311,10 @@ ShotResult fireHitscan(
             return {outcome, nearestHit, damage.spawnedDrop, impact};
         }
         const DamageOutcome damage = applyDamage(
-            manager, nearestHit->target, weapon.damage());
+            manager, nearestHit->target,
+            weapon.damage()
+                * (nearestHit->zone == HitZone::WeakPoint
+                        ? weakPointDamageMultiplier : 1.0F));
         return {
             damage == DamageOutcome::Killed ? ShotOutcome::Killed : ShotOutcome::Hit,
             nearestHit,

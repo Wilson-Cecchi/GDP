@@ -45,10 +45,15 @@ void signalPlayerDamage(FeedbackState& state) noexcept
     state.damageRemaining = damageFeedbackSeconds;
 }
 
-void signalHit(FeedbackState& state, const bool killed) noexcept
+void signalHit(
+    FeedbackState& state,
+    const bool killed,
+    const bool weakPoint) noexcept
 {
     state.hitRemaining = hitFeedbackSeconds;
-    state.hit = killed ? HitFeedbackKind::Kill : HitFeedbackKind::Hit;
+    state.hit = weakPoint
+        ? killed ? HitFeedbackKind::WeakKill : HitFeedbackKind::WeakHit
+        : killed ? HitFeedbackKind::Kill : HitFeedbackKind::Hit;
 }
 
 void signalNotice(FeedbackState& state, const NoticeFeedbackKind notice) noexcept

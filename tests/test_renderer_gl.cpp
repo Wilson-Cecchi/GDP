@@ -588,6 +588,15 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::game::visual::HudRenderData weakPointHud = functionalHud;
+            weakPointHud.hitFeedback
+                = gdp::game::visual::HudHitFeedback::WeakKill;
+            const bool renderedWeakPointHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, weakPointHud);
+            std::vector<std::uint8_t> weakPointHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                weakPointHudPixels.data());
+
             gdp::game::visual::HudRenderData performanceHud = functionalHud;
             performanceHud.performanceOverlay = true;
             performanceHud.graphicsQuality
@@ -942,6 +951,7 @@ int main()
             std::size_t campaignResultChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t weakPointHudChangedChannels = 0;
             std::size_t performanceOverlayChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
             std::size_t campaignTimerChangedChannels = 0;
@@ -1066,6 +1076,10 @@ int main()
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
+                    }
+                    if (weakPointHudPixels[index + channel]
+                        != functionalHudPixels[index + channel]) {
+                        ++weakPointHudChangedChannels;
                     }
                     if (performanceOverlayPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
@@ -1231,6 +1245,7 @@ int main()
                 && campaignResultChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedWeakPointHud && weakPointHudChangedChannels > 20U
                 && renderedPerformanceOverlay
                 && performanceOverlayChangedChannels > 500U
                 && performanceFrameStats.drawCalls > 0U

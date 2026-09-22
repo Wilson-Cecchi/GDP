@@ -11,10 +11,9 @@
 > reação visual transitória ao dano de inimigos e a Fase 109 passou a publicar
 > ponto, normal e material de cada impacto. A Fase 112 conectou eventos já
 > aceitos de disparo, recarga e equip aos snapshots do viewmodel. A Fase 113
-> tornou luminárias alvos metálicos destrutíveis. A fila
-> desacoplada de sinais de combate, além de spread
-> e weak points, permanece
-> para fases posteriores.
+> tornou luminárias alvos metálicos destrutíveis. A Fase 134 adicionou weak
+> points determinísticos e feedback próprio. A fila desacoplada de sinais de
+> combate e o spread permanecem para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -41,6 +40,14 @@ vazio, miss, impacto no mundo, prop protegido, hit, kill e prop destruído. Todo
 resultado que realmente toca uma superfície inclui `ImpactResult`: posição do
 primeiro contato, normal oposta ao raio e material `Metal`, `Composite` ou
 `Flesh`. Miss, cooldown e arma vazia não fabricam impacto.
+
+Na Fase 134, `HitResult` também identifica `Standard` ou `WeakPoint`. Inimigos
+orgânicos usam um volume menor sobre a cabeça; o IndustrialRobot usa o sensor
+superior metálico. O ponto de impacto vem da superfície desse volume menor, e
+um acerto válido aplica `1,75x` de dano. O volume permanece contido no AABB
+geral, não atravessa paredes e não altera tiros no torso, Props ou luminárias.
+O HUD distingue weak point com marcador dourado e segmentos internos, inclusive
+quando o dano é letal, sem introduzir RNG ou alterar a direção do disparo.
 
 ## WeaponDefinition
 
@@ -83,8 +90,8 @@ com o gameplay quando um menu pausa a run.
 `applyDamage()` opera sobre Enemy ou Prop destrutível, ignora IDs inválidos,
 dano não positivo e alvos terminais, faz clamp de HP em zero e produz uma única
 transição terminal. Props passam por `Damaged`, perdem colisão em `Destroyed` e
-um crate cria somente seu drop controlado. Weak points entram quando forem
-visualmente legíveis.
+um crate cria somente seu drop controlado. O multiplicador de weak point é
+resolvido pelo hitscan antes desta função; dano direto mantém sua semântica.
 
 `CeilingFixture` é a exceção alvo/navegação: não bloqueia personagens, mas seu
 AABB centrado no modelo intercepta hitscan. Possui 24 HP, impacto metálico e não
@@ -130,8 +137,10 @@ alvo mais próximo, overkill, double death, miss por alcance, aproximação do
 Guard, recuo sob pressão, envelope de tiro, cooldown e bloqueio de linha de
 visão, comando do Officer, filtro de aliados por papel/range/sala e cooldown de
 suporte independente, cura/restauração do Engineer, escolha do alvo reparável
-mais próximo e bloqueio de reparo por sólido/sala. Spread determinístico e weak point entram com suas
-respectivas features. O Boss também testa limiares exatos de HP, três envelopes,
+mais próximo e bloqueio de reparo por sólido/sala. Weak points cobrem dano-base
+inalterado no torso, multiplicador e classificação na cabeça, sensor metálico
+do IndustrialRobot e feedback distinto; spread determinístico permanece
+planejado. O Boss também testa limiares exatos de HP, três envelopes,
 velocidades/danos/cadências distintos, recuo, perseguição, line of sight,
 isolamento por sala, cooldown e estado Dead. A fábrica de configurações também
 valida a escala neutra, o aumento e o fallback para entrada não finita. Props acrescentam prioridade do

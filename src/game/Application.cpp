@@ -2411,9 +2411,11 @@ void Application::fixedUpdate(const double fixedStep)
         }
         if (shot.outcome == gameplay::ShotOutcome::Hit
             || shot.outcome == gameplay::ShotOutcome::Destroyed) {
-            gameplay::signalHit(feedback_, false);
+            gameplay::signalHit(feedback_, false,
+                shot.hit && shot.hit->zone == gameplay::HitZone::WeakPoint);
         } else if (shot.outcome == gameplay::ShotOutcome::Killed) {
-            gameplay::signalHit(feedback_, true);
+            gameplay::signalHit(feedback_, true,
+                shot.hit && shot.hit->zone == gameplay::HitZone::WeakPoint);
         }
         if (audio_ && shot.hit) {
             std::optional<gdp::audio::AudioEventKind> impactKind;
@@ -2453,7 +2455,10 @@ void Application::fixedUpdate(const double fixedStep)
         if (shot.outcome == gameplay::ShotOutcome::Hit
             || shot.outcome == gameplay::ShotOutcome::Killed
             || shot.outcome == gameplay::ShotOutcome::Destroyed) {
-            message << (shot.outcome == gameplay::ShotOutcome::Killed
+            const bool weakPoint = shot.hit
+                && shot.hit->zone == gameplay::HitZone::WeakPoint;
+            message << (weakPoint ? "Weak point | " : "")
+                    << (shot.outcome == gameplay::ShotOutcome::Killed
                     ? "Enemy killed: "
                     : shot.outcome == gameplay::ShotOutcome::Destroyed
                         ? hitCeilingFixture ? "Ceiling fixture destroyed: "
@@ -3402,6 +3407,10 @@ void Application::render()
         hud.hitFeedback = visual::HudHitFeedback::Hit;
     } else if (feedback_.hit == gameplay::HitFeedbackKind::Kill) {
         hud.hitFeedback = visual::HudHitFeedback::Kill;
+    } else if (feedback_.hit == gameplay::HitFeedbackKind::WeakHit) {
+        hud.hitFeedback = visual::HudHitFeedback::WeakHit;
+    } else if (feedback_.hit == gameplay::HitFeedbackKind::WeakKill) {
+        hud.hitFeedback = visual::HudHitFeedback::WeakKill;
     }
     hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
     hud.paused = pauseMenu_.paused;
