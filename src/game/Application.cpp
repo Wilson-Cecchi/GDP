@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <iomanip>
 #include <limits>
@@ -60,6 +61,27 @@ std::uint32_t roundedPerformanceMetric(const double value) noexcept
     const double maximum = static_cast<double>(
         std::numeric_limits<std::uint32_t>::max());
     return static_cast<std::uint32_t>(std::lround(std::min(value, maximum)));
+}
+
+std::string benchmarkToken(const std::string_view value)
+{
+    std::string token;
+    token.reserve(value.size());
+    bool previousSeparator = false;
+    for (const char character : value) {
+        const unsigned char byte = static_cast<unsigned char>(character);
+        if (std::isalnum(byte) != 0 || character == '.' || character == '-') {
+            token.push_back(character);
+            previousSeparator = false;
+        } else if (!previousSeparator && !token.empty()) {
+            token.push_back('_');
+            previousSeparator = true;
+        }
+    }
+    while (!token.empty() && token.back() == '_') {
+        token.pop_back();
+    }
+    return token.empty() ? std::string{"unknown"} : token;
 }
 
 visual::ImpactVisualMaterial impactVisualMaterial(
@@ -612,7 +634,10 @@ int Application::run()
                 << " instances=" << latest.renderedInstances
                 << " saved_draws=" << latest.avoidedDrawCalls
                 << " shadow_capacity="
-                << latest.shadowShaderOccluderCapacity;
+                << latest.shadowShaderOccluderCapacity
+                << " gpu_vendor=" << benchmarkToken(renderer_->gpuVendor())
+                << " gpu_renderer=" << benchmarkToken(renderer_->gpuRenderer())
+                << " gpu_version=" << benchmarkToken(renderer_->gpuVersion());
             log(LogLevel::Info, benchmarkSummary.str());
         }
         beginAnotherRun = restartRequested_;

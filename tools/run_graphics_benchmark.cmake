@@ -48,6 +48,16 @@ function(extract_benchmark_value summary key output_variable)
     set(${output_variable} "${value}" PARENT_SCOPE)
 endfunction()
 
+function(extract_benchmark_token summary key output_variable)
+    string(REGEX MATCH " ${key}=([A-Za-z0-9_.-]+)" matched "${summary}")
+    if(matched STREQUAL "")
+        message(FATAL_ERROR
+            "Benchmark summary omitted ${key}: ${summary}")
+    endif()
+    string(REGEX REPLACE "^ ${key}=" "" value "${matched}")
+    set(${output_variable} "${value}" PARENT_SCOPE)
+endfunction()
+
 function(decimal_to_hundredths value output_variable)
     if(NOT value MATCHES "^([0-9]+)\\.([0-9][0-9])$")
         message(FATAL_ERROR
@@ -90,6 +100,7 @@ set(timing_metrics
 set(structural_metrics
     draws triangles rooms enemies props lights shadow_lights shadow_occluders
     low_spec culled_draws instanced_draws instances saved_draws shadow_capacity)
+set(device_metrics gpu_vendor gpu_renderer gpu_version)
 
 foreach(run RANGE 1 ${GDP_REPEATS})
     foreach(profile IN LISTS GDP_PROFILES)
@@ -135,6 +146,10 @@ foreach(run RANGE 1 ${GDP_REPEATS})
         set(structural_signature "")
         foreach(metric IN LISTS structural_metrics)
             extract_benchmark_value("${benchmark_summary}" "${metric}" metric_value)
+            string(APPEND structural_signature " ${metric}=${metric_value}")
+        endforeach()
+        foreach(metric IN LISTS device_metrics)
+            extract_benchmark_token("${benchmark_summary}" "${metric}" metric_value)
             string(APPEND structural_signature " ${metric}=${metric_value}")
         endforeach()
         set(reference_name "structure_${profile}")

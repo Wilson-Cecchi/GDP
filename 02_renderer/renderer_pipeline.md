@@ -64,6 +64,8 @@
 > corredores, mantendo comparação byte a byte com o caminho individual.
 > A Fase 131 especializou o shader completo para budgets de 3, 6 e 8 oclusores,
 > escolhendo a menor variante capaz de representar o frame atual.
+> A Fase 133 passou a registrar vendor, renderer e versão do contexto OpenGL,
+> permitindo atribuir benchmarks ao dispositivo realmente ativo.
 >
 > **Regra de leitura:** decisões herdadas dos documentos anteriores são direção de design; contratos, algoritmos e números ainda não existentes são propostas desta especificação e precisam de validação em implementação/playtest.
 
@@ -165,6 +167,12 @@ fora. A capacidade selecionada aparece em `RendererFrameStats`, e um modo de
 referência interno permite comparar a variante 3 com a variante 8 sem mudar a
 cena. Testes exercitam as três capacidades e exigem equivalência byte a byte no
 caso comparável.
+
+Durante `initialize()`, o renderer captura `GL_VENDOR`, `GL_RENDERER` e
+`GL_VERSION` do contexto corrente. Esses valores são somente diagnóstico: não
+selecionam perfil, não alteram shaders e não introduzem caminho específico de
+fabricante. A aplicação os inclui no resumo de benchmark para distinguir GPU
+integrada, discreta e implementação por software.
 `prepareIndustrialRoomMaterials()`, `prepareStorageRoomMaterials()` e
 `prepareCombatRoomMaterials()`, `prepareCafeteriaRoomMaterials()` e
 `prepareLaboratoryRoomMaterials()`, `prepareTechnicalRoomMaterials()` e

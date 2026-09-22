@@ -49,6 +49,12 @@ if(NOT combined_output MATCHES "shadow_capacity=0")
     message(FATAL_ERROR
         "Benchmark summary omitted the active shader shadow capacity:\n${combined_output}")
 endif()
+if(NOT combined_output MATCHES
+        "gpu_vendor=[A-Za-z0-9_.-]+ gpu_renderer=[A-Za-z0-9_.-]+ gpu_version=[A-Za-z0-9_.-]+")
+    file(REMOVE_RECURSE "${preference_root}")
+    message(FATAL_ERROR
+        "Benchmark summary omitted the active OpenGL device identity:\n${combined_output}")
+endif()
 
 file(READ "${settings_file}" settings_after)
 file(REMOVE_RECURSE "${preference_root}")
@@ -88,7 +94,7 @@ endif()
 if(NOT repeated_combined_output MATCHES
         "BENCHMARK_MEDIAN profile=POTATO seed=12345 frames=8 repeats=3"
         OR NOT repeated_combined_output MATCHES
-        "draws=[0-9]+.*shadow_capacity=0")
+        "draws=[0-9]+.*shadow_capacity=0.*gpu_vendor=[A-Za-z0-9_.-]+.*gpu_renderer=[A-Za-z0-9_.-]+")
     message(FATAL_ERROR
         "Repeated benchmark omitted its median or stable counters:\n${repeated_combined_output}")
 endif()

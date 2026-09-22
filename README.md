@@ -504,6 +504,10 @@ especializados das pastas numeradas.
   de repetições, preserva cada amostra, rejeita mudanças nos contadores
   estruturais e publica a mediana de cada métrica. O alvo estável executa três
   matrizes sem substituir o benchmark rápido de uma passagem.
+- **Fase 133 — Proveniência da GPU:** a inicialização registra vendor, renderer
+  e versão OpenGL; as linhas de benchmark carregam a mesma identidade em formato
+  legível por máquina. Matrizes repetidas falham se o dispositivo mudar entre
+  passagens, impedindo comparar Intel, NVIDIA ou renderização por software.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1180,8 +1184,9 @@ de frames explícitos para comparações reproduzíveis. A instrumentação aind
 reduz qualidade: os presets gráficos serão definidos na fase seguinte a partir
 de medições em hardware real.
 
-Na Fase 118, uma coleta no ThinkPad W541/K2100M registrou aproximadamente
-9 FPS, P95 de 127 ms, `UPDATE` de 2 ms, `RENDER` de 84 ms e `WAIT` de 29 ms
+Na Fase 118, uma coleta no ThinkPad W541, ainda sem registrar a GPU ativa,
+marcou aproximadamente 9 FPS, P95 de 127 ms, `UPDATE` de 2 ms, `RENDER` de
+84 ms e `WAIT` de 29 ms
 com oito luzes, duas luzes de sombra e oito oclusores. A medição confirmou
 pressão gráfica, não de simulação. `QUALITY` passou a selecionar cinco budgets:
 `POTATO` usa escala interna de 50%, duas luzes, nenhuma sombra e materiais
@@ -1297,12 +1302,15 @@ repetível da vista inicial, mas não substitui os stress cases de sala cheia,
 maior encontro e Boss. O driver offscreen serve somente para validar o pipeline:
 seus tempos não representam uma GPU física.
 
-O baseline real de 2026-09-20 no ThinkPad W541/Quadro K2100M confirmou
+O baseline real de 2026-09-20 no ThinkPad W541 confirmou
 `POTATO` em 79,44 FPS (P95 15,13 ms), `LOW` em 74,76 FPS (P95 16,96 ms) e
 `MEDIUM` em 29,35 FPS (P95 40,41 ms). Como o update ficou abaixo de 0,11 ms e o
 tempo cresceu na GPU/apresentação, a próxima otimização deve atacar submissões e
 geometria repetida. A tabela completa está em
 [`10_testing/performance_budgets.md`](10_testing/performance_budgets.md).
+Essa versão do protocolo ainda não registrava o renderer OpenGL; o W541 possui
+uma Quadro K2100M, mas esses números não podem ser atribuídos retroativamente a
+ela.
 
 Na Fase 129, `wkc::render::Mesh` recebeu um buffer opcional de transforms por
 instância. Matrizes finitas usam quatro atributos consecutivos a partir da
@@ -1361,6 +1369,15 @@ runner falha, evitando comparar cenas diferentes. O alvo
 `graphics-benchmark-stable` usa três repetições; o alvo anterior conserva uma
 para iteração rápida. Essa fase altera apenas medição, sem tocar em renderização,
 gameplay, RNG ou qualidade visual.
+
+Na Fase 133, o renderer captura `GL_VENDOR`, `GL_RENDERER` e `GL_VERSION` logo
+após criar o contexto. A linha comum e a mediana publicam `gpu_vendor`,
+`gpu_renderer` e `gpu_version` como tokens estáveis; o runner inclui esses campos
+na assinatura estrutural e recusa uma matriz que troque de dispositivo entre
+passagens. No W541 auditado, a sessão padrão usa `Intel HD Graphics 4600`; em
+janela real, `DRI_PRIME=1` seleciona `Mesa/NVE6`, correspondente à Quadro K2100M
+com `nouveau`. O backend SDL offscreen continua escolhendo a Intel e não deve ser
+usado para validar seleção de GPU ou desempenho físico.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
@@ -1561,6 +1578,24 @@ matrizes e usar as linhas finais `BENCHMARK_MEDIAN`:
 ```bash
 cmake --build --preset release --target graphics-benchmark-stable
 ```
+
+Em Linux híbrido, conferir primeiro o renderer padrão e o discreto:
+
+```bash
+glxinfo -B
+DRI_PRIME=1 glxinfo -B
+```
+
+Para medir explicitamente a GPU discreta, mantendo a identidade registrada em
+cada linha:
+
+```bash
+DRI_PRIME=1 cmake --build --preset release --target graphics-benchmark-stable
+```
+
+Esse comando escolhe o dispositivo; não garante que o driver aberto `nouveau`
+consiga usar clocks altos. A comparação deve considerar as medianas e os campos
+`gpu_vendor/gpu_renderer`, não apenas o nome físico da placa.
 
 Durante essa execução, entradas de gameplay são descartadas; o evento de fechar
 a janela ainda é respeitado. Para validar apenas a automação em ambiente sem

@@ -17,6 +17,8 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -112,6 +114,18 @@ public:
     [[nodiscard]] std::uint64_t activeRoomMaterialKey() const noexcept
     {
         return activeRoomMaterialKey_;
+    }
+    [[nodiscard]] std::string_view gpuVendor() const noexcept
+    {
+        return gpuVendor_;
+    }
+    [[nodiscard]] std::string_view gpuRenderer() const noexcept
+    {
+        return gpuRenderer_;
+    }
+    [[nodiscard]] std::string_view gpuVersion() const noexcept
+    {
+        return gpuVersion_;
     }
     void setSurfaceInstancingEnabled(const bool enabled) noexcept
     {
@@ -266,6 +280,9 @@ private:
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};
+    std::string gpuVendor_{"unknown"};
+    std::string gpuRenderer_{"unknown"};
+    std::string gpuVersion_{"unknown"};
     RendererFrameStats lastFrameStats_{};
     RendererShaderPath activeShaderPath_{RendererShaderPath::FullShadow8};
     bool lowSpecShaderActive_{false};

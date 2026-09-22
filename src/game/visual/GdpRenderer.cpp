@@ -408,6 +408,14 @@ private:
     bool active_{false};
 };
 
+std::string openGlString(const GLenum name)
+{
+    const GLubyte* const value = glGetString(name);
+    return value == nullptr
+        ? std::string{"unknown"}
+        : std::string{reinterpret_cast<const char*>(value)};
+}
+
 } // namespace
 
 bool GdpRenderer::initialize(const int width, const int height)
@@ -415,6 +423,9 @@ bool GdpRenderer::initialize(const int width, const int height)
     if (!loadGlApi(gl_)) {
         return false;
     }
+    gpuVendor_ = openGlString(GL_VENDOR);
+    gpuRenderer_ = openGlString(GL_RENDERER);
+    gpuVersion_ = openGlString(GL_VERSION);
     if (!shader_.compile(gl_, vertexShaderSource, fragmentShaderSource)
         || !shadow3Shader_.compile(gl_, vertexShaderSource,
             makeShadowBudgetFragmentShaderSource(3U))
@@ -463,7 +474,11 @@ bool GdpRenderer::initialize(const int width, const int height)
         initialized_ = false;
         return false;
     }
-    wkc::core::log(wkc::core::LogLevel::Info, "Renderer initialized with fixed-room scene");
+    wkc::core::log(wkc::core::LogLevel::Info,
+        "OpenGL device: vendor=" + gpuVendor_
+            + ", renderer=" + gpuRenderer_ + ", version=" + gpuVersion_);
+    wkc::core::log(wkc::core::LogLevel::Info,
+        "Renderer initialized with fixed-room scene");
     return true;
 }
 

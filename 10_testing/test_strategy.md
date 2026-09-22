@@ -507,6 +507,12 @@ contadores estruturais estáveis. O runner rejeita repetição zero/par ou perfi
 desconhecido, e uma divergência de draws, triângulos, conteúdo visível, luzes,
 sombras ou instancing invalida a comparação antes de publicar a mediana.
 
+O gate da Fase 133 exige que o contexto OpenGL exponha vendor, renderer e versão
+não vazios. O smoke de benchmark cobra os três tokens tanto na linha individual
+quanto na mediana; o runner inclui a identidade na assinatura invariável das
+repetições. Validação offscreen comprova o contrato, mas seleção Intel/NVIDIA é
+confirmada somente em janela real.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

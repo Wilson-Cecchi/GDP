@@ -1182,7 +1182,10 @@ int main()
                     }
                 }
             }
-            passed = renderedRoomVariant && repeatedRoom
+            passed = !renderer.gpuVendor().empty()
+                && !renderer.gpuRenderer().empty()
+                && !renderer.gpuVersion().empty()
+                && renderedRoomVariant && repeatedRoom
                 && roomPixels == repeatedRoomPixels && roomChangedChannels > 100U
                 && renderedStorageVariant && themeChangedChannels > 100U
                 && renderedCombatVariant && combatChangedChannels > 100U

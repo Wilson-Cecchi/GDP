@@ -5,7 +5,8 @@
 > tempo real da GPU na Fase 120, protocolo reproduzível na Fase 128 e instancing
 > estrutural na Fase 130. A Fase 115 introduziu o primeiro budget rígido do passe
 > de sombras, especializado no shader na Fase 131; a Fase 132 adicionou mediana
-> de múltiplas matrizes para comparar ganhos pequenos.
+> de múltiplas matrizes para comparar ganhos pequenos e a Fase 133 tornou a GPU
+> ativa parte obrigatória do resultado.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -61,8 +62,8 @@ Sala cheia de props; maior encontro; Boss; muitas luzes; cache frio; cache quent
 
 ## Perfis da Fase 118
 
-Uma coleta no ThinkPad W541 com Quadro K2100M, no caminho visual legado,
-registrou 9 FPS, média de 115 ms, P95 de 127 ms, pior frame de 201 ms,
+Uma coleta no ThinkPad W541, ainda sem registrar a GPU ativa, no caminho visual
+legado registrou 9 FPS, média de 115 ms, P95 de 127 ms, pior frame de 201 ms,
 `UPDATE 2 ms`, `RENDER 84 ms` e `WAIT 29 ms`. A cena apresentou 273 draws,
 8.420 triângulos, oito luzes e budget de sombra 2×8. Isso localizou a pressão no
 caminho gráfico e justificou perfis que não alteram lógica ou conteúdo.
@@ -134,7 +135,8 @@ cmake --build --preset release --target graphics-benchmark-stable
 
 Cada passagem emite `RUN N/3 BENCHMARK`; ao final, `BENCHMARK_MEDIAN` contém a
 mediana independente de cada métrica temporal. Contadores estruturais precisam
-ser idênticos nas três passagens ou o runner encerra com erro. O alvo
+ser idênticos nas três passagens ou o runner encerra com erro. A identidade
+`gpu_vendor/gpu_renderer/gpu_version` também precisa permanecer igual. O alvo
 `graphics-benchmark` continua executando uma passagem rápida. Chamadas manuais
 podem definir qualquer `GDP_REPEATS` positivo e ímpar e limitar perfis com
 `GDP_PROFILES`, por exemplo `-DGDP_REPEATS=5 -DGDP_PROFILES=POTATO`.
@@ -148,9 +150,11 @@ separadas antes de mudar budgets ou promover um perfil automaticamente.
 
 ### Baseline W541 validado em 2026-09-20
 
-O protocolo foi executado no ThinkPad W541 com Quadro K2100M, commit `edc791e`,
-seed `12345`, 240 frames e 1280×720. Cada linha abaixo resume a janela final de
-120 amostras:
+O protocolo foi executado no ThinkPad W541, commit `edc791e`, seed `12345`, 240
+frames e 1280×720. Essa versão ainda não registrava `GL_RENDERER`: a máquina
+possui uma Quadro K2100M, mas não há evidência suficiente para afirmar que ela,
+e não a Intel integrada, processou esta coleta. Cada linha abaixo resume a
+janela final de 120 amostras:
 
 | Perfil | FPS | Média | P95 | Pior | Acima de 16,67 ms | GPU | Draws |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -163,10 +167,10 @@ seed `12345`, 240 frames e 1280×720. Cada linha abaixo resume a janela final de
 `UPDATE` permaneceu entre 0,07 e 0,11 ms. O salto ocorre no trabalho gráfico e
 na apresentação: `POTATO` e `LOW` usam duas salas, zero sombras e shader de baixo
 custo, enquanto `MEDIUM` passa a cinco salas, 265 draws, materiais completos e
-sombras. Assim, `POTATO` é o perfil estável de 60 FPS para esse hardware; `LOW`
-é a alternativa visual ainda próxima do budget, e `MEDIUM` ou superior não deve
-ser promovido automaticamente no W541. O próximo ganho deve reduzir submissões
-e trabalho repetido de geometria antes de diminuir novamente a qualidade.
+sombras. Assim, naquela sessão, `POTATO` foi o perfil estável de 60 FPS; `LOW`
+ficou próximo do budget, e `MEDIUM` ou superior não deve ser promovido
+automaticamente no W541. O próximo ganho deve reduzir submissões e trabalho
+repetido de geometria antes de diminuir novamente a qualidade.
 
 ## Instancing da Fase 130
 
@@ -209,6 +213,26 @@ um perfil nem declarar ganho uniforme de FPS. Comparações de desempenho menore
 que a variação observada precisam de múltiplas passagens antes de orientar outro
 budget.
 
+### Mediana provisória da GPU padrão em 2026-09-22
+
+A primeira matriz de três repetições ainda foi produzida antes de o resumo
+carregar a identidade OpenGL. A sessão foi auditada imediatamente depois e seu
+renderer padrão era `Mesa Intel HD Graphics 4600`; por isso esta coleta é
+classificada como integrada/provisória, não como resultado da K2100M:
+
+| Perfil | FPS mediano | Média | P95 | GPU | Present |
+|---|---:|---:|---:|---:|---:|
+| POTATO | 14,16 | 70,60 ms | 96,00 ms | 64,17 ms | 69,50 ms |
+| LOW | 13,01 | 76,86 ms | 101,74 ms | 69,85 ms | 75,82 ms |
+| MEDIUM | 9,80 | 102,00 ms | 126,59 ms | 94,47 ms | 97,13 ms |
+| HIGH | 8,11 | 123,24 ms | 149,38 ms | 115,73 ms | 117,68 ms |
+| ULTRA | 7,98 | 125,27 ms | 149,40 ms | 116,82 ms | 118,94 ms |
+
+Como `POTATO/LOW` também pioraram e não usam o shader de sombras especializado,
+esses valores não demonstram regressão da Fase 131. Eles mostram que identidade
+do dispositivo, driver, energia e aquecimento precisam acompanhar qualquer
+comparação. Uma nova matriz com os campos da Fase 133 substitui a inferência.
+
 ## Especialização de sombras da Fase 131
 
 O renderer nunca envia mais de oito oclusores, mas o shader completo ainda
@@ -221,8 +245,9 @@ O contador `shadow_capacity` torna a escolha observável no benchmark e
 `SHADOW CAP` faz o mesmo no F3. A regressão OpenGL compara a capacidade 3 com a
 referência 8 e exige pixels byte a byte idênticos; casos com quatro e sete
 oclusores garantem a seleção e execução das variantes 6 e 8. A próxima matriz no
-W541 deve avaliar o ganho real, pois somente o driver da K2100M pode demonstrar
-se os limites estáticos menores reduzem o custo do fragment shader.
+W541 com identidade registrada deve avaliar o ganho real, pois somente o driver
+e o dispositivo efetivamente ativos podem demonstrar se os limites estáticos
+menores reduzem o custo do fragment shader.
 
 Na cena determinística da seed `12345`, `POTATO/LOW` registram capacidade zero e
 `MEDIUM/HIGH/ULTRA` selecionam capacidade 3, pois os três oclusores efetivos já
