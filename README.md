@@ -1379,6 +1379,13 @@ janela real, `DRI_PRIME=1` seleciona `Mesa/NVE6`, correspondente à Quadro K2100
 com `nouveau`. O backend SDL offscreen continua escolhendo a Intel e não deve ser
 usado para validar seleção de GPU ou desempenho físico.
 
+A primeira passagem explícita na Quadro ficou entre 10,96 e 12,00 FPS, com custo
+GPU quase plano de 81,99–89,77 ms entre `POTATO` e `ULTRA`. Ao terminar, o pacote
+da CPU estava em 85 °C, acima do limite `high` de 84 °C, e o `nouveau` não expôs
+temperatura ou clock da GPU. O resultado confirma a seleção `NVE6`, mas não é
+baseline válido para reduzir qualidade: driver, reclocking e condição térmica
+precisam ser resolvidos ou isolados primeiro.
+
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
 permanecem dormentes: não executam IA, não contam para a limpeza e ignoram dano

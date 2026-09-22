@@ -233,6 +233,29 @@ esses valores não demonstram regressão da Fase 131. Eles mostram que identidad
 do dispositivo, driver, energia e aquecimento precisam acompanhar qualquer
 comparação. Uma nova matriz com os campos da Fase 133 substitui a inferência.
 
+### Diagnóstico da Quadro/Nouveau em 2026-09-22
+
+Uma passagem explícita com `DRI_PRIME=1` confirmou `gpu_vendor=Mesa` e
+`gpu_renderer=NVE6`, correspondentes à Quadro K2100M dirigida por `nouveau`:
+
+| Perfil | FPS | Média | P95 | GPU | Render |
+|---|---:|---:|---:|---:|---:|
+| POTATO | 12,00 | 83,30 ms | 88,01 ms | 81,99 ms | 82,86 ms |
+| LOW | 11,90 | 84,04 ms | 90,04 ms | 82,76 ms | 83,62 ms |
+| MEDIUM | 10,96 | 91,27 ms | 97,38 ms | 89,77 ms | 90,86 ms |
+| HIGH | 11,56 | 86,49 ms | 92,03 ms | 85,24 ms | 86,03 ms |
+| ULTRA | 11,72 | 85,29 ms | 91,52 ms | 83,95 ms | 84,83 ms |
+
+O custo quase plano entre 50% e 100% de escala, combinado ao tempo concentrado
+na chamada gráfica, não caracteriza uma carga normal limitada pela quantidade
+de pixels. Imediatamente após a coleta, os sensores registraram pacote/cores da
+CPU entre 83–85 °C, alcançando o limite `high` de 84 °C; temperatura e clock da
+GPU não estavam disponíveis pelo `nouveau`. Portanto, esta passagem comprova a
+seleção da Quadro, mas não é aceita como baseline de otimização. Até uma coleta
+fria demonstrar o contrário, a GPU integrada é a escolha Linux mais segura
+nesta instalação, e nenhum budget visual será reduzido para mascarar limitação
+de driver, clock ou estado térmico.
+
 ## Especialização de sombras da Fase 131
 
 O renderer nunca envia mais de oito oclusores, mas o shader completo ainda
