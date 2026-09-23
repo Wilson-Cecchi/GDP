@@ -456,6 +456,7 @@ struct HudRenderData {
     std::uint32_t reserveAmmo{0};
     HudWeaponRole weapon{HudWeaponRole::Pistol};
     bool weaponOverdrive{false};
+    float weaponSpread{0.0F};
     std::uint32_t keys{0};
     std::uint32_t level{1};
     std::uint32_t experience{0};

@@ -2869,9 +2869,19 @@ bool GdpRenderer::render(
             1, controls, uiTheme.mutedText);
     } else {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
-        glScissor((width / 2) - 7, (height / 2) - 1, 15, 3);
+        const int centerX = width / 2;
+        const int centerY = height / 2;
+        constexpr int armLength = 7;
+        const int spreadGap = static_cast<int>(std::lround(
+            std::clamp(hud.weaponSpread, 0.0F, 1.0F)
+            * 5.0F * static_cast<float>(hudScale)));
+        glScissor(centerX - spreadGap - armLength, centerY - 1, armLength, 3);
         glClear(GL_COLOR_BUFFER_BIT);
-        glScissor((width / 2) - 1, (height / 2) - 7, 3, 15);
+        glScissor(centerX + spreadGap + 1, centerY - 1, armLength, 3);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glScissor(centerX - 1, centerY - spreadGap - armLength, 3, armLength);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glScissor(centerX - 1, centerY + spreadGap + 1, 3, armLength);
         glClear(GL_COLOR_BUFFER_BIT);
     }
     drawExitConfirmation();

@@ -12,8 +12,9 @@
 > ponto, normal e material de cada impacto. A Fase 112 conectou eventos já
 > aceitos de disparo, recarga e equip aos snapshots do viewmodel. A Fase 113
 > tornou luminárias alvos metálicos destrutíveis. A Fase 134 adicionou weak
-> points determinísticos e feedback próprio. A fila desacoplada de sinais de
-> combate e o spread permanecem para fases posteriores.
+> points determinísticos e feedback próprio. A Fase 135 adicionou spread
+> determinístico por rajada. A fila desacoplada de sinais de combate permanece
+> para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -49,6 +50,14 @@ geral, não atravessa paredes e não altera tiros no torso, Props ou luminárias
 O HUD distingue weak point com marcador dourado e segmentos internos, inclusive
 quando o dano é letal, sem introduzir RNG ou alterar a direção do disparo.
 
+Na Fase 135, todo disparo aceito passa por um padrão geométrico fixo de doze
+amostras antes do raycast. O primeiro tiro é perfeitamente central; tiros
+rápidos seguintes usam offsets horizontais e verticais limitados. A Pistol tem
+envelope de `0,55°` e recuperação de `0,34 s`; a Carbine usa `0,90°` e `0,30 s`.
+Cooldown e arma vazia não avançam o padrão. Recarga, troca de arma, restauração
+de checkpoint ou o fim da janela de recuperação devolvem o próximo tiro ao
+centro. Não há consumo de RNG e o resultado independe do framerate.
+
 ## WeaponDefinition
 
 ```cpp
@@ -71,6 +80,12 @@ A Carbine da Fase 84 usa 26 de dano, intervalo de `0,13 s`, alcance de `34 m`,
 pente de 12 e reserva de 48. Ao equipá-la, os bônus acumulados sobre o dano e a
 reserva-base da Pistol são transportados; munição começa cheia e o cooldown é
 zerado. Recolher outra Carbine não altera nem reabastece a arma atual.
+
+O estado de spread é transitório e pertence à `Weapon`: índice da última
+amostra, quantidade da rajada e timer de recuperação. Ele não integra
+`WeaponCampaignProgress`, assim como cooldown e Overdrive; checkpoints entre
+andares restauram a arma em repouso. O HUD recebe apenas força normalizada para
+abrir a retícula enquanto a sequência estiver ativa.
 
 O Special da Fase 85 ativa Overdrive por `12 s`. Enquanto o timer está ativo,
 `Weapon::damage()` retorna 150% do dano atual e cada tiro usa 65% do intervalo
@@ -139,8 +154,10 @@ visão, comando do Officer, filtro de aliados por papel/range/sala e cooldown de
 suporte independente, cura/restauração do Engineer, escolha do alvo reparável
 mais próximo e bloqueio de reparo por sólido/sala. Weak points cobrem dano-base
 inalterado no torso, multiplicador e classificação na cabeça, sensor metálico
-do IndustrialRobot e feedback distinto; spread determinístico permanece
-planejado. O Boss também testa limiares exatos de HP, três envelopes,
+do IndustrialRobot e feedback distinto. Spread cobre primeiro tiro central,
+repetição exata do padrão, envelopes diferentes por arma, rejeições sem avanço,
+reset por recarga/tempo e deslocamento efetivo do hitscan. O Boss também testa
+limiares exatos de HP, três envelopes,
 velocidades/danos/cadências distintos, recuo, perseguição, line of sight,
 isolamento por sala, cooldown e estado Dead. A fábrica de configurações também
 valida a escala neutra, o aumento e o fallback para entrada não finita. Props acrescentam prioridade do

@@ -70,6 +70,11 @@ void updateEnemyHitReactions(
     gdp::entities::EntityManager& manager,
     float fixedStepSeconds) noexcept;
 
+[[nodiscard]] wkc::core::Vec3 applyDeterministicWeaponSpread(
+    wkc::core::Vec3 direction,
+    WeaponArchetype archetype,
+    std::uint32_t shotIndex) noexcept;
+
 [[nodiscard]] ShotResult fireHitscan(
     Weapon& weapon,
     wkc::core::Vec3 origin,

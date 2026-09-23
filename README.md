@@ -511,7 +511,12 @@ especializados das pastas numeradas.
 - **Fase 134 — Weak points:** inimigos orgânicos recebem um volume menor na
   cabeça e o IndustrialRobot no sensor superior. Acertos aplicam `1,75x` de
   dano, publicam a zona no resultado do hitscan e usam confirmação dourada
-  própria no HUD, sem RNG ou mudança em tiros no torso.
+  própria no HUD, sem RNG ou mudança em tiros no torso. Campaign/Speedrun
+  avançam para regras 21/20.
+- **Fase 135 — Spread determinístico:** o primeiro tiro permanece central e
+  disparos rápidos seguem um padrão fixo de duas dimensões, mais estreito na
+  Pistol que na Carbine. Tempo ou recarga restauram precisão; a retícula abre
+  enquanto a sequência está ativa. Campaign/Speedrun avançam para regras 22/21.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1398,6 +1403,16 @@ volume, continuam competindo normalmente com paredes e outros alvos e aplicam
 `1,75x` de dano somente após um disparo aceito. O HUD traduz weak hit e weak
 kill em um marcador dourado com detalhe interno; torso, Props, luminárias,
 munição, cooldown, áudio, progressão e RNG preservam os contratos anteriores.
+Como isso afeta estratégia e tempo, Campaign/Speedrun avançam para regras 21/20.
+
+Na Fase 135, cada arma recebe um perfil de spread derivado somente do arquétipo.
+Uma tabela fixa de doze amostras move o ray lógico em dois eixos após o primeiro
+tiro da rajada: a Pistol limita o envelope a `0,55°`, enquanto a Carbine chega a
+`0,90°`. A janela de recuperação é avançada no fixed update e zerada por tempo,
+recarga, equip ou restore; cooldown e dry fire não avançam a sequência. O HUD
+abre a retícula de forma proporcional para tornar a perda de precisão legível.
+Nenhum stream aleatório, seed estrutural ou formato de save foi alterado. Como
+o balanceamento e os tempos mudam, Campaign/Speedrun avançam para regras 22/21.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

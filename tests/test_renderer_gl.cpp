@@ -588,6 +588,14 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::game::visual::HudRenderData spreadHud = functionalHud;
+            spreadHud.weaponSpread = 1.0F;
+            const bool renderedSpreadHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, spreadHud);
+            std::vector<std::uint8_t> spreadHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                spreadHudPixels.data());
+
             gdp::game::visual::HudRenderData weakPointHud = functionalHud;
             weakPointHud.hitFeedback
                 = gdp::game::visual::HudHitFeedback::WeakKill;
@@ -951,6 +959,7 @@ int main()
             std::size_t campaignResultChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t spreadHudChangedChannels = 0;
             std::size_t weakPointHudChangedChannels = 0;
             std::size_t performanceOverlayChangedChannels = 0;
             std::size_t runTimerChangedChannels = 0;
@@ -1076,6 +1085,10 @@ int main()
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
+                    }
+                    if (spreadHudPixels[index + channel]
+                        != functionalHudPixels[index + channel]) {
+                        ++spreadHudChangedChannels;
                     }
                     if (weakPointHudPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
@@ -1245,6 +1258,7 @@ int main()
                 && campaignResultChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedSpreadHud && spreadHudChangedChannels > 20U
                 && renderedWeakPointHud && weakPointHudChangedChannels > 20U
                 && renderedPerformanceOverlay
                 && performanceOverlayChangedChannels > 500U

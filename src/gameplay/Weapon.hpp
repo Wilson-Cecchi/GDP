@@ -28,6 +28,13 @@ struct WeaponCampaignProgress {
     constexpr bool operator==(const WeaponCampaignProgress&) const noexcept = default;
 };
 
+struct WeaponSpreadProfile {
+    float maximumDegrees{0.55F};
+    float recoverySeconds{0.34F};
+
+    constexpr bool operator==(const WeaponSpreadProfile&) const noexcept = default;
+};
+
 enum class FireReadiness : std::uint8_t {
     Fired,
     Cooldown,
@@ -60,6 +67,9 @@ public:
     [[nodiscard]] float damage() const noexcept;
     [[nodiscard]] float overdriveRemaining() const noexcept;
     [[nodiscard]] bool overdriveActive() const noexcept;
+    [[nodiscard]] std::uint32_t spreadShotIndex() const noexcept;
+    [[nodiscard]] float spreadRecoveryRemaining() const noexcept;
+    [[nodiscard]] float spreadStrength() const noexcept;
 
 private:
     WeaponDefinition definition_{};
@@ -67,11 +77,16 @@ private:
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
     float overdriveRemaining_{0.0F};
+    std::uint32_t spreadShotCount_{0U};
+    std::uint32_t spreadShotIndex_{0U};
+    float spreadRecoveryRemaining_{0.0F};
 };
 
 [[nodiscard]] WeaponDefinition baseWeaponDefinition(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] const char* weaponArchetypeName(
+    WeaponArchetype archetype) noexcept;
+[[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(
     WeaponArchetype archetype) noexcept;
 
 } // namespace gdp::gameplay

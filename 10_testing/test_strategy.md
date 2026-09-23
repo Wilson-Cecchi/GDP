@@ -520,6 +520,15 @@ também distingue weak hit e weak kill dos marcadores comuns. A suíte completa
 protege seleção do alvo mais próximo, bloqueio por parede, impacto, progressão e
 pixels do HUD; o playtest confirma se o volume menor é legível durante combate.
 
+O gate da Fase 135 exige primeiro tiro exatamente central, padrão bidimensional
+repetível, envelope da Carbine maior que o da Pistol e direção inválida segura.
+Somente disparos aceitos avançam a sequência; recarga e recuperação por fixed
+time restauram o índice zero. Uma integração confirma que o segundo hitscan
+real desloca o impacto no mundo, e a regressão OpenGL exige pixels diferentes
+quando a retícula recebe bloom máximo. Persistência rejeita regras 20/19 dos
+períodos anteriores aos weak points e regras 21/20 anteriores ao spread,
+mantendo tempos comparáveis.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

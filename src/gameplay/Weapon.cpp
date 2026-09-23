@@ -26,6 +26,14 @@ const char* weaponArchetypeName(const WeaponArchetype archetype) noexcept
     return archetype == WeaponArchetype::Carbine ? "CARBINE" : "PISTOL";
 }
 
+WeaponSpreadProfile weaponSpreadProfile(
+    const WeaponArchetype archetype) noexcept
+{
+    return archetype == WeaponArchetype::Carbine
+        ? WeaponSpreadProfile{0.90F, 0.30F}
+        : WeaponSpreadProfile{};
+}
+
 Weapon::Weapon(WeaponDefinition definition)
     : definition_(definition)
 {
@@ -47,6 +55,12 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
         0.0F,
         cooldownRemaining_ - step);
     overdriveRemaining_ = std::max(0.0F, overdriveRemaining_ - step);
+    spreadRecoveryRemaining_ = std::max(
+        0.0F, spreadRecoveryRemaining_ - step);
+    if (spreadRecoveryRemaining_ <= 0.0F) {
+        spreadShotCount_ = 0U;
+        spreadShotIndex_ = 0U;
+    }
 }
 
 FireReadiness Weapon::tryFire() noexcept
@@ -60,6 +74,12 @@ FireReadiness Weapon::tryFire() noexcept
     --magazineAmmo_;
     cooldownRemaining_ = definition_.fireInterval
         * (overdriveActive() ? 0.65F : 1.0F);
+    spreadShotIndex_ = spreadShotCount_;
+    if (spreadShotCount_ < std::numeric_limits<std::uint32_t>::max()) {
+        ++spreadShotCount_;
+    }
+    spreadRecoveryRemaining_
+        = weaponSpreadProfile(definition_.archetype).recoverySeconds;
     return FireReadiness::Fired;
 }
 
@@ -72,6 +92,9 @@ bool Weapon::reload() noexcept
     const std::uint32_t transferred = std::min(requested, reserveAmmo_);
     magazineAmmo_ += transferred;
     reserveAmmo_ -= transferred;
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
     return true;
 }
 
@@ -121,6 +144,9 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     magazineAmmo_ = definition_.magazineSize;
     reserveAmmo_ = definition_.reserveMaximum;
     cooldownRemaining_ = 0.0F;
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
     return true;
 }
 
@@ -153,6 +179,9 @@ bool Weapon::restoreCampaignProgress(
     reserveAmmo_ = progress.reserveAmmo;
     cooldownRemaining_ = 0.0F;
     overdriveRemaining_ = 0.0F;
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
     return true;
 }
 
@@ -194,6 +223,24 @@ float Weapon::overdriveRemaining() const noexcept
 bool Weapon::overdriveActive() const noexcept
 {
     return overdriveRemaining_ > 0.0F;
+}
+
+std::uint32_t Weapon::spreadShotIndex() const noexcept
+{
+    return spreadShotIndex_;
+}
+
+float Weapon::spreadRecoveryRemaining() const noexcept
+{
+    return spreadRecoveryRemaining_;
+}
+
+float Weapon::spreadStrength() const noexcept
+{
+    const float maximumShots = definition_.archetype == WeaponArchetype::Carbine
+        ? 11.0F : 7.0F;
+    return std::clamp(
+        static_cast<float>(spreadShotCount_) / maximumShots, 0.0F, 1.0F);
 }
 
 } // namespace gdp::gameplay

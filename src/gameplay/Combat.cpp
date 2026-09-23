@@ -3,8 +3,10 @@
 #include "gameplay/Props.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <vector>
 
 namespace gdp::gameplay {
@@ -147,6 +149,48 @@ ImpactMaterial propImpactMaterial(
 
 } // namespace
 
+wkc::core::Vec3 applyDeterministicWeaponSpread(
+    wkc::core::Vec3 direction,
+    const WeaponArchetype archetype,
+    const std::uint32_t shotIndex) noexcept
+{
+    direction = wkc::core::normalized(direction);
+    if (wkc::core::length(direction) <= 1.0e-7F || shotIndex == 0U) {
+        return direction;
+    }
+
+    constexpr std::array<wkc::core::Vec2, 12> pattern{{
+        {0.00F, 0.00F},
+        {0.30F, 0.10F},
+        {-0.22F, 0.36F},
+        {0.45F, -0.20F},
+        {-0.52F, -0.28F},
+        {0.12F, 0.62F},
+        {0.63F, 0.18F},
+        {-0.38F, 0.58F},
+        {-0.70F, 0.05F},
+        {0.42F, -0.61F},
+        {0.68F, 0.52F},
+        {-0.58F, -0.62F},
+    }};
+    const wkc::core::Vec2 sample
+        = pattern[std::min<std::size_t>(shotIndex, pattern.size() - 1U)];
+    const float spreadRadians = weaponSpreadProfile(archetype).maximumDegrees
+        * (std::numbers::pi_v<float> / 180.0F);
+    const float horizontal = std::tan(sample.x * spreadRadians);
+    const float vertical = std::tan(sample.y * spreadRadians);
+
+    const wkc::core::Vec3 referenceUp = std::abs(direction.y) < 0.999F
+        ? wkc::core::Vec3{0.0F, 1.0F, 0.0F}
+        : wkc::core::Vec3{0.0F, 0.0F, 1.0F};
+    const wkc::core::Vec3 right
+        = wkc::core::normalized(wkc::core::cross(direction, referenceUp));
+    const wkc::core::Vec3 up
+        = wkc::core::normalized(wkc::core::cross(right, direction));
+    return wkc::core::normalized(
+        direction + (right * horizontal) + (up * vertical));
+}
+
 DamageOutcome applyDamage(
     gdp::entities::EntityManager& manager,
     const gdp::entities::EntityId target,
@@ -219,7 +263,8 @@ ShotResult fireHitscan(
         return {ShotOutcome::Empty, std::nullopt, {}, std::nullopt};
     }
 
-    direction = wkc::core::normalized(direction);
+    direction = applyDeterministicWeaponSpread(
+        direction, weapon.definition().archetype, weapon.spreadShotIndex());
     const float range = weapon.definition().range;
     if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
         return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};

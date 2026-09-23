@@ -86,6 +86,90 @@ void testWeaponLifecycle()
         "empty weapon rejects fire deterministically");
 }
 
+void testDeterministicWeaponSpread()
+{
+    using namespace gdp::gameplay;
+
+    const wkc::core::Vec3 forward{0.0F, 0.0F, -1.0F};
+    const wkc::core::Vec3 centered = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Pistol, 0U);
+    const wkc::core::Vec3 pistol = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Pistol, 10U);
+    const wkc::core::Vec3 repeated = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Pistol, 10U);
+    const wkc::core::Vec3 carbine = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Carbine, 10U);
+    expect(centered == forward,
+        "first shot remains exactly aligned with the reticle");
+    expect(pistol == repeated && !near(pistol.x, 0.0F)
+            && !near(pistol.y, 0.0F),
+        "later shots use a repeatable two-axis pattern without RNG");
+    expect(wkc::core::dot(carbine, forward)
+            < wkc::core::dot(pistol, forward),
+        "Carbine reaches a wider spread envelope than Pistol");
+    expect(applyDeterministicWeaponSpread(
+               {}, WeaponArchetype::Carbine, 4U) == wkc::core::Vec3{},
+        "invalid direction remains a safe miss after spread sampling");
+
+    Weapon gated({
+        .fireInterval = 0.20F,
+        .magazineSize = 2U,
+        .reserveMaximum = 0U,
+    });
+    expect(gated.tryFire() == FireReadiness::Fired
+            && gated.spreadShotIndex() == 0U,
+        "gated weapon accepts the first centered shot");
+    const float gatedStrength = gated.spreadStrength();
+    expect(gated.tryFire() == FireReadiness::Cooldown
+            && gated.spreadShotIndex() == 0U
+            && near(gated.spreadStrength(), gatedStrength),
+        "cooldown rejection cannot advance spread or crosshair bloom");
+
+    Weapon weapon({
+        .fireInterval = 0.0F,
+        .magazineSize = 4U,
+        .reserveMaximum = 4U,
+    });
+    expect(weapon.tryFire() == FireReadiness::Fired
+            && weapon.spreadShotIndex() == 0U
+            && weapon.spreadStrength() > 0.0F,
+        "accepted first shot starts a fresh spread sequence");
+    expect(weapon.tryFire() == FireReadiness::Fired
+            && weapon.spreadShotIndex() == 1U,
+        "a rapid accepted shot advances the spread sequence once");
+    expect(weapon.reload() && weapon.tryFire() == FireReadiness::Fired
+            && weapon.spreadShotIndex() == 0U,
+        "reload returns the next shot to centered accuracy");
+    expect(weapon.tryFire() == FireReadiness::Fired
+            && weapon.spreadShotIndex() == 1U,
+        "spread starts building again after the centered reload shot");
+    weapon.fixedUpdate(weaponSpreadProfile(WeaponArchetype::Pistol).recoverySeconds);
+    expect(near(weapon.spreadStrength(), 0.0F),
+        "crosshair bloom closes when the logical spread sequence recovers");
+    expect(weapon.tryFire() == FireReadiness::Fired
+            && weapon.spreadShotIndex() == 0U
+            && weapon.spreadRecoveryRemaining() > 0.0F,
+        "fixed-time recovery restores first-shot accuracy independently of FPS");
+
+    const CollisionWorld room{{{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    gdp::entities::EntityManager manager;
+    Weapon integration({
+        .fireInterval = 0.0F,
+        .range = 20.0F,
+        .magazineSize = 2U,
+        .reserveMaximum = 0U,
+    });
+    const ShotResult first = fireHitscan(
+        integration, {0.0F, 1.0F, 0.0F}, forward, 1U, room, manager);
+    const ShotResult second = fireHitscan(
+        integration, {0.0F, 1.0F, 0.0F}, forward, 1U, room, manager);
+    expect(first.outcome == ShotOutcome::ImpactWorld && first.impact
+            && near(first.impact->point.x, 0.0F)
+            && second.outcome == ShotOutcome::ImpactWorld && second.impact
+            && !near(second.impact->point.x, 0.0F),
+        "hitscan consumes the centered shot followed by the patterned shot");
+}
+
 void testWeaponPickupEquipment()
 {
     using namespace gdp::gameplay;
@@ -1959,6 +2043,7 @@ int main()
 {
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
+    testDeterministicWeaponSpread();
     testWeaponPickupEquipment();
     testWeaponOverdrive();
     testDamageLifecycle();

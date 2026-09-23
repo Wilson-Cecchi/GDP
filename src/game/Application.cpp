@@ -3382,6 +3382,7 @@ void Application::render()
     hud.weapon = weapon_.definition().archetype == gameplay::WeaponArchetype::Carbine
         ? visual::HudWeaponRole::Carbine : visual::HudWeaponRole::Pistol;
     hud.weaponOverdrive = weapon_.overdriveActive();
+    hud.weaponSpread = weapon_.spreadStrength();
     hud.keys = player_.state().keys;
     hud.level = progress.level;
     hud.runTimerVisible = true;
