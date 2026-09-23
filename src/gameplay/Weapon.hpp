@@ -88,5 +88,11 @@ private:
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(
     WeaponArchetype archetype) noexcept;
+[[nodiscard]] bool weaponUsesAutomaticFire(
+    WeaponArchetype archetype) noexcept;
+[[nodiscard]] bool weaponFireRequested(
+    const Weapon& weapon,
+    bool triggerPressed,
+    bool triggerHeld) noexcept;
 
 } // namespace gdp::gameplay

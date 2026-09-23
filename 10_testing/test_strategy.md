@@ -529,6 +529,13 @@ quando a retícula recebe bloom máximo. Persistência rejeita regras 20/19 dos
 períodos anteriores aos weak points e regras 21/20 anteriores ao spread,
 mantendo tempos comparáveis.
 
+O gate da Fase 136 exige borda obrigatória para a Pistol, repetição por hold
+somente na Carbine e ausência de pedidos quando o botão é solto. A fixture
+consome o pente completo e confirma que hold vazio não repete dry fire, enquanto
+um novo clique continua aceito. Input SDL, bootstrap jogável e suíte de combate
+permanecem no gate; Campaign/Speedrun rejeitam regras 22/21 anteriores ao modo
+automático.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

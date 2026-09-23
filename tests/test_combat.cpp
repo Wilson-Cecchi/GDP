@@ -195,6 +195,39 @@ void testWeaponPickupEquipment()
         "duplicate Carbine pickups cannot refill an already equipped weapon");
 }
 
+void testWeaponTriggerModes()
+{
+    using namespace gdp::gameplay;
+
+    Weapon pistol({
+        .fireInterval = 0.0F,
+        .magazineSize = 2U,
+        .reserveMaximum = 0U,
+        .archetype = WeaponArchetype::Pistol,
+    });
+    expect(!weaponUsesAutomaticFire(WeaponArchetype::Pistol)
+            && weaponFireRequested(pistol, true, true)
+            && !weaponFireRequested(pistol, false, true),
+        "Pistol fires on a new press but never repeats from a held trigger");
+
+    Weapon carbine(baseWeaponDefinition(WeaponArchetype::Carbine));
+    expect(weaponUsesAutomaticFire(WeaponArchetype::Carbine)
+            && weaponFireRequested(carbine, true, true)
+            && weaponFireRequested(carbine, false, true)
+            && !weaponFireRequested(carbine, false, false),
+        "Carbine continues requesting shots only while its trigger is held");
+    for (std::uint32_t shot = 0U;
+         shot < carbine.definition().magazineSize; ++shot) {
+        carbine.fixedUpdate(carbine.definition().fireInterval);
+        expect(carbine.tryFire() == FireReadiness::Fired,
+            "automatic-fire fixture consumes each available cartridge");
+    }
+    expect(carbine.magazineAmmo() == 0U
+            && !weaponFireRequested(carbine, false, true)
+            && weaponFireRequested(carbine, true, true),
+        "empty Carbine suppresses repeated dry fire but preserves one click per press");
+}
+
 void testWeaponOverdrive()
 {
     using namespace gdp::gameplay;
@@ -2045,6 +2078,7 @@ int main()
     testWeaponLifecycle();
     testDeterministicWeaponSpread();
     testWeaponPickupEquipment();
+    testWeaponTriggerModes();
     testWeaponOverdrive();
     testDamageLifecycle();
     testDormantEnemyIgnoresCombat();

@@ -126,6 +126,7 @@ private:
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};
     bool firePending_{false};
+    bool fireHeld_{false};
     bool reloadPending_{false};
     float weaponRecoilRemaining_{0.0F};
     float weaponMuzzleFlashRemaining_{0.0F};

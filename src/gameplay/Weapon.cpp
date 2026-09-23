@@ -34,6 +34,21 @@ WeaponSpreadProfile weaponSpreadProfile(
         : WeaponSpreadProfile{};
 }
 
+bool weaponUsesAutomaticFire(const WeaponArchetype archetype) noexcept
+{
+    return archetype == WeaponArchetype::Carbine;
+}
+
+bool weaponFireRequested(
+    const Weapon& weapon,
+    const bool triggerPressed,
+    const bool triggerHeld) noexcept
+{
+    return triggerPressed
+        || (triggerHeld && weapon.magazineAmmo() > 0U
+            && weaponUsesAutomaticFire(weapon.definition().archetype));
+}
+
 Weapon::Weapon(WeaponDefinition definition)
     : definition_(definition)
 {

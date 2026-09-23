@@ -517,6 +517,10 @@ especializados das pastas numeradas.
   disparos rápidos seguem um padrão fixo de duas dimensões, mais estreito na
   Pistol que na Carbine. Tempo ou recarga restauram precisão; a retícula abre
   enquanto a sequência está ativa. Campaign/Speedrun avançam para regras 22/21.
+- **Fase 136 — Carbine automática:** manter o botão primário pressionado repete
+  tiros da Carbine pelo fixed update e pelo cooldown real da arma. A Pistol
+  permanece semiautomática; pente vazio não repete dry fire. Campaign/Speedrun
+  avançam para regras 23/22.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1413,6 +1417,15 @@ recarga, equip ou restore; cooldown e dry fire não avançam a sequência. O HUD
 abre a retícula de forma proporcional para tornar a perda de precisão legível.
 Nenhum stream aleatório, seed estrutural ou formato de save foi alterado. Como
 o balanceamento e os tempos mudam, Campaign/Speedrun avançam para regras 22/21.
+
+Na Fase 136, o input distingue a borda de clique do estado segurado. Qualquer
+arma aceita a borda; somente a Carbine transforma o estado segurado em novos
+pedidos de disparo. As tentativas passam pelo mesmo `Weapon::tryFire()`, então
+cooldown, consumo de munição, spread, Overdrive, ruído, feedback e dano seguem
+um único pipeline no fixed update. Menus, pausa, término de sessão e soltura do
+botão desarmam o hold. Quando o pente zera, o hold deixa de pedir disparos para
+não repetir áudio de arma vazia; outro clique ainda gera um dry fire legítimo.
+Campaign/Speedrun avançam para regras 23/22.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

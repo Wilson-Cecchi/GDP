@@ -66,6 +66,11 @@ faz um arco curto e a troca de arma entra por baixo. O detalhe ciano passa a
 magenta durante Overdrive. A retícula e os painéis permanecem por cima, e menus
 pausam a animação junto com a simulação.
 
+A retícula abre conforme o estado transitório de spread. Pistol continua
+semiautomática; Carbine pode manter o botão primário pressionado. A interface
+somente apresenta bloom e munição: cadência, trigger mode e dry fire permanecem
+autoritativos no gameplay.
+
 Durante a Campanha, a linha do cronômetro inclui `FLOOR n/3` e `THREAT 100%`,
 `110%` ou `120%`. O renderer recebe o percentual pronto em `HudRenderData`; ele
 não calcula dificuldade nem altera a simulação.

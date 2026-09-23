@@ -8,7 +8,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 22U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 23U;
 
 struct CampaignCarryover {
     PlayerCampaignProgress player{};

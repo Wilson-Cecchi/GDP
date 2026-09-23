@@ -13,8 +13,9 @@
 > aceitos de disparo, recarga e equip aos snapshots do viewmodel. A Fase 113
 > tornou luminárias alvos metálicos destrutíveis. A Fase 134 adicionou weak
 > points determinísticos e feedback próprio. A Fase 135 adicionou spread
-> determinístico por rajada. A fila desacoplada de sinais de combate permanece
-> para fases posteriores.
+> determinístico por rajada. A Fase 136 tornou a Carbine automática sem alterar
+> a Pistol semiautomática. A fila desacoplada de sinais de combate permanece para
+> fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -80,6 +81,13 @@ A Carbine da Fase 84 usa 26 de dano, intervalo de `0,13 s`, alcance de `34 m`,
 pente de 12 e reserva de 48. Ao equipá-la, os bônus acumulados sobre o dano e a
 reserva-base da Pistol são transportados; munição começa cheia e o cooldown é
 zerado. Recolher outra Carbine não altera nem reabastece a arma atual.
+
+Na Fase 136, a Pistol continua disparando somente na borda de pressionamento. A
+Carbine aceita também o estado segurado e volta a tentar em cada fixed update;
+`Weapon::tryFire()` mantém o intervalo de `0,13 s` como autoridade, portanto o
+número de tiros não depende da taxa de renderização. Soltar, pausar, entrar em
+menu ou encerrar a sessão desarma o estado segurado. Com pente vazio, repetição
+automática é bloqueada, mas um novo clique ainda produz exatamente um dry fire.
 
 O estado de spread é transitório e pertence à `Weapon`: índice da última
 amostra, quantidade da rajada e timer de recuperação. Ele não integra
@@ -170,6 +178,8 @@ step, clamp em zero e limpeza imediata na morte.
 Impactos acrescentam ponto exato em parede, limite de volume, Enemy e Prop,
 classe material para orgânicos, robôs, crates e terminais, além da ausência de
 dados em disparos sem contato.
+Trigger mode acrescenta Pistol semiautomática, Carbine automática, interrupção
+ao soltar e supressão de dry fire repetido com pente vazio.
 O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
 e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
 na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.

@@ -1019,6 +1019,7 @@ void Application::processEvents()
         playerCommand_ = {};
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
@@ -1104,6 +1105,7 @@ void Application::processEvents()
         playerCommand_ = {};
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
@@ -1204,6 +1206,7 @@ void Application::processEvents()
         playerCommand_ = {};
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
@@ -1378,6 +1381,7 @@ void Application::processEvents()
         playerCommand_ = {};
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::openExitConfirmation(exitConfirmation_);
@@ -1512,6 +1516,7 @@ void Application::processEvents()
         playerCommand_ = {};
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
 
         std::optional<visual::HudPauseSelection> pointedSelection;
@@ -1618,8 +1623,14 @@ void Application::processEvents()
     playerCommand_.moveRight = (input_.isKeyDown(Key::D) ? 1.0F : 0.0F)
         - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
     interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
-    firePending_ = firePending_
-        || input_.wasMouseButtonPressed(MouseButton::Primary);
+    const bool firePressed
+        = input_.wasMouseButtonPressed(MouseButton::Primary);
+    const bool fireReleased
+        = input_.wasMouseButtonReleased(MouseButton::Primary);
+    firePending_ = firePending_ || firePressed;
+    if (firePressed || fireReleased) {
+        fireHeld_ = input_.isMouseButtonDown(MouseButton::Primary);
+    }
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
     playerCommand_.interact = interactionPending_;
 }
@@ -1634,6 +1645,7 @@ void Application::setPaused(const bool paused)
     playerCommand_ = {};
     interactionPending_ = false;
     firePending_ = false;
+    fireHeld_ = false;
     reloadPending_ = false;
     if (!config_.headless && window_ != nullptr
         && !SDL_SetWindowRelativeMouseMode(window_, !paused)) {
@@ -1704,6 +1716,7 @@ bool Application::returnToMainMenu()
     playerCommand_ = {};
     interactionPending_ = false;
     firePending_ = false;
+    fireHeld_ = false;
     reloadPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
@@ -2352,7 +2365,9 @@ void Application::fixedUpdate(const double fixedStep)
     }
     reloadPending_ = false;
     gameplay::updateEnemyHitReactions(entities_, step);
-    if (firePending_ && player_.state().alive) {
+    const bool fireRequested = gameplay::weaponFireRequested(
+        weapon_, firePending_, fireHeld_);
+    if (fireRequested && player_.state().alive) {
         const gameplay::ShotResult shot = gameplay::fireHitscan(
             weapon_,
             player_.cameraPosition(),
@@ -2629,6 +2644,7 @@ void Application::fixedUpdate(const double fixedStep)
     if (sessionUpdate.changed) {
         interactionPending_ = false;
         firePending_ = false;
+        fireHeld_ = false;
         reloadPending_ = false;
         latestSpeedrunRecordResult_ = gameplay::considerSpeedrunResult(
             session_.state(), speedrunRecord_);
@@ -3590,6 +3606,7 @@ void Application::shutdown()
     playerCommand_ = {};
     interactionPending_ = false;
     firePending_ = false;
+    fireHeld_ = false;
     reloadPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
