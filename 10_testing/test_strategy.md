@@ -536,6 +536,13 @@ um novo clique continua aceito. Input SDL, bootstrap jogável e suíte de combat
 permanecem no gate; Campaign/Speedrun rejeitam regras 22/21 anteriores ao modo
 automático.
 
+O gate da Fase 137 exige que iniciar uma recarga preserve pente e reserva, que
+metade do tempo produza progresso `0,5` sem transferência e que somente o tick
+final mova a quantidade necessária. Disparo e segunda recarga durante a ação
+são rejeitados; hitscan retorna `Reloading` sem alvo ou impacto. O gate também
+protege durações distintas por arquétipo, reset do spread, bloqueio do trigger,
+loot após conclusão e incompatibilidade das regras Campaign/Speedrun 23/22.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

@@ -164,7 +164,10 @@ void testAutomaticLootCollection()
     });
     (void)weapon.tryFire();
     (void)weapon.tryFire();
-    expect(weapon.reload() && weapon.reserveAmmo() == 8U,
+    expect(weapon.reload(),
+        "pickup test starts a timed reload before collection");
+    weapon.fixedUpdate(weaponReloadDurationSeconds(WeaponArchetype::Pistol));
+    expect(weapon.reserveAmmo() == 8U,
         "pickup test creates finite ammo capacity before collection");
 
     EntityManager manager;

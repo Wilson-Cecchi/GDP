@@ -259,6 +259,9 @@ ShotResult fireHitscan(
     if (readiness == FireReadiness::Cooldown) {
         return {ShotOutcome::Cooldown, std::nullopt, {}, std::nullopt};
     }
+    if (readiness == FireReadiness::Reloading) {
+        return {ShotOutcome::Reloading, std::nullopt, {}, std::nullopt};
+    }
     if (readiness == FireReadiness::Empty) {
         return {ShotOutcome::Empty, std::nullopt, {}, std::nullopt};
     }

@@ -21,6 +21,7 @@ enum class DamageOutcome : std::uint8_t {
 
 enum class ShotOutcome : std::uint8_t {
     Cooldown,
+    Reloading,
     Empty,
     Miss,
     ImpactWorld,

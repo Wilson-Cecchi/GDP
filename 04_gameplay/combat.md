@@ -14,8 +14,9 @@
 > tornou luminárias alvos metálicos destrutíveis. A Fase 134 adicionou weak
 > points determinísticos e feedback próprio. A Fase 135 adicionou spread
 > determinístico por rajada. A Fase 136 tornou a Carbine automática sem alterar
-> a Pistol semiautomática. A fila desacoplada de sinais de combate permanece para
-> fases posteriores.
+> a Pistol semiautomática. A Fase 137 tornou a recarga uma ação temporizada e
+> autoritativa. A fila desacoplada de sinais de combate permanece para fases
+> posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -89,6 +90,14 @@ número de tiros não depende da taxa de renderização. Soltar, pausar, entrar 
 menu ou encerrar a sessão desarma o estado segurado. Com pente vazio, repetição
 automática é bloqueada, mas um novo clique ainda produz exatamente um dry fire.
 
+Na Fase 137, `R` inicia a recarga sem alterar imediatamente o pente ou a reserva.
+A Pistol conclui em `0,82 s` e a Carbine em `1,05 s`, sempre pelo fixed update.
+Enquanto a ação está ativa, pedidos repetidos são recusados e `tryFire()` retorna
+`Reloading` sem consumir munição, fabricar impacto, emitir ruído ou tocar dry
+fire. A conclusão transfere somente a quantidade necessária; pausa congela o
+timer, enquanto equip, restore e reconstrução da run o descartam. A Carbine
+volta a disparar se o botão ainda estiver segurado após a conclusão.
+
 O estado de spread é transitório e pertence à `Weapon`: índice da última
 amostra, quantidade da rajada e timer de recuperação. Ele não integra
 `WeaponCampaignProgress`, assim como cooldown e Overdrive; checkpoints entre
@@ -104,7 +113,9 @@ não reinicia nem acumula duração, evitando extensão infinita do efeito.
 Na Fase 112, a `Application` traduz somente ações já aceitas em temporizadores
 visuais: um tiro que consumiu munição inicia recuo e flash, uma recarga válida
 inicia o arco de recarga e a troca efetiva para Carbine inicia a entrada da arma.
-Cooldown, dry fire e pickup recusado não fabricam movimento. Esses timers não
+Desde a Fase 137, o arco lê o progresso autoritativo de `Weapon`; apenas recuo,
+flash e equip mantêm timers cosméticos na aplicação. Cooldown, dry fire e pickup
+recusado não fabricam movimento. Esses estados não
 alteram `Weapon`, dano, cadência, munição ou direção do hitscan e congelam junto
 com o gameplay quando um menu pausa a run.
 

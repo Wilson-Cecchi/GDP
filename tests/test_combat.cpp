@@ -76,8 +76,27 @@ void testWeaponLifecycle()
     weapon.fixedUpdate(0.5F);
     expect(weapon.tryFire() == FireReadiness::Fired && weapon.magazineAmmo() == 0,
         "weapon fires again after its fixed-time cooldown");
-    expect(weapon.reload() && weapon.magazineAmmo() == 2 && weapon.reserveAmmo() == 1,
-        "reload transfers only the ammunition needed by the magazine");
+    const float reloadDuration = weaponReloadDurationSeconds(
+        WeaponArchetype::Pistol);
+    expect(reloadDuration > 0.0F
+            && weaponReloadDurationSeconds(WeaponArchetype::Carbine)
+                > reloadDuration,
+        "heavier Carbine keeps a longer positive reload duration than Pistol");
+    expect(weapon.reload() && weapon.reloading()
+            && weapon.magazineAmmo() == 0 && weapon.reserveAmmo() == 3
+            && near(weapon.reloadProgress(), 0.0F),
+        "reload starts without transferring ammunition early");
+    expect(weapon.tryFire() == FireReadiness::Reloading && !weapon.reload(),
+        "active reload blocks fire and duplicate reload requests");
+    weapon.fixedUpdate(reloadDuration * 0.5F);
+    expect(weapon.reloading() && weapon.magazineAmmo() == 0
+            && weapon.reserveAmmo() == 3
+            && near(weapon.reloadProgress(), 0.5F),
+        "reload advances deterministically without an early ammo grant");
+    weapon.fixedUpdate(reloadDuration * 0.5F);
+    expect(!weapon.reloading() && near(weapon.reloadProgress(), 0.0F)
+            && weapon.magazineAmmo() == 2 && weapon.reserveAmmo() == 1,
+        "reload completion transfers only the ammunition needed by the magazine");
     expect(!weapon.reload(), "full magazine rejects a redundant reload");
 
     Weapon empty({.fireInterval = 0.0F, .magazineSize = 1, .reserveMaximum = 0});
@@ -137,7 +156,11 @@ void testDeterministicWeaponSpread()
     expect(weapon.tryFire() == FireReadiness::Fired
             && weapon.spreadShotIndex() == 1U,
         "a rapid accepted shot advances the spread sequence once");
-    expect(weapon.reload() && weapon.tryFire() == FireReadiness::Fired
+    expect(weapon.reload()
+            && weapon.tryFire() == FireReadiness::Reloading,
+        "reload blocks firing until its fixed-time transaction completes");
+    weapon.fixedUpdate(weaponReloadDurationSeconds(WeaponArchetype::Pistol));
+    expect(weapon.tryFire() == FireReadiness::Fired
             && weapon.spreadShotIndex() == 0U,
         "reload returns the next shot to centered accuracy");
     expect(weapon.tryFire() == FireReadiness::Fired
@@ -168,6 +191,21 @@ void testDeterministicWeaponSpread()
             && second.outcome == ShotOutcome::ImpactWorld && second.impact
             && !near(second.impact->point.x, 0.0F),
         "hitscan consumes the centered shot followed by the patterned shot");
+
+    Weapon reloading({
+        .fireInterval = 0.0F,
+        .range = 20.0F,
+        .magazineSize = 2U,
+        .reserveMaximum = 2U,
+    });
+    expect(reloading.tryFire() == FireReadiness::Fired && reloading.reload(),
+        "hitscan reload fixture begins from a partially depleted magazine");
+    const ShotResult blockedByReload = fireHitscan(
+        reloading, {0.0F, 1.0F, 0.0F}, forward, 1U, room, manager);
+    expect(blockedByReload.outcome == ShotOutcome::Reloading
+            && !blockedByReload.hit && !blockedByReload.impact
+            && reloading.magazineAmmo() == 1U,
+        "hitscan reports an active reload without fabricating impact or ammo use");
 }
 
 void testWeaponPickupEquipment()
@@ -226,6 +264,11 @@ void testWeaponTriggerModes()
             && !weaponFireRequested(carbine, false, true)
             && weaponFireRequested(carbine, true, true),
         "empty Carbine suppresses repeated dry fire but preserves one click per press");
+
+    Weapon reloading(baseWeaponDefinition(WeaponArchetype::Carbine));
+    expect(reloading.tryFire() == FireReadiness::Fired && reloading.reload()
+            && !weaponFireRequested(reloading, true, true),
+        "an active reload suppresses both pressed and held trigger requests");
 }
 
 void testWeaponOverdrive()

@@ -521,6 +521,10 @@ especializados das pastas numeradas.
   tiros da Carbine pelo fixed update e pelo cooldown real da arma. A Pistol
   permanece semiautomática; pente vazio não repete dry fire. Campaign/Speedrun
   avançam para regras 23/22.
+- **Fase 137 — Recarga temporizada:** `R` inicia uma transação de `0,82 s` na
+  Pistol e `1,05 s` na Carbine. A munição permanece na reserva e disparos ficam
+  bloqueados até o fixed update concluir a transferência; o viewmodel usa o
+  mesmo progresso autoritativo. Campaign/Speedrun avançam para regras 24/23.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1426,6 +1430,16 @@ um único pipeline no fixed update. Menus, pausa, término de sessão e soltura 
 botão desarmam o hold. Quando o pente zera, o hold deixa de pedir disparos para
 não repetir áudio de arma vazia; outro clique ainda gera um dry fire legítimo.
 Campaign/Speedrun avançam para regras 23/22.
+
+Na Fase 137, `Weapon::reload()` deixa de transferir munição instantaneamente e
+passa a iniciar uma ação temporizada: `0,82 s` para a Pistol e `1,05 s` para a
+Carbine. Durante esse intervalo, pente e reserva não mudam, novos pedidos de
+recarga são rejeitados e nenhum disparo, impacto, ruído ou dry fire é produzido.
+O fixed update conclui a transferência de uma única vez e o progresso entregue
+ao viewmodel vem diretamente desse estado, eliminando o antigo timer cosmético
+duplicado na `Application`. Pausa congela a ação; equip, restore e nova run a
+cancelam. O estado transitório não entra no checkpoint, enquanto o novo tempo de
+combate avança Campaign/Speedrun para regras 24/23.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

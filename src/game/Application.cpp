@@ -50,7 +50,6 @@ namespace {
 constexpr float impactVisualDuration = 0.32F;
 constexpr float weaponRecoilDuration = 0.12F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
-constexpr float weaponReloadDuration = 0.42F;
 constexpr float weaponEquipDuration = 0.48F;
 
 std::uint32_t roundedPerformanceMetric(const double value) noexcept
@@ -775,7 +774,6 @@ bool Application::initializeRun()
     impactVisualCounter_ = 0U;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
-    weaponReloadRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
@@ -1720,7 +1718,6 @@ bool Application::returnToMainMenu()
     reloadPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
-    weaponReloadRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
     restartRequested_ = false;
     audioEventCounter_ = 0U;
@@ -2090,8 +2087,6 @@ void Application::fixedUpdate(const double fixedStep)
         = std::max(0.0F, weaponRecoilRemaining_ - step);
     weaponMuzzleFlashRemaining_
         = std::max(0.0F, weaponMuzzleFlashRemaining_ - step);
-    weaponReloadRemaining_
-        = std::max(0.0F, weaponReloadRemaining_ - step);
     weaponEquipRemaining_
         = std::max(0.0F, weaponEquipRemaining_ - step);
     for (ActiveImpact& impact : activeImpacts_) {
@@ -2352,9 +2347,8 @@ void Application::fixedUpdate(const double fixedStep)
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
-            weaponReloadRemaining_ = weaponReloadDuration;
             std::ostringstream message;
-            message << "Weapon reloaded: " << weapon_.magazineAmmo() << '/'
+            message << "Weapon reload started: " << weapon_.magazineAmmo() << '/'
                     << weapon_.reserveAmmo();
             log(LogLevel::Info, message.str());
             if (audio_) {
@@ -2394,6 +2388,7 @@ void Application::fixedUpdate(const double fixedStep)
             });
         }
         if (shot.outcome != gameplay::ShotOutcome::Cooldown
+            && shot.outcome != gameplay::ShotOutcome::Reloading
             && shot.outcome != gameplay::ShotOutcome::Empty) {
             weaponRecoilRemaining_ = weaponRecoilDuration;
             weaponMuzzleFlashRemaining_ = weaponMuzzleFlashDuration;
@@ -2401,7 +2396,8 @@ void Application::fixedUpdate(const double fixedStep)
                 entities_, playerRoom,
                 {.position = player_.state().position});
         }
-        if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown) {
+        if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown
+            && shot.outcome != gameplay::ShotOutcome::Reloading) {
             const gdp::audio::AudioEventKind fireKind
                 = shot.outcome == gameplay::ShotOutcome::Empty
                 ? gdp::audio::AudioEventKind::DryFire
@@ -3526,7 +3522,8 @@ void Application::render()
             }
         }
         if (hud.prompt == visual::HudPrompt::None
-            && weapon_.magazineAmmo() == 0U && weapon_.reserveAmmo() > 0U) {
+            && !weapon_.reloading() && weapon_.magazineAmmo() == 0U
+            && weapon_.reserveAmmo() > 0U) {
             hud.prompt = visual::HudPrompt::Reload;
         }
     }
@@ -3543,8 +3540,7 @@ void Application::render()
             && session_.state().phase == gameplay::SessionPhase::Playing,
         .role = hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
-        .reloadProgress = weaponReloadRemaining_ > 0.0F
-            ? 1.0F - (weaponReloadRemaining_ / weaponReloadDuration) : 0.0F,
+        .reloadProgress = weapon_.reloadProgress(),
         .equipStrength = weaponEquipRemaining_ / weaponEquipDuration,
         .muzzleFlashStrength
             = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
@@ -3610,7 +3606,6 @@ void Application::shutdown()
     reloadPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
-    weaponReloadRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;

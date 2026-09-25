@@ -34,6 +34,12 @@ WeaponSpreadProfile weaponSpreadProfile(
         : WeaponSpreadProfile{};
 }
 
+float weaponReloadDurationSeconds(
+    const WeaponArchetype archetype) noexcept
+{
+    return archetype == WeaponArchetype::Carbine ? 1.05F : 0.82F;
+}
+
 bool weaponUsesAutomaticFire(const WeaponArchetype archetype) noexcept
 {
     return archetype == WeaponArchetype::Carbine;
@@ -44,6 +50,9 @@ bool weaponFireRequested(
     const bool triggerPressed,
     const bool triggerHeld) noexcept
 {
+    if (weapon.reloading()) {
+        return false;
+    }
     return triggerPressed
         || (triggerHeld && weapon.magazineAmmo() > 0U
             && weaponUsesAutomaticFire(weapon.definition().archetype));
@@ -72,6 +81,16 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
     overdriveRemaining_ = std::max(0.0F, overdriveRemaining_ - step);
     spreadRecoveryRemaining_ = std::max(
         0.0F, spreadRecoveryRemaining_ - step);
+    const bool reloadCompleted = reloadRemaining_ > 0.0F
+        && step >= reloadRemaining_;
+    reloadRemaining_ = std::max(0.0F, reloadRemaining_ - step);
+    if (reloadCompleted) {
+        const std::uint32_t requested
+            = definition_.magazineSize - magazineAmmo_;
+        const std::uint32_t transferred = std::min(requested, reserveAmmo_);
+        magazineAmmo_ += transferred;
+        reserveAmmo_ -= transferred;
+    }
     if (spreadRecoveryRemaining_ <= 0.0F) {
         spreadShotCount_ = 0U;
         spreadShotIndex_ = 0U;
@@ -80,6 +99,9 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
 
 FireReadiness Weapon::tryFire() noexcept
 {
+    if (reloading()) {
+        return FireReadiness::Reloading;
+    }
     if (cooldownRemaining_ > 0.0F) {
         return FireReadiness::Cooldown;
     }
@@ -100,13 +122,11 @@ FireReadiness Weapon::tryFire() noexcept
 
 bool Weapon::reload() noexcept
 {
-    if (magazineAmmo_ >= definition_.magazineSize || reserveAmmo_ == 0) {
+    if (reloading() || magazineAmmo_ >= definition_.magazineSize
+        || reserveAmmo_ == 0U) {
         return false;
     }
-    const std::uint32_t requested = definition_.magazineSize - magazineAmmo_;
-    const std::uint32_t transferred = std::min(requested, reserveAmmo_);
-    magazineAmmo_ += transferred;
-    reserveAmmo_ -= transferred;
+    reloadRemaining_ = weaponReloadDurationSeconds(definition_.archetype);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
@@ -159,6 +179,7 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     magazineAmmo_ = definition_.magazineSize;
     reserveAmmo_ = definition_.reserveMaximum;
     cooldownRemaining_ = 0.0F;
+    reloadRemaining_ = 0.0F;
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
@@ -193,6 +214,7 @@ bool Weapon::restoreCampaignProgress(
     magazineAmmo_ = progress.magazineAmmo;
     reserveAmmo_ = progress.reserveAmmo;
     cooldownRemaining_ = 0.0F;
+    reloadRemaining_ = 0.0F;
     overdriveRemaining_ = 0.0F;
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
@@ -223,6 +245,27 @@ std::uint32_t Weapon::reserveCapacity() const noexcept
 float Weapon::cooldownRemaining() const noexcept
 {
     return cooldownRemaining_;
+}
+
+float Weapon::reloadRemaining() const noexcept
+{
+    return reloadRemaining_;
+}
+
+float Weapon::reloadProgress() const noexcept
+{
+    if (!reloading()) {
+        return 0.0F;
+    }
+    return std::clamp(
+        1.0F - (reloadRemaining_
+            / weaponReloadDurationSeconds(definition_.archetype)),
+        0.0F, 1.0F);
+}
+
+bool Weapon::reloading() const noexcept
+{
+    return reloadRemaining_ > 0.0F;
 }
 
 float Weapon::damage() const noexcept

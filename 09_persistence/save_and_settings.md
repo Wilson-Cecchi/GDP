@@ -151,6 +151,12 @@ Como o novo volume muda visão, hitscan, navegação e tempo, Campaign avança d
 regras 10 para 11 e Speedrun das regras 9 para 10. Fixtures das regras 10/9
 confirmam o isolamento da versão anterior.
 
+A Fase 137 mantém a recarga como estado transitório de `Weapon`: checkpoint de
+entrada, replay, troca de andar e equip restauram a arma em repouso, sem novo
+campo no schema 2. Como o tempo real sem disparar altera sobrevivência e duração
+das runs, Campaign/Speedrun avançam para regras 24/23; checkpoints 23 e recordes
+22 permanecem no disco, mas são rejeitados como incompatíveis.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

@@ -66,6 +66,11 @@ faz um arco curto e a troca de arma entra por baixo. O detalhe ciano passa a
 magenta durante Overdrive. A retícula e os painéis permanecem por cima, e menus
 pausam a animação junto com a simulação.
 
+Desde a Fase 137, o arco de recarga recebe o progresso real de `Weapon`, com
+duração própria para Pistol e Carbine. O prompt `R RELOAD` desaparece durante a
+ação já iniciada, e a munição exibida só muda quando o fixed update conclui a
+transferência.
+
 A retícula abre conforme o estado transitório de spread. Pistol continua
 semiautomática; Carbine pode manter o botão primário pressionado. A interface
 somente apresenta bloom e munição: cadência, trigger mode e dry fire permanecem

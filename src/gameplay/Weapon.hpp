@@ -38,6 +38,7 @@ struct WeaponSpreadProfile {
 enum class FireReadiness : std::uint8_t {
     Fired,
     Cooldown,
+    Reloading,
     Empty,
 };
 
@@ -64,6 +65,9 @@ public:
     [[nodiscard]] std::uint32_t reserveAmmo() const noexcept;
     [[nodiscard]] std::uint32_t reserveCapacity() const noexcept;
     [[nodiscard]] float cooldownRemaining() const noexcept;
+    [[nodiscard]] float reloadRemaining() const noexcept;
+    [[nodiscard]] float reloadProgress() const noexcept;
+    [[nodiscard]] bool reloading() const noexcept;
     [[nodiscard]] float damage() const noexcept;
     [[nodiscard]] float overdriveRemaining() const noexcept;
     [[nodiscard]] bool overdriveActive() const noexcept;
@@ -76,6 +80,7 @@ private:
     std::uint32_t magazineAmmo_{0};
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
+    float reloadRemaining_{0.0F};
     float overdriveRemaining_{0.0F};
     std::uint32_t spreadShotCount_{0U};
     std::uint32_t spreadShotIndex_{0U};
@@ -87,6 +92,8 @@ private:
 [[nodiscard]] const char* weaponArchetypeName(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(
+    WeaponArchetype archetype) noexcept;
+[[nodiscard]] float weaponReloadDurationSeconds(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] bool weaponUsesAutomaticFire(
     WeaponArchetype archetype) noexcept;
