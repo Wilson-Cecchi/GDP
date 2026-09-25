@@ -50,9 +50,11 @@ reserva máxima, Armor respeita sua capacidade e Key incrementa o estado do Play
 cheio mantém a entidade no chão; coleta válida usa destruição adiada, remove o
 handle da sala e só então faz flush. Jogador morto não coleta.
 
-Weapon equipa a Carbine somente enquanto a Pistol está ativa. O pickup transfere
-os bônus de progressão, aplica seu perfil próprio e permanece disponível quando
-a mesma Carbine já está equipada, impedindo que duplicatas virem fonte de munição.
+Weapon acrescenta a Carbine ao segundo slot, equipa a descoberta e preserva a
+Pistol com sua munição. O pickup transfere os bônus de progressão e aplica seu
+perfil próprio; outra Carbine permanece disponível no chão mesmo quando a arma
+está guardada, impedindo que duplicatas virem fonte de munição. Ammo abastece
+somente o slot ativo, enquanto recompensas Firepower e Capacity evoluem ambos.
 
 Special ativa 12 segundos de Overdrive na arma equipada. Durante o efeito, dano
 é multiplicado por `1,5` e o intervalo de tiro por `0,65`; outro Special fica no

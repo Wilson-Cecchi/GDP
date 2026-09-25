@@ -15,8 +15,8 @@
 > points determinísticos e feedback próprio. A Fase 135 adicionou spread
 > determinístico por rajada. A Fase 136 tornou a Carbine automática sem alterar
 > a Pistol semiautomática. A Fase 137 tornou a recarga uma ação temporizada e
-> autoritativa. A fila desacoplada de sinais de combate permanece para fases
-> posteriores.
+> autoritativa. A Fase 138 adicionou dois slots de arma com troca real. A fila
+> desacoplada de sinais de combate permanece para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -81,7 +81,8 @@ necessária da reserva para o pente. Progressão pode aumentar dano em blocos de
 A Carbine da Fase 84 usa 26 de dano, intervalo de `0,13 s`, alcance de `34 m`,
 pente de 12 e reserva de 48. Ao equipá-la, os bônus acumulados sobre o dano e a
 reserva-base da Pistol são transportados; munição começa cheia e o cooldown é
-zerado. Recolher outra Carbine não altera nem reabastece a arma atual.
+zerado. Desde a Fase 138, a Pistol permanece guardada com sua munição; recolher
+outra Carbine não altera nem reabastece nenhum slot.
 
 Na Fase 136, a Pistol continua disparando somente na borda de pressionamento. A
 Carbine aceita também o estado segurado e volta a tentar em cada fixed update;
@@ -97,6 +98,14 @@ Enquanto a ação está ativa, pedidos repetidos são recusados e `tryFire()` re
 fire. A conclusão transfere somente a quantidade necessária; pausa congela o
 timer, enquanto equip, restore e reconstrução da run o descartam. A Carbine
 volta a disparar se o botão ainda estiver segurado após a conclusão.
+
+Na Fase 138, `Weapon` mantém um slot ativo e outro guardado. `1` seleciona a
+Pistol, `2` seleciona a Carbine e a roda alterna, sempre por comando pendente
+consumido no fixed update. Cada slot conserva definição, pente e reserva. Troca
+válida zera cooldown, spread e recarga, preserva o timer global de Overdrive e
+desarma o gatilho segurado; selecionar o slot atual ou uma arma ainda não
+encontrada não muda estado. Firepower e Capacity atualizam ambas as armas, mas
+pickups Ammo abastecem somente a ativa.
 
 O estado de spread é transitório e pertence à `Weapon`: índice da última
 amostra, quantidade da rajada e timer de recuperação. Ele não integra

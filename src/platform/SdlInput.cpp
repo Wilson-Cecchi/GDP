@@ -23,6 +23,10 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::E;
     case SDL_SCANCODE_R:
         return Key::R;
+    case SDL_SCANCODE_1:
+        return Key::Digit1;
+    case SDL_SCANCODE_2:
+        return Key::Digit2;
     case SDL_SCANCODE_F3:
         return Key::F3;
     case SDL_SCANCODE_ESCAPE:
@@ -95,6 +99,13 @@ bool handleSdlInputEvent(Input& input, const SDL_Event& event) noexcept
             *button,
             event.type == SDL_EVENT_MOUSE_BUTTON_DOWN,
             {event.button.x, event.button.y});
+        return true;
+    }
+
+    if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+        const float direction = event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED
+            ? -1.0F : 1.0F;
+        input.handleMouseWheel(event.wheel.y * direction);
         return true;
     }
 

@@ -10,8 +10,10 @@
 
 ## Controles modernos
 
-`W/S` frente/trás, `A/D` strafe, mouse yaw/pitch, `E` interação, números/roda para armas e
-`Esc` para pausa. Um modo clássico posterior deve alterar apenas o mapeamento.
+`W/S` frente/trás, `A/D` strafe, mouse yaw/pitch, `E` interação, `R` recarga,
+`1` Pistol, `2` Carbine, roda para alternar armas e `Esc` para pausa. A seleção
+de arma vira comando pendente e só altera um slot possuído no fixed update. Um
+modo clássico posterior deve alterar apenas o mapeamento.
 
 ## Fixed update
 

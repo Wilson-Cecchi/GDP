@@ -212,13 +212,18 @@ void testWeaponPickupEquipment()
 {
     using namespace gdp::gameplay;
     Weapon weapon;
+    expect(weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && !weapon.ownsWeapon(WeaponArchetype::Carbine),
+        "new loadout owns only its initial Pistol");
     expect(weapon.increaseDamage(4.0F)
             && weapon.increaseReserveCapacity(4U),
         "weapon pickup fixture applies existing progression bonuses");
     (void)weapon.tryFire();
     expect(weapon.equip(WeaponArchetype::Carbine),
-        "Carbine pickup replaces the initial Pistol");
+        "Carbine pickup adds the long gun and equips it");
     expect(weapon.definition().archetype == WeaponArchetype::Carbine
+            && weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && weapon.ownsWeapon(WeaponArchetype::Carbine)
             && near(weapon.definition().damage, 30.0F)
             && near(weapon.definition().fireInterval, 0.13F)
             && weapon.definition().magazineSize == 12U
@@ -228,9 +233,30 @@ void testWeaponPickupEquipment()
             && near(weapon.cooldownRemaining(), 0.0F),
         "Carbine keeps upgrades and starts with its own complete ammunition profile");
     (void)weapon.tryFire();
+    expect(weapon.reload() && weapon.switchTo(WeaponArchetype::Pistol)
+            && !weapon.reloading() && weapon.magazineAmmo() == 7U,
+        "switching restores Pistol ammunition and cancels transient Carbine reload");
     expect(!weapon.equip(WeaponArchetype::Carbine)
-            && weapon.magazineAmmo() == 11U,
-        "duplicate Carbine pickups cannot refill an already equipped weapon");
+            && weapon.definition().archetype == WeaponArchetype::Pistol,
+        "duplicate Carbine pickups cannot refill a stowed weapon");
+    expect(weapon.increaseDamage(4.0F)
+            && weapon.increaseReserveCapacity(4U, 4U)
+            && weapon.cycleWeapon()
+            && weapon.definition().archetype == WeaponArchetype::Carbine
+            && near(weapon.definition().damage, 34.0F)
+            && weapon.reserveCapacity() == 56U
+            && weapon.magazineAmmo() == 11U
+            && weapon.reserveAmmo() == 56U,
+        "progression upgrades both slots and cycling preserves spent Carbine ammo");
+    expect(weapon.switchTo(WeaponArchetype::Pistol)
+            && near(weapon.definition().damage, 42.0F)
+            && weapon.reserveCapacity() == 40U
+            && !weapon.switchTo(WeaponArchetype::Pistol),
+        "direct slot selection restores upgraded Pistol and rejects redundant switch");
+    expect(weapon.activateOverdrive() && weapon.cycleWeapon()
+            && weapon.overdriveActive()
+            && weapon.definition().archetype == WeaponArchetype::Carbine,
+        "weapon switching preserves the loadout-wide Overdrive timer");
 }
 
 void testWeaponTriggerModes()

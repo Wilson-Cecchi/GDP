@@ -128,6 +128,7 @@ private:
     bool firePending_{false};
     bool fireHeld_{false};
     bool reloadPending_{false};
+    std::optional<gameplay::WeaponArchetype> weaponSwitchPending_;
     float weaponRecoilRemaining_{0.0F};
     float weaponMuzzleFlashRemaining_{0.0F};
     float weaponEquipRemaining_{0.0F};

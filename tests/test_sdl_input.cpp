@@ -59,6 +59,8 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_D, Key::D},
         std::pair{SDL_SCANCODE_E, Key::E},
         std::pair{SDL_SCANCODE_R, Key::R},
+        std::pair{SDL_SCANCODE_1, Key::Digit1},
+        std::pair{SDL_SCANCODE_2, Key::Digit2},
         std::pair{SDL_SCANCODE_F3, Key::F3},
         std::pair{SDL_SCANCODE_ESCAPE, Key::Escape},
         std::pair{SDL_SCANCODE_RETURN, Key::Enter},
@@ -113,6 +115,20 @@ void testSdlTranslation()
     expect(!input.isMouseButtonDown(MouseButton::Primary)
             && input.wasMouseButtonReleased(MouseButton::Primary),
         "SDL primary release maps to the neutral transition");
+
+    input.beginFrame();
+    event = {};
+    event.type = SDL_EVENT_MOUSE_WHEEL;
+    event.wheel.y = 2.0F;
+    event.wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+    expect(wkc::platform::handleSdlInputEvent(input, event)
+            && input.mouseWheelDelta() == 2.0F,
+        "SDL normal mouse wheel preserves its direction");
+    event.wheel.y = 1.0F;
+    event.wheel.direction = SDL_MOUSEWHEEL_FLIPPED;
+    expect(wkc::platform::handleSdlInputEvent(input, event)
+            && input.mouseWheelDelta() == 1.0F,
+        "SDL flipped mouse wheel is normalized before accumulation");
 }
 
 } // namespace

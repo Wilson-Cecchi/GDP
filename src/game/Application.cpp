@@ -772,6 +772,7 @@ bool Application::initializeRun()
     activeImpacts_.clear();
     roomFixtureEntities_.clear();
     impactVisualCounter_ = 0U;
+    weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
@@ -1019,6 +1020,7 @@ void Application::processEvents()
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::closeExitConfirmation(exitConfirmation_);
@@ -1105,6 +1107,7 @@ void Application::processEvents()
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::closeSettingsMenu(settingsMenu_);
@@ -1206,6 +1209,7 @@ void Application::processEvents()
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::openExitConfirmation(exitConfirmation_);
@@ -1381,6 +1385,7 @@ void Application::processEvents()
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::openExitConfirmation(exitConfirmation_);
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
@@ -1516,6 +1521,7 @@ void Application::processEvents()
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
 
         std::optional<visual::HudPauseSelection> pointedSelection;
         if (window_ != nullptr) {
@@ -1630,6 +1636,16 @@ void Application::processEvents()
         fireHeld_ = input_.isMouseButtonDown(MouseButton::Primary);
     }
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
+    if (input_.wasKeyPressed(Key::Digit1)) {
+        weaponSwitchPending_ = gameplay::WeaponArchetype::Pistol;
+    } else if (input_.wasKeyPressed(Key::Digit2)) {
+        weaponSwitchPending_ = gameplay::WeaponArchetype::Carbine;
+    } else if (input_.mouseWheelDelta() != 0.0F) {
+        weaponSwitchPending_ = weapon_.definition().archetype
+                == gameplay::WeaponArchetype::Pistol
+            ? gameplay::WeaponArchetype::Carbine
+            : gameplay::WeaponArchetype::Pistol;
+    }
     playerCommand_.interact = interactionPending_;
 }
 
@@ -1645,6 +1661,7 @@ void Application::setPaused(const bool paused)
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
+    weaponSwitchPending_.reset();
     if (!config_.headless && window_ != nullptr
         && !SDL_SetWindowRelativeMouseMode(window_, !paused)) {
         log(LogLevel::Warning, sdlError("Pause mouse mode update failed"));
@@ -1716,6 +1733,7 @@ bool Application::returnToMainMenu()
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
+    weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
@@ -2105,6 +2123,18 @@ void Application::fixedUpdate(const double fixedStep)
         return;
     }
     weapon_.fixedUpdate(step);
+    if (weaponSwitchPending_ && player_.state().alive
+        && weapon_.switchTo(*weaponSwitchPending_)) {
+        weaponEquipRemaining_ = weaponEquipDuration;
+        reloadPending_ = false;
+        firePending_ = false;
+        fireHeld_ = false;
+        log(LogLevel::Info,
+            std::string{"Weapon selected: "}
+                + gameplay::weaponArchetypeName(
+                    weapon_.definition().archetype));
+    }
+    weaponSwitchPending_.reset();
     entities::Entity* playerEntity = entities_.find(player_.entity());
     std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     const auto awardProgress = [this](
@@ -2642,6 +2672,7 @@ void Application::fixedUpdate(const double fixedStep)
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
+        weaponSwitchPending_.reset();
         latestSpeedrunRecordResult_ = gameplay::considerSpeedrunResult(
             session_.state(), speedrunRecord_);
         if (gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_)) {
@@ -3604,6 +3635,7 @@ void Application::shutdown()
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
+    weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;

@@ -157,6 +157,13 @@ campo no schema 2. Como o tempo real sem disparar altera sobrevivência e duraç
 das runs, Campaign/Speedrun avançam para regras 24/23; checkpoints 23 e recordes
 22 permanecem no disco, mas são rejeitados como incompatíveis.
 
+A Fase 138 avança o checkpoint para schema 3. Além da arma ativa, o arquivo
+grava presença, definição, pente e reserva do slot guardado; identidades iguais
+ou munição acima da capacidade invalidam o estado. Cooldown, recarga, spread e
+Overdrive continuam transitórios. O schema 2 de arma única não é reinterpretado,
+e Campaign/Speedrun avançam para regras 25/24 por causa das novas decisões de
+troca, munição e tempo.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

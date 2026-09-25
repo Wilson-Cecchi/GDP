@@ -87,9 +87,13 @@ void testCampaignCarryoverRoundTrip()
                 == sourceWeapon.reserveCapacity()
             && restoredWeapon.magazineAmmo() == sourceWeapon.magazineAmmo()
             && restoredWeapon.reserveAmmo() == sourceWeapon.reserveAmmo()
+            && restoredWeapon.campaignProgress()
+                == sourceWeapon.campaignProgress()
+            && restoredWeapon.ownsWeapon(WeaponArchetype::Pistol)
             && near(restoredWeapon.cooldownRemaining(), 0.0F)
+            && !restoredWeapon.reloading()
             && !restoredWeapon.overdriveActive(),
-        "weapon upgrades and ammunition persist while transient combat state resets");
+        "both weapon slots persist while transient combat state resets");
     expect(restoredProgression.state().level
                 == sourceProgression.state().level
             && restoredProgression.state().experienceIntoLevel
@@ -157,6 +161,18 @@ void testCampaignCarryoverRejectsInvalidStateAtomically()
         = static_cast<WeaponArchetype>(99U);
     expect(!validateCampaignCarryover(invalidWeapon),
         "unknown weapon identity invalidates Campaign carry-over");
+
+    CampaignCarryover duplicateSlot = valid;
+    duplicateSlot.weapon.stowed = WeaponCampaignProgress::StowedWeapon{
+        duplicateSlot.weapon.definition, 0U, 0U};
+    expect(!validateCampaignCarryover(duplicateSlot),
+        "Campaign carry-over rejects duplicate weapon identities across slots");
+
+    CampaignCarryover invalidStowedAmmo = valid;
+    invalidStowedAmmo.weapon.stowed = WeaponCampaignProgress::StowedWeapon{
+        baseWeaponDefinition(WeaponArchetype::Carbine), 13U, 0U};
+    expect(!validateCampaignCarryover(invalidStowedAmmo),
+        "Campaign carry-over validates stowed ammunition against its own capacity");
 
     CampaignCarryover invalidProgression = valid;
     invalidProgression.progression.vitalityRank = 1U;

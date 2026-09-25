@@ -525,6 +525,10 @@ especializados das pastas numeradas.
   Pistol e `1,05 s` na Carbine. A munição permanece na reserva e disparos ficam
   bloqueados até o fixed update concluir a transferência; o viewmodel usa o
   mesmo progresso autoritativo. Campaign/Speedrun avançam para regras 24/23.
+- **Fase 138 — Loadout de duas armas:** encontrar a Carbine preserva a Pistol
+  no slot 1; `1`, `2` e roda do mouse alternam os slots pelo fixed update. Cada
+  arma conserva munição própria, enquanto melhorias alcançam ambas e duplicatas
+  não reabastecem. Checkpoint schema 3 grava os dois slots; regras avançam 25/24.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -547,7 +551,8 @@ cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, dispara com o botão esquerdo
-e recarrega com `R`; `F3` alterna o diagnóstico de desempenho. Pickups próximos
+e recarrega com `R`; após encontrar a Carbine, `1`, `2` ou a roda do mouse
+alternam as armas. `F3` alterna o diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
 mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
@@ -1440,6 +1445,17 @@ ao viewmodel vem diretamente desse estado, eliminando o antigo timer cosmético
 duplicado na `Application`. Pausa congela a ação; equip, restore e nova run a
 cancelam. O estado transitório não entra no checkpoint, enquanto o novo tempo de
 combate avança Campaign/Speedrun para regras 24/23.
+
+Na Fase 138, o pickup da Carbine deixa de substituir a Pistol: ele cria um
+loadout de dois slots, equipa a arma nova e conserva munição da sidearm. `1`
+seleciona Pistol, `2` seleciona Carbine e qualquer passo da roda alterna entre
+as duas; pedidos entram no fixed update e só funcionam para armas possuídas.
+Trocar cancela cooldown, spread e recarga do slot que sai, preserva Overdrive e
+desarma o gatilho segurado para evitar um tiro involuntário. Cada slot mantém
+pente e reserva próprios; Ammo abastece somente a arma ativa, melhorias de dano
+e capacidade alcançam as duas e uma Carbine duplicada permanece no chão sem
+reabastecer. Campaign/Speedrun avançam para regras 25/24. O checkpoint schema 3
+grava arma ativa e guardada; schemas anteriores não são reinterpretados.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

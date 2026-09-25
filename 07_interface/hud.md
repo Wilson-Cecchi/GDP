@@ -54,7 +54,8 @@ essa ornamentação não amplia hit targets nem ocupa o centro do combate.
 
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o
-pickup é aceito.
+pickup ou uma seleção por `1`, `2` ou roda é aceita. A entrada visual por baixo
+é repetida na troca, sem fabricar disparo ou alterar os hit tests do HUD.
 
 Durante Overdrive, a mesma linha acrescenta `OD` entre a identidade da arma e a
 munição. O título diagnóstico mostra também os segundos inteiros restantes; o

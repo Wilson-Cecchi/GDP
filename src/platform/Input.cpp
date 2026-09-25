@@ -1,5 +1,6 @@
 #include "platform/Input.hpp"
 
+#include <cmath>
 #include <cstddef>
 
 namespace wkc::platform {
@@ -11,6 +12,7 @@ void Input::beginFrame() noexcept
     mouseButtonsPressed_.fill(false);
     mouseButtonsReleased_.fill(false);
     mouseDelta_ = {};
+    mouseWheelDelta_ = 0.0F;
 }
 
 void Input::handleKey(const Key key, const bool down, const bool repeat) noexcept
@@ -61,6 +63,13 @@ void Input::handleMouseMotion(
     mousePosition_ = position;
 }
 
+void Input::handleMouseWheel(const float delta) noexcept
+{
+    if (std::isfinite(delta)) {
+        mouseWheelDelta_ += delta;
+    }
+}
+
 bool Input::isKeyDown(const Key key) const noexcept
 {
     return isValidKey(key) && keysDown_[static_cast<std::size_t>(key)];
@@ -102,6 +111,11 @@ wkc::core::Vec2 Input::mouseDelta() const noexcept
 wkc::core::Vec2 Input::mousePosition() const noexcept
 {
     return mousePosition_;
+}
+
+float Input::mouseWheelDelta() const noexcept
+{
+    return mouseWheelDelta_;
 }
 
 bool Input::isValidKey(const Key key) noexcept

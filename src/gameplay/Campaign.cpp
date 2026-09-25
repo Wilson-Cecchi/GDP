@@ -21,11 +21,7 @@ CampaignCarryover captureCampaignCarryover(
             playerState.maximumArmor,
             playerState.keys,
         },
-        {
-            weapon.definition(),
-            weapon.magazineAmmo(),
-            weapon.reserveAmmo(),
-        },
+        weapon.campaignProgress(),
         progression.state(),
     };
 }
@@ -33,23 +29,13 @@ CampaignCarryover captureCampaignCarryover(
 bool validateCampaignCarryover(const CampaignCarryover& carryover) noexcept
 {
     const PlayerCampaignProgress& player = carryover.player;
-    const WeaponCampaignProgress& weapon = carryover.weapon;
     return std::isfinite(player.health) && player.health > 0.0F
         && std::isfinite(player.maximumHealth) && player.maximumHealth > 0.0F
         && player.health <= player.maximumHealth
         && std::isfinite(player.armor) && player.armor >= 0.0F
         && std::isfinite(player.maximumArmor) && player.maximumArmor >= 0.0F
         && player.armor <= player.maximumArmor
-        && std::isfinite(weapon.definition.damage)
-        && weapon.definition.damage > 0.0F
-        && std::isfinite(weapon.definition.fireInterval)
-        && weapon.definition.fireInterval >= 0.0F
-        && std::isfinite(weapon.definition.range)
-        && weapon.definition.range > 0.0F
-        && weapon.definition.magazineSize > 0U
-        && weapon.definition.archetype <= WeaponArchetype::Carbine
-        && weapon.magazineAmmo <= weapon.definition.magazineSize
-        && weapon.reserveAmmo <= weapon.definition.reserveMaximum
+        && validateWeaponCampaignProgress(carryover.weapon)
         && validateProgressionState(carryover.progression);
 }
 

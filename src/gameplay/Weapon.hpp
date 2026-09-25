@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace gdp::gameplay {
 
@@ -24,6 +25,14 @@ struct WeaponCampaignProgress {
     WeaponDefinition definition{};
     std::uint32_t magazineAmmo{0U};
     std::uint32_t reserveAmmo{0U};
+    struct StowedWeapon {
+        WeaponDefinition definition{};
+        std::uint32_t magazineAmmo{0U};
+        std::uint32_t reserveAmmo{0U};
+
+        constexpr bool operator==(const StowedWeapon&) const noexcept = default;
+    };
+    std::optional<StowedWeapon> stowed;
 
     constexpr bool operator==(const WeaponCampaignProgress&) const noexcept = default;
 };
@@ -55,6 +64,9 @@ public:
         std::uint32_t amount,
         std::uint32_t bonusAmmo = 0U) noexcept;
     [[nodiscard]] bool equip(WeaponArchetype archetype) noexcept;
+    [[nodiscard]] bool switchTo(WeaponArchetype archetype) noexcept;
+    [[nodiscard]] bool cycleWeapon() noexcept;
+    [[nodiscard]] bool ownsWeapon(WeaponArchetype archetype) const noexcept;
     [[nodiscard]] bool activateOverdrive(
         float durationSeconds = 12.0F) noexcept;
     [[nodiscard]] bool restoreCampaignProgress(
@@ -74,6 +86,7 @@ public:
     [[nodiscard]] std::uint32_t spreadShotIndex() const noexcept;
     [[nodiscard]] float spreadRecoveryRemaining() const noexcept;
     [[nodiscard]] float spreadStrength() const noexcept;
+    [[nodiscard]] WeaponCampaignProgress campaignProgress() const noexcept;
 
 private:
     WeaponDefinition definition_{};
@@ -85,6 +98,7 @@ private:
     std::uint32_t spreadShotCount_{0U};
     std::uint32_t spreadShotIndex_{0U};
     float spreadRecoveryRemaining_{0.0F};
+    std::optional<WeaponCampaignProgress::StowedWeapon> stowedWeapon_;
 };
 
 [[nodiscard]] WeaponDefinition baseWeaponDefinition(
@@ -101,5 +115,7 @@ private:
     const Weapon& weapon,
     bool triggerPressed,
     bool triggerHeld) noexcept;
+[[nodiscard]] bool validateWeaponCampaignProgress(
+    const WeaponCampaignProgress& progress) noexcept;
 
 } // namespace gdp::gameplay

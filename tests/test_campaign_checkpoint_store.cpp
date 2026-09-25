@@ -133,120 +133,130 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
         "unknown checkpoint schemas are not interpreted as current data");
 
-    writeText(path, "version = 2\nrules_version = 99\n");
+    writeText(path, "version = 2\nrules_version = 25\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
+        "single-slot checkpoint schema is not reinterpreted as a two-slot loadout");
+
+    writeText(path, "version = 3\nrules_version = 99\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from another Campaign ruleset remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 1\n");
+    writeText(path, "version = 3\nrules_version = 1\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from the pre-progression balance are rejected safely");
 
-    writeText(path, "version = 2\nrules_version = 2\n");
+    writeText(path, "version = 3\nrules_version = 2\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before procedural Armor remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 3\n");
+    writeText(path, "version = 3\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints without weapon identity remain isolated by their rules");
 
-    writeText(path, "version = 2\nrules_version = 4\n");
+    writeText(path, "version = 3\nrules_version = 4\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before Arena Overdrive remain isolated by their rules");
 
-    writeText(path, "version = 2\nrules_version = 5\n");
+    writeText(path, "version = 3\nrules_version = 5\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before deterministic obstacle avoidance remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 6\n");
+    writeText(path, "version = 3\nrules_version = 6\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before deterministic enemy separation remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 7\n");
+    writeText(path, "version = 3\nrules_version = 7\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before hard enemy contact volumes remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 8\n");
+    writeText(path, "version = 3\nrules_version = 8\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before deterministic patrol remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 9\n");
+    writeText(path, "version = 3\nrules_version = 9\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before enemy investigation remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 10\n");
+    writeText(path, "version = 3\nrules_version = 10\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before the START validation cover remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 11\n");
+    writeText(path, "version = 3\nrules_version = 11\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before combat-noise perception remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 12\n");
+    writeText(path, "version = 3\nrules_version = 12\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before the dedicated Alert state remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 13\n");
+    writeText(path, "version = 3\nrules_version = 13\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before the Recover state remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 14\n");
+    writeText(path, "version = 3\nrules_version = 14\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before global enemy pathfinding remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 15\n");
+    writeText(path, "version = 3\nrules_version = 15\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before directional enemy vision remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 16\n");
+    writeText(path, "version = 3\nrules_version = 16\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before group route diversity remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 17\n");
+    writeText(path, "version = 3\nrules_version = 17\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before material impact feedback remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 18\n");
+    writeText(path, "version = 3\nrules_version = 18\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before synchronized door motion remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 20\n");
+    writeText(path, "version = 3\nrules_version = 20\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before weak points remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 21\n");
+    writeText(path, "version = 3\nrules_version = 21\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before deterministic weapon spread remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 22\n");
+    writeText(path, "version = 3\nrules_version = 22\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before automatic Carbine fire remain isolated");
 
-    writeText(path, "version = 2\nrules_version = 23\n");
+    writeText(path, "version = 3\nrules_version = 23\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before timed reloads remain isolated");
+
+    writeText(path, "version = 3\nrules_version = 24\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before two-slot weapon loadouts remain isolated");
 
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
@@ -254,7 +264,7 @@ void testInvalidAndVersionedData()
         "checkpoint schema without weapon identity is not reinterpreted");
 
     writeText(path,
-        "version = 2\n"
+        "version = 3\n"
         "rules_version = 19\n"
         "initial_seed = broken\n");
     expect(persistence::loadCampaignCheckpoint(path).status
@@ -270,6 +280,12 @@ void testInvalidAndVersionedData()
         = std::numeric_limits<float>::quiet_NaN();
     expect(!persistence::saveCampaignCheckpoint(path, invalid),
         "non-finite gameplay state is never persisted");
+    invalid = makeCheckpoint();
+    invalid.floorEntry.weapon.stowed
+        = gameplay::WeaponCampaignProgress::StowedWeapon{
+            invalid.floorEntry.weapon.definition, 0U, 0U};
+    expect(!persistence::saveCampaignCheckpoint(path, invalid),
+        "duplicate active and stowed weapon identities are never persisted");
 }
 
 void testCommentsAndFutureFields()

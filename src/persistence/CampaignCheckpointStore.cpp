@@ -83,6 +83,15 @@ struct Fields {
     std::optional<std::uint64_t> reserveMaximum;
     std::optional<std::uint64_t> magazineAmmo;
     std::optional<std::uint64_t> reserveAmmo;
+    std::optional<std::uint64_t> stowedOwned;
+    std::optional<std::uint64_t> stowedArchetype;
+    std::optional<float> stowedDamage;
+    std::optional<float> stowedFireInterval;
+    std::optional<float> stowedRange;
+    std::optional<std::uint64_t> stowedMagazineSize;
+    std::optional<std::uint64_t> stowedReserveMaximum;
+    std::optional<std::uint64_t> stowedMagazineAmmo;
+    std::optional<std::uint64_t> stowedReserveAmmo;
     std::optional<std::uint64_t> level;
     std::optional<std::uint64_t> experienceIntoLevel;
     std::optional<std::uint64_t> totalExperience;
@@ -116,6 +125,12 @@ bool assignField(
         floatTarget = &fields.fireInterval;
     } else if (key == "weapon_range") {
         floatTarget = &fields.range;
+    } else if (key == "weapon_stowed_damage") {
+        floatTarget = &fields.stowedDamage;
+    } else if (key == "weapon_stowed_fire_interval") {
+        floatTarget = &fields.stowedFireInterval;
+    } else if (key == "weapon_stowed_range") {
+        floatTarget = &fields.stowedRange;
     }
     if (floatTarget != nullptr) {
         *floatTarget = parseFloat(value);
@@ -149,6 +164,18 @@ bool assignField(
         unsignedTarget = &fields.magazineAmmo;
     } else if (key == "weapon_reserve_ammo") {
         unsignedTarget = &fields.reserveAmmo;
+    } else if (key == "weapon_stowed_owned") {
+        unsignedTarget = &fields.stowedOwned;
+    } else if (key == "weapon_stowed_archetype") {
+        unsignedTarget = &fields.stowedArchetype;
+    } else if (key == "weapon_stowed_magazine_size") {
+        unsignedTarget = &fields.stowedMagazineSize;
+    } else if (key == "weapon_stowed_reserve_maximum") {
+        unsignedTarget = &fields.stowedReserveMaximum;
+    } else if (key == "weapon_stowed_magazine_ammo") {
+        unsignedTarget = &fields.stowedMagazineAmmo;
+    } else if (key == "weapon_stowed_reserve_ammo") {
+        unsignedTarget = &fields.stowedReserveAmmo;
     } else if (key == "progression_level") {
         unsignedTarget = &fields.level;
     } else if (key == "progression_experience") {
@@ -205,6 +232,27 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
            << "weapon_reserve_maximum = " << state.weapon.definition.reserveMaximum << '\n'
            << "weapon_magazine_ammo = " << state.weapon.magazineAmmo << '\n'
            << "weapon_reserve_ammo = " << state.weapon.reserveAmmo << '\n'
+           << "weapon_stowed_owned = " << (state.weapon.stowed ? 1U : 0U) << '\n';
+    if (state.weapon.stowed) {
+        output << "weapon_stowed_archetype = "
+               << static_cast<std::uint32_t>(
+                    state.weapon.stowed->definition.archetype) << '\n'
+               << "weapon_stowed_damage = "
+               << state.weapon.stowed->definition.damage << '\n'
+               << "weapon_stowed_fire_interval = "
+               << state.weapon.stowed->definition.fireInterval << '\n'
+               << "weapon_stowed_range = "
+               << state.weapon.stowed->definition.range << '\n'
+               << "weapon_stowed_magazine_size = "
+               << state.weapon.stowed->definition.magazineSize << '\n'
+               << "weapon_stowed_reserve_maximum = "
+               << state.weapon.stowed->definition.reserveMaximum << '\n'
+               << "weapon_stowed_magazine_ammo = "
+               << state.weapon.stowed->magazineAmmo << '\n'
+               << "weapon_stowed_reserve_ammo = "
+               << state.weapon.stowed->reserveAmmo << '\n';
+    }
+    output
            << "progression_level = " << state.progression.level << '\n'
            << "progression_experience = " << state.progression.experienceIntoLevel << '\n'
            << "progression_total_experience = " << state.progression.totalExperience << '\n'
@@ -282,6 +330,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto reserveMaximum = narrowUnsigned(fields.reserveMaximum);
         const auto magazineAmmo = narrowUnsigned(fields.magazineAmmo);
         const auto reserveAmmo = narrowUnsigned(fields.reserveAmmo);
+        const auto stowedOwned = narrowUnsigned(fields.stowedOwned);
         const auto level = narrowUnsigned(fields.level);
         const auto experience = narrowUnsigned(fields.experienceIntoLevel);
         const auto enemiesKilled = narrowUnsigned(fields.enemiesKilled);
@@ -294,15 +343,49 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         if (!fields.initialSeed || !fields.currentSeed || !runIndex || !seedIndex
             || !floor || !fields.health || !fields.maximumHealth || !fields.armor
             || !fields.maximumArmor || !keys || !weaponArchetype
+            || *weaponArchetype
+                > static_cast<std::uint32_t>(
+                    gameplay::WeaponArchetype::Carbine)
             || !fields.weaponDamage
             || !fields.fireInterval || !fields.range || !magazineSize
-            || !reserveMaximum || !magazineAmmo || !reserveAmmo || !level
+            || !reserveMaximum || !magazineAmmo || !reserveAmmo || !stowedOwned
+            || *stowedOwned > 1U || !level
             || !experience || !fields.totalExperience || !fields.score
             || !enemiesKilled || !propsDestroyed || !lootCollected
             || !eventsCompleted || !vitalityRank || !firepowerRank
             || !capacityRank) {
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;
+        }
+        std::optional<gameplay::WeaponCampaignProgress::StowedWeapon> stowed;
+        if (*stowedOwned == 1U) {
+            const auto stowedArchetype = narrowUnsigned(fields.stowedArchetype);
+            const auto stowedMagazineSize
+                = narrowUnsigned(fields.stowedMagazineSize);
+            const auto stowedReserveMaximum
+                = narrowUnsigned(fields.stowedReserveMaximum);
+            const auto stowedMagazineAmmo
+                = narrowUnsigned(fields.stowedMagazineAmmo);
+            const auto stowedReserveAmmo
+                = narrowUnsigned(fields.stowedReserveAmmo);
+            if (!stowedArchetype || !fields.stowedDamage
+                || !fields.stowedFireInterval || !fields.stowedRange
+                || !stowedMagazineSize || !stowedReserveMaximum
+                || !stowedMagazineAmmo || !stowedReserveAmmo
+                || *stowedArchetype
+                    > static_cast<std::uint32_t>(
+                        gameplay::WeaponArchetype::Carbine)) {
+                result.status = CampaignCheckpointLoadStatus::Invalid;
+                return result;
+            }
+            stowed = gameplay::WeaponCampaignProgress::StowedWeapon{
+                {*fields.stowedDamage, *fields.stowedFireInterval,
+                    *fields.stowedRange, *stowedMagazineSize,
+                    *stowedReserveMaximum,
+                    static_cast<gameplay::WeaponArchetype>(*stowedArchetype)},
+                *stowedMagazineAmmo,
+                *stowedReserveAmmo,
+            };
         }
         gameplay::CampaignCheckpoint checkpoint{
             *rulesVersion,
@@ -317,7 +400,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
                 {{*fields.weaponDamage, *fields.fireInterval, *fields.range,
                     *magazineSize, *reserveMaximum,
                     static_cast<gameplay::WeaponArchetype>(*weaponArchetype)},
-                    *magazineAmmo, *reserveAmmo},
+                    *magazineAmmo, *reserveAmmo, stowed},
                 {*level, *experience, *fields.totalExperience, *fields.score,
                     *enemiesKilled, *propsDestroyed, *lootCollected,
                     *eventsCompleted, *vitalityRank, *firepowerRank, *capacityRank},

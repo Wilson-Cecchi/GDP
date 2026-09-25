@@ -15,6 +15,8 @@ enum class Key : std::uint8_t {
     D,
     E,
     R,
+    Digit1,
+    Digit2,
     F3,
     Escape,
     Enter,
@@ -45,6 +47,7 @@ public:
     void handleMouseMotion(
         wkc::core::Vec2 position,
         wkc::core::Vec2 delta) noexcept;
+    void handleMouseWheel(float delta) noexcept;
 
     [[nodiscard]] bool isKeyDown(Key key) const noexcept;
     [[nodiscard]] bool wasKeyPressed(Key key) const noexcept;
@@ -54,6 +57,7 @@ public:
     [[nodiscard]] bool wasMouseButtonReleased(MouseButton button) const noexcept;
     [[nodiscard]] wkc::core::Vec2 mouseDelta() const noexcept;
     [[nodiscard]] wkc::core::Vec2 mousePosition() const noexcept;
+    [[nodiscard]] float mouseWheelDelta() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(Key::Count);
@@ -71,6 +75,7 @@ private:
     std::array<bool, mouseButtonCount> mouseButtonsReleased_{};
     wkc::core::Vec2 mouseDelta_{};
     wkc::core::Vec2 mousePosition_{};
+    float mouseWheelDelta_{0.0F};
 };
 
 } // namespace wkc::platform

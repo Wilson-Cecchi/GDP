@@ -5,6 +5,24 @@
 #include <limits>
 
 namespace gdp::gameplay {
+namespace {
+
+bool validateWeaponSlot(
+    const WeaponDefinition& definition,
+    const std::uint32_t magazineAmmo,
+    const std::uint32_t reserveAmmo) noexcept
+{
+    return std::isfinite(definition.damage)
+        && std::isfinite(definition.fireInterval)
+        && std::isfinite(definition.range)
+        && definition.damage > 0.0F && definition.fireInterval >= 0.0F
+        && definition.range > 0.0F && definition.magazineSize > 0U
+        && definition.archetype <= WeaponArchetype::Carbine
+        && magazineAmmo <= definition.magazineSize
+        && reserveAmmo <= definition.reserveMaximum;
+}
+
+} // namespace
 
 WeaponDefinition baseWeaponDefinition(const WeaponArchetype archetype) noexcept
 {
@@ -147,6 +165,9 @@ bool Weapon::increaseDamage(const float amount) noexcept
         return false;
     }
     definition_.damage += amount;
+    if (stowedWeapon_) {
+        stowedWeapon_->definition.damage += amount;
+    }
     return true;
 }
 
@@ -156,20 +177,32 @@ bool Weapon::increaseReserveCapacity(
 {
     if (amount == 0U
         || amount > std::numeric_limits<std::uint32_t>::max()
-            - definition_.reserveMaximum) {
+            - definition_.reserveMaximum
+        || (stowedWeapon_
+            && amount > std::numeric_limits<std::uint32_t>::max()
+                - stowedWeapon_->definition.reserveMaximum)) {
         return false;
     }
     definition_.reserveMaximum += amount;
     (void)addReserveAmmo(bonusAmmo);
+    if (stowedWeapon_) {
+        stowedWeapon_->definition.reserveMaximum += amount;
+        const std::uint32_t capacity
+            = stowedWeapon_->definition.reserveMaximum
+            - stowedWeapon_->reserveAmmo;
+        stowedWeapon_->reserveAmmo += std::min(bonusAmmo, capacity);
+    }
     return true;
 }
 
 bool Weapon::equip(const WeaponArchetype archetype) noexcept
 {
     if (archetype > WeaponArchetype::Carbine
-        || archetype == definition_.archetype) {
+        || ownsWeapon(archetype)) {
         return false;
     }
+    const WeaponCampaignProgress::StowedWeapon previous{
+        definition_, magazineAmmo_, reserveAmmo_};
     const WeaponDefinition currentBase = baseWeaponDefinition(definition_.archetype);
     WeaponDefinition replacement = baseWeaponDefinition(archetype);
     replacement.damage += std::max(definition_.damage - currentBase.damage, 0.0F);
@@ -183,7 +216,42 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
+    stowedWeapon_ = previous;
     return true;
+}
+
+bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
+{
+    if (archetype > WeaponArchetype::Carbine
+        || archetype == definition_.archetype || !stowedWeapon_
+        || stowedWeapon_->definition.archetype != archetype) {
+        return false;
+    }
+    const WeaponCampaignProgress::StowedWeapon previous{
+        definition_, magazineAmmo_, reserveAmmo_};
+    definition_ = stowedWeapon_->definition;
+    magazineAmmo_ = stowedWeapon_->magazineAmmo;
+    reserveAmmo_ = stowedWeapon_->reserveAmmo;
+    stowedWeapon_ = previous;
+    cooldownRemaining_ = 0.0F;
+    reloadRemaining_ = 0.0F;
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
+    return true;
+}
+
+bool Weapon::cycleWeapon() noexcept
+{
+    return stowedWeapon_ && switchTo(stowedWeapon_->definition.archetype);
+}
+
+bool Weapon::ownsWeapon(const WeaponArchetype archetype) const noexcept
+{
+    return archetype <= WeaponArchetype::Carbine
+        && (definition_.archetype == archetype
+            || (stowedWeapon_
+                && stowedWeapon_->definition.archetype == archetype));
 }
 
 bool Weapon::activateOverdrive(const float durationSeconds) noexcept
@@ -199,20 +267,13 @@ bool Weapon::activateOverdrive(const float durationSeconds) noexcept
 bool Weapon::restoreCampaignProgress(
     const WeaponCampaignProgress& progress) noexcept
 {
-    const WeaponDefinition& definition = progress.definition;
-    if (!std::isfinite(definition.damage)
-        || !std::isfinite(definition.fireInterval)
-        || !std::isfinite(definition.range)
-        || definition.damage <= 0.0F || definition.fireInterval < 0.0F
-        || definition.range <= 0.0F || definition.magazineSize == 0U
-        || definition.archetype > WeaponArchetype::Carbine
-        || progress.magazineAmmo > definition.magazineSize
-        || progress.reserveAmmo > definition.reserveMaximum) {
+    if (!validateWeaponCampaignProgress(progress)) {
         return false;
     }
-    definition_ = definition;
+    definition_ = progress.definition;
     magazineAmmo_ = progress.magazineAmmo;
     reserveAmmo_ = progress.reserveAmmo;
+    stowedWeapon_ = progress.stowed;
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
     overdriveRemaining_ = 0.0F;
@@ -299,6 +360,27 @@ float Weapon::spreadStrength() const noexcept
         ? 11.0F : 7.0F;
     return std::clamp(
         static_cast<float>(spreadShotCount_) / maximumShots, 0.0F, 1.0F);
+}
+
+WeaponCampaignProgress Weapon::campaignProgress() const noexcept
+{
+    return {definition_, magazineAmmo_, reserveAmmo_, stowedWeapon_};
+}
+
+bool validateWeaponCampaignProgress(
+    const WeaponCampaignProgress& progress) noexcept
+{
+    if (!validateWeaponSlot(
+            progress.definition, progress.magazineAmmo, progress.reserveAmmo)) {
+        return false;
+    }
+    return !progress.stowed
+        || (progress.stowed->definition.archetype
+                != progress.definition.archetype
+            && validateWeaponSlot(
+                progress.stowed->definition,
+                progress.stowed->magazineAmmo,
+                progress.stowed->reserveAmmo));
 }
 
 } // namespace gdp::gameplay

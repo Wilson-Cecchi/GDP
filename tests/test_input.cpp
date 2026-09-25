@@ -1,6 +1,7 @@
 #include "platform/Input.hpp"
 
 #include <iostream>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -65,6 +66,15 @@ void testInputState()
     input.handleMouseButton(MouseButton::Primary, false, {124.0F, 92.0F});
     expect(input.wasMouseButtonReleased(MouseButton::Primary),
         "mouse release transition is captured");
+
+    input.handleMouseWheel(1.0F);
+    input.handleMouseWheel(-0.25F);
+    input.handleMouseWheel(std::numeric_limits<float>::infinity());
+    expect(input.mouseWheelDelta() == 0.75F,
+        "mouse wheel movement accumulates finite input during a frame");
+    input.beginFrame();
+    expect(input.mouseWheelDelta() == 0.0F,
+        "beginFrame clears mouse wheel movement");
 }
 
 } // namespace

@@ -543,6 +543,13 @@ são rejeitados; hitscan retorna `Reloading` sem alvo ou impacto. O gate também
 protege durações distintas por arquétipo, reset do spread, bloqueio do trigger,
 loot após conclusão e incompatibilidade das regras Campaign/Speedrun 23/22.
 
+O gate da Fase 138 cobre aquisição sem perda da Pistol, seleção direta, ciclo,
+preservação independente de munição, cancelamento de recarga, progressão nos
+dois slots e rejeição de duplicata sem refill. Input neutro e SDL validam `1`,
+`2`, roda normal e roda invertida. Campaign restaura os dois slots sem estado
+transitório; checkpoint schema 3 faz round trip do loadout e rejeita schema 2,
+identidades duplicadas e regras 24/23 anteriores à troca de armas.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
