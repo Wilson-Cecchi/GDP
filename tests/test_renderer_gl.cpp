@@ -905,6 +905,19 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 carbineViewmodelPixels.data());
 
+            constexpr gdp::game::visual::WeaponViewmodelRenderData knifeViewmodel{
+                .visible = true,
+                .role = gdp::game::visual::HudWeaponRole::Knife,
+                .meleeStrength = 0.5F,
+                .visualSeed = 1717U,
+            };
+            const bool renderedKnifeViewmodel = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                knifeViewmodel);
+            std::vector<std::uint8_t> knifeViewmodelPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                knifeViewmodelPixels.data());
+
             constexpr gdp::game::visual::WeaponViewmodelRenderData firingViewmodel{
                 .visible = true,
                 .role = gdp::game::visual::HudWeaponRole::Pistol,
@@ -989,6 +1002,7 @@ int main()
             std::size_t impactChangedChannels = 0;
             std::size_t pistolViewmodelChangedChannels = 0;
             std::size_t carbineViewmodelChangedChannels = 0;
+            std::size_t knifeViewmodelChangedChannels = 0;
             std::size_t firingViewmodelChangedChannels = 0;
             std::size_t enemyChangedChannels = 0;
             for (std::size_t index = 0; index < pixels.size(); index += 4U) {
@@ -1200,6 +1214,10 @@ int main()
                         != pistolViewmodelPixels[index + channel]) {
                         ++carbineViewmodelChangedChannels;
                     }
+                    if (knifeViewmodelPixels[index + channel]
+                        != pistolViewmodelPixels[index + channel]) {
+                        ++knifeViewmodelChangedChannels;
+                    }
                     if (firingViewmodelPixels[index + channel]
                         != pistolViewmodelPixels[index + channel]) {
                         ++firingViewmodelChangedChannels;
@@ -1320,6 +1338,8 @@ int main()
                 && pistolViewmodelChangedChannels > 100U
                 && renderedCarbineViewmodel
                 && carbineViewmodelChangedChannels > 100U
+                && renderedKnifeViewmodel
+                && knifeViewmodelChangedChannels > 100U
                 && renderedFiringViewmodel
                 && firingViewmodelChangedChannels > 100U
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
@@ -1342,6 +1362,7 @@ int main()
                           << " impact=" << impactChangedChannels
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels
+                          << " knife=" << knifeViewmodelChangedChannels
                           << " firing=" << firingViewmodelChangedChannels
                           << " impactRendered=" << renderedImpacts << '\n';
             }

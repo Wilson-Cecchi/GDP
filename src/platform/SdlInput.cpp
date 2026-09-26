@@ -27,6 +27,8 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::Digit1;
     case SDL_SCANCODE_2:
         return Key::Digit2;
+    case SDL_SCANCODE_3:
+        return Key::Digit3;
     case SDL_SCANCODE_F3:
         return Key::F3;
     case SDL_SCANCODE_ESCAPE:

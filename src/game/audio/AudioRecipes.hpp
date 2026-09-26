@@ -27,6 +27,7 @@ enum class AudioEventKind : std::uint8_t {
     UiNavigate,
     UiConfirm,
     UiBack,
+    MeleeSwing,
     Count,
 };
 

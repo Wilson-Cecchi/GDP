@@ -346,6 +346,15 @@ void testInvalidAndVersionedData()
             == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
         "records from before responsive weapon selection remain isolated");
 
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 26\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
+        "records from before the permanent Knife fallback remain isolated");
+
     const gameplay::SpeedrunRecord invalid{
         gameplay::currentSpeedrunRulesVersion, 0U, 123U};
     expect(!persistence::saveSpeedrunRecord(path, invalid),
@@ -361,7 +370,7 @@ void testCommentsAndFutureFields()
     writeText(path,
         "# local record\n"
         "version = 1\n"
-        "rules_version = 26\n"
+        "rules_version = 27\n"
         "best_ticks = 321 # fixed ticks\n"
         "seed = 987\n"
         "future_field = preserved_by_future_versions\n");

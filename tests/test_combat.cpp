@@ -224,13 +224,15 @@ void testWeaponPickupEquipment()
     using namespace gdp::gameplay;
     expect(weaponArchetypeForSlot(1U) == WeaponArchetype::Carbine
             && weaponArchetypeForSlot(2U) == WeaponArchetype::Pistol
+            && weaponArchetypeForSlot(3U) == WeaponArchetype::Knife
             && !weaponArchetypeForSlot(0U)
-            && !weaponArchetypeForSlot(3U),
-        "weapon slots map Carbine to 1 and Pistol to 2 without invalid aliases");
+            && !weaponArchetypeForSlot(4U),
+        "weapon slots map Carbine, Pistol and Knife to 1, 2 and 3");
     Weapon weapon;
     expect(weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && weapon.ownsWeapon(WeaponArchetype::Knife)
             && !weapon.ownsWeapon(WeaponArchetype::Carbine),
-        "new loadout owns only its initial Pistol");
+        "new loadout owns its initial Pistol and permanent Knife fallback");
     expect(weapon.increaseDamage(4.0F)
             && weapon.increaseReserveCapacity(4U),
         "weapon pickup fixture applies existing progression bonuses");
@@ -289,13 +291,17 @@ void testWeaponPickupEquipment()
         "progression upgrades remain available to both weapon slots");
     weapon.fixedUpdate(pistolSwitchDuration);
     expect(weapon.cycleWeapon()
-            && weapon.definition().archetype == WeaponArchetype::Carbine
+            && weapon.definition().archetype == WeaponArchetype::Knife
+            && near(weapon.definition().damage, 56.0F)
+            && weapon.magazineAmmo() == 0U
+            && weapon.reserveAmmo() == 0U,
+        "cycling reaches the permanent Knife with loadout-wide damage upgrades");
+    expect(weapon.switchTo(WeaponArchetype::Carbine)
             && near(weapon.definition().damage, 34.0F)
             && weapon.reserveCapacity() == 56U
             && weapon.magazineAmmo() == 11U
-            && weapon.reserveAmmo() == 56U,
-        "progression upgrades both slots and cycling preserves spent Carbine ammo");
-    expect(weapon.switchTo(WeaponArchetype::Pistol)
+            && weapon.reserveAmmo() == 56U
+            && weapon.switchTo(WeaponArchetype::Pistol)
             && near(weapon.definition().damage, 42.0F)
             && weapon.reserveCapacity() == 40U
             && weapon.switching()
@@ -304,8 +310,66 @@ void testWeaponPickupEquipment()
     weapon.fixedUpdate(pistolSwitchDuration);
     expect(weapon.activateOverdrive() && weapon.cycleWeapon()
             && weapon.overdriveActive()
-            && weapon.definition().archetype == WeaponArchetype::Carbine,
+            && weapon.definition().archetype == WeaponArchetype::Knife,
         "weapon switching preserves the loadout-wide Overdrive timer");
+}
+
+void testKnifeFallback()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    Weapon weapon;
+    const std::uint32_t pistolMagazine = weapon.magazineAmmo();
+    const std::uint32_t pistolReserve = weapon.reserveAmmo();
+    expect(weapon.nextWeaponArchetype() == WeaponArchetype::Knife
+            && weapon.switchTo(WeaponArchetype::Knife)
+            && weapon.definition().archetype == WeaponArchetype::Knife
+            && weapon.switching() && !weapon.reload()
+            && weapon.magazineAmmo() == 0U && weapon.reserveAmmo() == 0U,
+        "Knife is always selectable after Pistol and never exposes ammunition");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Knife));
+    expect(!weaponUsesAutomaticFire(WeaponArchetype::Knife)
+            && weaponFireRequested(weapon, true, true)
+            && !weaponFireRequested(weapon, false, true),
+        "Knife attacks once per press instead of repeating while held");
+
+    const CollisionWorld room{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    EntityManager closeManager;
+    const EntityId closeEnemy = closeManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -1.4F}},
+        .roomId = 1U,
+        .health = 60.0F,
+    });
+    const ShotResult close = fireHitscan(
+        weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1U, room, closeManager);
+    expect(close.outcome == ShotOutcome::Hit && close.hit
+            && close.hit->target == closeEnemy
+            && near(closeManager.findData<EnemyData>(closeEnemy)->health, 12.0F)
+            && weapon.tryFire() == FireReadiness::Cooldown,
+        "Knife deals 48 damage inside its short reach and enforces swing cadence");
+
+    weapon.fixedUpdate(baseWeaponDefinition(WeaponArchetype::Knife).fireInterval);
+    EntityManager farManager;
+    const EntityId farEnemy = farManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -2.3F}},
+        .roomId = 1U,
+        .health = 60.0F,
+    });
+    const ShotResult far = fireHitscan(
+        weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        1U, room, farManager);
+    expect(far.outcome == ShotOutcome::Miss && !far.hit
+            && near(farManager.findData<EnemyData>(farEnemy)->health, 60.0F),
+        "Knife cannot damage a target beyond its authored melee reach");
+
+    const WeaponCampaignProgress progress = weapon.campaignProgress();
+    expect(progress.definition.archetype == WeaponArchetype::Pistol
+            && weapon.switchTo(WeaponArchetype::Pistol)
+            && weapon.magazineAmmo() == pistolMagazine
+            && weapon.reserveAmmo() == pistolReserve,
+        "Knife selection stays transient and preserves the underlying gun save and ammo");
 }
 
 void testWeaponTriggerModes()
@@ -2202,6 +2266,7 @@ int main()
     testWeaponLifecycle();
     testDeterministicWeaponSpread();
     testWeaponPickupEquipment();
+    testKnifeFallback();
     testWeaponTriggerModes();
     testWeaponOverdrive();
     testDamageLifecycle();

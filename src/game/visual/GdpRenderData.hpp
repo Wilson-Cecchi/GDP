@@ -38,6 +38,7 @@ enum class PickupVisualRole : std::uint8_t {
 enum class HudWeaponRole : std::uint8_t {
     Pistol,
     Carbine,
+    Knife,
 };
 
 enum class PropVisualRole : std::uint8_t {
@@ -186,6 +187,7 @@ struct WeaponViewmodelRenderData {
     float recoilStrength{0.0F};
     float reloadProgress{0.0F};
     float equipStrength{0.0F};
+    float meleeStrength{0.0F};
     float muzzleFlashStrength{0.0F};
     bool overdrive{false};
     wkc::core::Seed visualSeed{0U};

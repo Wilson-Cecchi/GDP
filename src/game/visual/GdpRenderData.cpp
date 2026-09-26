@@ -1203,18 +1203,24 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
     const float recoil = sanitized(weapon.recoilStrength);
     const float reload = sanitized(weapon.reloadProgress);
     const float equip = sanitized(weapon.equipStrength);
+    const float melee = sanitized(weapon.meleeStrength);
     const float reloadArc = std::sin(reload * 3.14159265358979323846F);
+    const float meleeArc = melee > 0.0F
+        ? std::sin((1.0F - melee) * 3.14159265358979323846F)
+        : 0.0F;
     const float mass = weapon.role == HudWeaponRole::Carbine ? 0.72F : 1.0F;
     return {
         .offset = {
-            -0.09F * reloadArc,
+            (-0.09F * reloadArc) - (0.18F * meleeArc),
             (-0.34F * equip) - (0.18F * reloadArc) + (0.025F * recoil),
-            (-0.12F * recoil * mass) - (0.05F * reloadArc),
+            (-0.12F * recoil * mass) - (0.05F * reloadArc)
+                + (0.20F * meleeArc),
         },
         .rotationDegrees = {
-            (-8.0F * recoil * mass) + (12.0F * reloadArc),
-            -8.0F * reloadArc,
-            34.0F * reloadArc,
+            (-8.0F * recoil * mass) + (12.0F * reloadArc)
+                - (22.0F * meleeArc),
+            (-8.0F * reloadArc) + (16.0F * meleeArc),
+            (34.0F * reloadArc) - (58.0F * meleeArc),
         },
     };
 }

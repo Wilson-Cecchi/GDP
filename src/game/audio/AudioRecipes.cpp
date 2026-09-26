@@ -191,6 +191,15 @@ void configureRecipe(
         recipe.noiseMix = 0.03F;
         recipe.gain = 0.18F;
         break;
+    case AudioEventKind::MeleeSwing:
+        recipe.durationSeconds = 0.16F;
+        recipe.baseFrequency = 260.0F;
+        recipe.secondaryFrequency = 760.0F;
+        recipe.attackSeconds = 0.002F;
+        recipe.releaseSeconds = 0.13F;
+        recipe.noiseMix = 0.36F;
+        recipe.gain = 0.30F;
+        break;
     case AudioEventKind::Count:
         break;
     }

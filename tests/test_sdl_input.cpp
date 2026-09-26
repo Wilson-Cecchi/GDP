@@ -61,6 +61,7 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_R, Key::R},
         std::pair{SDL_SCANCODE_1, Key::Digit1},
         std::pair{SDL_SCANCODE_2, Key::Digit2},
+        std::pair{SDL_SCANCODE_3, Key::Digit3},
         std::pair{SDL_SCANCODE_F3, Key::F3},
         std::pair{SDL_SCANCODE_ESCAPE, Key::Escape},
         std::pair{SDL_SCANCODE_RETURN, Key::Enter},

@@ -17,6 +17,7 @@ enum class Key : std::uint8_t {
     R,
     Digit1,
     Digit2,
+    Digit3,
     F3,
     Escape,
     Enter,

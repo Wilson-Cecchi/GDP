@@ -49,6 +49,7 @@ namespace {
 
 constexpr float impactVisualDuration = 0.32F;
 constexpr float weaponRecoilDuration = 0.12F;
+constexpr float weaponMeleeDuration = 0.28F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
 constexpr float weaponEquipDuration = 0.48F;
 
@@ -774,6 +775,7 @@ bool Application::initializeRun()
     impactVisualCounter_ = 0U;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
@@ -1640,11 +1642,10 @@ void Application::processEvents()
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
     } else if (input_.wasKeyPressed(Key::Digit2)) {
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
+    } else if (input_.wasKeyPressed(Key::Digit3)) {
+        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
     } else if (input_.mouseWheelDelta() != 0.0F) {
-        weaponSwitchPending_ = weapon_.definition().archetype
-                == gameplay::WeaponArchetype::Pistol
-            ? gameplay::WeaponArchetype::Carbine
-            : gameplay::WeaponArchetype::Pistol;
+        weaponSwitchPending_ = weapon_.nextWeaponArchetype();
     }
     playerCommand_.interact = interactionPending_;
 }
@@ -1735,6 +1736,7 @@ bool Application::returnToMainMenu()
     reloadPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
     restartRequested_ = false;
@@ -2103,6 +2105,8 @@ void Application::fixedUpdate(const double fixedStep)
     gameplay::updateFeedback(feedback_, step);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
+    weaponMeleeRemaining_
+        = std::max(0.0F, weaponMeleeRemaining_ - step);
     weaponMuzzleFlashRemaining_
         = std::max(0.0F, weaponMuzzleFlashRemaining_ - step);
     weaponEquipRemaining_
@@ -2386,6 +2390,8 @@ void Application::fixedUpdate(const double fixedStep)
     const bool fireRequested = gameplay::weaponFireRequested(
         weapon_, firePending_, fireHeld_);
     if (fireRequested && player_.state().alive) {
+        const bool meleeAttack = weapon_.definition().archetype
+            == gameplay::WeaponArchetype::Knife;
         const gameplay::ShotResult shot = gameplay::fireHitscan(
             weapon_,
             player_.cameraPosition(),
@@ -2415,11 +2421,16 @@ void Application::fixedUpdate(const double fixedStep)
             && shot.outcome != gameplay::ShotOutcome::Reloading
             && shot.outcome != gameplay::ShotOutcome::Switching
             && shot.outcome != gameplay::ShotOutcome::Empty) {
-            weaponRecoilRemaining_ = weaponRecoilDuration;
-            weaponMuzzleFlashRemaining_ = weaponMuzzleFlashDuration;
+            if (meleeAttack) {
+                weaponMeleeRemaining_ = weaponMeleeDuration;
+            } else {
+                weaponRecoilRemaining_ = weaponRecoilDuration;
+                weaponMuzzleFlashRemaining_ = weaponMuzzleFlashDuration;
+            }
             (void)gameplay::alertEnemiesToNoise(
                 entities_, playerRoom,
-                {.position = player_.state().position});
+                {.position = player_.state().position,
+                    .radius = meleeAttack ? 4.0F : 18.0F});
         }
         if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown
             && shot.outcome != gameplay::ShotOutcome::Reloading
@@ -2427,7 +2438,8 @@ void Application::fixedUpdate(const double fixedStep)
             const gdp::audio::AudioEventKind fireKind
                 = shot.outcome == gameplay::ShotOutcome::Empty
                 ? gdp::audio::AudioEventKind::DryFire
-                : gdp::audio::AudioEventKind::WeaponFire;
+                : meleeAttack ? gdp::audio::AudioEventKind::MeleeSwing
+                              : gdp::audio::AudioEventKind::WeaponFire;
             audio_->playAt(fireKind, config_.worldSeed, audioEventCounter_++,
                 player_.cameraPosition(), player_.cameraPosition(),
                 player_.forwardDirection());
@@ -3418,8 +3430,17 @@ void Application::render()
     hud.maximumArmor = player_.state().maximumArmor;
     hud.magazineAmmo = weapon_.magazineAmmo();
     hud.reserveAmmo = weapon_.reserveAmmo();
-    hud.weapon = weapon_.definition().archetype == gameplay::WeaponArchetype::Carbine
-        ? visual::HudWeaponRole::Carbine : visual::HudWeaponRole::Pistol;
+    switch (weapon_.definition().archetype) {
+    case gameplay::WeaponArchetype::Carbine:
+        hud.weapon = visual::HudWeaponRole::Carbine;
+        break;
+    case gameplay::WeaponArchetype::Knife:
+        hud.weapon = visual::HudWeaponRole::Knife;
+        break;
+    case gameplay::WeaponArchetype::Pistol:
+        hud.weapon = visual::HudWeaponRole::Pistol;
+        break;
+    }
     hud.weaponOverdrive = weapon_.overdriveActive();
     hud.weaponSpread = weapon_.spreadStrength();
     hud.keys = player_.state().keys;
@@ -3572,13 +3593,16 @@ void Application::render()
         .equipStrength = std::max(
             weaponEquipRemaining_ / weaponEquipDuration,
             weapon_.switchStrength()),
+        .meleeStrength = weaponMeleeRemaining_ / weaponMeleeDuration,
         .muzzleFlashStrength
             = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
         .overdrive = weapon_.overdriveActive(),
         .visualSeed = wkc::core::hashCombine(
             config_.worldSeed,
-            hud.weapon == visual::HudWeaponRole::Carbine ? 0x43415242494e45ULL
-                                                         : 0x504953544f4cULL),
+            hud.weapon == visual::HudWeaponRole::Carbine
+                ? 0x43415242494e45ULL
+                : hud.weapon == visual::HudWeaponRole::Knife
+                    ? 0x4b4e494645ULL : 0x504953544f4cULL),
     };
     currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
         visibleEnemies.size());
@@ -3636,6 +3660,7 @@ void Application::shutdown()
     reloadPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
     audioEventCounter_ = 0U;

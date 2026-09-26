@@ -8,6 +8,7 @@ namespace gdp::gameplay {
 enum class WeaponArchetype : std::uint8_t {
     Pistol,
     Carbine,
+    Knife,
 };
 
 struct WeaponDefinition {
@@ -67,6 +68,8 @@ public:
     [[nodiscard]] bool equip(WeaponArchetype archetype) noexcept;
     [[nodiscard]] bool switchTo(WeaponArchetype archetype) noexcept;
     [[nodiscard]] bool cycleWeapon() noexcept;
+    [[nodiscard]] std::optional<WeaponArchetype>
+        nextWeaponArchetype() const noexcept;
     [[nodiscard]] bool ownsWeapon(WeaponArchetype archetype) const noexcept;
     [[nodiscard]] bool activateOverdrive(
         float durationSeconds = 12.0F) noexcept;
@@ -94,9 +97,13 @@ public:
 
 private:
     WeaponDefinition definition_{};
+    WeaponDefinition knifeDefinition_{
+        48.0F, 0.52F, 1.65F, 1U, 0U, WeaponArchetype::Knife};
+    WeaponArchetype selectedArchetype_{WeaponArchetype::Pistol};
     std::uint32_t magazineAmmo_{0};
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
+    float knifeCooldownRemaining_{0.0F};
     float reloadRemaining_{0.0F};
     float switchRemaining_{0.0F};
     float overdriveRemaining_{0.0F};

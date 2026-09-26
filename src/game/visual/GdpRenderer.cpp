@@ -1964,10 +1964,12 @@ bool GdpRenderer::render(
             wkc::core::cross(right, forward));
         const WeaponViewmodelPose pose
             = sampleWeaponViewmodelPose(weaponViewmodel);
+        const bool carbine = weaponViewmodel.role == HudWeaponRole::Carbine;
+        const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
         const wkc::core::Vec3 baseOffset{
-            weaponViewmodel.role == HudWeaponRole::Carbine ? 0.27F : 0.32F,
-            weaponViewmodel.role == HudWeaponRole::Carbine ? -0.27F : -0.25F,
-            weaponViewmodel.role == HudWeaponRole::Carbine ? 0.72F : 0.62F,
+            carbine ? 0.27F : knife ? 0.38F : 0.32F,
+            carbine ? -0.27F : knife ? -0.31F : -0.25F,
+            carbine ? 0.72F : knife ? 0.52F : 0.62F,
         };
         const wkc::core::Vec3 localOffset = baseOffset + pose.offset;
         const wkc::core::Vec3 anchor = camera.position
@@ -2025,7 +2027,7 @@ bool GdpRenderer::render(
             drawWeaponPiece({0.0F, 0.02F, 0.30F},
                 {0.235F, 0.035F, 0.18F}, {}, accent, 0.10F);
             muzzlePosition = 0.88F;
-        } else {
+        } else if (weaponViewmodel.role == HudWeaponRole::Pistol) {
             drawWeaponPiece({}, {0.16F, 0.14F, 0.43F}, {}, metal);
             drawWeaponPiece({0.0F, 0.075F, 0.04F},
                 {0.145F, 0.085F, 0.36F}, {}, darkMetal);
@@ -2035,13 +2037,23 @@ bool GdpRenderer::render(
                 {0.07F, 0.07F, 0.20F}, {}, metal);
             drawWeaponPiece({0.0F, 0.13F, -0.02F},
                 {0.035F, 0.045F, 0.08F}, {}, accent, 0.24F);
+        } else {
+            drawWeaponPiece({0.0F, -0.16F, -0.05F},
+                {0.10F, 0.32F, 0.10F}, {}, grip);
+            drawWeaponPiece({0.0F, 0.02F, 0.03F},
+                {0.28F, 0.055F, 0.10F}, {}, darkMetal);
+            drawWeaponPiece({0.0F, 0.05F, 0.39F},
+                {0.075F, 0.025F, 0.55F}, {}, metal);
+            drawWeaponPiece({0.0F, 0.07F, 0.40F},
+                {0.04F, 0.012F, 0.54F}, {}, accent, 0.08F);
+            muzzlePosition = 0.0F;
         }
 
         const float flash = std::clamp(
             std::isfinite(weaponViewmodel.muzzleFlashStrength)
                 ? weaponViewmodel.muzzleFlashStrength : 0.0F,
             0.0F, 1.0F);
-        if (flash > 0.0F) {
+        if (flash > 0.0F && weaponViewmodel.role != HudWeaponRole::Knife) {
             const wkc::core::Vec3 flashColor{1.0F, 0.56F, 0.10F};
             drawWeaponPiece({0.0F, 0.0F, muzzlePosition + (0.07F * flash)},
                 {0.07F + (0.08F * flash), 0.07F + (0.08F * flash),
@@ -2385,10 +2397,15 @@ bool GdpRenderer::render(
         std::ostringstream armorStream;
         armorStream << "ARMOR " << armor << '/' << maximumArmor;
         std::ostringstream ammoStream;
-        ammoStream << (hud.weapon == HudWeaponRole::Carbine
-                ? "CARBINE" : "PISTOL")
-                   << (hud.weaponOverdrive ? " OD " : " ")
-                   << hud.magazineAmmo << '/' << hud.reserveAmmo;
+        if (hud.weapon == HudWeaponRole::Knife) {
+            ammoStream << "KNIFE" << (hud.weaponOverdrive ? " OD" : "")
+                       << " READY";
+        } else {
+            ammoStream << (hud.weapon == HudWeaponRole::Carbine
+                    ? "CARBINE" : "PISTOL")
+                       << (hud.weaponOverdrive ? " OD " : " ")
+                       << hud.magazineAmmo << '/' << hud.reserveAmmo;
+        }
         std::ostringstream keysStream;
         keysStream << "KEYS " << hud.keys;
         const std::string healthText = healthStream.str();

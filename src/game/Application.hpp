@@ -130,6 +130,7 @@ private:
     bool reloadPending_{false};
     std::optional<gameplay::WeaponArchetype> weaponSwitchPending_;
     float weaponRecoilRemaining_{0.0F};
+    float weaponMeleeRemaining_{0.0F};
     float weaponMuzzleFlashRemaining_{0.0F};
     float weaponEquipRemaining_{0.0F};
     std::optional<world::World> world_;

@@ -1248,11 +1248,22 @@ void testWeaponViewmodelPose()
     expect(equip.offset.y < -0.3F,
         "equip animation introduces the weapon from below the frame");
 
+    const WeaponViewmodelPose knifeSwing = sampleWeaponViewmodelPose({
+        .visible = true,
+        .role = HudWeaponRole::Knife,
+        .meleeStrength = 0.5F,
+    });
+    expect(knifeSwing.offset.x < -0.15F
+            && knifeSwing.offset.z > 0.15F
+            && knifeSwing.rotationDegrees.z < -50.0F,
+        "Knife swing follows a readable forward diagonal arc");
+
     const WeaponViewmodelPose invalid = sampleWeaponViewmodelPose({
         .visible = true,
         .recoilStrength = std::numeric_limits<float>::quiet_NaN(),
         .reloadProgress = std::numeric_limits<float>::infinity(),
         .equipStrength = -4.0F,
+        .meleeStrength = std::numeric_limits<float>::quiet_NaN(),
     });
     expect(invalid == idle,
         "weapon pose sanitizes non-finite and out-of-range animation input");

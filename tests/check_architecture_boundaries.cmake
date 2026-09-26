@@ -485,7 +485,7 @@ foreach(source IN LISTS audio_foundation_sources)
     endif()
     if(contents MATCHES "#include[ \t]+\"(game|gameplay|world|entities)/"
         OR contents MATCHES
-            "WeaponFire|EnemyHit|EnemyDeath|PropDestroyed|Pickup|RoomMaterial")
+            "WeaponFire|MeleeSwing|EnemyHit|EnemyDeath|PropDestroyed|Pickup|RoomMaterial")
         file(RELATIVE_PATH relative_source "${GDP_SOURCE_DIR}" "${source}")
         message(FATAL_ERROR
             "WKC Forge audio foundation owns GDP content: ${relative_source}"
