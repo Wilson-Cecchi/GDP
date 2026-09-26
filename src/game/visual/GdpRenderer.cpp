@@ -228,14 +228,14 @@ void main()
         // room lights are behind the player. It affects no world surfaces.
         vec3 fillDirection = normalize(uViewmodelLightDirection);
         float fill = max(dot(normal, fillDirection), 0.0);
-        result += albedo * (0.09 + 0.25 * fill);
+        result += albedo * (0.14 + 0.29 * fill);
 #if !GDP_LOW_SPEC
         if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
             vec3 halfway = normalize(fillDirection + viewDirection);
             float reflection = pow(max(dot(normal, halfway), 0.0),
-                mix(70.0, 12.0, roughness));
+                mix(30.0, 6.0, roughness));
             result += mix(vec3(0.035), albedo, metalness)
-                * reflection * (1.0 - roughness) * 0.95;
+                * reflection * (1.0 - roughness) * 1.15;
         }
 #endif
     }
@@ -2040,7 +2040,7 @@ bool GdpRenderer::render(
         const float seedTone = static_cast<float>(
             (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
         const std::array materialColors{
-            wkc::core::Vec3{0.42F + seedTone, 0.45F + seedTone, 0.47F + seedTone},
+            wkc::core::Vec3{0.45F + seedTone, 0.48F + seedTone, 0.50F + seedTone},
             wkc::core::Vec3{0.64F, 0.67F, 0.68F},
             wkc::core::Vec3{0.23F, 0.24F, 0.24F},
             wkc::core::Vec3{0.075F, 0.085F, 0.09F},

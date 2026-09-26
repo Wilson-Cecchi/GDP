@@ -128,6 +128,26 @@ relação à mesma cena sem arma, com tolerância de 2% por canal, a área caiu 
 (~50%) e `44465` para `21912` na faca (~51%). Essa é uma medida de ocupação
 visual naquela cena, não um benchmark de GPU nem garantia para todo FOV.
 
+### Refinamento de realismo da variante Used
+
+Após o feedback de que as armas ainda pareciam simples, a implementação da
+mesma variante aprovada recebeu silhuetas com transições chanfradas e frentes
+afiladas, camadas de receiver/slide e detalhes mecânicos nos dois lados:
+serrilhas, painéis de empunhadura, fixadores, controles e junções. A faca agora
+inclui espiga metálica e pinos no cabo. O acabamento distingue melhor aço
+revestido, aço aparente e polímero; a reflexão de preenchimento foi ajustada
+somente para o viewmodel. Enquadramento, funções e animações foram preservados.
+
+A [captura comparativa atual](../validation/weapon_first_person_v1_used_realism_comparison.png)
+mostra gameplay na linha superior e inspeção próxima na inferior. O
+[recorte das armas](../validation/weapon_first_person_v1_used_realism_details.png)
+facilita avaliar as superfícies sem confundir a prancha conceitual com a build.
+Na cena fixa de 1280×720, a captura registrou 58 draw calls para pistola/rifle
+e 57 para faca, com 1796, 2080 e 1228 triângulos respectivamente, incluindo
+o corredor. São contagens de geometria, não medição de FPS. A construção ainda
+é low/mid-poly procedural; este refinamento não equivale a fotorealismo nem
+substitui a aprovação visual jogando. Estado: `IMPLEMENTADA EM VALIDAÇÃO`.
+
 ## Prompts usados
 
 ### Maintained
