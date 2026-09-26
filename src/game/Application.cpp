@@ -1637,9 +1637,9 @@ void Application::processEvents()
     }
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
     if (input_.wasKeyPressed(Key::Digit1)) {
-        weaponSwitchPending_ = gameplay::WeaponArchetype::Pistol;
+        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
     } else if (input_.wasKeyPressed(Key::Digit2)) {
-        weaponSwitchPending_ = gameplay::WeaponArchetype::Carbine;
+        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
     } else if (input_.mouseWheelDelta() != 0.0F) {
         weaponSwitchPending_ = weapon_.definition().archetype
                 == gameplay::WeaponArchetype::Pistol

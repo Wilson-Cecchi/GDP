@@ -557,6 +557,12 @@ hitscan retorna `Switching` sem consumo, alvo ou impacto. A regressão também
 prova cancelamento da recarga anterior, preservação de Overdrive, reset no
 restore e incompatibilidade das regras Campaign/Speedrun 25/24.
 
+O gate da Fase 140 fixa `1 = Carbine` e `2 = Pistol`, rejeitando índices fora
+dos dois slots. As novas durações continuam positivas, com a arma longa mais
+lenta. Uma troca no meio da entrada precisa alterar imediatamente a arma ativa,
+reiniciar força em `1` e continuar bloqueando fire/reload; selecionar o slot já
+ativo permanece inerte. Stores isolam as regras Campaign/Speedrun 26/25.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

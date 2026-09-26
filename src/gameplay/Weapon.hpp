@@ -116,6 +116,8 @@ private:
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponSwitchDurationSeconds(
     WeaponArchetype archetype) noexcept;
+[[nodiscard]] std::optional<WeaponArchetype> weaponArchetypeForSlot(
+    std::uint32_t slot) noexcept;
 [[nodiscard]] bool weaponUsesAutomaticFire(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] bool weaponFireRequested(

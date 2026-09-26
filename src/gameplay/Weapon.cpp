@@ -61,7 +61,19 @@ float weaponReloadDurationSeconds(
 float weaponSwitchDurationSeconds(
     const WeaponArchetype archetype) noexcept
 {
-    return archetype == WeaponArchetype::Carbine ? 0.48F : 0.34F;
+    return archetype == WeaponArchetype::Carbine ? 0.32F : 0.24F;
+}
+
+std::optional<WeaponArchetype> weaponArchetypeForSlot(
+    const std::uint32_t slot) noexcept
+{
+    if (slot == 1U) {
+        return WeaponArchetype::Carbine;
+    }
+    if (slot == 2U) {
+        return WeaponArchetype::Pistol;
+    }
+    return std::nullopt;
 }
 
 bool weaponUsesAutomaticFire(const WeaponArchetype archetype) noexcept
@@ -235,7 +247,7 @@ bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
 {
     if (archetype > WeaponArchetype::Carbine
         || archetype == definition_.archetype || !stowedWeapon_
-        || stowedWeapon_->definition.archetype != archetype || switching()) {
+        || stowedWeapon_->definition.archetype != archetype) {
         return false;
     }
     const WeaponCampaignProgress::StowedWeapon previous{

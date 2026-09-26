@@ -8,7 +8,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentSpeedrunRulesVersion = 25U;
+inline constexpr std::uint32_t currentSpeedrunRulesVersion = 26U;
 
 struct SpeedrunRecord {
     std::uint32_t rulesVersion{currentSpeedrunRulesVersion};

@@ -60,6 +60,11 @@ o início da Fase 139, sua força vem do timer autoritativo de `Weapon`: `0,34 s
 para Pistol e `0,48 s` para Carbine. A arma só aceita disparo ou recarga quando
 o mesmo movimento visual termina.
 
+Na Fase 140, os tempos atuais caem para `0,24 s` na Pistol e `0,32 s` na
+Carbine. Se teclado ou roda escolherem o slot oposto durante a entrada, o HUD e
+o viewmodel mudam de identidade no mesmo fixed update e começam o novo movimento
+por baixo; não esperam a animação anterior terminar.
+
 Durante Overdrive, a mesma linha acrescenta `OD` entre a identidade da arma e a
 munição. O título diagnóstico mostra também os segundos inteiros restantes; o
 renderer recebe apenas o booleano de apresentação e nunca avança o timer.

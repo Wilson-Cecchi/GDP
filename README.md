@@ -533,6 +533,10 @@ especializados das pastas numeradas.
   em `0,48 s`, pelo estado autoritativo de `Weapon`. Disparo, recarga e outra
   troca ficam bloqueados até a entrada terminar; o viewmodel lê o mesmo timer.
   Campaign/Speedrun avançam para regras 26/25.
+- **Fase 140 — Seleção responsiva:** `1` passa a selecionar a Carbine e `2` a
+  Pistol. As entradas caem para `0,32 s`/`0,24 s`; teclado ou roda podem
+  interromper uma animação para exibir imediatamente o outro slot, reiniciando
+  seu bloqueio de disparo. Campaign/Speedrun avançam para regras 27/26.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -555,8 +559,9 @@ cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, dispara com o botão esquerdo
-e recarrega com `R`; após encontrar a Carbine, `1`, `2` ou a roda do mouse
-alternam as armas. `F3` alterna o diagnóstico de desempenho. Pickups próximos
+e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
+seleciona a Pistol e a roda do mouse alterna as armas. `F3` alterna o
+diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os
 mesmos estados permanecem no título como apoio. `Esc` abre a pausa durante a
@@ -1470,6 +1475,15 @@ a ação e o viewmodel recebe diretamente a força restante do mesmo estado, sem
 um segundo timer de troca na `Application`. A entrada inicial da run continua
 somente cosmética. O timer não entra no checkpoint; restore devolve o loadout
 em repouso. Campaign/Speedrun avançam para regras 26/25, sem mudar o schema 3.
+
+Na Fase 140, os atalhos passam a seguir a prioridade do loadout final: `1`
+seleciona a Carbine e `2` a Pistol. A roda continua alternando. A entrada fica
+mais ágil, com `0,32 s` para a Carbine e `0,24 s` para a Pistol. Uma seleção
+oposta durante o movimento troca o slot imediatamente e reinicia a entrada da
+nova arma, em vez de descartar o comando até a animação anterior acabar.
+Disparo e recarga permanecem bloqueados até o último movimento concluir, então
+rolar repetidamente não permite burlar cadência; apenas acompanha cada escolha.
+Campaign/Speedrun avançam para regras 27/26, mantendo checkpoint schema 3.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

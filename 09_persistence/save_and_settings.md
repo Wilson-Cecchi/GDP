@@ -170,6 +170,11 @@ dois slots em repouso. Como os `0,34 s`/`0,48 s` sem disparar alteram combate e
 tempo de conclusão, Campaign/Speedrun avançam para regras 26/25. Checkpoints 25
 e recordes 24 continuam no disco, mas são rejeitados como incompatíveis.
 
+A Fase 140 também mantém o schema 3, pois atalhos, duração e interrupção da
+entrada continuam transitórios. Como a seleção mais rápida altera decisões e
+tempo, Campaign/Speedrun avançam para regras 27/26. Checkpoints 26 e recordes 25
+permanecem preservados no disco e incompatíveis com a regra atual.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

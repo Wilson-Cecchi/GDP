@@ -15,9 +15,11 @@
 > points determinísticos e feedback próprio. A Fase 135 adicionou spread
 > determinístico por rajada. A Fase 136 tornou a Carbine automática sem alterar
 > a Pistol semiautomática. A Fase 137 tornou a recarga uma ação temporizada e
-> autoritativa. A Fase 138 adicionou dois slots de arma com troca real. A fila
-> Fase 139 tornou a entrada após equip/troca temporizada e autoritativa. A fila
-> desacoplada de sinais de combate permanece para fases posteriores.
+> autoritativa. A Fase 138 adicionou dois slots de arma com troca real. A
+> Fase 139 tornou a entrada após equip/troca temporizada e autoritativa. A
+> Fase 140 tornou essa seleção mais rápida, interruptível e inverteu os atalhos
+> para priorizar a Carbine em `1`. A fila desacoplada de sinais de combate
+> permanece para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -115,6 +117,13 @@ helper de trigger não solicita disparos. O timer avança apenas no fixed update
 portanto pausa o congela e alternar rapidamente não pode zerar cooldown para
 burlar a cadência. Ao terminar, a arma já selecionada fica disponível. Restore
 descarta a ação transitória, enquanto Overdrive continua preservado.
+
+Na Fase 140, a Carbine ocupa o atalho `1` e a Pistol o `2`. As durações atuais
+são `0,32 s` e `0,24 s`, respectivamente. `switchTo()` aceita o slot oposto
+mesmo durante uma entrada: a arma ativa muda imediatamente e o timer reinicia
+com a duração da nova arma. Selecionar o mesmo slot continua sem efeito. Como
+fire e reload seguem bloqueados até o último timer terminar, scroll repetido
+fica responsivo sem recuperar cadência ou produzir disparos intermediários.
 
 O estado de spread é transitório e pertence à `Weapon`: índice da última
 amostra, quantidade da rajada e timer de recuperação. Ele não integra
