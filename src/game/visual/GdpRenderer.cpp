@@ -1991,6 +1991,15 @@ bool GdpRenderer::render(
     if (weaponViewmodel.visible
         && static_cast<std::size_t>(weaponViewmodel.role) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
+        // The world FOV belongs to the player's camera, not to the weapon.
+        // A fixed viewmodel projection keeps its screen footprint stable
+        // throughout the supported 60-100 degree settings range.
+        constexpr float viewmodelFovDegrees = 68.0F;
+        constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
+        shader.setMat4(gl_, "uProjection", wkc::core::perspectiveMatrix(
+            viewmodelFovDegrees * degreesToRadians,
+            static_cast<float>(renderWidth) / static_cast<float>(renderHeight),
+            0.05F, 100.0F));
         shader.setInt(gl_, "uViewmodel", 1);
         shader.setInt(gl_, "uUseEmissionMap", 0);
         shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
@@ -2020,7 +2029,6 @@ bool GdpRenderer::render(
         const wkc::core::Vec3 anchor = camera.position
             + (right * localOffset.x) + (up * localOffset.y)
             + (forward * localOffset.z);
-        constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
         // Keep the weapon in the lower-right periphery. Geometry and flash
         // scale together; the camera-space firing ray remains unchanged.
         const float presentationScale = knife ? 0.80F : carbine ? 0.78F : 0.80F;

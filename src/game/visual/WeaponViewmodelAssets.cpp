@@ -252,25 +252,27 @@ public:
         MeshData& mesh = meshes_[indexOf(WeaponMaterial::BareSteel)];
         struct Section {
             float z;
+            float centerX;
             float width;
             float thickness;
         };
         constexpr std::array sections{
-            Section{0.12F, 0.065F, 0.035F},
-            Section{0.21F, 0.105F, 0.033F},
-            Section{0.39F, 0.105F, 0.028F},
-            Section{0.51F, 0.073F, 0.020F},
-            Section{0.62F, 0.003F, 0.002F},
+            Section{0.12F, 0.0F, 0.065F, 0.035F},
+            Section{0.21F, 0.0F, 0.105F, 0.033F},
+            Section{0.39F, 0.0F, 0.105F, 0.028F},
+            Section{0.49F, -0.014F, 0.080F, 0.021F},
+            Section{0.55F, -0.041F, 0.049F, 0.014F},
+            Section{0.62F, -0.070F, 0.003F, 0.002F},
         };
-        // Diamond sections give both the edge and central ridge real depth.
+        // Offset diamond sections create a clip point, edge and central ridge.
         for (std::size_t section = 0; section + 1U < sections.size(); ++section) {
             const auto ring = [](const Section value, const std::size_t corner)
                 -> Vec3 {
                 switch (corner) {
-                case 0U: return {-value.width, 0.015F, value.z};
-                case 1U: return {0.0F, 0.015F + value.thickness, value.z};
-                case 2U: return {value.width, 0.015F, value.z};
-                default: return {0.0F, 0.015F - value.thickness, value.z};
+                case 0U: return {value.centerX - value.width, 0.015F, value.z};
+                case 1U: return {value.centerX, 0.015F + value.thickness, value.z};
+                case 2U: return {value.centerX + value.width, 0.015F, value.z};
+                default: return {value.centerX, 0.015F - value.thickness, value.z};
                 }
             };
             for (std::size_t corner = 0; corner < 4U; ++corner) {
@@ -420,8 +422,25 @@ void makeCarbine(WeaponMeshBuilder& mesh)
                 0.072F, 0.02F}});
     mesh.beveledPrism(CoatedSteel, {0.0F, 0.018F, 0.275F},
         {0.19F, 0.14F, 0.067F}, 0.018F);
-    mesh.beveledPrism(Polymer, {0.0F, -0.018F, -0.44F},
-        {0.19F, 0.135F, 0.39F}, 0.018F);
+    // An open, adjustable stock reads as separate tube, cheek rest and rails
+    // instead of the old uninterrupted rectangular block near the camera.
+    mesh.cylinder(CoatedSteel, {0.0F, -0.019F, 0.0F},
+        0.047F, 0.047F, -0.64F, -0.22F);
+    mesh.cylinder(Recess, {0.0F, -0.019F, 0.0F},
+        0.055F, 0.055F, -0.62F, -0.59F);
+    mesh.beveledLoft(Polymer,
+        std::array{WeaponMeshBuilder::LoftSection{-0.63F, 0.085F, 0.066F,
+                       0.029F, 0.012F},
+            WeaponMeshBuilder::LoftSection{-0.35F, 0.083F, 0.072F,
+                0.031F, 0.013F},
+            WeaponMeshBuilder::LoftSection{-0.25F, 0.069F, 0.066F,
+                0.025F, 0.01F}});
+    for (const float facing : {-1.0F, 1.0F}) {
+        mesh.box(Polymer, {facing * 0.078F, -0.068F, -0.47F},
+            {0.028F, 0.035F, 0.34F});
+        mesh.box(BareSteel, {facing * 0.095F, -0.068F, -0.50F},
+            {0.005F, 0.006F, 0.16F});
+    }
     mesh.box(Polymer, {0.0F, -0.035F, -0.655F}, {0.225F, 0.20F, 0.07F});
     mesh.box(Recess, {0.0F, -0.035F, -0.697F}, {0.218F, 0.20F, 0.019F});
     mesh.box(Polymer, {0.0F, -0.185F, -0.095F},
@@ -493,12 +512,19 @@ void makeCarbine(WeaponMeshBuilder& mesh)
 void makeKnife(WeaponMeshBuilder& mesh)
 {
     using enum WeaponMaterial;
-    mesh.cylinder(Polymer, {0.0F, 0.015F, 0.0F},
-        0.064F, 0.048F, -0.35F, 0.125F);
     mesh.box(BareSteel, {0.0F, 0.015F, -0.115F},
-        {0.123F, 0.047F, 0.44F});
-    mesh.cylinder(Polymer, {0.0F, 0.015F, 0.0F},
-        0.063F, 0.05F, -0.334F, 0.111F);
+        {0.137F, 0.047F, 0.44F});
+    mesh.beveledLoft(Polymer,
+        std::array{WeaponMeshBuilder::LoftSection{-0.345F, 0.052F, 0.015F,
+                       0.037F, 0.013F},
+            WeaponMeshBuilder::LoftSection{-0.275F, 0.063F, 0.015F,
+                0.049F, 0.016F},
+            WeaponMeshBuilder::LoftSection{-0.105F, 0.059F, 0.015F,
+                0.046F, 0.015F},
+            WeaponMeshBuilder::LoftSection{0.02F, 0.065F, 0.015F,
+                0.049F, 0.016F},
+            WeaponMeshBuilder::LoftSection{0.12F, 0.053F, 0.015F,
+                0.041F, 0.013F}});
     mesh.box(Recess, {0.0F, 0.015F, -0.357F}, {0.15F, 0.106F, 0.04F});
     mesh.box(CoatedSteel, {0.0F, 0.015F, 0.126F}, {0.255F, 0.073F, 0.055F});
     mesh.box(CoatedSteel, {0.0F, 0.015F, 0.06F}, {0.08F, 0.064F, 0.16F});

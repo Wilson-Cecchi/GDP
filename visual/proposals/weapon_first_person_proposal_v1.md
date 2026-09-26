@@ -148,6 +148,26 @@ o corredor. São contagens de geometria, não medição de FPS. A construção a
 é low/mid-poly procedural; este refinamento não equivale a fotorealismo nem
 substitui a aprovação visual jogando. Estado: `IMPLEMENTADA EM VALIDAÇÃO`.
 
+### Enquadramento ao mudar o FOV e formas v1.2
+
+O FOV configurável de `60°–100°` passou a afetar somente a projeção do mundo.
+O viewmodel usa uma projeção vertical fixa de `68°`, com o mesmo aspecto da
+janela; assim a área ocupada na tela não cresce ou encolhe junto com o FOV.
+Essa separação não altera o raio de disparo, dano, alcance ou mira lógica.
+O teste de pixels do renderer compara a área e os limites das três armas nos
+dois extremos. A [captura 60°/100°](../validation/weapon_first_person_v1_used_fov_60_100.png)
+tem FOV 60° na primeira linha e 100° na segunda, em pistola, rifle e faca.
+
+No mesmo refinamento, a coronha do rifle deixou de ser um bloco maciço:
+possui tubo, apoio superior e trilhos separados. O cabo da faca recebeu perfil
+ergonômico em seções, com a espiga metálica discretamente exposta; a lâmina
+ganhou ponta assimétrica em vez de um triângulo centralizado. A
+[captura das formas atuais](../validation/weapon_first_person_v1_used_shape_refinement.png)
+mostra as três armas no enquadramento de inspeção. Na cena fixa em 1280×720,
+continuam 58 draw calls para pistola/rifle e 57 para faca; foram registrados
+1796, 2240 e 1220 triângulos, respectivamente, incluindo o corredor. Não é
+uma medição de desempenho. A aceitação visual em partida segue pendente.
+
 ## Prompts usados
 
 ### Maintained

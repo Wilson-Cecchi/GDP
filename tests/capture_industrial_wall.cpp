@@ -218,6 +218,22 @@ int main(const int argc, char* argv[])
                         gdp::game::visual::HudWeaponRole::Knife, gameplayCamera, {});
                     captureWeapon("knife_close",
                         gdp::game::visual::HudWeaponRole::Knife, closeWeaponCamera, {});
+                    auto minimumFovCamera = gameplayCamera;
+                    minimumFovCamera.verticalFieldOfViewDegrees = 60.0F;
+                    auto maximumFovCamera = gameplayCamera;
+                    maximumFovCamera.verticalFieldOfViewDegrees = 100.0F;
+                    captureWeapon("pistol_fov60",
+                        gdp::game::visual::HudWeaponRole::Pistol, minimumFovCamera, {});
+                    captureWeapon("pistol_fov100",
+                        gdp::game::visual::HudWeaponRole::Pistol, maximumFovCamera, {});
+                    captureWeapon("carbine_fov60",
+                        gdp::game::visual::HudWeaponRole::Carbine, minimumFovCamera, {});
+                    captureWeapon("carbine_fov100",
+                        gdp::game::visual::HudWeaponRole::Carbine, maximumFovCamera, {});
+                    captureWeapon("knife_fov60",
+                        gdp::game::visual::HudWeaponRole::Knife, minimumFovCamera, {});
+                    captureWeapon("knife_fov100",
+                        gdp::game::visual::HudWeaponRole::Knife, maximumFovCamera, {});
                     gdp::game::visual::HudRenderData potatoHud;
                     potatoHud.graphicsQuality
                         = gdp::game::visual::HudGraphicsQuality::Potato;

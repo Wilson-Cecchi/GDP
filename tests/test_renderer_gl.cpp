@@ -918,6 +918,82 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 knifeViewmodelPixels.data());
 
+            struct WeaponFootprint {
+                std::size_t pixels{0U};
+                int minX{width};
+                int minY{height};
+                int maxX{0};
+                int maxY{0};
+            };
+            const auto weaponFootprint = [&](const float fieldOfView,
+                const gdp::game::visual::HudWeaponRole role,
+                WeaponFootprint& footprint) {
+                gdp::game::visual::CameraData fovCamera;
+                fovCamera.verticalFieldOfViewDegrees = fieldOfView;
+                const gdp::game::visual::WeaponViewmodelRenderData weapon{
+                    .visible = true, .role = role, .visualSeed = 1717U};
+                if (!renderer.render(width, height, fovCamera)) {
+                    return false;
+                }
+                std::vector<std::uint8_t> background(baseline.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    background.data());
+                if (!renderer.render(width, height, fovCamera, {}, {}, {}, {},
+                        {}, {}, {}, {}, {}, {}, weapon)) {
+                    return false;
+                }
+                std::vector<std::uint8_t> frame(baseline.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    frame.data());
+                for (int y = 0; y < height; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const std::size_t pixel = static_cast<std::size_t>(
+                            (y * width + x) * 4);
+                        bool changed = false;
+                        for (std::size_t channel = 0U; channel < 3U; ++channel) {
+                            changed |= std::abs(static_cast<int>(frame[pixel + channel])
+                                - static_cast<int>(background[pixel + channel])) > 3;
+                        }
+                        if (changed) {
+                            ++footprint.pixels;
+                            footprint.minX = std::min(footprint.minX, x);
+                            footprint.minY = std::min(footprint.minY, y);
+                            footprint.maxX = std::max(footprint.maxX, x);
+                            footprint.maxY = std::max(footprint.maxY, y);
+                        }
+                    }
+                }
+                return true;
+            };
+            bool renderedFovViewmodels = true;
+            bool fovFootprintsStable = true;
+            for (const auto role : {gdp::game::visual::HudWeaponRole::Pistol,
+                    gdp::game::visual::HudWeaponRole::Carbine,
+                    gdp::game::visual::HudWeaponRole::Knife}) {
+                WeaponFootprint narrow;
+                WeaponFootprint wide;
+                renderedFovViewmodels &= weaponFootprint(60.0F, role, narrow)
+                    && weaponFootprint(100.0F, role, wide);
+                const bool stable = narrow.pixels > 20U
+                    && wide.pixels > 20U
+                    && std::abs(static_cast<int>(narrow.pixels)
+                        - static_cast<int>(wide.pixels))
+                        <= static_cast<int>(narrow.pixels / 10U + 2U)
+                    && std::abs(narrow.minX - wide.minX) <= 3
+                    && std::abs(narrow.minY - wide.minY) <= 3
+                    && std::abs(narrow.maxX - wide.maxX) <= 3
+                    && std::abs(narrow.maxY - wide.maxY) <= 3;
+                fovFootprintsStable &= stable;
+                if (!stable) {
+                    std::cerr << "Viewmodel FOV footprint changed: role="
+                        << static_cast<int>(role) << " pixels=" << narrow.pixels
+                        << '/' << wide.pixels << " bounds=" << narrow.minX << ','
+                        << narrow.minY << ',' << narrow.maxX << ',' << narrow.maxY
+                        << '/' << wide.minX << ',' << wide.minY << ',' << wide.maxX
+                        << ',' << wide.maxY << '\n';
+                }
+            }
+
             constexpr gdp::game::visual::WeaponViewmodelRenderData firingViewmodel{
                 .visible = true,
                 .role = gdp::game::visual::HudWeaponRole::Pistol,
@@ -1340,6 +1416,7 @@ int main()
                 && carbineViewmodelChangedChannels > 100U
                 && renderedKnifeViewmodel
                 && knifeViewmodelChangedChannels > 100U
+                && renderedFovViewmodels && fovFootprintsStable
                 && renderedFiringViewmodel
                 && firingViewmodelChangedChannels > 100U
                 && renderedEnemies && brightest > darkest + 8U && enemyChangedChannels > 100U
@@ -1363,6 +1440,7 @@ int main()
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels
                           << " knife=" << knifeViewmodelChangedChannels
+                          << " fovStable=" << fovFootprintsStable
                           << " firing=" << firingViewmodelChangedChannels
                           << " impactRendered=" << renderedImpacts << '\n';
             }
