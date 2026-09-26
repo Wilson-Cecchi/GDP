@@ -79,6 +79,25 @@ resultado final:
 
 ## Propostas ativas
 
+### Weapon/first-person presentation — v1
+
+```text
+unidade visual: Weapon/first-person presentation
+versão da proposta: v1
+arquivo/pranchas: visual/proposals/weapon_first_person_v1_maintained.png;
+                 visual/proposals/weapon_first_person_v1_used.png;
+                 visual/proposals/weapon_first_person_v1_worn.png
+variantes mostradas: Maintained; Used; Worn
+decisão do usuário: AGUARDANDO APROVAÇÃO
+data: 2026-09-26
+commit de implementação: pendente
+capturas no jogo: pendentes
+resultado final: pendente
+```
+
+Contrato e limites estão em
+[`proposals/weapon_first_person_proposal_v1.md`](proposals/weapon_first_person_proposal_v1.md).
+
 ### Industrial Corridor/Ceiling — v1 HD
 
 ```text
@@ -205,7 +224,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Officer/material families | Não revisada |
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
-| Weapon/first-person presentation | Não revisada |
+| Weapon/first-person presentation | Proposta v1 aguardando aprovação |
 | Player presentation | Não revisada |
 | HUD/map visual language | Não revisada |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
