@@ -13,6 +13,8 @@ namespace gdp::gameplay {
 struct PlayerCommand {
     float moveForward{0.0F};
     float moveRight{0.0F};
+    bool crouch{false};
+    bool jump{false};
     bool interact{false};
 };
 
@@ -32,6 +34,8 @@ struct PlayerState {
     float maximumArmor{50.0F};
     std::uint32_t keys{0};
     bool grounded{true};
+    bool crouching{false};
+    float crouchAmount{0.0F};
     bool alive{true};
 };
 
@@ -85,6 +89,7 @@ public:
     [[nodiscard]] wkc::core::Vec3 planarForwardDirection() const noexcept;
     [[nodiscard]] wkc::core::Vec3 rightDirection() const noexcept;
     [[nodiscard]] wkc::core::Vec3 cameraPosition() const noexcept;
+    [[nodiscard]] CharacterCollider collider() const noexcept;
     [[nodiscard]] float mouseSensitivity() const noexcept;
     [[nodiscard]] bool invertMouseY() const noexcept;
 
@@ -93,10 +98,13 @@ private:
     gdp::entities::EntityId entity_{};
     CharacterCollider collider_{};
     float moveSpeed_{4.5F};
+    float crouchMoveMultiplier_{0.58F};
+    float jumpSpeed_{6.2F};
     float gravity_{-20.0F};
     float mouseSensitivity_{0.12F};
     bool invertMouseY_{false};
-    float eyeHeight_{1.62F};
+    float standingEyeHeight_{1.62F};
+    float crouchingEyeHeight_{1.02F};
 };
 
 } // namespace gdp::gameplay

@@ -773,6 +773,7 @@ bool Application::initializeRun()
     activeImpacts_.clear();
     roomFixtureEntities_.clear();
     impactVisualCounter_ = 0U;
+    jumpPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     weaponMeleeRemaining_ = 0.0F;
@@ -1019,6 +1020,7 @@ void Application::processEvents()
     if (exitConfirmation_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
+        jumpPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -1106,6 +1108,7 @@ void Application::processEvents()
     if (settingsMenu_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
+        jumpPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -1208,6 +1211,7 @@ void Application::processEvents()
     if (mainMenu_.active) {
         playerCommand_ = {};
         interactionPending_ = false;
+        jumpPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -1384,6 +1388,7 @@ void Application::processEvents()
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
         playerCommand_ = {};
         interactionPending_ = false;
+        jumpPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -1520,6 +1525,7 @@ void Application::processEvents()
     if (pauseMenu_.paused) {
         playerCommand_ = {};
         interactionPending_ = false;
+        jumpPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -1628,6 +1634,9 @@ void Application::processEvents()
         - (input_.isKeyDown(Key::S) ? 1.0F : 0.0F);
     playerCommand_.moveRight = (input_.isKeyDown(Key::D) ? 1.0F : 0.0F)
         - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
+    playerCommand_.crouch = input_.isKeyDown(Key::C);
+    jumpPending_ = jumpPending_ || input_.wasKeyPressed(Key::Space);
+    playerCommand_.jump = jumpPending_;
     interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
     const bool firePressed
         = input_.wasMouseButtonPressed(MouseButton::Primary);
@@ -1659,6 +1668,7 @@ void Application::setPaused(const bool paused)
     }
     playerCommand_ = {};
     interactionPending_ = false;
+    jumpPending_ = false;
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
@@ -1731,6 +1741,7 @@ bool Application::returnToMainMenu()
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};
     interactionPending_ = false;
+    jumpPending_ = false;
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
@@ -2188,7 +2199,7 @@ void Application::fixedUpdate(const double fixedStep)
     };
     std::optional<world::EdgeId> occupiedCorridorEdge;
     if (world_ && !gameplay::roomContainingCharacter(
-            *world_, player_.state().position)) {
+            *world_, player_.state().position, player_.collider())) {
         for (const world::CorridorPath& corridor : world_->corridors) {
             if (gameplay::corridorProgressAt(corridor, player_.state().position)) {
                 occupiedCorridorEdge = corridor.edge;
@@ -2244,6 +2255,8 @@ void Application::fixedUpdate(const double fixedStep)
         baseCollisionWorld_, entities_, playerRoom);
     const wkc::core::Vec3 previousPlayerPosition = player_.state().position;
     player_.fixedUpdate(playerCommand_, step, collisionWorld_);
+    jumpPending_ = false;
+    playerCommand_.jump = false;
     const std::optional<std::uint64_t> footstepEvent = gameplay::updateFootsteps(
         footsteps_, previousPlayerPosition, player_.state().position,
         player_.state().grounded, player_.state().alive);
@@ -2282,7 +2295,7 @@ void Application::fixedUpdate(const double fixedStep)
 
     if (playerEntity != nullptr && world_) {
         const auto enteredRoom = gameplay::roomContainingCharacter(
-            *world_, player_.state().position);
+            *world_, player_.state().position, player_.collider());
         if (enteredRoom && *enteredRoom != playerRoom) {
             const auto destination = std::find_if(
                 world_->rooms.begin(), world_->rooms.end(),
@@ -2677,6 +2690,8 @@ void Application::fixedUpdate(const double fixedStep)
         player_.state().alive, currentRoomRole, boss.exists, boss.alive);
     if (sessionUpdate.changed) {
         interactionPending_ = false;
+        jumpPending_ = false;
+        playerCommand_.jump = false;
         firePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
@@ -3594,6 +3609,11 @@ void Application::render()
             weaponEquipRemaining_ / weaponEquipDuration,
             weapon_.switchStrength()),
         .meleeStrength = weaponMeleeRemaining_ / weaponMeleeDuration,
+        .crouchStrength = player_.state().crouchAmount,
+        .airborneStrength = player_.state().grounded ? 0.0F
+            : std::clamp(
+                0.35F + (std::abs(player_.state().velocity.y) / 9.0F),
+                0.0F, 1.0F),
         .muzzleFlashStrength
             = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
         .overdrive = weapon_.overdriveActive(),
@@ -3655,6 +3675,7 @@ void Application::shutdown()
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};
     interactionPending_ = false;
+    jumpPending_ = false;
     firePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;

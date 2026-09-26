@@ -125,6 +125,7 @@ private:
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};
+    bool jumpPending_{false};
     bool firePending_{false};
     bool fireHeld_{false};
     bool reloadPending_{false};

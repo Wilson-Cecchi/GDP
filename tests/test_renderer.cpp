@@ -1258,12 +1258,24 @@ void testWeaponViewmodelPose()
             && knifeSwing.rotationDegrees.z < -50.0F,
         "Knife swing follows a readable forward diagonal arc");
 
+    const WeaponViewmodelPose movementPose = sampleWeaponViewmodelPose({
+        .visible = true,
+        .crouchStrength = 1.0F,
+        .airborneStrength = 1.0F,
+    });
+    expect(movementPose.offset.y < -0.06F
+            && movementPose.offset.z < -0.03F
+            && movementPose.rotationDegrees.x > 6.0F,
+        "crouch and airborne movement keep a restrained first-person weapon response");
+
     const WeaponViewmodelPose invalid = sampleWeaponViewmodelPose({
         .visible = true,
         .recoilStrength = std::numeric_limits<float>::quiet_NaN(),
         .reloadProgress = std::numeric_limits<float>::infinity(),
         .equipStrength = -4.0F,
         .meleeStrength = std::numeric_limits<float>::quiet_NaN(),
+        .crouchStrength = std::numeric_limits<float>::infinity(),
+        .airborneStrength = -2.0F,
     });
     expect(invalid == idle,
         "weapon pose sanitizes non-finite and out-of-range animation input");

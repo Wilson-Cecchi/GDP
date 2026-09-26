@@ -542,6 +542,10 @@ especializados das pastas numeradas.
   `0,52 s`. A roda percorre as armas possuídas e a faca; sacar a arma branca não
   altera munição nem o slot de fogo persistido. Campaign/Speedrun avançam para
   regras 28/27.
+- **Fase 142 — Agachar e pular:** segurar `C` reduz o collider e a velocidade,
+  com câmera interpolada e bloqueio seguro ao tentar levantar sob obstáculos;
+  `Espaço` aplica salto físico com gravidade, colisão de cabeça e aterrissagem
+  sobre o cenário. Campaign/Speedrun avançam para regras 29/28.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -563,7 +567,7 @@ faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
-terminal, dispara com o botão esquerdo
+terminal, segura `C` para agachar, pula com `Espaço`, dispara com o botão esquerdo
 e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife e a roda do mouse percorre as armas
 disponíveis. `F3` alterna o
@@ -1500,6 +1504,17 @@ flash de disparo. O modelo procedural usa lâmina metálica independente, sem
 criar ou aprovar uma nova textura. A seleção da faca é transitória; checkpoints
 continuam no schema 3 e preservam apenas os dois slots de fogo e suas munições,
 restaurando a arma de fogo ativa. Campaign/Speedrun avançam para regras 28/27.
+
+Na Fase 142, segurar `C` interpola a câmera de `1,62 m` para `1,02 m`, reduz o
+collider de `1,80 m` para `1,15 m` e limita a velocidade a 58% da caminhada.
+Soltar a tecla restaura a postura somente quando o volume em pé está livre,
+evitando atravessar tetos ou props baixos. `Espaço` aplica impulso vertical de
+`6,2 m/s` apenas no chão; a gravidade permanece no fixed update, colisões
+interrompem a cabeça em tetos e permitem aterrissar sobre superfícies sólidas.
+A trajetória real move a câmera, enquanto o viewmodel recebe respostas sutis
+de postura e estado aéreo sem deslocar a mira lógica. Campaign/Speedrun avançam
+para regras 29/28, mantendo o checkpoint schema 3 porque postura, velocidade e
+posição continuam transitórias.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

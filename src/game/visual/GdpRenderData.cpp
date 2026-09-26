@@ -1204,6 +1204,8 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
     const float reload = sanitized(weapon.reloadProgress);
     const float equip = sanitized(weapon.equipStrength);
     const float melee = sanitized(weapon.meleeStrength);
+    const float crouch = sanitized(weapon.crouchStrength);
+    const float airborne = sanitized(weapon.airborneStrength);
     const float reloadArc = std::sin(reload * 3.14159265358979323846F);
     const float meleeArc = melee > 0.0F
         ? std::sin((1.0F - melee) * 3.14159265358979323846F)
@@ -1212,13 +1214,15 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
     return {
         .offset = {
             (-0.09F * reloadArc) - (0.18F * meleeArc),
-            (-0.34F * equip) - (0.18F * reloadArc) + (0.025F * recoil),
+            (-0.34F * equip) - (0.18F * reloadArc) + (0.025F * recoil)
+                - (0.045F * crouch) - (0.025F * airborne),
             (-0.12F * recoil * mass) - (0.05F * reloadArc)
-                + (0.20F * meleeArc),
+                + (0.20F * meleeArc) - (0.035F * airborne),
         },
         .rotationDegrees = {
             (-8.0F * recoil * mass) + (12.0F * reloadArc)
-                - (22.0F * meleeArc),
+                - (22.0F * meleeArc) + (3.0F * crouch)
+                + (4.0F * airborne),
             (-8.0F * reloadArc) + (16.0F * meleeArc),
             (34.0F * reloadArc) - (58.0F * meleeArc),
         },

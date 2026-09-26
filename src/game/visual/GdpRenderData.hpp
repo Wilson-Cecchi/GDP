@@ -188,6 +188,8 @@ struct WeaponViewmodelRenderData {
     float reloadProgress{0.0F};
     float equipStrength{0.0F};
     float meleeStrength{0.0F};
+    float crouchStrength{0.0F};
+    float airborneStrength{0.0F};
     float muzzleFlashStrength{0.0F};
     bool overdrive{false};
     wkc::core::Seed visualSeed{0U};

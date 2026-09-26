@@ -4,6 +4,7 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/ViewMotion.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -209,6 +210,114 @@ void testCollisionAndGravity()
     expect(falling.state().grounded, "floor collision marks the player grounded");
 }
 
+void testCrouchAndJumpMovement()
+{
+    using namespace gdp::gameplay;
+
+    const CollisionWorld openRoom{
+        {{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    Player crouched;
+    crouched.spawn({0.0F, 0.0F, 0.0F});
+    const float standingEye = crouched.cameraPosition().y;
+    updateMany(crouched, {.crouch = true}, openRoom, 8);
+    expect(crouched.state().crouching
+            && wkc::core::nearlyEqual(crouched.state().crouchAmount, 1.0F)
+            && wkc::core::nearlyEqual(crouched.collider().height, 1.15F)
+            && wkc::core::nearlyEqual(crouched.cameraPosition().y, 1.02F)
+            && crouched.cameraPosition().y < standingEye,
+        "crouch smoothly lowers the camera and authoritatively shortens the collider");
+    crouched.fixedUpdate(
+        {.crouch = true, .jump = true}, 1.0F / 60.0F, openRoom);
+    expect(crouched.state().grounded
+            && wkc::core::nearlyEqual(crouched.state().position.y, 0.0F),
+        "crouched player cannot launch a jump into low cover");
+
+    Player standingTravel;
+    Player crouchedTravel;
+    standingTravel.spawn({0.0F, 0.0F, 0.0F});
+    crouchedTravel.spawn({0.0F, 0.0F, 0.0F});
+    updateMany(standingTravel, {.moveRight = 1.0F}, openRoom, 60);
+    updateMany(crouchedTravel,
+        {.moveRight = 1.0F, .crouch = true}, openRoom, 60);
+    expect(wkc::core::nearlyEqual(standingTravel.state().position.x, 4.5F, 1.0e-4F)
+            && wkc::core::nearlyEqual(
+                crouchedTravel.state().position.x, 2.61F, 1.0e-4F),
+        "crouched travel uses its slower deterministic movement speed");
+
+    const CollisionWorld lowClearance(
+        {{-4.0F, 0.0F, -4.0F}, {4.0F, 4.0F, 4.0F}},
+        {{{-0.5F, 1.20F, -0.5F}, {0.5F, 1.45F, 0.5F}}});
+    Player approaching;
+    approaching.spawn({-1.0F, 0.0F, 0.0F});
+    for (int update = 0; update < 20; ++update) {
+        approaching.fixedUpdate(
+            {.moveRight = 1.0F, .crouch = true},
+            1.0F / 60.0F, lowClearance);
+        expect(approaching.cameraPosition().y
+                < approaching.state().position.y
+                    + approaching.collider().height,
+            "camera stays below the interpolating crouch collider");
+    }
+    expect(approaching.state().position.x > -0.5F
+            && approaching.state().crouching,
+        "crouch movement passes beneath low cover after clearance opens");
+    Player clearance;
+    clearance.spawn({0.0F, 0.0F, 0.0F});
+    updateMany(clearance, {.crouch = true}, lowClearance, 8);
+    updateMany(clearance, {}, lowClearance, 8);
+    expect(clearance.state().crouching
+            && wkc::core::nearlyEqual(clearance.collider().height, 1.15F),
+        "releasing crouch under an obstruction cannot expand the collider into it");
+    updateMany(clearance, {.moveRight = 1.0F}, lowClearance, 30);
+    expect(!clearance.state().crouching
+            && wkc::core::nearlyEqual(clearance.collider().height, 1.8F)
+            && clearance.state().position.x > 0.8F,
+        "player stands automatically after leaving low clearance");
+
+    Player jumping;
+    jumping.spawn({0.0F, 0.0F, 0.0F});
+    jumping.fixedUpdate({.jump = true}, 1.0F / 60.0F, openRoom);
+    float peak = jumping.state().position.y;
+    expect(!jumping.state().grounded && jumping.state().velocity.y > 0.0F,
+        "jump leaves the floor with an upward fixed-step impulse");
+    const float firstJumpVelocity = jumping.state().velocity.y;
+    jumping.fixedUpdate({.jump = true}, 1.0F / 60.0F, openRoom);
+    expect(jumping.state().velocity.y < firstJumpVelocity,
+        "a second airborne jump request cannot reset upward velocity");
+    for (int update = 0; update < 120; ++update) {
+        jumping.fixedUpdate({}, 1.0F / 60.0F, openRoom);
+        peak = std::max(peak, jumping.state().position.y);
+    }
+    expect(peak > 0.85F && peak < 1.05F
+            && jumping.state().grounded
+            && wkc::core::nearlyEqual(jumping.state().position.y, 0.0F),
+        "jump follows a bounded ballistic arc and settles back on the floor");
+
+    const CollisionWorld lowCeiling(
+        {{-4.0F, 0.0F, -4.0F}, {4.0F, 4.0F, 4.0F}},
+        {{{-1.0F, 2.0F, -1.0F}, {1.0F, 2.25F, 1.0F}}});
+    Player headBlocked;
+    headBlocked.spawn({0.0F, 0.0F, 0.0F});
+    headBlocked.fixedUpdate({.jump = true}, 1.0F / 60.0F, lowCeiling);
+    float blockedPeak = headBlocked.state().position.y;
+    for (int update = 0; update < 45; ++update) {
+        headBlocked.fixedUpdate({}, 1.0F / 60.0F, lowCeiling);
+        blockedPeak = std::max(blockedPeak, headBlocked.state().position.y);
+    }
+    expect(blockedPeak <= 0.2001F && headBlocked.state().grounded,
+        "jumping into a low ceiling stops the head before returning to ground");
+
+    const CollisionWorld platformRoom(
+        {{-4.0F, 0.0F, -4.0F}, {4.0F, 4.0F, 4.0F}},
+        {{{-1.0F, 0.0F, -1.0F}, {1.0F, 0.70F, 1.0F}}});
+    Player landing;
+    landing.spawn({0.0F, 2.0F, 0.0F});
+    updateMany(landing, {}, platformRoom, 120);
+    expect(landing.state().grounded
+            && wkc::core::nearlyEqual(landing.state().position.y, 0.70F),
+        "falling onto solid geometry lands on its upper surface");
+}
+
 void testLookAndCamera()
 {
     using namespace gdp::gameplay;
@@ -314,6 +423,7 @@ int main()
     testFootstepCadence();
     testCosmeticViewMotion();
     testCollisionAndGravity();
+    testCrouchAndJumpMovement();
     testLookAndCamera();
     testInteractionAndLife();
 

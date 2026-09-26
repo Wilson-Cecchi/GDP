@@ -56,6 +56,21 @@ wkc::core::Aabb transformBounds(
     return {minimum, maximum};
 }
 
+bool overlapsHorizontally(
+    const wkc::core::Vec3 feetPosition,
+    const CharacterCollider collider,
+    const wkc::core::Aabb solid) noexcept
+{
+    const float closestX = std::clamp(
+        feetPosition.x, solid.minimum.x, solid.maximum.x);
+    const float closestZ = std::clamp(
+        feetPosition.z, solid.minimum.z, solid.maximum.z);
+    const float differenceX = feetPosition.x - closestX;
+    const float differenceZ = feetPosition.z - closestZ;
+    return (differenceX * differenceX) + (differenceZ * differenceZ)
+        < collider.radius * collider.radius;
+}
+
 } // namespace
 
 CollisionWorld::CollisionWorld(
@@ -117,17 +132,43 @@ CharacterMotionResult CollisionWorld::moveCharacter(
     CharacterMotionResult result{position, velocity, false, false};
     const float step = std::max(fixedStepSeconds, 0.0F);
 
-    result.position.y += result.velocity.y * step;
-    if (result.position.y <= roomBounds_.minimum.y) {
-        result.position.y = roomBounds_.minimum.y;
-        result.velocity.y = 0.0F;
-        result.grounded = true;
-    }
-    const float maximumFeetHeight = roomBounds_.maximum.y - collider.height;
-    if (result.position.y > maximumFeetHeight) {
-        result.position.y = maximumFeetHeight;
-        result.velocity.y = std::min(result.velocity.y, 0.0F);
-        result.collided = true;
+    const float originalY = result.position.y;
+    const float requestedY = originalY + (result.velocity.y * step);
+    if (result.velocity.y <= 0.0F) {
+        float landingHeight = roomBounds_.minimum.y;
+        for (const wkc::core::Aabb solid : solids_) {
+            if (overlapsHorizontally(result.position, collider, solid)
+                && originalY >= solid.maximum.y - 1.0e-4F
+                && requestedY <= solid.maximum.y) {
+                landingHeight = std::max(landingHeight, solid.maximum.y);
+            }
+        }
+        if (requestedY <= landingHeight) {
+            result.position.y = landingHeight;
+            result.velocity.y = 0.0F;
+            result.grounded = true;
+            result.collided = requestedY < landingHeight - 1.0e-4F;
+        } else {
+            result.position.y = requestedY;
+        }
+    } else {
+        float ceilingHeight = roomBounds_.maximum.y;
+        const float originalTop = originalY + collider.height;
+        const float requestedTop = requestedY + collider.height;
+        for (const wkc::core::Aabb solid : solids_) {
+            if (overlapsHorizontally(result.position, collider, solid)
+                && originalTop <= solid.minimum.y + 1.0e-4F
+                && requestedTop >= solid.minimum.y) {
+                ceilingHeight = std::min(ceilingHeight, solid.minimum.y);
+            }
+        }
+        if (requestedTop >= ceilingHeight) {
+            result.position.y = ceilingHeight - collider.height;
+            result.velocity.y = 0.0F;
+            result.collided = true;
+        } else {
+            result.position.y = requestedY;
+        }
     }
 
     const float originalX = result.position.x;
@@ -208,12 +249,7 @@ bool CollisionWorld::overlapsSolid(
             continue;
         }
 
-        const float closestX = std::clamp(feetPosition.x, solid.minimum.x, solid.maximum.x);
-        const float closestZ = std::clamp(feetPosition.z, solid.minimum.z, solid.maximum.z);
-        const float differenceX = feetPosition.x - closestX;
-        const float differenceZ = feetPosition.z - closestZ;
-        if ((differenceX * differenceX) + (differenceZ * differenceZ)
-            < collider.radius * collider.radius) {
+        if (overlapsHorizontally(feetPosition, collider, solid)) {
             return true;
         }
     }

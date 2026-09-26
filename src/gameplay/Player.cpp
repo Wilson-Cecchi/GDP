@@ -8,6 +8,10 @@
 namespace gdp::gameplay {
 namespace {
 
+constexpr CharacterCollider standingCollider{0.3F, 1.8F};
+constexpr CharacterCollider crouchingCollider{0.3F, 1.15F};
+constexpr float crouchTransitionSpeed = 7.5F;
+
 std::optional<float> rayAabbDistance(
     const wkc::core::Vec3 origin,
     const wkc::core::Vec3 direction,
@@ -52,6 +56,7 @@ void Player::spawn(const wkc::core::Vec3 feetPosition, const float yawDegrees) n
     state_.position = feetPosition;
     state_.yawDegrees = std::remainder(yawDegrees, 360.0F);
     state_.grounded = false;
+    collider_ = standingCollider;
 }
 
 bool Player::relocate(
@@ -112,6 +117,27 @@ void Player::fixedUpdate(
         return;
     }
 
+    if (command.crouch) {
+        state_.crouching = true;
+    } else if (collisionWorld.canOccupy(state_.position, standingCollider)) {
+        state_.crouching = false;
+    }
+    const float crouchTarget = state_.crouching ? 1.0F : 0.0F;
+    const float crouchStep = crouchTransitionSpeed * fixedStepSeconds;
+    if (state_.crouchAmount < crouchTarget) {
+        state_.crouchAmount = std::min(
+            state_.crouchAmount + crouchStep, crouchTarget);
+    } else {
+        state_.crouchAmount = std::max(
+            state_.crouchAmount - crouchStep, crouchTarget);
+    }
+    collider_ = {
+        standingCollider.radius,
+        standingCollider.height
+            + ((crouchingCollider.height - standingCollider.height)
+                * state_.crouchAmount),
+    };
+
     wkc::core::Vec3 desired = planarForwardDirection()
             * std::clamp(command.moveForward, -1.0F, 1.0F)
         + rightDirection() * std::clamp(command.moveRight, -1.0F, 1.0F);
@@ -120,8 +146,21 @@ void Player::fixedUpdate(
         desired = desired * (1.0F / desiredLength);
     }
 
-    state_.velocity.x = desired.x * moveSpeed_;
-    state_.velocity.z = desired.z * moveSpeed_;
+    const float stanceSpeed = moveSpeed_
+        * (state_.crouching ? crouchMoveMultiplier_ : 1.0F);
+    state_.velocity.x = desired.x * stanceSpeed;
+    state_.velocity.z = desired.z * stanceSpeed;
+    bool jumpGrounded = state_.grounded;
+    if (command.jump && !jumpGrounded) {
+        jumpGrounded = collisionWorld.moveCharacter(
+            state_.position, {0.0F, -1.0F, 0.0F},
+            1.0e-4F, collider_).grounded;
+    }
+    if (command.jump && jumpGrounded && !state_.crouching
+        && state_.crouchAmount <= 1.0e-4F) {
+        state_.velocity.y = jumpSpeed_;
+        state_.grounded = false;
+    }
     state_.velocity.y += gravity_ * fixedStepSeconds;
 
     const CharacterMotionResult motion = collisionWorld.moveCharacter(
@@ -283,7 +322,15 @@ wkc::core::Vec3 Player::rightDirection() const noexcept
 
 wkc::core::Vec3 Player::cameraPosition() const noexcept
 {
-    return state_.position + wkc::core::Vec3{0.0F, eyeHeight_, 0.0F};
+    const float eyeHeight = standingEyeHeight_
+        + ((crouchingEyeHeight_ - standingEyeHeight_)
+            * std::clamp(state_.crouchAmount, 0.0F, 1.0F));
+    return state_.position + wkc::core::Vec3{0.0F, eyeHeight, 0.0F};
+}
+
+CharacterCollider Player::collider() const noexcept
+{
+    return collider_;
 }
 
 float Player::mouseSensitivity() const noexcept
