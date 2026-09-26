@@ -1,7 +1,7 @@
 # Armas em primeira pessoa — proposta visual v1
 
 ```text
-estado: AGUARDANDO APROVAÇÃO
+estado: IMPLEMENTADA EM VALIDAÇÃO (variante Used)
 unidade visual: Weapon/first-person presentation
 versão: v1
 data: 2026-09-26
@@ -13,6 +13,15 @@ geração: image_gen, conceito visual; não são capturas do jogo nem assets pro
 SHA-256 Maintained: f19d5486c5d4619482f9081116fc44ed81e54c2341dc7b0cd2a47ac7c27dbd41
 SHA-256 Used: bf1bf4f076915b4fda0329b0b177eb316e8760bc5403f2d604ad4a8199e4eb22
 SHA-256 Worn: adf13cbb1f052a3b7d8e1a82b4a98771963daa33e4f81c9071d8aaa214be7499
+decisão do usuário: "aprovada para implementação da usada"
+capturas in-engine: ../validation/weapon_first_person_v1_used_pistol_gameplay.png;
+                   ../validation/weapon_first_person_v1_used_pistol_close.png;
+                   ../validation/weapon_first_person_v1_used_carbine_gameplay.png;
+                   ../validation/weapon_first_person_v1_used_carbine_close.png;
+                   ../validation/weapon_first_person_v1_used_knife_gameplay.png;
+                   ../validation/weapon_first_person_v1_used_knife_close.png;
+                   ../validation/weapon_first_person_v1_used_carbine_potato.png;
+                   ../validation/weapon_first_person_v1_used_comparison.png
 ```
 
 ## Objetivo
@@ -73,6 +82,34 @@ medir o custo dos perfis gráficos antes de pedir aceitação visual final.
 Uma aprovação desta v1 cobre apenas `Weapon/first-person presentation` para
 rifle, pistola e faca. Não aprova braços/mãos novos, HUD, inimigos, armas de
 terceira pessoa, efeitos de disparo ou mudanças na lógica de combate.
+
+## Implementação da variante Used
+
+As três armas agora usam malhas procedurais próprias, agrupadas por cinco
+materiais compartilhados para manter poucas chamadas de desenho. Slide e
+receiver possuem chanfros reais; miras, janela de ejeção, estrias, rail,
+carregador, guarda-mato e lâmina com seção em losango são peças geométricas.
+Aço revestido, aço aparente e polímero usam albedo, normal e RMA independentes.
+Os mapas principais são `512×512`; recessos e miras usam `128×128`. Uma luz de
+preenchimento apenas no viewmodel mantém as faces metálicas legíveis quando a
+iluminação da sala vem de trás, sem alterar os ambientes.
+
+Na [comparação in-engine](../validation/weapon_first_person_v1_used_comparison.png),
+as colunas são pistola, rifle e faca; a linha superior mostra gameplay e a
+inferior, um campo de visão mais estreito para inspeção próxima.
+
+As capturas acima vêm do renderer OpenGL com cena de corredor fixa, não de uma
+partida controlada manualmente. A prancha conceitual tem detalhamento mais
+alto e mãos ilustrativas que não foram incorporadas à build; a validação
+visual final deve considerar as capturas reais e um teste jogando.
+
+Na cena de captura, foram medidos `58` draw calls para pistola/rifle e `57`
+para faca, com `1256`, `1524` e `992` triângulos respectivamente (incluindo
+todo o corredor, não apenas a arma). Esses números não são um benchmark de FPS.
+Os perfis leves preservam as mesmas silhuetas e desligam a resposta detalhada
+de normal/RMA conforme a configuração já existente.
+
+Estado final ainda pendente de aceitação humana: `IMPLEMENTADA EM VALIDAÇÃO`.
 
 ## Prompts usados
 

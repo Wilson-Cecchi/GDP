@@ -88,11 +88,19 @@ arquivo/pranchas: visual/proposals/weapon_first_person_v1_maintained.png;
                  visual/proposals/weapon_first_person_v1_used.png;
                  visual/proposals/weapon_first_person_v1_worn.png
 variantes mostradas: Maintained; Used; Worn
-decisão do usuário: AGUARDANDO APROVAÇÃO
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO somente Used
+                    ("aprovada para implementação da usada")
 data: 2026-09-26
-commit de implementação: pendente
-capturas no jogo: pendentes
-resultado final: pendente
+commit de implementação: feat: remodel used first-person weapons
+capturas no jogo: visual/validation/weapon_first_person_v1_used_pistol_gameplay.png;
+                  visual/validation/weapon_first_person_v1_used_pistol_close.png;
+                  visual/validation/weapon_first_person_v1_used_carbine_gameplay.png;
+                  visual/validation/weapon_first_person_v1_used_carbine_close.png;
+                  visual/validation/weapon_first_person_v1_used_knife_gameplay.png;
+                  visual/validation/weapon_first_person_v1_used_knife_close.png;
+                  visual/validation/weapon_first_person_v1_used_carbine_potato.png;
+                  visual/validation/weapon_first_person_v1_used_comparison.png
+resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual pendente)
 ```
 
 Contrato e limites estão em
@@ -224,7 +232,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Officer/material families | Não revisada |
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
-| Weapon/first-person presentation | Proposta v1 aguardando aprovação |
+| Weapon/first-person presentation | V1 Used implementada em validação |
 | Player presentation | Não revisada |
 | HUD/map visual language | Não revisada |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |

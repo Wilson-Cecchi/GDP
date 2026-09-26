@@ -5,6 +5,7 @@
 #include "render/Mesh.hpp"
 #include "render/RasterState.hpp"
 #include "game/visual/GdpRenderer.hpp"
+#include "game/visual/WeaponViewmodelAssets.hpp"
 #include "render/Texture.hpp"
 
 #include <array>
@@ -1356,6 +1357,45 @@ void testIndustrialUiTheme()
         "primary interface text remains brighter than secondary instructions");
 }
 
+void testWeaponViewmodelAssets()
+{
+    using namespace gdp::game::visual;
+    constexpr std::array roles{
+        HudWeaponRole::Pistol, HudWeaponRole::Carbine, HudWeaponRole::Knife};
+    for (const HudWeaponRole role : roles) {
+        const auto meshes = makeWeaponViewmodelMeshes(role);
+        std::size_t triangles = 0U;
+        std::size_t materialCount = 0U;
+        for (const auto& mesh : meshes) {
+            if (mesh.vertices.empty()) {
+                continue;
+            }
+            ++materialCount;
+            triangles += mesh.indices.size() / 3U;
+            std::string reason;
+            expect(wkc::render::validateMeshData(mesh, &reason),
+                "weapon viewmodel mesh validates");
+        }
+        expect(materialCount >= 3U && materialCount <= weaponMaterialCount,
+            "weapon viewmodel groups physical materials into few draws");
+        expect(triangles > 100U && triangles < 1600U,
+            "weapon viewmodel stays within its triangle budget");
+    }
+    for (std::size_t material = 0U; material < weaponMaterialCount; ++material) {
+        const auto images = makeUsedWeaponMaterialImages(
+            static_cast<WeaponMaterial>(material));
+        expect(wkc::render::validateImageData(images.albedo)
+                && wkc::render::validateImageData(images.normal)
+                && wkc::render::validateImageData(images.properties),
+            "used weapon material maps validate");
+        expect(images.albedo.width == (material < 3U ? 512 : 128),
+            "primary weapon surfaces retain close-view texture density");
+        expect(images.albedo.rgba == makeUsedWeaponMaterialImages(
+                static_cast<WeaponMaterial>(material)).albedo.rgba,
+            "used weapon wear is deterministic");
+    }
+}
+
 } // namespace
 
 int main()
@@ -1382,6 +1422,7 @@ int main()
     testWeaponViewmodelPose();
     testOptimizedShadowBudget();
     testIndustrialUiTheme();
+    testWeaponViewmodelAssets();
     testSettingsMenuLayout();
 
     if (failures != 0) {

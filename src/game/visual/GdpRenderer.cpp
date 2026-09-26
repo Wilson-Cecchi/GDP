@@ -92,6 +92,8 @@ uniform float uEmissiveStrength;
 uniform int uDetailedMaterial;
 uniform int uDetailedMaterialsEnabled;
 uniform int uUseEmissionMap;
+uniform int uViewmodel;
+uniform vec3 uViewmodelLightDirection;
 
 out vec4 fragmentColor;
 
@@ -218,6 +220,22 @@ void main()
                 * mix(0.90, 0.12, roughness);
             vec3 reflectance = mix(vec3(0.035), albedo, metalness);
             result += reflectance * highlight * diffuse * radiance * visibility;
+        }
+#endif
+    }
+    if (uViewmodel != 0) {
+        // A restrained camera-space reflection keeps steel readable when the
+        // room lights are behind the player. It affects no world surfaces.
+        vec3 fillDirection = normalize(uViewmodelLightDirection);
+        float fill = max(dot(normal, fillDirection), 0.0);
+        result += albedo * (0.09 + 0.25 * fill);
+#if !GDP_LOW_SPEC
+        if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
+            vec3 halfway = normalize(fillDirection + viewDirection);
+            float reflection = pow(max(dot(normal, halfway), 0.0),
+                mix(70.0, 12.0, roughness));
+            result += mix(vec3(0.035), albedo, metalness)
+                * reflection * (1.0 - roughness) * 0.95;
         }
 #endif
     }
@@ -437,6 +455,29 @@ bool GdpRenderer::initialize(const int width, const int height)
     }
     if (!box_.upload(gl_, wkc::render::makeBoxMesh())) {
         return false;
+    }
+    for (std::size_t role = 0; role < weaponRoleCount; ++role) {
+        const auto meshes = makeWeaponViewmodelMeshes(
+            static_cast<HudWeaponRole>(role));
+        for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
+            if (!meshes[material].vertices.empty()
+                && !weaponMeshes_[role][material].upload(gl_, meshes[material])) {
+                return false;
+            }
+        }
+    }
+    for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
+        const WeaponMaterialImages images = makeUsedWeaponMaterialImages(
+            static_cast<WeaponMaterial>(material));
+        WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
+        if (!gpuMaterial.albedo.upload(
+                gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
+            || !gpuMaterial.normal.upload(
+                gl_, images.normal, wkc::render::TextureSampling::Trilinear)
+            || !gpuMaterial.properties.upload(
+                gl_, images.properties, wkc::render::TextureSampling::Trilinear)) {
+            return false;
+        }
     }
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
         return false;
@@ -1101,6 +1142,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uMaterialMap", 2);
     shader.setInt(gl_, "uEmissionMap", 3);
     shader.setInt(gl_, "uUseEmissionMap", 0);
+    shader.setInt(gl_, "uViewmodel", 0);
     shader.setInt(gl_, "uInstanced", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
@@ -1946,12 +1988,12 @@ bool GdpRenderer::render(
         drawMesh(box_);
     }
 
-    if (weaponViewmodel.visible) {
+    if (weaponViewmodel.visible
+        && static_cast<std::size_t>(weaponViewmodel.role) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
-        fallbackTexture_.bind(gl_, textureBindings_);
-        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setInt(gl_, "uViewmodel", 1);
         shader.setInt(gl_, "uUseEmissionMap", 0);
-        shader.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
         shader.setVec2(gl_, "uUvOffset", {});
 
         const wkc::core::Vec3 forward = wkc::core::normalized(camera.forward);
@@ -1962,14 +2004,17 @@ bool GdpRenderer::render(
         }
         const wkc::core::Vec3 up = wkc::core::normalized(
             wkc::core::cross(right, forward));
+        shader.setVec3(gl_, "uViewmodelLightDirection",
+            wkc::core::normalized((up * 0.82F) - (right * 0.34F)
+                - (forward * 0.44F)));
         const WeaponViewmodelPose pose
             = sampleWeaponViewmodelPose(weaponViewmodel);
         const bool carbine = weaponViewmodel.role == HudWeaponRole::Carbine;
         const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
         const wkc::core::Vec3 baseOffset{
-            carbine ? 0.27F : knife ? 0.38F : 0.32F,
-            carbine ? -0.27F : knife ? -0.31F : -0.25F,
-            carbine ? 0.72F : knife ? 0.52F : 0.62F,
+            carbine ? 0.28F : knife ? 0.31F : 0.19F,
+            carbine ? -0.33F : knife ? -0.29F : -0.19F,
+            carbine ? 0.78F : knife ? 0.56F : 0.88F,
         };
         const wkc::core::Vec3 localOffset = baseOffset + pose.offset;
         const wkc::core::Vec3 anchor = camera.position
@@ -1982,18 +2027,47 @@ bool GdpRenderer::render(
             * wkc::core::rotationZMatrix(
                 pose.rotationDegrees.z * degreesToRadians)
             * wkc::core::rotationYMatrix(
-                pose.rotationDegrees.y * degreesToRadians)
+                (pose.rotationDegrees.y + (knife ? -35.0F : carbine ? -23.0F : -28.0F))
+                    * degreesToRadians)
             * wkc::core::rotationXMatrix(
-                pose.rotationDegrees.x * degreesToRadians);
+                (pose.rotationDegrees.x + (knife ? -28.0F : -7.0F))
+                    * degreesToRadians);
         const float seedTone = static_cast<float>(
-            (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.05F;
-        const wkc::core::Vec3 metal{
-            0.20F + seedTone, 0.25F + seedTone, 0.27F + seedTone};
-        const wkc::core::Vec3 darkMetal{0.075F, 0.095F, 0.105F};
-        const wkc::core::Vec3 grip{0.11F, 0.12F, 0.115F};
-        const wkc::core::Vec3 accent = weaponViewmodel.overdrive
-            ? wkc::core::Vec3{0.96F, 0.18F, 0.52F}
-            : wkc::core::Vec3{0.12F, 0.72F, 0.80F};
+            (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
+        const std::array materialColors{
+            wkc::core::Vec3{0.42F + seedTone, 0.45F + seedTone, 0.47F + seedTone},
+            wkc::core::Vec3{0.64F, 0.67F, 0.68F},
+            wkc::core::Vec3{0.23F, 0.24F, 0.24F},
+            wkc::core::Vec3{0.075F, 0.085F, 0.09F},
+            weaponViewmodel.overdrive
+                ? wkc::core::Vec3{0.96F, 0.18F, 0.52F}
+                : wkc::core::Vec3{0.12F, 0.72F, 0.80F},
+        };
+        shader.setMat4(gl_, "uModel", root);
+        shader.setInt(gl_, "uDetailedMaterial", 1);
+        const std::size_t weaponIndex = static_cast<std::size_t>(
+            weaponViewmodel.role);
+        for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
+            const wkc::render::Mesh& mesh = weaponMeshes_[weaponIndex][material];
+            if (!mesh.isValid()) {
+                continue;
+            }
+            const WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
+            gpuMaterial.albedo.bind(gl_, textureBindings_, 0U);
+            gpuMaterial.normal.bind(gl_, textureBindings_, 1U);
+            gpuMaterial.properties.bind(gl_, textureBindings_, 2U);
+            shader.setVec3(gl_, "uTint", materialColors[material]);
+            shader.setFloat(gl_, "uEmissiveStrength",
+                material == static_cast<std::size_t>(WeaponMaterial::Sight)
+                    ? 0.22F : 0.0F);
+            drawMesh(mesh);
+        }
+
+        // The flash is transient and remains independent of the approved
+        // weapon material. All three weapon bodies above are static GPU meshes.
+        fallbackTexture_.bind(gl_, textureBindings_);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
         const auto drawWeaponPiece = [&](const wkc::core::Vec3 offset,
                                          const wkc::core::Vec3 scale,
                                          const wkc::core::Vec3 rotationDegrees,
@@ -2010,44 +2084,7 @@ bool GdpRenderer::render(
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
-
-        float muzzlePosition = 0.48F;
-        if (weaponViewmodel.role == HudWeaponRole::Carbine) {
-            drawWeaponPiece({}, {0.22F, 0.18F, 0.52F}, {}, metal);
-            drawWeaponPiece({0.0F, 0.01F, 0.40F},
-                {0.17F, 0.13F, 0.42F}, {}, darkMetal);
-            drawWeaponPiece({0.0F, 0.0F, 0.70F},
-                {0.055F, 0.055F, 0.34F}, {}, metal);
-            drawWeaponPiece({0.0F, -0.01F, -0.35F},
-                {0.19F, 0.16F, 0.30F}, {}, darkMetal);
-            drawWeaponPiece({0.0F, -0.20F, -0.04F},
-                {0.12F, 0.31F, 0.16F}, {-12.0F, 0.0F, 0.0F}, grip);
-            drawWeaponPiece({0.0F, 0.14F, 0.02F},
-                {0.07F, 0.09F, 0.14F}, {}, accent, 0.28F);
-            drawWeaponPiece({0.0F, 0.02F, 0.30F},
-                {0.235F, 0.035F, 0.18F}, {}, accent, 0.10F);
-            muzzlePosition = 0.88F;
-        } else if (weaponViewmodel.role == HudWeaponRole::Pistol) {
-            drawWeaponPiece({}, {0.16F, 0.14F, 0.43F}, {}, metal);
-            drawWeaponPiece({0.0F, 0.075F, 0.04F},
-                {0.145F, 0.085F, 0.36F}, {}, darkMetal);
-            drawWeaponPiece({0.0F, -0.17F, -0.11F},
-                {0.12F, 0.28F, 0.15F}, {-14.0F, 0.0F, 0.0F}, grip);
-            drawWeaponPiece({0.0F, 0.0F, 0.31F},
-                {0.07F, 0.07F, 0.20F}, {}, metal);
-            drawWeaponPiece({0.0F, 0.13F, -0.02F},
-                {0.035F, 0.045F, 0.08F}, {}, accent, 0.24F);
-        } else {
-            drawWeaponPiece({0.0F, -0.16F, -0.05F},
-                {0.10F, 0.32F, 0.10F}, {}, grip);
-            drawWeaponPiece({0.0F, 0.02F, 0.03F},
-                {0.28F, 0.055F, 0.10F}, {}, darkMetal);
-            drawWeaponPiece({0.0F, 0.05F, 0.39F},
-                {0.075F, 0.025F, 0.55F}, {}, metal);
-            drawWeaponPiece({0.0F, 0.07F, 0.40F},
-                {0.04F, 0.012F, 0.54F}, {}, accent, 0.08F);
-            muzzlePosition = 0.0F;
-        }
+        const float muzzlePosition = carbine ? 1.08F : knife ? 0.0F : 0.33F;
 
         const float flash = std::clamp(
             std::isfinite(weaponViewmodel.muzzleFlashStrength)
@@ -2066,6 +2103,7 @@ bool GdpRenderer::render(
                 {0.0F, 0.0F, -45.0F}, flashColor, 1.5F);
         }
         shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setInt(gl_, "uViewmodel", 0);
     }
 
     framebuffer_.presentToDefault(gl_, width, height);

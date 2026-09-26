@@ -175,6 +175,56 @@ int main(const int argc, char* argv[])
                 captureView(ceilingCloseCamera, "industrial_corridor_ceiling_v1_hd",
                     "close", ceilingLighting);
                 if (capture.seed == 2U) {
+                    const auto captureWeapon = [&](const char* const label,
+                        const gdp::game::visual::HudWeaponRole role,
+                        const gdp::game::visual::CameraData view,
+                        const gdp::game::visual::HudRenderData hud) {
+                        const gdp::game::visual::WeaponViewmodelRenderData weapon{
+                            .visible = true, .role = role, .visualSeed = 1717U};
+                        if (!renderer.render(width, height, view, {}, {}, {},
+                                lighting, roomBehindCamera, doors, corridor,
+                                connectedRoom, hud, {}, weapon)) {
+                            std::cerr << "Weapon render failed for " << label << '\n';
+                            passed = false;
+                            return;
+                        }
+                        const auto stats = renderer.lastFrameStats();
+                        std::cout << "WEAPON_CAPTURE " << label
+                            << " draws=" << stats.drawCalls
+                            << " triangles=" << stats.triangles << '\n';
+                        glReadPixels(0, 0, width, height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, pixels.data());
+                        const std::filesystem::path path = outputDirectory
+                            / (std::string{"weapon_first_person_v1_used_"}
+                                + label + ".ppm");
+                        if (!savePpm(path, width, height, pixels)) {
+                            std::cerr << "Could not save " << path << '\n';
+                            passed = false;
+                        } else {
+                            std::cout << path.string() << '\n';
+                        }
+                    };
+                    auto closeWeaponCamera = gameplayCamera;
+                    closeWeaponCamera.verticalFieldOfViewDegrees = 55.0F;
+                    captureWeapon("pistol_gameplay",
+                        gdp::game::visual::HudWeaponRole::Pistol, gameplayCamera, {});
+                    captureWeapon("pistol_close",
+                        gdp::game::visual::HudWeaponRole::Pistol, closeWeaponCamera, {});
+                    captureWeapon("carbine_gameplay",
+                        gdp::game::visual::HudWeaponRole::Carbine, gameplayCamera, {});
+                    captureWeapon("carbine_close",
+                        gdp::game::visual::HudWeaponRole::Carbine, closeWeaponCamera, {});
+                    captureWeapon("knife_gameplay",
+                        gdp::game::visual::HudWeaponRole::Knife, gameplayCamera, {});
+                    captureWeapon("knife_close",
+                        gdp::game::visual::HudWeaponRole::Knife, closeWeaponCamera, {});
+                    gdp::game::visual::HudRenderData potatoHud;
+                    potatoHud.graphicsQuality
+                        = gdp::game::visual::HudGraphicsQuality::Potato;
+                    potatoHud.detailedMaterials = false;
+                    captureWeapon("carbine_potato",
+                        gdp::game::visual::HudWeaponRole::Carbine, gameplayCamera,
+                        potatoHud);
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "on", lighting);
                     gdp::game::visual::RoomLightingRenderData offLighting = lighting;

@@ -3,6 +3,7 @@
 #include "game/visual/EnemyGenerator.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/RoomMaterialGenerator.hpp"
+#include "game/visual/WeaponViewmodelAssets.hpp"
 #include "resources/AssetCache.hpp"
 #include "render/Camera.hpp"
 #include "render/Framebuffer.hpp"
@@ -239,6 +240,12 @@ private:
         wkc::render::Texture emission;
     };
 
+    struct WeaponGpuMaterial {
+        wkc::render::Texture albedo;
+        wkc::render::Texture normal;
+        wkc::render::Texture properties;
+    };
+
     struct RoomGpuMaterials {
         std::array<wkc::render::Texture,
             static_cast<std::size_t>(IndustrialSurface::Count)> textures;
@@ -259,6 +266,9 @@ private:
     wkc::render::Shader shadow6Shader_{};
     wkc::render::Shader lowSpecShader_{};
     wkc::render::Mesh box_{};
+    std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
+        weaponRoleCount> weaponMeshes_{};
+    std::array<WeaponGpuMaterial, weaponMaterialCount> weaponMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};

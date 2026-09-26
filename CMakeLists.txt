@@ -241,6 +241,7 @@ add_library(
     STATIC
     src/game/visual/GdpRenderData.cpp
     src/game/visual/GdpRenderer.cpp
+    src/game/visual/WeaponViewmodelAssets.cpp
 )
 
 target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)

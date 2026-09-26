@@ -546,6 +546,10 @@ especializados das pastas numeradas.
   com câmera interpolada e bloqueio seguro ao tentar levantar sob obstáculos;
   `Espaço` aplica salto físico com gravidade, colisão de cabeça e aterrissagem
   sobre o cenário. Campaign/Speedrun avançam para regras 29/28.
+- **Fase 143 — Armas em primeira pessoa, variante Used:** rifle, pistola e faca
+  receberam malhas próprias com componentes mecânicos, chanfros e materiais
+  metálico/polímero de desgaste moderado. A implementação e os testes técnicos
+  estão concluídos; a aceitação visual no jogo ainda depende de playtest.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1515,6 +1519,17 @@ A trajetória real move a câmera, enquanto o viewmodel recebe respostas sutis
 de postura e estado aéreo sem deslocar a mira lógica. Campaign/Speedrun avançam
 para regras 29/28, mantendo o checkpoint schema 3 porque postura, velocidade e
 posição continuam transitórias.
+
+Na Fase 143, a variante `Used` da proposta
+[`Weapon/first-person presentation v1`](visual/proposals/weapon_first_person_proposal_v1.md)
+aprovada pelo usuário substitui as peças simples do rifle, da pistola e da
+faca. As malhas são agrupadas por material para limitar draws; superfícies
+principais usam mapas procedurais de `512×512` com albedo, normal e RMA, e
+detalhes menores usam `128×128`. A iluminação de preenchimento é restrita ao
+viewmodel. Lógica de tiro, recarga, seleção, munição, dano e checkpoints não
+mudaram. As [capturas in-engine](visual/validation/weapon_first_person_v1_used_comparison.png)
+e o perfil POTATO estão registrados para aceitação visual; a prancha conceitual
+não é uma captura da build nem inclui aprovação de mãos/braços novos.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas
