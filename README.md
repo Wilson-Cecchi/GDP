@@ -529,6 +529,10 @@ especializados das pastas numeradas.
   no slot 1; `1`, `2` e roda do mouse alternam os slots pelo fixed update. Cada
   arma conserva munição própria, enquanto melhorias alcançam ambas e duplicatas
   não reabastecem. Checkpoint schema 3 grava os dois slots; regras avançam 25/24.
+- **Fase 139 — Troca de arma temporizada:** Pistol entra em `0,34 s` e Carbine
+  em `0,48 s`, pelo estado autoritativo de `Weapon`. Disparo, recarga e outra
+  troca ficam bloqueados até a entrada terminar; o viewmodel lê o mesmo timer.
+  Campaign/Speedrun avançam para regras 26/25.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1456,6 +1460,16 @@ pente e reserva próprios; Ammo abastece somente a arma ativa, melhorias de dano
 e capacidade alcançam as duas e uma Carbine duplicada permanece no chão sem
 reabastecer. Campaign/Speedrun avançam para regras 25/24. O checkpoint schema 3
 grava arma ativa e guardada; schemas anteriores não são reinterpretados.
+
+Na Fase 139, equipar ou selecionar uma arma inicia sua entrada autoritativa:
+`0,34 s` para a Pistol e `0,48 s` para a Carbine. Enquanto esse timer avança no
+fixed update, `tryFire()` retorna `Switching`, recarga e outra troca são
+rejeitadas e nenhum cartucho, hitscan, ruído, recuo, flash ou dry fire é criado.
+Isso impede reiniciar cooldown pela alternância rápida de slots. A pausa congela
+a ação e o viewmodel recebe diretamente a força restante do mesmo estado, sem
+um segundo timer de troca na `Application`. A entrada inicial da run continua
+somente cosmética. O timer não entra no checkpoint; restore devolve o loadout
+em repouso. Campaign/Speedrun avançam para regras 26/25, sem mudar o schema 3.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

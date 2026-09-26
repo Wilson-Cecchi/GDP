@@ -39,6 +39,8 @@ void testCampaignCarryoverRoundTrip()
         sourceWeapon);
     expect(sourceWeapon.equip(WeaponArchetype::Carbine),
         "campaign fixture equips the discovered Carbine");
+    sourceWeapon.fixedUpdate(
+        weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
     sourcePlayer.applyDamage(15.0F);
     expect(sourceWeapon.tryFire() == FireReadiness::Fired,
         "campaign fixture spends the first magazine round");
@@ -47,6 +49,13 @@ void testCampaignCarryoverRoundTrip()
         "campaign fixture spends the second magazine round");
     expect(sourceWeapon.activateOverdrive(),
         "campaign fixture activates a temporary Arena Overdrive");
+    expect(sourceWeapon.switchTo(WeaponArchetype::Pistol),
+        "campaign fixture begins a transient slot change");
+    sourceWeapon.fixedUpdate(
+        weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    expect(sourceWeapon.switchTo(WeaponArchetype::Carbine)
+            && sourceWeapon.switching(),
+        "campaign fixture captures an active Carbine entry");
 
     const CampaignCarryover carryover = captureCampaignCarryover(
         sourcePlayer, sourceWeapon, sourceProgression);
@@ -92,6 +101,7 @@ void testCampaignCarryoverRoundTrip()
             && restoredWeapon.ownsWeapon(WeaponArchetype::Pistol)
             && near(restoredWeapon.cooldownRemaining(), 0.0F)
             && !restoredWeapon.reloading()
+            && !restoredWeapon.switching()
             && !restoredWeapon.overdriveActive(),
         "both weapon slots persist while transient combat state resets");
     expect(restoredProgression.state().level

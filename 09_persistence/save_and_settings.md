@@ -164,6 +164,12 @@ Overdrive continuam transitórios. O schema 2 de arma única não é reinterpret
 e Campaign/Speedrun avançam para regras 25/24 por causa das novas decisões de
 troca, munição e tempo.
 
+A Fase 139 mantém o schema 3: o tempo restante de entrada da arma é transitório,
+assim como cooldown, recarga, spread e Overdrive, e restore sempre entrega os
+dois slots em repouso. Como os `0,34 s`/`0,48 s` sem disparar alteram combate e
+tempo de conclusão, Campaign/Speedrun avançam para regras 26/25. Checkpoints 25
+e recordes 24 continuam no disco, mas são rejeitados como incompatíveis.
+
 ## Settings
 
 Formato legível como TOML/JSON, versionado e tolerante a campos ausentes/desconhecidos.

@@ -16,6 +16,7 @@
 > determinístico por rajada. A Fase 136 tornou a Carbine automática sem alterar
 > a Pistol semiautomática. A Fase 137 tornou a recarga uma ação temporizada e
 > autoritativa. A Fase 138 adicionou dois slots de arma com troca real. A fila
+> Fase 139 tornou a entrada após equip/troca temporizada e autoritativa. A fila
 > desacoplada de sinais de combate permanece para fases posteriores.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -107,6 +108,14 @@ desarma o gatilho segurado; selecionar o slot atual ou uma arma ainda não
 encontrada não muda estado. Firepower e Capacity atualizam ambas as armas, mas
 pickups Ammo abastecem somente a ativa.
 
+Na Fase 139, adquirir ou selecionar um slot inicia uma entrada no próprio
+`Weapon`: `0,34 s` para Pistol e `0,48 s` para Carbine. Durante esse período,
+`tryFire()` retorna `Switching`, `reload()` e outra troca são recusados, e o
+helper de trigger não solicita disparos. O timer avança apenas no fixed update,
+portanto pausa o congela e alternar rapidamente não pode zerar cooldown para
+burlar a cadência. Ao terminar, a arma já selecionada fica disponível. Restore
+descarta a ação transitória, enquanto Overdrive continua preservado.
+
 O estado de spread é transitório e pertence à `Weapon`: índice da última
 amostra, quantidade da rajada e timer de recuperação. Ele não integra
 `WeaponCampaignProgress`, assim como cooldown e Overdrive; checkpoints entre
@@ -119,12 +128,12 @@ da arma equipada. O timer e o cooldown avançam pelo mesmo fixed update; ao
 expirar, o perfil-base volta sem mutar `WeaponDefinition`. Um segundo Special
 não reinicia nem acumula duração, evitando extensão infinita do efeito.
 
-Na Fase 112, a `Application` traduz somente ações já aceitas em temporizadores
-visuais: um tiro que consumiu munição inicia recuo e flash, uma recarga válida
-inicia o arco de recarga e a troca efetiva para Carbine inicia a entrada da arma.
-Desde a Fase 137, o arco lê o progresso autoritativo de `Weapon`; apenas recuo,
-flash e equip mantêm timers cosméticos na aplicação. Cooldown, dry fire e pickup
-recusado não fabricam movimento. Esses estados não
+Na Fase 112, a `Application` traduz somente ações já aceitas em apresentação:
+um tiro que consumiu munição inicia recuo e flash. Desde a Fase 137, o arco de
+recarga lê o progresso autoritativo de `Weapon`; desde a Fase 139, a entrada de
+equip/troca também lê a força autoritativa da arma. Apenas recuo, flash e a
+entrada inicial da run mantêm timers cosméticos na aplicação. Cooldown, dry
+fire e pickup recusado não fabricam movimento. Esses estados não
 alteram `Weapon`, dano, cadência, munição ou direção do hitscan e congelam junto
 com o gameplay quando um menu pausa a run.
 
@@ -200,6 +209,9 @@ classe material para orgânicos, robôs, crates e terminais, além da ausência 
 dados em disparos sem contato.
 Trigger mode acrescenta Pistol semiautomática, Carbine automática, interrupção
 ao soltar e supressão de dry fire repetido com pente vazio.
+Troca temporizada acrescenta durações por arquétipo, avanço parcial, bloqueio
+de disparo/recarga/segunda troca, hitscan sem impacto ou consumo, sincronização
+do viewmodel e reset seguro no restore.
 O gate da Fase 86 coloca uma barreira entre Worker e Player, executa 360 passos
 e exige que o inimigo a contorne. A repetição com a mesma seed precisa terminar
 na mesma posição; todos os cinco arquétipos usam o mesmo helper de movimento.

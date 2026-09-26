@@ -12,8 +12,10 @@
 
 `W/S` frente/trás, `A/D` strafe, mouse yaw/pitch, `E` interação, `R` recarga,
 `1` Pistol, `2` Carbine, roda para alternar armas e `Esc` para pausa. A seleção
-de arma vira comando pendente e só altera um slot possuído no fixed update. Um
-modo clássico posterior deve alterar apenas o mapeamento.
+de arma vira comando pendente e só altera um slot possuído no fixed update. A
+Pistol entra em `0,34 s` e a Carbine em `0,48 s`; tiro, recarga e nova seleção
+ficam bloqueados até o timer autoritativo terminar. Um modo clássico posterior
+deve alterar apenas o mapeamento.
 
 ## Fixed update
 

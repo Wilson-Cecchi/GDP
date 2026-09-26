@@ -2125,7 +2125,6 @@ void Application::fixedUpdate(const double fixedStep)
     weapon_.fixedUpdate(step);
     if (weaponSwitchPending_ && player_.state().alive
         && weapon_.switchTo(*weaponSwitchPending_)) {
-        weaponEquipRemaining_ = weaponEquipDuration;
         reloadPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
@@ -2327,8 +2326,6 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
 
-    const gameplay::WeaponArchetype weaponBeforeLoot
-        = weapon_.definition().archetype;
     const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
         entities_, player_, weapon_, playerRoom);
     if (loot.collected > 0U) {
@@ -2369,9 +2366,6 @@ void Application::fixedUpdate(const double fixedStep)
                 config_.worldSeed, audioEventCounter_++);
         }
         gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
-        if (weapon_.definition().archetype != weaponBeforeLoot) {
-            weaponEquipRemaining_ = weaponEquipDuration;
-        }
         awardProgress(gameplay::ProgressionEvent::LootCollected,
             static_cast<std::uint32_t>(loot.collected));
     }
@@ -2419,6 +2413,7 @@ void Application::fixedUpdate(const double fixedStep)
         }
         if (shot.outcome != gameplay::ShotOutcome::Cooldown
             && shot.outcome != gameplay::ShotOutcome::Reloading
+            && shot.outcome != gameplay::ShotOutcome::Switching
             && shot.outcome != gameplay::ShotOutcome::Empty) {
             weaponRecoilRemaining_ = weaponRecoilDuration;
             weaponMuzzleFlashRemaining_ = weaponMuzzleFlashDuration;
@@ -2427,7 +2422,8 @@ void Application::fixedUpdate(const double fixedStep)
                 {.position = player_.state().position});
         }
         if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown
-            && shot.outcome != gameplay::ShotOutcome::Reloading) {
+            && shot.outcome != gameplay::ShotOutcome::Reloading
+            && shot.outcome != gameplay::ShotOutcome::Switching) {
             const gdp::audio::AudioEventKind fireKind
                 = shot.outcome == gameplay::ShotOutcome::Empty
                 ? gdp::audio::AudioEventKind::DryFire
@@ -3553,7 +3549,8 @@ void Application::render()
             }
         }
         if (hud.prompt == visual::HudPrompt::None
-            && !weapon_.reloading() && weapon_.magazineAmmo() == 0U
+            && !weapon_.reloading() && !weapon_.switching()
+            && weapon_.magazineAmmo() == 0U
             && weapon_.reserveAmmo() > 0U) {
             hud.prompt = visual::HudPrompt::Reload;
         }
@@ -3572,7 +3569,9 @@ void Application::render()
         .role = hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
         .reloadProgress = weapon_.reloadProgress(),
-        .equipStrength = weaponEquipRemaining_ / weaponEquipDuration,
+        .equipStrength = std::max(
+            weaponEquipRemaining_ / weaponEquipDuration,
+            weapon_.switchStrength()),
         .muzzleFlashStrength
             = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
         .overdrive = weapon_.overdriveActive(),

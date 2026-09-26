@@ -55,7 +55,10 @@ essa ornamentação não amplia hit targets nem ocupa o centro do combate.
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o
 pickup ou uma seleção por `1`, `2` ou roda é aceita. A entrada visual por baixo
-é repetida na troca, sem fabricar disparo ou alterar os hit tests do HUD.
+é repetida na troca, sem fabricar disparo ou alterar os hit tests do HUD. Desde
+o início da Fase 139, sua força vem do timer autoritativo de `Weapon`: `0,34 s`
+para Pistol e `0,48 s` para Carbine. A arma só aceita disparo ou recarga quando
+o mesmo movimento visual termina.
 
 Durante Overdrive, a mesma linha acrescenta `OD` entre a identidade da arma e a
 munição. O título diagnóstico mostra também os segundos inteiros restantes; o

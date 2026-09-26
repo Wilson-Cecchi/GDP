@@ -48,6 +48,7 @@ enum class FireReadiness : std::uint8_t {
     Fired,
     Cooldown,
     Reloading,
+    Switching,
     Empty,
 };
 
@@ -80,6 +81,9 @@ public:
     [[nodiscard]] float reloadRemaining() const noexcept;
     [[nodiscard]] float reloadProgress() const noexcept;
     [[nodiscard]] bool reloading() const noexcept;
+    [[nodiscard]] float switchRemaining() const noexcept;
+    [[nodiscard]] float switchStrength() const noexcept;
+    [[nodiscard]] bool switching() const noexcept;
     [[nodiscard]] float damage() const noexcept;
     [[nodiscard]] float overdriveRemaining() const noexcept;
     [[nodiscard]] bool overdriveActive() const noexcept;
@@ -94,6 +98,7 @@ private:
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
     float reloadRemaining_{0.0F};
+    float switchRemaining_{0.0F};
     float overdriveRemaining_{0.0F};
     std::uint32_t spreadShotCount_{0U};
     std::uint32_t spreadShotIndex_{0U};
@@ -108,6 +113,8 @@ private:
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponReloadDurationSeconds(
+    WeaponArchetype archetype) noexcept;
+[[nodiscard]] float weaponSwitchDurationSeconds(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] bool weaponUsesAutomaticFire(
     WeaponArchetype archetype) noexcept;

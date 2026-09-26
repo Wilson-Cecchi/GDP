@@ -258,6 +258,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before two-slot weapon loadouts remain isolated");
 
+    writeText(path, "version = 3\nrules_version = 25\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before authoritative weapon switching remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,

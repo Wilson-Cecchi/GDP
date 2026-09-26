@@ -550,6 +550,13 @@ dois slots e rejeição de duplicata sem refill. Input neutro e SDL validam `1`,
 transitório; checkpoint schema 3 faz round trip do loadout e rejeita schema 2,
 identidades duplicadas e regras 24/23 anteriores à troca de armas.
 
+O gate da Fase 139 exige durações positivas e distintas por arquétipo, força
+normalizada `1 → 0` e conclusão exclusivamente pelo fixed update. Durante a
+entrada, disparo, recarga, trigger segurado e segunda troca são recusados;
+hitscan retorna `Switching` sem consumo, alvo ou impacto. A regressão também
+prova cancelamento da recarga anterior, preservação de Overdrive, reset no
+restore e incompatibilidade das regras Campaign/Speedrun 25/24.
+
 ## Sanitizers
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.

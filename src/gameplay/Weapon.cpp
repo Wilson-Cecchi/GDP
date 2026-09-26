@@ -58,6 +58,12 @@ float weaponReloadDurationSeconds(
     return archetype == WeaponArchetype::Carbine ? 1.05F : 0.82F;
 }
 
+float weaponSwitchDurationSeconds(
+    const WeaponArchetype archetype) noexcept
+{
+    return archetype == WeaponArchetype::Carbine ? 0.48F : 0.34F;
+}
+
 bool weaponUsesAutomaticFire(const WeaponArchetype archetype) noexcept
 {
     return archetype == WeaponArchetype::Carbine;
@@ -68,7 +74,7 @@ bool weaponFireRequested(
     const bool triggerPressed,
     const bool triggerHeld) noexcept
 {
-    if (weapon.reloading()) {
+    if (weapon.reloading() || weapon.switching()) {
         return false;
     }
     return triggerPressed
@@ -96,6 +102,7 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
     cooldownRemaining_ = std::max(
         0.0F,
         cooldownRemaining_ - step);
+    switchRemaining_ = std::max(0.0F, switchRemaining_ - step);
     overdriveRemaining_ = std::max(0.0F, overdriveRemaining_ - step);
     spreadRecoveryRemaining_ = std::max(
         0.0F, spreadRecoveryRemaining_ - step);
@@ -117,6 +124,9 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
 
 FireReadiness Weapon::tryFire() noexcept
 {
+    if (switching()) {
+        return FireReadiness::Switching;
+    }
     if (reloading()) {
         return FireReadiness::Reloading;
     }
@@ -140,7 +150,7 @@ FireReadiness Weapon::tryFire() noexcept
 
 bool Weapon::reload() noexcept
 {
-    if (reloading() || magazineAmmo_ >= definition_.magazineSize
+    if (switching() || reloading() || magazineAmmo_ >= definition_.magazineSize
         || reserveAmmo_ == 0U) {
         return false;
     }
@@ -198,7 +208,7 @@ bool Weapon::increaseReserveCapacity(
 bool Weapon::equip(const WeaponArchetype archetype) noexcept
 {
     if (archetype > WeaponArchetype::Carbine
-        || ownsWeapon(archetype)) {
+        || ownsWeapon(archetype) || switching()) {
         return false;
     }
     const WeaponCampaignProgress::StowedWeapon previous{
@@ -213,6 +223,7 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     reserveAmmo_ = definition_.reserveMaximum;
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    switchRemaining_ = weaponSwitchDurationSeconds(definition_.archetype);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
@@ -224,7 +235,7 @@ bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
 {
     if (archetype > WeaponArchetype::Carbine
         || archetype == definition_.archetype || !stowedWeapon_
-        || stowedWeapon_->definition.archetype != archetype) {
+        || stowedWeapon_->definition.archetype != archetype || switching()) {
         return false;
     }
     const WeaponCampaignProgress::StowedWeapon previous{
@@ -235,6 +246,7 @@ bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
     stowedWeapon_ = previous;
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    switchRemaining_ = weaponSwitchDurationSeconds(definition_.archetype);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
@@ -276,6 +288,7 @@ bool Weapon::restoreCampaignProgress(
     stowedWeapon_ = progress.stowed;
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    switchRemaining_ = 0.0F;
     overdriveRemaining_ = 0.0F;
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
@@ -327,6 +340,27 @@ float Weapon::reloadProgress() const noexcept
 bool Weapon::reloading() const noexcept
 {
     return reloadRemaining_ > 0.0F;
+}
+
+float Weapon::switchRemaining() const noexcept
+{
+    return switchRemaining_;
+}
+
+float Weapon::switchStrength() const noexcept
+{
+    if (!switching()) {
+        return 0.0F;
+    }
+    return std::clamp(
+        switchRemaining_
+            / weaponSwitchDurationSeconds(definition_.archetype),
+        0.0F, 1.0F);
+}
+
+bool Weapon::switching() const noexcept
+{
+    return switchRemaining_ > 0.0F;
 }
 
 float Weapon::damage() const noexcept

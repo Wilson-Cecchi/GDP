@@ -206,6 +206,17 @@ void testDeterministicWeaponSpread()
             && !blockedByReload.hit && !blockedByReload.impact
             && reloading.magazineAmmo() == 1U,
         "hitscan reports an active reload without fabricating impact or ammo use");
+
+    Weapon switching;
+    expect(switching.equip(WeaponArchetype::Carbine),
+        "hitscan switch fixture equips its second weapon");
+    const ShotResult blockedBySwitch = fireHitscan(
+        switching, {0.0F, 1.0F, 0.0F}, forward, 1U, room, manager);
+    expect(blockedBySwitch.outcome == ShotOutcome::Switching
+            && !blockedBySwitch.hit && !blockedBySwitch.impact
+            && switching.magazineAmmo()
+                == switching.definition().magazineSize,
+        "hitscan reports weapon entry without fabricating impact or ammo use");
 }
 
 void testWeaponPickupEquipment()
@@ -230,29 +241,57 @@ void testWeaponPickupEquipment()
             && weapon.reserveCapacity() == 52U
             && weapon.magazineAmmo() == 12U
             && weapon.reserveAmmo() == 52U
-            && near(weapon.cooldownRemaining(), 0.0F),
+            && near(weapon.cooldownRemaining(), 0.0F)
+            && weapon.switching()
+            && near(weapon.switchStrength(), 1.0F),
         "Carbine keeps upgrades and starts with its own complete ammunition profile");
-    (void)weapon.tryFire();
+    const float carbineSwitchDuration
+        = weaponSwitchDurationSeconds(WeaponArchetype::Carbine);
+    const float pistolSwitchDuration
+        = weaponSwitchDurationSeconds(WeaponArchetype::Pistol);
+    expect(carbineSwitchDuration > pistolSwitchDuration
+            && pistolSwitchDuration > 0.0F
+            && weapon.tryFire() == FireReadiness::Switching
+            && !weapon.reload()
+            && !weapon.switchTo(WeaponArchetype::Pistol)
+            && !weaponFireRequested(weapon, true, true),
+        "weapon entry blocks fire, reload and repeated slot changes authoritatively");
+    weapon.fixedUpdate(carbineSwitchDuration * 0.5F);
+    expect(weapon.switching()
+            && near(weapon.switchRemaining(), carbineSwitchDuration * 0.5F)
+            && near(weapon.switchStrength(), 0.5F),
+        "weapon entry advances from the fixed update with render-ready strength");
+    weapon.fixedUpdate(carbineSwitchDuration * 0.5F);
+    expect(!weapon.switching() && near(weapon.switchStrength(), 0.0F)
+            && weapon.tryFire() == FireReadiness::Fired,
+        "weapon becomes fire-ready only after its complete entry duration");
     expect(weapon.reload() && weapon.switchTo(WeaponArchetype::Pistol)
-            && !weapon.reloading() && weapon.magazineAmmo() == 7U,
+            && !weapon.reloading() && weapon.magazineAmmo() == 7U
+            && weapon.switching(),
         "switching restores Pistol ammunition and cancels transient Carbine reload");
     expect(!weapon.equip(WeaponArchetype::Carbine)
             && weapon.definition().archetype == WeaponArchetype::Pistol,
         "duplicate Carbine pickups cannot refill a stowed weapon");
     expect(weapon.increaseDamage(4.0F)
-            && weapon.increaseReserveCapacity(4U, 4U)
-            && weapon.cycleWeapon()
+            && weapon.increaseReserveCapacity(4U, 4U),
+        "progression upgrades remain available to both weapon slots");
+    weapon.fixedUpdate(pistolSwitchDuration);
+    expect(weapon.cycleWeapon()
             && weapon.definition().archetype == WeaponArchetype::Carbine
             && near(weapon.definition().damage, 34.0F)
             && weapon.reserveCapacity() == 56U
             && weapon.magazineAmmo() == 11U
             && weapon.reserveAmmo() == 56U,
         "progression upgrades both slots and cycling preserves spent Carbine ammo");
+    expect(!weapon.switchTo(WeaponArchetype::Pistol),
+        "a second switch cannot bypass the active weapon-entry time");
+    weapon.fixedUpdate(carbineSwitchDuration);
     expect(weapon.switchTo(WeaponArchetype::Pistol)
             && near(weapon.definition().damage, 42.0F)
             && weapon.reserveCapacity() == 40U
             && !weapon.switchTo(WeaponArchetype::Pistol),
         "direct slot selection restores upgraded Pistol and rejects redundant switch");
+    weapon.fixedUpdate(pistolSwitchDuration);
     expect(weapon.activateOverdrive() && weapon.cycleWeapon()
             && weapon.overdriveActive()
             && weapon.definition().archetype == WeaponArchetype::Carbine,
@@ -295,6 +334,12 @@ void testWeaponTriggerModes()
     expect(reloading.tryFire() == FireReadiness::Fired && reloading.reload()
             && !weaponFireRequested(reloading, true, true),
         "an active reload suppresses both pressed and held trigger requests");
+
+    Weapon switching;
+    expect(switching.equip(WeaponArchetype::Carbine)
+            && !weaponFireRequested(switching, true, true)
+            && !weaponFireRequested(switching, false, true),
+        "weapon entry suppresses both pressed and held trigger requests");
 }
 
 void testWeaponOverdrive()
