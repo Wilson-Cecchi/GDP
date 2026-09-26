@@ -99,7 +99,8 @@ capturas no jogo: visual/validation/weapon_first_person_v1_used_pistol_gameplay.
                   visual/validation/weapon_first_person_v1_used_knife_gameplay.png;
                   visual/validation/weapon_first_person_v1_used_knife_close.png;
                   visual/validation/weapon_first_person_v1_used_carbine_potato.png;
-                  visual/validation/weapon_first_person_v1_used_comparison.png
+                  visual/validation/weapon_first_person_v1_used_comparison.png;
+                  visual/validation/weapon_first_person_v1_used_pose_correction_comparison.png
 resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual pendente)
 ```
 

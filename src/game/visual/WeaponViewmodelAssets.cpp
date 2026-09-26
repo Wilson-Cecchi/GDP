@@ -25,7 +25,8 @@ constexpr std::size_t indexOf(const WeaponMaterial material) noexcept
 class WeaponMeshBuilder {
 public:
     void box(const WeaponMaterial material, const Vec3 center,
-        const Vec3 size, const float tiltDegrees = 0.0F)
+        const Vec3 size, const float tiltDegrees = 0.0F,
+        const std::uint32_t semanticRegion = 0U)
     {
         MeshData& destination = meshes_[indexOf(material)];
         const MeshData source = wkc::render::makeBoxMesh();
@@ -44,6 +45,7 @@ public:
             vertex.normal = {normal.x,
                 normal.y * cosine - normal.z * sine,
                 normal.y * sine + normal.z * cosine};
+            vertex.semanticRegion = semanticRegion;
             destination.vertices.push_back(vertex);
         }
         for (const std::uint32_t index : source.indices) {
@@ -233,7 +235,7 @@ void makePistol(WeaponMeshBuilder& mesh)
     using enum WeaponMaterial;
     mesh.box(Polymer, {0.0F, -0.052F, -0.02F}, {0.18F, 0.115F, 0.37F});
     mesh.box(Polymer, {0.0F, -0.205F, -0.115F},
-        {0.125F, 0.29F, 0.15F}, -14.0F);
+        {0.125F, 0.29F, 0.15F}, 22.0F, weaponGripSemanticRegion);
     mesh.box(Recess, {0.0F, -0.355F, -0.072F}, {0.13F, 0.025F, 0.17F});
     mesh.beveledPrism(CoatedSteel, {0.0F, 0.055F, 0.015F},
         {0.205F, 0.125F, 0.55F}, 0.022F);
@@ -282,7 +284,7 @@ void makeCarbine(WeaponMeshBuilder& mesh)
     mesh.box(Polymer, {0.0F, -0.035F, -0.655F}, {0.225F, 0.20F, 0.07F});
     mesh.box(Recess, {0.0F, -0.035F, -0.697F}, {0.218F, 0.20F, 0.019F});
     mesh.box(Polymer, {0.0F, -0.185F, -0.095F},
-        {0.13F, 0.275F, 0.155F}, -11.0F);
+        {0.13F, 0.275F, 0.155F}, 18.0F, weaponGripSemanticRegion);
     mesh.box(Recess, {0.0F, -0.16F, 0.015F}, {0.025F, 0.025F, 0.185F});
     mesh.box(Recess, {0.0F, -0.222F, 0.093F}, {0.025F, 0.105F, 0.026F});
     mesh.box(Recess, {0.0F, -0.27F, 0.025F}, {0.025F, 0.021F, 0.14F});

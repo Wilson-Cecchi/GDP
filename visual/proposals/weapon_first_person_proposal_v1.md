@@ -21,7 +21,8 @@ capturas in-engine: ../validation/weapon_first_person_v1_used_pistol_gameplay.pn
                    ../validation/weapon_first_person_v1_used_knife_gameplay.png;
                    ../validation/weapon_first_person_v1_used_knife_close.png;
                    ../validation/weapon_first_person_v1_used_carbine_potato.png;
-                   ../validation/weapon_first_person_v1_used_comparison.png
+                   ../validation/weapon_first_person_v1_used_comparison.png;
+                   ../validation/weapon_first_person_v1_used_pose_correction_comparison.png
 ```
 
 ## Objetivo
@@ -110,6 +111,22 @@ Os perfis leves preservam as mesmas silhuetas e desligam a resposta detalhada
 de normal/RMA conforme a configuração já existente.
 
 Estado final ainda pendente de aceitação humana: `IMPLEMENTADA EM VALIDAÇÃO`.
+
+### Correção após o primeiro feedback
+
+O usuário identificou a empunhadura invertida e a área excessiva das armas na
+tela. A pistola e o rifle agora inclinam a base do cabo para trás, não para o
+cano; um teste de geometria verifica essa relação. A apresentação foi reduzida
+e reposicionada no canto inferior direito sem mover a mira lógica ou alterar
+alcance, dano e animações. A faca também recebeu enquadramento menor.
+
+Na [comparação antes/depois](../validation/weapon_first_person_v1_used_pose_correction_comparison.png),
+as colunas são pistola, rifle e faca; a primeira linha é a captura anterior e
+a segunda é a correção, ambas em 1280×720. Comparando os pixels alterados em
+relação à mesma cena sem arma, com tolerância de 2% por canal, a área caiu de
+`64039` para `39046` pixels na pistola (~39%), `97401` para `48656` no rifle
+(~50%) e `44465` para `21912` na faca (~51%). Essa é uma medida de ocupação
+visual naquela cena, não um benchmark de GPU nem garantia para todo FOV.
 
 ## Prompts usados
 

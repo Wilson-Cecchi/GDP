@@ -8,6 +8,7 @@
 #include "game/visual/WeaponViewmodelAssets.hpp"
 #include "render/Texture.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -1380,6 +1381,42 @@ void testWeaponViewmodelAssets()
             "weapon viewmodel groups physical materials into few draws");
         expect(triangles > 100U && triangles < 1600U,
             "weapon viewmodel stays within its triangle budget");
+        if (role != HudWeaponRole::Knife) {
+            const auto& grip = meshes[static_cast<std::size_t>(
+                WeaponMaterial::Polymer)];
+            float minimumY = std::numeric_limits<float>::max();
+            float maximumY = -std::numeric_limits<float>::max();
+            std::size_t gripVertices = 0U;
+            for (const auto& vertex : grip.vertices) {
+                if (vertex.semanticRegion != weaponGripSemanticRegion) {
+                    continue;
+                }
+                minimumY = std::min(minimumY, vertex.position.y);
+                maximumY = std::max(maximumY, vertex.position.y);
+                ++gripVertices;
+            }
+            const float middleY = (minimumY + maximumY) * 0.5F;
+            float upperZ = 0.0F;
+            float lowerZ = 0.0F;
+            std::size_t upperCount = 0U;
+            std::size_t lowerCount = 0U;
+            for (const auto& vertex : grip.vertices) {
+                if (vertex.semanticRegion != weaponGripSemanticRegion) {
+                    continue;
+                }
+                if (vertex.position.y > middleY) {
+                    upperZ += vertex.position.z;
+                    ++upperCount;
+                } else {
+                    lowerZ += vertex.position.z;
+                    ++lowerCount;
+                }
+            }
+            expect(gripVertices == 24U && upperCount > 0U && lowerCount > 0U
+                    && lowerZ / static_cast<float>(lowerCount)
+                        < upperZ / static_cast<float>(upperCount),
+                "firearm grip base rakes toward the rear, not the muzzle");
+        }
     }
     for (std::size_t material = 0U; material < weaponMaterialCount; ++material) {
         const auto images = makeUsedWeaponMaterialImages(

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace gdp::game::visual {
 
@@ -21,6 +22,7 @@ enum class WeaponMaterial : std::size_t {
 inline constexpr std::size_t weaponMaterialCount
     = static_cast<std::size_t>(WeaponMaterial::Count);
 inline constexpr std::size_t weaponRoleCount = 3U;
+inline constexpr std::uint32_t weaponGripSemanticRegion = 1U;
 
 struct WeaponMaterialImages {
     wkc::render::ImageData albedo;

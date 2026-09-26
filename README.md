@@ -549,7 +549,8 @@ especializados das pastas numeradas.
 - **Fase 143 — Armas em primeira pessoa, variante Used:** rifle, pistola e faca
   receberam malhas próprias com componentes mecânicos, chanfros e materiais
   metálico/polímero de desgaste moderado. A implementação e os testes técnicos
-  estão concluídos; a aceitação visual no jogo ainda depende de playtest.
+  estão concluídos; empunhaduras e enquadramento foram corrigidos após a
+  primeira avaliação, mas a aceitação visual ainda depende de playtest.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1530,6 +1531,11 @@ viewmodel. Lógica de tiro, recarga, seleção, munição, dano e checkpoints n�
 mudaram. As [capturas in-engine](visual/validation/weapon_first_person_v1_used_comparison.png)
 e o perfil POTATO estão registrados para aceitação visual; a prancha conceitual
 não é uma captura da build nem inclui aprovação de mãos/braços novos.
+Após o primeiro feedback, a inclinação das empunhaduras da pistola e do rifle
+foi corrigida para que suas bases recuem em direção à coronha. O enquadramento
+dos três modelos ficou menor e mais periférico; a comparação
+[antes/depois](visual/validation/weapon_first_person_v1_used_pose_correction_comparison.png)
+registra a correção em 1280×720.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

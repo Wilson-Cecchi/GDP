@@ -2012,15 +2012,18 @@ bool GdpRenderer::render(
         const bool carbine = weaponViewmodel.role == HudWeaponRole::Carbine;
         const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
         const wkc::core::Vec3 baseOffset{
-            carbine ? 0.28F : knife ? 0.31F : 0.19F,
-            carbine ? -0.33F : knife ? -0.29F : -0.19F,
-            carbine ? 0.78F : knife ? 0.56F : 0.88F,
+            carbine ? 0.47F : knife ? 0.38F : 0.27F,
+            carbine ? -0.48F : knife ? -0.38F : -0.31F,
+            carbine ? 1.18F : knife ? 0.83F : 0.94F,
         };
         const wkc::core::Vec3 localOffset = baseOffset + pose.offset;
         const wkc::core::Vec3 anchor = camera.position
             + (right * localOffset.x) + (up * localOffset.y)
             + (forward * localOffset.z);
         constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
+        // Keep the weapon in the lower-right periphery. Geometry and flash
+        // scale together; the camera-space firing ray remains unchanged.
+        const float presentationScale = knife ? 0.80F : carbine ? 0.78F : 0.80F;
         const wkc::core::Mat4 root
             = wkc::core::translationMatrix(anchor)
             * basisMatrix(right, up, forward)
@@ -2031,7 +2034,9 @@ bool GdpRenderer::render(
                     * degreesToRadians)
             * wkc::core::rotationXMatrix(
                 (pose.rotationDegrees.x + (knife ? -28.0F : -7.0F))
-                    * degreesToRadians);
+                    * degreesToRadians)
+            * wkc::core::scaleMatrix({presentationScale,
+                presentationScale, presentationScale});
         const float seedTone = static_cast<float>(
             (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
         const std::array materialColors{
