@@ -68,7 +68,7 @@ EntityId EntityManager::createItem(const ItemCreateInfo& info)
         EntityKind::Item,
         info.transform,
         info.roomId,
-        ItemData{info.type, std::max(info.quantity, 1U)});
+        ItemData{info.type, std::max(info.quantity, 1U), std::nullopt});
 }
 
 EntityId EntityManager::createProp(const PropCreateInfo& info)

@@ -460,6 +460,41 @@ void testDirectionalAndLastWeaponSelection()
         "checkpoint restore does not invent a previous transient weapon");
 }
 
+void testDropAndRecoverFirearm()
+{
+    using namespace gdp::gameplay;
+    Weapon weapon;
+    expect(!weapon.dropSelectedFirearm(),
+        "the only firearm cannot be dropped from a valid campaign loadout");
+    expect(weapon.equip(WeaponArchetype::Carbine),
+        "second firearm is acquired before drop testing");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
+    expect(weapon.switchTo(WeaponArchetype::Pistol),
+        "Pistol can become the selected drop target");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    expect(weapon.tryFire() == FireReadiness::Fired,
+        "selected Pistol consumes ammunition before dropping");
+    const auto dropped = weapon.dropSelectedFirearm();
+    expect(dropped && dropped->definition.archetype == WeaponArchetype::Pistol
+            && dropped->magazineAmmo == 7U
+            && weapon.definition().archetype == WeaponArchetype::Carbine
+            && !weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && weapon.ownsWeapon(WeaponArchetype::Knife)
+            && !weapon.lastWeaponArchetype()
+            && validateWeaponCampaignProgress(weapon.campaignProgress()),
+        "drop keeps exact ammo and selects the remaining firearm without losing Knife");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
+    expect(!weapon.equipRecovered(WeaponArchetype::Pistol, 9U, 0U)
+            && !weapon.ownsWeapon(WeaponArchetype::Pistol),
+        "invalid recovered ammo cannot mutate the loadout");
+    expect(weapon.equipRecovered(WeaponArchetype::Pistol,
+            dropped->magazineAmmo, dropped->reserveAmmo)
+            && weapon.magazineAmmo() == 7U
+            && weapon.reserveAmmo() == dropped->reserveAmmo
+            && weapon.ownsWeapon(WeaponArchetype::Carbine),
+        "recovering the dropped Pistol restores ammo without refilling it");
+}
+
 void testWeaponTriggerModes()
 {
     using namespace gdp::gameplay;
@@ -2373,6 +2408,7 @@ int main()
     testWeaponPickupEquipment();
     testKnifeFallback();
     testDirectionalAndLastWeaponSelection();
+    testDropAndRecoverFirearm();
     testWeaponTriggerModes();
     testWeaponOverdrive();
     testDamageLifecycle();

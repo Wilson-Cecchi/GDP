@@ -295,6 +295,56 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     return true;
 }
 
+bool Weapon::equipRecovered(
+    const WeaponArchetype archetype,
+    const std::uint32_t magazineAmmo,
+    const std::uint32_t reserveAmmo) noexcept
+{
+    if (archetype > WeaponArchetype::Carbine
+        || ownsWeapon(archetype) || switching()) {
+        return false;
+    }
+    const WeaponDefinition currentBase = baseWeaponDefinition(
+        definition_.archetype);
+    WeaponDefinition recovered = baseWeaponDefinition(archetype);
+    recovered.damage += std::max(
+        definition_.damage - currentBase.damage, 0.0F);
+    recovered.reserveMaximum += definition_.reserveMaximum
+            > currentBase.reserveMaximum
+        ? definition_.reserveMaximum - currentBase.reserveMaximum : 0U;
+    if (!validateWeaponSlot(recovered, magazineAmmo, reserveAmmo)
+        || !equip(archetype)) {
+        return false;
+    }
+    magazineAmmo_ = magazineAmmo;
+    reserveAmmo_ = reserveAmmo;
+    return true;
+}
+
+std::optional<WeaponCampaignProgress::StowedWeapon>
+Weapon::dropSelectedFirearm() noexcept
+{
+    if (selectedArchetype_ == WeaponArchetype::Knife
+        || !stowedWeapon_ || switching()) {
+        return std::nullopt;
+    }
+    const WeaponCampaignProgress::StowedWeapon dropped{
+        definition_, magazineAmmo_, reserveAmmo_};
+    definition_ = stowedWeapon_->definition;
+    magazineAmmo_ = stowedWeapon_->magazineAmmo;
+    reserveAmmo_ = stowedWeapon_->reserveAmmo;
+    stowedWeapon_.reset();
+    selectedArchetype_ = definition_.archetype;
+    lastSelectedArchetype_.reset();
+    cooldownRemaining_ = 0.0F;
+    reloadRemaining_ = 0.0F;
+    switchRemaining_ = weaponSwitchDurationSeconds(selectedArchetype_);
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
+    return dropped;
+}
+
 bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
 {
     if (archetype > WeaponArchetype::Knife

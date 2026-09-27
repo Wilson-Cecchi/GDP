@@ -204,6 +204,15 @@ em até 22% do FOV configurado e reduz a dispersão do padrão determinístico
 em até 60%. Soltar retorna ao FOV base; a faca ignora a mira. O índice dos
 tiros, RNG e munição não mudam.
 
+Na Fase 152, `G` solta a arma de fogo ativa à frente do jogador, desde que
+exista outra arma de fogo no inventário, a troca atual tenha terminado e haja
+espaço físico para o pickup. A arma restante é selecionada, com entrada e
+cooldown normais; a faca nunca é descartada. Pente e reserva da arma solta são
+conservados, e recuperá-la não reabastece munição. O último slot de arma de
+fogo não pode ser solto: o checkpoint da Campanha continua exigindo um slot
+primário válido, sem mudança de schema. O pickup solto é transitório no mundo e
+não integra o checkpoint entre andares.
+
 ## Testes
 
 Implementados: sem munição, cooldown, recarga, parede bloqueia, filtro por sala,

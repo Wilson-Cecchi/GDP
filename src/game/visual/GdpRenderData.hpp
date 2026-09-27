@@ -32,6 +32,7 @@ enum class PickupVisualRole : std::uint8_t {
     Key,
     Armor,
     Weapon,
+    DroppedPistol,
     Special,
 };
 
@@ -281,6 +282,8 @@ enum class HudNotice : std::uint8_t {
     Wave,
     EventClear,
     LevelUp,
+    WeaponDropped,
+    WeaponDropBlocked,
 };
 
 enum class HudPauseSelection : std::uint8_t {

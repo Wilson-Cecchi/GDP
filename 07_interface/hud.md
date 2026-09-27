@@ -115,6 +115,9 @@ marcas claras ao redor da mira e eliminações mudam o marcador para vermelho.
 Coleta, início de evento, nova onda, setor limpo e level-up usam mensagens
 curtas com duração controlada pelo fixed update; a UI apenas apresenta o
 snapshot e não controla a simulação.
+`G` mostra `WEAPON DROPPED` ao soltar uma arma ou
+`KEEP ONE GUN / NEED SPACE` quando a ação não é válida. Esses avisos não
+alteram o inventário; a simulação decide se houve descarte.
 
 ## Painel rápido
 

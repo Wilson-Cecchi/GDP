@@ -66,6 +66,12 @@ public:
         std::uint32_t amount,
         std::uint32_t bonusAmmo = 0U) noexcept;
     [[nodiscard]] bool equip(WeaponArchetype archetype) noexcept;
+    [[nodiscard]] bool equipRecovered(
+        WeaponArchetype archetype,
+        std::uint32_t magazineAmmo,
+        std::uint32_t reserveAmmo) noexcept;
+    [[nodiscard]] std::optional<WeaponCampaignProgress::StowedWeapon>
+        dropSelectedFirearm() noexcept;
     [[nodiscard]] bool switchTo(WeaponArchetype archetype) noexcept;
     [[nodiscard]] bool cycleWeapon() noexcept;
     [[nodiscard]] std::optional<WeaponArchetype>

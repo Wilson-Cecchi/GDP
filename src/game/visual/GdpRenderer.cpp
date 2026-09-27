@@ -1959,6 +1959,9 @@ bool GdpRenderer::render(
         } else if (pickup.role == PickupVisualRole::Weapon) {
             tint = {0.72F, 0.28F, 0.96F};
             scale = {0.62F, 0.16F, 0.20F};
+        } else if (pickup.role == PickupVisualRole::DroppedPistol) {
+            tint = {0.72F, 0.28F, 0.96F};
+            scale = {0.30F, 0.16F, 0.20F};
         } else if (pickup.role == PickupVisualRole::Special) {
             tint = {1.0F, 0.24F, 0.52F};
             scale = {0.24F, 0.38F, 0.24F};
@@ -2724,6 +2727,12 @@ bool GdpRenderer::render(
         } else if (hud.notice == HudNotice::LevelUp) {
             noticeText = "LEVEL UP";
             noticeColor = {0.32F, 0.88F, 1.0F};
+        } else if (hud.notice == HudNotice::WeaponDropped) {
+            noticeText = "WEAPON DROPPED";
+            noticeColor = {0.32F, 0.88F, 1.0F};
+        } else if (hud.notice == HudNotice::WeaponDropBlocked) {
+            noticeText = "KEEP ONE GUN / NEED SPACE";
+            noticeColor = uiTheme.warning;
         }
         const float noticeStrength = std::clamp(
             hud.noticeFeedbackStrength, 0.0F, 1.0F);

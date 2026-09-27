@@ -288,6 +288,61 @@ void testAutomaticLootCollection()
         "dead player cannot collect procedural loot");
 }
 
+void testDroppedWeaponPickup()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    Player player;
+    Weapon weapon;
+    EntityManager manager;
+    const CollisionWorld world = CollisionWorld::fixedRoom();
+    expect(!dropSelectedWeapon(manager, player, weapon, world, 2U)
+            && manager.query(EntityKind::Item).empty(),
+        "G keeps the only firearm and does not create a phantom pickup");
+    expect(weapon.equip(WeaponArchetype::Carbine),
+        "drop test acquires a second firearm");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
+    expect(weapon.switchTo(WeaponArchetype::Pistol),
+        "drop test selects Pistol");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    expect(weapon.tryFire() == FireReadiness::Fired,
+        "drop test spends one round before dropping");
+    const auto itemId = dropSelectedWeapon(
+        manager, player, weapon, world, 2U);
+    const ItemData* item = itemId ? manager.findData<ItemData>(*itemId) : nullptr;
+    const Entity* entity = itemId ? manager.find(*itemId) : nullptr;
+    expect(item != nullptr && entity != nullptr
+            && item->recoveredWeapon
+            && item->recoveredWeapon->archetype
+                == static_cast<std::uint32_t>(WeaponArchetype::Pistol)
+            && item->recoveredWeapon->magazineAmmo == 7U
+            && weapon.definition().archetype == WeaponArchetype::Carbine,
+        "G creates one recoverable Pistol with its exact ammunition");
+    expect(collectNearbyLoot(manager, player, weapon, 2U).collected == 0U,
+        "the dropped gun is beyond immediate automatic pickup range");
+    if (entity != nullptr) {
+        expect(player.relocate(entity->transform.position, -90.0F),
+            "player can move to the dropped gun");
+    }
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
+    const LootCollectionSummary recovered
+        = collectNearbyLoot(manager, player, weapon, 2U);
+    expect(recovered.collected == 1U && recovered.weaponsRecovered == 1U
+            && recovered.rewardableCollected == 0U
+            && weapon.definition().archetype == WeaponArchetype::Pistol
+            && weapon.magazineAmmo() == 7U
+            && manager.flushDestroyed() == 1U,
+        "recovery preserves ammo, consumes the pickup and grants no repeat XP");
+
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    expect(player.relocate({0.0F, 0.0F, -4.5F}, -90.0F),
+        "drop test moves to the room wall");
+    expect(!dropSelectedWeapon(manager, player, weapon, world, 2U)
+            && weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && manager.query(EntityKind::Item).empty(),
+        "G cannot place a pickup through a nearby wall");
+}
+
 } // namespace
 
 int main()
@@ -295,6 +350,7 @@ int main()
     testDeterministicLootLayout();
     testRoleBudgetsAndBatch();
     testAutomaticLootCollection();
+    testDroppedWeaponPickup();
     if (failures != 0) {
         std::cerr << failures << " loot test(s) failed\n";
         return 1;

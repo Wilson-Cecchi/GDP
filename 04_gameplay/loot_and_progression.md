@@ -56,6 +56,13 @@ perfil próprio; outra Carbine permanece disponível no chão mesmo quando a arm
 está guardada, impedindo que duplicatas virem fonte de munição. Ammo abastece
 somente o slot ativo, enquanto recompensas Firepower e Capacity evoluem ambos.
 
+Desde a Fase 152, `G` também cria um pickup da arma de fogo selecionada, com
+arquétipo, pente e reserva exatos, somente quando outra arma de fogo permanece
+equipável. O objeto nasce à frente, após validação de colisão, fora do raio de
+coleta imediata. Recuperá-lo usa a coleta automática comum, mas não concede XP
+ou score de loot novamente; apenas loot gerado pelo mundo continua premiado.
+Pickups soltos não são persistidos no checkpoint do próximo andar.
+
 Special ativa 12 segundos de Overdrive na arma equipada. Durante o efeito, dano
 é multiplicado por `1,5` e o intervalo de tiro por `0,65`; outro Special fica no
 chão até o timer terminar. O estado é deliberadamente transitório e não entra
@@ -68,6 +75,8 @@ etapa visual posterior. Desde a Fase 83, Armor também aparece no layout
 procedural: Security, Storage e Maintenance possuem os maiores pesos, sem
 consumir o RNG estrutural do mundo. A recompensa Vitality continua sendo uma
 fonte independente de Armor.
+O pickup de pistola solta usa uma forma violeta mais curta que a da Carbine;
+ambas continuam provisórias até uma revisão visual aprovada.
 
 ## Progressão de sessão
 

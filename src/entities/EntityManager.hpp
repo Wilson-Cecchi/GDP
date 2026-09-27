@@ -113,6 +113,14 @@ struct EnemyData {
 struct ItemData {
     ItemType type{ItemType::Health};
     std::uint32_t quantity{1};
+    struct RecoveredWeapon {
+        std::uint32_t archetype{0U};
+        std::uint32_t magazineAmmo{0U};
+        std::uint32_t reserveAmmo{0U};
+
+        constexpr bool operator==(const RecoveredWeapon&) const noexcept = default;
+    };
+    std::optional<RecoveredWeapon> recoveredWeapon;
 };
 
 struct PropData {

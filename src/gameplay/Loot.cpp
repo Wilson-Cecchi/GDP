@@ -70,7 +70,18 @@ LootCollectionSummary collectNearbyLoot(
             break;
         }
         case ItemType::Weapon:
-            applied = weapon.equip(WeaponArchetype::Carbine);
+            if (item->recoveredWeapon) {
+                applied = item->recoveredWeapon->archetype
+                        <= static_cast<std::uint32_t>(WeaponArchetype::Carbine)
+                    && weapon.equipRecovered(
+                        static_cast<WeaponArchetype>(
+                            item->recoveredWeapon->archetype),
+                        item->recoveredWeapon->magazineAmmo,
+                        item->recoveredWeapon->reserveAmmo);
+                summary.weaponsRecovered += applied ? 1U : 0U;
+            } else {
+                applied = weapon.equip(WeaponArchetype::Carbine);
+            }
             summary.weaponsEquipped += applied ? 1U : 0U;
             break;
         case ItemType::Special:
@@ -82,12 +93,68 @@ LootCollectionSummary collectNearbyLoot(
             ++summary.blockedByCapacity;
             continue;
         }
+        const bool recoveredWeapon = item->recoveredWeapon.has_value();
         if (manager.destroy(id)) {
             summary.collectedItems.push_back(id);
             ++summary.collected;
+            summary.rewardableCollected += recoveredWeapon ? 0U : 1U;
         }
     }
     return summary;
+}
+
+std::optional<gdp::entities::EntityId> dropSelectedWeapon(
+    gdp::entities::EntityManager& manager,
+    Player& player,
+    Weapon& weapon,
+    const CollisionWorld& collisionWorld,
+    const std::uint32_t roomId)
+{
+    if (!player.state().alive || weapon.switching()
+        || weapon.definition().archetype == WeaponArchetype::Knife) {
+        return std::nullopt;
+    }
+    const WeaponCampaignProgress current = weapon.campaignProgress();
+    if (!current.stowed) {
+        return std::nullopt;
+    }
+
+    constexpr float dropDistance = 1.35F;
+    constexpr float minimumClearDistance = 1.05F;
+    const wkc::core::Vec3 position = player.state().position;
+    const wkc::core::Vec3 velocity
+        = player.planarForwardDirection() * dropDistance;
+    const CharacterMotionResult motion = collisionWorld.moveCharacter(
+        position, velocity, 1.0F, player.collider());
+    const float deltaX = motion.position.x - position.x;
+    const float deltaZ = motion.position.z - position.z;
+    if ((deltaX * deltaX) + (deltaZ * deltaZ)
+        < minimumClearDistance * minimumClearDistance) {
+        return std::nullopt;
+    }
+
+    const gdp::entities::EntityId item = manager.createItem({
+        .transform = {.position = motion.position},
+        .roomId = roomId,
+        .type = gdp::entities::ItemType::Weapon,
+        .quantity = 1U,
+    });
+    gdp::entities::ItemData* itemData
+        = manager.findData<gdp::entities::ItemData>(item);
+    if (itemData == nullptr) {
+        (void)manager.destroy(item);
+        return std::nullopt;
+    }
+    itemData->recoveredWeapon = gdp::entities::ItemData::RecoveredWeapon{
+        static_cast<std::uint32_t>(current.definition.archetype),
+        current.magazineAmmo,
+        current.reserveAmmo,
+    };
+    if (!weapon.dropSelectedFirearm()) {
+        (void)manager.destroy(item);
+        return std::nullopt;
+    }
+    return item;
 }
 
 } // namespace gdp::gameplay

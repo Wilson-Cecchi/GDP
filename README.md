@@ -583,6 +583,11 @@ especializados das pastas numeradas.
 - **Fase 151 — Painel rápido:** segurar `Tab` mostra placar, abates, eventos,
   loot e tempo da run sem pausar a simulação. `F3` permanece como painel de
   desempenho separado.
+- **Fase 152 — Soltar arma:** `G` coloca a arma de fogo selecionada à frente do
+  jogador quando há outra arma de fogo no inventário e espaço livre. A arma no
+  chão conserva pente e reserva, pode ser recuperada por coleta automática e
+  não concede XP pela segunda coleta. A faca é permanente; o último fuzil ou
+  pistola não pode ser descartado para preservar o checkpoint da Campanha.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -607,7 +612,9 @@ paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, segura `Ctrl` para agachar, pula com `Espaço`, dispara com o botão esquerdo
 e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife, `Q` retorna à última arma, e a roda
-percorre as armas disponíveis nos dois sentidos. `F3` alterna o
+percorre as armas disponíveis nos dois sentidos. `G` solta a arma de fogo
+selecionada quando outra arma de fogo permanece no inventário. `F` alterna a
+lanterna e `Tab` mostra o painel rápido; `F3` alterna o
 diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os

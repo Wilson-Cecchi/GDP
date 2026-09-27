@@ -23,6 +23,8 @@ enum class NoticeFeedbackKind : std::uint8_t {
     Wave,
     EventClear,
     LevelUp,
+    WeaponDropped,
+    WeaponDropBlocked,
 };
 
 struct FeedbackState {

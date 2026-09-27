@@ -775,6 +775,7 @@ bool Application::initializeRun()
     impactVisualCounter_ = 0U;
     jumpPending_ = false;
     weaponSwitchPending_.reset();
+    dropPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
     flashlightOn_ = false;
@@ -1027,6 +1028,7 @@ void Application::processEvents()
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::closeExitConfirmation(exitConfirmation_);
@@ -1115,6 +1117,7 @@ void Application::processEvents()
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::closeSettingsMenu(settingsMenu_);
@@ -1218,6 +1221,7 @@ void Application::processEvents()
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
 
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::openExitConfirmation(exitConfirmation_);
@@ -1395,6 +1399,7 @@ void Application::processEvents()
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
         if (input_.wasKeyPressed(Key::Escape)) {
             gameplay::openExitConfirmation(exitConfirmation_);
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
@@ -1532,6 +1537,7 @@ void Application::processEvents()
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
 
         std::optional<visual::HudPauseSelection> pointedSelection;
         if (window_ != nullptr) {
@@ -1652,6 +1658,7 @@ void Application::processEvents()
         fireHeld_ = input_.isMouseButtonDown(MouseButton::Primary);
     }
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
+    dropPending_ = dropPending_ || input_.wasKeyPressed(Key::G);
     if (input_.wasKeyPressed(Key::F)) {
         flashlightOn_ = !flashlightOn_;
         log(LogLevel::Info, flashlightOn_
@@ -1687,6 +1694,7 @@ void Application::setPaused(const bool paused)
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();
+    dropPending_ = false;
     if (!config_.headless && window_ != nullptr
         && !SDL_SetWindowRelativeMouseMode(window_, !paused)) {
         log(LogLevel::Warning, sdlError("Pause mouse mode update failed"));
@@ -1760,6 +1768,7 @@ bool Application::returnToMainMenu()
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();
+    dropPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
     flashlightOn_ = false;
@@ -2375,6 +2384,39 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
 
+    if (dropPending_) {
+        if (playerEntity != nullptr && world_) {
+            const auto room = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+                [playerRoom](const world::RoomInstance& candidate) {
+                    return candidate.id == playerRoom;
+                });
+            if (room != world_->rooms.end()) {
+                const auto dropped = gameplay::dropSelectedWeapon(
+                    entities_, player_, weapon_, collisionWorld_, playerRoom);
+                if (dropped) {
+                    room->entities.push_back(*dropped);
+                    gameplay::signalNotice(
+                        feedback_, gameplay::NoticeFeedbackKind::WeaponDropped);
+                    const entities::ItemData* item
+                        = entities_.findData<entities::ItemData>(*dropped);
+                    log(LogLevel::Info, item && item->recoveredWeapon
+                            ? "Weapon dropped: " + std::string{
+                                gameplay::weaponArchetypeName(
+                                    static_cast<gameplay::WeaponArchetype>(
+                                        item->recoveredWeapon->archetype))}
+                            : "Weapon dropped");
+                    reloadPending_ = false;
+                    firePending_ = false;
+                    fireHeld_ = false;
+                } else {
+                    gameplay::signalNotice(
+                        feedback_, gameplay::NoticeFeedbackKind::WeaponDropBlocked);
+                }
+            }
+        }
+        dropPending_ = false;
+    }
+
     const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
         entities_, player_, weapon_, playerRoom);
     if (loot.collected > 0U) {
@@ -2416,7 +2458,7 @@ void Application::fixedUpdate(const double fixedStep)
         }
         gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
         awardProgress(gameplay::ProgressionEvent::LootCollected,
-            static_cast<std::uint32_t>(loot.collected));
+            static_cast<std::uint32_t>(loot.rewardableCollected));
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
@@ -2739,6 +2781,7 @@ void Application::fixedUpdate(const double fixedStep)
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
+        dropPending_ = false;
         latestSpeedrunRecordResult_ = gameplay::considerSpeedrunResult(
             session_.state(), speedrunRecord_);
         if (gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_)) {
@@ -3096,7 +3139,12 @@ void Application::render()
         } else if (item->type == entities::ItemType::Armor) {
             role = visual::PickupVisualRole::Armor;
         } else if (item->type == entities::ItemType::Weapon) {
-            role = visual::PickupVisualRole::Weapon;
+            role = item->recoveredWeapon
+                    && item->recoveredWeapon->archetype
+                        == static_cast<std::uint32_t>(
+                            gameplay::WeaponArchetype::Pistol)
+                ? visual::PickupVisualRole::DroppedPistol
+                : visual::PickupVisualRole::Weapon;
         } else if (item->type == entities::ItemType::Special) {
             role = visual::PickupVisualRole::Special;
         }
@@ -3582,6 +3630,12 @@ void Application::render()
     case gameplay::NoticeFeedbackKind::LevelUp:
         hud.notice = visual::HudNotice::LevelUp;
         break;
+    case gameplay::NoticeFeedbackKind::WeaponDropped:
+        hud.notice = visual::HudNotice::WeaponDropped;
+        break;
+    case gameplay::NoticeFeedbackKind::WeaponDropBlocked:
+        hud.notice = visual::HudNotice::WeaponDropBlocked;
+        break;
     case gameplay::NoticeFeedbackKind::None:
         break;
     }
@@ -3734,6 +3788,7 @@ void Application::shutdown()
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();
+    dropPending_ = false;
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
     flashlightOn_ = false;
