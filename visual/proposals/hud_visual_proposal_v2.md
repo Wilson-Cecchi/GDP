@@ -1,7 +1,7 @@
 # HUD de gameplay — propostas visuais v2
 
 ```text
-estado: AGUARDANDO APROVAÇÃO
+estado: IMPLEMENTADA EM VALIDAÇÃO VISUAL
 unidade visual: HUD/map visual language — somente HUD de gameplay
 versão: v2
 data: 2026-09-27
@@ -12,8 +12,9 @@ pranchas: hud_visual_v2_a_precision.png
           hud_visual_v2_close_comparison.png
 geração: image_gen integrado; mockups editados, NÃO capturas da build
 seeds: não se aplica; o HUD não é uma textura procedural
-decisão do usuário: preferência por A ("eu gostei da hud a");
-                    aprovação para implementação pendente
+decisão do usuário: A Precision aprovada para implementação ("pode implementar")
+capturas da build: visual/validation/hud_visual_v2_a_implemented_{1280x720_neutral,960x540_neutral,960x600_neutral,1280x720_dim}.png
+aceitação visual final em partida: pendente
 ```
 
 ## Por que revisar
@@ -22,8 +23,9 @@ A variante v1 A Rail funciona, mas os módulos atuais ainda parecem caixas
 simples. A v2 explora acabamento e hierarquia melhores sem trocar informações,
 comandos ou regras de jogo. As três pranchas usam a mesma captura como
 referência de composição; o cenário, o viewmodel e alguns pixels podem ter
-sido reinterpretados pela geração de imagem. **Somente o HUD é proposto.**
-Nenhum mockup foi implementado no renderer.
+sido reinterpretados pela geração de imagem. **Somente o HUD foi alterado.**
+A variante A foi implementada com formas nativas; as pranchas continuam sendo
+conceitos, não capturas da build.
 
 ## Escolhas
 
@@ -35,8 +37,8 @@ Nenhum mockup foi implementado no renderer.
 
 A [prancha aproximada](hud_visual_v2_close_comparison.png) coloca A, B e C
 lado a lado, nesta ordem, para avaliar tipografia, espessura e barras. O
-usuário indicou que gostou da **A — Precision**. Isso registra a preferência,
-mas ainda não é aprovação explícita para implementá-la.
+usuário indicou que gostou da **A — Precision** e depois aprovou sua
+implementação.
 
 ## Contrato preservado
 
@@ -46,17 +48,18 @@ mas ainda não é aprovação explícita para implementá-la.
   objetivo novo ou mecânica de combate é proposto.
 - Ciano indica informação/interação; laranja indica aviso. O texto deve
   continuar legível em 960×540, 1280×720 e 16:10, inclusive com pouca luz.
-- A implementação aprovada deve usar formas/texto nativos do compositor,
+- A implementação aprovada usa formas/texto nativos do compositor,
   **não** colar estes PNGs na tela. Sem novo framebuffer, hit test ou custo
   significativo para POTATO/LOW.
 - Menus, painel `Tab`, overlay `F3`, modelos das armas e texturas do mundo ficam
-  fora desta aprovação. A v1 A Rail segue sendo a build atual até uma decisão.
+  fora desta aprovação. A v2 A Precision substitui a v1 A Rail no gameplay.
 
 ## Gate de aceitação
 
-Após escolha explícita de A, B ou C (ou pedido de revisão), fazer uma única
-implementação delimitada, capturar o HUD real em 1280×720, 960×540 e pouca luz,
-rodar regressões de HUD/menus/renderer e pedir aceitação visual em partida.
+A escolha explícita de A levou a uma implementação delimitada, com capturas
+reais em 1280×720, 960×540, 960×600 (16:10) e pouca luz e regressões de
+HUD/menus/renderer.
+A aceitação visual em partida ainda deve ser pedida.
 Variação relevante entre mockup e build volta para revisão.
 
 ## Prompts usados

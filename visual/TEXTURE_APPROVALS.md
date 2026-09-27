@@ -110,11 +110,15 @@ arquivo/pranchas: visual/proposals/hud_visual_v2_a_precision.png;
                  visual/proposals/hud_visual_v2_c_instrument.png;
                  visual/proposals/hud_visual_v2_close_comparison.png
 variantes mostradas: A Precision; B Telemetry; C Instrument
-decisão do usuário: preferência por A Precision ("eu gostei da hud a");
-                    APROVAÇÃO PARA IMPLEMENTAÇÃO PENDENTE
+decisão do usuário: A Precision APROVADA PARA IMPLEMENTAÇÃO
+                    ("eu gostei da hud a"; "pode implementar")
 data: 2026-09-27
-commit de implementação: nenhum
-resultado final: PROPOSTA; v1 A Rail continua na build
+commit de implementação: a registrar após validação técnica
+capturas no jogo: visual/validation/hud_visual_v2_a_implemented_1280x720_neutral.png;
+                  visual/validation/hud_visual_v2_a_implemented_960x540_neutral.png;
+                  visual/validation/hud_visual_v2_a_implemented_960x600_neutral.png;
+                  visual/validation/hud_visual_v2_a_implemented_1280x720_dim.png
+resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual em partida pendente)
 ```
 
 Contrato e comparação em
@@ -174,10 +178,15 @@ versão da proposta: v2
 arquivo/pranchas: visual/proposals/ground_weapon_pickup_v2_close.png;
                  visual/proposals/ground_weapon_pickup_v2_gameplay.png
 variantes mostradas: três poses de repouso para os modelos Used existentes
-decisão do usuário: AGUARDANDO APROVAÇÃO DE IMPLEMENTAÇÃO
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO ("pode implementar")
 data: 2026-09-27
-commit de implementação: nenhum
-resultado final: PROPOSTA; bloco violeta continua na build
+commit de implementação: a registrar após validação técnica
+capturas no jogo: visual/validation/ground_weapon_pickup_v2_close.png;
+                  visual/validation/ground_weapon_pickup_v2_gameplay.png;
+                  visual/validation/ground_weapon_pickup_v2_dim.png;
+                  visual/validation/ground_weapon_pickup_v2_potato.png;
+                  visual/validation/ground_weapon_pickup_v2_fall_mid.png
+resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual em partida pendente)
 ```
 
 Contrato e limites em
@@ -311,8 +320,8 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
 | Player presentation | Não revisada |
-| HUD/map visual language | V1 A Rail implementada em validação; V2 A é a preferência, implementação pendente de aprovação; mapa não revisado |
-| Weapon/ground pickup | V1 revisão solicitada; V2 aguarda aprovação; bloco violeta permanece na build |
+| HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |
+| Weapon/ground pickup | V2 modelos Used caídos implementada em validação; V1 substituída |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes

@@ -1,7 +1,7 @@
 # Arma solta no chão — proposta visual v2
 
 ```text
-estado: AGUARDANDO APROVAÇÃO
+estado: IMPLEMENTADA EM VALIDAÇÃO VISUAL
 unidade visual: Weapon/ground pickup — Pistol e Carbine
 versão: v2
 data: 2026-09-27
@@ -12,7 +12,9 @@ pranchas: ground_weapon_pickup_v2_close.png
 geração: image_gen integrado; conceitos, NÃO capturas da build
 referência de identidade: capturas in-engine da Pistol e da Carbine Used
 variantes: três poses de repouso, sem skins diferentes
-decisão de implementação: pendente
+decisão de implementação: APROVADA pelo usuário ("pode implementar")
+capturas da build: visual/validation/ground_weapon_pickup_v2_{close,gameplay,dim,potato,fall_mid}.png
+aceitação visual final em partida: pendente
 ```
 
 ## Direção revisada
@@ -32,18 +34,15 @@ contorno real da arma e da luz da sala. Em sala muito escura, a ausência de
 marcador pode exigir ajuste de contraste após playtest; nenhum marcador foi
 aprovado antecipadamente.
 
-## Movimento proposto, ainda não implementado
+## Movimento implementado
 
-Ao pressionar `G`, uma curta trajetória visual de queda deve levar a arma ao
-ponto de drop que o gameplay já validou. A arma gira um pouco, toca o piso e
-assenta de lado sem atravessá-lo. A orientação final pode variar de forma
-determinística por identidade do pickup, sem consumir o RNG estrutural do mapa.
-Não há necessidade de ragdoll ou física geral. O pickup lógico permanece no
-local seguro e conserva coleta automática, munição e progressão atuais. A
-imagem estática mostra somente o estado final; a queda em movimento exigirá
-captura ou vídeo in-engine depois da implementação.
+Ao pressionar `G`, a malha desce e gira por 25 ticks de simulação até repousar
+de lado no ponto lógico de drop. A orientação varia deterministicamente por
+identidade do pickup, sem consumir o RNG estrutural do mapa. O ponto de coleta,
+munição e progressão não mudam. A captura `fall_mid` registra o meio da queda;
+as demais mostram o repouso. Não há ragdoll nem física geral.
 
-## Limites, somente após aprovação
+## Limites da implementação
 
 - Reusar ou derivar as malhas e materiais atuais das armas em primeira pessoa;
   não usar estes PNGs como sprite/texture aplicada ao jogo.
@@ -57,10 +56,10 @@ captura ou vídeo in-engine depois da implementação.
 
 ## Gate de aceitação
 
-É necessária aprovação explícita desta v2 antes de alterar o renderer. Após a
-implementação: capturas reais em vista próxima, distância de coleta, pouca luz
-e POTATO; testes de loot/render e inspeção da queda completa até o repouso.
-Pedir aceitação visual em partida antes de declarar a unidade concluída.
+A implementação foi autorizada. Capturas reais em vista próxima, distância de
+coleta, pouca luz, POTATO e meio da queda acompanham testes de loot/render e
+contato dos vértices com o piso. A aceitação visual em partida permanece pendente;
+esta unidade ainda não foi declarada concluída pelo usuário.
 
 ## Prompts usados
 

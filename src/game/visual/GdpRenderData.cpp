@@ -1194,6 +1194,27 @@ float impactVisualSize(const float strength) noexcept
     return 0.025F + (safeStrength * 0.055F);
 }
 
+DroppedWeaponPose sampleDroppedWeaponPose(
+    const wkc::core::Seed visualSeed, const PickupVisualRole role,
+    const float progress) noexcept
+{
+    const float t = std::clamp(std::isfinite(progress) ? progress : 1.0F,
+        0.0F, 1.0F);
+    const std::uint64_t variation = visualSeed ^ (visualSeed >> 17U)
+        ^ (visualSeed << 13U);
+    const float yawVariation = static_cast<float>(variation % 51U) - 25.0F;
+    const float side = (variation & 0x80U) == 0U ? 1.0F : -1.0F;
+    const float settle = t * t * (3.0F - 2.0F * t);
+    const float floorHeight = role == PickupVisualRole::DroppedPistol
+        ? 0.11F : 0.14F;
+    return {
+        .yawDegrees = yawVariation + (1.0F - settle) * side * 16.0F,
+        .rollDegrees = side * (18.0F + 72.0F * settle),
+        .height = floorHeight + (1.0F - t) * (1.0F - t) * 0.78F
+            + 0.12F * std::sin(t * std::numbers::pi_v<float>),
+    };
+}
+
 WeaponViewmodelPose sampleWeaponViewmodelPose(
     const WeaponViewmodelRenderData& weapon) noexcept
 {

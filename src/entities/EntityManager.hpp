@@ -121,6 +121,9 @@ struct ItemData {
         constexpr bool operator==(const RecoveredWeapon&) const noexcept = default;
     };
     std::optional<RecoveredWeapon> recoveredWeapon;
+    // Transient presentation timing; gameplay and saved ammunition stay put.
+    std::optional<std::uint64_t> droppedVisualStartTick;
+    float droppedVisualYawDegrees{0.0F};
 };
 
 struct PropData {

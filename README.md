@@ -1697,6 +1697,13 @@ continuam disponíveis durante o desenvolvimento, mas ainda não são arte final
 aprovada. O protocolo e o inventário ficam em
 [`visual/TEXTURE_APPROVALS.md`](visual/TEXTURE_APPROVALS.md).
 
+A opção [HUD v2 A Precision](visual/proposals/hud_visual_proposal_v2.md) e a
+[arma caída v2](visual/proposals/ground_weapon_pickup_proposal_v2.md) foram
+aprovadas para implementação e já estão na build. As
+[capturas reais do HUD](visual/validation/hud_visual_v2_a_implemented_1280x720_neutral.png)
+e [das armas no piso](visual/validation/ground_weapon_pickup_v2_gameplay.png)
+documentam o estado atual; a aceitação visual em partida ainda está pendente.
+
 Para cada superfície ou família visual, o fluxo obrigatório é:
 
 1. definir objetivo, referências, material, paleta, densidade e desgaste;

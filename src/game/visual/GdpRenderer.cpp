@@ -63,6 +63,7 @@ uniform sampler2D uNormalMap;
 uniform sampler2D uMaterialMap;
 uniform sampler2D uEmissionMap;
 uniform vec3 uTint;
+uniform float uOpacity;
 uniform vec3 uCameraPosition;
 #if GDP_LOW_SPEC
 const int MAX_LIGHTS = 4;
@@ -259,7 +260,8 @@ void main()
     float emissiveMask = uUseEmissionMap != 0
         ? texture(uEmissionMap, materialUv).r
         : smoothstep(0.62, 0.82, max(albedo.r, max(albedo.g, albedo.b)));
-    fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength), 1.0);
+    fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength),
+        uOpacity);
 }
 )glsl";
 
@@ -1160,6 +1162,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uEmissionMap", 3);
     shader.setInt(gl_, "uUseEmissionMap", 0);
     shader.setInt(gl_, "uViewmodel", 0);
+    shader.setFloat(gl_, "uOpacity", 1.0F);
     shader.setInt(gl_, "uInstanced", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
@@ -1945,6 +1948,73 @@ bool GdpRenderer::render(
 
     fallbackTexture_.bind(gl_, textureBindings_);
     for (const PickupRenderData& pickup : pickups) {
+        if (pickup.role == PickupVisualRole::Weapon
+            || pickup.role == PickupVisualRole::DroppedPistol) {
+            constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
+            const HudWeaponRole weaponRole
+                = pickup.role == PickupVisualRole::DroppedPistol
+                ? HudWeaponRole::Pistol : HudWeaponRole::Carbine;
+            const DroppedWeaponPose pose = sampleDroppedWeaponPose(
+                pickup.visualSeed, pickup.role, pickup.fallProgress);
+            const float yaw = (pickup.baseYawDegrees + pose.yawDegrees)
+                * degreesToRadians;
+            // A faint footprint anchors the visual mesh without a marker or
+            // pedestal. It is not a gameplay collider and does not cast light.
+            const wkc::core::Vec3 shadowScale
+                = weaponRole == HudWeaponRole::Pistol
+                ? wkc::core::Vec3{0.27F, 0.003F, 0.52F}
+                : wkc::core::Vec3{0.32F, 0.003F, 1.25F};
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(pickup.position
+                    + wkc::core::Vec3{0.0F, 0.004F, 0.0F})
+                    * wkc::core::rotationYMatrix(yaw)
+                    * wkc::core::scaleMatrix(shadowScale));
+            shader.setVec3(gl_, "uTint", {0.025F, 0.03F, 0.035F});
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            shader.setFloat(gl_, "uOpacity", 0.36F
+                * std::clamp(pickup.fallProgress, 0.0F, 1.0F));
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            drawMesh(box_);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
+            shader.setFloat(gl_, "uOpacity", 1.0F);
+            const wkc::core::Mat4 model
+                = wkc::core::translationMatrix(pickup.position
+                    + wkc::core::Vec3{0.0F, pose.height, 0.0F})
+                * wkc::core::rotationYMatrix(yaw)
+                * wkc::core::rotationZMatrix(pose.rollDegrees * degreesToRadians);
+            shader.setMat4(gl_, "uModel", model);
+            shader.setInt(gl_, "uDetailedMaterial", 1);
+            shader.setInt(gl_, "uUseEmissionMap", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            const std::array materialColors{
+                wkc::core::Vec3{0.45F, 0.48F, 0.50F},
+                wkc::core::Vec3{0.64F, 0.67F, 0.68F},
+                wkc::core::Vec3{0.23F, 0.24F, 0.24F},
+                wkc::core::Vec3{0.075F, 0.085F, 0.09F},
+                wkc::core::Vec3{0.12F, 0.72F, 0.80F},
+            };
+            const std::size_t weaponIndex = static_cast<std::size_t>(weaponRole);
+            for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
+                const wkc::render::Mesh& mesh = weaponMeshes_[weaponIndex][material];
+                if (!mesh.isValid()) {
+                    continue;
+                }
+                const WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
+                gpuMaterial.albedo.bind(gl_, textureBindings_, 0U);
+                gpuMaterial.normal.bind(gl_, textureBindings_, 1U);
+                gpuMaterial.properties.bind(gl_, textureBindings_, 2U);
+                shader.setVec3(gl_, "uTint", materialColors[material]);
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(mesh);
+            }
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
         wkc::core::Vec3 tint{0.20F, 0.85F, 0.32F};
         wkc::core::Vec3 scale{0.30F, 0.22F, 0.30F};
         if (pickup.role == PickupVisualRole::Ammo) {
@@ -1956,12 +2026,6 @@ bool GdpRenderer::render(
         } else if (pickup.role == PickupVisualRole::Armor) {
             tint = {0.18F, 0.42F, 0.96F};
             scale = {0.36F, 0.26F, 0.30F};
-        } else if (pickup.role == PickupVisualRole::Weapon) {
-            tint = {0.72F, 0.28F, 0.96F};
-            scale = {0.62F, 0.16F, 0.20F};
-        } else if (pickup.role == PickupVisualRole::DroppedPistol) {
-            tint = {0.72F, 0.28F, 0.96F};
-            scale = {0.30F, 0.16F, 0.20F};
         } else if (pickup.role == PickupVisualRole::Special) {
             tint = {1.0F, 0.24F, 0.52F};
             scale = {0.24F, 0.38F, 0.24F};
@@ -2180,15 +2244,25 @@ bool GdpRenderer::render(
                                      const int scale,
                                      const wkc::core::Vec3 accent) {
         const int line = std::max(1, scale);
-        drawSolidRect(panel.x, panel.y, panel.width, panel.height, panelColor);
-        drawSolidRect(panel.x, panel.y + panel.height - line,
-            panel.width, line, uiTheme.panelBorder);
-        drawSolidRect(panel.x, panel.y, line, panel.height,
-            uiTheme.panelBorder);
-        drawSolidRect(panel.x, panel.y + panel.height - (4 * scale),
-            2 * line, 4 * scale, accent);
-        drawSolidRect(panel.x + panel.width - (5 * scale), panel.y,
-            5 * scale, line, uiTheme.panelBorder);
+        const wkc::core::Vec3 metal{0.27F, 0.33F, 0.36F};
+        const wkc::core::Vec3 highlight{0.52F, 0.59F, 0.61F};
+        const wkc::core::Vec3 shade{0.035F, 0.05F, 0.055F};
+        drawSolidRect(panel.x + line, panel.y - line,
+            panel.width, panel.height, shade);
+        drawSolidRect(panel.x, panel.y, panel.width, panel.height, metal);
+        drawSolidRect(panel.x + line, panel.y + line,
+            panel.width - 2 * line, panel.height - 2 * line, panelColor);
+        drawSolidRect(panel.x + 3 * line, panel.y + panel.height - 2 * line,
+            panel.width - 6 * line, line, highlight);
+        drawSolidRect(panel.x + 3 * line, panel.y + line,
+            panel.width - 6 * line, line, shade);
+        drawSolidRect(panel.x + line, panel.y + 2 * line,
+            line, panel.height - 4 * line, shade);
+        const int corner = std::min(panel.height / 2, 4 * scale);
+        drawSolidRect(panel.x, panel.y + panel.height - corner,
+            line, corner, accent);
+        drawSolidRect(panel.x + panel.width - line, panel.y,
+            line, corner, accent);
     };
     const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
         || hud.objective == ObjectiveRenderState::DefeatBoss;
@@ -2509,13 +2583,14 @@ bool GdpRenderer::render(
         const std::string armorText = armorStream.str();
         const std::string ammoText = ammoStream.str();
         const std::string keysText = keysStream.str();
+        const int iconWidth = 15 * hudScale;
         const int leftWidth = std::max(
             bitmapTextWidth(healthText, hudScale),
-            bitmapTextWidth(ammoText, hudScale)) + (hudPadding * 2);
+            bitmapTextWidth(ammoText, hudScale)) + (hudPadding * 2) + iconWidth;
         const int rightWidth = std::max(
             bitmapTextWidth(armorText, hudScale),
-            bitmapTextWidth(keysText, hudScale)) + (hudPadding * 2);
-        const int tileHeight = 18 * hudScale;
+            bitmapTextWidth(keysText, hudScale)) + (hudPadding * 2) + iconWidth;
+        const int tileHeight = 21 * hudScale;
         const int tileGap = 3 * hudScale;
         const int leftX = hudMargin;
         const int rightX = leftX + leftWidth + tileGap;
@@ -2529,19 +2604,53 @@ bool GdpRenderer::render(
             hudScale, uiTheme.mutedText);
         drawHudRailPanel({rightX, lowerY, rightWidth, tileHeight},
             hudScale, cyanColor);
+        const auto drawResourceIcon = [&](const int x, const int y,
+                                          const int kind,
+                                          const wkc::core::Vec3 color) {
+            const int s = hudScale;
+            const int cx = x + 7 * s;
+            const int cy = y + tileHeight / 2;
+            if (kind == 0) { // medical cross
+                drawSolidRect(cx - s, cy - 5 * s, 2 * s, 10 * s, color);
+                drawSolidRect(cx - 5 * s, cy - s, 10 * s, 2 * s, color);
+            } else if (kind == 1) { // armored plate
+                drawSolidRect(cx - 5 * s, cy + 3 * s, 10 * s, 2 * s, color);
+                drawSolidRect(cx - 4 * s, cy - 2 * s, 8 * s, 5 * s, color);
+                drawSolidRect(cx - 2 * s, cy - 5 * s, 4 * s, 3 * s, color);
+            } else if (kind == 2) { // cartridges
+                drawSolidRect(cx - 4 * s, cy - 5 * s, 3 * s, 8 * s, color);
+                drawSolidRect(cx + s, cy - 5 * s, 3 * s, 8 * s, color);
+                drawSolidRect(cx - 3 * s, cy + 3 * s, s, 2 * s, color);
+                drawSolidRect(cx + 2 * s, cy + 3 * s, s, 2 * s, color);
+            } else { // key ring and stem
+                drawSolidRect(cx - 4 * s, cy + s, 7 * s, s, color);
+                drawSolidRect(cx - 4 * s, cy - 2 * s, 7 * s, s, color);
+                drawSolidRect(cx - 4 * s, cy - s, s, 2 * s, color);
+                drawSolidRect(cx + 2 * s, cy - s, s, 2 * s, color);
+                drawSolidRect(cx - s, cy - 5 * s, 2 * s, 4 * s, color);
+                drawSolidRect(cx + s, cy - 5 * s, 2 * s, s, color);
+            }
+        };
+        drawResourceIcon(leftX + hudPadding, upperY, 0, cyanColor);
+        drawResourceIcon(rightX + hudPadding, upperY, 1,
+            {0.34F, 0.65F, 0.78F});
+        drawResourceIcon(leftX + hudPadding, lowerY, 2, textColor);
+        drawResourceIcon(rightX + hudPadding, lowerY, 3, cyanColor);
         const int upperTextY = upperY + tileHeight - hudPadding - (7 * hudScale);
         const int barY = upperY + (3 * hudScale);
-        const int leftBarWidth = leftWidth - (hudPadding * 2);
-        const int rightBarWidth = rightWidth - (hudPadding * 2);
+        const int leftBarWidth = leftWidth - (hudPadding * 2) - iconWidth;
+        const int rightBarWidth = rightWidth - (hudPadding * 2) - iconWidth;
+        const int leftTextX = leftX + hudPadding + iconWidth;
+        const int rightTextX = rightX + hudPadding + iconWidth;
         const float healthRatio = std::clamp(
             std::max(hud.health, 0.0F) / std::max(hud.maximumHealth, 1.0F),
             0.0F, 1.0F);
-        drawBitmapText(leftX + hudPadding, upperTextY, hudScale, healthText,
+        drawBitmapText(leftTextX, upperTextY, hudScale, healthText,
             healthRatio <= 0.25F
                 ? wkc::core::Vec3{0.98F, 0.20F, 0.12F} : textColor);
-        drawSolidRect(leftX + hudPadding, barY, leftBarWidth, 2 * hudScale,
+        drawSolidRect(leftTextX, barY, leftBarWidth, 2 * hudScale,
             {0.10F, 0.14F, 0.15F});
-        drawSolidRect(leftX + hudPadding, barY,
+        drawSolidRect(leftTextX, barY,
             static_cast<int>(static_cast<float>(leftBarWidth) * healthRatio),
             2 * hudScale,
             healthRatio <= 0.25F
@@ -2550,19 +2659,19 @@ bool GdpRenderer::render(
         const float armorRatio = std::clamp(
             std::max(hud.armor, 0.0F) / std::max(hud.maximumArmor, 1.0F),
             0.0F, 1.0F);
-        drawBitmapText(rightX + hudPadding, upperTextY, hudScale, armorText,
+        drawBitmapText(rightTextX, upperTextY, hudScale, armorText,
             textColor);
-        drawSolidRect(rightX + hudPadding, barY, rightBarWidth, 2 * hudScale,
+        drawSolidRect(rightTextX, barY, rightBarWidth, 2 * hudScale,
             {0.10F, 0.14F, 0.15F});
-        drawSolidRect(rightX + hudPadding, barY,
+        drawSolidRect(rightTextX, barY,
             static_cast<int>(static_cast<float>(rightBarWidth) * armorRatio),
             2 * hudScale, {0.34F, 0.65F, 0.78F});
         const int lowerTextY = lowerY + ((tileHeight - (7 * hudScale)) / 2);
-        drawBitmapText(leftX + hudPadding, lowerTextY,
+        drawBitmapText(leftTextX, lowerTextY,
             hudScale, ammoText,
             hud.weapon != HudWeaponRole::Knife && hud.magazineAmmo == 0U
                 ? uiTheme.warning : textColor);
-        drawBitmapText(rightX + hudPadding, lowerTextY,
+        drawBitmapText(rightTextX, lowerTextY,
             hudScale, keysText, cyanColor);
 
         if (hud.flashlightOn && width >= 400) {

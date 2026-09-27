@@ -30,6 +30,7 @@
 #include <chrono>
 #include <cctype>
 #include <cmath>
+#include <numbers>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -2395,6 +2396,14 @@ void Application::fixedUpdate(const double fixedStep)
                     entities_, player_, weapon_, collisionWorld_, playerRoom);
                 if (dropped) {
                     room->entities.push_back(*dropped);
+                    if (entities::ItemData* item
+                        = entities_.findData<entities::ItemData>(*dropped)) {
+                        item->droppedVisualStartTick = fixedUpdates_;
+                        const wkc::core::Vec3 forward
+                            = player_.planarForwardDirection();
+                        item->droppedVisualYawDegrees = std::atan2(
+                            forward.x, forward.z) * (180.0F / std::numbers::pi_v<float>);
+                    }
                     gameplay::signalNotice(
                         feedback_, gameplay::NoticeFeedbackKind::WeaponDropped);
                     const entities::ItemData* item
@@ -3151,7 +3160,18 @@ void Application::render()
         } else if (item->type == entities::ItemType::Special) {
             role = visual::PickupVisualRole::Special;
         }
-        visiblePickups.push_back({entity->transform.position, role});
+        float fallProgress = 1.0F;
+        if (item->droppedVisualStartTick) {
+            constexpr float fallDurationTicks = 25.0F;
+            const std::uint64_t elapsedTicks
+                = fixedUpdates_ >= *item->droppedVisualStartTick
+                ? fixedUpdates_ - *item->droppedVisualStartTick : 0U;
+            fallProgress = std::clamp(
+                static_cast<float>(elapsedTicks) / fallDurationTicks,
+                0.0F, 1.0F);
+        }
+        visiblePickups.push_back({entity->transform.position, role,
+            id.packed(), fallProgress, item->droppedVisualYawDegrees});
     }
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Prop)) {
         const entities::Entity* entity = entities_.find(id);

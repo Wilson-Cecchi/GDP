@@ -68,7 +68,11 @@ EntityId EntityManager::createItem(const ItemCreateInfo& info)
         EntityKind::Item,
         info.transform,
         info.roomId,
-        ItemData{info.type, std::max(info.quantity, 1U), std::nullopt});
+        ItemData{.type = info.type,
+            .quantity = std::max(info.quantity, 1U),
+            .recoveredWeapon = std::nullopt,
+            .droppedVisualStartTick = std::nullopt,
+            .droppedVisualYawDegrees = 0.0F});
 }
 
 EntityId EntityManager::createProp(const PropCreateInfo& info)

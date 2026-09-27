@@ -282,8 +282,11 @@ int main(const int argc, char* argv[])
                                 * static_cast<std::size_t>(captureHeight) * 4U);
                         glReadPixels(0, 0, captureWidth, captureHeight, GL_RGBA,
                             GL_UNSIGNED_BYTE, hudPixels.data());
+                        const std::string hudPrefix = hudStage == "v2_a"
+                            ? "hud_visual_v2_a_implemented_"
+                            : "hud_visual_v1_a_" + hudStage + '_';
                         const std::filesystem::path path = outputDirectory
-                            / ("hud_visual_v1_a_" + hudStage + '_'
+                            / (hudPrefix
                                 + std::to_string(captureWidth) + 'x'
                                 + std::to_string(captureHeight) + '_'
                                 + lightingName + ".ppm");
@@ -296,6 +299,7 @@ int main(const int argc, char* argv[])
                     };
                     captureHud(1280, 720, "neutral", lighting);
                     captureHud(960, 540, "neutral", lighting);
+                    captureHud(960, 600, "neutral", lighting);
                     gdp::game::visual::RoomLightingRenderData darkLighting = lighting;
                     darkLighting.ambientIntensity = 0.08F;
                     darkLighting.fixtureEmissive = 0.16F;
@@ -303,6 +307,55 @@ int main(const int argc, char* argv[])
                         darkLighting.lights[index].intensity *= 0.20F;
                     }
                     captureHud(1280, 720, "dim", darkLighting);
+                    const auto captureGroundWeapons = [&](const char* label,
+                        const gdp::game::visual::CameraData view,
+                        const gdp::game::visual::RoomLightingRenderData& sceneLighting,
+                        const gdp::game::visual::HudRenderData& sceneHud,
+                        const float fallProgress = 1.0F) {
+                        const std::array groundWeapons{
+                            gdp::game::visual::PickupRenderData{
+                                {-0.48F, 0.0F, 0.0F},
+                                gdp::game::visual::PickupVisualRole::DroppedPistol,
+                                123U, fallProgress, 0.0F},
+                            gdp::game::visual::PickupRenderData{
+                                {0.50F, 0.0F, 0.0F},
+                                gdp::game::visual::PickupVisualRole::Weapon,
+                                456U, fallProgress, 0.0F},
+                        };
+                        if (!renderer.render(width, height, view, {}, groundWeapons,
+                                {}, sceneLighting, roomBehindCamera, doors,
+                                corridor, connectedRoom, sceneHud)) {
+                            std::cerr << "Ground weapon render failed\n";
+                            passed = false;
+                            return;
+                        }
+                        glReadPixels(0, 0, width, height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, pixels.data());
+                        const std::filesystem::path path = outputDirectory
+                            / (std::string{"ground_weapon_pickup_v2_"}
+                                + label + ".ppm");
+                        if (!savePpm(path, width, height, pixels)) {
+                            std::cerr << "Could not save " << path << '\n';
+                            passed = false;
+                        } else {
+                            std::cout << path.string() << '\n';
+                        }
+                    };
+                    const gdp::game::visual::CameraData groundCloseCamera{
+                        {0.0F, 1.10F, 2.15F}, {0.0F, -0.43F, -0.90F}, 62.0F};
+                    const gdp::game::visual::CameraData groundGameplayCamera{
+                        {0.0F, 1.58F, 3.25F}, {0.0F, -0.26F, -0.97F}, 70.0F};
+                    captureGroundWeapons("close", groundCloseCamera, lighting, {});
+                    captureGroundWeapons("fall_mid", groundCloseCamera,
+                        lighting, {}, 0.5F);
+                    captureGroundWeapons("gameplay", groundGameplayCamera, lighting, {});
+                    captureGroundWeapons("dim", groundCloseCamera, darkLighting, {});
+                    gdp::game::visual::HudRenderData groundPotato;
+                    groundPotato.graphicsQuality
+                        = gdp::game::visual::HudGraphicsQuality::Potato;
+                    groundPotato.detailedMaterials = false;
+                    captureGroundWeapons("potato", groundCloseCamera,
+                        lighting, groundPotato);
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "on", lighting);
                     gdp::game::visual::RoomLightingRenderData offLighting = lighting;

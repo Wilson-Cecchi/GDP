@@ -153,7 +153,21 @@ struct EnemyRenderData {
 struct PickupRenderData {
     wkc::core::Vec3 position{};
     PickupVisualRole role{PickupVisualRole::Health};
+    wkc::core::Seed visualSeed{0U};
+    float fallProgress{1.0F};
+    float baseYawDegrees{0.0F};
 };
+
+struct DroppedWeaponPose {
+    float yawDegrees{0.0F};
+    float rollDegrees{90.0F};
+    float height{0.0F};
+
+    constexpr bool operator==(const DroppedWeaponPose&) const noexcept = default;
+};
+
+[[nodiscard]] DroppedWeaponPose sampleDroppedWeaponPose(
+    wkc::core::Seed visualSeed, PickupVisualRole role, float progress) noexcept;
 
 struct PropRenderData {
     wkc::core::Vec3 position{};

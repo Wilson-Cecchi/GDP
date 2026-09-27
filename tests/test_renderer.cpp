@@ -15,8 +15,10 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <numbers>
 #include <string>
 #include <string_view>
+#include <tuple>
 
 namespace {
 
@@ -1283,6 +1285,54 @@ void testWeaponViewmodelPose()
         "weapon pose sanitizes non-finite and out-of-range animation input");
 }
 
+void testDroppedWeaponPose()
+{
+    using namespace gdp::game::visual;
+    const DroppedWeaponPose beginning = sampleDroppedWeaponPose(
+        123U, PickupVisualRole::Weapon, 0.0F);
+    const DroppedWeaponPose middle = sampleDroppedWeaponPose(
+        123U, PickupVisualRole::Weapon, 0.5F);
+    const DroppedWeaponPose settled = sampleDroppedWeaponPose(
+        123U, PickupVisualRole::Weapon, 1.0F);
+    expect(beginning.height > middle.height && middle.height > settled.height,
+        "dropped weapon falls toward the floor without changing pickup position");
+    expect(std::abs(settled.rollDegrees) == 90.0F,
+        "dropped weapon rests on its side");
+    expect(settled == sampleDroppedWeaponPose(
+            123U, PickupVisualRole::Weapon, 1.0F),
+        "dropped pose is deterministic per pickup identity");
+    expect(sampleDroppedWeaponPose(124U, PickupVisualRole::Weapon, 1.0F)
+            != settled,
+        "different pickups may settle at different angles");
+    expect(sampleDroppedWeaponPose(123U, PickupVisualRole::DroppedPistol, 1.0F)
+            .height < settled.height,
+        "pistol uses its own floor contact height");
+    expect(sampleDroppedWeaponPose(123U, PickupVisualRole::Weapon,
+            std::numeric_limits<float>::quiet_NaN()) == settled,
+        "non-finite drop progress settles safely");
+    for (const auto& [role, visualRole, seed] : std::array{
+             std::tuple{HudWeaponRole::Pistol, PickupVisualRole::DroppedPistol, 123U},
+             std::tuple{HudWeaponRole::Carbine, PickupVisualRole::Weapon, 456U},
+         }) {
+        const DroppedWeaponPose contact
+            = sampleDroppedWeaponPose(seed, visualRole, 1.0F);
+        const float sine = std::sin(contact.rollDegrees
+            * std::numbers::pi_v<float> / 180.0F);
+        const float cosine = std::cos(contact.rollDegrees
+            * std::numbers::pi_v<float> / 180.0F);
+        float lowestPoint = std::numeric_limits<float>::max();
+        for (const auto& mesh : makeWeaponViewmodelMeshes(role)) {
+            for (const auto& vertex : mesh.vertices) {
+                lowestPoint = std::min(lowestPoint,
+                    contact.height + sine * vertex.position.x
+                        + cosine * vertex.position.y);
+            }
+        }
+        expect(lowestPoint >= -0.002F && lowestPoint < 0.025F,
+            "settled weapon mesh touches floor without clipping");
+    }
+}
+
 void testOptimizedShadowBudget()
 {
     using namespace gdp::game::visual;
@@ -1457,6 +1507,7 @@ int main()
     testEnemyRootAnimation();
     testImpactVisualData();
     testWeaponViewmodelPose();
+    testDroppedWeaponPose();
     testOptimizedShadowBudget();
     testIndustrialUiTheme();
     testWeaponViewmodelAssets();
