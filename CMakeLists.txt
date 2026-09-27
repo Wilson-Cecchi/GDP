@@ -88,6 +88,19 @@ gdp_enable_warnings(wkc_forge_core)
 gdp_enable_sanitizers(wkc_forge_core)
 
 add_library(
+    wkc_forge_ai
+    STATIC
+    src/ai/NeuralNetwork.cpp
+    src/ai/Genome.cpp
+)
+
+target_compile_features(wkc_forge_ai PUBLIC cxx_std_20)
+target_include_directories(wkc_forge_ai PUBLIC src)
+target_link_libraries(wkc_forge_ai PUBLIC wkc_forge_core)
+gdp_enable_warnings(wkc_forge_ai)
+gdp_enable_sanitizers(wkc_forge_ai)
+
+add_library(
     wkc_forge_platform
     STATIC
     src/platform/Input.cpp
@@ -400,6 +413,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME core_systems COMMAND wkc_forge_core_tests)
     set_tests_properties(core_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(wkc_forge_ai_tests tests/test_ai.cpp)
+    target_link_libraries(wkc_forge_ai_tests PRIVATE wkc_forge_ai)
+    gdp_enable_warnings(wkc_forge_ai_tests)
+    gdp_enable_sanitizers(wkc_forge_ai_tests)
+
+    add_test(NAME ai_foundation_systems COMMAND wkc_forge_ai_tests)
+    set_tests_properties(ai_foundation_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_seed_domain_tests tests/test_seed_domains.cpp)
     target_link_libraries(gdp_seed_domain_tests PRIVATE wkc_forge_core)

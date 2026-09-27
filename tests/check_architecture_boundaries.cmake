@@ -46,6 +46,10 @@ if(root_cmake_contents MATCHES
     message(FATAL_ERROR "GDP-prefixed core target must not return")
 endif()
 if(NOT root_cmake_contents MATCHES
+        "add_library\\([ \t\r\n]+wkc_forge_ai[ \t\r\n]+STATIC")
+    message(FATAL_ERROR "Generic AI foundation must belong to WKC Forge")
+endif()
+if(NOT root_cmake_contents MATCHES
         "add_library\\([ \t\r\n]+wkc_forge_platform[ \t\r\n]+STATIC")
     message(FATAL_ERROR "Generic input platform must belong to WKC Forge")
 endif()
@@ -107,6 +111,7 @@ if(root_cmake_contents MATCHES
 endif()
 foreach(wkc_target IN ITEMS
     wkc_forge_core
+    wkc_forge_ai
     wkc_forge_platform
     wkc_forge_platform_sdl
     wkc_forge_audio

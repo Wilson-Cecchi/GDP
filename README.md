@@ -595,6 +595,15 @@ especializados das pastas numeradas.
   O cone frontal, a linha de visão, a sala ativa e o alcance normal com a
   lanterna desligada não mudam. Os atalhos `4` e `5` continuam reservados, sem
   equipamento ou item especial associado por enquanto.
+- **Base de neuroevolução — núcleo genérico:** `wkc_forge_ai` fornece uma rede
+  feedforward pequena (uma camada oculta, `tanh`) e genomas copiáveis com
+  inicialização, mutação e cruzamento determinísticos por seed independente.
+  A implementação usa C++20/RAII para seguir a arquitetura atual, embora a
+  proposta original exemplifique C. Entradas são normalizadas em `[-1, 1]`;
+  pesos gerados e mutados ficam nesse intervalo. Há testes unitários de forma,
+  forward, clone, seed, mutação e cruzamento. Ainda **não** há sensores,
+  treinamento, persistência ou integração com os inimigos da partida; o
+  comportamento atual permanece inalterado até validação posterior.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
