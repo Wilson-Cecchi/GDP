@@ -79,6 +79,25 @@ resultado final:
 
 ## Propostas ativas
 
+### HUD/map visual language — v1 (somente HUD de gameplay)
+
+```text
+unidade visual: HUD/map visual language — HUD de gameplay
+versão da proposta: v1
+arquivo/pranchas: visual/proposals/hud_visual_v1_a_rail.png;
+                 visual/proposals/hud_visual_v1_b_plate.png;
+                 visual/proposals/hud_visual_v1_c_stencil.png
+variantes mostradas: A Rail; B Plate; C Stencil
+decisão do usuário: AGUARDANDO APROVAÇÃO
+data: 2026-09-26
+commit de implementação: nenhum
+capturas no jogo: nenhuma
+resultado final: NÃO IMPLEMENTADA
+```
+
+Contrato e limites em
+[`proposals/hud_visual_proposal_v1.md`](proposals/hud_visual_proposal_v1.md).
+
 ### Weapon/first-person presentation — v1
 
 ```text

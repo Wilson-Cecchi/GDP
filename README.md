@@ -555,6 +555,9 @@ especializados das pastas numeradas.
   determinístico de `WeaponFired`, contato e dano/morte. `Application` usa esse
   contrato para feedback visual, HUD e áudio, mantendo dano, drops, progressão e
   colisão no resultado autoritativo. Rejeições não produzem tiro fictício.
+- **Fase 145 — Proposta visual do HUD:** três variantes conceituais (Rail,
+  Plate e Stencil) foram registradas para decisão do usuário. Nenhuma delas
+  altera o HUD do jogo antes da aprovação explícita.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
