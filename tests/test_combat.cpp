@@ -179,6 +179,12 @@ void testDeterministicWeaponSpread()
     expect(pistol == repeated && !near(pistol.x, 0.0F)
             && !near(pistol.y, 0.0F),
         "later shots use a repeatable two-axis pattern without RNG");
+    const wkc::core::Vec3 aimed = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Pistol, 10U, 0.40F);
+    expect(wkc::core::dot(aimed, forward) > wkc::core::dot(pistol, forward)
+            && aimed == applyDeterministicWeaponSpread(
+                forward, WeaponArchetype::Pistol, 10U, 0.40F),
+        "aiming narrows deterministic spread without a new RNG stream");
     expect(wkc::core::dot(carbine, forward)
             < wkc::core::dot(pistol, forward),
         "Carbine reaches a wider spread envelope than Pistol");

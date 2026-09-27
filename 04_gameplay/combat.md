@@ -199,6 +199,11 @@ slot inexistente ou repetir o atual não modifica esse histórico. A roda usa
 delta, ignorando armas não possuídas. O histórico de `Q` não é salvo: após
 restaurar um checkpoint, uma nova seleção o inicializa novamente.
 
+Na Fase 149, segurar o botão direito em uma arma de fogo aproxima a câmera
+em até 22% do FOV configurado e reduz a dispersão do padrão determinístico
+em até 60%. Soltar retorna ao FOV base; a faca ignora a mira. O índice dos
+tiros, RNG e munição não mudam.
+
 ## Testes
 
 Implementados: sem munição, cooldown, recarga, parede bloqueia, filtro por sala,

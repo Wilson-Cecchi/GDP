@@ -571,6 +571,9 @@ especializados das pastas numeradas.
   e seu volume; os inimigos investigam passos normais próximos, mas só ouvem
   passos silenciosos/agachados praticamente ao lado. Visão e disparos mantêm
   seu alcance normal.
+- **Fase 149 — Mira no botão direito:** segurar `Mouse2` aproxima a câmera
+  suavemente e reduz a dispersão dos tiros; a faca não usa mira. O FOV base
+  configurado pelo jogador permanece como referência ao soltar o botão.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

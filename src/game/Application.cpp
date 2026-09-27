@@ -776,6 +776,7 @@ bool Application::initializeRun()
     jumpPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    aimBlend_ = 0.0F;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
@@ -1754,6 +1755,7 @@ bool Application::returnToMainMenu()
     reloadPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    aimBlend_ = 0.0F;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
@@ -2121,6 +2123,12 @@ void Application::fixedUpdate(const double fixedStep)
         return;
     }
     gameplay::updateFeedback(feedback_, step);
+    const bool aimRequested = player_.state().alive
+        && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
+        && input_.isMouseButtonDown(MouseButton::Secondary);
+    aimBlend_ = std::clamp(aimBlend_
+            + (aimRequested ? 1.0F : -1.0F) * step * 8.0F,
+        0.0F, 1.0F);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
     weaponMeleeRemaining_
@@ -2428,7 +2436,8 @@ void Application::fixedUpdate(const double fixedStep)
             player_.forwardDirection(),
             playerRoom,
             collisionWorld_,
-            entities_);
+            entities_,
+            1.0F - aimBlend_ * 0.60F);
         const gameplay::CombatSignalBatch signals
             = gameplay::combatSignalsForShot(shot);
         const entities::PropData* hitProp = shot.hit
@@ -2978,7 +2987,8 @@ void Application::render()
     const visual::CameraData camera{
         renderCameraPosition,
         player_.forwardDirection(),
-        static_cast<float>(runtimeSettings_.fieldOfViewDegrees),
+        static_cast<float>(runtimeSettings_.fieldOfViewDegrees)
+            * (1.0F - aimBlend_ * 0.22F),
     };
     const float cameraAspect = height > 0
         ? static_cast<float>(width) / static_cast<float>(height)
@@ -3708,6 +3718,7 @@ void Application::shutdown()
     reloadPending_ = false;
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
+    aimBlend_ = 0.0F;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;

@@ -152,7 +152,8 @@ ImpactMaterial propImpactMaterial(
 wkc::core::Vec3 applyDeterministicWeaponSpread(
     wkc::core::Vec3 direction,
     const WeaponArchetype archetype,
-    const std::uint32_t shotIndex) noexcept
+    const std::uint32_t shotIndex,
+    const float spreadScale) noexcept
 {
     direction = wkc::core::normalized(direction);
     if (wkc::core::length(direction) <= 1.0e-7F || shotIndex == 0U) {
@@ -175,7 +176,10 @@ wkc::core::Vec3 applyDeterministicWeaponSpread(
     }};
     const wkc::core::Vec2 sample
         = pattern[std::min<std::size_t>(shotIndex, pattern.size() - 1U)];
+    const float safeScale = std::isfinite(spreadScale)
+        ? std::clamp(spreadScale, 0.0F, 1.0F) : 1.0F;
     const float spreadRadians = weaponSpreadProfile(archetype).maximumDegrees
+        * safeScale
         * (std::numbers::pi_v<float> / 180.0F);
     const float horizontal = std::tan(sample.x * spreadRadians);
     const float vertical = std::tan(sample.y * spreadRadians);
@@ -299,7 +303,8 @@ ShotResult fireHitscan(
     wkc::core::Vec3 direction,
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
-    gdp::entities::EntityManager& manager) noexcept
+    gdp::entities::EntityManager& manager,
+    const float spreadScale) noexcept
 {
     const FireReadiness readiness = weapon.tryFire();
     if (readiness == FireReadiness::Cooldown) {
@@ -316,7 +321,8 @@ ShotResult fireHitscan(
     }
 
     direction = applyDeterministicWeaponSpread(
-        direction, weapon.definition().archetype, weapon.spreadShotIndex());
+        direction, weapon.definition().archetype, weapon.spreadShotIndex(),
+        spreadScale);
     const float range = weapon.definition().range;
     if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
         return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};

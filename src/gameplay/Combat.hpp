@@ -102,7 +102,8 @@ void updateEnemyHitReactions(
 [[nodiscard]] wkc::core::Vec3 applyDeterministicWeaponSpread(
     wkc::core::Vec3 direction,
     WeaponArchetype archetype,
-    std::uint32_t shotIndex) noexcept;
+    std::uint32_t shotIndex,
+    float spreadScale = 1.0F) noexcept;
 
 [[nodiscard]] ShotResult fireHitscan(
     Weapon& weapon,
@@ -110,7 +111,8 @@ void updateEnemyHitReactions(
     wkc::core::Vec3 direction,
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
-    gdp::entities::EntityManager& manager) noexcept;
+    gdp::entities::EntityManager& manager,
+    float spreadScale = 1.0F) noexcept;
 
 [[nodiscard]] bool hasLineOfSight(
     wkc::core::Vec3 origin,
