@@ -801,11 +801,111 @@ void updateUnseenEnemy(
     }
 }
 
+bool updateNeuralEnemy(
+    gdp::entities::EntityManager& manager,
+    const std::vector<gdp::entities::EntityId>& enemyIds,
+    const gdp::entities::EntityId id,
+    const std::uint32_t roomId,
+    gdp::entities::Entity& entity,
+    gdp::entities::EnemyData& enemy,
+    Player& player,
+    const CollisionWorld& collisionWorld,
+    const float step,
+    const bool lineOfSight,
+    const float detectionRange,
+    const float visionHalfAngleDegrees,
+    const float eyeHeight,
+    const EnemyPerception perception,
+    const float attackRange,
+    const float moveSpeed,
+    const float attackDamage,
+    const float attackInterval,
+    const CharacterCollider collider,
+    NeuralEnemyExperiment* const experiment,
+    EnemyUpdateSummary& summary) noexcept
+{
+    using gdp::entities::EnemyBehaviorState;
+    if (experiment == nullptr || experiment->archetype != enemy.archetype) {
+        return false;
+    }
+    if (!experiment->selected) {
+        experiment->selected = id;
+        if (experiment->logSelection) {
+            wkc::core::log(wkc::core::LogLevel::Info,
+                "Experimental neural enemy selected");
+        }
+    }
+    if (experiment->selected != id) {
+        return false;
+    }
+    ++experiment->controlledTicks;
+    experiment->decisionSecondsRemaining -= step;
+    if (experiment->decisionSecondsRemaining <= 0.0F) {
+        const EnemySensorValues sensors = sampleEnemySensors(
+            entity, enemy, player, collisionWorld, lineOfSight, detectionRange);
+        const std::vector<float> outputs = experiment->genome.network.forward(sensors);
+        std::copy(outputs.begin(), outputs.end(), experiment->outputs.begin());
+        experiment->decisionSecondsRemaining = 0.1F;
+    }
+
+    constexpr float radiansPerDegree = 0.01745329251994329577F;
+    const float currentYawDegrees = std::isfinite(entity.transform.rotationDegrees.y)
+        ? entity.transform.rotationDegrees.y : 0.0F;
+    const float yaw = currentYawDegrees * radiansPerDegree;
+    const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
+    const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
+    const wkc::core::Vec3 desired = forward * experiment->outputs[0]
+        + right * experiment->outputs[1];
+    const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
+        * moveSpeed;
+    if (requestedSpeed > 0.05F && step > 0.0F) {
+        entity.transform.position = moveEnemy(
+            manager, enemyIds, collisionWorld, id, roomId, enemy,
+            entity.transform.position, wkc::core::normalized(desired),
+            requestedSpeed, step, collider);
+    }
+    entity.transform.rotationDegrees.y = std::remainder(
+        currentYawDegrees + experiment->outputs[2] * 180.0F * step, 360.0F);
+
+    const wkc::core::Vec3 attackOffset
+        = player.state().position - entity.transform.position;
+    const float attackDistance = wkc::core::length(
+        {attackOffset.x, 0.0F, attackOffset.z});
+    const bool attackRequested = experiment->outputs[3] > 0.65F;
+    const bool attackVisible = attackRequested && attackDistance <= attackRange
+        && playerVisibleToEnemy(entity, player, attackDistance, detectionRange,
+            visionHalfAngleDegrees, eyeHeight, collisionWorld, perception);
+    if (attackVisible) {
+        enemy.behavior = EnemyBehaviorState::Attack;
+        ++summary.attacking;
+        if (enemy.attackCooldown <= 0.0F) {
+            player.applyDamage(attackDamage);
+            enemy.attackCooldown = attackInterval;
+            ++summary.attacksLanded;
+        }
+    } else if (requestedSpeed > 0.05F) {
+        enemy.behavior = lineOfSight
+            ? EnemyBehaviorState::Chase : EnemyBehaviorState::Patrol;
+        if (lineOfSight) {
+            ++summary.chasing;
+        } else {
+            ++summary.patrolling;
+        }
+    } else {
+        enemy.behavior = EnemyBehaviorState::Idle;
+        ++summary.idle;
+    }
+    return true;
+}
+
 } // namespace
 
-NeuralWorkerExperiment::NeuralWorkerExperiment(const wkc::core::Seed seed)
+NeuralEnemyExperiment::NeuralEnemyExperiment(
+    const wkc::core::Seed seed,
+    const gdp::entities::EnemyArchetype selectedArchetype)
     : genome{wkc::ai::NeuralNetwork{
           neuralWorkerInputCount, neuralWorkerHiddenCount, neuralWorkerOutputCount}}
+    , archetype{selectedArchetype}
 {
     genome.network.randomize(seed, 0.5F);
 }
@@ -920,7 +1020,7 @@ EnemyUpdateSummary updateWorkers(
     const float fixedStepSeconds,
     WorkerConfig config,
     const EnemyPerception perception,
-    NeuralWorkerExperiment* const neuralExperiment) noexcept
+    NeuralEnemyExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -956,68 +1056,13 @@ EnemyUpdateSummary updateWorkers(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.0F,
             collisionWorld, perception);
-        if (neuralExperiment != nullptr && !neuralExperiment->selected) {
-            neuralExperiment->selected = id;
-            if (neuralExperiment->logSelection) {
-                wkc::core::log(wkc::core::LogLevel::Info,
-                    "Experimental neural Worker selected");
-            }
-        }
-        if (neuralExperiment != nullptr && neuralExperiment->selected == id) {
-            neuralExperiment->decisionSecondsRemaining -= step;
-            if (neuralExperiment->decisionSecondsRemaining <= 0.0F) {
-                const EnemySensorValues sensors = sampleEnemySensors(
-                    *entity, *enemy, player, collisionWorld, lineOfSight,
-                    config.detectionRange);
-                const std::vector<float> outputs
-                    = neuralExperiment->genome.network.forward(sensors);
-                std::copy(outputs.begin(), outputs.end(),
-                    neuralExperiment->outputs.begin());
-                neuralExperiment->decisionSecondsRemaining = 0.1F;
-            }
-
-            constexpr float radiansPerDegree = 0.01745329251994329577F;
-            const float currentYawDegrees
-                = std::isfinite(entity->transform.rotationDegrees.y)
-                ? entity->transform.rotationDegrees.y : 0.0F;
-            const float yaw = currentYawDegrees * radiansPerDegree;
-            const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
-            const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
-            const wkc::core::Vec3 desired = forward * neuralExperiment->outputs[0]
-                + right * neuralExperiment->outputs[1];
-            const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
-                * config.moveSpeed;
-            if (requestedSpeed > 0.05F && step > 0.0F) {
-                entity->transform.position = moveEnemy(
-                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
-                    entity->transform.position, wkc::core::normalized(desired),
-                    requestedSpeed, step, {.radius = 0.35F, .height = 1.8F});
-            }
-            entity->transform.rotationDegrees.y = std::remainder(
-                currentYawDegrees + neuralExperiment->outputs[2] * 180.0F * step,
-                360.0F);
-
-            const bool attackRequested = neuralExperiment->outputs[3] > 0.65F;
-            if (attackRequested && lineOfSight && distance <= config.attackRange) {
-                enemy->behavior = EnemyBehaviorState::Attack;
-                ++summary.attacking;
-                if (enemy->attackCooldown <= 0.0F) {
-                    player.applyDamage(config.attackDamage);
-                    enemy->attackCooldown = config.attackInterval;
-                    ++summary.attacksLanded;
-                }
-            } else if (requestedSpeed > 0.05F) {
-                enemy->behavior = lineOfSight
-                    ? EnemyBehaviorState::Chase : EnemyBehaviorState::Patrol;
-                if (lineOfSight) {
-                    ++summary.chasing;
-                } else {
-                    ++summary.patrolling;
-                }
-            } else {
-                enemy->behavior = EnemyBehaviorState::Idle;
-                ++summary.idle;
-            }
+        if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
+                player, collisionWorld, step, lineOfSight,
+                config.detectionRange,
+                config.investigation.visionHalfAngleDegrees, 1.0F, perception,
+                config.attackRange, config.moveSpeed,
+                config.attackDamage, config.attackInterval,
+                {.radius = 0.35F, .height = 1.8F}, neuralExperiment, summary)) {
             continue;
         }
         if (lineOfSight) {
@@ -1074,7 +1119,8 @@ EnemyUpdateSummary updateGuards(
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
     GuardConfig config,
-    const EnemyPerception perception) noexcept
+    const EnemyPerception perception,
+    NeuralEnemyExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1116,6 +1162,15 @@ EnemyUpdateSummary updateGuards(
             collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
+                player, collisionWorld, step, lineOfSight,
+                config.detectionRange,
+                config.investigation.visionHalfAngleDegrees, 1.35F, perception,
+                config.preferredMaximumRange,
+                config.moveSpeed, config.attackDamage, config.attackInterval,
+                {.radius = 0.35F, .height = 1.8F}, neuralExperiment, summary)) {
+            continue;
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1186,7 +1241,8 @@ EnemyUpdateSummary updateOfficers(
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
     OfficerConfig config,
-    const EnemyPerception perception) noexcept
+    const EnemyPerception perception,
+    NeuralEnemyExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1282,6 +1338,15 @@ EnemyUpdateSummary updateOfficers(
             }
         }
 
+        if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
+                player, collisionWorld, step, lineOfSight,
+                config.detectionRange,
+                config.investigation.visionHalfAngleDegrees, 1.4F, perception,
+                config.preferredMaximumRange,
+                config.moveSpeed, config.attackDamage, config.attackInterval,
+                {.radius = 0.35F, .height = 1.8F}, neuralExperiment, summary)) {
+            continue;
+        }
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -1337,7 +1402,8 @@ EnemyUpdateSummary updateEngineers(
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
     EngineerConfig config,
-    const EnemyPerception perception) noexcept
+    const EnemyPerception perception,
+    NeuralEnemyExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1475,6 +1541,15 @@ EnemyUpdateSummary updateEngineers(
             }
         }
 
+        if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
+                player, collisionWorld, step, lineOfSight,
+                config.detectionRange,
+                config.investigation.visionHalfAngleDegrees, 1.25F, perception,
+                config.preferredMaximumRange,
+                config.moveSpeed, config.attackDamage, config.attackInterval,
+                {.radius = 0.35F, .height = 1.8F}, neuralExperiment, summary)) {
+            continue;
+        }
         const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
             ? planarOffset * (1.0F / distance)
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -1551,7 +1626,8 @@ EnemyUpdateSummary updateIndustrialRobots(
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
     IndustrialRobotConfig config,
-    const EnemyPerception perception) noexcept
+    const EnemyPerception perception,
+    NeuralEnemyExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1639,6 +1715,15 @@ EnemyUpdateSummary updateIndustrialRobots(
             collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
+        }
+        if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
+                player, collisionWorld, step, lineOfSight,
+                config.detectionRange,
+                config.investigation.visionHalfAngleDegrees, 1.45F, perception,
+                maximumRange, moveSpeed, attackDamage,
+                attackInterval, {.radius = 0.52F, .height = 1.9F},
+                neuralExperiment, summary)) {
+            continue;
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,

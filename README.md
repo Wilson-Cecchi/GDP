@@ -604,15 +604,19 @@ especializados das pastas numeradas.
   forward, clone, seed, mutação e cruzamento. Nesta entrega inicial, ainda não
   havia sensores ou integração com os inimigos; a IA da partida permaneceu
   inalterada até a etapa experimental seguinte.
-- **Worker neural experimental:** `--experimental-neural-worker` habilita um
-  único Worker por run com sensores de distância/ângulo apenas sob percepção,
+- **Inimigo neural experimental:** `--experimental-neural-enemy TIPO` habilita um
+  único inimigo do arquétipo escolhido por partida (`worker`, `guard`, `officer`,
+  `engineer` ou `robot`). `--experimental-neural-worker` permanece como alias.
+  Os sensores incluem distância/ângulo apenas sob percepção,
   visibilidade, vida e proximidade de paredes. A rede decide movimento local,
   rotação e pedido de ataque a 10 Hz; colisão, cooldown, alcance e linha de
   visão continuam obrigatórios. A seed é derivada em domínio independente.
-  Sem a opção, todos os inimigos mantêm a IA anterior. Nesta entrega do
-  protótipo ainda não havia treino ou persistência; a etapa seguinte adiciona
-  essas capacidades sem promover cérebros automaticamente ao gameplay.
-- **Treinamento automático do Worker:** `--ai-training worker` executa arenas
+  Sem a opção, todos os inimigos mantêm a IA anterior. As habilidades especiais
+  de suporte/reparo continuam sob suas regras existentes; a rede experimental
+  controla movimento, rotação e ataque, sem substituir automaticamente a IA.
+  A contagem de suporte/reparo aparece no log de treino, mas não entra no
+  fitness porque essas ações ainda não são decisões da rede.
+- **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa arenas
   determinísticas sem abrir janela ou inicializar renderização/áudio. Cada
   geração avalia todos os cérebros em quatro cenários, com duas variações de
   seed cada, envolvendo movimento do jogador,
@@ -623,29 +627,36 @@ especializados das pastas numeradas.
   o fitness. A seleção combina a média dos cenários com o pior resultado para
   não premiar um cérebro que só funciona em uma arena. O log de cada geração
   mostra os totais dessas métricas nas oito partidas do campeão, permitindo
-  identificar comportamentos que exploram a pontuação. O treino preserva os
+  identificar comportamentos que exploram a pontuação. Métricas de movimento
+  e pedido de ataque só são creditadas nos ticks controlados pela rede, não
+  durante comportamentos de suporte/reparo ainda roteirizados. O treino preserva os
   melhores e cria descendentes por torneio
   e mutação; outras oito partidas com seeds separadas medem o campeão final.
-  `--save-dir` escreve um
-  arquivo versionado com checksum por geração, sem substituir arquivos
+  `--save-dir` escreve um arquivo versionado com arquétipo e checksum por
+  geração, sem substituir arquivos
   existentes. `--resume` inicia outra sequência a partir de um desses campeões
-  (não reproduz exatamente a população anterior). O cérebro salvo só é usado
-  na partida com `--experimental-neural-worker --neural-brain ARQUIVO`; nunca
-  substitui automaticamente a IA normal. Esta primeira versão treina apenas o
-  Worker em arenas simplificadas. O treino não ensina ainda navegação completa,
-  uso tático de cobertura, trabalho em equipe ou outros arquétipos; melhora de
-  fitness não equivale a aprovação de gameplay, que ainda requer playtest.
+  do mesmo arquétipo (não reproduz exatamente a população anterior). Arquivos
+  antigos de Worker ainda podem ser carregados. `--ai-training all` treina os
+  cinco arquétipos em sequência e salva cada um em uma subpasta de `--save-dir`;
+  `--resume` exige um tipo específico. O cérebro salvo só é usado na partida
+  com `--experimental-neural-enemy TIPO --neural-brain ARQUIVO`, com checagem
+  do tipo; nunca substitui automaticamente a IA normal. O treino ainda usa
+  arenas simplificadas e não ensina navegação completa, flanqueamento ou
+  coordenação entre inimigos; melhora de fitness não equivale a aprovação de
+  gameplay, que ainda requer playtest.
 
   Exemplo após compilar o preset Debug (use um diretório novo ou vazio):
 
   ```bash
-  build/debug/gdp --ai-training worker --population 24 --generations 30 --seed 42 \
-    --save-dir build/ai-runs/worker-42
-  build/debug/gdp --experimental-neural-worker \
-    --neural-brain build/ai-runs/worker-42/worker_generation_000030.brain
+  build/debug/gdp --ai-training all --population 24 --generations 30 --seed 42 \
+    --save-dir build/ai-runs/all-42
+  build/debug/gdp --experimental-neural-enemy guard \
+    --neural-brain build/ai-runs/all-42/guard/guard_generation_000030.brain
   ```
 
-  Para continuar, use `--resume CAMINHO_DO_BRAIN --generations N --save-dir NOVO_DIRETORIO`.
+  Para continuar um único tipo, combine `--ai-training TIPO`,
+  `--resume CAMINHO_DO_BRAIN`, `--generations N` e
+  `--save-dir NOVO_DIRETORIO`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

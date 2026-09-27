@@ -132,17 +132,23 @@ struct EnemyPerception {
     bool playerFlashlightOn{false};
 };
 
-// Opt-in prototype: exactly one Worker is selected per run. The network is
-// fixed-size and seeded independently; no evolution occurs during gameplay.
-struct NeuralWorkerExperiment {
-    explicit NeuralWorkerExperiment(wkc::core::Seed seed);
+// Opt-in prototype: exactly one enemy of the selected archetype per run.
+// The network is fixed-size; evolution occurs only in headless training.
+struct NeuralEnemyExperiment {
+    explicit NeuralEnemyExperiment(wkc::core::Seed seed,
+        gdp::entities::EnemyArchetype archetype
+            = gdp::entities::EnemyArchetype::Worker);
 
     wkc::ai::Genome genome;
+    gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
     bool logSelection{true};
     std::optional<gdp::entities::EntityId> selected;
+    std::uint64_t controlledTicks{0U};
     float decisionSecondsRemaining{0.0F};
     std::array<float, 4> outputs{};
 };
+
+using NeuralWorkerExperiment = NeuralEnemyExperiment;
 
 [[nodiscard]] std::size_t alertEnemiesToNoise(
     gdp::entities::EntityManager& manager,
@@ -178,7 +184,7 @@ struct EnemyUpdateSummary {
     float fixedStepSeconds,
     WorkerConfig config = {},
     EnemyPerception perception = {},
-    NeuralWorkerExperiment* neuralExperiment = nullptr) noexcept;
+    NeuralEnemyExperiment* neuralExperiment = nullptr) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateGuards(
     gdp::entities::EntityManager& manager,
@@ -187,7 +193,8 @@ struct EnemyUpdateSummary {
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
     GuardConfig config = {},
-    EnemyPerception perception = {}) noexcept;
+    EnemyPerception perception = {},
+    NeuralEnemyExperiment* neuralExperiment = nullptr) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateOfficers(
     gdp::entities::EntityManager& manager,
@@ -196,7 +203,8 @@ struct EnemyUpdateSummary {
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
     OfficerConfig config = {},
-    EnemyPerception perception = {}) noexcept;
+    EnemyPerception perception = {},
+    NeuralEnemyExperiment* neuralExperiment = nullptr) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateEngineers(
     gdp::entities::EntityManager& manager,
@@ -205,7 +213,8 @@ struct EnemyUpdateSummary {
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
     EngineerConfig config = {},
-    EnemyPerception perception = {}) noexcept;
+    EnemyPerception perception = {},
+    NeuralEnemyExperiment* neuralExperiment = nullptr) noexcept;
 
 [[nodiscard]] IndustrialRobotPhase industrialRobotPhase(
     float health,
@@ -219,6 +228,7 @@ struct EnemyUpdateSummary {
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
     IndustrialRobotConfig config = {},
-    EnemyPerception perception = {}) noexcept;
+    EnemyPerception perception = {},
+    NeuralEnemyExperiment* neuralExperiment = nullptr) noexcept;
 
 } // namespace gdp::gameplay

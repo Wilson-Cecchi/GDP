@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ai/Genome.hpp"
+#include "entities/EntityManager.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -22,14 +23,19 @@ struct WorkerFitnessMetrics {
     float wastedAttackSeconds{0.0F};
     std::uint32_t attacksLanded{0};
     std::uint32_t deaths{0};
+    std::uint32_t supportActions{0};
 };
 
 [[nodiscard]] float scoreWorkerFitness(const WorkerFitnessMetrics& metrics) noexcept;
+[[nodiscard]] float scoreEnemyFitness(
+    const WorkerFitnessMetrics& metrics,
+    gdp::entities::EnemyArchetype archetype) noexcept;
 [[nodiscard]] float evaluateWorkerGenome(
     const wkc::ai::Genome& genome,
     wkc::core::Seed scenarioSeed);
 
 struct WorkerTrainingOptions {
+    gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
     wkc::core::Seed seed{12'345U};
     bool seedExplicit{false};
     std::uint32_t population{16U};
@@ -50,6 +56,10 @@ struct WorkerTrainingResult {
 };
 
 [[nodiscard]] WorkerTrainingResult runWorkerTraining(
+    const WorkerTrainingOptions& options,
+    std::ostream& output);
+
+[[nodiscard]] WorkerTrainingResult runEnemyTraining(
     const WorkerTrainingOptions& options,
     std::ostream& output);
 

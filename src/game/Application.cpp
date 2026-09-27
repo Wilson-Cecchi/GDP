@@ -769,19 +769,21 @@ bool Application::initializeRun()
 {
     using Clock = std::chrono::steady_clock;
     performanceMonitor_.reset();
-    if (config_.experimentalNeuralWorker) {
-        neuralWorkerExperiment_.emplace(wkc::core::deriveSeed(
-            config_.worldSeed, SeedDomain::NeuralWorker, 0U));
+    if (config_.experimentalNeuralEnemy) {
+        neuralEnemyExperiment_.emplace(wkc::core::deriveSeed(
+            config_.worldSeed, SeedDomain::NeuralWorker,
+            static_cast<std::uint64_t>(*config_.experimentalNeuralEnemy)),
+            *config_.experimentalNeuralEnemy);
         if (config_.neuralBrainPath) {
-            const auto record = persistence::loadWorkerBrain(*config_.neuralBrainPath);
-            if (!record) {
-                log(LogLevel::Error, "Cannot load experimental Worker brain");
+            const auto record = persistence::loadEnemyBrain(*config_.neuralBrainPath);
+            if (!record || record->archetype != *config_.experimentalNeuralEnemy) {
+                log(LogLevel::Error, "Cannot load matching experimental enemy brain");
                 return false;
             }
-            neuralWorkerExperiment_->genome = record->genome;
+            neuralEnemyExperiment_->genome = record->genome;
         }
     } else {
-        neuralWorkerExperiment_.reset();
+        neuralEnemyExperiment_.reset();
     }
     currentFramePerformance_ = {};
     enemyAnimationTicks_ = 0U;
@@ -2655,19 +2657,23 @@ void Application::fixedUpdate(const double fixedStep)
     const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.worker, perception,
-        neuralWorkerExperiment_ ? &*neuralWorkerExperiment_ : nullptr);
+        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
     const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.guard, perception);
+        difficultyConfigs.guard, perception,
+        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
     const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.officer, perception);
+        difficultyConfigs.officer, perception,
+        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
     const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.engineer, perception);
+        difficultyConfigs.engineer, perception,
+        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
     const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.industrialRobot, perception);
+        difficultyConfigs.industrialRobot, perception,
+        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
     const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
         + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
     if (audio_ && attacksLanded > 0U) {

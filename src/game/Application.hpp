@@ -49,7 +49,7 @@ namespace gdp::game {
 
 struct ApplicationConfig {
     bool headless{false};
-    bool experimentalNeuralWorker{false};
+    std::optional<entities::EnemyArchetype> experimentalNeuralEnemy;
     std::optional<std::filesystem::path> neuralBrainPath;
     std::optional<std::uint64_t> frameLimit;
     std::optional<gameplay::GraphicsQuality> benchmarkQuality;
@@ -125,7 +125,7 @@ private:
         gameplay::SpeedrunRecordResult::Ineligible};
     std::optional<std::filesystem::path> speedrunRecordPath_;
     entities::EntityManager entities_;
-    std::optional<gameplay::NeuralWorkerExperiment> neuralWorkerExperiment_;
+    std::optional<gameplay::NeuralEnemyExperiment> neuralEnemyExperiment_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};

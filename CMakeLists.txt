@@ -442,13 +442,19 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_worker_training_tests)
 
     add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
-    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 30)
+    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 120)
 
     add_test(
         NAME worker_training_cli_smoke
         COMMAND gdp --ai-training worker --population 4 --generations 2 --seed 42
     )
     set_tests_properties(worker_training_cli_smoke PROPERTIES TIMEOUT 30)
+
+    add_test(
+        NAME all_enemy_training_cli_smoke
+        COMMAND gdp --ai-training all --population 2 --generations 1 --seed 42
+    )
+    set_tests_properties(all_enemy_training_cli_smoke PROPERTIES TIMEOUT 30)
 
     add_executable(gdp_enemy_sensors_tests tests/test_enemy_sensors.cpp)
     target_link_libraries(gdp_enemy_sensors_tests PRIVATE gdp_gameplay)

@@ -36,7 +36,8 @@ bool validRecord(const WorkerBrainRecord& record) noexcept
     const auto& network = record.genome.network;
     if (network.inputCount() != inputCount || network.hiddenCount() != hiddenCount
         || network.outputCount() != outputCount
-        || !std::isfinite(record.genome.fitness)) {
+        || !std::isfinite(record.genome.fitness)
+        || record.archetype > gdp::entities::EnemyArchetype::IndustrialRobot) {
         return false;
     }
     for (const float weight : network.parameters()) {
@@ -50,7 +51,8 @@ bool validRecord(const WorkerBrainRecord& record) noexcept
 std::string serialize(const WorkerBrainRecord& record)
 {
     std::ostringstream output;
-    output << "GDP_WORKER_BRAIN 1\n"
+    output << "GDP_ENEMY_BRAIN 2\n"
+           << "archetype " << static_cast<unsigned>(record.archetype) << '\n'
            << "seed " << record.trainingSeed << '\n'
            << "generation " << record.genome.generation << '\n'
            << "id " << record.genome.id << '\n'
@@ -87,13 +89,24 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
     std::string key;
     std::string magic;
     std::uint32_t version = 0;
+    unsigned archetypeNumber = 0U;
     std::uint64_t seed = 0;
     std::uint32_t generation = 0;
     std::uint32_t id = 0;
     std::uint32_t fitnessBits = 0;
     std::size_t weightCount = 0;
-    if (!(input >> magic >> version) || magic != "GDP_WORKER_BRAIN" || version != 1
-        || !(input >> key >> seed) || key != "seed"
+    if (!(input >> magic >> version)
+        || !((magic == "GDP_WORKER_BRAIN" && version == 1U)
+            || (magic == "GDP_ENEMY_BRAIN" && version == 2U))) {
+        return std::nullopt;
+    }
+    if (version == 2U && (!(input >> key >> archetypeNumber)
+            || key != "archetype"
+            || archetypeNumber > static_cast<unsigned>(
+                gdp::entities::EnemyArchetype::IndustrialRobot))) {
+        return std::nullopt;
+    }
+    if (!(input >> key >> seed) || key != "seed"
         || !(input >> key >> generation) || key != "generation"
         || !(input >> key >> id) || key != "id"
         || !(input >> key >> fitnessBits) || key != "fitness_bits"
@@ -104,7 +117,8 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
     WorkerBrainRecord record{
         wkc::ai::Genome{wkc::ai::NeuralNetwork{inputCount, hiddenCount, outputCount},
             std::bit_cast<float>(fitnessBits), generation, id},
-        seed};
+        seed,
+        static_cast<gdp::entities::EnemyArchetype>(archetypeNumber)};
     for (float& weight : record.genome.network.parameters()) {
         std::uint32_t bits = 0;
         if (!(input >> bits)) {
@@ -120,7 +134,7 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
 
 } // namespace
 
-std::optional<WorkerBrainRecord> loadWorkerBrain(
+std::optional<EnemyBrainRecord> loadEnemyBrain(
     const std::filesystem::path& path) noexcept
 {
     try {
@@ -145,7 +159,7 @@ std::optional<WorkerBrainRecord> loadWorkerBrain(
     }
 }
 
-bool saveWorkerBrain(
+bool saveEnemyBrain(
     const std::filesystem::path& path,
     const WorkerBrainRecord& record) noexcept
 {
@@ -179,8 +193,9 @@ bool saveWorkerBrain(
                 return false;
             }
         }
-        const auto validation = loadWorkerBrain(temporary);
+        const auto validation = loadEnemyBrain(temporary);
         if (!validation || validation->trainingSeed != record.trainingSeed
+            || validation->archetype != record.archetype
             || validation->genome.generation != record.genome.generation
             || validation->genome.id != record.genome.id
             || validation->genome.fitness != record.genome.fitness
@@ -201,6 +216,24 @@ bool saveWorkerBrain(
         std::filesystem::remove(temporary, error);
         return false;
     }
+}
+
+std::optional<WorkerBrainRecord> loadWorkerBrain(
+    const std::filesystem::path& path) noexcept
+{
+    auto record = loadEnemyBrain(path);
+    if (record && record->archetype == gdp::entities::EnemyArchetype::Worker) {
+        return record;
+    }
+    return std::nullopt;
+}
+
+bool saveWorkerBrain(
+    const std::filesystem::path& path,
+    const WorkerBrainRecord& record) noexcept
+{
+    return record.archetype == gdp::entities::EnemyArchetype::Worker
+        && saveEnemyBrain(path, record);
 }
 
 } // namespace gdp::persistence

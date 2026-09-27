@@ -1,8 +1,10 @@
 #include "game/ai/WorkerTraining.hpp"
 
+#include "core/Hash.hpp"
 #include "persistence/WorkerBrainStore.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -67,6 +69,17 @@ void testFitness()
     capped.contactSeconds = 100.0F;
     expect(scoreWorkerFitness(capped) - scoreWorkerFitness(contact) <= 2.0F,
         "contact reward is bounded so camping cannot dominate combat");
+    const auto boss = gdp::entities::EnemyArchetype::IndustrialRobot;
+    WorkerFitnessMetrics robotHit = baseline;
+    robotHit.damageDealt += 10.0F;
+    expect(scoreEnemyFitness(robotHit, boss) - scoreEnemyFitness(baseline, boss)
+            < scoreWorkerFitness(robotHit) - scoreWorkerFitness(baseline),
+        "boss damage is scaled to avoid dominating its own fitness");
+    WorkerFitnessMetrics robotDeath = baseline;
+    robotDeath.deaths = 1U;
+    expect(scoreEnemyFitness(baseline, boss)
+            - scoreEnemyFitness(robotDeath, boss) > 8.0F,
+        "boss death has a stronger penalty");
 }
 
 void testTrainingAndPersistence()
@@ -114,6 +127,27 @@ void testTrainingAndPersistence()
                     first.champion->network.parameters().begin()),
                 "checkpoint preserves every weight exactly");
         }
+        std::ostringstream legacyBody;
+        legacyBody << "GDP_WORKER_BRAIN 1\nseed " << options.seed
+                   << "\ngeneration " << first.champion->generation
+                   << "\nid " << first.champion->id
+                   << "\nfitness_bits "
+                   << std::bit_cast<std::uint32_t>(first.champion->fitness)
+                   << "\nweights "
+                   << first.champion->network.parameters().size() << '\n';
+        for (const float weight : first.champion->network.parameters()) {
+            legacyBody << std::bit_cast<std::uint32_t>(weight) << '\n';
+        }
+        const fs::path legacyPath = root / "legacy_worker.brain";
+        {
+            std::ofstream legacyFile(legacyPath, std::ios::binary);
+            legacyFile << legacyBody.str() << "checksum "
+                       << wkc::core::fnv1a64(legacyBody.str()) << '\n';
+        }
+        const auto legacy = gdp::persistence::loadWorkerBrain(legacyPath);
+        expect(legacy && legacy->archetype
+                == gdp::entities::EnemyArchetype::Worker,
+            "version-one Worker checkpoints remain loadable");
         expect(!gdp::persistence::saveWorkerBrain(
                 *first.lastCheckpoint, {*first.champion, options.seed}),
             "saving never overwrites an existing checkpoint");
@@ -190,11 +224,78 @@ void testTrainingAndPersistence()
     expect(!error, "temporary training files are cleaned up");
 }
 
+void testOtherArchetypes()
+{
+    namespace fs = std::filesystem;
+    using namespace gdp::game::ai;
+    using gdp::entities::EnemyArchetype;
+    const fs::path root = fs::temp_directory_path()
+        / ("gdp_all_enemy_training_test_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code error;
+    if (!fs::create_directory(root, error) || error) {
+        expect(false, "all-archetype test owns a unique temporary directory");
+        return;
+    }
+    for (const EnemyArchetype archetype : {
+             EnemyArchetype::Guard, EnemyArchetype::Officer,
+             EnemyArchetype::Engineer, EnemyArchetype::IndustrialRobot}) {
+        WorkerTrainingOptions options;
+        options.archetype = archetype;
+        options.seed = 42U;
+        options.population = 3U;
+        options.generations = 2U;
+        options.saveDirectory = root / std::to_string(
+            static_cast<unsigned>(archetype));
+        std::ostringstream output;
+        const WorkerTrainingResult trained = runEnemyTraining(options, output);
+        expect(trained.succeeded && trained.lastCheckpoint
+                && trained.champion && trained.lastGeneration == 2U,
+            "each enemy archetype trains and saves a brain");
+        if (!trained.lastCheckpoint) continue;
+        const auto saved = gdp::persistence::loadEnemyBrain(*trained.lastCheckpoint);
+        expect(saved && saved->archetype == archetype
+                && saved->trainingSeed == options.seed,
+            "checkpoint identifies its enemy archetype and seed");
+        expect(!gdp::persistence::loadWorkerBrain(*trained.lastCheckpoint),
+            "Worker-only loader rejects another archetype");
+        WorkerTrainingOptions mismatched = options;
+        mismatched.archetype = EnemyArchetype::Worker;
+        mismatched.resumeBrain = *trained.lastCheckpoint;
+        mismatched.saveDirectory.reset();
+        std::ostringstream rejectedOutput;
+        expect(!runEnemyTraining(mismatched, rejectedOutput).succeeded,
+            "resume refuses a brain belonging to another archetype");
+        if (archetype == EnemyArchetype::Guard) {
+            WorkerTrainingOptions resumed = options;
+            resumed.generations = 1U;
+            resumed.resumeBrain = *trained.lastCheckpoint;
+            resumed.saveDirectory = root / "guard_resumed";
+            std::ostringstream resumeOutput;
+            const WorkerTrainingResult continuation
+                = runEnemyTraining(resumed, resumeOutput);
+            expect(continuation.succeeded && continuation.lastGeneration == 3U,
+                "a non-Worker archetype can continue from its checkpoint");
+        }
+        WorkerTrainingOptions repeated = options;
+        repeated.saveDirectory.reset();
+        std::ostringstream repeatedOutput;
+        const WorkerTrainingResult again
+            = runEnemyTraining(repeated, repeatedOutput);
+        expect(again.succeeded && again.finalBest == trained.finalBest
+                && again.holdoutFitness == trained.holdoutFitness,
+            "each archetype training run is deterministic");
+    }
+    fs::remove_all(root, error);
+    expect(!error, "all-archetype temporary checkpoints are cleaned up");
+}
+
 } // namespace
 
 int main()
 {
     testFitness();
     testTrainingAndPersistence();
+    testOtherArchetypes();
     return failures == 0 ? 0 : 1;
 }

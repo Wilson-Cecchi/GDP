@@ -147,6 +147,74 @@ void testExperimentalWorker()
             && hiddenUpdate.attacksLanded == 0
             && hiddenPlayer.state().health == 100.0F,
         "neural command cannot attack through blocked line of sight");
+
+    EntityManager turnedManager;
+    (void)turnedManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    Player turnedPlayer;
+    turnedPlayer.spawn({0.0F, 0.0F, 0.0F});
+    NeuralEnemyExperiment turning{123};
+    forceAttack(turning);
+    turning.genome.network.parameters()[64 + 2 * 9] = 2.0F;
+    const EnemyUpdateSummary turnedUpdate = updateWorkers(
+        turnedManager, turnedPlayer, 1, room, 1.0F,
+        WorkerConfig{}, {}, &turning);
+    expect(turnedUpdate.attacksLanded == 0U
+            && turnedPlayer.state().health == 100.0F,
+        "attack checks visibility again after the neural turn");
+}
+
+void testExperimentalArchetypes()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-16.0F, 0.0F, -16.0F}, {16.0F, 4.0F, 16.0F}}};
+    for (const EnemyArchetype archetype : {
+             EnemyArchetype::Guard, EnemyArchetype::Officer,
+             EnemyArchetype::Engineer, EnemyArchetype::IndustrialRobot}) {
+        EntityManager manager;
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        const float distance = archetype == EnemyArchetype::IndustrialRobot
+            ? 9.0F : archetype == EnemyArchetype::Officer ? 7.0F : 5.0F;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, distance},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1,
+            .archetype = archetype,
+        });
+        NeuralEnemyExperiment experiment{123, archetype};
+        forceAttack(experiment);
+        EnemyUpdateSummary update;
+        switch (archetype) {
+        case EnemyArchetype::Worker:
+            break;
+        case EnemyArchetype::Guard:
+            update = updateGuards(manager, player, 1, room, 0.01F,
+                GuardConfig{}, {}, &experiment);
+            break;
+        case EnemyArchetype::Officer:
+            update = updateOfficers(manager, player, 1, room, 0.01F,
+                OfficerConfig{}, {}, &experiment);
+            break;
+        case EnemyArchetype::Engineer:
+            update = updateEngineers(manager, player, 1, room, 0.01F,
+                EngineerConfig{}, {}, &experiment);
+            break;
+        case EnemyArchetype::IndustrialRobot:
+            update = updateIndustrialRobots(manager, player, 1, room, 0.01F,
+                IndustrialRobotConfig{}, {}, &experiment);
+            break;
+        }
+        expect(experiment.selected == id && experiment.controlledTicks == 1U
+                && update.attacksLanded == 1U
+                && player.state().health < 100.0F,
+            "each non-Worker archetype can execute its neural attack");
+    }
 }
 
 } // namespace
@@ -155,5 +223,6 @@ int main()
 {
     testSensors();
     testExperimentalWorker();
+    testExperimentalArchetypes();
     return failures == 0 ? 0 : 1;
 }

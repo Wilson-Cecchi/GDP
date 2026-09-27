@@ -19,22 +19,35 @@ void printUsage(const std::string_view executable)
 {
     std::cout << "Usage: " << executable
               << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N]"
-                 " [--experimental-neural-worker] [--neural-brain FILE] [--help]\n"
+                 " [--experimental-neural-enemy TYPE] [--neural-brain FILE] [--help]\n"
               << "       " << executable
-              << " --ai-training worker [--population N] [--generations N]"
+              << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--save-dir DIR] [--resume FILE]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
               << "  --seed N             Generate a deterministic world from unsigned integer N.\n"
-              << "  --experimental-neural-worker  Test one seeded neural Worker per run.\n"
-              << "  --neural-brain FILE  Load a saved brain for that experimental Worker.\n"
-              << "  --ai-training worker  Train Worker brains headlessly; no normal run.\n"
+              << "  --experimental-neural-enemy TYPE  Test one neural enemy of TYPE.\n"
+              << "  --experimental-neural-worker  Alias for Worker playtesting.\n"
+              << "  --neural-brain FILE  Load a matching saved experimental brain.\n"
+              << "  --ai-training TYPE  Train worker, guard, officer, engineer, robot, or all.\n"
               << "  --population N      Training population (2..128, default 16).\n"
               << "  --generations N     Training generations (1..10000, default 10).\n"
               << "  --save-dir DIR      Save one best-brain checkpoint per generation.\n"
               << "  --resume FILE       Seed a new training run from a checkpoint.\n"
               << "  --help               Show this message.\n";
+}
+
+std::optional<gdp::entities::EnemyArchetype> parseEnemyArchetype(
+    const std::string_view value)
+{
+    using gdp::entities::EnemyArchetype;
+    if (value == "worker") return EnemyArchetype::Worker;
+    if (value == "guard") return EnemyArchetype::Guard;
+    if (value == "officer") return EnemyArchetype::Officer;
+    if (value == "engineer") return EnemyArchetype::Engineer;
+    if (value == "robot") return EnemyArchetype::IndustrialRobot;
+    return std::nullopt;
 }
 
 std::optional<std::uint32_t> parsePositiveU32(const std::string_view value)
@@ -101,6 +114,7 @@ int main(const int argc, char* argv[])
     gdp::game::ApplicationConfig config;
     gdp::game::ai::WorkerTrainingOptions trainingOptions;
     bool trainingMode = false;
+    bool trainAll = false;
     bool trainingOnlyArgumentSeen = false;
     std::optional<wkc::core::Seed> requestedSeed;
 
@@ -118,7 +132,17 @@ int main(const int argc, char* argv[])
         }
 
         if (argument == "--experimental-neural-worker") {
-            config.experimentalNeuralWorker = true;
+            config.experimentalNeuralEnemy = gdp::entities::EnemyArchetype::Worker;
+            continue;
+        }
+
+        if (argument == "--experimental-neural-enemy") {
+            if (index + 1 >= argc
+                || !(config.experimentalNeuralEnemy
+                    = parseEnemyArchetype(argv[++index]))) {
+                std::cerr << "Expected worker, guard, officer, engineer or robot\n";
+                return 2;
+            }
             continue;
         }
 
@@ -132,10 +156,18 @@ int main(const int argc, char* argv[])
         }
 
         if (argument == "--ai-training") {
-            if (index + 1 >= argc || std::string_view{argv[++index]} != "worker") {
-                std::cerr << "--ai-training currently supports only worker\n";
+            if (index + 1 >= argc) {
+                std::cerr << "Missing archetype after --ai-training\n";
                 return 2;
             }
+            const std::string_view selected{argv[++index]};
+            trainAll = selected == "all";
+            const auto archetype = parseEnemyArchetype(selected);
+            if (!trainAll && !archetype) {
+                std::cerr << "Expected worker, guard, officer, engineer, robot or all\n";
+                return 2;
+            }
+            if (archetype) trainingOptions.archetype = *archetype;
             trainingMode = true;
             continue;
         }
@@ -231,16 +263,49 @@ int main(const int argc, char* argv[])
 
     if (trainingMode) {
         if (config.benchmarkQuality || config.frameLimit
-            || config.experimentalNeuralWorker || config.neuralBrainPath) {
+            || config.experimentalNeuralEnemy || config.neuralBrainPath) {
             std::cerr << "Training cannot be combined with gameplay or benchmark options\n";
+            return 2;
+        }
+        if (trainAll && trainingOptions.resumeBrain) {
+            std::cerr << "--resume requires a single training archetype\n";
             return 2;
         }
         trainingOptions.seed = requestedSeed.value_or(12'345U);
         trainingOptions.seedExplicit = requestedSeed.has_value();
-        const auto result = gdp::game::ai::runWorkerTraining(trainingOptions, std::cout);
-        if (!result.succeeded) {
-            std::cerr << "AI training failed: " << result.error << '\n';
-            return 1;
+        if (trainAll) {
+            const auto root = trainingOptions.saveDirectory;
+            if (root) {
+                std::error_code error;
+                if (std::filesystem::exists(*root, error)
+                    ? error || !std::filesystem::is_directory(*root, error)
+                        || !std::filesystem::is_empty(*root, error)
+                    : error || !std::filesystem::create_directories(*root, error)) {
+                    std::cerr << "AI training failed: save directory must be new or empty\n";
+                    return 1;
+                }
+            }
+            constexpr std::string_view names[]{
+                "worker", "guard", "officer", "engineer", "robot"};
+            for (std::size_t type = 0U; type < 5U; ++type) {
+                trainingOptions.archetype
+                    = static_cast<gdp::entities::EnemyArchetype>(type);
+                if (root) trainingOptions.saveDirectory = *root / names[type];
+                const auto result = gdp::game::ai::runEnemyTraining(
+                    trainingOptions, std::cout);
+                if (!result.succeeded) {
+                    std::cerr << "AI training failed for " << names[type]
+                              << ": " << result.error << '\n';
+                    return 1;
+                }
+            }
+        } else {
+            const auto result = gdp::game::ai::runEnemyTraining(
+                trainingOptions, std::cout);
+            if (!result.succeeded) {
+                std::cerr << "AI training failed: " << result.error << '\n';
+                return 1;
+            }
         }
         return 0;
     }
@@ -248,8 +313,8 @@ int main(const int argc, char* argv[])
         std::cerr << "--population, --generations, --save-dir and --resume need --ai-training\n";
         return 2;
     }
-    if (config.neuralBrainPath && !config.experimentalNeuralWorker) {
-        std::cerr << "--neural-brain needs --experimental-neural-worker\n";
+    if (config.neuralBrainPath && !config.experimentalNeuralEnemy) {
+        std::cerr << "--neural-brain needs --experimental-neural-enemy TYPE\n";
         return 2;
     }
     if (config.headless && config.benchmarkQuality) {
