@@ -777,6 +777,7 @@ bool Application::initializeRun()
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
+    flashlightOn_ = false;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
@@ -1651,6 +1652,9 @@ void Application::processEvents()
         fireHeld_ = input_.isMouseButtonDown(MouseButton::Primary);
     }
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
+    if (input_.wasKeyPressed(Key::F)) {
+        flashlightOn_ = !flashlightOn_;
+    }
     if (input_.wasKeyPressed(Key::Digit1)) {
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
     } else if (input_.wasKeyPressed(Key::Digit2)) {
@@ -1756,6 +1760,7 @@ bool Application::returnToMainMenu()
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
+    flashlightOn_ = false;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
@@ -3266,6 +3271,10 @@ void Application::render()
                 roomFixtureEntities_, playerRoom, player_.state().position);
             lighting.lightCount = std::min<std::uint32_t>(
                 lighting.lightCount, graphicsQuality.maximumLights);
+            lighting.flashlightEnabled = flashlightOn_
+                && player_.state().alive;
+            lighting.flashlightPosition = player_.cameraPosition();
+            lighting.flashlightDirection = player_.forwardDirection();
             if (graphicsQuality.maximumShadowLights > 0U
                 && graphicsQuality.maximumShadowOccluders > 0U) {
                 std::vector<visual::ShadowOccluderRenderData> shadowCandidates;
@@ -3416,6 +3425,11 @@ void Application::render()
     SDL_SetWindowTitle(window_, title.str().c_str());
     visual::HudRenderData hud;
     hud.visible = true;
+    hud.infoOverlay = input_.isKeyDown(Key::Tab);
+    hud.score = progress.score;
+    hud.enemiesKilled = progress.enemiesKilled;
+    hud.eventsCompleted = progress.eventsCompleted;
+    hud.lootCollected = progress.lootCollected;
     hud.graphicsQuality = hudGraphicsQuality;
     hud.worldRenderScalePercent = graphicsQuality.renderScalePercent;
     hud.detailedMaterials = graphicsQuality.detailedMaterials;
@@ -3719,6 +3733,7 @@ void Application::shutdown()
     weaponSwitchPending_.reset();
     weaponRecoilRemaining_ = 0.0F;
     aimBlend_ = 0.0F;
+    flashlightOn_ = false;
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;

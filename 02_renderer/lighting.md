@@ -23,6 +23,11 @@ struct Light { LightType type; Vec3 position,direction,color; float intensity,ra
 
 Interiores não exigem luz direcional global no primeiro vertical slice.
 
+Na Fase 150, `F` alterna uma lanterna de câmera com cone suave e alcance de
+14 m. Ela usa um uniforme separado das luminárias, não consome a capacidade
+de pontos por sala e não projeta sombra na primeira versão. Quando desligada,
+o passe do cone é ignorado; não há textura ou emissivo de teto duplicado.
+
 A sala fixa usa uma luz pontual com cor, posição, difusa e atenuação quadrática
 aproximada, além de ambiente mínimo para legibilidade. Desde a Fase 10, o teto
 industrial também contém luminárias lineares com contribuição emissiva por

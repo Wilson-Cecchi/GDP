@@ -234,6 +234,16 @@ int main()
             std::vector<std::uint8_t> lightingPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lightingPixels.data());
+            gdp::game::visual::RoomLightingRenderData flashlightLighting
+                = proceduralLighting;
+            flashlightLighting.flashlightEnabled = true;
+            flashlightLighting.flashlightPosition = {0.0F, 1.62F, 4.0F};
+            flashlightLighting.flashlightDirection = {0.0F, 0.0F, -1.0F};
+            const bool renderedFlashlight = renderer.render(
+                width, height, {}, {}, {}, {}, flashlightLighting);
+            std::vector<std::uint8_t> flashlightPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                flashlightPixels.data());
 
             gdp::game::visual::HudRenderData potatoQuality;
             potatoQuality.graphicsQuality
@@ -253,6 +263,17 @@ int main()
             std::vector<std::uint8_t> potatoQualityPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 potatoQualityPixels.data());
+            gdp::game::visual::RoomLightingRenderData potatoFlashlightLighting
+                = potatoLighting;
+            potatoFlashlightLighting.flashlightEnabled = true;
+            potatoFlashlightLighting.flashlightPosition = {0.0F, 1.62F, 4.0F};
+            potatoFlashlightLighting.flashlightDirection = {0.0F, 0.0F, -1.0F};
+            const bool renderedPotatoFlashlight = renderer.render(
+                width, height, {}, {}, {}, {}, potatoFlashlightLighting,
+                {}, {}, {}, {}, potatoQuality);
+            std::vector<std::uint8_t> potatoFlashlightPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                potatoFlashlightPixels.data());
             gdp::game::visual::RoomLightingRenderData potatoReferenceLighting
                 = potatoLighting;
             potatoReferenceLighting.shadowOccluderCount = 1U;
@@ -587,6 +608,18 @@ int main()
             std::vector<std::uint8_t> functionalHudPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
+
+            gdp::game::visual::HudRenderData infoHud = functionalHud;
+            infoHud.infoOverlay = true;
+            infoHud.score = 2300U;
+            infoHud.enemiesKilled = 7U;
+            infoHud.eventsCompleted = 2U;
+            infoHud.lootCollected = 3U;
+            const bool renderedInfoHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, infoHud);
+            std::vector<std::uint8_t> infoHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                infoHudPixels.data());
 
             gdp::game::visual::HudRenderData spreadHud = functionalHud;
             spreadHud.weaponSpread = 1.0F;
@@ -1033,6 +1066,7 @@ int main()
             std::size_t securityChangedChannels = 0;
             std::size_t centralHubChangedChannels = 0;
             std::size_t lightingChangedChannels = 0;
+            std::size_t flashlightChangedChannels = 0;
             std::size_t potatoQualityChangedChannels = 0;
             std::size_t damagedFixtureChangedChannels = 0;
             std::size_t destroyedFixtureChangedChannels = 0;
@@ -1119,6 +1153,10 @@ int main()
                     if (lightingPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++lightingChangedChannels;
+                    }
+                    if (flashlightPixels[index + channel]
+                        > lightingPixels[index + channel]) {
+                        ++flashlightChangedChannels;
                     }
                     if (potatoQualityPixels[index + channel]
                         != lightingPixels[index + channel]) {
@@ -1316,7 +1354,11 @@ int main()
                 && renderedSecurityVariant && securityChangedChannels > 100U
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
+                && renderedFlashlight && flashlightChangedChannels > 30U
+                && renderedInfoHud && infoHudPixels != functionalHudPixels
                 && renderedPotatoQuality && potatoQualityChangedChannels > 100U
+                && renderedPotatoFlashlight
+                && potatoFlashlightPixels != potatoQualityPixels
                 && potatoFrameStats.lowSpecShader
                 && renderedPotatoReference
                 && !potatoReferenceStats.lowSpecShader

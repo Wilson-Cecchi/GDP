@@ -574,6 +574,12 @@ especializados das pastas numeradas.
 - **Fase 149 — Mira no botão direito:** segurar `Mouse2` aproxima a câmera
   suavemente e reduz a dispersão dos tiros; a faca não usa mira. O FOV base
   configurado pelo jogador permanece como referência ao soltar o botão.
+- **Fase 150 — Lanterna:** `F` liga/desliga um cone de luz preso à câmera,
+  independente das luminárias do ambiente. A primeira versão não projeta
+  sombras nem usa bateria; desligada, não consome um slot de luz da sala.
+- **Fase 151 — Painel rápido:** segurar `Tab` mostra placar, abates, eventos,
+  loot e tempo da run sem pausar a simulação. `F3` permanece como painel de
+  desempenho separado.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

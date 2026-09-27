@@ -452,6 +452,11 @@ exitConfirmationSelectionAt(
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
+    bool infoOverlay{false};
+    std::uint64_t score{0U};
+    std::uint32_t enemiesKilled{0U};
+    std::uint32_t eventsCompleted{0U};
+    std::uint32_t lootCollected{0U};
     float health{100.0F};
     float maximumHealth{100.0F};
     float armor{0.0F};
@@ -583,6 +588,9 @@ struct RoomLightingRenderData {
     std::uint32_t shadowLightCount{0U};
     float fixtureEmissive{0.75F};
     bool alert{false};
+    bool flashlightEnabled{false};
+    wkc::core::Vec3 flashlightPosition{};
+    wkc::core::Vec3 flashlightDirection{0.0F, 0.0F, -1.0F};
 };
 
 struct ShadowBudgetResult {

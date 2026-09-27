@@ -116,6 +116,12 @@ Coleta, início de evento, nova onda, setor limpo e level-up usam mensagens
 curtas com duração controlada pelo fixed update; a UI apenas apresenta o
 snapshot e não controla a simulação.
 
+## Painel rápido
+
+Segurar `Tab` mostra placar, abates, eventos, loot e tempo da run. Os números
+vêm do snapshot de progressão; abrir o painel não pausa nem altera o jogador.
+Ele é separado do diagnóstico `F3` e não aparece sobre menus.
+
 ## Escala
 
 Layout deve funcionar em 16:9, 16:10 e ultrawide sem depender de pixels fixos.

@@ -77,6 +77,9 @@ uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
 uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
+uniform int uFlashlightEnabled;
+uniform vec3 uFlashlightPosition;
+uniform vec3 uFlashlightDirection;
 const int MAX_SHADOW_OCCLUDERS = GDP_MAX_SHADOW_OCCLUDERS;
 #if !GDP_LOW_SPEC
 uniform int uShadowLightCount;
@@ -222,6 +225,20 @@ void main()
             result += reflectance * highlight * diffuse * radiance * visibility;
         }
 #endif
+    }
+    if (uFlashlightEnabled != 0 && uViewmodel == 0) {
+        vec3 beam = vWorldPosition - uFlashlightPosition;
+        float beamDistance = length(beam);
+        if (beamDistance > 0.001 && beamDistance < 14.0) {
+            vec3 beamDirection = beam / beamDistance;
+            float cone = smoothstep(0.82, 0.95,
+                dot(beamDirection, normalize(uFlashlightDirection)));
+            float incidence = max(dot(normal, -beamDirection), 0.0);
+            float falloff = 1.0 / (1.0 + 0.16 * beamDistance * beamDistance);
+            float rangeFade = 1.0 - smoothstep(11.0, 14.0, beamDistance);
+            result += albedo * vec3(0.90, 0.95, 1.0)
+                * cone * incidence * falloff * rangeFade * 2.2;
+        }
     }
     if (uViewmodel != 0) {
         // A restrained camera-space reflection keeps steel readable when the
@@ -1158,6 +1175,10 @@ bool GdpRenderer::render(
         ? (lighting.ambientColor * 0.28F) + (alertColor * 0.72F)
         : lighting.ambientColor;
     shader.setInt(gl_, "uLightCount", static_cast<int>(lightCount));
+    shader.setInt(gl_, "uFlashlightEnabled",
+        lighting.flashlightEnabled ? 1 : 0);
+    shader.setVec3(gl_, "uFlashlightPosition", lighting.flashlightPosition);
+    shader.setVec3(gl_, "uFlashlightDirection", lighting.flashlightDirection);
     shader.setVec3(gl_, "uAmbientColor", ambientColor);
     shader.setFloat(gl_, "uAmbientIntensity",
         lighting.alert ? std::max(lighting.ambientIntensity, 0.16F)
@@ -2706,6 +2727,41 @@ bool GdpRenderer::render(
             drawBitmapText(noticeX + hudPadding, noticeY + hudPadding,
                 hudScale, noticeText,
                 noticeColor * (0.42F + (0.58F * noticeStrength)));
+        }
+    }
+
+    if (hud.infoOverlay && hud.visible && !hud.mainMenu && !hud.paused
+        && !hud.settingsMenu) {
+        const std::array<std::string, 6> lines{
+            "RUN STATUS",
+            "SCORE " + std::to_string(hud.score),
+            "KILLS " + std::to_string(hud.enemiesKilled),
+            "EVENTS " + std::to_string(hud.eventsCompleted),
+            "LOOT " + std::to_string(hud.lootCollected),
+            "TIME " + runTimeText(hud.elapsedRunTicks),
+        };
+        const int panelScale = hudScale;
+        const int lineHeight = 10 * panelScale;
+        int textWidth = 0;
+        for (const std::string& line : lines) {
+            textWidth = std::max(textWidth,
+                bitmapTextWidth(line, panelScale));
+        }
+        const int panelWidth = std::min(width - (hudMargin * 2),
+            textWidth + (hudPadding * 4));
+        const int panelHeight = static_cast<int>(lines.size()) * lineHeight
+            + (hudPadding * 3);
+        const int panelX = (width - panelWidth) / 2;
+        const int panelY = (height - panelHeight) / 2;
+        drawIndustrialPanel({panelX, panelY, panelWidth, panelHeight},
+            panelScale, cyanColor);
+        int lineY = panelY + panelHeight - (hudPadding * 2)
+            - (7 * panelScale);
+        for (std::size_t index = 0; index < lines.size(); ++index) {
+            drawBitmapText(panelX + (hudPadding * 2), lineY,
+                panelScale, lines[index],
+                index == 0U ? cyanColor : textColor);
+            lineY -= lineHeight;
         }
     }
 

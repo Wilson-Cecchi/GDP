@@ -135,6 +135,7 @@ private:
     float weaponMuzzleFlashRemaining_{0.0F};
     float weaponEquipRemaining_{0.0F};
     float aimBlend_{0.0F};
+    bool flashlightOn_{false};
     std::optional<world::World> world_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
