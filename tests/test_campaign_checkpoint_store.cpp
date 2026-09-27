@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -329,6 +330,43 @@ void testCommentsAndFutureFields()
         "comments and unknown future fields remain forward compatible");
 }
 
+void testKnifeOnlyAndLegacyRoundTrip()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const std::filesystem::path path
+        = directory.path() / "campaign_checkpoint.toml";
+    gameplay::CampaignCheckpoint knifeOnly = makeCheckpoint();
+    gameplay::Weapon weapon;
+    expect(weapon.dropSelectedFirearm().has_value(),
+        "Knife-only checkpoint fixture drops its last gun");
+    knifeOnly.floorEntry.weapon = weapon.campaignProgress();
+    expect(persistence::saveCampaignCheckpoint(path, knifeOnly)
+            && persistence::loadCampaignCheckpoint(path).checkpoint == knifeOnly,
+        "schema 4 preserves a checkpoint with no firearm");
+
+    const gameplay::CampaignCheckpoint legacy = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, legacy),
+        "legacy migration fixture saves a valid armed checkpoint");
+    std::ifstream input(path, std::ios::binary);
+    std::string serialized{
+        std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    const std::size_t ownedLine = serialized.find("weapon_owned = 1\n");
+    expect(ownedLine != std::string::npos,
+        "new checkpoint explicitly stores firearm ownership");
+    if (ownedLine != std::string::npos) {
+        serialized.erase(ownedLine, std::string{"weapon_owned = 1\n"}.size());
+        writeText(path, serialized);
+        expect(persistence::loadCampaignCheckpoint(path).status
+                == persistence::CampaignCheckpointLoadStatus::Invalid,
+            "schema 4 rejects missing ownership instead of inventing a gun");
+        serialized.replace(0U, std::string{"version = 4"}.size(), "version = 3");
+        writeText(path, serialized);
+        expect(persistence::loadCampaignCheckpoint(path).checkpoint == legacy,
+            "schema 3 checkpoints migrate as an armed loadout");
+    }
+}
+
 } // namespace
 
 int main()
@@ -336,6 +374,7 @@ int main()
     testMissingRoundTripReplacementAndRemoval();
     testInvalidAndVersionedData();
     testCommentsAndFutureFields();
+    testKnifeOnlyAndLegacyRoundTrip();
     if (failures != 0) {
         std::cerr << failures << " Campaign checkpoint persistence test(s) failed\n";
         return 1;

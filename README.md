@@ -584,10 +584,12 @@ especializados das pastas numeradas.
   loot e tempo da run sem pausar a simulação. `F3` permanece como painel de
   desempenho separado.
 - **Fase 152 — Soltar arma:** `G` coloca a arma de fogo selecionada à frente do
-  jogador quando há outra arma de fogo no inventário e espaço livre. A arma no
+  jogador quando há espaço livre. A arma no
   chão conserva pente e reserva, pode ser recuperada por coleta automática e
-  não concede XP pela segunda coleta. A faca é permanente; o último fuzil ou
-  pistola não pode ser descartado para preservar o checkpoint da Campanha.
+  não concede XP pela segunda coleta. A faca é permanente e não pode ser solta.
+  A regra atual permite largar também a última arma de fogo: o jogador fica
+  apenas com a faca, sem slots fantasmas de Pistol/Carbine. O checkpoint schema
+  4 grava esse estado; checkpoints schema 3 com arma continuam legíveis.
 - **Fase 153 — Lanterna e percepção:** enquanto `F` mantém a lanterna ligada,
   inimigos podem adquirir o jogador até 25% mais longe, limitado a 4 m extras.
   O cone frontal, a linha de visão, a sala ativa e o alcance normal com a
@@ -618,7 +620,7 @@ terminal, segura `Ctrl` para agachar, pula com `Espaço`, dispara com o botão e
 e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife, `Q` retorna à última arma, e a roda
 percorre as armas disponíveis nos dois sentidos. `G` solta a arma de fogo
-selecionada quando outra arma de fogo permanece no inventário. `F` alterna a
+selecionada mesmo quando é a última; a faca não pode ser solta. `F` alterna a
 lanterna e `Tab` mostra o painel rápido; `4` e `5` não executam ação por
 enquanto. `F3` alterna o
 diagnóstico de desempenho. Pickups próximos

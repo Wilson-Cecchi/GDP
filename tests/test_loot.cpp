@@ -296,9 +296,6 @@ void testDroppedWeaponPickup()
     Weapon weapon;
     EntityManager manager;
     const CollisionWorld world = CollisionWorld::fixedRoom();
-    expect(!dropSelectedWeapon(manager, player, weapon, world, 2U)
-            && manager.query(EntityKind::Item).empty(),
-        "G keeps the only firearm and does not create a phantom pickup");
     expect(weapon.equip(WeaponArchetype::Carbine),
         "drop test acquires a second firearm");
     weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
@@ -343,6 +340,44 @@ void testDroppedWeaponPickup()
         "G cannot place a pickup through a nearby wall");
 }
 
+void testLastFirearmPickup()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    Player player;
+    Weapon weapon;
+    EntityManager manager;
+    const CollisionWorld world = CollisionWorld::fixedRoom();
+    const auto dropped = dropSelectedWeapon(manager, player, weapon, world, 2U);
+    const ItemData* item = dropped ? manager.findData<ItemData>(*dropped) : nullptr;
+    const Entity* entity = dropped ? manager.find(*dropped) : nullptr;
+    expect(item && entity && item->recoveredWeapon
+            && item->recoveredWeapon->archetype
+                == static_cast<std::uint32_t>(WeaponArchetype::Pistol)
+            && !weapon.hasFirearm()
+            && weapon.definition().archetype == WeaponArchetype::Knife,
+        "G drops the last Pistol and leaves a recoverable item with Knife equipped");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Knife));
+    expect(!dropSelectedWeapon(manager, player, weapon, world, 2U)
+            && manager.query(EntityKind::Item).size() == 1U,
+        "G never drops Knife or creates another pickup");
+    expect(collectNearbyLoot(manager, player, weapon, 2U).collected == 0U,
+        "last firearm does not immediately return to Knife-only player");
+    if (entity != nullptr) {
+        expect(player.relocate(entity->transform.position, -90.0F),
+            "Knife-only player can reach the dropped firearm");
+    }
+    const LootCollectionSummary recovered
+        = collectNearbyLoot(manager, player, weapon, 2U);
+    expect(recovered.collected == 1U && recovered.weaponsRecovered == 1U
+            && recovered.rewardableCollected == 0U
+            && weapon.hasFirearm()
+            && weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && !weapon.ownsWeapon(WeaponArchetype::Carbine)
+            && manager.flushDestroyed() == 1U,
+        "Knife-only player can recover the last gun without bonus XP");
+}
+
 } // namespace
 
 int main()
@@ -351,6 +386,7 @@ int main()
     testRoleBudgetsAndBatch();
     testAutomaticLootCollection();
     testDroppedWeaponPickup();
+    testLastFirearmPickup();
     if (failures != 0) {
         std::cerr << failures << " loot test(s) failed\n";
         return 1;

@@ -2840,7 +2840,8 @@ bool GdpRenderer::render(
             noticeText = "WEAPON DROPPED";
             noticeColor = {0.32F, 0.88F, 1.0F};
         } else if (hud.notice == HudNotice::WeaponDropBlocked) {
-            noticeText = "KEEP ONE GUN / NEED SPACE";
+            noticeText = hud.weapon == HudWeaponRole::Knife
+                ? "KNIFE CANNOT DROP" : "NEED SPACE / WAIT";
             noticeColor = uiTheme.warning;
         }
         const float noticeStrength = std::clamp(

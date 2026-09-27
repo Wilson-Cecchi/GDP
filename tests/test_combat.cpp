@@ -391,6 +391,9 @@ void testKnifeFallback()
             && weapon.magazineAmmo() == 0U && weapon.reserveAmmo() == 0U,
         "Knife is always selectable after Pistol and never exposes ammunition");
     weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Knife));
+    expect(!weapon.dropSelectedFirearm()
+            && weapon.ownsWeapon(WeaponArchetype::Pistol),
+        "equipped Knife cannot be dropped while a firearm is owned");
     expect(!weaponUsesAutomaticFire(WeaponArchetype::Knife)
             && weaponFireRequested(weapon, true, true)
             && !weaponFireRequested(weapon, false, true),
@@ -464,8 +467,6 @@ void testDropAndRecoverFirearm()
 {
     using namespace gdp::gameplay;
     Weapon weapon;
-    expect(!weapon.dropSelectedFirearm(),
-        "the only firearm cannot be dropped from a valid campaign loadout");
     expect(weapon.equip(WeaponArchetype::Carbine),
         "second firearm is acquired before drop testing");
     weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
@@ -493,6 +494,87 @@ void testDropAndRecoverFirearm()
             && weapon.reserveAmmo() == dropped->reserveAmmo
             && weapon.ownsWeapon(WeaponArchetype::Carbine),
         "recovering the dropped Pistol restores ammo without refilling it");
+}
+
+void testKnifeOnlyLoadout()
+{
+    using namespace gdp::gameplay;
+    Weapon weapon;
+    expect(weapon.tryFire() == FireReadiness::Fired,
+        "last firearm drop fixture uses one Pistol round");
+    const auto dropped = weapon.dropSelectedFirearm();
+    expect(dropped && dropped->definition.archetype == WeaponArchetype::Pistol
+            && dropped->magazineAmmo == 7U
+            && !weapon.hasFirearm()
+            && weapon.definition().archetype == WeaponArchetype::Knife
+            && !weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && weapon.ownsWeapon(WeaponArchetype::Knife)
+            && !weapon.lastWeaponArchetype()
+            && !weapon.switchTo(WeaponArchetype::Pistol)
+            && !weapon.dropSelectedFirearm()
+            && validateWeaponCampaignProgress(weapon.campaignProgress()),
+        "dropping the last gun leaves only permanent Knife and no ghost slot");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Knife));
+    expect(!weapon.cycleWeapon()
+            && weapon.nextWeaponArchetype() == WeaponArchetype::Knife
+            && weapon.previousWeaponArchetype() == WeaponArchetype::Knife
+            && weapon.addReserveAmmo(8U) == 0U
+            && weapon.tryFire() == FireReadiness::Fired,
+        "Knife-only loadout keeps melee usable and does not absorb ammo");
+    expect(weapon.increaseDamage(4.0F)
+            && weapon.increaseReserveCapacity(4U, 4U)
+            && near(weapon.definition().damage, 52.0F),
+        "Knife-only progression retains firepower and capacity upgrades");
+    const WeaponCampaignProgress knifeOnly = weapon.campaignProgress();
+    Weapon restored;
+    expect(restored.restoreCampaignProgress(knifeOnly)
+            && !restored.hasFirearm()
+            && restored.definition().archetype == WeaponArchetype::Knife
+            && !restored.ownsWeapon(WeaponArchetype::Pistol),
+        "Knife-only campaign state restores without resurrecting a gun");
+    expect(!restored.equipRecovered(WeaponArchetype::Pistol, 9U, 0U)
+            && !restored.hasFirearm(),
+        "invalid recovered ammo does not invent a gun");
+    expect(restored.equipRecovered(WeaponArchetype::Pistol,
+            dropped->magazineAmmo, dropped->reserveAmmo)
+            && restored.hasFirearm()
+            && restored.magazineAmmo() == 7U
+            && near(restored.definition().damage, 38.0F)
+            && restored.reserveCapacity() == 36U
+            && restored.ownsWeapon(WeaponArchetype::Pistol)
+            && !restored.ownsWeapon(WeaponArchetype::Carbine),
+        "recovering from Knife-only restores exact ammo and only one gun");
+
+    Weapon twoGuns;
+    expect(twoGuns.equip(WeaponArchetype::Carbine),
+        "two-gun fixture equips Carbine");
+    twoGuns.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Carbine));
+    const auto first = twoGuns.dropSelectedFirearm();
+    twoGuns.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    const auto second = twoGuns.dropSelectedFirearm();
+    expect(first && second
+            && first->definition.archetype == WeaponArchetype::Carbine
+            && second->definition.archetype == WeaponArchetype::Pistol
+            && !twoGuns.hasFirearm()
+            && twoGuns.definition().archetype == WeaponArchetype::Knife,
+        "both firearms can be dropped in sequence");
+    WeaponCampaignProgress invalid = twoGuns.campaignProgress();
+    invalid.magazineAmmo = 1U;
+    expect(!validateWeaponCampaignProgress(invalid),
+        "Knife-only progress rejects phantom ammunition");
+    invalid = twoGuns.campaignProgress();
+    invalid.stowed = WeaponCampaignProgress::StowedWeapon{
+        baseWeaponDefinition(WeaponArchetype::Carbine), 0U, 0U};
+    expect(!validateWeaponCampaignProgress(invalid),
+        "Knife-only progress rejects a phantom stowed gun");
+
+    twoGuns.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Knife));
+    expect(twoGuns.equip(WeaponArchetype::Carbine)
+            && twoGuns.hasFirearm()
+            && twoGuns.ownsWeapon(WeaponArchetype::Carbine)
+            && !twoGuns.ownsWeapon(WeaponArchetype::Pistol)
+            && !twoGuns.campaignProgress().stowed,
+        "a fresh firearm pickup after dropping both creates only one slot");
 }
 
 void testWeaponTriggerModes()
@@ -2497,6 +2579,7 @@ int main()
     testKnifeFallback();
     testDirectionalAndLastWeaponSelection();
     testDropAndRecoverFirearm();
+    testKnifeOnlyLoadout();
     testWeaponTriggerModes();
     testWeaponOverdrive();
     testDamageLifecycle();

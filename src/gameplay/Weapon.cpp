@@ -224,6 +224,9 @@ bool Weapon::reload() noexcept
 
 std::uint32_t Weapon::addReserveAmmo(const std::uint32_t amount) noexcept
 {
+    if (!hasFirearm_) {
+        return 0U;
+    }
     const std::uint32_t capacity = definition_.reserveMaximum - reserveAmmo_;
     const std::uint32_t accepted = std::min(amount, capacity);
     reserveAmmo_ += accepted;
@@ -289,7 +292,10 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
-    stowedWeapon_ = previous;
+    stowedWeapon_ = hasFirearm_
+        ? std::optional<WeaponCampaignProgress::StowedWeapon>{previous}
+        : std::nullopt;
+    hasFirearm_ = true;
     lastSelectedArchetype_ = selectedArchetype_;
     selectedArchetype_ = definition_.archetype;
     return true;
@@ -325,16 +331,23 @@ std::optional<WeaponCampaignProgress::StowedWeapon>
 Weapon::dropSelectedFirearm() noexcept
 {
     if (selectedArchetype_ == WeaponArchetype::Knife
-        || !stowedWeapon_ || switching()) {
+        || !hasFirearm_ || switching()) {
         return std::nullopt;
     }
     const WeaponCampaignProgress::StowedWeapon dropped{
         definition_, magazineAmmo_, reserveAmmo_};
-    definition_ = stowedWeapon_->definition;
-    magazineAmmo_ = stowedWeapon_->magazineAmmo;
-    reserveAmmo_ = stowedWeapon_->reserveAmmo;
-    stowedWeapon_.reset();
-    selectedArchetype_ = definition_.archetype;
+    if (stowedWeapon_) {
+        definition_ = stowedWeapon_->definition;
+        magazineAmmo_ = stowedWeapon_->magazineAmmo;
+        reserveAmmo_ = stowedWeapon_->reserveAmmo;
+        stowedWeapon_.reset();
+        selectedArchetype_ = definition_.archetype;
+    } else {
+        hasFirearm_ = false;
+        magazineAmmo_ = 0U;
+        reserveAmmo_ = 0U;
+        selectedArchetype_ = WeaponArchetype::Knife;
+    }
     lastSelectedArchetype_.reset();
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
@@ -432,10 +445,15 @@ std::optional<WeaponArchetype> Weapon::lastWeaponArchetype() const noexcept
 bool Weapon::ownsWeapon(const WeaponArchetype archetype) const noexcept
 {
     return archetype == WeaponArchetype::Knife
-        || (archetype <= WeaponArchetype::Carbine
+        || (hasFirearm_ && archetype <= WeaponArchetype::Carbine
         && (definition_.archetype == archetype
             || (stowedWeapon_
                 && stowedWeapon_->definition.archetype == archetype)));
+}
+
+bool Weapon::hasFirearm() const noexcept
+{
+    return hasFirearm_;
 }
 
 bool Weapon::activateOverdrive(const float durationSeconds) noexcept
@@ -458,7 +476,9 @@ bool Weapon::restoreCampaignProgress(
     magazineAmmo_ = progress.magazineAmmo;
     reserveAmmo_ = progress.reserveAmmo;
     stowedWeapon_ = progress.stowed;
-    selectedArchetype_ = definition_.archetype;
+    hasFirearm_ = progress.firearmOwned;
+    selectedArchetype_ = hasFirearm_
+        ? definition_.archetype : WeaponArchetype::Knife;
     lastSelectedArchetype_.reset();
     knifeDefinition_ = baseWeaponDefinition(WeaponArchetype::Knife);
     const WeaponDefinition rangedBase
@@ -584,7 +604,7 @@ float Weapon::spreadStrength() const noexcept
 
 WeaponCampaignProgress Weapon::campaignProgress() const noexcept
 {
-    return {definition_, magazineAmmo_, reserveAmmo_, stowedWeapon_};
+    return {definition_, magazineAmmo_, reserveAmmo_, stowedWeapon_, hasFirearm_};
 }
 
 bool validateWeaponCampaignProgress(
@@ -593,6 +613,10 @@ bool validateWeaponCampaignProgress(
     if (!validateWeaponSlot(
             progress.definition, progress.magazineAmmo, progress.reserveAmmo)) {
         return false;
+    }
+    if (!progress.firearmOwned) {
+        return !progress.stowed && progress.magazineAmmo == 0U
+            && progress.reserveAmmo == 0U;
     }
     return !progress.stowed
         || (progress.stowed->definition.archetype

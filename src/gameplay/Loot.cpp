@@ -115,9 +115,6 @@ std::optional<gdp::entities::EntityId> dropSelectedWeapon(
         return std::nullopt;
     }
     const WeaponCampaignProgress current = weapon.campaignProgress();
-    if (!current.stowed) {
-        return std::nullopt;
-    }
 
     constexpr float dropDistance = 1.35F;
     constexpr float minimumClearDistance = 1.05F;

@@ -34,6 +34,7 @@ struct WeaponCampaignProgress {
         constexpr bool operator==(const StowedWeapon&) const noexcept = default;
     };
     std::optional<StowedWeapon> stowed;
+    bool firearmOwned{true};
 
     constexpr bool operator==(const WeaponCampaignProgress&) const noexcept = default;
 };
@@ -81,6 +82,7 @@ public:
     [[nodiscard]] std::optional<WeaponArchetype>
         lastWeaponArchetype() const noexcept;
     [[nodiscard]] bool ownsWeapon(WeaponArchetype archetype) const noexcept;
+    [[nodiscard]] bool hasFirearm() const noexcept;
     [[nodiscard]] bool activateOverdrive(
         float durationSeconds = 12.0F) noexcept;
     [[nodiscard]] bool restoreCampaignProgress(
@@ -122,6 +124,7 @@ private:
     std::uint32_t spreadShotIndex_{0U};
     float spreadRecoveryRemaining_{0.0F};
     std::optional<WeaponCampaignProgress::StowedWeapon> stowedWeapon_;
+    bool hasFirearm_{true};
 };
 
 [[nodiscard]] WeaponDefinition baseWeaponDefinition(

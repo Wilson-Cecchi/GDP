@@ -76,6 +76,7 @@ struct Fields {
     std::optional<float> maximumArmor;
     std::optional<std::uint64_t> keys;
     std::optional<std::uint64_t> weaponArchetype;
+    std::optional<std::uint64_t> firearmOwned;
     std::optional<float> weaponDamage;
     std::optional<float> fireInterval;
     std::optional<float> range;
@@ -156,6 +157,8 @@ bool assignField(
         unsignedTarget = &fields.keys;
     } else if (key == "weapon_archetype") {
         unsignedTarget = &fields.weaponArchetype;
+    } else if (key == "weapon_owned") {
+        unsignedTarget = &fields.firearmOwned;
     } else if (key == "weapon_magazine_size") {
         unsignedTarget = &fields.magazineSize;
     } else if (key == "weapon_reserve_maximum") {
@@ -225,6 +228,7 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
            << "player_keys = " << state.player.keys << '\n'
            << "weapon_archetype = "
            << static_cast<std::uint32_t>(state.weapon.definition.archetype) << '\n'
+           << "weapon_owned = " << (state.weapon.firearmOwned ? 1U : 0U) << '\n'
            << "weapon_damage = " << state.weapon.definition.damage << '\n'
            << "weapon_fire_interval = " << state.weapon.definition.fireInterval << '\n'
            << "weapon_range = " << state.weapon.definition.range << '\n'
@@ -308,7 +312,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;
         }
-        if (*fields.version != currentCampaignCheckpointFileVersion) {
+        if (*fields.version != 3U
+            && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::UnsupportedVersion;
             return result;
         }
@@ -326,6 +331,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto floor = narrowUnsigned(fields.floor);
         const auto keys = narrowUnsigned(fields.keys);
         const auto weaponArchetype = narrowUnsigned(fields.weaponArchetype);
+        const auto firearmOwned = narrowUnsigned(fields.firearmOwned);
         const auto magazineSize = narrowUnsigned(fields.magazineSize);
         const auto reserveMaximum = narrowUnsigned(fields.reserveMaximum);
         const auto magazineAmmo = narrowUnsigned(fields.magazineAmmo);
@@ -346,6 +352,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             || *weaponArchetype
                 > static_cast<std::uint32_t>(
                     gameplay::WeaponArchetype::Carbine)
+            || (*fields.version >= 4U
+                && (!firearmOwned || *firearmOwned > 1U))
             || !fields.weaponDamage
             || !fields.fireInterval || !fields.range || !magazineSize
             || !reserveMaximum || !magazineAmmo || !reserveAmmo || !stowedOwned
@@ -400,7 +408,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
                 {{*fields.weaponDamage, *fields.fireInterval, *fields.range,
                     *magazineSize, *reserveMaximum,
                     static_cast<gameplay::WeaponArchetype>(*weaponArchetype)},
-                    *magazineAmmo, *reserveAmmo, stowed},
+                    *magazineAmmo, *reserveAmmo, stowed,
+                    *fields.version == 3U || *firearmOwned == 1U},
                 {*level, *experience, *fields.totalExperience, *fields.score,
                     *enemiesKilled, *propsDestroyed, *lootCollected,
                     *eventsCompleted, *vitalityRank, *firepowerRank, *capacityRank},
