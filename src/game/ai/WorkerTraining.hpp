@@ -17,7 +17,11 @@ struct WorkerFitnessMetrics {
     float approachMeters{0.0F};
     float proximitySeconds{0.0F};
     float idleSeconds{0.0F};
+    float contactSeconds{0.0F};
+    float blockedSeconds{0.0F};
+    float wastedAttackSeconds{0.0F};
     std::uint32_t attacksLanded{0};
+    std::uint32_t deaths{0};
 };
 
 [[nodiscard]] float scoreWorkerFitness(const WorkerFitnessMetrics& metrics) noexcept;

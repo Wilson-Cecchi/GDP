@@ -28,6 +28,8 @@ constexpr std::uint64_t trainingScenarioDomain = 0x41495343454E4554ULL;
 constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
+constexpr std::size_t scenarioCount = 4U;
+constexpr std::size_t scenarioRepetitions = 2U;
 constexpr std::size_t inputCount = 7;
 constexpr std::size_t hiddenCount = 8;
 constexpr std::size_t outputCount = 4;
@@ -43,16 +45,23 @@ float planarDistance(
 
 WorkerFitnessMetrics simulateEpisode(
     const wkc::ai::Genome& genome,
-    const wkc::core::Seed seed)
+    const wkc::core::Seed seed,
+    const std::size_t scenario)
 {
     wkc::core::RandomStream random{seed};
-    const float workerX = random.rangeFloat(-1.0F, 1.0F);
+    const float workerX = random.rangeFloat(-0.8F, 0.8F);
     const float workerZ = random.rangeFloat(3.4F, 4.6F);
     const float sweep = random.rangeFloat(0.5F, 1.8F);
     const float direction = random.chance(0.5F) ? 1.0F : -1.0F;
     const float phase = random.rangeFloat(0.0F, 3.0F);
+    std::vector<wkc::core::Aabb> obstacles;
+    if (scenario == 1U) {
+        obstacles.push_back({{-1.5F, 0.0F, 1.4F}, {-0.45F, 2.4F, 2.7F}});
+    } else if (scenario == 2U) {
+        obstacles.push_back({{0.45F, 0.0F, 1.4F}, {1.5F, 2.4F, 2.7F}});
+    }
     const gameplay::CollisionWorld arena{
-        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}, std::move(obstacles)};
     gameplay::Player player;
     player.spawn({0.0F, 0.0F, 0.0F});
     entities::EntityManager manager;
@@ -83,7 +92,9 @@ WorkerFitnessMetrics simulateEpisode(
         }
         const float time = static_cast<float>(tick) * fixedStep;
         const float playerX = direction * sweep * std::sin(time * 0.7F + phase);
-        (void)player.relocate({playerX, 0.0F, 0.0F}, -90.0F);
+        const float playerZ = scenario == 3U
+            ? -std::min(time * 0.25F, 1.8F) : 0.0F;
+        (void)player.relocate({playerX, 0.0F, playerZ}, -90.0F);
         const wkc::core::Vec3 before = entity->transform.position;
         const float playerHealthBefore = player.state().health;
         const auto summary = gameplay::updateWorkers(
@@ -96,28 +107,93 @@ WorkerFitnessMetrics simulateEpisode(
             0.0F, playerHealthBefore - player.state().health);
         metrics.attacksLanded += static_cast<std::uint32_t>(summary.attacksLanded);
         metrics.survivalSeconds += fixedStep;
-        if (distance <= 2.0F && gameplay::hasLineOfSight(
+        const bool playerVisible = gameplay::hasLineOfSight(
                 entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
-                player.cameraPosition(), arena)) {
+                player.cameraPosition(), arena);
+        if (distance <= 2.0F && playerVisible) {
             metrics.proximitySeconds += fixedStep;
         }
-        if (movement < 0.002F) {
+        if (distance <= 6.0F && playerVisible) {
+            metrics.contactSeconds += fixedStep;
+        }
+        const float requestedMovement = std::hypot(
+            brain.outputs[0], brain.outputs[1]);
+        if (movement < 0.002F && distance > 1.5F
+            && requestedMovement < 0.1F) {
             metrics.idleSeconds += fixedStep;
         }
+        if (movement < 0.002F && requestedMovement > 0.3F) {
+            metrics.blockedSeconds += fixedStep;
+        }
+        if (brain.outputs[3] > 0.65F && summary.attacking == 0U) {
+            metrics.wastedAttackSeconds += fixedStep;
+        }
         shotCooldown -= fixedStep;
-        if (shotCooldown <= 0.0F && distance <= 6.0F
+        if (shotCooldown <= 0.0F && distance <= 5.0F
             && gameplay::hasLineOfSight(
                 player.cameraPosition(),
                 entity->transform.position
                     + wkc::core::Vec3{0.0F, 1.0F, 0.0F}, arena)) {
             const float healthBefore = enemy->health;
-            (void)gameplay::applyDamage(manager, worker, 9.0F);
+            (void)gameplay::applyDamage(manager, worker, 8.0F);
             metrics.damageReceived += healthBefore - enemy->health;
-            shotCooldown = 0.9F;
+            shotCooldown = 1.4F;
         }
     }
     metrics.approachMeters = std::max(0.0F, initialDistance - closestDistance);
+    if (const entities::EnemyData* enemy
+        = manager.findData<entities::EnemyData>(worker);
+        enemy != nullptr && enemy->behavior == entities::EnemyBehaviorState::Dead) {
+        metrics.deaths = 1U;
+    }
     return metrics;
+}
+
+struct WorkerEvaluation {
+    float score{0.0F};
+    float worstScenario{0.0F};
+    WorkerFitnessMetrics metrics{};
+};
+
+void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
+{
+    total.damageDealt += sample.damageDealt;
+    total.damageReceived += sample.damageReceived;
+    total.survivalSeconds += sample.survivalSeconds;
+    total.approachMeters += sample.approachMeters;
+    total.proximitySeconds += sample.proximitySeconds;
+    total.idleSeconds += sample.idleSeconds;
+    total.contactSeconds += sample.contactSeconds;
+    total.blockedSeconds += sample.blockedSeconds;
+    total.wastedAttackSeconds += sample.wastedAttackSeconds;
+    total.attacksLanded += sample.attacksLanded;
+    total.deaths += sample.deaths;
+}
+
+WorkerEvaluation evaluateGenome(
+    const wkc::ai::Genome& genome,
+    const wkc::core::Seed scenarioSeed)
+{
+    WorkerEvaluation evaluation;
+    float worst = std::numeric_limits<float>::infinity();
+    for (std::size_t scenario = 0U; scenario < scenarioCount; ++scenario) {
+        for (std::size_t repetition = 0U;
+             repetition < scenarioRepetitions; ++repetition) {
+            const WorkerFitnessMetrics metrics = simulateEpisode(genome,
+                wkc::core::deriveSeed(scenarioSeed, trainingScenarioDomain,
+                    scenario * scenarioRepetitions + repetition), scenario);
+            const float scenarioScore = scoreWorkerFitness(metrics);
+            evaluation.score += scenarioScore;
+            worst = std::min(worst, scenarioScore);
+            addMetrics(evaluation.metrics, metrics);
+        }
+    }
+    evaluation.worstScenario = worst;
+    evaluation.score = 0.75F
+        * (evaluation.score
+            / static_cast<float>(scenarioCount * scenarioRepetitions))
+        + 0.25F * worst;
+    return evaluation;
 }
 
 wkc::ai::Genome freshGenome(
@@ -203,26 +279,26 @@ bool prepareOutputDirectory(const std::filesystem::path& directory)
 
 float scoreWorkerFitness(const WorkerFitnessMetrics& metrics) noexcept
 {
+    // Combat is the primary objective; bounded shaping helps early evolution
+    // without making waiting, wall-running or blind attacks profitable.
     return metrics.damageDealt * 4.0F
         + static_cast<float>(metrics.attacksLanded) * 2.0F
         + std::min(metrics.approachMeters, 6.0F) * 1.5F
         + std::min(metrics.proximitySeconds, 8.0F) * 0.5F
+        + std::min(metrics.contactSeconds, 8.0F) * 0.25F
         + metrics.survivalSeconds * 0.1F
         - metrics.damageReceived * 0.35F
-        - metrics.idleSeconds * 0.2F;
+        - metrics.idleSeconds * 0.5F
+        - metrics.blockedSeconds * 1.5F
+        - metrics.wastedAttackSeconds * 0.6F
+        - static_cast<float>(metrics.deaths) * 8.0F;
 }
 
 float evaluateWorkerGenome(
     const wkc::ai::Genome& genome,
     const wkc::core::Seed scenarioSeed)
 {
-    float fitness = 0.0F;
-    for (std::uint64_t scenario = 0; scenario < 3U; ++scenario) {
-        const WorkerFitnessMetrics metrics = simulateEpisode(genome,
-            wkc::core::deriveSeed(scenarioSeed, trainingScenarioDomain, scenario));
-        fitness += scoreWorkerFitness(metrics);
-    }
-    return fitness / 3.0F;
+    return evaluateGenome(genome, scenarioSeed).score;
 }
 
 WorkerTrainingResult runWorkerTraining(
@@ -291,7 +367,9 @@ WorkerTrainingResult runWorkerTraining(
         output << "AI_TRAINING archetype=WORKER seed=" << seed
                << " population=" << options.population
                << " generations=" << options.generations
-               << " start_generation=" << firstGeneration << '\n';
+               << " start_generation=" << firstGeneration
+               << " scenarios=" << scenarioCount
+               << " repetitions=" << scenarioRepetitions << '\n';
         for (std::uint32_t offset = 0; offset < options.generations; ++offset) {
             const std::uint32_t generation = firstGeneration + offset;
             float total = 0.0F;
@@ -311,9 +389,24 @@ WorkerTrainingResult runWorkerTraining(
             result.finalBest = best;
             result.lastGeneration = generation;
             result.champion = population.front();
+            const WorkerEvaluation bestEvaluation
+                = evaluateGenome(*result.champion, commonScenarios);
+            const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
                    << " best=" << std::fixed << std::setprecision(3) << best
                    << " mean=" << total / static_cast<float>(population.size())
+                   << " worst_scenario=" << bestEvaluation.worstScenario
+                   << " damage_dealt=" << bestMetrics.damageDealt
+                   << " damage_received=" << bestMetrics.damageReceived
+                   << " hits=" << bestMetrics.attacksLanded
+                   << " approach=" << bestMetrics.approachMeters
+                   << " proximity_s=" << bestMetrics.proximitySeconds
+                   << " contact_s=" << bestMetrics.contactSeconds
+                   << " survival_s=" << bestMetrics.survivalSeconds
+                   << " idle_s=" << bestMetrics.idleSeconds
+                   << " blocked_s=" << bestMetrics.blockedSeconds
+                   << " wasted_attack_s=" << bestMetrics.wastedAttackSeconds
+                   << " deaths=" << bestMetrics.deaths
                    << '\n';
             if (options.saveDirectory) {
                 const std::filesystem::path path

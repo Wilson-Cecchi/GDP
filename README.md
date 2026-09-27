@@ -614,17 +614,27 @@ especializados das pastas numeradas.
   essas capacidades sem promover cérebros automaticamente ao gameplay.
 - **Treinamento automático do Worker:** `--ai-training worker` executa arenas
   determinísticas sem abrir janela ou inicializar renderização/áudio. Cada
-  geração avalia todos os cérebros nos mesmos cenários, combina dano,
-  aproximação, sobrevivência e
-  inatividade em fitness, preserva os melhores e cria descendentes por torneio
-  e mutação; um cenário separado mede o campeão final. `--save-dir` escreve um
+  geração avalia todos os cérebros em quatro cenários, com duas variações de
+  seed cada, envolvendo movimento do jogador,
+  obstáculos à esquerda/direita e retirada. A bonificação prioriza dano e
+  ataques acertados; aproximação, contato visual, proximidade e sobrevivência
+  têm bônus menores e limitados. Dano recebido, morte, inatividade longe do
+  jogador, movimento bloqueado e pedidos de ataque sem visão/alcance reduzem
+  o fitness. A seleção combina a média dos cenários com o pior resultado para
+  não premiar um cérebro que só funciona em uma arena. O log de cada geração
+  mostra os totais dessas métricas nas oito partidas do campeão, permitindo
+  identificar comportamentos que exploram a pontuação. O treino preserva os
+  melhores e cria descendentes por torneio
+  e mutação; outras oito partidas com seeds separadas medem o campeão final.
+  `--save-dir` escreve um
   arquivo versionado com checksum por geração, sem substituir arquivos
   existentes. `--resume` inicia outra sequência a partir de um desses campeões
   (não reproduz exatamente a população anterior). O cérebro salvo só é usado
   na partida com `--experimental-neural-worker --neural-brain ARQUIVO`; nunca
   substitui automaticamente a IA normal. Esta primeira versão treina apenas o
-  Worker em arenas simplificadas: melhora de fitness não equivale a aprovação
-  de gameplay, que ainda requer playtest.
+  Worker em arenas simplificadas. O treino não ensina ainda navegação completa,
+  uso tático de cobertura, trabalho em equipe ou outros arquétipos; melhora de
+  fitness não equivale a aprovação de gameplay, que ainda requer playtest.
 
   Exemplo após compilar o preset Debug (use um diretório novo ou vazio):
 

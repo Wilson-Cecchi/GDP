@@ -41,9 +41,32 @@ void testFitness()
         "damage and landed attacks increase fitness");
     WorkerFitnessMetrics worse = baseline;
     worse.damageReceived += 10.0F;
+    expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
+        "damage received reduces fitness");
+    worse = baseline;
     worse.idleSeconds += 2.0F;
     expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
-        "damage received and idling reduce fitness");
+        "idling reduces fitness");
+    worse = baseline;
+    worse.blockedSeconds += 1.0F;
+    expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
+        "blocked movement reduces fitness");
+    worse = baseline;
+    worse.wastedAttackSeconds += 1.0F;
+    expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
+        "attacking without a chance to hit reduces fitness");
+    worse = baseline;
+    worse.deaths = 1U;
+    expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
+        "death reduces fitness");
+    WorkerFitnessMetrics contact = baseline;
+    contact.contactSeconds += 2.0F;
+    expect(scoreWorkerFitness(contact) > scoreWorkerFitness(baseline),
+        "useful visual contact increases fitness");
+    WorkerFitnessMetrics capped = contact;
+    capped.contactSeconds = 100.0F;
+    expect(scoreWorkerFitness(capped) - scoreWorkerFitness(contact) <= 2.0F,
+        "contact reward is bounded so camping cannot dominate combat");
 }
 
 void testTrainingAndPersistence()
@@ -72,6 +95,12 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U,
         "automated training produces a champion and final checkpoint");
+    expect(output.str().find("scenarios=4") != std::string::npos
+            && output.str().find("repetitions=2") != std::string::npos
+            && output.str().find("worst_scenario=") != std::string::npos
+            && output.str().find("blocked_s=") != std::string::npos
+            && output.str().find("wasted_attack_s=") != std::string::npos,
+        "training reports scenario count and reward-penalty evidence");
     if (first.succeeded && first.champion && first.lastCheckpoint) {
         expect(first.finalBest >= first.initialBest - 1e-4F,
             "elitism preserves the best score on fixed scenarios");
