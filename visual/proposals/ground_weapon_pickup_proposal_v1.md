@@ -1,7 +1,7 @@
 # Arma solta no chão — proposta visual v1
 
 ```text
-estado: AGUARDANDO APROVAÇÃO
+estado: REVISÃO SOLICITADA; substituída pela proposta v2
 unidade visual: Weapon/ground pickup — Pistol e Carbine
 versão: v1
 data: 2026-09-27
@@ -12,6 +12,12 @@ referência de identidade: weapon_first_person_v1_used.png (Used aprovada)
 variantes: três distribuições de desgaste Used, da esquerda para a direita
 decisão do usuário: pendente
 ```
+
+Após esta primeira prancha, o usuário pediu que a arma parecesse **jogada no
+chão, como se tivesse caído**, usando a aparência já existente. Esta versão
+mostra armas excessivamente arrumadas e um marcador ciano não desejado para a
+nova direção. A revisão está em
+[`ground_weapon_pickup_proposal_v2.md`](ground_weapon_pickup_proposal_v2.md).
 
 ## Problema e direção
 

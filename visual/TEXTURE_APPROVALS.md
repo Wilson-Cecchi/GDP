@@ -156,14 +156,32 @@ versão da proposta: v1
 arquivo/pranchas: visual/proposals/ground_weapon_pickup_v1_close.png;
                  visual/proposals/ground_weapon_pickup_v1_gameplay.png
 variantes mostradas: três distribuições de desgaste Used
-decisão do usuário: AGUARDANDO APROVAÇÃO
+decisão do usuário: REVISÃO SOLICITADA; arma deve parecer jogada no chão,
+                    como se tivesse caído, usando a aparência atual
+data: 2026-09-27
+commit de implementação: nenhum
+resultado final: SUBSTITUÍDA PELA V2; bloco violeta continua na build
+```
+
+Contrato e limites em
+[`proposals/ground_weapon_pickup_proposal_v1.md`](proposals/ground_weapon_pickup_proposal_v1.md).
+
+### Weapon/ground pickup — v2
+
+```text
+unidade visual: Weapon/ground pickup — Pistol e Carbine
+versão da proposta: v2
+arquivo/pranchas: visual/proposals/ground_weapon_pickup_v2_close.png;
+                 visual/proposals/ground_weapon_pickup_v2_gameplay.png
+variantes mostradas: três poses de repouso para os modelos Used existentes
+decisão do usuário: AGUARDANDO APROVAÇÃO DE IMPLEMENTAÇÃO
 data: 2026-09-27
 commit de implementação: nenhum
 resultado final: PROPOSTA; bloco violeta continua na build
 ```
 
 Contrato e limites em
-[`proposals/ground_weapon_pickup_proposal_v1.md`](proposals/ground_weapon_pickup_proposal_v1.md).
+[`proposals/ground_weapon_pickup_proposal_v2.md`](proposals/ground_weapon_pickup_proposal_v2.md).
 
 ### Industrial Corridor/Ceiling — v1 HD
 
@@ -294,7 +312,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Weapon/first-person presentation | V1 Used implementada em validação |
 | Player presentation | Não revisada |
 | HUD/map visual language | V1 A Rail implementada em validação; V2 A é a preferência, implementação pendente de aprovação; mapa não revisado |
-| Weapon/ground pickup | V1 aguardando aprovação; bloco violeta permanece na build |
+| Weapon/ground pickup | V1 revisão solicitada; V2 aguarda aprovação; bloco violeta permanece na build |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes
