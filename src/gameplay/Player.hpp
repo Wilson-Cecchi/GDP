@@ -14,6 +14,7 @@ struct PlayerCommand {
     float moveForward{0.0F};
     float moveRight{0.0F};
     bool crouch{false};
+    bool quietWalk{false};
     bool jump{false};
     bool interact{false};
 };
@@ -99,6 +100,7 @@ private:
     CharacterCollider collider_{};
     float moveSpeed_{4.5F};
     float crouchMoveMultiplier_{0.58F};
+    float quietWalkMultiplier_{0.52F};
     float jumpSpeed_{6.2F};
     float gravity_{-20.0F};
     float mouseSensitivity_{0.12F};

@@ -57,6 +57,10 @@ Segurar `Ctrl` esquerdo ou direito agacha; soltar ambos solicita levantar.
 O estado físico continua bloqueando a postura em pé quando há teto ou prop
 baixo acima do Player. `C` não é mais um atalho de agachar desde a Fase 146.
 `Espaço` continua pulando apenas quando a postura e o chão permitem.
+Segurar `Shift` esquerdo ou direito reduz a velocidade horizontal a 52% e
+seleciona passos suaves. Passos normais atraem inimigos ativos na mesma sala
+até 4 m; os suaves (inclusive agachado) alcançam apenas 0,75 m. Visão, tiro
+e outras fontes de alerta não são suprimidos por `Shift`.
 
 ## Armadura
 

@@ -129,6 +129,8 @@ void testFootstepCueIdentity()
         = generateAudioRecipe(seed, AudioEventKind::Footstep, 0U);
     const AudioRecipe next
         = generateAudioRecipe(seed, AudioEventKind::Footstep, 1U);
+    const AudioRecipe quiet
+        = generateAudioRecipe(seed, AudioEventKind::QuietFootstep, 0U);
 
     expect(validateAudioRecipe(first).isValid()
             && validateAudioClip(synthesizeAudioClip(first), first).isValid(),
@@ -140,6 +142,10 @@ void testFootstepCueIdentity()
             && first.secondaryFrequency < first.baseFrequency
             && first.noiseMix > 0.40F,
         "footstep keeps a short low metallic impact signature");
+    expect(validateAudioRecipe(quiet).isValid()
+            && quiet.gain < first.gain
+            && quiet.recipeHash != first.recipeHash,
+        "quiet movement has a valid, distinctly softer footstep cue");
 }
 
 void testUiCueIdentity()

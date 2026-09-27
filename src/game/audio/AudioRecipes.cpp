@@ -164,6 +164,16 @@ void configureRecipe(
         recipe.pulseRate = 13.0F;
         recipe.gain = 0.26F;
         break;
+    case AudioEventKind::QuietFootstep:
+        recipe.durationSeconds = 0.10F;
+        recipe.baseFrequency = 125.0F;
+        recipe.secondaryFrequency = 52.0F;
+        recipe.attackSeconds = 0.001F;
+        recipe.releaseSeconds = 0.085F;
+        recipe.noiseMix = 0.33F;
+        recipe.pulseRate = 11.0F;
+        recipe.gain = 0.085F;
+        break;
     case AudioEventKind::UiNavigate:
         recipe.durationSeconds = 0.055F;
         recipe.baseFrequency = 780.0F;

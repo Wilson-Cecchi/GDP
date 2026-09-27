@@ -147,7 +147,8 @@ void Player::fixedUpdate(
     }
 
     const float stanceSpeed = moveSpeed_
-        * (state_.crouching ? crouchMoveMultiplier_ : 1.0F);
+        * (state_.crouching ? crouchMoveMultiplier_ : 1.0F)
+        * (command.quietWalk ? quietWalkMultiplier_ : 1.0F);
     state_.velocity.x = desired.x * stanceSpeed;
     state_.velocity.z = desired.z * stanceSpeed;
     bool jumpGrounded = state_.grounded;

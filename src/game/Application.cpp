@@ -1636,6 +1636,8 @@ void Application::processEvents()
         - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
     playerCommand_.crouch = input_.isKeyDown(Key::LeftControl)
         || input_.isKeyDown(Key::RightControl);
+    playerCommand_.quietWalk = input_.isKeyDown(Key::LeftShift)
+        || input_.isKeyDown(Key::RightShift);
     jumpPending_ = jumpPending_ || input_.wasKeyPressed(Key::Space);
     playerCommand_.jump = jumpPending_;
     interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
@@ -2265,11 +2267,21 @@ void Application::fixedUpdate(const double fixedStep)
     const std::optional<std::uint64_t> footstepEvent = gameplay::updateFootsteps(
         footsteps_, previousPlayerPosition, player_.state().position,
         player_.state().grounded, player_.state().alive);
-    if (footstepEvent && audio_) {
-        audio_->playAt(gdp::audio::AudioEventKind::Footstep,
-            session_.state().currentSeed, *footstepEvent,
-            player_.state().position, player_.state().position,
-            player_.planarForwardDirection());
+    if (footstepEvent) {
+        const bool quietStep = playerCommand_.quietWalk
+            || player_.state().crouching;
+        (void)gameplay::alertEnemiesToNoise(
+            entities_, playerRoom,
+            {.position = player_.state().position,
+                .radius = quietStep ? 0.75F : 4.0F});
+        if (audio_) {
+            audio_->playAt(quietStep
+                    ? gdp::audio::AudioEventKind::QuietFootstep
+                    : gdp::audio::AudioEventKind::Footstep,
+                session_.state().currentSeed, *footstepEvent,
+                player_.state().position, player_.state().position,
+                player_.planarForwardDirection());
+        }
     }
     gameplay::updateViewMotion(
         viewMotion_, previousPlayerPosition, player_.state().position,

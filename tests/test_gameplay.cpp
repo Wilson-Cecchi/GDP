@@ -69,6 +69,14 @@ void testMovement()
     updateMany(secondRun, {.moveRight = -1.0F}, world, 24);
     expect(firstRun.state().position == secondRun.state().position,
         "fixed movement is deterministic");
+
+    Player quiet;
+    const auto quietStart = quiet.state().position;
+    updateMany(quiet, {.moveForward = 1.0F, .quietWalk = true}, world, 15);
+    expect(wkc::core::nearlyEqual(
+            horizontalDistance(quiet.state().position, quietStart),
+            cardinalDistance * 0.52F, 1.0e-4F),
+        "quiet walk reduces grounded movement without changing direction");
 }
 
 void testFootstepCadence()

@@ -567,6 +567,10 @@ especializados das pastas numeradas.
   realmente selecionada; a roda percorre os slots disponíveis para frente ou
   para trás conforme o sentido. A memória de `Q` é transitória e não altera o
   formato do checkpoint.
+- **Fase 148 — Caminhada silenciosa:** segurar qualquer `Shift` reduz o passo
+  e seu volume; os inimigos investigam passos normais próximos, mas só ouvem
+  passos silenciosos/agachados praticamente ao lado. Visão e disparos mantêm
+  seu alcance normal.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
