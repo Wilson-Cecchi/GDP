@@ -601,17 +601,41 @@ especializados das pastas numeradas.
   A implementação usa C++20/RAII para seguir a arquitetura atual, embora a
   proposta original exemplifique C. Entradas são normalizadas em `[-1, 1]`;
   pesos gerados e mutados ficam nesse intervalo. Há testes unitários de forma,
-  forward, clone, seed, mutação e cruzamento. Ainda **não** há sensores,
-  treinamento, persistência ou integração com os inimigos da partida; o
-  comportamento atual permanece inalterado até validação posterior.
+  forward, clone, seed, mutação e cruzamento. Nesta entrega inicial, ainda não
+  havia sensores ou integração com os inimigos; a IA da partida permaneceu
+  inalterada até a etapa experimental seguinte.
 - **Worker neural experimental:** `--experimental-neural-worker` habilita um
   único Worker por run com sensores de distância/ângulo apenas sob percepção,
   visibilidade, vida e proximidade de paredes. A rede decide movimento local,
   rotação e pedido de ataque a 10 Hz; colisão, cooldown, alcance e linha de
   visão continuam obrigatórios. A seed é derivada em domínio independente.
-  Sem a opção, todos os inimigos mantêm a IA anterior. Ainda não há treino,
-  seleção de fitness ou persistência de genomas; esta etapa testa somente a
-  integração segura da inferência em jogo.
+  Sem a opção, todos os inimigos mantêm a IA anterior. Nesta entrega do
+  protótipo ainda não havia treino ou persistência; a etapa seguinte adiciona
+  essas capacidades sem promover cérebros automaticamente ao gameplay.
+- **Treinamento automático do Worker:** `--ai-training worker` executa arenas
+  determinísticas sem abrir janela ou inicializar renderização/áudio. Cada
+  geração avalia todos os cérebros nos mesmos cenários, combina dano,
+  aproximação, sobrevivência e
+  inatividade em fitness, preserva os melhores e cria descendentes por torneio
+  e mutação; um cenário separado mede o campeão final. `--save-dir` escreve um
+  arquivo versionado com checksum por geração, sem substituir arquivos
+  existentes. `--resume` inicia outra sequência a partir de um desses campeões
+  (não reproduz exatamente a população anterior). O cérebro salvo só é usado
+  na partida com `--experimental-neural-worker --neural-brain ARQUIVO`; nunca
+  substitui automaticamente a IA normal. Esta primeira versão treina apenas o
+  Worker em arenas simplificadas: melhora de fitness não equivale a aprovação
+  de gameplay, que ainda requer playtest.
+
+  Exemplo após compilar o preset Debug (use um diretório novo ou vazio):
+
+  ```bash
+  build/debug/gdp --ai-training worker --population 24 --generations 30 --seed 42 \
+    --save-dir build/ai-runs/worker-42
+  build/debug/gdp --experimental-neural-worker \
+    --neural-brain build/ai-runs/worker-42/worker_generation_000030.brain
+  ```
+
+  Para continuar, use `--resume CAMINHO_DO_BRAIN --generations N --save-dir NOVO_DIRETORIO`.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

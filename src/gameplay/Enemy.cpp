@@ -958,8 +958,10 @@ EnemyUpdateSummary updateWorkers(
             collisionWorld, perception);
         if (neuralExperiment != nullptr && !neuralExperiment->selected) {
             neuralExperiment->selected = id;
-            wkc::core::log(wkc::core::LogLevel::Info,
-                "Experimental neural Worker selected");
+            if (neuralExperiment->logSelection) {
+                wkc::core::log(wkc::core::LogLevel::Info,
+                    "Experimental neural Worker selected");
+            }
         }
         if (neuralExperiment != nullptr && neuralExperiment->selected == id) {
             neuralExperiment->decisionSecondsRemaining -= step;

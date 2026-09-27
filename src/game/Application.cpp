@@ -14,6 +14,7 @@
 #include "gameplay/Speedrun.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SpeedrunRecordStore.hpp"
+#include "persistence/WorkerBrainStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "platform/SdlInput.hpp"
 #include "game/visual/GdpRenderData.hpp"
@@ -771,6 +772,14 @@ bool Application::initializeRun()
     if (config_.experimentalNeuralWorker) {
         neuralWorkerExperiment_.emplace(wkc::core::deriveSeed(
             config_.worldSeed, SeedDomain::NeuralWorker, 0U));
+        if (config_.neuralBrainPath) {
+            const auto record = persistence::loadWorkerBrain(*config_.neuralBrainPath);
+            if (!record) {
+                log(LogLevel::Error, "Cannot load experimental Worker brain");
+                return false;
+            }
+            neuralWorkerExperiment_->genome = record->genome;
+        }
     } else {
         neuralWorkerExperiment_.reset();
     }

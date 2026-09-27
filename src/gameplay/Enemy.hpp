@@ -138,6 +138,7 @@ struct NeuralWorkerExperiment {
     explicit NeuralWorkerExperiment(wkc::core::Seed seed);
 
     wkc::ai::Genome genome;
+    bool logSelection{true};
     std::optional<gdp::entities::EntityId> selected;
     float decisionSecondsRemaining{0.0F};
     std::array<float, 4> outputs{};

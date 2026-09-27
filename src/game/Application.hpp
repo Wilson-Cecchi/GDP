@@ -50,6 +50,7 @@ namespace gdp::game {
 struct ApplicationConfig {
     bool headless{false};
     bool experimentalNeuralWorker{false};
+    std::optional<std::filesystem::path> neuralBrainPath;
     std::optional<std::uint64_t> frameLimit;
     std::optional<gameplay::GraphicsQuality> benchmarkQuality;
     int windowWidth{1280};

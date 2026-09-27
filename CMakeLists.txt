@@ -303,6 +303,7 @@ add_library(
     src/persistence/CampaignCheckpointStore.cpp
     src/persistence/SettingsStore.cpp
     src/persistence/SpeedrunRecordStore.cpp
+    src/persistence/WorkerBrainStore.cpp
 )
 
 target_compile_features(gdp_persistence PUBLIC cxx_std_20)
@@ -310,6 +311,17 @@ target_include_directories(gdp_persistence PUBLIC src)
 target_link_libraries(gdp_persistence PUBLIC gdp_gameplay)
 gdp_enable_warnings(gdp_persistence)
 gdp_enable_sanitizers(gdp_persistence)
+
+add_library(
+    gdp_training
+    STATIC
+    src/game/ai/WorkerTraining.cpp
+)
+target_compile_features(gdp_training PUBLIC cxx_std_20)
+target_include_directories(gdp_training PUBLIC src)
+target_link_libraries(gdp_training PUBLIC gdp_gameplay gdp_persistence)
+gdp_enable_warnings(gdp_training)
+gdp_enable_sanitizers(gdp_training)
 
 add_executable(
     gdp
@@ -327,6 +339,7 @@ target_link_libraries(
     gdp_entities
     gdp_gameplay
     gdp_persistence
+    gdp_training
     wkc_forge_platform
     wkc_forge_platform_sdl
     gdp_visual_renderer
@@ -422,6 +435,20 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME ai_foundation_systems COMMAND wkc_forge_ai_tests)
     set_tests_properties(ai_foundation_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_worker_training_tests tests/test_worker_training.cpp)
+    target_link_libraries(gdp_worker_training_tests PRIVATE gdp_training)
+    gdp_enable_warnings(gdp_worker_training_tests)
+    gdp_enable_sanitizers(gdp_worker_training_tests)
+
+    add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
+    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 30)
+
+    add_test(
+        NAME worker_training_cli_smoke
+        COMMAND gdp --ai-training worker --population 4 --generations 2 --seed 42
+    )
+    set_tests_properties(worker_training_cli_smoke PROPERTIES TIMEOUT 30)
 
     add_executable(gdp_enemy_sensors_tests tests/test_enemy_sensors.cpp)
     target_link_libraries(gdp_enemy_sensors_tests PRIVATE gdp_gameplay)
