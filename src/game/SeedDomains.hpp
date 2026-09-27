@@ -22,6 +22,7 @@ enum class SeedDomain : std::uint64_t {
     Events = 15,
     Audio = 16,
     RoomMaterial = 17,
+    NeuralWorker = 18,
 };
 
 } // namespace gdp::game

@@ -1,11 +1,14 @@
 #pragma once
 
+#include "ai/Genome.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Player.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
+#include <optional>
 
 namespace gdp::gameplay {
 
@@ -129,6 +132,17 @@ struct EnemyPerception {
     bool playerFlashlightOn{false};
 };
 
+// Opt-in prototype: exactly one Worker is selected per run. The network is
+// fixed-size and seeded independently; no evolution occurs during gameplay.
+struct NeuralWorkerExperiment {
+    explicit NeuralWorkerExperiment(wkc::core::Seed seed);
+
+    wkc::ai::Genome genome;
+    std::optional<gdp::entities::EntityId> selected;
+    float decisionSecondsRemaining{0.0F};
+    std::array<float, 4> outputs{};
+};
+
 [[nodiscard]] std::size_t alertEnemiesToNoise(
     gdp::entities::EntityManager& manager,
     std::uint32_t roomId,
@@ -162,7 +176,8 @@ struct EnemyUpdateSummary {
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
     WorkerConfig config = {},
-    EnemyPerception perception = {}) noexcept;
+    EnemyPerception perception = {},
+    NeuralWorkerExperiment* neuralExperiment = nullptr) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateGuards(
     gdp::entities::EntityManager& manager,

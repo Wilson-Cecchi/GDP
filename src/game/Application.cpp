@@ -768,6 +768,12 @@ bool Application::initializeRun()
 {
     using Clock = std::chrono::steady_clock;
     performanceMonitor_.reset();
+    if (config_.experimentalNeuralWorker) {
+        neuralWorkerExperiment_.emplace(wkc::core::deriveSeed(
+            config_.worldSeed, SeedDomain::NeuralWorker, 0U));
+    } else {
+        neuralWorkerExperiment_.reset();
+    }
     currentFramePerformance_ = {};
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
@@ -2639,7 +2645,8 @@ void Application::fixedUpdate(const double fixedStep)
     };
     const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.worker, perception);
+        difficultyConfigs.worker, perception,
+        neuralWorkerExperiment_ ? &*neuralWorkerExperiment_ : nullptr);
     const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.guard, perception);

@@ -604,6 +604,14 @@ especializados das pastas numeradas.
   forward, clone, seed, mutação e cruzamento. Ainda **não** há sensores,
   treinamento, persistência ou integração com os inimigos da partida; o
   comportamento atual permanece inalterado até validação posterior.
+- **Worker neural experimental:** `--experimental-neural-worker` habilita um
+  único Worker por run com sensores de distância/ângulo apenas sob percepção,
+  visibilidade, vida e proximidade de paredes. A rede decide movimento local,
+  rotação e pedido de ataque a 10 Hz; colisão, cooldown, alcance e linha de
+  visão continuam obrigatórios. A seed é derivada em domínio independente.
+  Sem a opção, todos os inimigos mantêm a IA anterior. Ainda não há treino,
+  seleção de fitness ou persistência de genomas; esta etapa testa somente a
+  integração segura da inferência em jogo.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para

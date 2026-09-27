@@ -1,7 +1,9 @@
 #include "gameplay/Enemy.hpp"
 
 #include "core/Hash.hpp"
+#include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
+#include "gameplay/EnemySensors.hpp"
 #include "gameplay/Props.hpp"
 
 #include <algorithm>
@@ -13,6 +15,10 @@
 
 namespace gdp::gameplay {
 namespace {
+
+constexpr std::size_t neuralWorkerInputCount = static_cast<std::size_t>(EnemySensor::Count);
+constexpr std::size_t neuralWorkerHiddenCount = 8;
+constexpr std::size_t neuralWorkerOutputCount = 4;
 
 float planarDistanceSquared(
     const wkc::core::Vec3 first,
@@ -797,6 +803,13 @@ void updateUnseenEnemy(
 
 } // namespace
 
+NeuralWorkerExperiment::NeuralWorkerExperiment(const wkc::core::Seed seed)
+    : genome{wkc::ai::NeuralNetwork{
+          neuralWorkerInputCount, neuralWorkerHiddenCount, neuralWorkerOutputCount}}
+{
+    genome.network.randomize(seed, 0.5F);
+}
+
 EnemyDifficultyConfigs makeEnemyDifficultyConfigs(const float multiplier) noexcept
 {
     const float safeMultiplier = std::clamp(
@@ -906,7 +919,8 @@ EnemyUpdateSummary updateWorkers(
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
     WorkerConfig config,
-    const EnemyPerception perception) noexcept
+    const EnemyPerception perception,
+    NeuralWorkerExperiment* const neuralExperiment) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -942,6 +956,68 @@ EnemyUpdateSummary updateWorkers(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.0F,
             collisionWorld, perception);
+        if (neuralExperiment != nullptr && !neuralExperiment->selected) {
+            neuralExperiment->selected = id;
+            wkc::core::log(wkc::core::LogLevel::Info,
+                "Experimental neural Worker selected");
+        }
+        if (neuralExperiment != nullptr && neuralExperiment->selected == id) {
+            neuralExperiment->decisionSecondsRemaining -= step;
+            if (neuralExperiment->decisionSecondsRemaining <= 0.0F) {
+                const EnemySensorValues sensors = sampleEnemySensors(
+                    *entity, *enemy, player, collisionWorld, lineOfSight,
+                    config.detectionRange);
+                const std::vector<float> outputs
+                    = neuralExperiment->genome.network.forward(sensors);
+                std::copy(outputs.begin(), outputs.end(),
+                    neuralExperiment->outputs.begin());
+                neuralExperiment->decisionSecondsRemaining = 0.1F;
+            }
+
+            constexpr float radiansPerDegree = 0.01745329251994329577F;
+            const float currentYawDegrees
+                = std::isfinite(entity->transform.rotationDegrees.y)
+                ? entity->transform.rotationDegrees.y : 0.0F;
+            const float yaw = currentYawDegrees * radiansPerDegree;
+            const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
+            const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
+            const wkc::core::Vec3 desired = forward * neuralExperiment->outputs[0]
+                + right * neuralExperiment->outputs[1];
+            const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
+                * config.moveSpeed;
+            if (requestedSpeed > 0.05F && step > 0.0F) {
+                entity->transform.position = moveEnemy(
+                    manager, enemyIds, collisionWorld, id, roomId, *enemy,
+                    entity->transform.position, wkc::core::normalized(desired),
+                    requestedSpeed, step, {.radius = 0.35F, .height = 1.8F});
+            }
+            entity->transform.rotationDegrees.y = std::remainder(
+                currentYawDegrees + neuralExperiment->outputs[2] * 180.0F * step,
+                360.0F);
+
+            const bool attackRequested = neuralExperiment->outputs[3] > 0.65F;
+            if (attackRequested && lineOfSight && distance <= config.attackRange) {
+                enemy->behavior = EnemyBehaviorState::Attack;
+                ++summary.attacking;
+                if (enemy->attackCooldown <= 0.0F) {
+                    player.applyDamage(config.attackDamage);
+                    enemy->attackCooldown = config.attackInterval;
+                    ++summary.attacksLanded;
+                }
+            } else if (requestedSpeed > 0.05F) {
+                enemy->behavior = lineOfSight
+                    ? EnemyBehaviorState::Chase : EnemyBehaviorState::Patrol;
+                if (lineOfSight) {
+                    ++summary.chasing;
+                } else {
+                    ++summary.patrolling;
+                }
+            } else {
+                enemy->behavior = EnemyBehaviorState::Idle;
+                ++summary.idle;
+            }
+            continue;
+        }
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }

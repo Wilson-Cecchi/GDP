@@ -8,6 +8,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Campaign.hpp"
 #include "gameplay/Door.hpp"
+#include "gameplay/Enemy.hpp"
 #include "gameplay/Feedback.hpp"
 #include "gameplay/Footstep.hpp"
 #include "gameplay/ExitConfirmation.hpp"
@@ -48,6 +49,7 @@ namespace gdp::game {
 
 struct ApplicationConfig {
     bool headless{false};
+    bool experimentalNeuralWorker{false};
     std::optional<std::uint64_t> frameLimit;
     std::optional<gameplay::GraphicsQuality> benchmarkQuality;
     int windowWidth{1280};
@@ -122,6 +124,7 @@ private:
         gameplay::SpeedrunRecordResult::Ineligible};
     std::optional<std::filesystem::path> speedrunRecordPath_;
     entities::EntityManager entities_;
+    std::optional<gameplay::NeuralWorkerExperiment> neuralWorkerExperiment_;
     entities::EntityId terminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};

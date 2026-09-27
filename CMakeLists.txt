@@ -170,6 +170,7 @@ add_library(
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/EnemySensors.cpp
     src/gameplay/ExitConfirmation.cpp
     src/gameplay/Feedback.cpp
     src/gameplay/Footstep.cpp
@@ -191,7 +192,7 @@ add_library(
 
 target_compile_features(gdp_gameplay PUBLIC cxx_std_20)
 target_include_directories(gdp_gameplay PUBLIC src)
-target_link_libraries(gdp_gameplay PUBLIC wkc_forge_core gdp_entities)
+target_link_libraries(gdp_gameplay PUBLIC wkc_forge_core wkc_forge_ai gdp_entities)
 gdp_enable_warnings(gdp_gameplay)
 gdp_enable_sanitizers(gdp_gameplay)
 
@@ -421,6 +422,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME ai_foundation_systems COMMAND wkc_forge_ai_tests)
     set_tests_properties(ai_foundation_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_enemy_sensors_tests tests/test_enemy_sensors.cpp)
+    target_link_libraries(gdp_enemy_sensors_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_enemy_sensors_tests)
+    gdp_enable_sanitizers(gdp_enemy_sensors_tests)
+
+    add_test(NAME enemy_sensors_systems COMMAND gdp_enemy_sensors_tests)
+    set_tests_properties(enemy_sensors_systems PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_seed_domain_tests tests/test_seed_domains.cpp)
     target_link_libraries(gdp_seed_domain_tests PRIVATE wkc_forge_core)

@@ -16,11 +16,13 @@ namespace {
 void printUsage(const std::string_view executable)
 {
     std::cout << "Usage: " << executable
-              << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N] [--help]\n"
+              << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N]"
+                 " [--experimental-neural-worker] [--help]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
               << "  --seed N             Generate a deterministic world from unsigned integer N.\n"
+              << "  --experimental-neural-worker  Test one seeded neural Worker per run.\n"
               << "  --help               Show this message.\n";
 }
 
@@ -86,6 +88,11 @@ int main(const int argc, char* argv[])
 
         if (argument == "--headless") {
             config.headless = true;
+            continue;
+        }
+
+        if (argument == "--experimental-neural-worker") {
+            config.experimentalNeuralWorker = true;
             continue;
         }
 
