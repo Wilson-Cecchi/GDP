@@ -193,6 +193,12 @@ de eventos de sala é independente e continua produzindo ondas, lockdown e
 recompensa determinísticos. Nenhum cue altera resultado, RNG estrutural ou
 ordem de combate.
 
+Na Fase 147, `Q` consulta a última arma selecionada com sucesso. Escolher um
+slot inexistente ou repetir o atual não modifica esse histórico. A roda usa
+`nextWeaponArchetype()` ou `previousWeaponArchetype()` conforme o sinal do
+delta, ignorando armas não possuídas. O histórico de `Q` não é salvo: após
+restaurar um checkpoint, uma nova seleção o inicializa novamente.
+
 ## Testes
 
 Implementados: sem munição, cooldown, recarga, parede bloqueia, filtro por sala,

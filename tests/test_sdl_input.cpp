@@ -57,14 +57,22 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_A, Key::A},
         std::pair{SDL_SCANCODE_S, Key::S},
         std::pair{SDL_SCANCODE_D, Key::D},
+        std::pair{SDL_SCANCODE_Q, Key::Q},
         std::pair{SDL_SCANCODE_E, Key::E},
+        std::pair{SDL_SCANCODE_F, Key::F},
+        std::pair{SDL_SCANCODE_G, Key::G},
         std::pair{SDL_SCANCODE_R, Key::R},
+        std::pair{SDL_SCANCODE_LSHIFT, Key::LeftShift},
+        std::pair{SDL_SCANCODE_RSHIFT, Key::RightShift},
         std::pair{SDL_SCANCODE_LCTRL, Key::LeftControl},
         std::pair{SDL_SCANCODE_RCTRL, Key::RightControl},
         std::pair{SDL_SCANCODE_SPACE, Key::Space},
         std::pair{SDL_SCANCODE_1, Key::Digit1},
         std::pair{SDL_SCANCODE_2, Key::Digit2},
         std::pair{SDL_SCANCODE_3, Key::Digit3},
+        std::pair{SDL_SCANCODE_4, Key::Digit4},
+        std::pair{SDL_SCANCODE_5, Key::Digit5},
+        std::pair{SDL_SCANCODE_TAB, Key::Tab},
         std::pair{SDL_SCANCODE_F3, Key::F3},
         std::pair{SDL_SCANCODE_ESCAPE, Key::Escape},
         std::pair{SDL_SCANCODE_RETURN, Key::Enter},
@@ -147,6 +155,13 @@ void testSdlTranslation()
     expect(!input.isMouseButtonDown(MouseButton::Primary)
             && input.wasMouseButtonReleased(MouseButton::Primary),
         "SDL primary release maps to the neutral transition");
+
+    event = {};
+    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    event.button.button = SDL_BUTTON_RIGHT;
+    expect(wkc::platform::handleSdlInputEvent(input, event)
+            && input.isMouseButtonDown(MouseButton::Secondary),
+        "SDL right button is available for aiming");
 
     input.beginFrame();
     event = {};

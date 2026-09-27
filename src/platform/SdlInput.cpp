@@ -19,10 +19,20 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::S;
     case SDL_SCANCODE_D:
         return Key::D;
+    case SDL_SCANCODE_Q:
+        return Key::Q;
     case SDL_SCANCODE_E:
         return Key::E;
+    case SDL_SCANCODE_F:
+        return Key::F;
+    case SDL_SCANCODE_G:
+        return Key::G;
     case SDL_SCANCODE_R:
         return Key::R;
+    case SDL_SCANCODE_LSHIFT:
+        return Key::LeftShift;
+    case SDL_SCANCODE_RSHIFT:
+        return Key::RightShift;
     case SDL_SCANCODE_LCTRL:
         return Key::LeftControl;
     case SDL_SCANCODE_RCTRL:
@@ -35,6 +45,12 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::Digit2;
     case SDL_SCANCODE_3:
         return Key::Digit3;
+    case SDL_SCANCODE_4:
+        return Key::Digit4;
+    case SDL_SCANCODE_5:
+        return Key::Digit5;
+    case SDL_SCANCODE_TAB:
+        return Key::Tab;
     case SDL_SCANCODE_F3:
         return Key::F3;
     case SDL_SCANCODE_ESCAPE:

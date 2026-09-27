@@ -563,6 +563,10 @@ especializados das pastas numeradas.
 - **Fase 146 — Agachar em Ctrl:** `Ctrl` esquerdo ou direito substitui `C`
   como comando de agachar; a física, a câmera e o salto não mudaram. As duas
   teclas são rastreadas separadamente para uma não cancelar a outra ao soltar.
+- **Fase 147 — Troca direcional e última arma:** `Q` alterna com a última arma
+  realmente selecionada; a roda percorre os slots disponíveis para frente ou
+  para trás conforme o sentido. A memória de `Q` é transitória e não altera o
+  formato do checkpoint.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -586,8 +590,8 @@ controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
 terminal, segura `Ctrl` para agachar, pula com `Espaço`, dispara com o botão esquerdo
 e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
-seleciona a Pistol, `3` seleciona a Knife e a roda do mouse percorre as armas
-disponíveis. `F3` alterna o
+seleciona a Pistol, `3` seleciona a Knife, `Q` retorna à última arma, e a roda
+percorre as armas disponíveis nos dois sentidos. `F3` alterna o
 diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os

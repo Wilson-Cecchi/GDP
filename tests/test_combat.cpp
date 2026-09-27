@@ -428,6 +428,32 @@ void testKnifeFallback()
         "Knife selection stays transient and preserves the underlying gun save and ammo");
 }
 
+void testDirectionalAndLastWeaponSelection()
+{
+    using namespace gdp::gameplay;
+    Weapon weapon;
+    expect(!weapon.lastWeaponArchetype()
+            && weapon.nextWeaponArchetype() == WeaponArchetype::Knife
+            && weapon.previousWeaponArchetype() == WeaponArchetype::Knife,
+        "single firearm and Knife wrap in both wheel directions");
+    expect(weapon.switchTo(WeaponArchetype::Knife)
+            && weapon.lastWeaponArchetype() == WeaponArchetype::Pistol,
+        "Q remembers the last selected firearm after drawing Knife");
+    expect(weapon.switchTo(*weapon.lastWeaponArchetype())
+            && weapon.lastWeaponArchetype() == WeaponArchetype::Knife,
+        "Q can toggle back to the previous selection");
+    weapon.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    expect(weapon.equip(WeaponArchetype::Carbine)
+            && weapon.lastWeaponArchetype() == WeaponArchetype::Pistol
+            && weapon.nextWeaponArchetype() == WeaponArchetype::Pistol
+            && weapon.previousWeaponArchetype() == WeaponArchetype::Knife,
+        "newly equipped Carbine preserves Q and opposite wheel directions");
+    const WeaponCampaignProgress progress = weapon.campaignProgress();
+    expect(weapon.restoreCampaignProgress(progress)
+            && !weapon.lastWeaponArchetype(),
+        "checkpoint restore does not invent a previous transient weapon");
+}
+
 void testWeaponTriggerModes()
 {
     using namespace gdp::gameplay;
@@ -2340,6 +2366,7 @@ int main()
     testDeterministicWeaponSpread();
     testWeaponPickupEquipment();
     testKnifeFallback();
+    testDirectionalAndLastWeaponSelection();
     testWeaponTriggerModes();
     testWeaponOverdrive();
     testDamageLifecycle();

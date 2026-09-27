@@ -290,6 +290,7 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
     stowedWeapon_ = previous;
+    lastSelectedArchetype_ = selectedArchetype_;
     selectedArchetype_ = definition_.archetype;
     return true;
 }
@@ -310,6 +311,7 @@ bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
         stowedWeapon_ = previous;
         cooldownRemaining_ = 0.0F;
     }
+    lastSelectedArchetype_ = selectedArchetype_;
     selectedArchetype_ = archetype;
     reloadRemaining_ = 0.0F;
     switchRemaining_ = weaponSwitchDurationSeconds(selectedArchetype_);
@@ -346,6 +348,37 @@ std::optional<WeaponArchetype> Weapon::nextWeaponArchetype() const noexcept
     return std::nullopt;
 }
 
+std::optional<WeaponArchetype> Weapon::previousWeaponArchetype() const noexcept
+{
+    constexpr std::array order{
+        WeaponArchetype::Carbine,
+        WeaponArchetype::Pistol,
+        WeaponArchetype::Knife,
+    };
+    const auto current = std::find(
+        order.begin(), order.end(), selectedArchetype_);
+    const std::size_t currentIndex = current == order.end()
+        ? 0U : static_cast<std::size_t>(current - order.begin());
+    for (std::size_t offset = 1U; offset <= order.size(); ++offset) {
+        const WeaponArchetype candidate
+            = order[(currentIndex + order.size() - offset) % order.size()];
+        if (ownsWeapon(candidate)) {
+            return candidate;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<WeaponArchetype> Weapon::lastWeaponArchetype() const noexcept
+{
+    if (lastSelectedArchetype_
+        && *lastSelectedArchetype_ != selectedArchetype_
+        && ownsWeapon(*lastSelectedArchetype_)) {
+        return lastSelectedArchetype_;
+    }
+    return std::nullopt;
+}
+
 bool Weapon::ownsWeapon(const WeaponArchetype archetype) const noexcept
 {
     return archetype == WeaponArchetype::Knife
@@ -376,6 +409,7 @@ bool Weapon::restoreCampaignProgress(
     reserveAmmo_ = progress.reserveAmmo;
     stowedWeapon_ = progress.stowed;
     selectedArchetype_ = definition_.archetype;
+    lastSelectedArchetype_.reset();
     knifeDefinition_ = baseWeaponDefinition(WeaponArchetype::Knife);
     const WeaponDefinition rangedBase
         = baseWeaponDefinition(definition_.archetype);

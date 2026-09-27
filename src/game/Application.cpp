@@ -1654,8 +1654,12 @@ void Application::processEvents()
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
     } else if (input_.wasKeyPressed(Key::Digit3)) {
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
+    } else if (input_.wasKeyPressed(Key::Q)) {
+        weaponSwitchPending_ = weapon_.lastWeaponArchetype();
     } else if (input_.mouseWheelDelta() != 0.0F) {
-        weaponSwitchPending_ = weapon_.nextWeaponArchetype();
+        weaponSwitchPending_ = input_.mouseWheelDelta() > 0.0F
+            ? weapon_.nextWeaponArchetype()
+            : weapon_.previousWeaponArchetype();
     }
     playerCommand_.interact = interactionPending_;
 }

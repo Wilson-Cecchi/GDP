@@ -70,6 +70,10 @@ public:
     [[nodiscard]] bool cycleWeapon() noexcept;
     [[nodiscard]] std::optional<WeaponArchetype>
         nextWeaponArchetype() const noexcept;
+    [[nodiscard]] std::optional<WeaponArchetype>
+        previousWeaponArchetype() const noexcept;
+    [[nodiscard]] std::optional<WeaponArchetype>
+        lastWeaponArchetype() const noexcept;
     [[nodiscard]] bool ownsWeapon(WeaponArchetype archetype) const noexcept;
     [[nodiscard]] bool activateOverdrive(
         float durationSeconds = 12.0F) noexcept;
@@ -100,6 +104,7 @@ private:
     WeaponDefinition knifeDefinition_{
         48.0F, 0.52F, 1.65F, 1U, 0U, WeaponArchetype::Knife};
     WeaponArchetype selectedArchetype_{WeaponArchetype::Pistol};
+    std::optional<WeaponArchetype> lastSelectedArchetype_;
     std::uint32_t magazineAmmo_{0};
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
