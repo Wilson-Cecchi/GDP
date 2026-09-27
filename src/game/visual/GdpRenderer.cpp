@@ -234,10 +234,10 @@ void main()
             float cone = smoothstep(0.82, 0.95,
                 dot(beamDirection, normalize(uFlashlightDirection)));
             float incidence = max(dot(normal, -beamDirection), 0.0);
-            float falloff = 1.0 / (1.0 + 0.16 * beamDistance * beamDistance);
+            float falloff = 1.0 / (1.0 + 0.05 * beamDistance * beamDistance);
             float rangeFade = 1.0 - smoothstep(11.0, 14.0, beamDistance);
             result += albedo * vec3(0.90, 0.95, 1.0)
-                * cone * incidence * falloff * rangeFade * 2.2;
+                * cone * incidence * falloff * rangeFade * 5.5;
         }
     }
     if (uViewmodel != 0) {
@@ -2561,6 +2561,18 @@ bool GdpRenderer::render(
                 ? uiTheme.warning : textColor);
         drawBitmapText(rightX + hudPadding, lowerTextY,
             hudScale, keysText, cyanColor);
+
+        if (hud.flashlightOn && width >= 400) {
+            constexpr std::string_view lightText = "F  LIGHT ON";
+            const int lightWidth = bitmapTextWidth(lightText, hudScale)
+                + (hudPadding * 2);
+            const int lightHeight = (7 * hudScale) + (hudPadding * 2);
+            const int lightX = (width - lightWidth) / 2;
+            drawHudRailPanel({lightX, hudMargin, lightWidth, lightHeight},
+                hudScale, cyanColor);
+            drawBitmapText(lightX + hudPadding, hudMargin + hudPadding,
+                hudScale, lightText, cyanColor);
+        }
 
         std::ostringstream levelStream;
         levelStream << "LV " << hud.level;

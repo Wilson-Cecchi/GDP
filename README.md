@@ -567,7 +567,8 @@ especializados das pastas numeradas.
   realmente selecionada; a roda percorre os slots disponíveis para frente ou
   para trás conforme o sentido. A memória de `Q` é transitória e não altera o
   formato do checkpoint.
-- **Fase 148 — Caminhada silenciosa:** segurar qualquer `Shift` reduz o passo
+- **Fase 148 — Caminhada silenciosa:** segurar qualquer `Shift` reduz a
+  velocidade horizontal para 52% da normal, além do passo
   e seu volume; os inimigos investigam passos normais próximos, mas só ouvem
   passos silenciosos/agachados praticamente ao lado. Visão e disparos mantêm
   seu alcance normal.
@@ -577,6 +578,8 @@ especializados das pastas numeradas.
 - **Fase 150 — Lanterna:** `F` liga/desliga um cone de luz preso à câmera,
   independente das luminárias do ambiente. A primeira versão não projeta
   sombras nem usa bateria; desligada, não consome um slot de luz da sala.
+  Após o primeiro teste em jogo, o feixe foi reforçado a média distância e
+  passou a ter a indicação `F LIGHT ON` no HUD.
 - **Fase 151 — Painel rápido:** segurar `Tab` mostra placar, abates, eventos,
   loot e tempo da run sem pausar a simulação. `F3` permanece como painel de
   desempenho separado.
@@ -1732,6 +1735,11 @@ Executar normalmente:
 ```bash
 build/debug/gdp
 ```
+
+Depois de atualizar o repositório, recompile o preset do executável que você
+usa (`cmake --build --preset debug --target gdp` ou
+`cmake --build --preset release --target gdp`). Um binário anterior em `build/`
+não recebe os controles novos apenas com `git pull`.
 
 No Windows 11 x64, use o pacote `GDP-Windows-x64` produzido pela CI ou siga o
 guia de compilação em [`README_WINDOWS.md`](README_WINDOWS.md). O ZIP contém

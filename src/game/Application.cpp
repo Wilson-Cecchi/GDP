@@ -1654,6 +1654,8 @@ void Application::processEvents()
     reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
     if (input_.wasKeyPressed(Key::F)) {
         flashlightOn_ = !flashlightOn_;
+        log(LogLevel::Info, flashlightOn_
+                ? "Flashlight enabled" : "Flashlight disabled");
     }
     if (input_.wasKeyPressed(Key::Digit1)) {
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
@@ -3425,6 +3427,7 @@ void Application::render()
     SDL_SetWindowTitle(window_, title.str().c_str());
     visual::HudRenderData hud;
     hud.visible = true;
+    hud.flashlightOn = flashlightOn_ && player_.state().alive;
     hud.infoOverlay = input_.isKeyDown(Key::Tab);
     hud.score = progress.score;
     hud.enemiesKilled = progress.enemiesKilled;

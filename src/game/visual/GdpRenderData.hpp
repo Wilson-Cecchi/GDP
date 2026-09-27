@@ -452,6 +452,7 @@ exitConfirmationSelectionAt(
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
+    bool flashlightOn{false};
     bool infoOverlay{false};
     std::uint64_t score{0U};
     std::uint32_t enemiesKilled{0U};

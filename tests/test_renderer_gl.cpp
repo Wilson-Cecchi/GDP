@@ -244,6 +244,30 @@ int main()
             std::vector<std::uint8_t> flashlightPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 flashlightPixels.data());
+            gdp::game::visual::RoomLightingRenderData darkLighting
+                = proceduralLighting;
+            darkLighting.lightCount = 0U;
+            darkLighting.ambientIntensity = 0.05F;
+            const bool renderedDarkReference = renderer.render(
+                width, height, {}, {}, {}, {}, darkLighting);
+            std::vector<std::uint8_t> darkPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                darkPixels.data());
+            darkLighting.flashlightEnabled = true;
+            darkLighting.flashlightPosition = {0.0F, 1.62F, 4.0F};
+            darkLighting.flashlightDirection = {0.0F, 0.0F, -1.0F};
+            const bool renderedDarkFlashlight = renderer.render(
+                width, height, {}, {}, {}, {}, darkLighting);
+            std::vector<std::uint8_t> darkFlashlightPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                darkFlashlightPixels.data());
+            std::size_t darkBeamPixels = 0U;
+            for (std::size_t index = 0U; index < darkPixels.size(); index += 4U) {
+                if (static_cast<int>(darkFlashlightPixels[index])
+                        - static_cast<int>(darkPixels[index]) >= 20) {
+                    ++darkBeamPixels;
+                }
+            }
 
             gdp::game::visual::HudRenderData potatoQuality;
             potatoQuality.graphicsQuality
@@ -1355,6 +1379,8 @@ int main()
                 && renderedCentralHubVariant && centralHubChangedChannels > 100U
                 && renderedProceduralLighting && lightingChangedChannels > 100U
                 && renderedFlashlight && flashlightChangedChannels > 30U
+                && renderedDarkReference && renderedDarkFlashlight
+                && darkBeamPixels > 500U
                 && renderedInfoHud && infoHudPixels != functionalHudPixels
                 && renderedPotatoQuality && potatoQualityChangedChannels > 100U
                 && renderedPotatoFlashlight

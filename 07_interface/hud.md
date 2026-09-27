@@ -121,6 +121,8 @@ snapshot e não controla a simulação.
 Segurar `Tab` mostra placar, abates, eventos, loot e tempo da run. Os números
 vêm do snapshot de progressão; abrir o painel não pausa nem altera o jogador.
 Ele é separado do diagnóstico `F3` e não aparece sobre menus.
+Com a lanterna ligada, uma pequena indicação `F LIGHT ON` fica na borda
+inferior em resoluções normais, sem ocupar o centro da mira.
 
 ## Escala
 
