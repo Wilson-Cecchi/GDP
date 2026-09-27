@@ -5,6 +5,7 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Weapon.hpp"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -62,6 +63,32 @@ struct ShotResult {
     gdp::entities::EntityId spawnedItem{};
     std::optional<ImpactResult> impact;
 };
+
+enum class CombatSignalKind : std::uint8_t {
+    WeaponFired,
+    EntityHit,
+    EntityDamaged,
+    EntityKilled,
+    ImpactWorld,
+};
+
+struct CombatSignal {
+    CombatSignalKind kind{CombatSignalKind::WeaponFired};
+    ShotOutcome outcome{ShotOutcome::Miss};
+    gdp::entities::EntityId target{};
+    HitZone zone{HitZone::Standard};
+    wkc::core::Vec3 point{};
+    std::optional<ImpactResult> impact;
+};
+
+// A single accepted shot emits at most fire, contact, and damage/death, in that order.
+struct CombatSignalBatch {
+    std::array<CombatSignal, 3> signals{};
+    std::uint8_t count{0};
+};
+
+[[nodiscard]] CombatSignalBatch combatSignalsForShot(
+    const ShotResult& shot) noexcept;
 
 [[nodiscard]] DamageOutcome applyDamage(
     gdp::entities::EntityManager& manager,

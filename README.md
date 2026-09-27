@@ -551,6 +551,10 @@ especializados das pastas numeradas.
   metálico/polímero de desgaste moderado. A implementação e os testes técnicos
   estão concluídos; empunhaduras e enquadramento foram corrigidos após a
   primeira avaliação, mas a aceitação visual ainda depende de playtest.
+- **Fase 144 — Sinais de combate:** cada disparo aceito produz um lote local
+  determinístico de `WeaponFired`, contato e dano/morte. `Application` usa esse
+  contrato para feedback visual, HUD e áudio, mantendo dano, drops, progressão e
+  colisão no resultado autoritativo. Rejeições não produzem tiro fictício.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -1536,6 +1540,12 @@ foi corrigida para que suas bases recuem em direção à coronha. O enquadrament
 dos três modelos ficou menor e mais periférico; a comparação
 [antes/depois](visual/validation/weapon_first_person_v1_used_pose_correction_comparison.png)
 registra a correção em 1280×720.
+
+Na Fase 144, `combatSignalsForShot()` transforma `ShotResult` em um lote de até
+três sinais ordenados. Flash/recuo, ruído, impacto, hitmarker e áudio consomem
+esse lote sem alterar munição, dano ou RNG estrutural. É uma separação local de
+apresentação por disparo, não uma fila global nem save de eventos. O checkpoint
+continua registrando a entrada do andar, não um estado intermediário.
 
 Na Fase 16, eventos acionados por entrada preparam a primeira onda durante a
 inicialização do mundo. Esses inimigos são desenhados na sala vizinha, mas

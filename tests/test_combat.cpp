@@ -28,6 +28,62 @@ bool near(const float first, const float second) noexcept
     return std::abs(first - second) < 1.0e-5F;
 }
 
+void testCombatSignalBatch()
+{
+    using namespace gdp::gameplay;
+    const gdp::entities::EntityId target{7U, 2U};
+    const HitResult hit{target, {1.0F, 2.0F, 3.0F}, 4.0F, HitZone::WeakPoint};
+    const ImpactResult impact{{1.0F, 2.0F, 3.0F}, {0.0F, 0.0F, 1.0F},
+        ImpactMaterial::Metal};
+
+    for (const ShotOutcome rejected : {ShotOutcome::Cooldown,
+             ShotOutcome::Reloading, ShotOutcome::Switching, ShotOutcome::Empty}) {
+        const ShotResult shot{rejected, std::nullopt, {}, std::nullopt};
+        expect(combatSignalsForShot(shot).count == 0U,
+            "rejected shots do not emit fire or contact signals");
+    }
+    const ShotResult miss{ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
+    const CombatSignalBatch missed = combatSignalsForShot(miss);
+    expect(missed.count == 1U
+            && missed.signals[0].kind == CombatSignalKind::WeaponFired,
+        "accepted miss emits only weapon fired");
+
+    const ShotResult world{ShotOutcome::ImpactWorld, std::nullopt, {}, impact};
+    const CombatSignalBatch wall = combatSignalsForShot(world);
+    expect(wall.count == 2U
+            && wall.signals[0].kind == CombatSignalKind::WeaponFired
+            && wall.signals[1].kind == CombatSignalKind::ImpactWorld
+            && wall.signals[1].point == impact.point
+            && wall.signals[1].impact
+            && wall.signals[1].impact->material == ImpactMaterial::Metal,
+        "world contact carries position and material after weapon fired");
+
+    for (const ShotOutcome outcome : {ShotOutcome::ImpactProp, ShotOutcome::Hit,
+             ShotOutcome::Killed, ShotOutcome::Destroyed}) {
+        const ShotResult shot{outcome, hit, {}, impact};
+        const CombatSignalBatch batch = combatSignalsForShot(shot);
+        const bool damaged = outcome == ShotOutcome::Hit;
+        const bool killed = outcome == ShotOutcome::Killed
+            || outcome == ShotOutcome::Destroyed;
+        expect(batch.count == (damaged || killed ? 3U : 2U)
+                && batch.signals[0].kind == CombatSignalKind::WeaponFired
+                && batch.signals[1].kind == CombatSignalKind::EntityHit
+                && batch.signals[1].target == target
+                && batch.signals[1].zone == HitZone::WeakPoint
+                && batch.signals[1].point == hit.point
+                && batch.signals[1].impact,
+            "entity contact preserves target, weak point and impact in order");
+        if (damaged || killed) {
+            expect(batch.signals[2].kind == (damaged
+                    ? CombatSignalKind::EntityDamaged
+                    : CombatSignalKind::EntityKilled)
+                    && batch.signals[2].outcome == outcome
+                    && batch.signals[2].target == target,
+                "damage and destruction append the correct terminal signal");
+        }
+    }
+}
+
 void testEnemyDifficultyConfigs()
 {
     using namespace gdp::gameplay;
@@ -548,6 +604,12 @@ void testHitscanSelectionAndBlocking()
         weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F}, 1, openRoom, manager);
     expect(first.outcome == ShotOutcome::Hit && first.hit && first.hit->target == nearest,
         "hitscan selects the nearest live enemy in the current room");
+    const CombatSignalBatch firstSignals = combatSignalsForShot(first);
+    expect(firstSignals.count == 3U
+            && firstSignals.signals[1].kind == CombatSignalKind::EntityHit
+            && firstSignals.signals[2].kind == CombatSignalKind::EntityDamaged
+            && firstSignals.signals[1].target == nearest,
+        "real hitscan emits contact then damage for the selected enemy");
     expect(first.impact && first.impact->material == ImpactMaterial::Flesh
             && first.impact->point == first.hit->point
             && first.impact->normal == wkc::core::Vec3{0.0F, 0.0F, 1.0F},
@@ -560,6 +622,11 @@ void testHitscanSelectionAndBlocking()
         weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F}, 1, openRoom, manager);
     expect(lethal.outcome == ShotOutcome::Killed && lethal.hit->target == nearest,
         "lethal hitscan reports the killed target");
+    const CombatSignalBatch lethalSignals = combatSignalsForShot(lethal);
+    expect(lethalSignals.count == 3U
+            && lethalSignals.signals[2].kind == CombatSignalKind::EntityKilled
+            && lethalSignals.signals[2].target == nearest,
+        "real lethal hitscan emits one death signal for the selected enemy");
     weapon.fixedUpdate(0.1F);
     const ShotResult afterDeath = fireHitscan(
         weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F}, 1, openRoom, manager);
@@ -588,6 +655,11 @@ void testHitscanSelectionAndBlocking()
             && near(blocked.impact->point.z, -1.5F)
             && blockedManager.findData<EnemyData>(blockedEnemy)->health == 50.0F,
         "solid geometry stops a shot and reports its exact surface impact");
+    const CombatSignalBatch blockedSignals = combatSignalsForShot(blocked);
+    expect(blockedSignals.count == 2U
+            && blockedSignals.signals[1].kind == CombatSignalKind::ImpactWorld
+            && blockedSignals.signals[1].point == blocked.impact->point,
+        "real blocked hitscan publishes wall contact without entity damage");
 
     Weapon shortRange({.fireInterval = 0.0F, .range = 1.0F});
     const ShotResult miss = fireHitscan(
@@ -2262,6 +2334,7 @@ void testEnemyNoisePerception()
 
 int main()
 {
+    testCombatSignalBatch();
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
     testDeterministicWeaponSpread();

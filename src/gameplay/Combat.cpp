@@ -247,6 +247,52 @@ void updateEnemyHitReactions(
     }
 }
 
+CombatSignalBatch combatSignalsForShot(const ShotResult& shot) noexcept
+{
+    CombatSignalBatch batch;
+    if (shot.outcome == ShotOutcome::Cooldown
+        || shot.outcome == ShotOutcome::Reloading
+        || shot.outcome == ShotOutcome::Switching
+        || shot.outcome == ShotOutcome::Empty) {
+        return batch;
+    }
+
+    batch.signals[batch.count++] = {.kind = CombatSignalKind::WeaponFired,
+        .outcome = shot.outcome, .impact = std::nullopt};
+    if (shot.hit) {
+        batch.signals[batch.count++] = {
+            .kind = CombatSignalKind::EntityHit,
+            .outcome = shot.outcome,
+            .target = shot.hit->target,
+            .zone = shot.hit->zone,
+            .point = shot.hit->point,
+            .impact = shot.impact,
+        };
+        if (shot.outcome == ShotOutcome::Hit
+            || shot.outcome == ShotOutcome::Killed
+            || shot.outcome == ShotOutcome::Destroyed) {
+            batch.signals[batch.count++] = {
+                .kind = shot.outcome == ShotOutcome::Hit
+                    ? CombatSignalKind::EntityDamaged
+                    : CombatSignalKind::EntityKilled,
+                .outcome = shot.outcome,
+                .target = shot.hit->target,
+                .zone = shot.hit->zone,
+                .point = shot.hit->point,
+                .impact = std::nullopt,
+            };
+        }
+    } else if (shot.outcome == ShotOutcome::ImpactWorld) {
+        batch.signals[batch.count++] = {
+            .kind = CombatSignalKind::ImpactWorld,
+            .outcome = shot.outcome,
+            .point = shot.impact ? shot.impact->point : wkc::core::Vec3{},
+            .impact = shot.impact,
+        };
+    }
+    return batch;
+}
+
 ShotResult fireHitscan(
     Weapon& weapon,
     const wkc::core::Vec3 origin,

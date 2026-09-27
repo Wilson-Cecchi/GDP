@@ -18,8 +18,8 @@
 > autoritativa. A Fase 138 adicionou dois slots de arma com troca real. A
 > Fase 139 tornou a entrada após equip/troca temporizada e autoritativa. A
 > Fase 140 tornou essa seleção mais rápida, interruptível e inverteu os atalhos
-> para priorizar a Carbine em `1`. A fila desacoplada de sinais de combate
-> permanece para fases posteriores.
+> para priorizar a Carbine em `1`. A Fase 144 acrescentou o lote local de sinais
+> de combate; uma fila global permanece para fases posteriores, se necessária.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -177,19 +177,21 @@ Standard e Speedrun usam sempre `1.00x`.
 
 ## Eventos
 
-`ShotResult` já separa os resultados lógicos consumidos pela aplicação e, desde
-a Fase 109, fornece o contrato de impacto usado diretamente por apresentação e
-áudio. A fila
-desacoplada `WeaponFired`, `EntityHit`, `EntityDamaged`, `EntityKilled` e
-`ImpactWorld` permanece planejada para renderer e áudio. O sistema atual de
-eventos de sala é independente dessa futura fila: ele consome estado de
-encontro e produz ondas, lockdown e recompensa determinísticos.
+`ShotResult` conserva o resultado autoritativo do hitscan e, desde a Fase 109,
+inclui o impacto. Na Fase 144, `combatSignalsForShot()` traduz cada disparo
+aceito em um lote local de até três sinais, na ordem `WeaponFired`, contato
+(`EntityHit` ou `ImpactWorld`) e consequência (`EntityDamaged` ou
+`EntityKilled`). Acerto em prop indestrutível só emite contato; `Destroyed`
+usa `EntityKilled` com `ShotOutcome::Destroyed` para preservar a distinção de
+áudio e HUD. Cooldown, troca, recarga e arma vazia não emitem disparo.
 
-Enquanto a fila genérica permanece planejada, `Application` traduz resultados
-já consolidados em cues procedurais: tiro/arma vazia, recarga, hit/morte,
-impacto/destruição de prop, impacto no mundo, coleta, dano recebido e
-ativação/conclusão de evento. Cues espaciais usam o ponto real do impacto; nenhum som
-altera resultado, RNG estrutural ou ordem de combate.
+`Application` consome os sinais para recuo/flash ou golpe, ruído, efeito de
+impacto, feedback de hit e áudio espacial. Arma vazia/recarga e outros sistemas
+continuam usando seus próprios cues. O lote não é uma fila persistida ou global:
+progressão, drops, colisões e log continuam ancorados no `ShotResult`. O sistema
+de eventos de sala é independente e continua produzindo ondas, lockdown e
+recompensa determinísticos. Nenhum cue altera resultado, RNG estrutural ou
+ordem de combate.
 
 ## Testes
 

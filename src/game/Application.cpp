@@ -2412,28 +2412,31 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_);
+        const gameplay::CombatSignalBatch signals
+            = gameplay::combatSignalsForShot(shot);
         const entities::PropData* hitProp = shot.hit
             ? entities_.findData<entities::PropData>(shot.hit->target) : nullptr;
         const bool hitCeilingFixture = hitProp != nullptr
             && hitProp->type == entities::PropType::CeilingFixture;
-        if (shot.impact) {
-            activeImpacts_.push_back({
-                .render = {
-                    .position = shot.impact->point,
-                    .normal = shot.impact->normal,
-                    .material = impactVisualMaterial(shot.impact->material),
-                    .strength = 1.0F,
-                    .visualSeed = wkc::core::hashCombine(
-                        config_.worldSeed, impactVisualCounter_++),
-                },
-                .roomId = playerRoom,
-                .remaining = impactVisualDuration,
-            });
-        }
-        if (shot.outcome != gameplay::ShotOutcome::Cooldown
-            && shot.outcome != gameplay::ShotOutcome::Reloading
-            && shot.outcome != gameplay::ShotOutcome::Switching
-            && shot.outcome != gameplay::ShotOutcome::Empty) {
+        for (std::uint8_t index = 0; index < signals.count; ++index) {
+            const gameplay::CombatSignal& signal = signals.signals[index];
+            if (signal.impact) {
+                activeImpacts_.push_back({
+                    .render = {
+                        .position = signal.impact->point,
+                        .normal = signal.impact->normal,
+                        .material = impactVisualMaterial(signal.impact->material),
+                        .strength = 1.0F,
+                        .visualSeed = wkc::core::hashCombine(
+                            config_.worldSeed, impactVisualCounter_++),
+                    },
+                    .roomId = playerRoom,
+                    .remaining = impactVisualDuration,
+                });
+            }
+            if (signal.kind != gameplay::CombatSignalKind::WeaponFired) {
+                continue;
+            }
             if (meleeAttack) {
                 weaponMeleeRemaining_ = weaponMeleeDuration;
             } else {
@@ -2444,16 +2447,17 @@ void Application::fixedUpdate(const double fixedStep)
                 entities_, playerRoom,
                 {.position = player_.state().position,
                     .radius = meleeAttack ? 4.0F : 18.0F});
+            if (audio_) {
+                audio_->playAt(meleeAttack ? gdp::audio::AudioEventKind::MeleeSwing
+                                           : gdp::audio::AudioEventKind::WeaponFire,
+                    config_.worldSeed, audioEventCounter_++,
+                    player_.cameraPosition(), player_.cameraPosition(),
+                    player_.forwardDirection());
+            }
         }
-        if (audio_ && shot.outcome != gameplay::ShotOutcome::Cooldown
-            && shot.outcome != gameplay::ShotOutcome::Reloading
-            && shot.outcome != gameplay::ShotOutcome::Switching) {
-            const gdp::audio::AudioEventKind fireKind
-                = shot.outcome == gameplay::ShotOutcome::Empty
-                ? gdp::audio::AudioEventKind::DryFire
-                : meleeAttack ? gdp::audio::AudioEventKind::MeleeSwing
-                              : gdp::audio::AudioEventKind::WeaponFire;
-            audio_->playAt(fireKind, config_.worldSeed, audioEventCounter_++,
+        if (audio_ && shot.outcome == gameplay::ShotOutcome::Empty) {
+            audio_->playAt(gdp::audio::AudioEventKind::DryFire,
+                config_.worldSeed, audioEventCounter_++,
                 player_.cameraPosition(), player_.cameraPosition(),
                 player_.forwardDirection());
         }
@@ -2471,37 +2475,43 @@ void Application::fixedUpdate(const double fixedStep)
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
         }
-        if (shot.outcome == gameplay::ShotOutcome::Hit
-            || shot.outcome == gameplay::ShotOutcome::Destroyed) {
-            gameplay::signalHit(feedback_, false,
-                shot.hit && shot.hit->zone == gameplay::HitZone::WeakPoint);
-        } else if (shot.outcome == gameplay::ShotOutcome::Killed) {
-            gameplay::signalHit(feedback_, true,
-                shot.hit && shot.hit->zone == gameplay::HitZone::WeakPoint);
-        }
-        if (audio_ && shot.hit) {
-            std::optional<gdp::audio::AudioEventKind> impactKind;
-            if (shot.outcome == gameplay::ShotOutcome::Hit) {
-                const entities::Entity* target = entities_.find(shot.hit->target);
-                impactKind = target != nullptr && target->kind == entities::EntityKind::Prop
-                    ? gdp::audio::AudioEventKind::PropImpact
-                    : gdp::audio::AudioEventKind::EnemyHit;
-            } else if (shot.outcome == gameplay::ShotOutcome::Killed) {
-                impactKind = gdp::audio::AudioEventKind::EnemyDeath;
-            } else if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
-                impactKind = gdp::audio::AudioEventKind::PropDestroyed;
-            } else if (shot.outcome == gameplay::ShotOutcome::ImpactProp) {
-                impactKind = gdp::audio::AudioEventKind::PropImpact;
+        for (std::uint8_t index = 0; index < signals.count; ++index) {
+            const gameplay::CombatSignal& signal = signals.signals[index];
+            if (signal.kind == gameplay::CombatSignalKind::EntityDamaged
+                || signal.kind == gameplay::CombatSignalKind::EntityKilled) {
+                gameplay::signalHit(feedback_,
+                    signal.outcome == gameplay::ShotOutcome::Killed,
+                    signal.zone == gameplay::HitZone::WeakPoint);
             }
-            if (impactKind) {
-                audio_->playAt(*impactKind, config_.worldSeed, audioEventCounter_++,
-                    shot.hit->point, player_.cameraPosition(), player_.forwardDirection());
+            if (!audio_) {
+                continue;
             }
-        } else if (audio_ && shot.outcome == gameplay::ShotOutcome::ImpactWorld) {
-            audio_->playAt(gdp::audio::AudioEventKind::PropImpact,
-                config_.worldSeed, audioEventCounter_++,
-                shot.impact ? shot.impact->point : player_.cameraPosition(),
-                player_.cameraPosition(), player_.forwardDirection());
+            if (signal.kind == gameplay::CombatSignalKind::EntityHit) {
+                std::optional<gdp::audio::AudioEventKind> impactKind;
+                if (signal.outcome == gameplay::ShotOutcome::Hit) {
+                    const entities::Entity* target = entities_.find(signal.target);
+                    impactKind = target != nullptr
+                        && target->kind == entities::EntityKind::Prop
+                        ? gdp::audio::AudioEventKind::PropImpact
+                        : gdp::audio::AudioEventKind::EnemyHit;
+                } else if (signal.outcome == gameplay::ShotOutcome::Killed) {
+                    impactKind = gdp::audio::AudioEventKind::EnemyDeath;
+                } else if (signal.outcome == gameplay::ShotOutcome::Destroyed) {
+                    impactKind = gdp::audio::AudioEventKind::PropDestroyed;
+                } else if (signal.outcome == gameplay::ShotOutcome::ImpactProp) {
+                    impactKind = gdp::audio::AudioEventKind::PropImpact;
+                }
+                if (impactKind) {
+                    audio_->playAt(*impactKind, config_.worldSeed, audioEventCounter_++,
+                        signal.point, player_.cameraPosition(),
+                        player_.forwardDirection());
+                }
+            } else if (signal.kind == gameplay::CombatSignalKind::ImpactWorld) {
+                audio_->playAt(gdp::audio::AudioEventKind::PropImpact,
+                    config_.worldSeed, audioEventCounter_++,
+                    signal.impact ? signal.point : player_.cameraPosition(),
+                    player_.cameraPosition(), player_.forwardDirection());
+            }
         }
         if (shot.outcome == gameplay::ShotOutcome::Killed && shot.hit) {
             const entities::EnemyData* killed
