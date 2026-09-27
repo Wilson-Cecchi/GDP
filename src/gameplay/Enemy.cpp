@@ -854,8 +854,17 @@ bool updateNeuralEnemy(
     const float yaw = currentYawDegrees * radiansPerDegree;
     const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
     const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
-    const wkc::core::Vec3 desired = forward * experiment->outputs[0]
-        + right * experiment->outputs[1];
+    // Keep locomotion aligned with the visible facing direction. Older brains
+    // may request lateral motion without forward motion; turn that into a
+    // cautious forward step instead of making them stall after this fix.
+    constexpr float maximumStrafeRatio = 0.25F;
+    const float forwardIntent = std::abs(experiment->outputs[0]) < 0.15F
+        ? std::abs(experiment->outputs[1]) * 0.35F
+        : experiment->outputs[0];
+    const float lateral = experiment->outputs[1]
+        * std::abs(forwardIntent) * maximumStrafeRatio;
+    const wkc::core::Vec3 desired = forward * forwardIntent
+        + right * lateral;
     const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
         * moveSpeed;
     if (requestedSpeed > 0.05F && step > 0.0F) {

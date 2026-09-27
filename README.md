@@ -616,6 +616,10 @@ especializados das pastas numeradas.
   controla movimento, rotação e ataque, sem substituir automaticamente a IA.
   A contagem de suporte/reparo aparece no log de treino, mas não entra no
   fitness porque essas ações ainda não são decisões da rede.
+  O movimento lateral da rede é limitado a um ajuste curto de direção; um
+  pedido somente lateral vira um passo cauteloso para frente, evitando que o
+  modelo deslize de lado. Cérebros salvos anteriormente continuam carregando,
+  mas vale treiná-los novamente para ajustar a política ao novo movimento.
 - **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa arenas
   determinísticas sem abrir janela ou inicializar renderização/áudio. Cada
   geração avalia todos os cérebros em quatro cenários, com duas variações de

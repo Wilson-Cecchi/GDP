@@ -217,6 +217,46 @@ void testExperimentalArchetypes()
     }
 }
 
+void testNeuralLocomotionFacing()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    EntityManager manager;
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const EntityId id = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    NeuralEnemyExperiment experiment{123};
+    auto parameters = experiment.genome.network.parameters();
+    std::fill(parameters.begin(), parameters.end(), 0.0F);
+    parameters[7] = 2.0F;
+    parameters[64 + 1 * 9] = 2.0F; // Strong lateral output only.
+    const wkc::core::Vec3 start = manager.find(id)->transform.position;
+    (void)updateWorkers(manager, player, 1, room, 0.1F,
+        WorkerConfig{}, {}, &experiment);
+    const wkc::core::Vec3 afterStrafe = manager.find(id)->transform.position;
+    const float cautiousTravel = std::hypot(
+        afterStrafe.x - start.x, afterStrafe.z - start.z);
+    expect(cautiousTravel > 0.01F
+            && (start.z - afterStrafe.z) / cautiousTravel > 0.96F,
+        "lateral-only output becomes cautious forward motion, not side sliding");
+
+    parameters[64 + 0 * 9] = 2.0F; // Forward and lateral together.
+    (void)updateWorkers(manager, player, 1, room, 0.1F,
+        WorkerConfig{}, {}, &experiment);
+    const wkc::core::Vec3 end = manager.find(id)->transform.position;
+    const float dx = end.x - afterStrafe.x;
+    const float dz = end.z - afterStrafe.z;
+    const float travel = std::hypot(dx, dz);
+    expect(travel > 0.01F && -dz / travel > 0.96F,
+        "moving neural enemy travels mostly in the direction it faces");
+}
+
 } // namespace
 
 int main()
@@ -224,5 +264,6 @@ int main()
     testSensors();
     testExperimentalWorker();
     testExperimentalArchetypes();
+    testNeuralLocomotionFacing();
     return failures == 0 ? 0 : 1;
 }
