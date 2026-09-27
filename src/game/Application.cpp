@@ -2625,21 +2625,24 @@ void Application::fixedUpdate(const double fixedStep)
     const bool playerWasAlive = player_.state().alive;
     const gameplay::EnemyDifficultyConfigs difficultyConfigs
         = gameplay::makeEnemyDifficultyConfigs(runDifficulty_);
+    const gameplay::EnemyPerception perception{
+        .playerFlashlightOn = flashlightOn_,
+    };
     const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.worker);
+        difficultyConfigs.worker, perception);
     const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.guard);
+        difficultyConfigs.guard, perception);
     const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.officer);
+        difficultyConfigs.officer, perception);
     const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.engineer);
+        difficultyConfigs.engineer, perception);
     const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
         entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.industrialRobot);
+        difficultyConfigs.industrialRobot, perception);
     const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
         + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
     if (audio_ && attacksLanded > 0U) {

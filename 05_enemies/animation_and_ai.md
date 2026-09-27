@@ -265,6 +265,12 @@ obrigatórios. Patrulha, Chase, Investigate, Alert e Recover já giram o corpo e
 portanto, varrem o cone sem estado visual paralelo. Ruído pode chegar por trás e
 usa Alert para orientar o inimigo antes da confirmação visual.
 
+Na Fase 153, a lanterna ligada amplia apenas o alcance de aquisição visual do
+Player em 25%, com teto de 4 m adicionais. A regra vale para os cinco papéis,
+sem ignorar o cone frontal ou a linha de visão: uma parede ou o lado de trás
+continuam impedindo a detecção visual. Lanterna desligada preserva os alcances
+anteriores, e esse sinal transitório não entra em saves nem consome RNG.
+
 A Fase 108 acrescenta diversidade determinística ao mesmo grafo. A paridade da
 identidade define qual lado de um sólido entra primeiro no desempate; quando a
 colisão ativa `avoidanceSide`, o próximo cálculo usa esse lado e consegue

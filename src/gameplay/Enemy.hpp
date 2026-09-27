@@ -125,6 +125,10 @@ struct EnemyNoiseStimulus {
     float radius{18.0F};
 };
 
+struct EnemyPerception {
+    bool playerFlashlightOn{false};
+};
+
 [[nodiscard]] std::size_t alertEnemiesToNoise(
     gdp::entities::EntityManager& manager,
     std::uint32_t roomId,
@@ -157,7 +161,8 @@ struct EnemyUpdateSummary {
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
-    WorkerConfig config = {}) noexcept;
+    WorkerConfig config = {},
+    EnemyPerception perception = {}) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateGuards(
     gdp::entities::EntityManager& manager,
@@ -165,7 +170,8 @@ struct EnemyUpdateSummary {
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
-    GuardConfig config = {}) noexcept;
+    GuardConfig config = {},
+    EnemyPerception perception = {}) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateOfficers(
     gdp::entities::EntityManager& manager,
@@ -173,7 +179,8 @@ struct EnemyUpdateSummary {
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
-    OfficerConfig config = {}) noexcept;
+    OfficerConfig config = {},
+    EnemyPerception perception = {}) noexcept;
 
 [[nodiscard]] EnemyUpdateSummary updateEngineers(
     gdp::entities::EntityManager& manager,
@@ -181,7 +188,8 @@ struct EnemyUpdateSummary {
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
-    EngineerConfig config = {}) noexcept;
+    EngineerConfig config = {},
+    EnemyPerception perception = {}) noexcept;
 
 [[nodiscard]] IndustrialRobotPhase industrialRobotPhase(
     float health,
@@ -194,6 +202,7 @@ struct EnemyUpdateSummary {
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     float fixedStepSeconds,
-    IndustrialRobotConfig config = {}) noexcept;
+    IndustrialRobotConfig config = {},
+    EnemyPerception perception = {}) noexcept;
 
 } // namespace gdp::gameplay

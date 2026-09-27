@@ -588,6 +588,11 @@ especializados das pastas numeradas.
   chão conserva pente e reserva, pode ser recuperada por coleta automática e
   não concede XP pela segunda coleta. A faca é permanente; o último fuzil ou
   pistola não pode ser descartado para preservar o checkpoint da Campanha.
+- **Fase 153 — Lanterna e percepção:** enquanto `F` mantém a lanterna ligada,
+  inimigos podem adquirir o jogador até 25% mais longe, limitado a 4 m extras.
+  O cone frontal, a linha de visão, a sala ativa e o alcance normal com a
+  lanterna desligada não mudam. Os atalhos `4` e `5` continuam reservados, sem
+  equipamento ou item especial associado por enquanto.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -614,7 +619,8 @@ e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife, `Q` retorna à última arma, e a roda
 percorre as armas disponíveis nos dois sentidos. `G` solta a arma de fogo
 selecionada quando outra arma de fogo permanece no inventário. `F` alterna a
-lanterna e `Tab` mostra o painel rápido; `F3` alterna o
+lanterna e `Tab` mostra o painel rápido; `4` e `5` não executam ação por
+enquanto. `F3` alterna o
 diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os

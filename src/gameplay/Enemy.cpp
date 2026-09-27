@@ -573,9 +573,13 @@ bool playerVisibleToEnemy(
     const float detectionRange,
     const float visionHalfAngleDegrees,
     const float eyeHeight,
-    const CollisionWorld& collisionWorld) noexcept
+    const CollisionWorld& collisionWorld,
+    const EnemyPerception perception) noexcept
 {
-    if (!player.state().alive || distance > detectionRange) {
+    const float effectiveRange = detectionRange
+        + (perception.playerFlashlightOn
+                ? std::min(detectionRange * 0.25F, 4.0F) : 0.0F);
+    if (!player.state().alive || distance > effectiveRange) {
         return false;
     }
     const wkc::core::Vec3 offset
@@ -901,7 +905,8 @@ EnemyUpdateSummary updateWorkers(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
-    WorkerConfig config) noexcept
+    WorkerConfig config,
+    const EnemyPerception perception) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -936,7 +941,7 @@ EnemyUpdateSummary updateWorkers(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.0F,
-            collisionWorld);
+            collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }
@@ -990,7 +995,8 @@ EnemyUpdateSummary updateGuards(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
-    GuardConfig config) noexcept
+    GuardConfig config,
+    const EnemyPerception perception) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1029,7 +1035,7 @@ EnemyUpdateSummary updateGuards(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.35F,
-            collisionWorld);
+            collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }
@@ -1101,7 +1107,8 @@ EnemyUpdateSummary updateOfficers(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
-    OfficerConfig config) noexcept
+    OfficerConfig config,
+    const EnemyPerception perception) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1144,7 +1151,7 @@ EnemyUpdateSummary updateOfficers(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.4F,
-            collisionWorld);
+            collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }
@@ -1251,7 +1258,8 @@ EnemyUpdateSummary updateEngineers(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
-    EngineerConfig config) noexcept
+    EngineerConfig config,
+    const EnemyPerception perception) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1297,7 +1305,7 @@ EnemyUpdateSummary updateEngineers(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.25F,
-            collisionWorld);
+            collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }
@@ -1464,7 +1472,8 @@ EnemyUpdateSummary updateIndustrialRobots(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     const float fixedStepSeconds,
-    IndustrialRobotConfig config) noexcept
+    IndustrialRobotConfig config,
+    const EnemyPerception perception) noexcept
 {
     using gdp::entities::EnemyArchetype;
     using gdp::entities::EnemyBehaviorState;
@@ -1549,7 +1558,7 @@ EnemyUpdateSummary updateIndustrialRobots(
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.45F,
-            collisionWorld);
+            collisionWorld, perception);
         if (lineOfSight) {
             rememberVisiblePlayer(*enemy, player, config.investigation);
         }

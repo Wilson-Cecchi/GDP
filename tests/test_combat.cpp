@@ -1005,6 +1005,94 @@ void testDirectionalEnemyVision()
     }
 }
 
+void testFlashlightEnemyVisibility()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld open{{{-12.0F, 0.0F, -12.0F},
+                                   {12.0F, 4.0F, 12.0F}}};
+    const CollisionWorld blocked{
+        {{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}},
+        {{{-1.0F, 0.0F, 3.0F}, {1.0F, 3.0F, 4.0F}}},
+    };
+    const auto detected = [&](const EnemyArchetype archetype,
+                              const CollisionWorld& world,
+                              const float playerZ,
+                              const bool flashlightOn) {
+        Player player;
+        player.spawn({0.0F, 0.0F, playerZ});
+        EntityManager manager;
+        const EntityId id = manager.createEnemy({
+            .transform = {
+                .position = {0.0F, 0.0F, 0.0F},
+                .rotationDegrees = {0.0F, 0.0F, 0.0F},
+            },
+            .roomId = 1,
+            .archetype = archetype,
+        });
+        const EnemyPerception perception{.playerFlashlightOn = flashlightOn};
+        switch (archetype) {
+        case EnemyArchetype::Worker: {
+            WorkerConfig config;
+            config.detectionRange = 6.0F;
+            (void)updateWorkers(manager, player, 1, world, 0.0F,
+                config, perception);
+            break;
+        }
+        case EnemyArchetype::Guard: {
+            GuardConfig config;
+            config.detectionRange = 6.0F;
+            (void)updateGuards(manager, player, 1, world, 0.0F,
+                config, perception);
+            break;
+        }
+        case EnemyArchetype::Officer: {
+            OfficerConfig config;
+            config.detectionRange = 6.0F;
+            (void)updateOfficers(manager, player, 1, world, 0.0F,
+                config, perception);
+            break;
+        }
+        case EnemyArchetype::Engineer: {
+            EngineerConfig config;
+            config.detectionRange = 6.0F;
+            (void)updateEngineers(manager, player, 1, world, 0.0F,
+                config, perception);
+            break;
+        }
+        case EnemyArchetype::IndustrialRobot: {
+            IndustrialRobotConfig config;
+            config.detectionRange = 6.0F;
+            (void)updateIndustrialRobots(manager, player, 1, world, 0.0F,
+                config, perception);
+            break;
+        }
+        }
+        const EnemyData* enemy = manager.findData<EnemyData>(id);
+        return enemy != nullptr && enemy->investigationTime > 0.0F;
+    };
+
+    constexpr std::array archetypes{
+        EnemyArchetype::Worker,
+        EnemyArchetype::Guard,
+        EnemyArchetype::Officer,
+        EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot,
+    };
+    for (const EnemyArchetype archetype : archetypes) {
+        expect(!detected(archetype, open, 7.0F, false)
+                && detected(archetype, open, 7.0F, true),
+            "flashlight extends frontal acquisition without changing the dark range");
+        expect(!detected(archetype, open, 8.0F, true),
+            "flashlight does not grant unlimited detection range");
+        expect(!detected(archetype, open, -7.0F, true),
+            "flashlight does not reveal the player behind an enemy");
+        expect(!detected(archetype, blocked, 7.0F, true),
+            "flashlight does not reveal the player through a solid wall");
+    }
+}
+
 void testDeterministicEnemyObstacleAvoidance()
 {
     using namespace gdp::entities;
@@ -2419,6 +2507,7 @@ int main()
     testWorkerBehavior();
     testWorkerLineOfSight();
     testDirectionalEnemyVision();
+    testFlashlightEnemyVisibility();
     testDeterministicEnemyObstacleAvoidance();
     testDeterministicEnemyGlobalPathfinding();
     testDeterministicGroupRouteDiversity();
