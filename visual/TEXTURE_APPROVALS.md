@@ -88,11 +88,13 @@ arquivo/pranchas: visual/proposals/hud_visual_v1_a_rail.png;
                  visual/proposals/hud_visual_v1_b_plate.png;
                  visual/proposals/hud_visual_v1_c_stencil.png
 variantes mostradas: A Rail; B Plate; C Stencil
-decisão do usuário: AGUARDANDO APROVAÇÃO
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO somente A Rail ("a")
 data: 2026-09-26
-commit de implementação: nenhum
-capturas no jogo: nenhuma
-resultado final: NÃO IMPLEMENTADA
+commit de implementação: feat: implement approved Rail gameplay HUD
+capturas no jogo: visual/validation/hud_visual_v1_a_comparison.png;
+                  visual/validation/hud_visual_v1_a_after_960x540_neutral.png;
+                  visual/validation/hud_visual_v1_a_after_1280x720_dim.png
+resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual pendente)
 ```
 
 Contrato e limites em
@@ -254,7 +256,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
 | Player presentation | Não revisada |
-| HUD/map visual language | Não revisada |
+| HUD/map visual language | V1 A Rail implementada em validação; mapa não revisado |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes

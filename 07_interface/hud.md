@@ -12,6 +12,8 @@
 > por `F3`, sem interferir no HUD normal ou na simulação. Na Fase 118, o painel
 > também identifica o perfil gráfico e a escala interna ativos. Na Fase 120,
 > ele separa submissão da CPU, execução da GPU e espera de apresentação.
+> A Fase 145 implementou a variante Rail v1 aprovada para o HUD de gameplay;
+> a aceitação visual final em partida ainda depende do usuário.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -48,9 +50,16 @@ somente quando a mesma ação é válida ou necessária na simulação.
 
 `UiVisualTheme` define uma única hierarquia: fundo quase preto, painel azul
 grafite, aro técnico, texto principal, texto secundário e ciano de interação.
-Aviso, perigo e sucesso têm laranja, vermelho e verde exclusivos. Os blocos usam
-sombra curta, moldura de um pixel lógico, faixa superior e cantos inferiores;
-essa ornamentação não amplia hit targets nem ocupa o centro do combate.
+Aviso, perigo e sucesso têm laranja, vermelho e verde exclusivos. Menus continuam
+com o painel industrial da Fase 111; o HUD de gameplay usa painéis Rail finos,
+sem sombra pesada nem textura de tela, conforme a
+[proposta A aprovada](../visual/proposals/hud_visual_proposal_v1.md). O grupo
+inferior esquerdo tem quatro módulos em 2×2: HP e Armor em cima, arma/munição e
+chaves embaixo. Cada recurso mantém texto e barra independentes, sem sobrepor
+um ao outro. O canto inferior direito conserva nível e XP. Objetivo e tempo
+compartilham um painel superior direito; o evento aparece logo abaixo, com
+espaçamento explícito. Prompts e avisos temporários usam a mesma moldura leve.
+Nada disso amplia hit targets nem ocupa o centro do combate.
 
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o

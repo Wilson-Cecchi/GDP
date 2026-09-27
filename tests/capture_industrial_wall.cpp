@@ -43,6 +43,7 @@ int main(const int argc, char* argv[])
     constexpr int height = 720;
     const std::filesystem::path outputDirectory
         = argc > 1 ? std::filesystem::path{argv[1]} : std::filesystem::path{"."};
+    const std::string hudStage = argc > 2 ? argv[2] : "current";
     std::filesystem::create_directories(outputDirectory);
 
     if (!SDL_Init(SDL_INIT_VIDEO)
@@ -241,6 +242,67 @@ int main(const int argc, char* argv[])
                     captureWeapon("carbine_potato",
                         gdp::game::visual::HudWeaponRole::Carbine, gameplayCamera,
                         potatoHud);
+                    const gdp::game::visual::HudRenderData gameplayHud{
+                        .objective = gdp::game::visual::ObjectiveRenderState::ReachBoss,
+                        .visible = true,
+                        .health = 85.0F,
+                        .maximumHealth = 115.0F,
+                        .armor = 35.0F,
+                        .maximumArmor = 60.0F,
+                        .magazineAmmo = 18U,
+                        .reserveAmmo = 84U,
+                        .weapon = gdp::game::visual::HudWeaponRole::Carbine,
+                        .keys = 1U,
+                        .level = 3U,
+                        .experience = 70U,
+                        .experienceForNextLevel = 175U,
+                        .runTimerVisible = true,
+                        .elapsedRunTicks = 6U * 60U * 60U,
+                        .event = gdp::game::visual::HudEventState::Active,
+                    };
+                    const gdp::game::visual::WeaponViewmodelRenderData hudWeapon{
+                        .visible = true,
+                        .role = gdp::game::visual::HudWeaponRole::Carbine,
+                        .visualSeed = 1717U,
+                    };
+                    const auto captureHud = [&](const int captureWidth,
+                        const int captureHeight,
+                        const char* const lightingName,
+                        const gdp::game::visual::RoomLightingRenderData& captureLighting) {
+                        if (!renderer.render(captureWidth, captureHeight,
+                                gameplayCamera, {}, {}, {}, captureLighting,
+                                roomBehindCamera, doors, corridor, connectedRoom,
+                                gameplayHud, {}, hudWeapon)) {
+                            std::cerr << "HUD render failed\n";
+                            passed = false;
+                            return;
+                        }
+                        std::vector<std::uint8_t> hudPixels(
+                            static_cast<std::size_t>(captureWidth)
+                                * static_cast<std::size_t>(captureHeight) * 4U);
+                        glReadPixels(0, 0, captureWidth, captureHeight, GL_RGBA,
+                            GL_UNSIGNED_BYTE, hudPixels.data());
+                        const std::filesystem::path path = outputDirectory
+                            / ("hud_visual_v1_a_" + hudStage + '_'
+                                + std::to_string(captureWidth) + 'x'
+                                + std::to_string(captureHeight) + '_'
+                                + lightingName + ".ppm");
+                        if (!savePpm(path, captureWidth, captureHeight, hudPixels)) {
+                            std::cerr << "Could not save " << path << '\n';
+                            passed = false;
+                        } else {
+                            std::cout << path.string() << '\n';
+                        }
+                    };
+                    captureHud(1280, 720, "neutral", lighting);
+                    captureHud(960, 540, "neutral", lighting);
+                    gdp::game::visual::RoomLightingRenderData darkLighting = lighting;
+                    darkLighting.ambientIntensity = 0.08F;
+                    darkLighting.fixtureEmissive = 0.16F;
+                    for (std::size_t index = 0; index < darkLighting.lightCount; ++index) {
+                        darkLighting.lights[index].intensity *= 0.20F;
+                    }
+                    captureHud(1280, 720, "dim", darkLighting);
                     captureView(ceilingCamera, "ceiling_fixture_v1_hd",
                         "on", lighting);
                     gdp::game::visual::RoomLightingRenderData offLighting = lighting;

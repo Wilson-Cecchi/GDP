@@ -2152,6 +2152,28 @@ bool GdpRenderer::render(
         drawSolidRect(panel.x + panel.width - (2 * border), panel.y,
             2 * border, corner, accent);
     };
+    const auto drawHudRailPanel = [&](const UiRect panel,
+                                     const int scale,
+                                     const wkc::core::Vec3 accent) {
+        const int line = std::max(1, scale);
+        drawSolidRect(panel.x, panel.y, panel.width, panel.height, panelColor);
+        drawSolidRect(panel.x, panel.y + panel.height - line,
+            panel.width, line, uiTheme.panelBorder);
+        drawSolidRect(panel.x, panel.y, line, panel.height,
+            uiTheme.panelBorder);
+        drawSolidRect(panel.x, panel.y + panel.height - (4 * scale),
+            2 * line, 4 * scale, accent);
+        drawSolidRect(panel.x + panel.width - (5 * scale), panel.y,
+            5 * scale, line, uiTheme.panelBorder);
+    };
+    const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
+        || hud.objective == ObjectiveRenderState::DefeatBoss;
+    const int topRightLines = (topRightObjective ? 2 : 0)
+        + (hud.visible && hud.runTimerVisible ? 1 : 0)
+        + (hud.visible && hud.runTimerVisible && hud.speedrunMode
+                && hud.speedrunRecordVisible ? 1 : 0);
+    const int topRightHeight = topRightLines == 0 ? 0
+        : (hudPadding * 2) + (topRightLines * hudLineHeight);
     const auto drawSelectedRow = [&](const UiRect row,
                                      const int scale,
                                      const wkc::core::Vec3 accent) {
@@ -2463,54 +2485,60 @@ bool GdpRenderer::render(
         const std::string armorText = armorStream.str();
         const std::string ammoText = ammoStream.str();
         const std::string keysText = keysStream.str();
-        const int statusTextWidth = std::max({
+        const int leftWidth = std::max(
             bitmapTextWidth(healthText, hudScale),
+            bitmapTextWidth(ammoText, hudScale)) + (hudPadding * 2);
+        const int rightWidth = std::max(
             bitmapTextWidth(armorText, hudScale),
-            bitmapTextWidth(ammoText, hudScale),
-            bitmapTextWidth(keysText, hudScale),
-        });
-        const int statusWidth = statusTextWidth + (hudPadding * 2);
-        const int statusHeight = (hudPadding * 2) + (hudLineHeight * 4)
-            + (8 * hudScale);
-        const int statusX = hudMargin;
-        const int statusY = hudMargin;
-        drawIndustrialPanel(
-            {statusX, statusY, statusWidth, statusHeight}, hudScale, cyanColor);
-        const int statusTextX = statusX + hudPadding;
-        const int healthTextY = statusY + statusHeight - hudPadding - (7 * hudScale);
+            bitmapTextWidth(keysText, hudScale)) + (hudPadding * 2);
+        const int tileHeight = 18 * hudScale;
+        const int tileGap = 3 * hudScale;
+        const int leftX = hudMargin;
+        const int rightX = leftX + leftWidth + tileGap;
+        const int lowerY = hudMargin;
+        const int upperY = lowerY + tileHeight + tileGap;
+        drawHudRailPanel({leftX, upperY, leftWidth, tileHeight},
+            hudScale, cyanColor);
+        drawHudRailPanel({rightX, upperY, rightWidth, tileHeight},
+            hudScale, {0.34F, 0.65F, 0.78F});
+        drawHudRailPanel({leftX, lowerY, leftWidth, tileHeight},
+            hudScale, uiTheme.mutedText);
+        drawHudRailPanel({rightX, lowerY, rightWidth, tileHeight},
+            hudScale, cyanColor);
+        const int upperTextY = upperY + tileHeight - hudPadding - (7 * hudScale);
+        const int barY = upperY + (3 * hudScale);
+        const int leftBarWidth = leftWidth - (hudPadding * 2);
+        const int rightBarWidth = rightWidth - (hudPadding * 2);
         const float healthRatio = std::clamp(
             std::max(hud.health, 0.0F) / std::max(hud.maximumHealth, 1.0F),
             0.0F, 1.0F);
-        const int barWidth = statusWidth - (hudPadding * 2);
-        const int healthBarY = healthTextY - (5 * hudScale);
-        drawBitmapText(statusTextX, healthTextY, hudScale, healthText,
+        drawBitmapText(leftX + hudPadding, upperTextY, hudScale, healthText,
             healthRatio <= 0.25F
                 ? wkc::core::Vec3{0.98F, 0.20F, 0.12F} : textColor);
-        drawSolidRect(statusTextX, healthBarY, barWidth, 3 * hudScale,
+        drawSolidRect(leftX + hudPadding, barY, leftBarWidth, 2 * hudScale,
             {0.10F, 0.14F, 0.15F});
-        drawSolidRect(statusTextX, healthBarY,
-            static_cast<int>(static_cast<float>(barWidth) * healthRatio),
-            3 * hudScale,
+        drawSolidRect(leftX + hudPadding, barY,
+            static_cast<int>(static_cast<float>(leftBarWidth) * healthRatio),
+            2 * hudScale,
             healthRatio <= 0.25F
                 ? wkc::core::Vec3{0.94F, 0.16F, 0.10F}
-                : wkc::core::Vec3{0.24F, 0.88F, 0.52F});
-        const int armorTextY = healthTextY - hudLineHeight;
-        const int armorBarY = armorTextY - (5 * hudScale);
+                : cyanColor);
         const float armorRatio = std::clamp(
             std::max(hud.armor, 0.0F) / std::max(hud.maximumArmor, 1.0F),
             0.0F, 1.0F);
-        drawBitmapText(statusTextX, armorTextY, hudScale, armorText,
-            armor > 0 ? wkc::core::Vec3{0.36F, 0.68F, 1.0F} : textColor);
-        drawSolidRect(statusTextX, armorBarY, barWidth, 3 * hudScale,
+        drawBitmapText(rightX + hudPadding, upperTextY, hudScale, armorText,
+            textColor);
+        drawSolidRect(rightX + hudPadding, barY, rightBarWidth, 2 * hudScale,
             {0.10F, 0.14F, 0.15F});
-        drawSolidRect(statusTextX, armorBarY,
-            static_cast<int>(static_cast<float>(barWidth) * armorRatio),
-            3 * hudScale, {0.16F, 0.48F, 0.98F});
-        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 2),
+        drawSolidRect(rightX + hudPadding, barY,
+            static_cast<int>(static_cast<float>(rightBarWidth) * armorRatio),
+            2 * hudScale, {0.34F, 0.65F, 0.78F});
+        const int lowerTextY = lowerY + ((tileHeight - (7 * hudScale)) / 2);
+        drawBitmapText(leftX + hudPadding, lowerTextY,
             hudScale, ammoText,
-            hud.magazineAmmo == 0U
-                ? wkc::core::Vec3{0.98F, 0.42F, 0.14F} : textColor);
-        drawBitmapText(statusTextX, healthTextY - (hudLineHeight * 3),
+            hud.weapon != HudWeaponRole::Knife && hud.magazineAmmo == 0U
+                ? uiTheme.warning : textColor);
+        drawBitmapText(rightX + hudPadding, lowerTextY,
             hudScale, keysText, cyanColor);
 
         std::ostringstream levelStream;
@@ -2531,7 +2559,7 @@ bool GdpRenderer::render(
             + (4 * hudScale);
         const int progressX = std::max(hudMargin, width - hudMargin - progressWidth);
         const int progressY = hudMargin;
-        drawIndustrialPanel(
+        drawHudRailPanel(
             {progressX, progressY, progressWidth, progressHeight},
             hudScale, cyanColor);
         const int progressTextX = progressX + hudPadding;
@@ -2572,8 +2600,9 @@ bool GdpRenderer::render(
             const int eventHeight = (7 * hudScale) + (hudPadding * 2);
             const int eventX = std::max(hudMargin, width - hudMargin - eventWidth);
             const int eventY = std::max(hudMargin,
-                height - hudMargin - eventHeight - (13 * hudScale));
-            drawIndustrialPanel(
+                height - hudMargin - topRightHeight
+                    - (topRightHeight > 0 ? 3 * hudScale : 0) - eventHeight);
+            drawHudRailPanel(
                 {eventX, eventY, eventWidth, eventHeight}, hudScale, eventColor);
             drawBitmapText(eventX + hudPadding, eventY + hudPadding,
                 hudScale, eventText, eventColor);
@@ -2598,7 +2627,7 @@ bool GdpRenderer::render(
             const int promptHeight = (7 * hudScale) + (hudPadding * 2);
             const int promptX = (width - promptWidth) / 2;
             const int promptY = std::max(hudMargin, height / 5);
-            drawIndustrialPanel(
+            drawHudRailPanel(
                 {promptX, promptY, promptWidth, promptHeight}, hudScale, promptColor);
             drawBitmapText(promptX + hudPadding, promptY + hudPadding,
                 hudScale, promptText, promptColor);
@@ -2672,7 +2701,7 @@ bool GdpRenderer::render(
             const int noticeX = (width - noticeWidth) / 2;
             const int noticeY = std::max(hudMargin,
                 height - hudMargin - noticeHeight - (18 * hudScale));
-            drawIndustrialPanel(
+            drawHudRailPanel(
                 {noticeX, noticeY, noticeWidth, noticeHeight}, hudScale, noticeColor);
             drawBitmapText(noticeX + hudPadding, noticeY + hudPadding,
                 hudScale, noticeText,
@@ -2787,19 +2816,15 @@ bool GdpRenderer::render(
     }
 
     std::string_view objectiveText;
-    wkc::core::Vec3 objectiveColor{0.30F, 0.88F, 0.92F};
+    wkc::core::Vec3 objectiveColor = cyanColor;
     if (hud.objective == ObjectiveRenderState::ReachBoss) {
         objectiveText = "REACH BOSS";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {
         objectiveText = "DEFEAT BOSS";
-        objectiveColor = {0.96F, 0.56F, 0.18F};
+        objectiveColor = uiTheme.warning;
     }
-    if (!objectiveText.empty()) {
-        const int textWidth = bitmapTextWidth(objectiveText, hudScale);
-        drawBitmapText(std::max(hudMargin, width - textWidth - hudMargin),
-            std::max(hudMargin, height - hudMargin - (7 * hudScale)),
-            hudScale, objectiveText, objectiveColor);
-    }
+    std::string timerText;
+    std::string bestText;
     if (hud.visible && hud.runTimerVisible) {
         const std::string timerPrefix = hud.speedrunMode
             ? "SPEEDRUN "
@@ -2808,21 +2833,41 @@ bool GdpRenderer::render(
                     + std::to_string(hud.campaignFloorCount) + "  THREAT "
                     + std::to_string(hud.campaignThreatPercent) + "%  TIME "
                 : "TIME ";
-        const std::string timerText = timerPrefix + runTimeText(hud.elapsedRunTicks);
-        const int timerWidth = bitmapTextWidth(timerText, hudScale);
-        const int timerOffset = objectiveText.empty() ? 7 : 17;
-        drawBitmapText(std::max(hudMargin, width - timerWidth - hudMargin),
-            std::max(hudMargin,
-                height - hudMargin - (timerOffset * hudScale)),
-            hudScale, timerText, textColor);
+        timerText = timerPrefix + runTimeText(hud.elapsedRunTicks);
         if (hud.speedrunMode && hud.speedrunRecordVisible) {
-            const std::string bestText
-                = "BEST " + runTimeText(hud.bestSpeedrunTicks);
-            const int bestWidth = bitmapTextWidth(bestText, hudScale);
-            drawBitmapText(std::max(hudMargin, width - bestWidth - hudMargin),
-                std::max(hudMargin,
-                    height - hudMargin - ((timerOffset + 10) * hudScale)),
-                hudScale, bestText, {0.94F, 0.78F, 0.18F});
+            bestText = "BEST " + runTimeText(hud.bestSpeedrunTicks);
+        }
+    }
+    if (topRightLines > 0) {
+        const int topRightWidth = std::max({
+            bitmapTextWidth("OBJECTIVE", hudScale),
+            bitmapTextWidth(objectiveText, hudScale),
+            bitmapTextWidth(timerText, hudScale),
+            bitmapTextWidth(bestText, hudScale),
+        }) + (hudPadding * 2);
+        const int topRightX = std::max(hudMargin,
+            width - hudMargin - topRightWidth);
+        const int topRightY = std::max(hudMargin,
+            height - hudMargin - topRightHeight);
+        drawHudRailPanel({topRightX, topRightY, topRightWidth,
+            topRightHeight}, hudScale, objectiveColor);
+        int lineY = topRightY + topRightHeight - hudPadding - (7 * hudScale);
+        const int textX = topRightX + hudPadding;
+        if (!objectiveText.empty()) {
+            drawBitmapText(textX, lineY, hudScale, "OBJECTIVE",
+                uiTheme.mutedText);
+            lineY -= hudLineHeight;
+            drawBitmapText(textX, lineY, hudScale, objectiveText,
+                objectiveColor);
+            lineY -= hudLineHeight;
+        }
+        if (!timerText.empty()) {
+            drawBitmapText(textX, lineY, hudScale, timerText, textColor);
+            lineY -= hudLineHeight;
+        }
+        if (!bestText.empty()) {
+            drawBitmapText(textX, lineY, hudScale, bestText,
+                uiTheme.warning);
         }
     }
     if (hud.objective == ObjectiveRenderState::Victory
