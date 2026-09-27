@@ -100,6 +100,26 @@ resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual pendente)
 Contrato e limites em
 [`proposals/hud_visual_proposal_v1.md`](proposals/hud_visual_proposal_v1.md).
 
+### HUD/map visual language — v2 (somente HUD de gameplay)
+
+```text
+unidade visual: HUD/map visual language — HUD de gameplay
+versão da proposta: v2
+arquivo/pranchas: visual/proposals/hud_visual_v2_a_precision.png;
+                 visual/proposals/hud_visual_v2_b_telemetry.png;
+                 visual/proposals/hud_visual_v2_c_instrument.png;
+                 visual/proposals/hud_visual_v2_close_comparison.png
+variantes mostradas: A Precision; B Telemetry; C Instrument
+decisão do usuário: preferência por A Precision ("eu gostei da hud a");
+                    APROVAÇÃO PARA IMPLEMENTAÇÃO PENDENTE
+data: 2026-09-27
+commit de implementação: nenhum
+resultado final: PROPOSTA; v1 A Rail continua na build
+```
+
+Contrato e comparação em
+[`proposals/hud_visual_proposal_v2.md`](proposals/hud_visual_proposal_v2.md).
+
 ### Weapon/first-person presentation — v1
 
 ```text
@@ -127,6 +147,23 @@ resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação visual pendente)
 
 Contrato e limites estão em
 [`proposals/weapon_first_person_proposal_v1.md`](proposals/weapon_first_person_proposal_v1.md).
+
+### Weapon/ground pickup — v1
+
+```text
+unidade visual: Weapon/ground pickup — Pistol e Carbine
+versão da proposta: v1
+arquivo/pranchas: visual/proposals/ground_weapon_pickup_v1_close.png;
+                 visual/proposals/ground_weapon_pickup_v1_gameplay.png
+variantes mostradas: três distribuições de desgaste Used
+decisão do usuário: AGUARDANDO APROVAÇÃO
+data: 2026-09-27
+commit de implementação: nenhum
+resultado final: PROPOSTA; bloco violeta continua na build
+```
+
+Contrato e limites em
+[`proposals/ground_weapon_pickup_proposal_v1.md`](proposals/ground_weapon_pickup_proposal_v1.md).
 
 ### Industrial Corridor/Ceiling — v1 HD
 
@@ -256,7 +293,8 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
 | Player presentation | Não revisada |
-| HUD/map visual language | V1 A Rail implementada em validação; mapa não revisado |
+| HUD/map visual language | V1 A Rail implementada em validação; V2 A é a preferência, implementação pendente de aprovação; mapa não revisado |
+| Weapon/ground pickup | V1 aguardando aprovação; bloco violeta permanece na build |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes
