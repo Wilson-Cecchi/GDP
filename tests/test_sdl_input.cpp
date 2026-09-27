@@ -59,7 +59,8 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_D, Key::D},
         std::pair{SDL_SCANCODE_E, Key::E},
         std::pair{SDL_SCANCODE_R, Key::R},
-        std::pair{SDL_SCANCODE_C, Key::C},
+        std::pair{SDL_SCANCODE_LCTRL, Key::LeftControl},
+        std::pair{SDL_SCANCODE_RCTRL, Key::RightControl},
         std::pair{SDL_SCANCODE_SPACE, Key::Space},
         std::pair{SDL_SCANCODE_1, Key::Digit1},
         std::pair{SDL_SCANCODE_2, Key::Digit2},
@@ -81,6 +82,34 @@ void testSdlTranslation()
                 && mappedInput.isKeyDown(key),
             "every GDP control has an SDL mapping");
     }
+
+    wkc::platform::Input crouchInput;
+    SDL_Event crouchEvent{};
+    crouchEvent.type = SDL_EVENT_KEY_DOWN;
+    crouchEvent.key.scancode = SDL_SCANCODE_LCTRL;
+    expect(wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent)
+            && crouchInput.isKeyDown(Key::LeftControl),
+        "left Control activates the crouch binding");
+    crouchEvent.key.scancode = SDL_SCANCODE_RCTRL;
+    expect(wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent)
+            && crouchInput.isKeyDown(Key::RightControl),
+        "right Control can be held independently");
+    crouchEvent.type = SDL_EVENT_KEY_UP;
+    crouchEvent.key.scancode = SDL_SCANCODE_LCTRL;
+    expect(wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent)
+            && !crouchInput.isKeyDown(Key::LeftControl)
+            && crouchInput.isKeyDown(Key::RightControl),
+        "releasing one Control leaves the other held");
+    crouchEvent.key.scancode = SDL_SCANCODE_RCTRL;
+    expect(wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent)
+            && !crouchInput.isKeyDown(Key::RightControl),
+        "releasing both Control keys ends the crouch binding");
+
+    crouchEvent = {};
+    crouchEvent.type = SDL_EVENT_KEY_DOWN;
+    crouchEvent.key.scancode = SDL_SCANCODE_C;
+    expect(!wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent),
+        "C no longer activates crouch");
 
     event = {};
     event.type = SDL_EVENT_KEY_DOWN;

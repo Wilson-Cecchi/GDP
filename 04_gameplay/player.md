@@ -51,6 +51,13 @@ O Player guarda seu próprio `EntityId`; a aplicação sincroniza posição, HP,
 Armor, capacidade e chaves no registro central a cada fixed update. Pickups próximos são coletados
 sem interromper movimento; Health e Ammo cheios permanecem disponíveis.
 
+## Controles de postura
+
+Segurar `Ctrl` esquerdo ou direito agacha; soltar ambos solicita levantar.
+O estado físico continua bloqueando a postura em pé quando há teto ou prop
+baixo acima do Player. `C` não é mais um atalho de agachar desde a Fase 146.
+`Espaço` continua pulando apenas quando a postura e o chão permitem.
+
 ## Armadura
 
 O Player nasce com `0/50` de Armor. Cada ponto absorve um ponto de dano antes

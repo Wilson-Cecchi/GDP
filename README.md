@@ -542,7 +542,8 @@ especializados das pastas numeradas.
   `0,52 s`. A roda percorre as armas possuídas e a faca; sacar a arma branca não
   altera munição nem o slot de fogo persistido. Campaign/Speedrun avançam para
   regras 28/27.
-- **Fase 142 — Agachar e pular:** segurar `C` reduz o collider e a velocidade,
+- **Fase 142 — Agachar e pular:** segurar o comando de agachar reduz o
+  collider e a velocidade,
   com câmera interpolada e bloqueio seguro ao tentar levantar sob obstáculos;
   `Espaço` aplica salto físico com gravidade, colisão de cabeça e aterrissagem
   sobre o cenário. Campaign/Speedrun avançam para regras 29/28.
@@ -559,6 +560,9 @@ especializados das pastas numeradas.
   ganhou módulos finos separados para recursos, progresso e objetivo/evento.
   Menus e lógica de jogo não mudaram. Capturas in-engine em 1280×720, 960×540
   e pouca luz estão disponíveis; falta aceitação visual jogando.
+- **Fase 146 — Agachar em Ctrl:** `Ctrl` esquerdo ou direito substitui `C`
+  como comando de agachar; a física, a câmera e o salto não mudaram. As duas
+  teclas são rastreadas separadamente para uma não cancelar a outra ao soltar.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
@@ -580,7 +584,7 @@ faixa de tráfego e teto com luzes lineares usam receitas e cache separados. A
 cena é produzida em framebuffer próprio e apresentada na janela. O jogador
 controla essa câmera com `W/A/S/D` e mouse, colide com
 paredes e props, usa `E` para abrir portas fisicamente ou interagir com o
-terminal, segura `C` para agachar, pula com `Espaço`, dispara com o botão esquerdo
+terminal, segura `Ctrl` para agachar, pula com `Espaço`, dispara com o botão esquerdo
 e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife e a roda do mouse percorre as armas
 disponíveis. `F3` alterna o
@@ -1518,7 +1522,8 @@ criar ou aprovar uma nova textura. A seleção da faca é transitória; checkpoi
 continuam no schema 3 e preservam apenas os dois slots de fogo e suas munições,
 restaurando a arma de fogo ativa. Campaign/Speedrun avançam para regras 28/27.
 
-Na Fase 142, segurar `C` interpola a câmera de `1,62 m` para `1,02 m`, reduz o
+Na Fase 142, segurar o comando de agachar (atualmente `Ctrl`) interpola a
+câmera de `1,62 m` para `1,02 m`, reduz o
 collider de `1,80 m` para `1,15 m` e limita a velocidade a 58% da caminhada.
 Soltar a tecla restaura a postura somente quando o volume em pé está livre,
 evitando atravessar tetos ou props baixos. `Espaço` aplica impulso vertical de

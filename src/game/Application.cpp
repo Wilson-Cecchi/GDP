@@ -1634,7 +1634,8 @@ void Application::processEvents()
         - (input_.isKeyDown(Key::S) ? 1.0F : 0.0F);
     playerCommand_.moveRight = (input_.isKeyDown(Key::D) ? 1.0F : 0.0F)
         - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
-    playerCommand_.crouch = input_.isKeyDown(Key::C);
+    playerCommand_.crouch = input_.isKeyDown(Key::LeftControl)
+        || input_.isKeyDown(Key::RightControl);
     jumpPending_ = jumpPending_ || input_.wasKeyPressed(Key::Space);
     playerCommand_.jump = jumpPending_;
     interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
