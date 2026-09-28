@@ -5,8 +5,9 @@
 1. Baixe o artefato `GDP-Windows-x64` de uma execução bem-sucedida da CI no
    GitHub.
 2. Extraia `GDP-Windows-x64.zip` por completo.
-3. Execute `gdp.exe` dentro da pasta extraída. `SDL3.dll` deve permanecer ao
-   lado do executável.
+3. Execute `gdp.exe` dentro da pasta extraída. `SDL3.dll` e a pasta `ai/`
+   devem permanecer ao lado do executável; nela ficam os cinco cérebros
+   treinados usados automaticamente no jogo.
 
 O computador precisa oferecer OpenGL 3.3 Core por meio do driver da placa de
 vídeo. Em notebooks híbridos, configure `gdp.exe` para usar a GPU dedicada nas
@@ -20,6 +21,10 @@ não assinados.
 
 Configurações, recordes e checkpoints são gravados pelo SDL no diretório de
 preferências do usuário, fora da pasta extraída.
+
+Para comparar com a IA anterior, execute `gdp.exe --scripted-enemies`. Se um
+arquivo de cérebro estiver ausente ou inválido, apenas aquele tipo de inimigo
+volta para a IA anterior.
 
 Em hardware antigo, abra `SETTINGS` e selecione primeiro `QUALITY: POTATO`.
 Esse perfil mantém HUD e menus nítidos, mas reduz o custo do mundo 3D. `F3`

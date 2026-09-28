@@ -112,6 +112,12 @@ jobs:
           if ($null -eq $executable -or $null -eq $runtime) {
             throw "Package must contain gdp.exe and SDL3.dll"
           }
+          foreach ($type in @("worker", "guard", "officer", "engineer", "robot")) {
+            $brain = Join-Path $executable.DirectoryName "ai/$type.brain"
+            if (-not (Test-Path $brain)) {
+              throw "Package is missing trained enemy brain: $brain"
+            }
+          }
           & $executable.FullName --headless --frames 3
           if ($LASTEXITCODE -ne 0) {
             throw "Packaged headless smoke test failed with $LASTEXITCODE"

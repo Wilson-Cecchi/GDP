@@ -879,30 +879,53 @@ bool updateNeuralEnemy(
     if (experiment == nullptr || experiment->archetype != enemy.archetype) {
         return false;
     }
-    if (!experiment->selected) {
-        experiment->selected = id;
-        if (experiment->logSelection) {
-            wkc::core::log(wkc::core::LogLevel::Info,
-                "Experimental neural enemy selected");
+    if (!experiment->controlAll) {
+        if (!experiment->selected) {
+            experiment->selected = id;
+            if (experiment->logSelection) {
+                wkc::core::log(wkc::core::LogLevel::Info,
+                    "Experimental neural enemy selected");
+            }
         }
-    }
-    if (experiment->selected != id) {
-        return false;
+        if (experiment->selected != id) {
+            return false;
+        }
     }
     // Without a current sighting the network has no target-position sensor.
     // Let the regular alert/investigation/navigation states use legitimate
     // last-known information instead of drifting on stale motor outputs.
     if (!lineOfSight) {
+        if (experiment->controlAll) {
+            const auto motor = experiment->motors.find(id.packed());
+            if (motor != experiment->motors.end()) {
+                motor->second.decisionSecondsRemaining = 0.0F;
+            }
+        } else {
+            experiment->decisionSecondsRemaining = 0.0F;
+        }
         return false;
     }
+    float* decisionSecondsRemaining = &experiment->decisionSecondsRemaining;
+    std::array<float, 4>* outputs = &experiment->outputs;
+    NeuralEnemyMotorState* motor = nullptr;
+    if (experiment->controlAll) {
+        motor = &experiment->motors[id.packed()];
+        if (motor->scriptedSecondsRemaining > 0.0F) {
+            motor->scriptedSecondsRemaining = std::max(
+                0.0F, motor->scriptedSecondsRemaining - step);
+            return false;
+        }
+        decisionSecondsRemaining = &motor->decisionSecondsRemaining;
+        outputs = &motor->outputs;
+    }
     ++experiment->controlledTicks;
-    experiment->decisionSecondsRemaining -= step;
-    if (experiment->decisionSecondsRemaining <= 0.0F) {
+    *decisionSecondsRemaining -= step;
+    if (*decisionSecondsRemaining <= 0.0F) {
         const EnemySensorValues sensors = sampleEnemySensors(
             entity, enemy, player, collisionWorld, lineOfSight, detectionRange);
-        const std::vector<float> outputs = experiment->genome.network.forward(sensors);
-        std::copy(outputs.begin(), outputs.end(), experiment->outputs.begin());
-        experiment->decisionSecondsRemaining = 0.1F;
+        const std::vector<float> decision = experiment->genome.network.forward(sensors);
+        std::copy(decision.begin(), decision.end(), outputs->begin());
+        *decisionSecondsRemaining = 0.1F;
     }
 
     constexpr float radiansPerDegree = 0.01745329251994329577F;
@@ -915,21 +938,30 @@ bool updateNeuralEnemy(
     // may request lateral motion without forward motion; turn that into a
     // cautious forward step instead of making them stall after this fix.
     constexpr float maximumStrafeRatio = 0.25F;
-    const float forwardIntent = std::abs(experiment->outputs[0]) < 0.15F
-        ? std::abs(experiment->outputs[1]) * 0.35F
-        : experiment->outputs[0];
-    const float lateral = experiment->outputs[1]
+    const float forwardIntent = std::abs((*outputs)[0]) < 0.15F
+        ? std::abs((*outputs)[1]) * 0.35F
+        : (*outputs)[0];
+    const float lateral = (*outputs)[1]
         * std::abs(forwardIntent) * maximumStrafeRatio;
     const wkc::core::Vec3 desired = forward * forwardIntent
         + right * lateral;
-    const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
-        * moveSpeed;
+    const float distanceBeforeMovement = std::sqrt(
+        planarDistanceSquared(entity.transform.position, player.state().position));
+    const bool holdMeleeRange = motor != nullptr
+        && enemy.archetype == gdp::entities::EnemyArchetype::Worker
+        && distanceBeforeMovement <= attackRange;
+    const float requestedSpeed = holdMeleeRange ? 0.0F
+        : std::min(wkc::core::length(desired), 1.0F) * moveSpeed;
     bool navigating = false;
     bool reachedApproach = false;
     if (requestedSpeed > 0.05F && step > 0.0F) {
         wkc::core::Vec3 travelDirection = wkc::core::normalized(desired);
-        if (enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot
-            && forwardIntent > 0.15F) {
+        const bool pursuingWorker = motor != nullptr
+            && enemy.archetype == gdp::entities::EnemyArchetype::Worker
+            && distanceBeforeMovement > attackRange;
+        if ((enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot
+                && forwardIntent > 0.15F)
+            || pursuingWorker) {
             const wkc::core::Vec3 start = entity.transform.position;
             const std::int8_t preferredSide = enemy.avoidanceSide != 0
                 ? enemy.avoidanceSide
@@ -945,8 +977,8 @@ bool updateNeuralEnemy(
                 travelDirection = {};
                 navigating = true;
                 reachedApproach = true;
-            } else if (approach && !navigationSegmentClear(
-                    collisionWorld, start, *approach, collider)) {
+            } else if (approach && (pursuingWorker || !navigationSegmentClear(
+                    collisionWorld, start, *approach, collider))) {
                 travelDirection = navigationDirection(
                     collisionWorld, start, *approach, collider, preferredSide);
                 navigating = true;
@@ -975,14 +1007,20 @@ bool updateNeuralEnemy(
     // Navigation owns facing only while steering around an obstruction.
     if (!navigating) {
         entity.transform.rotationDegrees.y = std::remainder(
-            currentYawDegrees + experiment->outputs[2] * 180.0F * step, 360.0F);
+            currentYawDegrees + (*outputs)[2] * 180.0F * step, 360.0F);
     }
 
     const wkc::core::Vec3 attackOffset
         = player.state().position - entity.transform.position;
     const float attackDistance = wkc::core::length(
         {attackOffset.x, 0.0F, attackOffset.z});
-    const bool attackRequested = experiment->outputs[3] > 0.65F;
+    const bool attackRequested = (*outputs)[3] > 0.65F;
+    if (motor != nullptr && attackRequested && attackDistance <= attackRange) {
+        // Runtime aim assist prevents a trained motor's turn output from
+        // circling a stationary visible target forever.
+        turnEnemyToward(entity, attackOffset, step,
+            targetTurnRateDegreesPerSecond);
+    }
     const float attackYaw = entity.transform.rotationDegrees.y
         * radiansPerDegree;
     const wkc::core::Vec3 attackForward{
@@ -1016,6 +1054,20 @@ bool updateNeuralEnemy(
     } else {
         enemy.behavior = EnemyBehaviorState::Idle;
         ++summary.idle;
+    }
+    if (motor != nullptr) {
+        // A bundled brain must not make a visible enemy harmless indefinitely.
+        // Give it time to aim or flank, then let the proven scripted policy
+        // recover briefly when neither damage nor approach is happening.
+        const bool approaching = distanceBeforeMovement > attackRange
+            && attackDistance + 0.001F < distanceBeforeMovement;
+        motor->ineffectiveSeconds = attackVisible || approaching
+            ? 0.0F : motor->ineffectiveSeconds + step;
+        if (motor->ineffectiveSeconds >= 2.0F) {
+            motor->scriptedSecondsRemaining = 1.5F;
+            motor->ineffectiveSeconds = 0.0F;
+            motor->decisionSecondsRemaining = 0.0F;
+        }
     }
     return true;
 }

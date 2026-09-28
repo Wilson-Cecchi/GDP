@@ -341,6 +341,92 @@ void testNeuralBossNavigatesCover()
         "neural boss obstacle approach remains deterministic");
 }
 
+void testNeuralBrainControlsEveryEnemyIndependently()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    EntityManager manager;
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const EntityId left = manager.createEnemy({
+        .transform = {.position = {-0.6F, 0.0F, 0.8F},
+            .rotationDegrees = {0.0F, 143.13F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    const EntityId right = manager.createEnemy({
+        .transform = {.position = {0.6F, 0.0F, 0.8F},
+            .rotationDegrees = {0.0F, -143.13F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    NeuralEnemyExperiment brain{42};
+    forceAttack(brain);
+    brain.controlAll = true;
+    brain.logSelection = false;
+    const EnemyUpdateSummary first = updateWorkers(
+        manager, player, 1, room, 0.01F, WorkerConfig{}, {}, &brain);
+    expect(first.attacksLanded == 2U && player.state().health == 80.0F
+            && !brain.selected && brain.controlledTicks == 2U
+            && brain.motors.size() == 2U,
+        "active brain controls both visible Workers without selecting only one");
+    brain.motors.at(left.packed()).outputs.fill(0.0F);
+    brain.motors.at(left.packed()).decisionSecondsRemaining = 1.0F;
+    (void)updateWorkers(manager, player, 1, room, 0.11F,
+        WorkerConfig{}, {}, &brain);
+    expect(brain.motors.at(left.packed()).outputs[3] == 0.0F
+            && brain.motors.at(right.packed()).outputs[3] > 0.65F,
+        "each enemy retains its own decision timer and motor outputs");
+}
+
+void testActiveWorkerMaintainsMeleeThreat()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    EntityManager manager;
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const EntityId id = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    NeuralEnemyExperiment attacking{42};
+    forceAttack(attacking);
+    attacking.genome.network.parameters()[64] = 2.0F;
+    attacking.controlAll = true;
+    attacking.logSelection = false;
+    const auto initialPosition = manager.find(id)->transform.position;
+    const EnemyUpdateSummary hit = updateWorkers(
+        manager, player, 1, room, 0.1F, WorkerConfig{}, {}, &attacking);
+    expect(hit.attacksLanded == 1U
+            && manager.find(id)->transform.position == initialPosition,
+        "active melee brain stops inside attack range instead of crossing player");
+
+    EntityManager stalledManager;
+    const EntityId stalled = stalledManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Worker,
+    });
+    NeuralEnemyExperiment inactive{42};
+    std::fill(inactive.genome.network.parameters().begin(),
+        inactive.genome.network.parameters().end(), 0.0F);
+    inactive.controlAll = true;
+    inactive.logSelection = false;
+    for (int tick = 0; tick < 180; ++tick) {
+        (void)updateWorkers(stalledManager, player, 1, room,
+            1.0F / 60.0F, WorkerConfig{}, {}, &inactive);
+    }
+    expect(inactive.controlledTicks < 180U
+            && stalledManager.find(stalled)->transform.position.z < 2.5F,
+        "unproductive active brain yields temporarily to scripted pursuit");
+}
+
 } // namespace
 
 int main()
@@ -351,5 +437,7 @@ int main()
     testNeuralLocomotionFacing();
     testNeuralRangedAim();
     testNeuralBossNavigatesCover();
+    testNeuralBrainControlsEveryEnemyIndependently();
+    testActiveWorkerMaintainsMeleeThreat();
     return failures == 0 ? 0 : 1;
 }

@@ -611,9 +611,16 @@ especializados das pastas numeradas.
   visibilidade, vida e proximidade de paredes. A rede decide movimento local,
   rotação e pedido de ataque a 10 Hz; colisão, cooldown, alcance e linha de
   visão continuam obrigatórios. A seed é derivada em domínio independente.
-  Sem a opção, todos os inimigos mantêm a IA anterior. As habilidades especiais
-  de suporte/reparo continuam sob suas regras existentes; a rede experimental
-  controla movimento, rotação e ataque, sem substituir automaticamente a IA.
+  No jogo normal, os cinco cérebros distribuídos em `assets/ai/` são carregados
+  automaticamente. Cada inimigo tem seu próprio estado de decisão, compartilhando
+  os pesos treinados do seu arquétipo. Se um arquivo estiver ausente ou inválido,
+  somente aquele arquétipo volta à IA anterior. `--scripted-enemies` força a IA
+  anterior para todos; a opção experimental continua isolando um único inimigo.
+  No jogo normal, a navegação e a mira têm salvaguardas para manter o combate
+  legível; se um cérebro não progride nem consegue atacar por dois segundos,
+  o inimigo usa temporariamente a IA anterior.
+  As habilidades especiais de suporte/reparo continuam sob suas regras
+  existentes; a rede controla movimento, rotação e ataque.
   A contagem de suporte/reparo aparece no log de treino, mas não entra no
   fitness porque essas ações ainda não são decisões da rede.
   O movimento lateral da rede é limitado a um ajuste curto de direção; um
@@ -644,12 +651,12 @@ especializados das pastas numeradas.
   `--save-dir` escreve um arquivo versionado com arquétipo e checksum por
   geração, sem substituir arquivos
   existentes. `--resume` inicia outra sequência a partir de um desses campeões
-  do mesmo arquétipo (não reproduz exatamente a população anterior). Arquivos
+  do mesmo arquétipo (não reproduz exatamente a população anterior). Um treino
+  novo não substitui automaticamente os assets distribuídos: escolha, teste e
+  promova manualmente os novos campeões a `assets/ai/`. Arquivos
   antigos de Worker ainda podem ser carregados. `--ai-training all` treina os
   cinco arquétipos em sequência e salva cada um em uma subpasta de `--save-dir`;
-  `--resume` exige um tipo específico. O cérebro salvo só é usado na partida
-  com `--experimental-neural-enemy TIPO --neural-brain ARQUIVO`, com checagem
-  do tipo; nunca substitui automaticamente a IA normal. O treino ainda usa
+  `--resume` exige um tipo específico. O treino ainda usa
   arenas simplificadas e não ensina navegação completa, flanqueamento ou
   coordenação entre inimigos; melhora de fitness não equivale a aprovação de
   gameplay, que ainda requer playtest.
@@ -665,6 +672,7 @@ especializados das pastas numeradas.
     --save-dir build/ai-runs/all-42
   build/debug/gdp --experimental-neural-enemy guard \
     --neural-brain build/ai-runs/all-42/guard/guard_generation_000030.brain
+  build/debug/gdp --scripted-enemies # comparação com a IA anterior
   ```
 
   Para continuar um único tipo, combine `--ai-training TIPO`,

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 namespace gdp::gameplay {
 
@@ -132,8 +133,15 @@ struct EnemyPerception {
     bool playerFlashlightOn{false};
 };
 
-// Opt-in prototype: exactly one enemy of the selected archetype per run.
-// The network is fixed-size; evolution occurs only in headless training.
+struct NeuralEnemyMotorState {
+    float decisionSecondsRemaining{0.0F};
+    std::array<float, 4> outputs{};
+    float ineffectiveSeconds{0.0F};
+    float scriptedSecondsRemaining{0.0F};
+};
+
+// One trained genome can control every enemy of an archetype, with independent
+// decision timing/output per entity. Evolution occurs only in headless training.
 struct NeuralEnemyExperiment {
     explicit NeuralEnemyExperiment(wkc::core::Seed seed,
         gdp::entities::EnemyArchetype archetype
@@ -141,11 +149,13 @@ struct NeuralEnemyExperiment {
 
     wkc::ai::Genome genome;
     gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
+    bool controlAll{false};
     bool logSelection{true};
     std::optional<gdp::entities::EntityId> selected;
     std::uint64_t controlledTicks{0U};
     float decisionSecondsRemaining{0.0F};
     std::array<float, 4> outputs{};
+    std::unordered_map<std::uint64_t, NeuralEnemyMotorState> motors;
 };
 
 using NeuralWorkerExperiment = NeuralEnemyExperiment;

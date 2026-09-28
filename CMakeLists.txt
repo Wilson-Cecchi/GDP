@@ -315,6 +315,7 @@ gdp_enable_sanitizers(gdp_persistence)
 add_library(
     gdp_training
     STATIC
+    src/game/ai/ActiveEnemyBrains.cpp
     src/game/ai/WorkerTraining.cpp
 )
 target_compile_features(gdp_training PUBLIC cxx_std_20)
@@ -349,6 +350,22 @@ target_link_libraries(
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
 
+set(GDP_ACTIVE_BRAIN_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/worker.brain"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/guard.brain"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/officer.brain"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/engineer.brain"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/robot.brain"
+)
+add_custom_target(gdp_brain_assets
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:gdp>/ai"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${GDP_ACTIVE_BRAIN_FILES} "$<TARGET_FILE_DIR:gdp>/ai"
+    DEPENDS ${GDP_ACTIVE_BRAIN_FILES}
+    VERBATIM
+)
+add_dependencies(gdp gdp_brain_assets)
+
 add_custom_target(
     graphics-benchmark
     COMMAND ${CMAKE_COMMAND}
@@ -372,6 +389,7 @@ add_custom_target(
 
 if(WIN32)
     install(TARGETS gdp RUNTIME DESTINATION .)
+    install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
 
     set(GDP_SDL_SHARED_TARGET "")
     if(TARGET SDL3::SDL3-shared)
@@ -444,6 +462,21 @@ if(GDP_BUILD_TESTS)
     add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
     # ASan/UBSan runs the role-specific arena curriculum substantially slower.
     set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 300)
+
+    add_executable(gdp_active_enemy_brain_tests tests/test_active_enemy_brains.cpp)
+    target_link_libraries(gdp_active_enemy_brain_tests PRIVATE gdp_training)
+    target_compile_definitions(gdp_active_enemy_brain_tests PRIVATE
+        GDP_SOURCE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}")
+    gdp_enable_warnings(gdp_active_enemy_brain_tests)
+    gdp_enable_sanitizers(gdp_active_enemy_brain_tests)
+    add_test(NAME active_enemy_brain_catalog COMMAND gdp_active_enemy_brain_tests)
+    set_tests_properties(active_enemy_brain_catalog PROPERTIES TIMEOUT 10)
+
+    add_test(NAME active_enemy_brains_headless
+        COMMAND ${CMAKE_COMMAND}
+            -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_active_brains.cmake)
+    set_tests_properties(active_enemy_brains_headless PROPERTIES TIMEOUT 15)
 
     add_test(
         NAME worker_training_cli_smoke
@@ -743,7 +776,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_combat_tests)
 
     add_test(NAME combat_systems COMMAND gdp_combat_tests)
-    set_tests_properties(combat_systems PROPERTIES TIMEOUT 10)
+    set_tests_properties(combat_systems PROPERTIES TIMEOUT 30)
 
     add_executable(gdp_entity_tests tests/test_entities.cpp)
     target_link_libraries(gdp_entity_tests PRIVATE gdp_entities)

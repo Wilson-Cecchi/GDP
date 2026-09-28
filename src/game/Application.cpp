@@ -36,6 +36,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -769,7 +770,13 @@ bool Application::initializeRun()
 {
     using Clock = std::chrono::steady_clock;
     performanceMonitor_.reset();
-    if (config_.experimentalNeuralEnemy) {
+    for (auto& brain : activeEnemyBrains_) {
+        brain.reset();
+    }
+    if (config_.scriptedEnemies) {
+        neuralEnemyExperiment_.reset();
+        log(LogLevel::Info, "Scripted enemy AI selected");
+    } else if (config_.experimentalNeuralEnemy) {
         neuralEnemyExperiment_.emplace(wkc::core::deriveSeed(
             config_.worldSeed, SeedDomain::NeuralWorker,
             static_cast<std::uint64_t>(*config_.experimentalNeuralEnemy)),
@@ -784,6 +791,36 @@ bool Application::initializeRun()
         }
     } else {
         neuralEnemyExperiment_.reset();
+        const char* const basePath = SDL_GetBasePath();
+        if (basePath == nullptr) {
+            log(LogLevel::Warning,
+                "Cannot find bundled enemy brains; using scripted AI");
+        } else {
+            auto records = ai::loadActiveEnemyBrains(
+                std::filesystem::path{basePath} / "ai");
+            constexpr std::array<std::string_view, ai::activeEnemyBrainCount> names{
+                "worker", "guard", "officer", "engineer", "robot"};
+            for (std::size_t index = 0U; index < records.size(); ++index) {
+                if (!records[index]) {
+                    log(LogLevel::Warning,
+                        std::string{"No valid bundled "} + std::string{names[index]}
+                            + " brain; using scripted AI for that type");
+                    continue;
+                }
+                const auto archetype
+                    = static_cast<entities::EnemyArchetype>(index);
+                auto& brain = activeEnemyBrains_[index];
+                brain.emplace(wkc::core::deriveSeed(
+                    config_.worldSeed, SeedDomain::NeuralWorker,
+                    static_cast<std::uint64_t>(archetype)), archetype);
+                brain->genome = std::move(records[index]->genome);
+                brain->controlAll = true;
+                brain->logSelection = false;
+                log(LogLevel::Info,
+                    std::string{"Trained enemy brain active: "}
+                        + std::string{names[index]});
+            }
+        }
     }
     currentFramePerformance_ = {};
     enemyAnimationTicks_ = 0U;
@@ -2654,26 +2691,34 @@ void Application::fixedUpdate(const double fixedStep)
     const gameplay::EnemyPerception perception{
         .playerFlashlightOn = flashlightOn_,
     };
+    const auto brainFor = [this](const entities::EnemyArchetype archetype)
+        -> gameplay::NeuralEnemyExperiment* {
+        if (neuralEnemyExperiment_) {
+            return &*neuralEnemyExperiment_;
+        }
+        auto& brain = activeEnemyBrains_[static_cast<std::size_t>(archetype)];
+        return brain ? &*brain : nullptr;
+    };
     const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.worker, perception,
-        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
+        brainFor(entities::EnemyArchetype::Worker));
     const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.guard, perception,
-        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
+        brainFor(entities::EnemyArchetype::Guard));
     const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.officer, perception,
-        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
+        brainFor(entities::EnemyArchetype::Officer));
     const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.engineer, perception,
-        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
+        brainFor(entities::EnemyArchetype::Engineer));
     const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
         entities_, player_, playerRoom, collisionWorld_, step,
         difficultyConfigs.industrialRobot, perception,
-        neuralEnemyExperiment_ ? &*neuralEnemyExperiment_ : nullptr);
+        brainFor(entities::EnemyArchetype::IndustrialRobot));
     const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
         + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
     if (audio_ && attacksLanded > 0U) {

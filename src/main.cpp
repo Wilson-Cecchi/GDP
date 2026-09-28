@@ -19,7 +19,8 @@ void printUsage(const std::string_view executable)
 {
     std::cout << "Usage: " << executable
               << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N]"
-                 " [--experimental-neural-enemy TYPE] [--neural-brain FILE] [--help]\n"
+                 " [--scripted-enemies] [--experimental-neural-enemy TYPE]"
+                 " [--neural-brain FILE] [--help]\n"
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--save-dir DIR] [--resume FILE]\n"
@@ -27,6 +28,7 @@ void printUsage(const std::string_view executable)
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
               << "  --seed N             Generate a deterministic world from unsigned integer N.\n"
+              << "  --scripted-enemies   Use the original scripted AI instead of bundled brains.\n"
               << "  --experimental-neural-enemy TYPE  Test one neural enemy of TYPE.\n"
               << "  --experimental-neural-worker  Alias for Worker playtesting.\n"
               << "  --neural-brain FILE  Load a matching saved experimental brain.\n"
@@ -128,6 +130,11 @@ int main(const int argc, char* argv[])
 
         if (argument == "--headless") {
             config.headless = true;
+            continue;
+        }
+
+        if (argument == "--scripted-enemies") {
+            config.scriptedEnemies = true;
             continue;
         }
 
@@ -263,7 +270,8 @@ int main(const int argc, char* argv[])
 
     if (trainingMode) {
         if (config.benchmarkQuality || config.frameLimit
-            || config.experimentalNeuralEnemy || config.neuralBrainPath) {
+            || config.scriptedEnemies || config.experimentalNeuralEnemy
+            || config.neuralBrainPath) {
             std::cerr << "Training cannot be combined with gameplay or benchmark options\n";
             return 2;
         }
@@ -315,6 +323,10 @@ int main(const int argc, char* argv[])
     }
     if (config.neuralBrainPath && !config.experimentalNeuralEnemy) {
         std::cerr << "--neural-brain needs --experimental-neural-enemy TYPE\n";
+        return 2;
+    }
+    if (config.scriptedEnemies && config.experimentalNeuralEnemy) {
+        std::cerr << "--scripted-enemies cannot be combined with experimental neural AI\n";
         return 2;
     }
     if (config.headless && config.benchmarkQuality) {
