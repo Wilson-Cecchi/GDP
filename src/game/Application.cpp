@@ -1029,6 +1029,7 @@ bool Application::initializeRun()
             "Campaign started without a persistent floor checkpoint");
     }
     gameplay::closeMainMenu(mainMenu_);
+    controlsMenuActive_ = false;
     input_ = Input{};
 
     std::ostringstream worldSummary;
@@ -1160,6 +1161,43 @@ void Application::processEvents()
             log(LogLevel::Info, "Game exit confirmed");
             restartRequested_ = false;
             running_ = false;
+        }
+        return;
+    }
+
+    if (controlsMenuActive_) {
+        playerCommand_ = {};
+        interactionPending_ = false;
+        jumpPending_ = false;
+        firePending_ = false;
+        fireHeld_ = false;
+        reloadPending_ = false;
+        weaponSwitchPending_.reset();
+        dropPending_ = false;
+
+        bool backClicked = false;
+        if (window_ != nullptr
+            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            int drawableWidth = 0;
+            int drawableHeight = 0;
+            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
+                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+                && windowWidth > 0 && windowHeight > 0) {
+                const Vec2 pointer = input_.mousePosition();
+                backClicked = visual::controlsMenuBackAt(
+                    drawableWidth, drawableHeight,
+                    pointer.x * static_cast<float>(drawableWidth)
+                        / static_cast<float>(windowWidth),
+                    pointer.y * static_cast<float>(drawableHeight)
+                        / static_cast<float>(windowHeight));
+            }
+        }
+        if (input_.wasKeyPressed(Key::Escape)
+            || input_.wasKeyPressed(Key::Enter) || backClicked) {
+            controlsMenuActive_ = false;
+            playUiAudio(gdp::audio::AudioEventKind::UiBack);
         }
         return;
     }
@@ -1307,6 +1345,9 @@ void Application::processEvents()
                   if (selection == visual::HudMainMenuSelection::Settings) {
                       return gameplay::MainMenuOption::Settings;
                   }
+                  if (selection == visual::HudMainMenuSelection::Controls) {
+                      return gameplay::MainMenuOption::Controls;
+                  }
                   if (selection
                       == visual::HudMainMenuSelection::ContinueCampaign) {
                       return gameplay::MainMenuOption::ContinueCampaign;
@@ -1439,6 +1480,9 @@ void Application::processEvents()
             gameplay::openSettingsMenu(
                 settingsMenu_, gameplay::SettingsMenuOrigin::MainMenu);
             log(LogLevel::Info, "Main menu opened settings");
+        } else if (command == gameplay::MainMenuCommand::Controls) {
+            controlsMenuActive_ = true;
+            log(LogLevel::Info, "Main menu opened controls");
         } else if (command == gameplay::MainMenuCommand::ExitGame) {
             gameplay::openExitConfirmation(exitConfirmation_);
             log(LogLevel::Info, "Main menu opened exit confirmation");
@@ -1618,6 +1662,8 @@ void Application::processEvents()
                 return gameplay::PauseMenuOption::RestartRun;
             case visual::HudPauseSelection::Settings:
                 return gameplay::PauseMenuOption::Settings;
+            case visual::HudPauseSelection::Controls:
+                return gameplay::PauseMenuOption::Controls;
             case visual::HudPauseSelection::MainMenu:
                 return gameplay::PauseMenuOption::MainMenu;
             case visual::HudPauseSelection::ExitGame:
@@ -1680,6 +1726,9 @@ void Application::processEvents()
             gameplay::openSettingsMenu(
                 settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
             log(LogLevel::Info, "Pause menu opened settings");
+        } else if (command == gameplay::PauseMenuCommand::Controls) {
+            controlsMenuActive_ = true;
+            log(LogLevel::Info, "Pause menu opened controls");
         } else if (command == gameplay::PauseMenuCommand::MainMenu) {
             log(LogLevel::Info, "Pause menu requested main menu");
             if (!returnToMainMenu()) {
@@ -1814,6 +1863,7 @@ bool Application::returnToMainMenu()
     gameplay::closePauseMenu(pauseMenu_);
     gameplay::closeResultMenu(resultMenu_);
     gameplay::closeSettingsMenu(settingsMenu_);
+    controlsMenuActive_ = false;
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();
     collisionWorld_ = baseCollisionWorld_;
     playerCommand_ = {};
@@ -2183,7 +2233,8 @@ void Application::fixedUpdate(const double fixedStep)
 {
     const float step = static_cast<float>(fixedStep);
     const bool gameplayActive
-        = !mainMenu_.active && !pauseMenu_.paused && !settingsMenu_.active;
+        = !mainMenu_.active && !pauseMenu_.paused && !settingsMenu_.active
+        && !controlsMenuActive_;
     if (world_) {
         session_.advanceRunTimer(gameplayActive);
     }
@@ -3042,6 +3093,19 @@ void Application::render()
         return true;
     };
 
+    if (controlsMenuActive_) {
+        SDL_SetWindowTitle(window_, "GDP | CONTROLS");
+        visual::HudRenderData hud;
+        hud.controlsMenu = true;
+        if (!renderAndPresent([&] {
+                return renderer_->render(
+                    width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            }, "Renderer failed while drawing controls")) {
+            return;
+        }
+        return;
+    }
+
     if (settingsMenu_.active) {
         SDL_SetWindowTitle(window_, "GDP | SETTINGS");
         visual::HudRenderData hud;
@@ -3077,6 +3141,8 @@ void Application::render()
         hud.mainMenu = true;
         if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
             hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
+        } else if (mainMenu_.selection == gameplay::MainMenuOption::Controls) {
+            hud.mainMenuSelection = visual::HudMainMenuSelection::Controls;
         } else if (mainMenu_.selection
             == gameplay::MainMenuOption::ContinueCampaign) {
             hud.mainMenuSelection
@@ -3567,6 +3633,7 @@ void Application::render()
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
     hud.infoOverlay = input_.isKeyDown(Key::Tab);
+    hud.runSeed = session_.state().currentSeed;
     hud.score = progress.score;
     hud.enemiesKilled = progress.enemiesKilled;
     hud.eventsCompleted = progress.eventsCompleted;
@@ -3692,6 +3759,8 @@ void Application::render()
         hud.pauseSelection = visual::HudPauseSelection::RestartRun;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Settings) {
         hud.pauseSelection = visual::HudPauseSelection::Settings;
+    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Controls) {
+        hud.pauseSelection = visual::HudPauseSelection::Controls;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::MainMenu) {
         hud.pauseSelection = visual::HudPauseSelection::MainMenu;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
@@ -3867,6 +3936,7 @@ void Application::shutdown()
     gameplay::resetViewMotion(viewMotion_);
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
+    controlsMenuActive_ = false;
     gameplay::closeResultMenu(resultMenu_);
     gameplay::closeSettingsMenu(settingsMenu_);
     baseCollisionWorld_ = gameplay::CollisionWorld::fixedRoom();

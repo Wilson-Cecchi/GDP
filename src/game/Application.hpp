@@ -120,6 +120,7 @@ private:
     gameplay::PauseMenuState pauseMenu_;
     gameplay::ResultMenuState resultMenu_;
     gameplay::SettingsMenuState settingsMenu_;
+    bool controlsMenuActive_{false};
     gameplay::ExitConfirmationState exitConfirmation_;
     gameplay::RuntimeSettings runtimeSettings_;
     std::optional<std::filesystem::path> settingsPath_;

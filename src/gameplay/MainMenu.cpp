@@ -59,6 +59,8 @@ MainMenuCommand activateMainMenuSelection(MainMenuState& state) noexcept
         return MainMenuCommand::BestSeed;
     case MainMenuOption::Settings:
         return MainMenuCommand::Settings;
+    case MainMenuOption::Controls:
+        return MainMenuCommand::Controls;
     case MainMenuOption::ExitGame:
         return MainMenuCommand::ExitGame;
     case MainMenuOption::Count:

@@ -82,7 +82,8 @@ especializados das pastas numeradas.
   acertos e eliminações confirmam na mira, e coleta, ondas, eventos e level-up
   geram avisos temporários determinísticos.
 - **Fase 19 — Pausa funcional:** concluída; `Esc` congela a simulação e abre um
-  menu responsivo com `RESUME`, `RESTART RUN`, `SETTINGS`, `MAIN MENU` e `EXIT GAME`,
+  menu responsivo com `RESUME`, `RESTART RUN`, `SETTINGS`, `CONTROLS`,
+  `MAIN MENU` e `EXIT GAME`,
   liberando o mouse até o retorno ao gameplay.
 - **Estabilização de travessia:** concluída; corredores não podem reentrar nas
   próprias salas, loops fecham apenas branches próximas, curvas possuem juntas
@@ -581,7 +582,7 @@ especializados das pastas numeradas.
   Após o primeiro teste em jogo, o feixe foi reforçado a média distância e
   passou a ter a indicação `F LIGHT ON` no HUD.
 - **Fase 151 — Painel rápido:** segurar `Tab` mostra placar, abates, eventos,
-  loot e tempo da run sem pausar a simulação. `F3` permanece como painel de
+  loot, seed e tempo da run sem pausar a simulação. `F3` permanece como painel de
   desempenho separado.
 - **Fase 152 — Soltar arma:** `G` coloca a arma de fogo selecionada à frente do
   jogador quando há espaço livre. A arma no
@@ -595,6 +596,9 @@ especializados das pastas numeradas.
   O cone frontal, a linha de visão, a sala ativa e o alcance normal com a
   lanterna desligada não mudam. Os atalhos `4` e `5` continuam reservados, sem
   equipamento ou item especial associado por enquanto.
+- **Referência de controles:** `CONTROLS` no título e na pausa lista os comandos
+  implementados. `Esc`, `Enter` ou clique em `BACK` retorna ao menu de origem;
+  abrir a página durante uma run não avança a simulação.
 - **Base de neuroevolução — núcleo genérico:** `wkc_forge_ai` fornece uma rede
   feedforward pequena (uma camada oculta, `tanh`) e genomas copiáveis com
   inicialização, mutação e cruzamento determinísticos por seed independente.

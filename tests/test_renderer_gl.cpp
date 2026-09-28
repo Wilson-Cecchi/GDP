@@ -635,6 +635,7 @@ int main()
 
             gdp::game::visual::HudRenderData infoHud = functionalHud;
             infoHud.infoOverlay = true;
+            infoHud.runSeed = 12345U;
             infoHud.score = 2300U;
             infoHud.enemiesKilled = 7U;
             infoHud.eventsCompleted = 2U;
@@ -644,6 +645,13 @@ int main()
             std::vector<std::uint8_t> infoHudPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 infoHudPixels.data());
+
+            infoHud.runSeed = 54321U;
+            const bool renderedAlternateSeed = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, infoHud);
+            std::vector<std::uint8_t> alternateSeedPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                alternateSeedPixels.data());
 
             gdp::game::visual::HudRenderData spreadHud = functionalHud;
             spreadHud.weaponSpread = 1.0F;
@@ -763,6 +771,14 @@ int main()
             std::vector<std::uint8_t> mainMenuPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mainMenuPixels.data());
+
+            gdp::game::visual::HudRenderData controlsHud;
+            controlsHud.controlsMenu = true;
+            const bool renderedControls = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, controlsHud);
+            std::vector<std::uint8_t> controlsPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                controlsPixels.data());
 
             gdp::game::visual::HudRenderData mainMenuContinueHud = mainMenuHud;
             mainMenuContinueHud.mainMenuSelection
@@ -1450,6 +1466,8 @@ int main()
                 && speedrunRecordChangedChannels > 50U
                 && renderedPauseMenu && pauseMenuChangedChannels > 500U
                 && renderedMainMenu && mainMenuChangedChannels > 500U
+                && renderedControls && controlsPixels != mainMenuPixels
+                && renderedAlternateSeed && alternateSeedPixels != infoHudPixels
                 && renderedMainMenuContinue
                 && mainMenuContinueChangedChannels > 100U
                 && renderedMainMenuCampaign

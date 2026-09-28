@@ -15,6 +15,8 @@
 > A Fase 81 adicionou `CONTINUE` persistente no início do andar atual.
 > A Fase 111 aplicou uma linguagem industrial única ao título, pausa, resultado,
 > configurações e confirmação, preservando os layouts usados pelo mouse.
+> A tela `CONTROLS` foi adicionada ao título e à pausa como referência funcional
+> dos comandos atuais, sem alterar bindings nem a linguagem visual aprovada.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -27,7 +29,7 @@ por teclado quanto por hover. Perigo e sucesso substituem apenas a cor de
 ênfase; posição e dimensões continuam vindo dos layouts funcionais existentes.
 
 O bootstrap gráfico mostra `START RUN`, `CONTINUE`, `CAMPAIGN`, `SPEEDRUN`,
-`BEST SEED`, `SETTINGS` e `EXIT GAME` antes de gerar a dungeon.
+`BEST SEED`, `SETTINGS`, `CONTROLS` e `EXIT GAME` antes de gerar a dungeon.
 `W/S` ou setas navegam com wrap, `Enter` confirma, o mouse seleciona e confirma
 por clique, e `Esc` abre a confirmação de saída. A seleção inicial segura é
 sempre `START RUN`.
@@ -61,7 +63,7 @@ ao título ou jogar outro modo e é removido após `CAMPAIGN CLEAR`.
 
 `Esc` abre e fecha a pausa, sempre selecionando `RESUME` como opção segura.
 `W/S` ou setas navegam com wrap e `Enter` confirma `RESUME`, `RESTART RUN`,
-`SETTINGS`, `MAIN MENU` ou `EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
+`SETTINGS`, `CONTROLS`, `MAIN MENU` ou `EXIT GAME`. Hover também seleciona qualquer opção e o botão primário confirma;
 cliques fora dos botões não executam comandos. O mouse relativo é liberado no
 menu e restaurado no retorno.
 Enquanto o overlay está aberto, fixed update, look e comandos pendentes não
@@ -75,6 +77,13 @@ Campaign, ele também restaura o snapshot da entrada do andar.
 O desenho e o hit test usam o mesmo `PauseMenuLayout`. A posição lógica do
 ponteiro é convertida para as dimensões reais do framebuffer antes da consulta,
 mantendo os botões alinhados em escalas high-DPI e após redimensionamento.
+
+`CONTROLS` abre uma página de consulta a partir do título ou da pausa. O jogo
+permanece congelado quando a origem é a pausa; `Esc`, `Enter` ou clique em
+`BACK` devolvem exatamente ao menu de origem. A página mostra os controles
+efetivamente implementados, sem listar os slots 4/5 ainda reservados.
+O painel rápido `Tab` também apresenta a seed exata da run para facilitar
+reprodução de mapas e relatos de bugs.
 
 ## Menu de resultado
 

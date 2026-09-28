@@ -40,8 +40,11 @@ void testMainMenuNavigation()
     expect(menu.selection == MainMenuOption::Settings,
         "navigation magnitude is normalized to one step");
     moveMainMenuSelection(menu, 4);
+    expect(menu.selection == MainMenuOption::Controls,
+        "down selects Controls after Settings");
+    moveMainMenuSelection(menu, 4);
     expect(menu.selection == MainMenuOption::ExitGame,
-        "down selects Exit Game after Settings");
+        "down selects Exit Game after Controls");
     moveMainMenuSelection(menu, 1);
     expect(menu.selection == MainMenuOption::StartRun,
         "down wraps from Exit Game to Start Run");
@@ -66,6 +69,10 @@ void testMainMenuActivation()
     expect(activateMainMenuSelection(menu) == MainMenuCommand::Settings
             && menu.active,
         "Settings emits its command without closing the main menu");
+    selectMainMenuOption(menu, MainMenuOption::Controls);
+    expect(activateMainMenuSelection(menu) == MainMenuCommand::Controls
+            && menu.active,
+        "Controls keeps the main menu available on return");
     selectMainMenuOption(menu, MainMenuOption::ContinueCampaign);
     expect(activateMainMenuSelection(menu) == MainMenuCommand::ContinueCampaign
             && menu.active,

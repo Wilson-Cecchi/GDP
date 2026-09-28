@@ -2324,6 +2324,56 @@ bool GdpRenderer::render(
             uiTheme.mutedText);
     };
 
+    if (hud.controlsMenu) {
+        const ControlsMenuLayout layout = makeControlsMenuLayout(width, height);
+        const int scale = layout.scale;
+        drawSolidRect(0, 0, width, height, uiTheme.background);
+        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        constexpr std::string_view title = "CONTROLS";
+        drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
+            layout.panel.y + layout.panel.height - (21 * scale),
+            2 * scale, title, cyanColor);
+        constexpr std::array<std::string_view, 16> bindings{
+            "WASD      MOVE",
+            "SHIFT     QUIET WALK",
+            "CTRL      CROUCH",
+            "SPACE     JUMP",
+            "MOUSE1    FIRE / KNIFE",
+            "MOUSE2    AIM",
+            "R         RELOAD",
+            "E         INTERACT",
+            "F         FLASHLIGHT",
+            "G         DROP GUN",
+            "1/2/3     CARBINE/PISTOL/KNIFE",
+            "Q / WHEEL LAST / CYCLE WEAPON",
+            "TAB       RUN INFO",
+            "F3        PERFORMANCE",
+            "ESC       PAUSE / MENU",
+            "MENUS     WS/ARROWS/ENTER/MOUSE",
+        };
+        const int textX = layout.panel.x + (12 * scale);
+        const int firstY = layout.panel.y + layout.panel.height - (37 * scale);
+        for (std::size_t index = 0U; index < bindings.size(); ++index) {
+            drawBitmapText(textX, firstY - static_cast<int>(index) * (8 * scale),
+                scale, bindings[index], textColor);
+        }
+        drawSelectedRow(layout.backButton, scale, cyanColor);
+        constexpr std::string_view back = "BACK";
+        drawBitmapText((width - bitmapTextWidth(back, scale)) / 2,
+            layout.backButton.y + (3 * scale), scale, back, cyanColor);
+        glDisable(GL_SCISSOR_TEST);
+        glEnable(GL_DEPTH_TEST);
+        const GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::ostringstream message;
+            message << "OpenGL controls menu render error: 0x"
+                    << std::hex << error;
+            wkc::core::log(wkc::core::LogLevel::Error, message.str());
+            return false;
+        }
+        return true;
+    }
+
     if (hud.settingsMenu) {
         const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
         const int scale = layout.scale;
@@ -2480,14 +2530,15 @@ bool GdpRenderer::render(
         const std::string continueText = hud.campaignContinueAvailable
             ? "CONTINUE F" + std::to_string(hud.campaignContinueFloor) + "/3"
             : "CONTINUE --";
-        const std::array<std::string_view, 7> options{
+        const std::array<std::string_view, 8> options{
             "START RUN", continueText, "CAMPAIGN", "SPEEDRUN", bestSeedText,
-            "SETTINGS", "EXIT GAME",
+            "SETTINGS", "CONTROLS", "EXIT GAME",
         };
-        const std::array<UiRect, 7> buttons{
+        const std::array<UiRect, 8> buttons{
             layout.startButton, layout.continueButton, layout.campaignButton,
             layout.speedrunButton,
-            layout.bestSeedButton, layout.settingsButton, layout.exitButton,
+            layout.bestSeedButton, layout.settingsButton,
+            layout.controlsButton, layout.exitButton,
         };
         std::size_t selected = 0U;
         if (hud.mainMenuSelection == HudMainMenuSelection::ContinueCampaign) {
@@ -2500,8 +2551,10 @@ bool GdpRenderer::render(
             selected = 4U;
         } else if (hud.mainMenuSelection == HudMainMenuSelection::Settings) {
             selected = 5U;
-        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::Controls) {
             selected = 6U;
+        } else if (hud.mainMenuSelection == HudMainMenuSelection::ExitGame) {
+            selected = 7U;
         }
         for (std::size_t index = 0; index < buttons.size(); ++index) {
             const UiRect button = buttons[index];
@@ -2863,8 +2916,9 @@ bool GdpRenderer::render(
 
     if (hud.infoOverlay && hud.visible && !hud.mainMenu && !hud.paused
         && !hud.settingsMenu) {
-        const std::array<std::string, 6> lines{
+        const std::array<std::string, 7> lines{
             "RUN STATUS",
+            "SEED " + std::to_string(hud.runSeed),
             "SCORE " + std::to_string(hud.score),
             "KILLS " + std::to_string(hud.enemiesKilled),
             "EVENTS " + std::to_string(hud.eventsCompleted),
@@ -3133,22 +3187,26 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (14 * scale), scale,
             pauseTitle, cyanColor);
 
-        constexpr std::array<std::string_view, 5> options{
-            "RESUME", "RESTART RUN", "SETTINGS", "MAIN MENU", "EXIT GAME",
+        constexpr std::array<std::string_view, 6> options{
+            "RESUME", "RESTART RUN", "SETTINGS", "CONTROLS",
+            "MAIN MENU", "EXIT GAME",
         };
         std::size_t selected = 0U;
         if (hud.pauseSelection == HudPauseSelection::RestartRun) {
             selected = 1U;
         } else if (hud.pauseSelection == HudPauseSelection::Settings) {
             selected = 2U;
-        } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
+        } else if (hud.pauseSelection == HudPauseSelection::Controls) {
             selected = 3U;
-        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
+        } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
             selected = 4U;
+        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
+            selected = 5U;
         }
-        const std::array<UiRect, 5> buttons{
+        const std::array<UiRect, 6> buttons{
             layout.resumeButton, layout.restartButton,
-            layout.settingsButton, layout.mainMenuButton, layout.exitButton,
+            layout.settingsButton, layout.controlsButton,
+            layout.mainMenuButton, layout.exitButton,
         };
         for (std::size_t index = 0; index < options.size(); ++index) {
             const UiRect button = buttons[index];

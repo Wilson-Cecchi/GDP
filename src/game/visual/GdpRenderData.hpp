@@ -304,6 +304,7 @@ enum class HudPauseSelection : std::uint8_t {
     Resume,
     RestartRun,
     Settings,
+    Controls,
     MainMenu,
     ExitGame,
 };
@@ -315,6 +316,7 @@ enum class HudMainMenuSelection : std::uint8_t {
     Speedrun,
     BestSeed,
     Settings,
+    Controls,
     ExitGame,
 };
 
@@ -387,6 +389,7 @@ struct MainMenuLayout {
     UiRect speedrunButton{};
     UiRect bestSeedButton{};
     UiRect settingsButton{};
+    UiRect controlsButton{};
     UiRect exitButton{};
 };
 
@@ -396,9 +399,21 @@ struct PauseMenuLayout {
     UiRect resumeButton{};
     UiRect restartButton{};
     UiRect settingsButton{};
+    UiRect controlsButton{};
     UiRect mainMenuButton{};
     UiRect exitButton{};
 };
+
+struct ControlsMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    UiRect backButton{};
+};
+
+[[nodiscard]] ControlsMenuLayout makeControlsMenuLayout(
+    int width, int height) noexcept;
+[[nodiscard]] bool controlsMenuBackAt(
+    int width, int height, float pointerX, float pointerY) noexcept;
 
 struct ResultMenuLayout {
     int scale{1};
@@ -471,6 +486,7 @@ struct HudRenderData {
     bool visible{false};
     bool flashlightOn{false};
     bool infoOverlay{false};
+    std::uint64_t runSeed{0U};
     std::uint64_t score{0U};
     std::uint32_t enemiesKilled{0U};
     std::uint32_t eventsCompleted{0U};
@@ -519,6 +535,7 @@ struct HudRenderData {
     HudExitConfirmationSelection exitConfirmationSelection{
         HudExitConfirmationSelection::Cancel};
     bool settingsMenu{false};
+    bool controlsMenu{false};
     HudSettingsSelection settingsSelection{HudSettingsSelection::MasterVolume};
     std::uint16_t masterVolumePercent{100U};
     std::uint16_t effectsVolumePercent{100U};

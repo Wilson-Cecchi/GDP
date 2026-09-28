@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 
 namespace {
 
@@ -411,10 +412,14 @@ void testMainMenuLayout()
         "Best Seed button is inside the menu panel");
     expect(wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y),
         "Settings button is inside the menu panel");
+    expect(wide.panel.contains(wide.controlsButton.x, wide.controlsButton.y),
+        "Controls button is inside the menu panel");
     expect(wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "Exit Game button is inside the menu panel");
     expect(wide.exitButton.y >= wide.panel.y + (16 * wide.scale)
             && wide.exitButton.y + wide.exitButton.height
+                <= wide.controlsButton.y
+            && wide.controlsButton.y + wide.controlsButton.height
                 <= wide.settingsButton.y
             && wide.settingsButton.y + wide.settingsButton.height
                 <= wide.bestSeedButton.y
@@ -426,7 +431,7 @@ void testMainMenuLayout()
                 <= wide.continueButton.y
             && wide.continueButton.y + wide.continueButton.height
                 <= wide.startButton.y,
-        "seven main-menu buttons remain separated from controls and each other");
+        "eight main-menu buttons remain separated from footer and each other");
 
     const float startX = static_cast<float>(wide.startButton.x + wide.startButton.width / 2);
     const float startY = static_cast<float>(
@@ -472,6 +477,13 @@ void testMainMenuLayout()
     expect(mainMenuSelectionAt(1280, 720, settingsX, settingsY)
             == HudMainMenuSelection::Settings,
         "top-origin pointer maps to Settings");
+    const float controlsX = static_cast<float>(
+        wide.controlsButton.x + wide.controlsButton.width / 2);
+    const float controlsY = static_cast<float>(
+        720 - 1 - (wide.controlsButton.y + wide.controlsButton.height / 2));
+    expect(mainMenuSelectionAt(1280, 720, controlsX, controlsY)
+            == HudMainMenuSelection::Controls,
+        "top-origin pointer maps to Controls");
     expect(mainMenuSelectionAt(1280, 720, exitX, exitY)
             == HudMainMenuSelection::ExitGame,
         "top-origin pointer maps to Exit Game");
@@ -496,6 +508,7 @@ void testMainMenuLayout()
             && tiny.panel.contains(
                 tiny.bestSeedButton.x, tiny.bestSeedButton.y)
             && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
+            && tiny.panel.contains(tiny.controlsButton.x, tiny.controlsButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny menu clamps all hit targets inside the framebuffer");
 }
@@ -513,6 +526,7 @@ void testPauseMenuLayout()
     expect(wide.panel.contains(wide.resumeButton.x, wide.resumeButton.y)
             && wide.panel.contains(wide.restartButton.x, wide.restartButton.y)
             && wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y)
+            && wide.panel.contains(wide.controlsButton.x, wide.controlsButton.y)
             && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
             && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
         "pause menu hit targets stay inside the panel");
@@ -537,6 +551,10 @@ void testPauseMenuLayout()
             == HudPauseSelection::Settings,
         "top-origin pointer maps to pause Settings");
     expect(pauseMenuSelectionAt(1280, 720,
+               pointerX(wide.controlsButton), pointerY(wide.controlsButton))
+            == HudPauseSelection::Controls,
+        "top-origin pointer maps to pause Controls");
+    expect(pauseMenuSelectionAt(1280, 720,
                pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
             == HudPauseSelection::MainMenu,
         "top-origin pointer maps to pause Main Menu");
@@ -559,9 +577,35 @@ void testPauseMenuLayout()
     expect(tiny.panel.contains(tiny.resumeButton.x, tiny.resumeButton.y)
             && tiny.panel.contains(tiny.restartButton.x, tiny.restartButton.y)
             && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
+            && tiny.panel.contains(tiny.controlsButton.x, tiny.controlsButton.y)
             && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
             && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
         "tiny pause menu clamps all hit targets inside the framebuffer");
+}
+
+void testControlsMenuLayout()
+{
+    using namespace gdp::game::visual;
+    for (const auto& [width, height] :
+        {std::pair{1280, 720}, std::pair{320, 200}}) {
+        const ControlsMenuLayout layout = makeControlsMenuLayout(width, height);
+        expect(layout.panel.contains(layout.backButton.x,
+                   layout.backButton.y),
+            "Controls Back button remains inside its panel");
+        const float pointerX = static_cast<float>(
+            layout.backButton.x + layout.backButton.width / 2);
+        const float pointerY = static_cast<float>(height - 1
+            - (layout.backButton.y + layout.backButton.height / 2));
+        expect(controlsMenuBackAt(width, height, pointerX, pointerY),
+            "Controls Back button is clickable at framebuffer scale");
+        expect(!controlsMenuBackAt(width, height, 0.0F, 0.0F),
+            "Controls ignores clicks outside Back");
+    }
+    expect(!controlsMenuBackAt(0, 0, 0.0F, 0.0F),
+        "Controls rejects invalid dimensions");
+    const ControlsMenuLayout tiny = makeControlsMenuLayout(12, 12);
+    expect(tiny.panel.contains(tiny.backButton.x, tiny.backButton.y),
+        "tiny Controls Back target is clamped inside the panel");
 }
 
 void testSettingsMenuLayout()
@@ -1501,6 +1545,7 @@ int main()
     testConservativeVisibilityCulling();
     testMainMenuLayout();
     testPauseMenuLayout();
+    testControlsMenuLayout();
     testResultMenuLayout();
     testExitConfirmationLayout();
     testRunTimeFormatting();

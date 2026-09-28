@@ -11,6 +11,7 @@ enum class MainMenuOption : std::uint8_t {
     Speedrun,
     BestSeed,
     Settings,
+    Controls,
     ExitGame,
     Count,
 };
@@ -23,6 +24,7 @@ enum class MainMenuCommand : std::uint8_t {
     Speedrun,
     BestSeed,
     Settings,
+    Controls,
     ExitGame,
 };
 

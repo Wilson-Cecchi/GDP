@@ -31,8 +31,11 @@ void testPauseNavigation()
     expect(state.selection == PauseMenuOption::Settings,
         "navigation magnitude is normalized to one deterministic step");
     movePauseSelection(state, 1);
+    expect(state.selection == PauseMenuOption::Controls,
+        "down navigation selects Controls after Settings");
+    movePauseSelection(state, 1);
     expect(state.selection == PauseMenuOption::MainMenu,
-        "down navigation selects Main Menu after Settings");
+        "down navigation selects Main Menu after Controls");
     movePauseSelection(state, 1);
     expect(state.selection == PauseMenuOption::ExitGame,
         "down navigation selects Exit Game after Main Menu");
@@ -63,6 +66,10 @@ void testPauseCommands()
             && state.paused,
         "Settings is reported without mutating pause ownership");
     movePauseSelection(state, 1);
+    expect(activatePauseSelection(state) == PauseMenuCommand::Controls
+            && state.paused,
+        "Controls leaves the run paused");
+    movePauseSelection(state, 1);
     expect(activatePauseSelection(state) == PauseMenuCommand::MainMenu
             && state.paused,
         "Main Menu is reported without mutating external run ownership");
@@ -90,6 +97,9 @@ void testDirectPauseSelection()
     selectPauseMenuOption(state, PauseMenuOption::Settings);
     expect(state.selection == PauseMenuOption::Settings,
         "pointer selection can target Settings directly");
+    selectPauseMenuOption(state, PauseMenuOption::Controls);
+    expect(state.selection == PauseMenuOption::Controls,
+        "pointer selection can target Controls directly");
     selectPauseMenuOption(state, PauseMenuOption::MainMenu);
     expect(state.selection == PauseMenuOption::MainMenu,
         "pointer selection can target Main Menu directly");
