@@ -184,6 +184,57 @@ wkc::core::Vec3 navigationDirection(
     return wkc::core::normalized({offset.x, 0.0F, offset.z});
 }
 
+std::optional<wkc::core::Vec3> reachablePlayerApproach(
+    const CollisionWorld& collisionWorld,
+    const wkc::core::Vec3 start,
+    const wkc::core::Vec3 playerPosition,
+    const CharacterCollider collider,
+    const std::int8_t preferredSide) noexcept
+{
+    const wkc::core::Vec3 groundTarget{
+        playerPosition.x, start.y, playerPosition.z};
+    if (collisionWorld.canOccupy(groundTarget, collider)) {
+        return groundTarget;
+    }
+
+    // A player standing on a prop is visible, but their feet are not a valid
+    // ground-level destination for the robot. Approach a reachable corner of
+    // the prop instead of repeatedly walking into its face.
+    const float clearance = collider.radius + 0.10F;
+    std::optional<wkc::core::Vec3> best;
+    float bestDistance = std::numeric_limits<float>::infinity();
+    for (const wkc::core::Aabb solid : collisionWorld.solids()) {
+        if (solid.maximum.y <= start.y
+            || solid.minimum.y >= start.y + collider.height
+            || playerPosition.x < solid.minimum.x - collider.radius
+            || playerPosition.x > solid.maximum.x + collider.radius
+            || playerPosition.z < solid.minimum.z - collider.radius
+            || playerPosition.z > solid.maximum.z + collider.radius) {
+            continue;
+        }
+        const float firstX = preferredSide < 0
+            ? solid.minimum.x - clearance : solid.maximum.x + clearance;
+        const float secondX = preferredSide < 0
+            ? solid.maximum.x + clearance : solid.minimum.x - clearance;
+        for (const float x : {firstX, secondX}) {
+            for (const float z : {
+                     solid.minimum.z - clearance,
+                     solid.maximum.z + clearance}) {
+                const wkc::core::Vec3 corner{x, start.y, z};
+                if (!collisionWorld.canOccupy(corner, collider)) {
+                    continue;
+                }
+                const float distance = planarDistanceSquared(start, corner);
+                if (distance < bestDistance) {
+                    best = corner;
+                    bestDistance = distance;
+                }
+            }
+        }
+    }
+    return best;
+}
+
 wkc::core::Vec3 avoidanceDirection(
     const wkc::core::Vec3 desired,
     const std::int8_t side) noexcept
@@ -873,14 +924,59 @@ bool updateNeuralEnemy(
         + right * lateral;
     const float requestedSpeed = std::min(wkc::core::length(desired), 1.0F)
         * moveSpeed;
+    bool navigating = false;
+    bool reachedApproach = false;
     if (requestedSpeed > 0.05F && step > 0.0F) {
-        entity.transform.position = moveEnemy(
-            manager, enemyIds, collisionWorld, id, roomId, enemy,
-            entity.transform.position, wkc::core::normalized(desired),
-            requestedSpeed, step, collider);
+        wkc::core::Vec3 travelDirection = wkc::core::normalized(desired);
+        if (enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot
+            && forwardIntent > 0.15F) {
+            const wkc::core::Vec3 start = entity.transform.position;
+            const std::int8_t preferredSide = enemy.avoidanceSide != 0
+                ? enemy.avoidanceSide
+                : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
+            const auto approach = reachablePlayerApproach(
+                collisionWorld, start, player.state().position, collider,
+                preferredSide);
+            const bool blockedApproach = approach
+                && planarDistanceSquared(*approach, player.state().position)
+                    > 1.0e-6F;
+            if (blockedApproach
+                && planarDistanceSquared(start, *approach) < 0.04F) {
+                travelDirection = {};
+                navigating = true;
+                reachedApproach = true;
+            } else if (approach && !navigationSegmentClear(
+                    collisionWorld, start, *approach, collider)) {
+                travelDirection = navigationDirection(
+                    collisionWorld, start, *approach, collider, preferredSide);
+                navigating = true;
+            } else if (blockedApproach) {
+                travelDirection = navigationDirection(
+                    collisionWorld, start, *approach, collider, preferredSide);
+                navigating = true;
+            }
+        }
+        const wkc::core::Vec3 previous = entity.transform.position;
+        if (!reachedApproach) {
+            entity.transform.position = moveEnemy(
+                manager, enemyIds, collisionWorld, id, roomId, enemy,
+                previous, travelDirection,
+                requestedSpeed, step, collider);
+        }
+        if (navigating) {
+            turnEnemyToward(entity,
+                reachedApproach
+                    ? player.state().position - entity.transform.position
+                    : entity.transform.position - previous,
+                step, reachedApproach ? targetTurnRateDegreesPerSecond
+                                      : travelTurnRateDegreesPerSecond);
+        }
     }
-    entity.transform.rotationDegrees.y = std::remainder(
-        currentYawDegrees + experiment->outputs[2] * 180.0F * step, 360.0F);
+    // Navigation owns facing only while steering around an obstruction.
+    if (!navigating) {
+        entity.transform.rotationDegrees.y = std::remainder(
+            currentYawDegrees + experiment->outputs[2] * 180.0F * step, 360.0F);
+    }
 
     const wkc::core::Vec3 attackOffset
         = player.state().position - entity.transform.position;

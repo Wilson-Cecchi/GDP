@@ -286,6 +286,61 @@ void testNeuralRangedAim()
         "neural ranged enemy can hit after visibly aligning with the target");
 }
 
+void testNeuralBossNavigatesCover()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const auto run = [](const bool elevated, const int ticks) {
+        const CollisionWorld room{
+            {{-8.0F, 0.0F, -8.0F}, {8.0F, 5.0F, 8.0F}},
+            {{{-1.0F, 0.0F, 0.5F}, {1.0F, 0.9F, 1.5F}}},
+        };
+        EntityManager manager;
+        Player player;
+        player.spawn({0.0F, elevated ? 0.9F : 0.0F,
+            elevated ? 1.0F : -1.0F});
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 4.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1,
+            .archetype = EnemyArchetype::IndustrialRobot,
+            .visualSeed = 0xB055U,
+        });
+        NeuralEnemyExperiment experiment{123, EnemyArchetype::IndustrialRobot};
+        auto parameters = experiment.genome.network.parameters();
+        std::fill(parameters.begin(), parameters.end(), 0.0F);
+        parameters[7] = 2.0F;
+        parameters[64] = 2.0F; // Keep requesting a forward step.
+        IndustrialRobotConfig config;
+        config.longRangeMoveSpeed = 1.5F;
+        config.pressureMoveSpeed = 1.5F;
+        config.pursuitMoveSpeed = 1.5F;
+        config.longRangeDamage = 0.0F;
+        config.pressureDamage = 0.0F;
+        config.pursuitDamage = 0.0F;
+        for (int tick = 0; tick < ticks; ++tick) {
+            (void)updateIndustrialRobots(
+                manager, player, 1, room, 1.0F / 60.0F,
+                config, {}, &experiment);
+        }
+        return std::pair{manager.find(id)->transform.position,
+            experiment.controlledTicks};
+    };
+
+    const auto [behindCover, coveredTicks] = run(false, 270);
+    expect(coveredTicks > 0U && std::abs(behindCover.x) > 0.8F
+            && behindCover.z < -0.5F,
+        "neural boss routes around low visible cover instead of pushing into it");
+    const auto [aboveCover, elevatedTicks] = run(true, 960);
+    expect(elevatedTicks > 0U && std::abs(aboveCover.x) > 1.4F
+            && aboveCover.z < 2.4F,
+        "neural boss approaches a flank when the player stands on a prop");
+    expect(run(true, 1080).first == aboveCover,
+        "neural boss holds its reachable flank instead of oscillating at the prop");
+    expect(run(true, 960).first == aboveCover,
+        "neural boss obstacle approach remains deterministic");
+}
+
 } // namespace
 
 int main()
@@ -295,5 +350,6 @@ int main()
     testExperimentalArchetypes();
     testNeuralLocomotionFacing();
     testNeuralRangedAim();
+    testNeuralBossNavigatesCover();
     return failures == 0 ? 0 : 1;
 }
