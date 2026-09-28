@@ -1,10 +1,12 @@
 #include "world/WorldEntities.hpp"
 
+#include "core/Random.hpp"
 #include "game/SeedDomains.hpp"
 #include "world/LootGenerator.hpp"
 #include "world/PropGenerator.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace gdp::world {
@@ -42,8 +44,10 @@ InitialEntitySet populateInitialEntities(
         std::isfinite(difficulty) ? difficulty : 1.0F, 0.5F, 2.0F);
     std::vector<LootLayout> lootLayouts;
     std::vector<PropLayout> propLayouts;
+    std::vector<std::uint32_t> roomDepths;
     lootLayouts.reserve(world.rooms.size());
     propLayouts.reserve(world.rooms.size());
+    roomDepths.reserve(world.rooms.size());
     for (const RoomInstance& room : world.rooms) {
         const auto node = std::find_if(
             world.graph.nodes.begin(), world.graph.nodes.end(),
@@ -51,6 +55,7 @@ InitialEntitySet populateInitialEntities(
         if (node == world.graph.nodes.end()) {
             return result;
         }
+        roomDepths.push_back(node->depth);
         LootLayout layout = generateLootLayout(
             room.seed, room.role, room.theme, node->depth, room.lootZones,
             safeDifficulty);
@@ -182,25 +187,57 @@ InitialEntitySet populateInitialEntities(
                 .solid = solid,
             }));
         };
+        wkc::core::RandomStream encounter{wkc::core::deriveSeed(
+            room.seed, gdp::game::SeedDomain::EnemySpawn, 0)};
 
         switch (room.role) {
         case RoomRole::Normal:
-            addEnemy(EnemyArchetype::Worker, {}, 50.0F);
+            if (encounter.chance(0.5F)) {
+                addEnemy(EnemyArchetype::Worker, {}, 50.0F);
+            } else {
+                addEnemy(EnemyArchetype::Worker, {-0.75F, 0.0F, 0.0F}, 50.0F);
+                const bool guarded = roomDepths[roomIndex] >= 3U;
+                addEnemy(guarded ? EnemyArchetype::Guard : EnemyArchetype::Worker,
+                    {0.75F, 0.0F, 0.0F}, guarded ? 75.0F : 50.0F);
+            }
             break;
         case RoomRole::Hub:
             break;
         case RoomRole::Arena:
-            addEnemy(EnemyArchetype::Worker, {-1.5F, 0.0F, 0.0F}, 50.0F);
-            addEnemy(EnemyArchetype::Guard, {1.5F, 0.0F, 0.0F}, 75.0F);
-            addEnemy(EnemyArchetype::Officer, {0.0F, 0.0F, 1.5F}, 65.0F);
-            addEnemy(EnemyArchetype::Engineer, {0.0F, 0.0F, -1.5F}, 58.0F);
+        {
+            constexpr std::array archetypes{
+                EnemyArchetype::Worker, EnemyArchetype::Guard,
+                EnemyArchetype::Officer, EnemyArchetype::Engineer,
+            };
+            constexpr std::array positions{
+                wkc::core::Vec3{-1.5F, 0.0F, 0.0F},
+                wkc::core::Vec3{1.5F, 0.0F, 0.0F},
+                wkc::core::Vec3{0.0F, 0.0F, 1.5F},
+                wkc::core::Vec3{0.0F, 0.0F, -1.5F},
+            };
+            std::array<std::size_t, 4> order{0U, 1U, 2U, 3U};
+            for (std::size_t index = 0; index < order.size(); ++index) {
+                const auto selected = static_cast<std::size_t>(encounter.rangeInt(
+                    static_cast<int>(index), static_cast<int>(order.size() - 1U)));
+                std::swap(order[index], order[selected]);
+            }
+            const std::size_t count = static_cast<std::size_t>(encounter.rangeInt(2, 4));
+            for (std::size_t index = 0; index < count; ++index) {
+                const EnemyArchetype archetype = archetypes[order[index]];
+                const float health = archetype == EnemyArchetype::Guard ? 75.0F
+                    : archetype == EnemyArchetype::Officer ? 65.0F
+                    : archetype == EnemyArchetype::Engineer ? 58.0F : 50.0F;
+                addEnemy(archetype, positions[index], health);
+            }
             break;
+        }
         case RoomRole::DeadEnd:
             break;
         case RoomRole::Secret:
             break;
         case RoomRole::Boss:
-            addEnemy(EnemyArchetype::IndustrialRobot, {}, 250.0F);
+            addEnemy(EnemyArchetype::IndustrialRobot, {},
+                360.0F + 30.0F * static_cast<float>(encounter.rangeInt(0, 2)));
             addFixedProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
             break;
         case RoomRole::Start:

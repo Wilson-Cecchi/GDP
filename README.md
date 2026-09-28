@@ -1893,6 +1893,13 @@ computador que apenas executará o jogo.
 Cada nova abertura gráfica sem argumentos escolhe uma seed inicial diferente.
 O valor usado aparece no log e pode ser reproduzido com `--seed`.
 
+O mapa mantém oito salas e a rota garantida START→BOSS, mas as branches agora
+podem ligar-se em pontos diferentes. A sala Secret — e sua Carbine garantida —
+nem sempre fica perto do início. Salas comuns têm um ou dois inimigos, a Arena
+começa com dois a quatro adversários (mais sua onda de evento), e o boss recebe
+360–420 HP conforme a seed. Campanha e Speedrun usam versões de regras novas
+para não misturar checkpoints ou recordes de balanceamentos anteriores.
+
 Executar sem janela por uma quantidade determinada de frames:
 
 ```bash

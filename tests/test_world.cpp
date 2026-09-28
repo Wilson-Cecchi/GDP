@@ -291,8 +291,18 @@ void testMapGraph()
     const bool firstIsBranch = loop.first > graph.mainPath.size();
     const bool secondIsBranch = loop.second > graph.mainPath.size();
     const RoomNodeId mainEndpoint = firstIsBranch ? loop.second : loop.first;
-    expect(firstIsBranch != secondIsBranch
-            && (mainEndpoint == 1U || mainEndpoint == 3U),
+    const RoomNodeId branchEndpoint = firstIsBranch ? loop.first : loop.second;
+    const auto branchLink = std::find_if(
+        graph.edges.begin(), graph.edges.end(),
+        [branchEndpoint](const MapEdge& edge) {
+            return !edge.mainPath
+                && (edge.first == branchEndpoint || edge.second == branchEndpoint);
+        });
+    const RoomNodeId branchParent = branchLink == graph.edges.end() ? 0U
+        : branchLink->first == branchEndpoint ? branchLink->second : branchLink->first;
+    expect(firstIsBranch != secondIsBranch && branchParent != 0U
+            && (mainEndpoint + 1U == branchParent
+                || branchParent + 1U == mainEndpoint),
         "loop closes a local branch instead of creating a map-spanning corridor");
     expect(graphToDot(graph).find("graph GDP") != std::string::npos,
         "graph debug dump uses DOT format");
@@ -317,7 +327,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0xFEF4A385CE034FE6ULL,
+    expect(fingerprint == 0x30238E02FA7C9E8DULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -403,9 +413,8 @@ void testInitialEntityPopulation()
     expect(terminal != nullptr && terminal->type == PropType::Terminal && terminal->solid,
         "START room receives the solid interaction terminal");
 
-    bool arenaGuardValid = false;
-    bool arenaOfficerValid = false;
-    bool arenaEngineerValid = false;
+    bool arenaCompositionValid = true;
+    std::size_t arenaEnemyCount = 0U;
     bool bossRobotValid = false;
     bool startCoverValid = false;
     bool startCoverSpawnClear = false;
@@ -461,34 +470,26 @@ void testInitialEntityPopulation()
                             || !coverBounds.contains(other->transform.position));
                 }
             }
-            arenaGuardValid = arenaGuardValid || (room.role == RoomRole::Arena
-                && enemy != nullptr
-                && enemy->archetype == EnemyArchetype::Guard
-                && enemy->health == 75.0F && enemy->maximumHealth == 75.0F
-                && enemy->visualSeed != 0U);
-            arenaOfficerValid = arenaOfficerValid || (room.role == RoomRole::Arena
-                && enemy != nullptr
-                && enemy->archetype == EnemyArchetype::Officer
-                && enemy->health == 65.0F && enemy->maximumHealth == 65.0F
-                && enemy->visualSeed != 0U);
-            arenaEngineerValid = arenaEngineerValid || (room.role == RoomRole::Arena
-                && enemy != nullptr
-                && enemy->archetype == EnemyArchetype::Engineer
-                && enemy->health == 58.0F && enemy->maximumHealth == 58.0F
-                && enemy->visualSeed != 0U);
+            if (room.role == RoomRole::Arena && enemy != nullptr) {
+                ++arenaEnemyCount;
+                const float expectedHealth = enemy->archetype == EnemyArchetype::Guard
+                    ? 75.0F : enemy->archetype == EnemyArchetype::Officer ? 65.0F
+                    : enemy->archetype == EnemyArchetype::Engineer ? 58.0F : 50.0F;
+                arenaCompositionValid = arenaCompositionValid
+                    && enemy->health == expectedHealth
+                    && enemy->maximumHealth == expectedHealth
+                    && enemy->visualSeed != 0U;
+            }
             bossRobotValid = bossRobotValid || (room.role == RoomRole::Boss
                 && enemy != nullptr
                 && enemy->archetype == EnemyArchetype::IndustrialRobot
-                && enemy->health == 250.0F && enemy->maximumHealth == 250.0F
+                && enemy->health >= 360.0F && enemy->health <= 420.0F
+                && enemy->health == enemy->maximumHealth
                 && enemy->visualSeed != 0U);
         }
     }
-    expect(arenaGuardValid,
-        "Arena population includes one healthy Guard with an isolated visual seed");
-    expect(arenaOfficerValid,
-        "Arena population includes one healthy Officer with an isolated visual seed");
-    expect(arenaEngineerValid,
-        "Arena population includes one healthy Engineer with an isolated visual seed");
+    expect(arenaCompositionValid && arenaEnemyCount >= 2U && arenaEnemyCount <= 4U,
+        "Arena population uses two to four healthy seeded enemies");
     expect(bossRobotValid,
         "Boss population includes one healthy IndustrialRobot with an isolated visual seed");
     expect(startCoverValid,
@@ -532,10 +533,14 @@ void testInitialEntityPopulation()
             ? PropLayout{}
             : generatePropLayout(
                 room.seed, room.role, room.theme, node->depth, room.propZones);
-        const std::size_t baseCount = room.role == RoomRole::Arena ? 4U
-            : room.role == RoomRole::Start ? 4U
-            : room.role == RoomRole::Normal ? 1U
-            : room.role == RoomRole::Boss ? 2U : 0U;
+        const std::size_t baseCount = room.role == RoomRole::Start ? 4U
+            : room.role == RoomRole::Boss ? 2U
+            : static_cast<std::size_t>(std::count_if(
+                room.entities.begin(), room.entities.end(),
+                [&manager](const EntityId id) {
+                    const Entity* entity = manager.find(id);
+                    return entity != nullptr && entity->kind == EntityKind::Enemy;
+                }));
         const std::size_t expectedCount
             = baseCount + props.props.size() + loot.drops.size();
         if (room.entities.size() != expectedCount || manager.queryRoom(room.id) != room.entities) {
@@ -713,8 +718,15 @@ void testWorldSeedBatch()
     bool sawMedium = false;
     bool sawLarge = false;
     bool roleSizesValid = true;
+    std::size_t secretAtHub = 0U;
+    std::size_t secretFarther = 0U;
+    bool secondBranchBeyondHub = true;
+    std::array<bool, 2> normalCounts{};
+    std::array<bool, 3> arenaCounts{};
+    std::array<bool, 3> bossHealthValues{};
+    bool encountersValid = true;
     for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
-        const WorldGenerationResult generated = generateWorld(seed);
+        WorldGenerationResult generated = generateWorld(seed);
         if (!generated.world || !validateWorld(*generated.world).isValid()) {
             allValid = false;
             std::cerr << "World batch failed at seed " << seed << '\n';
@@ -723,6 +735,30 @@ void testWorldSeedBatch()
         maximumAcceptedAttempt = std::max(
             maximumAcceptedAttempt,
             generated.world->acceptedAttempt);
+        const RoomNodeId secondBranchId
+            = static_cast<RoomNodeId>(generated.world->graph.mainPath.size() + 2U);
+        const auto secondBranchLink = std::find_if(
+            generated.world->graph.edges.begin(), generated.world->graph.edges.end(),
+            [secondBranchId](const MapEdge& edge) {
+                return !edge.mainPath && edge.second == secondBranchId;
+            });
+        secondBranchBeyondHub = secondBranchBeyondHub
+            && secondBranchLink != generated.world->graph.edges.end()
+            && secondBranchLink->first > 2U;
+        const auto secretNode = std::find_if(
+            generated.world->graph.nodes.begin(), generated.world->graph.nodes.end(),
+            [](const RoomNode& node) { return node.role == RoomRole::Secret; });
+        if (secretNode != generated.world->graph.nodes.end()) {
+            const auto secretLink = std::find_if(
+                generated.world->graph.edges.begin(), generated.world->graph.edges.end(),
+                [secretNode](const MapEdge& edge) {
+                    return !edge.mainPath && edge.second == secretNode->id;
+                });
+            if (secretLink != generated.world->graph.edges.end()) {
+                secretAtHub += secretLink->first == 2U ? 1U : 0U;
+                secretFarther += secretLink->first > 2U ? 1U : 0U;
+            }
+        }
         for (const RoomInstance& room : generated.world->rooms) {
             sawCompact = sawCompact || room.sizeClass == RoomSizeClass::Compact;
             sawMedium = sawMedium || room.sizeClass == RoomSizeClass::Medium;
@@ -745,6 +781,47 @@ void testWorldSeedBatch()
             }
             maximumCorridorLength = std::max(maximumCorridorLength, length);
         }
+        if (seed < 64U) {
+            gdp::entities::EntityManager manager;
+            const InitialEntitySet initial = populateInitialEntities(
+                *generated.world, manager,
+                {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F});
+            encountersValid = encountersValid && initial.isValid();
+            std::size_t secretWeapons = 0U;
+            for (const RoomInstance& room : generated.world->rooms) {
+                std::size_t enemies = 0U;
+                for (const gdp::entities::EntityId id : room.entities) {
+                    const auto* enemy = manager.findData<gdp::entities::EnemyData>(id);
+                    const auto* item = manager.findData<gdp::entities::ItemData>(id);
+                    enemies += enemy != nullptr ? 1U : 0U;
+                    secretWeapons += room.role == RoomRole::Secret && item != nullptr
+                        && item->type == gdp::entities::ItemType::Weapon ? 1U : 0U;
+                    if (room.role == RoomRole::Boss && enemy != nullptr) {
+                        const float stepped = (enemy->maximumHealth - 360.0F) / 30.0F;
+                        const int index = static_cast<int>(std::lround(stepped));
+                        encountersValid = encountersValid && index >= 0 && index < 3
+                            && std::abs(stepped - static_cast<float>(index)) < 1.0e-4F;
+                        if (index >= 0 && index < 3) {
+                            bossHealthValues[static_cast<std::size_t>(index)] = true;
+                        }
+                    }
+                }
+                if (room.role == RoomRole::Normal) {
+                    encountersValid = encountersValid && enemies >= 1U && enemies <= 2U;
+                    if (enemies >= 1U && enemies <= 2U) {
+                        normalCounts[enemies - 1U] = true;
+                    }
+                } else if (room.role == RoomRole::Arena) {
+                    encountersValid = encountersValid && enemies >= 2U && enemies <= 4U;
+                    if (enemies >= 2U && enemies <= 4U) {
+                        arenaCounts[enemies - 2U] = true;
+                    }
+                } else if (room.role == RoomRole::Boss) {
+                    encountersValid = encountersValid && enemies == 1U;
+                }
+            }
+            encountersValid = encountersValid && secretWeapons == 1U;
+        }
     }
     expect(allValid, "1,000 deterministic seeds produce valid committed worlds");
     expect(maximumAcceptedAttempt < 32U, "batch stays inside configured attempt budget");
@@ -752,6 +829,14 @@ void testWorldSeedBatch()
         "seed batch exercises all size families and preserves role-specific sizing");
     expect(maximumCorridorLength <= 17.0F,
         "local loop policy prevents map-spanning corridors");
+    expect(secondBranchBeyondHub && secretAtHub > 0U
+            && secretFarther > secretAtHub,
+        "seed batch places the guaranteed secret weapon both near and more often farther along the route");
+    expect(encountersValid
+            && std::all_of(normalCounts.begin(), normalCounts.end(), [](bool seen) { return seen; })
+            && std::all_of(arenaCounts.begin(), arenaCounts.end(), [](bool seen) { return seen; })
+            && std::all_of(bossHealthValues.begin(), bossHealthValues.end(), [](bool seen) { return seen; }),
+        "seed batch keeps a weapon and exercises all bounded enemy and boss variants");
 }
 
 } // namespace

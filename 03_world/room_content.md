@@ -55,12 +55,21 @@ Security favorece painéis/monitores/barricadas; Laboratory equipamentos cientí
 `populateInitialEntities()` roda depois do gate estrutural e registra em cada
 `RoomInstance` apenas os handles controlados pelo `EntityManager`. START recebe
 Player, terminal, um Worker ativo, Ammo e um crate procedural; Normal recebe
-Worker, props e loot variáveis; Hub recebe Health e prop temático; Arena recebe
-Worker, Guard, Officer, Engineer, Ammo e props; DeadEnd recebe Ammo e props;
-Secret recebe Key, Health e crate; Boss recebe IndustrialRobot, door e
-barricadas/props. Os quatro
-papéis da Arena e o IndustrialRobot já possuem IA, visual e combate; itens
+um ou dois inimigos (Worker, com Guard possível em maior profundidade), props e
+loot variáveis; Hub recebe Health e prop temático; Arena recebe dois a quatro
+inimigos distintos escolhidos entre Worker, Guard, Officer e Engineer, mais
+Ammo e props; DeadEnd recebe Ammo e props; Secret recebe Key, Health, Weapon e
+crate; Boss recebe um IndustrialRobot com 360, 390 ou 420 HP por seed, door e
+barricadas/props. Os quatro papéis possíveis da Arena e o IndustrialRobot já
+possuem IA, visual e combate; itens
 possuem coleta e efeitos funcionais.
+
+O evento da Arena ainda acrescenta uma onda de um inimigo depois de limpar a
+população inicial, totalizando três a cinco adversários ao longo do encontro.
+A variação usa `SeedDomain::EnemySpawn` e não altera os streams de loot, props,
+eventos ou o visual dos inimigos. A sala Secret continua garantindo a Carbine,
+mas sua ligação no grafo varia; o boss tem mais tempo para apresentar as três
+faixas de comportamento. A dificuldade efetiva ainda exige playtest humano.
 
 Desde a Fase 102, START também recebe uma divisória industrial fixa de
 `0,46 × 2,25 × 2,80 m`, posicionada fora do eixo das portas e no lado oposto ao

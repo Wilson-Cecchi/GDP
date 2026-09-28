@@ -107,6 +107,7 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
 
     const std::uint32_t branchCount = config.roomCount >= 6U ? 2U : 0U;
     const std::uint32_t mainCount = config.roomCount - branchCount;
+    const bool secretFirst = branchCount > 0U && random.chance(0.33F);
     for (std::uint32_t index = 0; index < config.roomCount; ++index) {
         RoomRole role = RoomRole::Normal;
         if (index == 0U) {
@@ -118,7 +119,9 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
         } else if (index == mainCount - 2U) {
             role = RoomRole::Arena;
         } else if (index >= mainCount) {
-            role = ((index - mainCount) % 2U == 0U) ? RoomRole::DeadEnd : RoomRole::Secret;
+            const bool firstBranch = index == mainCount;
+            role = firstBranch == secretFirst
+                ? RoomRole::Secret : RoomRole::DeadEnd;
         }
         graph.nodes.push_back({index + 1U, role, chooseTheme(role, random), 0});
     }
@@ -136,7 +139,12 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
     graph.mainPath.push_back(mainCount);
 
     for (std::uint32_t index = mainCount; index < config.roomCount; ++index) {
-        const RoomNodeId parent = 2;
+        // Keep one branch on the Hub, but let the other appear farther along
+        // the route. The secret and the guaranteed weapon need not be adjacent
+        // to the starting room on every seed.
+        const RoomNodeId parent = index == mainCount ? 2U
+            : static_cast<RoomNodeId>(random.rangeInt(
+                mainCount > 4U ? 3 : 2, static_cast<int>(mainCount - 2U)));
         graph.edges.push_back({nextEdge++, parent, index + 1U, false});
         connections.insert(connectionKey(parent, index + 1U));
         ++degrees[parent - 1U];
