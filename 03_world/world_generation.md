@@ -63,6 +63,14 @@ connector e corridor.
 Essa separação está explícita nos tipos atuais. Placement usa espaçamento mínimo
 e rotação por sala; connector selection escolhe a normal disponível mais
 alinhada ao destino antes de consumir a edge.
+O caminho principal agora escolhe uma direção cardinal inicial e faz uma ou
+duas curvas de 90 graus em índices internos derivados da seed. As branches
+procuram posição livre ao redor do nó pai e favorecem proximidade aos seus
+vizinhos lógicos.
+Cada candidato é rejeitado se houver sobreposição, corredor inválido ou rota
+individual acima de 17 unidades; nenhuma sala é deslocada indefinidamente para
+abrir espaço. O gate de 1.000 seeds verifica conectividade, variedade de
+direções/ordem e o limite dos corredores.
 
 ## Saída
 

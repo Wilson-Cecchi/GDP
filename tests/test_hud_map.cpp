@@ -92,9 +92,22 @@ int main()
         fogValid = fogValid && link.known
             == (initial.rooms[link.first].id == start->id
                 || initial.rooms[link.second].id == start->id);
+        const auto corridor = std::find_if(world.corridors.begin(),
+            world.corridors.end(), [&world, index](const CorridorPath& path) {
+                return path.edge == world.graph.edges[index].id;
+            });
+        fogValid = fogValid && corridor != world.corridors.end()
+            && link.pointCount == corridor->points.size();
+        if (corridor != world.corridors.end()) {
+            for (std::size_t point = 0; point < link.pointCount; ++point) {
+                fogValid = fogValid && link.points[point]
+                    == wkc::core::Vec2{corridor->points[point].x,
+                        corridor->points[point].z};
+            }
+        }
     }
     expect(fogValid && nextRoom != 0U,
-        "fog reveals only visited rooms, neighboring exits and their links");
+        "fog reveals neighboring exits and uses each corridor's actual path");
 
     const std::array visitedNext{start->id, nextRoom};
     const auto moved = gdp::game::buildHudMap(world, visitedNext, nextRoom,

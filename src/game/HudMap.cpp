@@ -48,11 +48,23 @@ visual::HudMapData buildHudMap(
             continue;
         }
         const bool known = map.rooms[first].visited || map.rooms[second].visited;
-        map.links[map.linkCount++] = {
-            static_cast<std::uint8_t>(first),
-            static_cast<std::uint8_t>(second),
-            known,
-        };
+        const auto corridor = std::find_if(world.corridors.begin(),
+            world.corridors.end(), [&edge](const world::CorridorPath& path) {
+                return path.edge == edge.id;
+            });
+        if (corridor == world.corridors.end()
+            || corridor->points.size() > visual::maximumHudMapCorridorPoints) {
+            return {};
+        }
+        visual::HudMapLink& link = map.links[map.linkCount++];
+        link.first = static_cast<std::uint8_t>(first);
+        link.second = static_cast<std::uint8_t>(second);
+        link.known = known;
+        link.pointCount = static_cast<std::uint8_t>(corridor->points.size());
+        for (std::size_t point = 0U; point < corridor->points.size(); ++point) {
+            link.points[point] = {corridor->points[point].x,
+                corridor->points[point].z};
+        }
         if (known) {
             map.rooms[first].known = true;
             map.rooms[second].known = true;

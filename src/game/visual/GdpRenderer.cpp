@@ -3088,6 +3088,18 @@ bool GdpRenderer::render(
                 minimumZ = std::min(minimumZ, center.y);
                 maximumZ = std::max(maximumZ, center.y);
             }
+            for (std::size_t index = 0U;
+                 index < std::min(hud.map.linkCount, hud.map.links.size()); ++index) {
+                const HudMapLink& link = hud.map.links[index];
+                for (std::size_t point = 0U;
+                     point < std::min<std::size_t>(link.pointCount, link.points.size());
+                     ++point) {
+                    minimumX = std::min(minimumX, link.points[point].x);
+                    maximumX = std::max(maximumX, link.points[point].x);
+                    minimumZ = std::min(minimumZ, link.points[point].y);
+                    maximumZ = std::max(maximumZ, link.points[point].y);
+                }
+            }
             const float roomSpanX = std::max(1.0F, maximumX - minimumX);
             const float roomSpanZ = std::max(1.0F, maximumZ - minimumZ);
             const int mapInset = 6 * hudScale;
@@ -3115,14 +3127,38 @@ bool GdpRenderer::render(
                 if (!link.known || link.first >= roomCount || link.second >= roomCount) {
                     continue;
                 }
-                const auto [firstX, firstY] = mapPoint(hud.map.rooms[link.first].center);
-                const auto [secondX, secondY] = mapPoint(hud.map.rooms[link.second].center);
-                drawSolidRect(std::min(firstX, secondX), firstY,
-                    std::abs(secondX - firstX) + lineThickness,
-                    lineThickness, routeColor);
-                drawSolidRect(secondX, std::min(firstY, secondY),
-                    lineThickness, std::abs(secondY - firstY) + lineThickness,
-                    routeColor);
+                const auto drawMapSegment = [&](const wkc::core::Vec2 first,
+                                                const wkc::core::Vec2 second) {
+                    const auto [firstX, firstY] = mapPoint(first);
+                    const auto [secondX, secondY] = mapPoint(second);
+                    if (firstY == secondY) {
+                        drawSolidRect(std::min(firstX, secondX), firstY,
+                            std::abs(secondX - firstX) + lineThickness,
+                            lineThickness, routeColor);
+                    } else if (firstX == secondX) {
+                        drawSolidRect(firstX, std::min(firstY, secondY),
+                            lineThickness,
+                            std::abs(secondY - firstY) + lineThickness,
+                            routeColor);
+                    }
+                };
+                for (std::size_t point = 1U;
+                     point < std::min<std::size_t>(link.pointCount, link.points.size());
+                     ++point) {
+                    drawMapSegment(link.points[point - 1U], link.points[point]);
+                }
+                if (link.pointCount >= 2U) {
+                    // Short strokes inside each room attach its icon to the
+                    // real connector-to-connector corridor polyline.
+                    const auto joinRoom = [&](const wkc::core::Vec2 center,
+                                              const wkc::core::Vec2 door) {
+                        drawMapSegment(center, {door.x, center.y});
+                        drawMapSegment({door.x, center.y}, door);
+                    };
+                    joinRoom(hud.map.rooms[link.first].center, link.points[0]);
+                    joinRoom(hud.map.rooms[link.second].center,
+                        link.points[link.pointCount - 1U]);
+                }
             }
             for (std::size_t index = 0U; index < roomCount; ++index) {
                 const HudMapRoom& mapRoom = hud.map.rooms[index];

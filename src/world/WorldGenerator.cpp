@@ -6,7 +6,7 @@
 #include "world/MapGraph.hpp"
 
 #include <algorithm>
-#include <limits>
+#include <cmath>
 #include <vector>
 
 namespace gdp::world {
@@ -64,32 +64,70 @@ bool overlapsWithGap(
         && first.maximum.z + gap > second.minimum.z;
 }
 
-wkc::core::Vec3 placementForNode(
+std::optional<wkc::core::Vec3> placementForNode(
     const MapGraph& graph,
     const RoomNodeId node,
     const float spacing,
     const RoomInstance& prototype,
-    const std::span<const RoomInstance> placedRooms)
+    const std::span<const RoomInstance> placedRooms,
+    const wkc::core::Seed placementSeed)
 {
     // Preserve the former default feel as a 2.5-unit doorway-to-doorway gap,
     // while allowing callers to request roomier maps through roomSpacing.
     const float corridorClearance = std::max(2.5F, spacing - 9.5F);
+    const auto positionBeside = [&](const RoomInstance& anchor, const int direction) {
+        switch (direction) {
+        case 0: return wkc::core::Vec3{anchor.transform.position.x, 0.0F,
+            anchor.worldBounds.minimum.z - corridorClearance
+                - prototype.worldBounds.maximum.z};
+        case 1: return wkc::core::Vec3{
+            anchor.worldBounds.maximum.x + corridorClearance
+                - prototype.worldBounds.minimum.x, 0.0F,
+            anchor.transform.position.z};
+        case 2: return wkc::core::Vec3{anchor.transform.position.x, 0.0F,
+            anchor.worldBounds.maximum.z + corridorClearance
+                - prototype.worldBounds.minimum.z};
+        default: return wkc::core::Vec3{
+            anchor.worldBounds.minimum.x - corridorClearance
+                - prototype.worldBounds.maximum.x, 0.0F,
+            anchor.transform.position.z};
+        }
+    };
+    const auto clear = [&](const wkc::core::Vec3 position) {
+        const wkc::core::Aabb bounds = translatedBounds(prototype.worldBounds, position);
+        return std::none_of(placedRooms.begin(), placedRooms.end(),
+            [bounds](const RoomInstance& room) {
+                return overlapsWithGap(bounds, room.worldBounds, 0.5F);
+            });
+    };
+    wkc::core::RandomStream random{placementSeed};
     const auto main = std::find(graph.mainPath.begin(), graph.mainPath.end(), node);
     if (main != graph.mainPath.end()) {
         if (main == graph.mainPath.begin()) {
-            return {};
+            return wkc::core::Vec3{};
         }
         const RoomNodeId previousId = *(main - 1);
         const RoomInstance* previous = findPlacedRoom(placedRooms, previousId);
         if (previous == nullptr) {
-            return {};
+            return std::nullopt;
         }
-        return {
-            previous->transform.position.x,
-            0.0F,
-            previous->worldBounds.minimum.z - corridorClearance
-                - prototype.worldBounds.maximum.z,
-        };
+        // Bounded one- or two-turn routes change the silhouette without an
+        // unconstrained random walk that can self-cross or trap corridors.
+        wkc::core::RandomStream layout{placementSeed};
+        const int firstDirection = layout.rangeInt(0, 3);
+        const int turn = layout.chance(0.5F) ? 1 : 3;
+        const std::size_t turnIndex = static_cast<std::size_t>(layout.rangeInt(
+            2, static_cast<int>(graph.mainPath.size() - 2U)));
+        const bool secondTurn = turnIndex + 2U < graph.mainPath.size()
+            && layout.chance(0.5F);
+        const int finalDirection = (firstDirection + turn
+            + (layout.chance(0.5F) ? 1 : 3)) % 4;
+        const std::size_t index = static_cast<std::size_t>(main - graph.mainPath.begin());
+        const int direction = index < turnIndex ? firstDirection
+            : secondTurn && index >= turnIndex + 2U
+                ? finalDirection : (firstDirection + turn) % 4;
+        const wkc::core::Vec3 position = positionBeside(*previous, direction);
+        return clear(position) ? std::optional{position} : std::nullopt;
     }
 
     std::vector<const RoomInstance*> neighbors;
@@ -103,53 +141,28 @@ wkc::core::Vec3 placementForNode(
         }
     }
     if (neighbors.empty()) {
-        return {};
+        return std::nullopt;
     }
-
-    std::size_t branchOrdinal = 0;
-    for (const RoomNode& candidate : graph.nodes) {
-        if (candidate.id == node) {
-            break;
+    const RoomInstance& parent = *neighbors.front();
+    const int offset = random.rangeInt(0, 3);
+    std::optional<wkc::core::Vec3> best;
+    float bestScore = 0.0F;
+    for (int index = 0; index < 4; ++index) {
+        const wkc::core::Vec3 position = positionBeside(parent, (offset + index) % 4);
+        if (!clear(position)) {
+            continue;
         }
-        if (std::find(graph.mainPath.begin(), graph.mainPath.end(), candidate.id)
-            == graph.mainPath.end()) {
-            ++branchOrdinal;
+        float score = 0.0F;
+        for (const RoomInstance* neighbor : neighbors) {
+            score += std::abs(position.x - neighbor->transform.position.x)
+                + std::abs(position.z - neighbor->transform.position.z);
+        }
+        if (!best || score < bestScore) {
+            best = position;
+            bestScore = score;
         }
     }
-    const float side = (branchOrdinal % 2U == 0U) ? -1.0F : 1.0F;
-    float averageZ = 0.0F;
-    float sideBoundary = side < 0.0F
-        ? std::numeric_limits<float>::max()
-        : std::numeric_limits<float>::lowest();
-    for (const RoomInstance* neighbor : neighbors) {
-        averageZ += neighbor->transform.position.z;
-        sideBoundary = side < 0.0F
-            ? std::min(sideBoundary, neighbor->worldBounds.minimum.x)
-            : std::max(sideBoundary, neighbor->worldBounds.maximum.x);
-    }
-    averageZ /= static_cast<float>(neighbors.size());
-
-    wkc::core::Vec3 position{
-        side < 0.0F
-            ? sideBoundary - corridorClearance - prototype.worldBounds.maximum.x
-            : sideBoundary + corridorClearance - prototype.worldBounds.minimum.x,
-        0.0F,
-        averageZ,
-    };
-    for (int adjustment = 0; adjustment < 64; ++adjustment) {
-        const wkc::core::Aabb candidateBounds
-            = translatedBounds(prototype.worldBounds, position);
-        const bool overlaps = std::any_of(
-            placedRooms.begin(), placedRooms.end(),
-            [candidateBounds](const RoomInstance& room) {
-                return overlapsWithGap(candidateBounds, room.worldBounds, 0.5F);
-            });
-        if (!overlaps) {
-            break;
-        }
-        position.x += side;
-    }
-    return position;
+    return best;
 }
 
 ConnectorInstance* chooseConnector(RoomInstance& room, const wkc::core::Vec3 target)
@@ -205,9 +218,14 @@ CandidateOutcome generateCandidate(
         if (!prototype) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }
-        const wkc::core::Vec3 position = placementForNode(
-            candidate.graph, node.id, config.roomSpacing, *prototype, candidate.rooms);
-        auto room = instantiateRoom(*module, node.id, node.role, roomSeed, position, rotation);
+        const auto position = placementForNode(
+            candidate.graph, node.id, config.roomSpacing, *prototype, candidate.rooms,
+            wkc::core::deriveSeed(attemptSeed, gdp::game::SeedDomain::MapPlacement,
+                node.id <= candidate.graph.mainPath.size() ? 0U : node.id));
+        if (!position) {
+            return {std::nullopt, GenerationFailure::RoomOverlap};
+        }
+        auto room = instantiateRoom(*module, node.id, node.role, roomSeed, *position, rotation);
         if (!room) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }
@@ -235,6 +253,14 @@ CandidateOutcome generateCandidate(
         auto corridor = routeCorridor(
             edge.id, firstRoom->id, secondRoom->id, *first, *second, candidate.rooms);
         if (!corridor) {
+            return {std::nullopt, GenerationFailure::CorridorInvalid};
+        }
+        float routeLength = 0.0F;
+        for (std::size_t point = 1U; point < corridor->points.size(); ++point) {
+            routeLength += std::abs(corridor->points[point].x - corridor->points[point - 1U].x)
+                + std::abs(corridor->points[point].z - corridor->points[point - 1U].z);
+        }
+        if (routeLength > 17.0F) {
             return {std::nullopt, GenerationFailure::CorridorInvalid};
         }
         candidate.corridors.push_back(std::move(*corridor));

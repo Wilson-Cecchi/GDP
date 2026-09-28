@@ -67,8 +67,9 @@ Nada disso amplia hit targets nem ocupa o centro do combate.
 
 Um painel no canto superior esquerdo mostra o setor em coordenadas reais do
 mundo: quadrado ciano para a sala atual, marcação clara para salas visitadas,
-marcação discreta para saídas vizinhas descobertas e linhas para as conexões
-conhecidas. O ponto do jogador e seu indicador de direção acompanham o
+marcação discreta para saídas vizinhas descobertas e linhas que copiam os
+pontos reais de cada corredor, inclusive curvas, em vez de traçar um L entre
+centros de salas. O ponto do jogador e seu indicador de direção acompanham o
 deslocamento dentro de salas e corredores. Salas além das saídas conhecidas
 ficam ocultas; a sala Secret não recebe ícone especial antes de ser visitada.
 

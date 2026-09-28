@@ -108,15 +108,25 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
     const std::uint32_t branchCount = config.roomCount >= 6U ? 2U : 0U;
     const std::uint32_t mainCount = config.roomCount - branchCount;
     const bool secretFirst = branchCount > 0U && random.chance(0.33F);
+    const std::uint32_t hubIndex = branchCount > 0U
+        ? static_cast<std::uint32_t>(random.rangeInt(1, static_cast<int>(mainCount - 3U)))
+        : 0U;
+    std::uint32_t arenaIndex = mainCount - 2U;
+    if (mainCount >= 5U) {
+        do {
+            arenaIndex = static_cast<std::uint32_t>(random.rangeInt(
+                1, static_cast<int>(mainCount - 2U)));
+        } while (arenaIndex == hubIndex);
+    }
     for (std::uint32_t index = 0; index < config.roomCount; ++index) {
         RoomRole role = RoomRole::Normal;
         if (index == 0U) {
             role = RoomRole::Start;
         } else if (index == mainCount - 1U) {
             role = RoomRole::Boss;
-        } else if (branchCount > 0U && index == 1U) {
+        } else if (branchCount > 0U && index == hubIndex) {
             role = RoomRole::Hub;
-        } else if (index == mainCount - 2U) {
+        } else if (index == arenaIndex) {
             role = RoomRole::Arena;
         } else if (index >= mainCount) {
             const bool firstBranch = index == mainCount;
@@ -139,12 +149,15 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
     graph.mainPath.push_back(mainCount);
 
     for (std::uint32_t index = mainCount; index < config.roomCount; ++index) {
-        // Keep one branch on the Hub, but let the other appear farther along
-        // the route. The secret and the guaranteed weapon need not be adjacent
-        // to the starting room on every seed.
-        const RoomNodeId parent = index == mainCount ? 2U
-            : static_cast<RoomNodeId>(random.rangeInt(
-                mainCount > 4U ? 3 : 2, static_cast<int>(mainCount - 2U)));
+        // Keep one branch on the Hub while varying where both the Hub and
+        // second branch appear along the main route.
+        RoomNodeId parent = hubIndex + 1U;
+        if (index != mainCount) {
+            do {
+                parent = static_cast<RoomNodeId>(random.rangeInt(
+                    2, static_cast<int>(mainCount - 1U)));
+            } while (parent == hubIndex + 1U);
+        }
         graph.edges.push_back({nextEdge++, parent, index + 1U, false});
         connections.insert(connectionKey(parent, index + 1U));
         ++degrees[parent - 1U];

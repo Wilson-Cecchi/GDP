@@ -327,7 +327,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0x30238E02FA7C9E8DULL,
+    expect(fingerprint == 0xAB7EF9529E06FBE8ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -720,7 +720,13 @@ void testWorldSeedBatch()
     bool roleSizesValid = true;
     std::size_t secretAtHub = 0U;
     std::size_t secretFarther = 0U;
-    bool secondBranchBeyondHub = true;
+    bool secondBranchAwayFromHub = true;
+    std::array<bool, 4> firstDirections{};
+    std::array<bool, 4> hubPositions{};
+    std::array<bool, 4> arenaPositions{};
+    bool mainPathTurns = true;
+    bool sawOneTurn = false;
+    bool sawTwoTurns = false;
     std::array<bool, 2> normalCounts{};
     std::array<bool, 3> arenaCounts{};
     std::array<bool, 3> bossHealthValues{};
@@ -735,6 +741,34 @@ void testWorldSeedBatch()
         maximumAcceptedAttempt = std::max(
             maximumAcceptedAttempt,
             generated.world->acceptedAttempt);
+        const auto& rooms = generated.world->rooms;
+        const auto& nodes = generated.world->graph.nodes;
+        const float firstX = rooms[1].transform.position.x - rooms[0].transform.position.x;
+        const float firstZ = rooms[1].transform.position.z - rooms[0].transform.position.z;
+        firstDirections[std::abs(firstX) > std::abs(firstZ)
+            ? (firstX > 0.0F ? 1U : 3U) : (firstZ > 0.0F ? 2U : 0U)] = true;
+        std::size_t turns = 0U;
+        for (std::size_t index = 2U; index < generated.world->graph.mainPath.size(); ++index) {
+            const float previousX = rooms[index - 1U].transform.position.x
+                - rooms[index - 2U].transform.position.x;
+            const float currentX = rooms[index].transform.position.x
+                - rooms[index - 1U].transform.position.x;
+            turns += (std::abs(previousX) > 0.01F)
+                != (std::abs(currentX) > 0.01F) ? 1U : 0U;
+        }
+        mainPathTurns = mainPathTurns && turns >= 1U && turns <= 2U;
+        sawOneTurn = sawOneTurn || turns == 1U;
+        sawTwoTurns = sawTwoTurns || turns == 2U;
+        const auto hub = std::find_if(nodes.begin(), nodes.end(),
+            [](const RoomNode& room) { return room.role == RoomRole::Hub; });
+        const auto arena = std::find_if(nodes.begin(), nodes.end(),
+            [](const RoomNode& room) { return room.role == RoomRole::Arena; });
+        if (hub != nodes.end() && hub->id >= 2U && hub->id <= 5U) {
+            hubPositions[hub->id - 2U] = true;
+        }
+        if (arena != nodes.end() && arena->id >= 2U && arena->id <= 5U) {
+            arenaPositions[arena->id - 2U] = true;
+        }
         const RoomNodeId secondBranchId
             = static_cast<RoomNodeId>(generated.world->graph.mainPath.size() + 2U);
         const auto secondBranchLink = std::find_if(
@@ -742,9 +776,9 @@ void testWorldSeedBatch()
             [secondBranchId](const MapEdge& edge) {
                 return !edge.mainPath && edge.second == secondBranchId;
             });
-        secondBranchBeyondHub = secondBranchBeyondHub
+        secondBranchAwayFromHub = secondBranchAwayFromHub
             && secondBranchLink != generated.world->graph.edges.end()
-            && secondBranchLink->first > 2U;
+            && hub != nodes.end() && secondBranchLink->first != hub->id;
         const auto secretNode = std::find_if(
             generated.world->graph.nodes.begin(), generated.world->graph.nodes.end(),
             [](const RoomNode& node) { return node.role == RoomRole::Secret; });
@@ -755,8 +789,8 @@ void testWorldSeedBatch()
                     return !edge.mainPath && edge.second == secretNode->id;
                 });
             if (secretLink != generated.world->graph.edges.end()) {
-                secretAtHub += secretLink->first == 2U ? 1U : 0U;
-                secretFarther += secretLink->first > 2U ? 1U : 0U;
+                secretAtHub += hub != nodes.end() && secretLink->first == hub->id ? 1U : 0U;
+                secretFarther += hub != nodes.end() && secretLink->first != hub->id ? 1U : 0U;
             }
         }
         for (const RoomInstance& room : generated.world->rooms) {
@@ -829,9 +863,14 @@ void testWorldSeedBatch()
         "seed batch exercises all size families and preserves role-specific sizing");
     expect(maximumCorridorLength <= 17.0F,
         "local loop policy prevents map-spanning corridors");
-    expect(secondBranchBeyondHub && secretAtHub > 0U
+    expect(secondBranchAwayFromHub && secretAtHub > 0U
             && secretFarther > secretAtHub,
-        "seed batch places the guaranteed secret weapon both near and more often farther along the route");
+        "seed batch places the guaranteed secret weapon both at the Hub and elsewhere");
+    expect(mainPathTurns && sawOneTurn && sawTwoTurns
+            && std::all_of(firstDirections.begin(), firstDirections.end(), [](bool seen) { return seen; })
+            && std::count(hubPositions.begin(), hubPositions.end(), true) >= 2
+            && std::count(arenaPositions.begin(), arenaPositions.end(), true) >= 2,
+        "seed batch varies route direction, turns and room-role order");
     expect(encountersValid
             && std::all_of(normalCounts.begin(), normalCounts.end(), [](bool seen) { return seen; })
             && std::all_of(arenaCounts.begin(), arenaCounts.end(), [](bool seen) { return seen; })

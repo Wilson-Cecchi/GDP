@@ -650,12 +650,26 @@ int main()
             mapHud.map.rooms[2] = {3U, {12.0F, -12.0F}, false, false, false};
             mapHud.map.linkCount = 2U;
             mapHud.map.links[0] = {0U, 1U, true};
+            mapHud.map.links[0].points[0] = {0.0F, -2.0F};
+            mapHud.map.links[0].points[1] = {0.0F, -10.0F};
+            mapHud.map.links[0].pointCount = 2U;
             mapHud.map.links[1] = {1U, 2U, false};
             const bool renderedMapHud = renderer.render(
                 width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mapHud);
             std::vector<std::uint8_t> mapHudPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mapHudPixels.data());
+
+            gdp::game::visual::HudRenderData bentMapHud = mapHud;
+            bentMapHud.map.links[0].points[1] = {4.0F, -2.0F};
+            bentMapHud.map.links[0].points[2] = {4.0F, -10.0F};
+            bentMapHud.map.links[0].points[3] = {0.0F, -10.0F};
+            bentMapHud.map.links[0].pointCount = 4U;
+            const bool renderedBentMapHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, bentMapHud);
+            std::vector<std::uint8_t> bentMapHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                bentMapHudPixels.data());
 
             mapHud.map.rooms[1].visited = true;
             mapHud.map.rooms[2].known = true;
@@ -1156,6 +1170,7 @@ int main()
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
             std::size_t mapHudChangedChannels = 0;
+            std::size_t mapRouteChangedChannels = 0;
             std::size_t mapExplorationChangedChannels = 0;
             std::size_t spreadHudChangedChannels = 0;
             std::size_t weakPointHudChangedChannels = 0;
@@ -1292,6 +1307,10 @@ int main()
                     if (mapHudPixels[index + channel]
                         != mapReferencePixels[index + channel]) {
                         ++mapHudChangedChannels;
+                    }
+                    if (bentMapHudPixels[index + channel]
+                        != mapHudPixels[index + channel]) {
+                        ++mapRouteChangedChannels;
                     }
                     if (exploredMapHudPixels[index + channel]
                         != mapHudPixels[index + channel]) {
@@ -1480,6 +1499,7 @@ int main()
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedMapReference && renderedMapHud
+                && renderedBentMapHud && mapRouteChangedChannels > 5U
                 && renderedExploredMapHud && mapHudChangedChannels > 100U
                 && mapExplorationChangedChannels > 5U
                 && renderedSpreadHud && spreadHudChangedChannels > 20U

@@ -483,6 +483,7 @@ exitConfirmationSelectionAt(
 
 inline constexpr std::size_t maximumHudMapRooms = 32U;
 inline constexpr std::size_t maximumHudMapLinks = 64U;
+inline constexpr std::size_t maximumHudMapCorridorPoints = 8U;
 
 struct HudMapRoom {
     std::uint32_t id{0U};
@@ -496,6 +497,8 @@ struct HudMapLink {
     std::uint8_t first{0U};
     std::uint8_t second{0U};
     bool known{false};
+    std::array<wkc::core::Vec2, maximumHudMapCorridorPoints> points{};
+    std::uint8_t pointCount{0U};
 };
 
 struct HudMapData {

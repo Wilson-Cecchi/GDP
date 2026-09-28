@@ -27,13 +27,13 @@ struct MapEdge { EdgeID id; RoomNodeID a,b; bool mainPath; };
 base conectada → MST → loops controlados → roles → branches/secrets
 ```
 
-A implementação parte de uma chain autoritativa START→BOSS e gasta um
+A implementação parte de um caminho autoritativo START→BOSS e gasta um
 `loopBudget` explícito sem self-edge, duplicata ou grau maior que quatro. Oito
-salas são o perfil inicial, com duas branches e um loop. Uma branch mantém o
-Hub conectado; a outra escolhe por seed um ponto de ligação após o Hub e antes
-da Arena (quando o tamanho do mapa permite). Secret e DeadEnd trocam de branch
-por seed, com a Secret favorecendo a branch mais distante. Assim, a
-arma garantida na Secret não fica sempre em uma sala ao lado do Hub. Os loops
+salas são o perfil inicial, com duas branches e um loop. Hub e Arena variam de
+posição entre os nós internos do caminho; uma branch permanece conectada ao
+Hub e a outra escolhe outro nó interno. Secret e DeadEnd trocam de branch por
+seed, com a Secret favorecendo a branch fora do Hub. Assim, a arma garantida na
+Secret e o encontro da Arena não seguem sempre a mesma ordem. Os loops
 continuam locais para não gerar corredores excessivamente longos.
 
 ## Regras
