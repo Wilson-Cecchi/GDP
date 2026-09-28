@@ -929,6 +929,76 @@ void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
         "line of sight cannot cross disconnected navigable volumes");
 }
 
+void testShotsThroughOpenCorridor()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld openPath = CollisionWorld::fromWalkableVolumes({
+        {{-4.0F, 0.0F, 0.0F}, {4.0F, 4.0F, 5.0F}},
+        {{-0.6F, 0.0F, -3.0F}, {0.6F, 2.2F, 0.0F}},
+        {{-4.0F, 0.0F, -8.0F}, {4.0F, 4.0F, -3.0F}},
+    });
+    const CollisionWorld closedPath{{{-4.0F, 0.0F, 0.0F}, {4.0F, 4.0F, 5.0F}}};
+    EntityManager manager;
+    const EntityId enemy = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -5.5F}},
+        .roomId = 2U,
+        .health = 100.0F,
+    });
+    constexpr std::array reachableRoom{2U};
+    const wkc::core::Vec3 direction{0.0F, 0.0F, -1.0F};
+    const WeaponDefinition definition{.fireInterval = 0.0F, .range = 20.0F};
+
+    Weapon isolated(definition);
+    const ShotResult withoutNeighbor = fireHitscan(isolated,
+        {0.0F, 1.0F, -1.5F}, direction, 1U, openPath, manager);
+    expect(!withoutNeighbor.hit && manager.findData<EnemyData>(enemy)->health == 100.0F,
+        "corridor target is not damaged without an explicitly reachable room");
+
+    Weapon openWeapon(definition);
+    const ShotResult throughCorridor = fireHitscan(openWeapon,
+        {0.0F, 1.0F, -1.5F}, direction, 1U, openPath, manager,
+        1.0F, reachableRoom);
+    expect(throughCorridor.outcome == ShotOutcome::Hit && throughCorridor.hit
+            && throughCorridor.hit->target == enemy
+            && manager.findData<EnemyData>(enemy)->health < 100.0F,
+        "shot from a corridor damages a visible enemy in its open neighbor room");
+
+    const float damagedHealth = manager.findData<EnemyData>(enemy)->health;
+    Weapon closedWeapon(definition);
+    const ShotResult throughClosedDoor = fireHitscan(closedWeapon,
+        {0.0F, 1.0F, 2.0F}, direction, 1U, closedPath, manager,
+        1.0F, reachableRoom);
+    expect(throughClosedDoor.outcome == ShotOutcome::ImpactWorld
+            && !throughClosedDoor.hit
+            && manager.findData<EnemyData>(enemy)->health == damagedHealth,
+        "closed geometry still blocks a cross-room shot even if room selection is stale");
+
+    EntityManager propManager;
+    const EntityId crate = propManager.createProp({
+        .transform = {.position = {0.0F, 0.0F, -4.2F},
+            .scale = {1.0F, 1.6F, 1.0F}},
+        .roomId = 2U,
+        .type = PropType::Crate,
+        .solid = true,
+        .health = 80.0F,
+        .maximumHealth = 80.0F,
+    });
+    const EntityId behindCrate = propManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -5.5F}},
+        .roomId = 2U,
+        .health = 100.0F,
+    });
+    Weapon propWeapon(definition);
+    const ShotResult propShot = fireHitscan(propWeapon,
+        {0.0F, 1.0F, -1.5F}, direction, 1U, openPath, propManager,
+        1.0F, reachableRoom);
+    expect(propShot.hit && propShot.hit->target == crate
+            && propManager.findData<EnemyData>(behindCrate)->health == 100.0F,
+        "an adjacent room prop absorbs the shot before an enemy behind it");
+}
+
 void testWorkerBehavior()
 {
     using namespace gdp::entities;
@@ -2587,6 +2657,7 @@ int main()
     testHitscanSelectionAndBlocking();
     testWeakPointDamageAndClassification();
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
+    testShotsThroughOpenCorridor();
     testWorkerBehavior();
     testWorkerLineOfSight();
     testDirectionalEnemyVision();

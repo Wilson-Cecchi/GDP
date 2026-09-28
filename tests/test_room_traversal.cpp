@@ -1,5 +1,6 @@
 #include "core/Math.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Combat.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/RoomTraversal.hpp"
@@ -364,6 +365,58 @@ void testCorridorTraversalSeedBatch()
         "500 deterministic worlds keep every corridor traversable in both directions");
 }
 
+void testOpenCorridorShotsReachNextRoom()
+{
+    using namespace gdp;
+    bool allReachable = true;
+    for (wkc::core::Seed seed = 0U; seed < 64U; ++seed) {
+        const world::WorldGenerationResult generated = world::generateWorld(seed);
+        if (!generated.world || generated.world->corridors.empty()) {
+            allReachable = false;
+            break;
+        }
+        const world::World& world = *generated.world;
+        const world::CorridorPath& corridor = world.corridors.front();
+        const world::RoomInstance* destination = findRoom(world, corridor.secondRoom);
+        const world::ConnectorInstance* destinationDoor = destination == nullptr
+            ? nullptr : connectorForEdge(*destination, corridor.edge);
+        if (destinationDoor == nullptr || corridor.points.size() < 3U) {
+            allReachable = false;
+            break;
+        }
+        wkc::core::Vec3 origin = corridor.points[corridor.points.size() - 2U];
+        origin.y = 1.0F;
+        wkc::core::Vec3 target = destinationDoor->worldPosition
+            - destinationDoor->worldNormal * 1.4F;
+        target.y = 1.0F;
+        if (!gameplay::corridorProgressAt(corridor, origin)
+            || gameplay::roomContainingCharacter(world, origin)) {
+            allReachable = false;
+            break;
+        }
+        entities::EntityManager manager;
+        const entities::EntityId enemy = manager.createEnemy({
+            .transform = {.position = {target.x, 0.0F, target.z}},
+            .roomId = destination->id,
+            .health = 100.0F,
+        });
+        gameplay::Weapon weapon({.fireInterval = 0.0F, .range = 20.0F});
+        const auto navigation = gameplay::makeRoomNavigationCollision(
+            world, corridor.firstRoom, false);
+        const std::array reachableRoom{destination->id};
+        const gameplay::ShotResult shot = gameplay::fireHitscan(
+            weapon, origin, wkc::core::normalized(target - origin),
+            corridor.firstRoom, navigation, manager, 1.0F, reachableRoom);
+        if (!shot.hit || shot.hit->target != enemy) {
+            std::cerr << "Corridor combat failed at seed " << seed << '\n';
+            allReachable = false;
+            break;
+        }
+    }
+    expect(allReachable,
+        "shots from generated corridors reach enemies just inside the next room");
+}
+
 void testLockdownEntryKeepsPlayerMobile()
 {
     using namespace gdp;
@@ -545,6 +598,7 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
 int main()
 {
     testEveryGeneratedConnectionTraversesBothWays();
+    testOpenCorridorShotsReachNextRoom();
     testRangeInvalidInputAndPlayerRelocation();
     testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();

@@ -3061,7 +3061,7 @@ bool GdpRenderer::render(
     if (hud.visible && hud.map.visible && hud.map.roomCount > 0U
         && (!hud.performanceOverlay || height >= 520)) {
         const int mapSize = std::max(24,
-            std::min({60 * hudScale, width / 3, height / 3}));
+            std::min({76 * hudScale, width / 3, height / 3}));
         const int mapWidth = mapSize + (hudPadding * 2);
         const int mapHeight = mapSize + (hudPadding * 2) + (10 * hudScale);
         const int performanceHeight = hud.performanceOverlay
@@ -3075,18 +3075,18 @@ bool GdpRenderer::render(
                 mapY + mapHeight - hudPadding - (7 * hudScale),
                 hudScale, "MAP", cyanColor);
 
-            float minimumX = hud.map.rooms[0].center.x;
-            float maximumX = minimumX;
-            float minimumZ = hud.map.rooms[0].center.y;
-            float maximumZ = minimumZ;
+            float minimumX = hud.map.rooms[0].minimum.x;
+            float maximumX = hud.map.rooms[0].maximum.x;
+            float minimumZ = hud.map.rooms[0].minimum.y;
+            float maximumZ = hud.map.rooms[0].maximum.y;
             const std::size_t roomCount = std::min(
                 hud.map.roomCount, hud.map.rooms.size());
             for (std::size_t index = 1U; index < roomCount; ++index) {
-                const wkc::core::Vec2 center = hud.map.rooms[index].center;
-                minimumX = std::min(minimumX, center.x);
-                maximumX = std::max(maximumX, center.x);
-                minimumZ = std::min(minimumZ, center.y);
-                maximumZ = std::max(maximumZ, center.y);
+                const HudMapRoom& mapRoom = hud.map.rooms[index];
+                minimumX = std::min(minimumX, mapRoom.minimum.x);
+                maximumX = std::max(maximumX, mapRoom.maximum.x);
+                minimumZ = std::min(minimumZ, mapRoom.minimum.y);
+                maximumZ = std::max(maximumZ, mapRoom.maximum.y);
             }
             for (std::size_t index = 0U;
                  index < std::min(hud.map.linkCount, hud.map.links.size()); ++index) {
@@ -3165,14 +3165,16 @@ bool GdpRenderer::render(
                 if (!mapRoom.known) {
                     continue;
                 }
-                const auto [centerX, centerY] = mapPoint(mapRoom.center);
-                const int tileSize = (mapRoom.current ? 5 : mapRoom.visited ? 4 : 3)
-                    * hudScale;
+                const auto [left, top] = mapPoint(
+                    {mapRoom.minimum.x, mapRoom.maximum.y});
+                const auto [right, bottom] = mapPoint(
+                    {mapRoom.maximum.x, mapRoom.minimum.y});
                 const wkc::core::Vec3 roomColor = mapRoom.current ? cyanColor
                     : mapRoom.visited ? wkc::core::Vec3{0.46F, 0.66F, 0.70F}
                     : wkc::core::Vec3{0.23F, 0.34F, 0.37F};
-                drawSolidRect(centerX - tileSize / 2, centerY - tileSize / 2,
-                    tileSize, tileSize, roomColor);
+                drawSolidRect(std::min(left, right), std::min(top, bottom),
+                    std::max(1, std::abs(right - left) + 1),
+                    std::max(1, std::abs(bottom - top) + 1), roomColor);
             }
             const auto [playerX, playerY] = mapPoint(hud.map.playerPosition);
             drawSolidRect(playerX - hudScale, playerY - hudScale,

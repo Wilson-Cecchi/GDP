@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace gdp::gameplay {
 
@@ -112,7 +113,8 @@ void updateEnemyHitReactions(
     std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager,
-    float spreadScale = 1.0F) noexcept;
+    float spreadScale = 1.0F,
+    std::span<const std::uint32_t> additionalRoomIds = {}) noexcept;
 
 [[nodiscard]] bool hasLineOfSight(
     wkc::core::Vec3 origin,

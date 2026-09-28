@@ -2601,6 +2601,23 @@ void Application::fixedUpdate(const double fixedStep)
     if (fireRequested && player_.state().alive) {
         const bool meleeAttack = weapon_.definition().archetype
             == gameplay::WeaponArchetype::Knife;
+        std::vector<std::uint32_t> reachableShotRooms;
+        if (world_) {
+            reachableShotRooms.reserve(4U);
+            for (const world::CorridorPath& corridor : world_->corridors) {
+                const world::RoomId neighbor = corridor.firstRoom == playerRoom
+                    ? corridor.secondRoom
+                    : corridor.secondRoom == playerRoom ? corridor.firstRoom : 0U;
+                if (neighbor == 0U) {
+                    continue;
+                }
+                const auto door = doorRuntimes_.find(corridor.edge);
+                if (door != doorRuntimes_.end()
+                    && gameplay::isDoorPassable(door->second)) {
+                    reachableShotRooms.push_back(neighbor);
+                }
+            }
+        }
         const gameplay::ShotResult shot = gameplay::fireHitscan(
             weapon_,
             player_.cameraPosition(),
@@ -2608,7 +2625,8 @@ void Application::fixedUpdate(const double fixedStep)
             playerRoom,
             collisionWorld_,
             entities_,
-            1.0F - aimBlend_ * 0.60F);
+            1.0F - aimBlend_ * 0.60F,
+            reachableShotRooms);
         const gameplay::CombatSignalBatch signals
             = gameplay::combatSignalsForShot(shot);
         const entities::PropData* hitProp = shot.hit
@@ -2644,6 +2662,12 @@ void Application::fixedUpdate(const double fixedStep)
                 entities_, playerRoom,
                 {.position = player_.state().position,
                     .radius = meleeAttack ? 4.0F : 18.0F});
+            for (const world::RoomId neighbor : reachableShotRooms) {
+                (void)gameplay::alertEnemiesToNoise(
+                    entities_, neighbor,
+                    {.position = player_.state().position,
+                        .radius = meleeAttack ? 4.0F : 18.0F});
+            }
             if (audio_) {
                 audio_->playAt(meleeAttack ? gdp::audio::AudioEventKind::MeleeSwing
                                            : gdp::audio::AudioEventKind::WeaponFire,

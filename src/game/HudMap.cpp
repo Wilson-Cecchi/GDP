@@ -31,6 +31,8 @@ visual::HudMapData buildHudMap(
             visited,
             visited,
             room.id == currentRoom,
+            {room.worldBounds.minimum.x, room.worldBounds.minimum.z},
+            {room.worldBounds.maximum.x, room.worldBounds.maximum.z},
         };
     }
     const auto roomIndex = [&map](const world::RoomId id) {

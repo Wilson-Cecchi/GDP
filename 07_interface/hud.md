@@ -66,11 +66,14 @@ Nada disso amplia hit targets nem ocupa o centro do combate.
 ## Minimap
 
 Um painel no canto superior esquerdo mostra o setor em coordenadas reais do
-mundo: quadrado ciano para a sala atual, marcação clara para salas visitadas,
+mundo: footprint proporcional ao tamanho real de cada sala, ciano para a sala
+atual, marcação clara para salas visitadas,
 marcação discreta para saídas vizinhas descobertas e linhas que copiam os
 pontos reais de cada corredor, inclusive curvas, em vez de traçar um L entre
 centros de salas. O ponto do jogador e seu indicador de direção acompanham o
-deslocamento dentro de salas e corredores. Salas além das saídas conhecidas
+deslocamento dentro de salas e corredores. Isso mantém o marcador dentro do
+contorno da sala enquanto o jogador estiver nela, em vez de aparentar um
+deslocamento causado por ícones de tamanho fixo. Salas além das saídas conhecidas
 ficam ocultas; a sala Secret não recebe ícone especial antes de ser visitada.
 
 A lista de salas visitadas pertence à run, é inicializada com START e zerada ao

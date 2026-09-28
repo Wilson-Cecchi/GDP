@@ -1904,8 +1904,12 @@ para não misturar checkpoints ou recordes de layouts anteriores.
 
 O canto superior esquerdo da HUD agora traz um minimapa: ele acompanha sua
 posição e direção, guarda salas visitadas e mostra apenas as saídas já
-descobertas, seguindo a geometria real dos corredores. Reiniciar a run ou
-avançar de andar limpa essa exploração.
+descobertas, seguindo a geometria real dos corredores. Salas usam suas dimensões
+reais no mapa, e tiros disparados de um corredor podem acertar alvos na sala
+vizinha quando a porta estiver aberta. Reiniciar a run ou avançar de andar
+limpa essa exploração.
+Recordes Speedrun anteriores a essa regra de combate são mantidos no arquivo,
+mas não são comparados com os novos tempos.
 
 Executar sem janela por uma quantidade determinada de frames:
 

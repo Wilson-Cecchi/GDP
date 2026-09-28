@@ -304,7 +304,8 @@ ShotResult fireHitscan(
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager,
-    const float spreadScale) noexcept
+    const float spreadScale,
+    const std::span<const std::uint32_t> additionalRoomIds) noexcept
 {
     const FireReadiness readiness = weapon.tryFire();
     if (readiness == FireReadiness::Cooldown) {
@@ -329,11 +330,16 @@ ShotResult fireHitscan(
     }
 
     const float worldDistance = firstWorldDistance(origin, direction, range, collisionWorld);
+    const auto targetRoomAllowed = [roomId, additionalRoomIds](const std::uint32_t targetRoom) {
+        return targetRoom == roomId
+            || std::find(additionalRoomIds.begin(), additionalRoomIds.end(), targetRoom)
+                != additionalRoomIds.end();
+    };
     std::optional<HitResult> nearestHit;
     for (const gdp::entities::EntityId id : manager.query(gdp::entities::EntityKind::Enemy)) {
         const gdp::entities::Entity* entity = manager.find(id);
         const gdp::entities::EnemyData* enemy = manager.findData<gdp::entities::EnemyData>(id);
-        if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
+        if (entity == nullptr || enemy == nullptr || !targetRoomAllowed(entity->roomId)
             || !enemy->active
             || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
             continue;
@@ -365,7 +371,7 @@ ShotResult fireHitscan(
         const bool targetable = prop != nullptr
             && (prop->solid
                 || prop->type == gdp::entities::PropType::CeilingFixture);
-        if (entity == nullptr || prop == nullptr || entity->roomId != roomId
+        if (entity == nullptr || prop == nullptr || !targetRoomAllowed(entity->roomId)
             || !targetable
             || prop->state == gdp::entities::PropState::Destroyed) {
             continue;

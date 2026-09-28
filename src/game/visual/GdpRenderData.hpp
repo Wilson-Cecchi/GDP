@@ -491,6 +491,8 @@ struct HudMapRoom {
     bool known{false};
     bool visited{false};
     bool current{false};
+    wkc::core::Vec2 minimum{};
+    wkc::core::Vec2 maximum{};
 };
 
 struct HudMapLink {

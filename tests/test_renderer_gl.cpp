@@ -645,9 +645,12 @@ int main()
             gdp::game::visual::HudRenderData mapHud = mapReferenceHud;
             mapHud.map.visible = true;
             mapHud.map.roomCount = 3U;
-            mapHud.map.rooms[0] = {1U, {0.0F, 0.0F}, true, true, true};
-            mapHud.map.rooms[1] = {2U, {0.0F, -12.0F}, true, false, false};
-            mapHud.map.rooms[2] = {3U, {12.0F, -12.0F}, false, false, false};
+            mapHud.map.rooms[0] = {1U, {0.0F, 0.0F}, true, true, true,
+                {-4.0F, -4.0F}, {4.0F, 4.0F}};
+            mapHud.map.rooms[1] = {2U, {0.0F, -12.0F}, true, false, false,
+                {-4.0F, -16.0F}, {4.0F, -8.0F}};
+            mapHud.map.rooms[2] = {3U, {12.0F, -12.0F}, false, false, false,
+                {8.0F, -16.0F}, {16.0F, -8.0F}};
             mapHud.map.linkCount = 2U;
             mapHud.map.links[0] = {0U, 1U, true};
             mapHud.map.links[0].points[0] = {0.0F, -2.0F};
@@ -659,6 +662,15 @@ int main()
             std::vector<std::uint8_t> mapHudPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mapHudPixels.data());
+
+            gdp::game::visual::HudRenderData narrowRoomMapHud = mapHud;
+            narrowRoomMapHud.map.rooms[0].minimum.x = -2.0F;
+            narrowRoomMapHud.map.rooms[0].maximum.x = 2.0F;
+            const bool renderedNarrowRoomMapHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, narrowRoomMapHud);
+            std::vector<std::uint8_t> narrowRoomMapHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                narrowRoomMapHudPixels.data());
 
             gdp::game::visual::HudRenderData bentMapHud = mapHud;
             bentMapHud.map.links[0].points[1] = {4.0F, -2.0F};
@@ -1171,6 +1183,7 @@ int main()
             std::size_t functionalHudChangedChannels = 0;
             std::size_t mapHudChangedChannels = 0;
             std::size_t mapRouteChangedChannels = 0;
+            std::size_t mapFootprintChangedChannels = 0;
             std::size_t mapExplorationChangedChannels = 0;
             std::size_t spreadHudChangedChannels = 0;
             std::size_t weakPointHudChangedChannels = 0;
@@ -1311,6 +1324,10 @@ int main()
                     if (bentMapHudPixels[index + channel]
                         != mapHudPixels[index + channel]) {
                         ++mapRouteChangedChannels;
+                    }
+                    if (narrowRoomMapHudPixels[index + channel]
+                        != mapHudPixels[index + channel]) {
+                        ++mapFootprintChangedChannels;
                     }
                     if (exploredMapHudPixels[index + channel]
                         != mapHudPixels[index + channel]) {
@@ -1500,6 +1517,7 @@ int main()
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedMapReference && renderedMapHud
                 && renderedBentMapHud && mapRouteChangedChannels > 5U
+                && renderedNarrowRoomMapHud && mapFootprintChangedChannels > 5U
                 && renderedExploredMapHud && mapHudChangedChannels > 100U
                 && mapExplorationChangedChannels > 5U
                 && renderedSpreadHud && spreadHudChangedChannels > 20U

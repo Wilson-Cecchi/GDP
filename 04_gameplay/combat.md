@@ -39,9 +39,12 @@ Fire input
 O ray lógico parte da câmera/retícula e para no primeiro bloqueador válido. O cano visual não
 define a direção real do tiro.
 
-`fireHitscan()` normaliza a direção, limita pelo alcance, consulta somente
-Enemies vivos e Props sólidos no `roomId` do jogador e compara o primeiro AABB
-de alvo com o primeiro solid ou limite da sala. O resultado distingue cooldown,
+`fireHitscan()` normaliza a direção, limita pelo alcance, consulta Enemies vivos
+e Props sólidos na sala atual e nas salas vizinhas conectadas por portas já
+transitáveis. O raio ainda precisa cruzar os volumes caminháveis contínuos e
+para no primeiro sólido ou limite do espaço aberto; portas fechadas não liberam
+tiros entre salas. Disparos no corredor podem atingir a sala de destino, e o
+ruído alcança os inimigos das salas conectadas. O resultado distingue cooldown,
 vazio, miss, impacto no mundo, prop protegido, hit, kill e prop destruído. Todo
 resultado que realmente toca uma superfície inclui `ImpactResult`: posição do
 primeiro contato, normal oposta ao raio e material `Metal`, `Composite` ou

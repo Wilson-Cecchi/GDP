@@ -65,6 +65,12 @@ int main()
     const auto* secretMarker = findRoom(initial, secret->id);
     expect(startMarker != nullptr && startMarker->current && startMarker->visited,
         "start room is the initial current room");
+    expect(startMarker != nullptr
+            && startMarker->minimum == wkc::core::Vec2{
+                start->worldBounds.minimum.x, start->worldBounds.minimum.z}
+            && startMarker->maximum == wkc::core::Vec2{
+                start->worldBounds.maximum.x, start->worldBounds.maximum.z},
+        "room footprint follows the physical room rather than a fixed icon size");
     expect(secretMarker != nullptr && !secretMarker->known,
         "secret room is not revealed from the starting room");
 
@@ -120,6 +126,20 @@ int main()
     expect(moved.playerPosition == wkc::core::Vec2{2.0F, -3.0F}
             && moved.playerForward == wkc::core::Vec2{1.0F, 0.0F},
         "player marker updates without regenerating the world");
+
+    const wkc::core::Vec3 nearWall{
+        start->worldBounds.maximum.x - 0.4F,
+        start->transform.position.y,
+        start->transform.position.z};
+    const auto nearWallMap = gdp::game::buildHudMap(world, visited, start->id,
+        nearWall, {1.0F, 0.0F, 0.0F});
+    const auto* nearWallRoom = findRoom(nearWallMap, start->id);
+    expect(nearWallRoom != nullptr
+            && nearWallMap.playerPosition.x >= nearWallRoom->minimum.x
+            && nearWallMap.playerPosition.x <= nearWallRoom->maximum.x
+            && nearWallMap.playerPosition.y >= nearWallRoom->minimum.y
+            && nearWallMap.playerPosition.y <= nearWallRoom->maximum.y,
+        "player near a wall stays inside the room's map footprint");
 
     const auto reset = gdp::game::buildHudMap(world, visited, start->id,
         start->transform.position, {0.0F, 0.0F, -1.0F});
