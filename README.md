@@ -689,6 +689,31 @@ especializados das pastas numeradas.
   `--resume CAMINHO_DO_BRAIN`, `--generations N` e
   `--save-dir NOVO_DIRETORIO`.
 
+- **Avaliação reproduzível de gameplay da IA:** `gdp_ai_gameplay_eval` compara a
+  IA anterior (`scripted`) e os cérebros carregados (`neural`) em cinco situações:
+  espaço aberto, cobertura central, jogador elevado, grupo e cobertura do boss
+  (esta última apenas para o robô). Usa salas Start/Boss de um mundo gerado pela
+  seed indicada, com obstáculos de teste fixos, atualização real dos inimigos a
+  60 Hz e o mesmo movimento do jogador nas duas políticas. O CSV informa dano
+  causado ao jogador, acertos, deslocamento dos inimigos, menor distância,
+  tempo até derrota e quantos ticks foram realmente controlados pela rede.
+  Pode-se avaliar um checkpoint ainda não promovido sem alterar os assets:
+
+  ```bash
+  cmake --build --preset debug --target gdp_ai_gameplay_eval
+  build/debug/gdp_ai_gameplay_eval --seed 12345 --frames 360
+  build/debug/gdp_ai_gameplay_eval --seed 12345 --frames 360 \
+    --brain robot=build/ai-runs/EXEMPLO/robot/robot_generation_010000.brain
+  ```
+
+  Para comparar checkpoints, execute com as mesmas seeds e a mesma quantidade
+  de frames; `--brain-dir` aponta para outro conjunto completo de cinco cérebros.
+  Esta é uma medição controlada, não uma partida completa: usa os limites das
+  salas geradas, mas substitui a decoração/colisão interna por obstáculos de
+  teste, não simula tiros do jogador nem progressão de campanha. Dano maior ao
+  jogador, isoladamente, não aprova um cérebro; cobertura, navegação, legibilidade
+  e equilíbrio ainda precisam de playtest.
+
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
 testes. O núcleo inclui streams aleatórios determinísticos, derivação genérica e

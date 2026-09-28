@@ -350,6 +350,11 @@ target_link_libraries(
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
 
+add_executable(gdp_ai_gameplay_eval tools/ai_gameplay_eval.cpp)
+target_link_libraries(gdp_ai_gameplay_eval PRIVATE gdp_training gdp_world)
+gdp_enable_warnings(gdp_ai_gameplay_eval)
+gdp_enable_sanitizers(gdp_ai_gameplay_eval)
+
 set(GDP_ACTIVE_BRAIN_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/worker.brain"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/guard.brain"
@@ -471,6 +476,13 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_active_enemy_brain_tests)
     add_test(NAME active_enemy_brain_catalog COMMAND gdp_active_enemy_brain_tests)
     set_tests_properties(active_enemy_brain_catalog PROPERTIES TIMEOUT 10)
+
+    add_test(NAME ai_gameplay_eval_deterministic
+        COMMAND ${CMAKE_COMMAND}
+            -DGDP_AI_EVAL=$<TARGET_FILE:gdp_ai_gameplay_eval>
+            -DGDP_BRAIN_DIR=${CMAKE_CURRENT_SOURCE_DIR}/assets/ai
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_ai_gameplay_eval.cmake)
+    set_tests_properties(ai_gameplay_eval_deterministic PROPERTIES TIMEOUT 30)
 
     add_test(NAME active_enemy_brains_headless
         COMMAND ${CMAKE_COMMAND}
