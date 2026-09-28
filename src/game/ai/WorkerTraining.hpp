@@ -19,6 +19,10 @@ struct WorkerFitnessMetrics {
     float proximitySeconds{0.0F};
     float idleSeconds{0.0F};
     float contactSeconds{0.0F};
+    float aimSeconds{0.0F};
+    float bossLongRangeSeconds{0.0F};
+    float bossPressureSeconds{0.0F};
+    float bossPursuitSeconds{0.0F};
     float blockedSeconds{0.0F};
     float wastedAttackSeconds{0.0F};
     std::uint32_t attacksLanded{0};

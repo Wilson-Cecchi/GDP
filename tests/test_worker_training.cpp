@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -22,6 +23,16 @@ void expect(const bool condition, const std::string_view message)
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+float reportedMetric(const std::string& output, const std::string_view key)
+{
+    const std::size_t start = output.find(key);
+    if (start == std::string::npos) return -1.0F;
+    std::istringstream input{output.substr(start + key.size())};
+    float value = -1.0F;
+    input >> value;
+    return value;
 }
 
 void testFitness()
@@ -80,6 +91,26 @@ void testFitness()
     expect(scoreEnemyFitness(baseline, boss)
             - scoreEnemyFitness(robotDeath, boss) > 8.0F,
         "boss death has a stronger penalty");
+    WorkerFitnessMetrics aimed = baseline;
+    aimed.aimSeconds += 2.0F;
+    expect(scoreEnemyFitness(aimed, gdp::entities::EnemyArchetype::Guard)
+            > scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Guard)
+            && scoreWorkerFitness(aimed) == scoreWorkerFitness(baseline),
+        "ranged roles reward aligned aim but melee Worker does not");
+    WorkerFitnessMetrics supported = baseline;
+    supported.supportActions += 2U;
+    expect(scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Engineer)
+            - scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Engineer)
+            > scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Officer)
+                - scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Officer),
+        "Engineer values support more highly than Officer");
+    supported.supportActions = 100U;
+    WorkerFitnessMetrics cappedSupport = supported;
+    cappedSupport.supportActions = 4U;
+    expect(scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Engineer)
+            == scoreEnemyFitness(cappedSupport,
+                gdp::entities::EnemyArchetype::Engineer),
+        "support reward is capped to avoid farming scripted actions");
 }
 
 void testTrainingAndPersistence()
@@ -108,11 +139,14 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U,
         "automated training produces a champion and final checkpoint");
-    expect(output.str().find("scenarios=4") != std::string::npos
+    expect(output.str().find("curriculum=2") != std::string::npos
+            && output.str().find("scenarios=4") != std::string::npos
+            && output.str().find("holdout_scenarios=2") != std::string::npos
             && output.str().find("repetitions=2") != std::string::npos
             && output.str().find("worst_scenario=") != std::string::npos
             && output.str().find("blocked_s=") != std::string::npos
-            && output.str().find("wasted_attack_s=") != std::string::npos,
+            && output.str().find("wasted_attack_s=") != std::string::npos
+            && output.str().find("aim_s=") != std::string::npos,
         "training reports scenario count and reward-penalty evidence");
     if (first.succeeded && first.champion && first.lastCheckpoint) {
         expect(first.finalBest >= first.initialBest - 1e-4F,
@@ -252,6 +286,12 @@ void testOtherArchetypes()
         expect(trained.succeeded && trained.lastCheckpoint
                 && trained.champion && trained.lastGeneration == 2U,
             "each enemy archetype trains and saves a brain");
+        if (archetype == EnemyArchetype::IndustrialRobot) {
+            expect(reportedMetric(output.str(), "boss_long_s=") > 0.0F
+                    && reportedMetric(output.str(), "boss_pressure_s=") > 0.0F
+                    && reportedMetric(output.str(), "boss_pursuit_s=") > 0.0F,
+                "boss curriculum exercises all three health phases");
+        }
         if (!trained.lastCheckpoint) continue;
         const auto saved = gdp::persistence::loadEnemyBrain(*trained.lastCheckpoint);
         expect(saved && saved->archetype == archetype

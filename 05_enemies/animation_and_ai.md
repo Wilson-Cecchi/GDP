@@ -174,6 +174,36 @@ vivo ou muda um Prop de `Damaged` para `Intact`. Nunca repara mortos,
 Worker aproxima e ataca; Guard procura linha de tiro; Officer altera ameaça do grupo;
 Engineer opera sistemas; IndustrialRobot muda de fase conforme dano.
 
+## Treino neural experimental por arquétipo
+
+O currículo 2 mantém a topologia e o formato dos cérebros existentes, mas deixa
+de avaliar todos os papéis nas mesmas quatro arenas. Cada arquétipo tem quatro
+situações de treino e duas situações separadas de validação, com duas variações
+de seed por situação. Os padrões variam cobertura, orientação inicial,
+movimento do Player e frequência de disparos recebidos. Worker é avaliado por
+aproximação e contato corpo a corpo; Guard por faixa de tiro e alinhamento;
+Officer por tiro e posição útil ao comando; Engineer por sobrevivência e posição
+útil ao reparo. O IndustrialRobot começa em diferentes faixas de HP, incluindo
+as três fases, e executa episódios de 12 s em vez de 8 s. Seu intervalo de
+distância desejado acompanha a fase atual.
+
+As ações neurais de ataque remoto só acertam após alinhamento de 12° com o
+Player, enquanto o Worker mantém uma tolerância de 35° para combate próximo.
+Quando a visão se perde, o inimigo selecionado volta à investigação e à
+navegação normais com a última posição conhecida; a rede não recebe a posição
+real de um jogador oculto nem continua repetindo saídas de movimento obsoletas.
+Mira alinhada e suporte entram na pontuação com limites para não dominar dano
+e acertos. Comando e reparo permanecem automáticos no gameplay; o treino pode
+melhorar o posicionamento que os viabiliza, mas não atribui à rede a decisão de
+executá-los. Uma política inicial de percepção, giro e ataque dá ao processo um
+ponto de partida; descendentes e indivíduos aleatórios preservam exploração.
+`curriculum=2` nos logs distingue os resultados: pontuações de treinos
+anteriores não são comparáveis, embora seus arquivos `.brain` continuem
+carregáveis para jogo ou `--resume`. Um treino novo, sem `--resume`, é preferível
+para aproveitar a política inicial e o alinhamento de mira mais restrito. A
+integração no jogo segue opt-in para um
+único inimigo por vez, não substitui a IA normal dos demais.
+
 ## Boss
 
 IndustrialRobot detecta em até `24 m`. Acima de 66% de HP opera a `0,75 m/s`

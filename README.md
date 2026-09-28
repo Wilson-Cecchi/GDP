@@ -621,21 +621,26 @@ especializados das pastas numeradas.
   modelo deslize de lado. Cérebros salvos anteriormente continuam carregando,
   mas vale treiná-los novamente para ajustar a política ao novo movimento.
 - **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa arenas
-  determinísticas sem abrir janela ou inicializar renderização/áudio. Cada
-  geração avalia todos os cérebros em quatro cenários, com duas variações de
-  seed cada, envolvendo movimento do jogador,
-  obstáculos à esquerda/direita e retirada. A bonificação prioriza dano e
-  ataques acertados; aproximação, contato visual, proximidade e sobrevivência
-  têm bônus menores e limitados. Dano recebido, morte, inatividade longe do
-  jogador, movimento bloqueado e pedidos de ataque sem visão/alcance reduzem
-  o fitness. A seleção combina a média dos cenários com o pior resultado para
-  não premiar um cérebro que só funciona em uma arena. O log de cada geração
-  mostra os totais dessas métricas nas oito partidas do campeão, permitindo
-  identificar comportamentos que exploram a pontuação. Métricas de movimento
-  e pedido de ataque só são creditadas nos ticks controlados pela rede, não
-  durante comportamentos de suporte/reparo ainda roteirizados. O treino preserva os
-  melhores e cria descendentes por torneio
-  e mutação; outras oito partidas com seeds separadas medem o campeão final.
+  determinísticas sem abrir janela ou inicializar renderização/áudio. O
+  currículo 2 usa quatro cenários de treino por arquétipo, com duas seeds cada,
+  e dois cenários diferentes, também duplicados, para avaliar o campeão fora
+  do treino. Worker pratica perseguição e ataque próximo; Guard, alinhamento
+  de mira e faixa de tiro; Officer, posicionamento junto a aliados; Engineer,
+  sobrevivência e alcance de reparo; IndustrialRobot, as três faixas de HP e
+  combate mais longo. Movimento do jogador, orientação inicial, cobertura e
+  cadência dos disparos recebidos variam. A pontuação de cada papel combina
+  dano, acertos e objetivos táticos limitados, com punições por dano recebido,
+  morte, inatividade, colisão e pedidos de ataque inviáveis. Os disparos neurais
+  remotos exigem alinhamento de 12°; Worker usa 35° para ataque próximo. A
+  população inicial inclui uma política simples que percebe, gira e tenta
+  atacar, além de indivíduos aleatórios; a evolução pode superá-la. A seleção
+  combina média e pior cenário para reduzir especialização excessiva. O log
+  mostra `aim_s`, suporte e demais métricas do campeão. Comando e reparo ainda
+  são ações roteirizadas: a rede aprende somente o posicionamento que pode
+  facilitar essas ações, não decide quando executá-las. Sem visão atual do
+  Player, a navegação volta aos estados normais de alerta/investigação em vez
+  de repetir comandos neurais sem alvo. O treino preserva os
+  melhores e cria descendentes por torneio e mutação.
   `--save-dir` escreve um arquivo versionado com arquétipo e checksum por
   geração, sem substituir arquivos
   existentes. `--resume` inicia outra sequência a partir de um desses campeões
@@ -648,6 +653,10 @@ especializados das pastas numeradas.
   arenas simplificadas e não ensina navegação completa, flanqueamento ou
   coordenação entre inimigos; melhora de fitness não equivale a aprovação de
   gameplay, que ainda requer playtest.
+  Cérebros do currículo anterior continuam carregando e podem ser usados em
+  `--resume`, mas as pontuações antigas não são comparáveis às novas. Para
+  aproveitar a política inicial e a mira mais exigente, prefira começar uma
+  nova população sem `--resume`, usando um diretório de saída novo e vazio.
 
   Exemplo após compilar o preset Debug (use um diretório novo ou vazio):
 

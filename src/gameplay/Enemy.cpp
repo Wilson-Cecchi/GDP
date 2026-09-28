@@ -838,6 +838,12 @@ bool updateNeuralEnemy(
     if (experiment->selected != id) {
         return false;
     }
+    // Without a current sighting the network has no target-position sensor.
+    // Let the regular alert/investigation/navigation states use legitimate
+    // last-known information instead of drifting on stale motor outputs.
+    if (!lineOfSight) {
+        return false;
+    }
     ++experiment->controlledTicks;
     experiment->decisionSecondsRemaining -= step;
     if (experiment->decisionSecondsRemaining <= 0.0F) {
@@ -881,7 +887,18 @@ bool updateNeuralEnemy(
     const float attackDistance = wkc::core::length(
         {attackOffset.x, 0.0F, attackOffset.z});
     const bool attackRequested = experiment->outputs[3] > 0.65F;
+    const float attackYaw = entity.transform.rotationDegrees.y
+        * radiansPerDegree;
+    const wkc::core::Vec3 attackForward{
+        std::sin(attackYaw), 0.0F, std::cos(attackYaw)};
+    const float aimCosine = enemy.archetype == gdp::entities::EnemyArchetype::Worker
+        ? 0.8191520443F : 0.9781476007F; // 35-degree melee, 12-degree ranged.
+    const bool aimAligned = attackDistance <= 1.0e-5F
+        || wkc::core::dot(attackForward,
+            wkc::core::Vec3{attackOffset.x, 0.0F, attackOffset.z}
+                * (1.0F / attackDistance)) >= aimCosine;
     const bool attackVisible = attackRequested && attackDistance <= attackRange
+        && aimAligned
         && playerVisibleToEnemy(entity, player, attackDistance, detectionRange,
             visionHalfAngleDegrees, eyeHeight, collisionWorld, perception);
     if (attackVisible) {

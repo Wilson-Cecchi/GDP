@@ -144,9 +144,10 @@ void testExperimentalWorker()
         blockedManager, hiddenPlayer, 1, blocked, 0.1F,
         WorkerConfig{}, {}, &blockedExperiment);
     expect(blockedExperiment.selected == blockedWorker
+            && blockedExperiment.controlledTicks == 0U
             && hiddenUpdate.attacksLanded == 0
             && hiddenPlayer.state().health == 100.0F,
-        "neural command cannot attack through blocked line of sight");
+        "hidden neural enemy falls back to safe investigation without attacking");
 
     EntityManager turnedManager;
     (void)turnedManager.createEnemy({
@@ -257,6 +258,34 @@ void testNeuralLocomotionFacing()
         "moving neural enemy travels mostly in the direction it faces");
 }
 
+void testNeuralRangedAim()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    EntityManager manager;
+    Player player;
+    player.spawn({3.0F, 0.0F, 0.0F});
+    const EntityId id = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1,
+        .archetype = EnemyArchetype::Guard,
+    });
+    NeuralEnemyExperiment experiment{123, EnemyArchetype::Guard};
+    forceAttack(experiment);
+    const EnemyUpdateSummary broadVision = updateGuards(
+        manager, player, 1, room, 0.01F, GuardConfig{}, {}, &experiment);
+    expect(broadVision.attacksLanded == 0U
+            && player.state().health == 100.0F,
+        "neural ranged enemy cannot hit merely because the target is in vision");
+    manager.find(id)->transform.rotationDegrees.y = 149.0F;
+    const EnemyUpdateSummary aimed = updateGuards(
+        manager, player, 1, room, 0.01F, GuardConfig{}, {}, &experiment);
+    expect(aimed.attacksLanded == 1U && player.state().health < 100.0F,
+        "neural ranged enemy can hit after visibly aligning with the target");
+}
+
 } // namespace
 
 int main()
@@ -265,5 +294,6 @@ int main()
     testExperimentalWorker();
     testExperimentalArchetypes();
     testNeuralLocomotionFacing();
+    testNeuralRangedAim();
     return failures == 0 ? 0 : 1;
 }

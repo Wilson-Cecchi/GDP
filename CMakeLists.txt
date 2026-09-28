@@ -442,7 +442,8 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_worker_training_tests)
 
     add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
-    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 120)
+    # ASan/UBSan runs the role-specific arena curriculum substantially slower.
+    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 300)
 
     add_test(
         NAME worker_training_cli_smoke
