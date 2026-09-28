@@ -226,6 +226,28 @@ void testTrainingAndPersistence()
                     first.champion->network.parameters().begin()),
             "a different seed changes the trained champion");
 
+        WorkerTrainingOptions allScenarios = repeated;
+        allScenarios.generations = 1U;
+        allScenarios.trainAllScenarios = true;
+        std::ostringstream allScenariosOutput;
+        const WorkerTrainingResult broad = runWorkerTraining(
+            allScenarios, allScenariosOutput);
+        expect(broad.succeeded && broad.champion
+                && allScenariosOutput.str().find("curriculum=3")
+                    != std::string::npos
+                && allScenariosOutput.str().find("scenarios=6")
+                    != std::string::npos
+                && allScenariosOutput.str().find("holdout_scenarios=6")
+                    != std::string::npos,
+            "all-scenarios curriculum trains and holds out all six situations");
+        std::ostringstream repeatBroadOutput;
+        const WorkerTrainingResult repeatBroad = runWorkerTraining(
+            allScenarios, repeatBroadOutput);
+        expect(repeatBroad.succeeded
+                && repeatBroad.finalBest == broad.finalBest
+                && repeatBroad.holdoutFitness == broad.holdoutFitness,
+            "all-scenarios curriculum remains deterministic for a fixed seed");
+
         WorkerTrainingOptions resume = options;
         resume.generations = 1U;
         resume.seedExplicit = false;

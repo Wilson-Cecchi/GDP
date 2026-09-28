@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <exception>
@@ -17,6 +18,7 @@
 #include <optional>
 #include <ostream>
 #include <sstream>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -83,8 +85,9 @@ struct TrainingScenario {
     float playerShotInterval;
 };
 
-// The last two cases are evaluated only as holdout. In particular, the boss
-// starts in all three health phases instead of spending every episode at full HP.
+// The last two cases are holdout-only in the default curriculum. The broad
+// curriculum trains all six and evaluates them again with independent seeds.
+// In particular, the boss starts in all three health phases.
 constexpr std::array<TrainingScenario, 6> workerScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -30.0F, 1.0F, 1.4F},
@@ -466,12 +469,16 @@ WorkerEvaluation evaluateGenome(
     const wkc::ai::Genome& genome,
     const wkc::core::Seed scenarioSeed,
     const EnemyArchetype archetype,
-    const bool holdout = false)
+    const bool holdout = false,
+    const bool trainAllScenarios = false)
 {
     WorkerEvaluation evaluation;
     float worst = std::numeric_limits<float>::infinity();
-    const std::size_t firstScenario = holdout ? scenarioCount : 0U;
-    const std::size_t count = holdout ? holdoutScenarioCount : scenarioCount;
+    const std::size_t firstScenario
+        = holdout && !trainAllScenarios ? scenarioCount : 0U;
+    const std::size_t count = trainAllScenarios
+        ? scenarioCount + holdoutScenarioCount
+        : holdout ? holdoutScenarioCount : scenarioCount;
     for (std::size_t offset = 0U; offset < count; ++offset) {
         const std::size_t scenario = firstScenario + offset;
         for (std::size_t repetition = 0U;
@@ -694,8 +701,10 @@ WorkerTrainingResult runEnemyTraining(
     WorkerTrainingResult result;
     if (options.archetype > EnemyArchetype::IndustrialRobot
         || options.population < 2U || options.population > 128U
-        || options.generations == 0U || options.generations > 10'000U) {
-        result.error = "population must be 2..128 and generations must be 1..10000";
+        || options.generations == 0U || options.generations > 10'000U
+        || options.cooldownMilliseconds > 10'000U) {
+        result.error = "population must be 2..128, generations 1..10000, "
+            "and cooldown 0..10000 ms";
         return result;
     }
     try {
@@ -766,20 +775,24 @@ WorkerTrainingResult runEnemyTraining(
             seed, trainingScenarioDomain,
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
-               << " curriculum=2"
+               << " curriculum=" << (options.trainAllScenarios ? 3 : 2)
                << " seed=" << seed
                << " population=" << options.population
                << " generations=" << options.generations
+               << " cooldown_ms=" << options.cooldownMilliseconds
                << " start_generation=" << firstGeneration
-               << " scenarios=" << scenarioCount
-               << " holdout_scenarios=" << holdoutScenarioCount
+               << " scenarios=" << (options.trainAllScenarios
+                    ? scenarioCount + holdoutScenarioCount : scenarioCount)
+               << " holdout_scenarios=" << (options.trainAllScenarios
+                    ? scenarioCount + holdoutScenarioCount : holdoutScenarioCount)
                << " repetitions=" << scenarioRepetitions << '\n';
         for (std::uint32_t offset = 0; offset < options.generations; ++offset) {
             const std::uint32_t generation = firstGeneration + offset;
             float total = 0.0F;
             for (wkc::ai::Genome& genome : population) {
                 genome.fitness = evaluateGenome(
-                    genome, commonScenarios, options.archetype).score;
+                    genome, commonScenarios, options.archetype,
+                    false, options.trainAllScenarios).score;
                 total += genome.fitness;
             }
             std::sort(population.begin(), population.end(),
@@ -796,7 +809,7 @@ WorkerTrainingResult runEnemyTraining(
             result.champion = population.front();
             const WorkerEvaluation bestEvaluation
                 = evaluateGenome(*result.champion, commonScenarios,
-                    options.archetype);
+                    options.archetype, false, options.trainAllScenarios);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
                    << " best=" << std::fixed << std::setprecision(3) << best
@@ -838,12 +851,17 @@ WorkerTrainingResult runEnemyTraining(
             if (offset + 1U < options.generations) {
                 population = nextPopulation(
                     population, populationSeed, generation + 1U);
+                if (options.cooldownMilliseconds > 0U) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds{
+                        options.cooldownMilliseconds});
+                }
             }
         }
         const wkc::core::Seed holdoutSeed
             = wkc::core::deriveSeed(seed, holdoutScenarioDomain, 0U);
         result.holdoutFitness = evaluateGenome(
-            *result.champion, holdoutSeed, options.archetype, true).score;
+            *result.champion, holdoutSeed, options.archetype, true,
+            options.trainAllScenarios).score;
         output << "AI_RESULT generation=" << result.lastGeneration
                << " train_best=" << result.finalBest
                << " holdout=" << result.holdoutFitness;

@@ -42,8 +42,10 @@ struct WorkerTrainingOptions {
     gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
     wkc::core::Seed seed{12'345U};
     bool seedExplicit{false};
+    bool trainAllScenarios{false};
     std::uint32_t population{16U};
     std::uint32_t generations{10U}; // Additional generations when resuming.
+    std::uint32_t cooldownMilliseconds{0U};
     std::optional<std::filesystem::path> saveDirectory;
     std::optional<std::filesystem::path> resumeBrain;
 };

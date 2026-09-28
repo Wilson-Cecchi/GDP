@@ -23,7 +23,8 @@ void printUsage(const std::string_view executable)
                  " [--neural-brain FILE] [--help]\n"
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
-                 " [--seed N] [--save-dir DIR] [--resume FILE]\n"
+                 " [--seed N] [--all-scenarios] [--cooldown-ms N]"
+                 " [--save-dir DIR] [--resume FILE]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
@@ -35,6 +36,8 @@ void printUsage(const std::string_view executable)
               << "  --ai-training TYPE  Train worker, guard, officer, engineer, robot, or all.\n"
               << "  --population N      Training population (2..128, default 16).\n"
               << "  --generations N     Training generations (1..10000, default 10).\n"
+              << "  --all-scenarios     Train all six scenarios per type; test on separate seeds.\n"
+              << "  --cooldown-ms N     Sleep 1..10000 ms between generations to limit heat.\n"
               << "  --save-dir DIR      Save one best-brain checkpoint per generation.\n"
               << "  --resume FILE       Seed a new training run from a checkpoint.\n"
               << "  --help               Show this message.\n";
@@ -179,7 +182,14 @@ int main(const int argc, char* argv[])
             continue;
         }
 
-        if (argument == "--population" || argument == "--generations") {
+        if (argument == "--all-scenarios") {
+            trainingOptions.trainAllScenarios = true;
+            trainingOnlyArgumentSeen = true;
+            continue;
+        }
+
+        if (argument == "--population" || argument == "--generations"
+            || argument == "--cooldown-ms") {
             if (index + 1 >= argc) {
                 std::cerr << "Missing value after " << argument << '\n';
                 return 2;
@@ -191,8 +201,10 @@ int main(const int argc, char* argv[])
             }
             if (argument == "--population") {
                 trainingOptions.population = *value;
-            } else {
+            } else if (argument == "--generations") {
                 trainingOptions.generations = *value;
+            } else {
+                trainingOptions.cooldownMilliseconds = *value;
             }
             trainingOnlyArgumentSeen = true;
             continue;
@@ -318,7 +330,7 @@ int main(const int argc, char* argv[])
         return 0;
     }
     if (trainingOnlyArgumentSeen) {
-        std::cerr << "--population, --generations, --save-dir and --resume need --ai-training\n";
+        std::cerr << "Training options need --ai-training\n";
         return 2;
     }
     if (config.neuralBrainPath && !config.experimentalNeuralEnemy) {

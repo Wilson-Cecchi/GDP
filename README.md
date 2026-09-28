@@ -631,7 +631,10 @@ especializados das pastas numeradas.
   determinísticas sem abrir janela ou inicializar renderização/áudio. O
   currículo 2 usa quatro cenários de treino por arquétipo, com duas seeds cada,
   e dois cenários diferentes, também duplicados, para avaliar o campeão fora
-  do treino. Worker pratica perseguição e ataque próximo; Guard, alinhamento
+  do treino. `--all-scenarios` usa os seis cenários disponíveis de cada
+  arquétipo no treino e avalia os mesmos tipos de situação com seeds separadas
+  (currículo 3). São arenas simplificadas, não todos os mapas gerados pelo jogo.
+  Worker pratica perseguição e ataque próximo; Guard, alinhamento
   de mira e faixa de tiro; Officer, posicionamento junto a aliados; Engineer,
   sobrevivência e alcance de reparo; IndustrialRobot, as três faixas de HP e
   combate mais longo. Movimento do jogador, orientação inicial, cobertura e
@@ -660,6 +663,10 @@ especializados das pastas numeradas.
   arenas simplificadas e não ensina navegação completa, flanqueamento ou
   coordenação entre inimigos; melhora de fitness não equivale a aprovação de
   gameplay, que ainda requer playtest.
+  Em notebooks que aquecem sob carga contínua, `--cooldown-ms N` faz uma pausa
+  de N milissegundos entre gerações, sem alterar os pesos ou a pontuação.
+  A pausa não substitui o monitoramento da temperatura: interrompa o treino
+  se a CPU se aproximar do limite térmico informado pelo hardware.
   Cérebros do currículo anterior continuam carregando e podem ser usados em
   `--resume`, mas as pontuações antigas não são comparáveis às novas. Para
   aproveitar a política inicial e a mira mais exigente, prefira começar uma
@@ -670,6 +677,9 @@ especializados das pastas numeradas.
   ```bash
   build/debug/gdp --ai-training all --population 24 --generations 30 --seed 42 \
     --save-dir build/ai-runs/all-42
+  build/release/gdp --ai-training all --all-scenarios --population 24 \
+    --generations 1200 --seed 424242 --cooldown-ms 1000 \
+    --save-dir build/ai-runs/all-scenarios-424242
   build/debug/gdp --experimental-neural-enemy guard \
     --neural-brain build/ai-runs/all-42/guard/guard_generation_000030.brain
   build/debug/gdp --scripted-enemies # comparação com a IA anterior
