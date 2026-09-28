@@ -1900,6 +1900,10 @@ começa com dois a quatro adversários (mais sua onda de evento), e o boss receb
 360–420 HP conforme a seed. Campanha e Speedrun usam versões de regras novas
 para não misturar checkpoints ou recordes de balanceamentos anteriores.
 
+O canto superior esquerdo da HUD agora traz um minimapa: ele acompanha sua
+posição e direção, guarda salas visitadas e mostra apenas as saídas já
+descobertas. Reiniciar a run ou avançar de andar limpa essa exploração.
+
 Executar sem janela por uma quantidade determinada de frames:
 
 ```bash

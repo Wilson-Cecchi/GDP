@@ -148,6 +148,7 @@ private:
     float aimBlend_{0.0F};
     bool flashlightOn_{false};
     std::optional<world::World> world_;
+    std::vector<world::RoomId> visitedRooms_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
     std::unordered_map<world::RoomId, std::vector<entities::EntityId>>

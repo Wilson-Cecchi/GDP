@@ -633,6 +633,39 @@ int main()
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 functionalHudPixels.data());
 
+            gdp::game::visual::HudRenderData mapReferenceHud = functionalHud;
+            mapReferenceHud.objective
+                = gdp::game::visual::ObjectiveRenderState::None;
+            const bool renderedMapReference = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mapReferenceHud);
+            std::vector<std::uint8_t> mapReferencePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mapReferencePixels.data());
+
+            gdp::game::visual::HudRenderData mapHud = mapReferenceHud;
+            mapHud.map.visible = true;
+            mapHud.map.roomCount = 3U;
+            mapHud.map.rooms[0] = {1U, {0.0F, 0.0F}, true, true, true};
+            mapHud.map.rooms[1] = {2U, {0.0F, -12.0F}, true, false, false};
+            mapHud.map.rooms[2] = {3U, {12.0F, -12.0F}, false, false, false};
+            mapHud.map.linkCount = 2U;
+            mapHud.map.links[0] = {0U, 1U, true};
+            mapHud.map.links[1] = {1U, 2U, false};
+            const bool renderedMapHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mapHud);
+            std::vector<std::uint8_t> mapHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                mapHudPixels.data());
+
+            mapHud.map.rooms[1].visited = true;
+            mapHud.map.rooms[2].known = true;
+            mapHud.map.links[1].known = true;
+            const bool renderedExploredMapHud = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, mapHud);
+            std::vector<std::uint8_t> exploredMapHudPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                exploredMapHudPixels.data());
+
             gdp::game::visual::HudRenderData infoHud = functionalHud;
             infoHud.infoOverlay = true;
             infoHud.runSeed = 12345U;
@@ -1122,6 +1155,8 @@ int main()
             std::size_t campaignResultChangedChannels = 0;
             std::size_t resultSelectionChangedChannels = 0;
             std::size_t functionalHudChangedChannels = 0;
+            std::size_t mapHudChangedChannels = 0;
+            std::size_t mapExplorationChangedChannels = 0;
             std::size_t spreadHudChangedChannels = 0;
             std::size_t weakPointHudChangedChannels = 0;
             std::size_t performanceOverlayChangedChannels = 0;
@@ -1253,6 +1288,14 @@ int main()
                     if (functionalHudPixels[index + channel]
                         != centralHubPixels[index + channel]) {
                         ++functionalHudChangedChannels;
+                    }
+                    if (mapHudPixels[index + channel]
+                        != mapReferencePixels[index + channel]) {
+                        ++mapHudChangedChannels;
+                    }
+                    if (exploredMapHudPixels[index + channel]
+                        != mapHudPixels[index + channel]) {
+                        ++mapExplorationChangedChannels;
                     }
                     if (spreadHudPixels[index + channel]
                         != functionalHudPixels[index + channel]) {
@@ -1436,6 +1479,9 @@ int main()
                 && campaignResultChangedChannels > 100U
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
+                && renderedMapReference && renderedMapHud
+                && renderedExploredMapHud && mapHudChangedChannels > 100U
+                && mapExplorationChangedChannels > 5U
                 && renderedSpreadHud && spreadHudChangedChannels > 20U
                 && renderedWeakPointHud && weakPointHudChangedChannels > 20U
                 && renderedPerformanceOverlay

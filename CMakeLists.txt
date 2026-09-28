@@ -328,6 +328,7 @@ add_executable(
     gdp
     src/main.cpp
     src/game/Application.cpp
+    src/game/HudMap.cpp
     src/game/LaunchSeed.cpp
     src/game/PerformanceMonitor.cpp
 )
@@ -805,6 +806,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME world_module_systems COMMAND gdp_world_tests)
     set_tests_properties(world_module_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_hud_map_tests tests/test_hud_map.cpp src/game/HudMap.cpp)
+    target_link_libraries(gdp_hud_map_tests PRIVATE gdp_world)
+    gdp_enable_warnings(gdp_hud_map_tests)
+    gdp_enable_sanitizers(gdp_hud_map_tests)
+
+    add_test(NAME hud_map_systems COMMAND gdp_hud_map_tests)
+    set_tests_properties(hud_map_systems PROPERTIES TIMEOUT 10)
 
     add_test(NAME bootstrap_headless COMMAND gdp --headless --frames 3)
     set_tests_properties(bootstrap_headless PROPERTIES TIMEOUT 10)

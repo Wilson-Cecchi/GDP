@@ -481,11 +481,39 @@ exitConfirmationSelectionAt(
     float pointerY) noexcept;
 [[nodiscard]] std::string runTimeText(std::uint64_t elapsedTicks);
 
+inline constexpr std::size_t maximumHudMapRooms = 32U;
+inline constexpr std::size_t maximumHudMapLinks = 64U;
+
+struct HudMapRoom {
+    std::uint32_t id{0U};
+    wkc::core::Vec2 center{};
+    bool known{false};
+    bool visited{false};
+    bool current{false};
+};
+
+struct HudMapLink {
+    std::uint8_t first{0U};
+    std::uint8_t second{0U};
+    bool known{false};
+};
+
+struct HudMapData {
+    bool visible{false};
+    std::array<HudMapRoom, maximumHudMapRooms> rooms{};
+    std::size_t roomCount{0U};
+    std::array<HudMapLink, maximumHudMapLinks> links{};
+    std::size_t linkCount{0U};
+    wkc::core::Vec2 playerPosition{};
+    wkc::core::Vec2 playerForward{0.0F, -1.0F};
+};
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
     bool flashlightOn{false};
     bool infoOverlay{false};
+    HudMapData map{};
     std::uint64_t runSeed{0U};
     std::uint64_t score{0U};
     std::uint32_t enemiesKilled{0U};

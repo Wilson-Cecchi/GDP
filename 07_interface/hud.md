@@ -14,6 +14,8 @@
 > ele separa submissão da CPU, execução da GPU e espera de apresentação.
 > A Fase 145 implementou a variante Rail v1 aprovada para o HUD de gameplay;
 > a aceitação visual final em partida ainda depende do usuário.
+> O minimapa funcional usa a mesma moldura Rail, sem criar textura ou receita
+> artística nova.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -60,6 +62,22 @@ um ao outro. O canto inferior direito conserva nível e XP. Objetivo e tempo
 compartilham um painel superior direito; o evento aparece logo abaixo, com
 espaçamento explícito. Prompts e avisos temporários usam a mesma moldura leve.
 Nada disso amplia hit targets nem ocupa o centro do combate.
+
+## Minimap
+
+Um painel no canto superior esquerdo mostra o setor em coordenadas reais do
+mundo: quadrado ciano para a sala atual, marcação clara para salas visitadas,
+marcação discreta para saídas vizinhas descobertas e linhas para as conexões
+conhecidas. O ponto do jogador e seu indicador de direção acompanham o
+deslocamento dentro de salas e corredores. Salas além das saídas conhecidas
+ficam ocultas; a sala Secret não recebe ícone especial antes de ser visitada.
+
+A lista de salas visitadas pertence à run, é inicializada com START e zerada ao
+reiniciar, sair ao menu ou avançar de andar. O renderer recebe apenas um snapshot
+limitado a 32 salas e 64 conexões, sem consultar o mundo nem alterar a geração.
+Em telas pequenas, o mapa se recolhe quando o painel técnico `F3` ocupa o
+canto superior esquerdo. A composição reutiliza as cores e os painéis já
+aprovados da HUD Rail; não revisa materiais ou texturas.
 
 A linha de munição usa `PISTOL atual/reserva` ou `CARBINE atual/reserva`. Essa
 identidade vem pronta no snapshot visual e muda no mesmo fixed update em que o

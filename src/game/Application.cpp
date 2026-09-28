@@ -1,6 +1,7 @@
 #include "game/Application.hpp"
 
 #include "game/audio/AudioSystem.hpp"
+#include "game/HudMap.hpp"
 #include "game/SeedDomains.hpp"
 #include "core/Hash.hpp"
 #include "core/Log.hpp"
@@ -827,6 +828,7 @@ bool Application::initializeRun()
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
     roomFixtureEntities_.clear();
+    visitedRooms_.clear();
     impactVisualCounter_ = 0U;
     jumpPending_ = false;
     weaponSwitchPending_.reset();
@@ -858,6 +860,7 @@ bool Application::initializeRun()
         log(LogLevel::Error, "Generated world does not contain a START room");
         return false;
     }
+    visitedRooms_.push_back(startRoom->id);
 
     const wkc::core::Vec3 startForward = wkc::core::rotateQuarterTurns(
         {0.0F, 0.0F, -1.0F}, startRoom->rotation);
@@ -1886,6 +1889,7 @@ bool Application::returnToMainMenu()
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
+    visitedRooms_.clear();
     clock_.reset();
     applyRuntimeSettings();
 
@@ -2422,6 +2426,10 @@ void Application::fixedUpdate(const double fixedStep)
         const std::string_view transitionKind) {
         const std::uint32_t sourceRoom = playerRoom;
         playerRoom = destination.id;
+        if (std::find(visitedRooms_.begin(), visitedRooms_.end(), playerRoom)
+            == visitedRooms_.end()) {
+            visitedRooms_.push_back(playerRoom);
+        }
         playerEntity->roomId = playerRoom;
         playerEntity->transform.position = player_.state().position;
         std::vector<world::EdgeId> blockedEdges;
@@ -3633,6 +3641,10 @@ void Application::render()
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
     hud.infoOverlay = input_.isKeyDown(Key::Tab);
+    if (world_) {
+        hud.map = buildHudMap(*world_, visitedRooms_, playerRoom,
+            player_.state().position, player_.planarForwardDirection());
+    }
     hud.runSeed = session_.state().currentSeed;
     hud.score = progress.score;
     hud.enemiesKilled = progress.enemiesKilled;
@@ -3960,6 +3972,7 @@ void Application::shutdown()
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     world_.reset();
+    visitedRooms_.clear();
 
     if (glContext_ != nullptr) {
         SDL_GL_DestroyContext(glContext_);
