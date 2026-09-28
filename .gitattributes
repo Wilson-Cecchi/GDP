@@ -1,0 +1,2 @@
+# Brain checksums cover LF bytes; keep packaged snapshots stable on Windows.
+*.brain text eol=lf

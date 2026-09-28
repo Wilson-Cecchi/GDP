@@ -69,13 +69,27 @@ std::string serialize(const WorkerBrainRecord& record)
 
 std::optional<WorkerBrainRecord> parse(const std::string& content)
 {
-    const std::size_t checksumStart = content.rfind("checksum ");
+    // Git and text editors may transport a saved brain using CRLF. The
+    // checksum covers the canonical LF representation written by serialize().
+    std::string canonical;
+    canonical.reserve(content.size());
+    for (std::size_t index = 0U; index < content.size(); ++index) {
+        if (content[index] == '\r') {
+            if (index + 1U == content.size() || content[index + 1U] != '\n') {
+                return std::nullopt;
+            }
+            continue;
+        }
+        canonical.push_back(content[index]);
+    }
+
+    const std::size_t checksumStart = canonical.rfind("checksum ");
     if (checksumStart == std::string::npos || checksumStart == 0U
-        || content[checksumStart - 1U] != '\n') {
+        || canonical[checksumStart - 1U] != '\n') {
         return std::nullopt;
     }
-    const std::string body = content.substr(0U, checksumStart);
-    std::istringstream checksumInput{content.substr(checksumStart)};
+    const std::string body = canonical.substr(0U, checksumStart);
+    std::istringstream checksumInput{canonical.substr(checksumStart)};
     std::string checksumKey;
     std::uint64_t storedChecksum = 0;
     std::string extra;

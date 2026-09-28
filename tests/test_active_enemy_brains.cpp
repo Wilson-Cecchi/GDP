@@ -1,8 +1,11 @@
 #include "game/ai/ActiveEnemyBrains.hpp"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -16,6 +19,33 @@ void expect(const bool condition, const std::string_view message)
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+bool copyWithCrLf(const std::filesystem::path& sourcePath,
+    const std::filesystem::path& destinationPath)
+{
+    std::ifstream source(sourcePath, std::ios::binary);
+    if (!source) {
+        return false;
+    }
+    const std::string original{std::istreambuf_iterator<char>{source},
+        std::istreambuf_iterator<char>{}};
+    if (source.bad()) {
+        return false;
+    }
+    std::ofstream destination(destinationPath,
+        std::ios::binary | std::ios::trunc);
+    if (!destination) {
+        return false;
+    }
+    for (const char character : original) {
+        if (character == '\n') {
+            destination.put('\r');
+        }
+        destination.put(character);
+    }
+    destination.close();
+    return destination.good();
 }
 
 } // namespace
@@ -47,7 +77,25 @@ int main()
         expect(false, "test creates a unique temporary directory");
         return 1;
     }
-    fs::copy_file(bundled / "worker.brain", temporary / "guard.brain", error);
+    constexpr std::array<std::string_view, 5> names{
+        "worker", "guard", "officer", "engineer", "robot"};
+    for (const std::string_view name : names) {
+        const std::string filename = std::string{name} + ".brain";
+        expect(copyWithCrLf(bundled / filename, temporary / filename),
+            "test creates a CRLF copy of each bundled brain");
+    }
+    const auto windowsLineEndings = gdp::game::ai::loadActiveEnemyBrains(temporary);
+    for (std::size_t index = 0U; index < windowsLineEndings.size(); ++index) {
+        expect(windowsLineEndings[index]
+                && static_cast<std::size_t>(
+                    windowsLineEndings[index]->archetype) == index
+                && windowsLineEndings[index]->genome.generation == 200U
+                && windowsLineEndings[index]->trainingSeed == 42U,
+            "CRLF transport preserves each checked brain");
+    }
+
+    fs::copy_file(bundled / "worker.brain", temporary / "guard.brain",
+        fs::copy_options::overwrite_existing, error);
     expect(!error, "test copies a mismatched brain under the guard filename");
     const auto mismatched = gdp::game::ai::loadActiveEnemyBrains(temporary);
     expect(!mismatched[1U], "wrong archetype brain is rejected per enemy type");
