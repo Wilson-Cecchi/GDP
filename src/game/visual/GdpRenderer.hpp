@@ -155,7 +155,8 @@ public:
         std::span<const RoomRenderData> connectedRooms = {},
         HudRenderData hud = {},
         std::span<const ImpactRenderData> impacts = {},
-        WeaponViewmodelRenderData weaponViewmodel = {});
+        WeaponViewmodelRenderData weaponViewmodel = {},
+        std::span<const EnemyProjectileRenderData> enemyProjectiles = {});
     [[nodiscard]] RendererFrameStats lastFrameStats() const noexcept
     {
         RendererFrameStats stats = lastFrameStats_;

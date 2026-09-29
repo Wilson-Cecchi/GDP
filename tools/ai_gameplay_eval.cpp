@@ -186,25 +186,27 @@ gdp::gameplay::EnemyUpdateSummary updateEnemy(
     gdp::gameplay::Player& player,
     const gdp::world::RoomId roomId,
     const CollisionWorld& collision,
-    gdp::gameplay::NeuralEnemyExperiment* const brain)
+    gdp::gameplay::NeuralEnemyExperiment* const brain,
+    std::vector<gdp::gameplay::EnemyProjectile>& shots)
 {
     using namespace gdp::gameplay;
+    const EnemyPerception perception{.projectiles = &shots};
     switch (archetype) {
     case EnemyArchetype::Worker:
         return updateWorkers(manager, player, roomId, collision,
-            fixedStep, {}, {}, brain);
+            fixedStep, {}, perception, brain);
     case EnemyArchetype::Guard:
         return updateGuards(manager, player, roomId, collision,
-            fixedStep, {}, {}, brain);
+            fixedStep, {}, perception, brain);
     case EnemyArchetype::Officer:
         return updateOfficers(manager, player, roomId, collision,
-            fixedStep, {}, {}, brain);
+            fixedStep, {}, perception, brain);
     case EnemyArchetype::Engineer:
         return updateEngineers(manager, player, roomId, collision,
-            fixedStep, {}, {}, brain);
+            fixedStep, {}, perception, brain);
     case EnemyArchetype::IndustrialRobot:
         return updateIndustrialRobots(manager, player, roomId, collision,
-            fixedStep, {}, {}, brain);
+            fixedStep, {}, perception, brain);
     }
     return {};
 }
@@ -290,6 +292,7 @@ std::optional<ScenarioResult> runScenario(
         brain->logSelection = false;
     }
     ScenarioResult result;
+    gameplay::EnemyProjectileSystem projectiles;
     result.enemyCount = enemyCount;
     result.closestDistance = 1000.0F;
     for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
@@ -307,9 +310,14 @@ std::optional<ScenarioResult> runScenario(
         for (const EntityId id : enemies) {
             before.push_back(manager.find(id)->transform.position);
         }
+        std::vector<gameplay::EnemyProjectile> shots;
         const auto summary = updateEnemy(archetype, manager, player,
-            room->id, collision, brain ? &*brain : nullptr);
+            room->id, collision, brain ? &*brain : nullptr, shots);
+        projectiles.spawn(shots);
         result.hits += summary.attacksLanded;
+        for (const auto& event : projectiles.update(fixedStep, player, collision)) {
+            result.hits += event.hitPlayer ? 1U : 0U;
+        }
         result.supportActions += summary.commandsIssued + summary.repairsPerformed;
         for (std::size_t index = 0U; index < enemies.size(); ++index) {
             const Vec3 after = manager.find(enemies[index])->transform.position;
@@ -380,6 +388,7 @@ std::optional<DuelResult> runDuelScenario(
     }
 
     DuelResult result;
+    gameplay::EnemyProjectileSystem projectiles;
     for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
         const Vec3 previousPlayer = player.state().position;
         const Vec3 previousEnemy = manager.find(enemyId)->transform.position;
@@ -434,9 +443,14 @@ std::optional<DuelResult> runDuelScenario(
             result.outcome = "player_win";
             break;
         }
+        std::vector<gameplay::EnemyProjectile> shots;
         const auto summary = updateEnemy(archetype, manager, player,
-            room->id, collision, brain ? &*brain : nullptr);
+            room->id, collision, brain ? &*brain : nullptr, shots);
+        projectiles.spawn(shots);
         result.enemyHits += summary.attacksLanded;
+        for (const auto& event : projectiles.update(fixedStep, player, collision)) {
+            result.enemyHits += event.hitPlayer ? 1U : 0U;
+        }
         result.enemyTravel += planarDistance(previousEnemy,
             manager.find(enemyId)->transform.position);
         if (!player.state().alive) {

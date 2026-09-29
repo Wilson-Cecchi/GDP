@@ -1,5 +1,6 @@
 #include "gameplay/Enemy.hpp"
 #include "gameplay/EnemySensors.hpp"
+#include "gameplay/EnemyProjectile.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -484,6 +485,52 @@ void testActiveWorkerMaintainsMeleeThreat()
         "unproductive active brain yields temporarily to scripted pursuit");
 }
 
+void testEnemyProjectiles()
+{
+    using namespace gdp::gameplay;
+    const CollisionWorld clear{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 4.0F, 10.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const EnemyProjectile incoming{{0.0F, 1.2F, 5.0F},
+        {0.0F, 0.0F, -10.0F}, {}, 1U, 8.0F, 0.8F, true, true, 5.0F};
+    EnemyProjectileSystem shots;
+    shots.spawn(std::span{&incoming, 1U});
+    expect(player.state().health == 100.0F && shots.projectiles().size() == 1U,
+        "enemy projectile does not damage on firing");
+    std::vector<EnemyProjectileEvent> events;
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, clear);
+    }
+    expect(events.size() == 1U && events[0].hitPlayer
+            && player.state().health == 92.0F,
+        "swept projectile hits player exactly once");
+
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const CollisionWorld covered{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 4.0F, 10.0F}},
+        {{{-1.0F, 0.0F, 2.0F}, {1.0F, 2.0F, 2.2F}}}};
+    shots.spawn(std::span{&incoming, 1U});
+    events.clear();
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, covered);
+    }
+    expect(events.size() == 1U && events[0].blocked
+            && player.state().health == 100.0F,
+        "solid cover intercepts projectile before player");
+
+    shots.spawn(std::span{&incoming, 1U});
+    expect(player.relocate({2.0F, 0.0F, 0.0F}, 0.0F),
+        "player relocates out of incoming trajectory");
+    events.clear();
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, clear);
+    }
+    expect(events.size() == 1U && events[0].dodged
+            && player.state().health == 100.0F,
+        "moving away from a threatening launch earns real dodge event");
+}
+
 } // namespace
 
 int main()
@@ -497,5 +544,6 @@ int main()
     testNeuralBossNavigatesCover();
     testNeuralBrainControlsEveryEnemyIndependently();
     testActiveWorkerMaintainsMeleeThreat();
+    testEnemyProjectiles();
     return failures == 0 ? 0 : 1;
 }

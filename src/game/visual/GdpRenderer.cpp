@@ -1099,7 +1099,8 @@ bool GdpRenderer::render(
     const std::span<const RoomRenderData> connectedRooms,
     const HudRenderData hud,
     const std::span<const ImpactRenderData> impacts,
-    const WeaponViewmodelRenderData weaponViewmodel)
+    const WeaponViewmodelRenderData weaponViewmodel,
+    const std::span<const EnemyProjectileRenderData> enemyProjectiles)
 {
     lastFrameStats_ = {};
     if (!initialized_ || width <= 0 || height <= 0) {
@@ -1775,6 +1776,21 @@ bool GdpRenderer::render(
             shader.setVec3(gl_, "uTint", color);
             drawMesh(box_);
         }
+    }
+
+    for (const EnemyProjectileRenderData& projectile : enemyProjectiles) {
+        const wkc::core::Vec3 direction
+            = wkc::core::normalized(projectile.direction);
+        const float yaw = std::atan2(direction.x, direction.z);
+        const float pitch = -std::asin(std::clamp(direction.y, -1.0F, 1.0F));
+        shader.setMat4(gl_, "uModel",
+            wkc::core::translationMatrix(projectile.position)
+                * wkc::core::rotationYMatrix(yaw)
+                * wkc::core::rotationXMatrix(pitch)
+                * wkc::core::scaleMatrix({0.11F, 0.11F, 0.30F}));
+        shader.setVec3(gl_, "uTint", {1.0F, 0.32F, 0.08F});
+        shader.setFloat(gl_, "uEmissiveStrength", 2.0F);
+        drawMesh(box_);
     }
 
     ceilingFixtureMaterial_.albedo.bind(gl_, textureBindings_, 0U);

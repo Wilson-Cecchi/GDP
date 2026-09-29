@@ -32,7 +32,12 @@ struct WorkerFitnessMetrics {
     float strafeCreditSeconds{0.0F};
     float peakPlayerSpeed{0.0F};
     std::uint32_t attacksLanded{0};
+    std::uint32_t shotsFired{0};
+    std::uint32_t shotsBlocked{0};
+    std::uint32_t shotsDodged{0};
+    std::uint32_t reloadsStarted{0};
     std::uint32_t fallbackAttacksLanded{0};
+    std::uint32_t fallbackShotsFired{0};
     std::uint32_t playerEliminations{0};
     std::uint32_t fallbackPlayerEliminations{0};
     std::uint32_t deaths{0};

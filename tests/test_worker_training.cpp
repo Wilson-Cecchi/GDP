@@ -62,6 +62,14 @@ void testFitness()
     better.attacksLanded += 1U;
     expect(scoreWorkerFitness(better) > scoreWorkerFitness(baseline),
         "damage and landed attacks increase fitness");
+    WorkerFitnessMetrics wastefulShooter = baseline;
+    wastefulShooter.shotsFired = 8U;
+    wastefulShooter.shotsBlocked = 2U;
+    expect(scoreEnemyFitness(wastefulShooter,
+            gdp::entities::EnemyArchetype::Guard)
+            < scoreEnemyFitness(baseline,
+                gdp::entities::EnemyArchetype::Guard),
+        "missed and obstructed shots cost bounded reward");
     WorkerFitnessMetrics worse = baseline;
     worse.damageReceived += 10.0F;
     expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
@@ -180,7 +188,7 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U,
         "automated training produces a champion and final checkpoint");
-    expect(output.str().find("reward_rules=2") != std::string::npos
+    expect(output.str().find("reward_rules=3") != std::string::npos
             && output.str().find("brain_contract=2") != std::string::npos
             && output.str().find("curriculum=2") != std::string::npos
             && output.str().find("scenarios=5") != std::string::npos

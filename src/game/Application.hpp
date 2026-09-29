@@ -159,6 +159,7 @@ private:
     std::unordered_map<std::uint64_t, visual::EnemyAnimationTransition>
         enemyAnimationTransitions_;
     std::vector<ActiveImpact> activeImpacts_;
+    gameplay::EnemyProjectileSystem enemyProjectiles_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<visual::GdpRenderer> renderer_;
     SDL_Window* window_{nullptr};

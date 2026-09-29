@@ -191,6 +191,11 @@ struct ImpactRenderData {
     wkc::core::Seed visualSeed{0U};
 };
 
+struct EnemyProjectileRenderData {
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 direction{0.0F, 0.0F, 1.0F};
+};
+
 [[nodiscard]] wkc::core::Vec3 impactVisualColor(
     ImpactVisualMaterial material,
     float strength = 1.0F) noexcept;

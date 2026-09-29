@@ -4,6 +4,7 @@
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/EnemyBrainContract.hpp"
+#include "gameplay/EnemyProjectile.hpp"
 #include "gameplay/Player.hpp"
 
 #include <cstddef>
@@ -132,6 +133,7 @@ struct EnemyNoiseStimulus {
 
 struct EnemyPerception {
     bool playerFlashlightOn{false};
+    std::vector<EnemyProjectile>* projectiles{nullptr};
 };
 
 struct NeuralEnemyMotorState {
@@ -179,6 +181,8 @@ struct EnemyUpdateSummary {
     std::size_t repositioning{0};
     std::size_t attacking{0};
     std::size_t attacksLanded{0};
+    std::size_t shotsFired{0};
+    std::size_t reloadsStarted{0};
     std::size_t commandsIssued{0};
     std::size_t alliesSupported{0};
     std::size_t repairsPerformed{0};

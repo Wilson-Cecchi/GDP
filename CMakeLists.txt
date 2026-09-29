@@ -170,6 +170,7 @@ add_library(
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/EnemyProjectile.cpp
     src/gameplay/EnemySensors.cpp
     src/gameplay/ExitConfirmation.cpp
     src/gameplay/Feedback.cpp

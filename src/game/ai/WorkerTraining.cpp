@@ -234,24 +234,26 @@ gameplay::EnemyUpdateSummary updateTrainingEnemy(
     gameplay::Player& player,
     const std::uint32_t roomId,
     const gameplay::CollisionWorld& arena,
-    gameplay::NeuralEnemyExperiment& brain)
+    gameplay::NeuralEnemyExperiment& brain,
+    std::vector<gameplay::EnemyProjectile>& shots)
 {
+    const gameplay::EnemyPerception perception{.projectiles = &shots};
     switch (archetype) {
     case EnemyArchetype::Worker:
         return gameplay::updateWorkers(manager, player, roomId, arena,
-            fixedStep, {}, {}, &brain);
+            fixedStep, {}, perception, &brain);
     case EnemyArchetype::Guard:
         return gameplay::updateGuards(manager, player, roomId, arena,
-            fixedStep, {}, {}, &brain);
+            fixedStep, {}, perception, &brain);
     case EnemyArchetype::Officer:
         return gameplay::updateOfficers(manager, player, roomId, arena,
-            fixedStep, {}, {}, &brain);
+            fixedStep, {}, perception, &brain);
     case EnemyArchetype::Engineer:
         return gameplay::updateEngineers(manager, player, roomId, arena,
-            fixedStep, {}, {}, &brain);
+            fixedStep, {}, perception, &brain);
     case EnemyArchetype::IndustrialRobot:
         return gameplay::updateIndustrialRobots(manager, player, roomId, arena,
-            fixedStep, {}, {}, &brain);
+            fixedStep, {}, perception, &brain);
     }
     return {};
 }
@@ -341,6 +343,7 @@ WorkerFitnessMetrics simulateEpisode(
     brain.genome = genome;
     brain.logSelection = false;
     WorkerFitnessMetrics metrics;
+    gameplay::EnemyProjectileSystem enemyProjectiles;
     float shotCooldown = 1.0F;
     float previousForwardIntent = 0.0F;
     float previousStrafeIntent = 0.0F;
@@ -389,9 +392,28 @@ WorkerFitnessMetrics simulateEpisode(
             entity->transform.rotationDegrees.y, player.state().position);
         const float playerHealthBefore = player.state().health;
         const std::uint64_t controlledBefore = brain.controlledTicks;
+        std::vector<gameplay::EnemyProjectile> spawnedShots;
         const auto summary = updateTrainingEnemy(
-            archetype, manager, player, roomId, arena, brain);
+            archetype, manager, player, roomId, arena, brain, spawnedShots);
         const bool controlled = brain.controlledTicks != controlledBefore;
+        enemyProjectiles.spawn(spawnedShots);
+        const auto projectileEvents = enemyProjectiles.update(
+            fixedStep, player, arena);
+        bool neuralProjectileElimination = false;
+        for (const auto& event : projectileEvents) {
+            if (event.hitPlayer && event.neural) {
+                metrics.damageDealt += event.damageApplied;
+                ++metrics.attacksLanded;
+                neuralProjectileElimination = !player.state().alive;
+            } else if (event.hitPlayer) {
+                metrics.fallbackDamageDealt += event.damageApplied;
+                ++metrics.fallbackAttacksLanded;
+            } else if (event.neural && event.blocked) {
+                ++metrics.shotsBlocked;
+            } else if (event.neural && event.dodged) {
+                ++metrics.shotsDodged;
+            }
+        }
         if (controlled) {
             ++metrics.neuralTicks;
         } else {
@@ -411,14 +433,24 @@ WorkerFitnessMetrics simulateEpisode(
         totalTacticalProgress += tacticalProgress;
         if (controlled) {
             metrics.tacticalProgressMeters += tacticalProgress;
-            metrics.damageDealt += std::max(
-                0.0F, playerHealthBefore - player.state().health);
-            metrics.attacksLanded += static_cast<std::uint32_t>(summary.attacksLanded);
+            if (archetype == EnemyArchetype::Worker) {
+                metrics.damageDealt += std::max(
+                    0.0F, playerHealthBefore - player.state().health);
+                metrics.attacksLanded += static_cast<std::uint32_t>(
+                    summary.attacksLanded);
+            }
+            metrics.shotsFired += static_cast<std::uint32_t>(summary.shotsFired);
+            metrics.reloadsStarted += static_cast<std::uint32_t>(
+                summary.reloadsStarted);
         } else {
-            metrics.fallbackDamageDealt += std::max(
-                0.0F, playerHealthBefore - player.state().health);
-            metrics.fallbackAttacksLanded += static_cast<std::uint32_t>(
-                summary.attacksLanded);
+            if (archetype == EnemyArchetype::Worker) {
+                metrics.fallbackDamageDealt += std::max(
+                    0.0F, playerHealthBefore - player.state().health);
+                metrics.fallbackAttacksLanded += static_cast<std::uint32_t>(
+                    summary.attacksLanded);
+            }
+            metrics.fallbackShotsFired += static_cast<std::uint32_t>(
+                summary.shotsFired);
         }
         metrics.supportActions += static_cast<std::uint32_t>(
             summary.commandsIssued + summary.repairsPerformed);
@@ -501,7 +533,8 @@ WorkerFitnessMetrics simulateEpisode(
             metrics.wastedAttackSeconds += fixedStep;
         }
         if (!player.state().alive) {
-            if (controlled) {
+            if (archetype != EnemyArchetype::Worker
+                    ? neuralProjectileElimination : controlled) {
                 metrics.playerEliminations = 1U;
             } else {
                 metrics.fallbackPlayerEliminations = 1U;
@@ -563,7 +596,12 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.peakPlayerSpeed = std::max(
         total.peakPlayerSpeed, sample.peakPlayerSpeed);
     total.attacksLanded += sample.attacksLanded;
+    total.shotsFired += sample.shotsFired;
+    total.shotsBlocked += sample.shotsBlocked;
+    total.shotsDodged += sample.shotsDodged;
+    total.reloadsStarted += sample.reloadsStarted;
     total.fallbackAttacksLanded += sample.fallbackAttacksLanded;
+    total.fallbackShotsFired += sample.fallbackShotsFired;
     total.playerEliminations += sample.playerEliminations;
     total.fallbackPlayerEliminations += sample.fallbackPlayerEliminations;
     total.deaths += sample.deaths;
@@ -826,7 +864,7 @@ WorkerTrainingResult runEnemyTraining(
             seed, trainingScenarioDomain,
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
-               << " reward_rules=2"
+               << " reward_rules=3"
                << " brain_contract=2"
                << " curriculum=" << (options.trainAllScenarios ? 3 : 2)
                << " seed=" << seed
@@ -873,7 +911,12 @@ WorkerTrainingResult runEnemyTraining(
                    << " fallback_damage_dealt=" << bestMetrics.fallbackDamageDealt
                    << " fallback_damage_received=" << bestMetrics.fallbackDamageReceived
                    << " hits=" << bestMetrics.attacksLanded
+                   << " shots=" << bestMetrics.shotsFired
+                   << " blocked_shots=" << bestMetrics.shotsBlocked
+                   << " dodged_shots=" << bestMetrics.shotsDodged
+                   << " reloads=" << bestMetrics.reloadsStarted
                    << " fallback_hits=" << bestMetrics.fallbackAttacksLanded
+                   << " fallback_shots=" << bestMetrics.fallbackShotsFired
                    << " range_progress=" << bestMetrics.tacticalProgressMeters
                    << " proximity_s=" << bestMetrics.proximitySeconds
                    << " contact_s=" << bestMetrics.contactSeconds
@@ -930,7 +973,7 @@ WorkerTrainingResult runEnemyTraining(
             *result.champion, holdoutSeed, options.archetype, true,
             options.trainAllScenarios).score;
         output << "AI_RESULT generation=" << result.lastGeneration
-               << " reward_rules=2"
+               << " reward_rules=3"
                << " brain_contract=2"
                << " train_best=" << result.finalBest
                << " holdout=" << result.holdoutFitness;

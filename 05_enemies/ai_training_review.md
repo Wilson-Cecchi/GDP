@@ -244,7 +244,8 @@ Os cérebros ativos, os sensores e o formato `.brain` **não mudaram**; scores
 antigos e novos não devem ser comparados diretamente. Ainda faltam os estágios
 isolados de mira/tiro/esquiva e geometrias de corredor/porta. Como o ataque
 inimigo não tem evento de tiro, munição ou projétil, não foram inventadas
-recompensas por precisão, recarga ou esquiva de tiro já disparado.
+recompensas por precisão, recarga ou esquiva de tiro já disparado. Esta é a
+fotografia anterior ao checkpoint de projéteis abaixo.
 
 **Contrato tático v3 (em implementação):** treinos novos geram cérebros com
 12 entradas, 12 neurônios ocultos e 5 saídas. Os sete sensores antigos mantêm
@@ -253,5 +254,18 @@ ameaça de mira, munição e recarga. As saídas passam a representar frente,
 strafe independente, giro, ataque e recarga. O arquivo `GDP_ENEMY_BRAIN 3`
 registra o contrato e seu checksum. Arquivos v1/v2 continuam carregáveis com
 movimento legado, mas não servem como `--resume` do formato novo. A ação de
-recarga e os eventos de projétil ainda precisam ser ligados ao combate; este
-checkpoint preserva o gameplay antigo até isso estar validado.
+recarga e os eventos de projétil ainda precisavam ser ligados ao combate neste
+checkpoint; o passo seguinte faz essa ligação.
+
+**Projéteis inimigos (checkpoint seguinte):** Guard, Officer, Engineer e Robot
+agora lançam projéteis visíveis, com velocidade finita, colisão com cobertura,
+munição e recarga. O tiro guarda sua direção no disparo: deslocamento posterior
+do Player pode evitá-lo. Worker permanece melee. O motor de simulação é o mesmo
+no jogo, no treino e no avaliador de gameplay; o treino atribui acerto e dano
+ao autor do disparo após contato, mesmo que o motor tenha entrado em fallback
+no intervalo. Tiros bloqueados e oportunidades de esquiva são eventos, não
+pedidos de ataque. O Player ainda dispara hitscan, então a reação defensiva
+dos inimigos no jogo continua preventiva. O currículo em sete estágios e
+avaliação em corredores/portas permanecem a etapa seguinte; ainda não houve
+promoção de cérebro. A penalidade limitada por erros/obstruções altera o log
+para `reward_rules=3`; scores v2/v3 não são comparáveis diretamente.

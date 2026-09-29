@@ -649,7 +649,7 @@ especializados das pastas numeradas.
   combate mais longo. Movimento do jogador, orientação inicial, cobertura e
   cadência dos disparos recebidos variam. Um dos cenários de treino usa
   `Player::fixedUpdate` para saltos/Bhop reais; os demais ainda usam trajetórias
-  roteirizadas. As regras de recompensa `reward_rules=2` pontuam apenas dano,
+  roteirizadas. As regras de recompensa `reward_rules=3` pontuam apenas dano,
   acertos e eliminações de autoria neural; dano durante fallback e suporte
   automático aparecem no log, mas não rendem pontos ofensivos. Dano recebido
   penaliza o episódio mesmo durante fallback. Eliminar o Player vale
@@ -690,14 +690,17 @@ especializados das pastas numeradas.
   de N milissegundos entre gerações, sem alterar os pesos ou a pontuação.
   A pausa não substitui o monitoramento da temperatura: interrompa o treino
   se a CPU se aproximar do limite térmico informado pelo hardware.
-  Pontuações de `reward_rules=2` não são comparáveis numericamente às de runs
+  Pontuações de `reward_rules=3` não são comparáveis numericamente às de runs
   anteriores. `--resume` aceita apenas um checkpoint do contrato tático novo;
   um cérebro antigo continua jogável, mas o treino novo precisa começar fresco.
   Os checkpoints gerados não substituem os ativos sem
-  avaliação comparativa e aprovação visual. Mira por evento real, munição/
-  recarga inimiga, esquiva de projéteis, corredores/portas e estágios de
-  treinamento separados ainda exigem implementação específica; o treino não
-  declara precisão de tiro ou esquivas que o combate atual não consegue medir.
+  avaliação comparativa e aprovação visual. Inimigos de alcance agora lançam
+  projéteis visíveis com trajetória fixa, colisão com cobertura, carregador e
+  recarga; Worker continua com ataque corpo a corpo. O treino registra tiros
+  disparados, acertos reais, tiros bloqueados e tiros evitados pelo Player.
+  O Player ainda usa hitscan: a defesa da IA contra ele depende de antecipar
+  mira e buscar cobertura, não de desviar depois que o tiro foi disparado.
+  Os estágios isolados e mapas com corredores/portas ainda estão em construção.
   Para aproveitar a política inicial e a mira mais exigente, comece uma
   população nova, usando um diretório de saída novo e vazio.
 

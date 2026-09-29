@@ -93,6 +93,8 @@ float scoreEnemyFitness(
     const float receivedFraction = std::clamp(
         (metrics.damageReceived + metrics.fallbackDamageReceived)
             / profile.maximumHealth, 0.0F, 1.0F);
+    const std::uint32_t misses = metrics.shotsFired > metrics.attacksLanded
+        ? metrics.shotsFired - metrics.attacksLanded : 0U;
     // Offensive credit is neural-authored. Damage taken is a whole-episode
     // consequence, even when a fallback tick delivers the final hit.
     // Survival alone, pressing forward and automatic support give no points.
@@ -107,6 +109,8 @@ float scoreEnemyFitness(
         - std::min(metrics.idleSeconds, 8.0F) * profile.idle
         - std::min(metrics.blockedSeconds, 8.0F) * profile.blocked
         - std::min(metrics.wastedAttackSeconds, 8.0F) * profile.wastedAttack
+        - static_cast<float>(std::min(misses, 8U)) * 0.06F
+        - static_cast<float>(std::min(metrics.shotsBlocked, 8U)) * 0.14F
         - static_cast<float>(std::min(metrics.unproductiveReversals, 8U))
             * profile.reversal;
     // An entire episode of shaping cannot outweigh either terminal event.

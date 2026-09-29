@@ -829,6 +829,7 @@ bool Application::initializeRun()
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
+    enemyProjectiles_.clear();
     roomFixtureEntities_.clear();
     visitedRooms_.clear();
     impactVisualCounter_ = 0U;
@@ -1857,6 +1858,7 @@ bool Application::returnToMainMenu()
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    enemyProjectiles_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};
@@ -2780,8 +2782,10 @@ void Application::fixedUpdate(const double fixedStep)
     const bool playerWasAlive = player_.state().alive;
     const gameplay::EnemyDifficultyConfigs difficultyConfigs
         = gameplay::makeEnemyDifficultyConfigs(runDifficulty_);
+    std::vector<gameplay::EnemyProjectile> spawnedProjectiles;
     const gameplay::EnemyPerception perception{
         .playerFlashlightOn = flashlightOn_,
+        .projectiles = &spawnedProjectiles,
     };
     const auto brainFor = [this](const entities::EnemyArchetype archetype)
         -> gameplay::NeuralEnemyExperiment* {
@@ -2864,6 +2868,13 @@ void Application::fixedUpdate(const double fixedStep)
             entities_, player_, enemyRoom, enemyCollision, step,
             difficultyConfigs.industrialRobot, perception,
             brainFor(entities::EnemyArchetype::IndustrialRobot)).attacksLanded;
+    }
+    enemyProjectiles_.spawn(spawnedProjectiles);
+    for (const gameplay::EnemyProjectileEvent& event
+         : enemyProjectiles_.update(step, player_, collisionWorld_)) {
+        if (event.hitPlayer) {
+            ++attacksLanded;
+        }
     }
     if (world_) {
         gameplay::updateEnemyRoomMembership(*world_, entities_);
@@ -3989,6 +4000,14 @@ void Application::render()
             visibleImpacts.push_back(impact.render);
         }
     }
+    std::vector<visual::EnemyProjectileRenderData> visibleEnemyProjectiles;
+    for (const gameplay::EnemyProjectile& projectile
+         : enemyProjectiles_.projectiles()) {
+        if (sphereIsVisible(projectile.position, 0.4F)) {
+            visibleEnemyProjectiles.push_back({projectile.position,
+                projectile.velocity});
+        }
+    }
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
@@ -4027,7 +4046,7 @@ void Application::render()
             return renderer_->render(
                 width, height, camera, visibleEnemies, visiblePickups, visibleProps,
                 lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
-                hud, visibleImpacts, weaponViewmodel);
+                hud, visibleImpacts, weaponViewmodel, visibleEnemyProjectiles);
         }, "Renderer failed while drawing the frame")) {
         return;
     }
@@ -4050,6 +4069,7 @@ void Application::shutdown()
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    enemyProjectiles_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};

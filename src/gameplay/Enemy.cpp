@@ -16,6 +16,79 @@
 namespace gdp::gameplay {
 namespace {
 
+constexpr std::uint32_t rangedMagazineCapacity = 8U;
+
+void advanceEnemyReload(gdp::entities::EnemyData& enemy, const float step) noexcept
+{
+    if (enemy.reloadRemaining <= 0.0F) {
+        return;
+    }
+    enemy.reloadRemaining = std::max(0.0F, enemy.reloadRemaining - step);
+    if (enemy.reloadRemaining == 0.0F) {
+        const std::uint32_t rounds = std::min(
+            rangedMagazineCapacity - enemy.magazineAmmo, enemy.reserveAmmo);
+        enemy.magazineAmmo += rounds;
+        enemy.reserveAmmo -= rounds;
+    }
+}
+
+bool startEnemyReload(gdp::entities::EnemyData& enemy,
+    const gdp::entities::EnemyArchetype archetype) noexcept
+{
+    if (enemy.reloadRemaining > 0.0F || enemy.magazineAmmo >= rangedMagazineCapacity
+        || enemy.reserveAmmo == 0U) {
+        return false;
+    }
+    enemy.reloadRemaining = archetype
+            == gdp::entities::EnemyArchetype::IndustrialRobot ? 1.5F : 1.15F;
+    return true;
+}
+
+bool fireRangedEnemy(gdp::entities::Entity& entity,
+    gdp::entities::EnemyData& enemy, const gdp::entities::EntityId id,
+    Player& player, const float damage, const EnemyPerception perception,
+    const bool neural, EnemyUpdateSummary& summary)
+{
+    if (perception.projectiles == nullptr) {
+        player.applyDamage(damage);
+        ++summary.attacksLanded;
+        return true;
+    }
+    if (enemy.reloadRemaining > 0.0F) {
+        return false;
+    }
+    if (enemy.magazineAmmo == 0U) {
+        if (startEnemyReload(enemy, enemy.archetype)) {
+            ++summary.reloadsStarted;
+        }
+        return false;
+    }
+    constexpr float radiansPerDegree = 0.01745329251994329577F;
+    const float yaw = entity.transform.rotationDegrees.y * radiansPerDegree;
+    const wkc::core::Vec3 horizontal{std::sin(yaw), 0.0F, std::cos(yaw)};
+    const wkc::core::Vec3 muzzle = entity.transform.position
+        + wkc::core::Vec3{0.0F, 1.2F, 0.0F} + horizontal * 0.45F;
+    const wkc::core::Vec3 target = player.cameraPosition()
+        - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
+    const float horizontalDistance = std::max(0.1F, std::hypot(
+        target.x - muzzle.x, target.z - muzzle.z));
+    const wkc::core::Vec3 direction = wkc::core::normalized({
+        horizontal.x, (target.y - muzzle.y) / horizontalDistance, horizontal.z});
+    const float speed = enemy.archetype
+            == gdp::entities::EnemyArchetype::IndustrialRobot ? 18.0F
+        : enemy.archetype == gdp::entities::EnemyArchetype::Officer ? 13.0F
+        : 16.0F;
+    const float along = wkc::core::dot(target - muzzle, direction);
+    const float missDistance = wkc::core::length(
+        (target - muzzle) - direction * along);
+    perception.projectiles->push_back({muzzle, direction * speed, id,
+        entity.roomId, damage, 2.0F, neural,
+        along > 0.0F && missDistance <= 0.5F, along, 0.0F});
+    --enemy.magazineAmmo;
+    ++summary.shotsFired;
+    return true;
+}
+
 float planarDistanceSquared(
     const wkc::core::Vec3 first,
     const wkc::core::Vec3 second) noexcept
@@ -1025,6 +1098,12 @@ bool updateNeuralEnemy(
     const float attackDistance = wkc::core::length(
         {attackOffset.x, 0.0F, attackOffset.z});
     const bool attackRequested = (*outputs)[3] > 0.65F;
+    if (tactical && enemy.archetype
+            != gdp::entities::EnemyArchetype::Worker
+        && perception.projectiles != nullptr && (*outputs)[4] > 0.65F
+        && startEnemyReload(enemy, enemy.archetype)) {
+        ++summary.reloadsStarted;
+    }
     if (motor != nullptr && attackRequested && attackDistance <= attackRange) {
         // Runtime aim assist prevents a trained motor's turn output from
         // circling a stationary visible target forever.
@@ -1049,9 +1128,14 @@ bool updateNeuralEnemy(
         enemy.behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
         if (enemy.attackCooldown <= 0.0F) {
-            player.applyDamage(attackDamage);
-            enemy.attackCooldown = attackInterval;
-            ++summary.attacksLanded;
+            if (enemy.archetype == gdp::entities::EnemyArchetype::Worker) {
+                player.applyDamage(attackDamage);
+                enemy.attackCooldown = attackInterval;
+                ++summary.attacksLanded;
+            } else if (fireRangedEnemy(entity, enemy, id, player,
+                    attackDamage, perception, true, summary)) {
+                enemy.attackCooldown = attackInterval;
+            }
         }
     } else if (requestedSpeed > 0.05F) {
         enemy.behavior = lineOfSight
@@ -1341,6 +1425,9 @@ EnemyUpdateSummary updateGuards(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        if (perception.projectiles != nullptr) {
+            advanceEnemyReload(*enemy, step);
+        }
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
@@ -1414,9 +1501,10 @@ EnemyUpdateSummary updateGuards(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
-            player.applyDamage(config.attackDamage);
-            enemy->attackCooldown = config.attackInterval;
-            ++summary.attacksLanded;
+            if (fireRangedEnemy(*entity, *enemy, id, player,
+                    config.attackDamage, perception, false, summary)) {
+                enemy->attackCooldown = config.attackInterval;
+            }
         }
     }
     return summary;
@@ -1466,6 +1554,9 @@ EnemyUpdateSummary updateOfficers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        if (perception.projectiles != nullptr) {
+            advanceEnemyReload(*enemy, step);
+        }
         enemy->supportCooldown = std::max(0.0F, enemy->supportCooldown - step);
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
@@ -1575,9 +1666,10 @@ EnemyUpdateSummary updateOfficers(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
-            player.applyDamage(config.attackDamage);
-            enemy->attackCooldown = config.attackInterval;
-            ++summary.attacksLanded;
+            if (fireRangedEnemy(*entity, *enemy, id, player,
+                    config.attackDamage, perception, false, summary)) {
+                enemy->attackCooldown = config.attackInterval;
+            }
         }
     }
     return summary;
@@ -1629,6 +1721,9 @@ EnemyUpdateSummary updateEngineers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        if (perception.projectiles != nullptr) {
+            advanceEnemyReload(*enemy, step);
+        }
         enemy->supportCooldown = std::max(0.0F, enemy->supportCooldown - step);
         const wkc::core::Vec3 offset
             = player.state().position - entity->transform.position;
@@ -1777,9 +1872,10 @@ EnemyUpdateSummary updateEngineers(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
-            player.applyDamage(config.attackDamage);
-            enemy->attackCooldown = config.attackInterval;
-            ++summary.attacksLanded;
+            if (fireRangedEnemy(*entity, *enemy, id, player,
+                    config.attackDamage, perception, false, summary)) {
+                enemy->attackCooldown = config.attackInterval;
+            }
         }
     }
     return summary;
@@ -1865,6 +1961,9 @@ EnemyUpdateSummary updateIndustrialRobots(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        if (perception.projectiles != nullptr) {
+            advanceEnemyReload(*enemy, step);
+        }
         const IndustrialRobotPhase phase
             = industrialRobotPhase(enemy->health, enemy->maximumHealth, config);
         float minimumRange = 0.0F;
@@ -1966,9 +2065,10 @@ EnemyUpdateSummary updateIndustrialRobots(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
         if (enemy->attackCooldown <= 0.0F) {
-            player.applyDamage(attackDamage);
-            enemy->attackCooldown = attackInterval;
-            ++summary.attacksLanded;
+            if (fireRangedEnemy(*entity, *enemy, id, player,
+                    attackDamage, perception, false, summary)) {
+                enemy->attackCooldown = attackInterval;
+            }
         }
     }
     return summary;
