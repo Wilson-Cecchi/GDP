@@ -531,6 +531,43 @@ void testEnemyProjectiles()
         "moving away from a threatening launch earns real dodge event");
 }
 
+void testRangedEnemyFiresDelayedProjectile()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld arena{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 4.0F, 10.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId guard = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 6.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::Guard,
+    });
+    std::vector<EnemyProjectile> spawned;
+    const EnemyPerception perception{.projectiles = &spawned};
+    for (int tick = 0; tick < 60 && spawned.empty(); ++tick) {
+        (void)updateGuards(manager, player, 1U, arena, 1.0F / 60.0F,
+            {}, perception);
+    }
+    expect(!spawned.empty() && player.state().health == 100.0F
+            && manager.findData<EnemyData>(guard)->magazineAmmo == 7U,
+        "ranged enemy spends ammunition and does not apply instant damage");
+    EnemyProjectileSystem projectiles;
+    projectiles.spawn(spawned);
+    bool hit = false;
+    for (int tick = 0; tick < 120 && !hit; ++tick) {
+        for (const auto& event : projectiles.update(1.0F / 60.0F,
+                 player, arena)) {
+            hit |= event.hitPlayer;
+        }
+    }
+    expect(hit && player.state().health < 100.0F,
+        "enemy shot damages only after traveling to the player");
+}
+
 } // namespace
 
 int main()
@@ -545,5 +582,6 @@ int main()
     testNeuralBrainControlsEveryEnemyIndependently();
     testActiveWorkerMaintainsMeleeThreat();
     testEnemyProjectiles();
+    testRangedEnemyFiresDelayedProjectile();
     return failures == 0 ? 0 : 1;
 }

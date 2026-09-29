@@ -269,3 +269,74 @@ dos inimigos no jogo continua preventiva. O currículo em sete estágios e
 avaliação em corredores/portas permanecem a etapa seguinte; ainda não houve
 promoção de cérebro. A penalidade limitada por erros/obstruções altera o log
 para `reward_rules=3`; scores v2/v3 não são comparáveis diretamente.
+
+**Currículo em sete estágios (checkpoint atual):** o treino libera por geração
+locomoção, mira, controle de tiro, esquiva, duelo, posicionamento e mapa real.
+As etapas 1–2 desligam dano para isolar movimento e mira; a 3 exercita tiros,
+munição e recarga sem ataque do Player; a 4 lança projéteis de treino contra
+o inimigo e só credita esquiva quando uma trajetória que o ameaçava passa sem
+acerto; as etapas 5–7 combinam o combate. O estágio 7 gera um mundo com seed
+independente, usa a colisão de navegação do jogo e tenta iniciar o inimigo em
+um corredor conectado. O holdout percorre todos os sete estágios com outras
+seeds; `--all-scenarios` amplia de duas para quatro seeds por estágio. O log
+inclui autoria neural/fallback, tiros, acertos, recargas, oportunidades e
+esquivas, exposição/cobertura, distância, bloqueio, Bhop e casos de mapa.
+As pontuações específicas das etapas iniciais não são comparáveis entre
+gerações: `stage=N/7` informa o que já foi liberado. Sete gerações ou mais
+são necessárias para completar o ciclo. O ataque do Player no jogo continua
+hitscan; a etapa de esquiva com projéteis testa reação antecipada à mira e
+trajetória, mas não prova esquiva pós-disparo em gameplay. Ainda são exigidos
+comparação pareada com cérebros antigos e playtest antes da promoção.
+
+**Paridade de execução do treino (checkpoint seguinte):** o treino agora usa
+`controlAll=true`, assim como o jogo. Cada inimigo mantém seu próprio estado
+motor e a telemetria consulta as saídas desse estado, não uma saída global.
+Isso inclui as salvaguardas de mira e o fallback temporário de produção na
+simulação. O log marca `runtime_control_all=1` e os currículos `8`/`9`.
+Checkpoints obtidos antes dessa correção são diagnósticos e não são candidatos
+à promoção, mesmo que o fitness de treino pareça melhor.
+
+**Rodada curta com paridade (2026-09-29):** cinco treinos independentes, seed
+42, população 8, 14 gerações por arquétipo, sete estágios concluídos, sem
+pausa artificial. Os checkpoints e o log estão localmente em
+`build/ai-runs/tactical-runtime-20260929/` e
+`build/ai-runs/tactical-runtime-20260929.log` (arquivos de build ignorados pelo
+Git). Os holdouts finais, na escala nova, foram Worker `-3,017`, Guard `0,621`,
+Officer `0,564`, Engineer `-0,509` e Robot `-0,343`. Esses números **não**
+autorizam promoção por si só.
+
+Comparação de gameplay em três seeds não usadas diretamente na seleção
+(`12345`, `67890`, `54321`), 360 frames por cenário, candidato da geração 14
+contra o cérebro ativo do mesmo tipo. Os números abaixo somam o dano no Player;
+o teste padrão tem quatro cenários por tipo, mais `boss_cover` para Robot, e
+o duelo tem `ground_strafe` e `bhop`:
+
+| Tipo | Padrão ativo → novo | Duelo ativo → novo |
+| --- | ---: | ---: |
+| Worker | 280 → 210 | 30 → 30 |
+| Guard | 732 → 708 | 96 → 24 |
+| Officer | 462 → 468 | 42 → 42 |
+| Engineer | 480 → 465 | 35 → 25 |
+| Robot | 780 → 588 | 170 → 174 |
+
+Todos os seis duelos por tipo mantiveram o mesmo desfecho entre ativo e novo:
+vitória do Player para os quatro tipos comuns; limite de tempo para Robot.
+No cenário `boss_cover`, Robot caiu de 32 para 0 de dano nas seeds `12345` e
+`67890` (e também na terceira seed). A queda do Guard contra Bhop/strafe e
+a cobertura do boss tornam a substituição insegura. **Nenhum dos cinco assets
+em `assets/ai/` foi trocado.** Antes de uma nova rodada, priorizar locomoção
+em cobertura/corredor e avaliação visual de orientação, sem usar o fitness
+como único critério.
+
+Validação local desta fase: build Debug concluído e `ctest --test-dir
+build/debug --output-on-failure` passou em 59/59 testes. Isso confirma as
+invariantes automatizadas e não substitui uma partida visual completa.
+
+**Ajuste de seleção após a rodada curta:** um primeiro treino de sete gerações
+mostrou que boa locomoção nas primeiras etapas não conserva necessariamente
+a capacidade de atirar nas últimas. O currículo 6 (7 com quatro seeds por
+estágio) reintroduz dois candidatos táticos, de direções laterais opostas,
+quando um estágio é liberado; seus pesos respeitam o limite do arquivo
+`.brain`. A primeira comparação pareada em `gdp_ai_gameplay_eval --duel`,
+seed 12345 e 360 frames, mostrou regressões dos candidatos da rodada v2
+em Guard, Engineer e Robot contra Bhop. Esses candidatos não foram promovidos.

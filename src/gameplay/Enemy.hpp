@@ -134,6 +134,7 @@ struct EnemyNoiseStimulus {
 struct EnemyPerception {
     bool playerFlashlightOn{false};
     std::vector<EnemyProjectile>* projectiles{nullptr};
+    bool allowAttacks{true};
 };
 
 struct NeuralEnemyMotorState {

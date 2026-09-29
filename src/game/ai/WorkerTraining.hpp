@@ -11,6 +11,16 @@
 
 namespace gdp::game::ai {
 
+enum class TrainingStage : std::uint8_t {
+    Locomotion = 1,
+    Aim,
+    FireControl,
+    Dodge,
+    Duel,
+    Positioning,
+    RealMaps,
+};
+
 struct WorkerFitnessMetrics {
     float damageDealt{0.0F};
     float damageReceived{0.0F};
@@ -22,6 +32,10 @@ struct WorkerFitnessMetrics {
     float idleSeconds{0.0F};
     float contactSeconds{0.0F};
     float aimSeconds{0.0F};
+    float exposedSeconds{0.0F};
+    float coverSeconds{0.0F};
+    float rangeErrorSeconds{0.0F};
+    float distanceSum{0.0F};
     float bossLongRangeSeconds{0.0F};
     float bossPressureSeconds{0.0F};
     float bossPursuitSeconds{0.0F};
@@ -36,6 +50,13 @@ struct WorkerFitnessMetrics {
     std::uint32_t shotsBlocked{0};
     std::uint32_t shotsDodged{0};
     std::uint32_t reloadsStarted{0};
+    std::uint32_t dodgeOpportunities{0};
+    std::uint32_t dodgesSucceeded{0};
+    std::uint32_t incomingProjectileHits{0};
+    std::uint32_t coverEntries{0};
+    std::uint32_t distanceSamples{0};
+    std::uint32_t realMapEpisodes{0};
+    std::uint32_t corridorSpawns{0};
     std::uint32_t fallbackAttacksLanded{0};
     std::uint32_t fallbackShotsFired{0};
     std::uint32_t playerEliminations{0};
@@ -58,6 +79,10 @@ struct DirectionalCredit {
 [[nodiscard]] float scoreEnemyFitness(
     const WorkerFitnessMetrics& metrics,
     gdp::entities::EnemyArchetype archetype) noexcept;
+[[nodiscard]] float scoreTrainingStage(
+    const WorkerFitnessMetrics& metrics,
+    gdp::entities::EnemyArchetype archetype,
+    TrainingStage stage) noexcept;
 [[nodiscard]] float creditedTacticalProgress(
     float neuralProgress, float totalProgress) noexcept;
 [[nodiscard]] DirectionalCredit directionalMovementCredit(
@@ -85,6 +110,7 @@ struct WorkerTrainingResult {
     float initialBest{0.0F};
     float finalBest{0.0F};
     float holdoutFitness{0.0F};
+    std::uint32_t completedStages{0U};
     std::optional<std::filesystem::path> lastCheckpoint;
     std::uint32_t lastGeneration{0U};
 };

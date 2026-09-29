@@ -4,6 +4,7 @@
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
 #include "gameplay/Weapon.hpp"
+#include "core/Random.hpp"
 #include "world/WorldGenerator.hpp"
 
 #include <algorithm>
@@ -47,6 +48,10 @@ struct ScenarioResult {
     std::uint32_t defeatFrame{0U};
     std::size_t enemyCount{0U};
     std::size_t hits{0U};
+    std::size_t enemyShots{0U};
+    std::size_t blockedShots{0U};
+    std::size_t dodgedShots{0U};
+    std::size_t reloads{0U};
     std::size_t supportActions{0U};
     std::uint64_t neuralTicks{0U};
     float playerDamage{0.0F};
@@ -61,6 +66,10 @@ struct DuelResult {
     std::size_t playerShots{0U};
     std::size_t playerHits{0U};
     std::size_t enemyHits{0U};
+    std::size_t enemyShots{0U};
+    std::size_t blockedShots{0U};
+    std::size_t dodgedShots{0U};
+    std::size_t reloads{0U};
     std::size_t jumps{0U};
     std::uint64_t neuralTicks{0U};
     float damageToEnemy{0.0F};
@@ -315,8 +324,12 @@ std::optional<ScenarioResult> runScenario(
             room->id, collision, brain ? &*brain : nullptr, shots);
         projectiles.spawn(shots);
         result.hits += summary.attacksLanded;
+        result.enemyShots += summary.shotsFired;
+        result.reloads += summary.reloadsStarted;
         for (const auto& event : projectiles.update(fixedStep, player, collision)) {
             result.hits += event.hitPlayer ? 1U : 0U;
+            result.blockedShots += event.blocked ? 1U : 0U;
+            result.dodgedShots += event.dodged ? 1U : 0U;
         }
         result.supportActions += summary.commandsIssued + summary.repairsPerformed;
         for (std::size_t index = 0U; index < enemies.size(); ++index) {
@@ -355,8 +368,16 @@ std::optional<DuelResult> runDuelScenario(
     const Vec3 center = (room->worldBounds.minimum
         + room->worldBounds.maximum) * 0.5F;
     const float floor = room->worldBounds.minimum.y;
-    const Vec3 playerStart{center.x, floor, center.z - 2.3F};
-    const Vec3 enemyStart{center.x, floor, center.z + 2.5F};
+    wkc::core::RandomStream fixtureRandom{wkc::core::deriveSeed(
+        world.masterSeed, 0x4455454c46585452ULL,
+        static_cast<std::uint64_t>(archetype) * 2U
+            + static_cast<std::uint64_t>(bunnyHop))};
+    const float lateral = fixtureRandom.rangeFloat(-1.2F, 1.2F);
+    const float separation = fixtureRandom.rangeFloat(4.2F, 6.2F);
+    const Vec3 playerStart{center.x - lateral * 0.5F,
+        floor, center.z - separation * 0.5F};
+    const Vec3 enemyStart{center.x + lateral * 0.5F,
+        floor, center.z + separation * 0.5F};
     const CollisionWorld collision{room->worldBounds, {}};
     if (!collision.canOccupy(playerStart)
         || !collision.canOccupy(enemyStart)) {
@@ -366,9 +387,13 @@ std::optional<DuelResult> runDuelScenario(
     gameplay::Player player;
     player.spawn(playerStart, 90.0F);
     entities::EntityManager manager;
+    constexpr float degreesPerRadian = 57.29577951308232F;
+    const Vec3 towardPlayer = playerStart - enemyStart;
+    const float enemyYaw = std::atan2(towardPlayer.x, towardPlayer.z)
+        * degreesPerRadian + fixtureRandom.rangeFloat(-25.0F, 25.0F);
     const EntityId enemyId = manager.createEnemy({
         .transform = {.position = enemyStart,
-            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
         .roomId = room->id,
         .archetype = archetype,
         .health = enemyHealth(archetype),
@@ -448,8 +473,12 @@ std::optional<DuelResult> runDuelScenario(
             room->id, collision, brain ? &*brain : nullptr, shots);
         projectiles.spawn(shots);
         result.enemyHits += summary.attacksLanded;
+        result.enemyShots += summary.shotsFired;
+        result.reloads += summary.reloadsStarted;
         for (const auto& event : projectiles.update(fixedStep, player, collision)) {
             result.enemyHits += event.hitPlayer ? 1U : 0U;
+            result.blockedShots += event.blocked ? 1U : 0U;
+            result.dodgedShots += event.dodged ? 1U : 0U;
         }
         result.enemyTravel += planarDistance(previousEnemy,
             manager.find(enemyId)->transform.position);
@@ -477,7 +506,9 @@ void printDuelRow(const std::string_view policy,
               << result.enemyHits << ',' << result.damageToEnemy << ','
               << result.damageToPlayer << ',' << result.jumps << ','
               << result.peakPlayerSpeed << ',' << result.playerTravel << ','
-              << result.enemyTravel << ',' << result.neuralTicks << '\n';
+              << result.enemyTravel << ',' << result.neuralTicks << ','
+              << result.enemyShots << ',' << result.blockedShots << ','
+              << result.dodgedShots << ',' << result.reloads << '\n';
 }
 
 void printRow(const std::string_view policy,
@@ -493,7 +524,9 @@ void printRow(const std::string_view policy,
               << result.defeatFrame << ',' << result.playerDamage << ','
               << result.hits << ',' << result.supportActions << ','
               << result.enemyTravel << ',' << result.closestDistance << ','
-              << result.finalDistance << ',' << result.neuralTicks << '\n';
+              << result.finalDistance << ',' << result.neuralTicks << ','
+              << result.enemyShots << ',' << result.blockedShots << ','
+              << result.dodgedShots << ',' << result.reloads << '\n';
 }
 
 } // namespace
@@ -532,7 +565,9 @@ int main(const int argc, char* argv[])
         std::cout << "policy,scenario,archetype,seed,brain_generation,"
                      "outcome,elapsed_frames,player_shots,player_hits,"
                      "enemy_hits,damage_to_enemy,damage_to_player,jumps,"
-                     "peak_player_speed,player_travel,enemy_travel,neural_ticks\n";
+                     "peak_player_speed,player_travel,enemy_travel,neural_ticks,"
+                     "enemy_shots,enemy_shots_blocked,enemy_shots_dodged,"
+                     "enemy_reloads\n";
         for (std::size_t type = 0U; type < archetypeNames.size(); ++type) {
             const auto archetype = static_cast<EnemyArchetype>(type);
             for (std::size_t scenario = 0U;
@@ -559,7 +594,9 @@ int main(const int argc, char* argv[])
     }
     std::cout << "policy,scenario,archetype,seed,brain_generation,enemies,"
                  "elapsed_frames,defeat_frame,player_damage,hits,support_actions,"
-                 "enemy_travel,closest_distance,final_distance,neural_ticks\n";
+                 "enemy_travel,closest_distance,final_distance,neural_ticks,"
+                 "enemy_shots,enemy_shots_blocked,enemy_shots_dodged,"
+                 "enemy_reloads\n";
     for (std::size_t type = 0U; type < archetypeNames.size(); ++type) {
         const auto archetype = static_cast<EnemyArchetype>(type);
         for (std::size_t scenario = 0U; scenario < scenarioNames.size(); ++scenario) {

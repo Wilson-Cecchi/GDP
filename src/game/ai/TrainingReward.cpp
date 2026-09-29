@@ -120,4 +120,48 @@ float scoreEnemyFitness(
     return terminal + std::clamp(auxiliary, -4.0F, 4.0F);
 }
 
+float scoreTrainingStage(const WorkerFitnessMetrics& metrics,
+    const gdp::entities::EnemyArchetype archetype,
+    const TrainingStage stage) noexcept
+{
+    const float progress = std::clamp(metrics.tacticalProgressMeters, -4.0F, 4.0F);
+    const float stuck = std::min(metrics.blockedSeconds, 8.0F);
+    switch (stage) {
+    case TrainingStage::Locomotion:
+        return std::clamp(progress * 0.75F
+            - stuck * 0.3F - std::min(metrics.idleSeconds, 8.0F) * 0.1F,
+            -4.0F, 4.0F);
+    case TrainingStage::Aim:
+        return std::clamp(std::min(metrics.aimSeconds, 8.0F) * 0.35F
+            + std::min(metrics.contactSeconds, 8.0F) * 0.08F
+            - stuck * 0.25F, -4.0F, 4.0F);
+    case TrainingStage::FireControl: {
+        const auto misses = metrics.shotsFired > metrics.attacksLanded
+            ? metrics.shotsFired - metrics.attacksLanded : 0U;
+        return std::clamp(std::min(metrics.damageDealt / 100.0F, 1.0F) * 3.0F
+            + static_cast<float>(std::min(metrics.attacksLanded, 4U)) * 0.22F
+            - static_cast<float>(std::min(misses, 8U)) * 0.08F
+            - static_cast<float>(std::min(metrics.shotsBlocked, 8U)) * 0.18F
+            - std::min(metrics.wastedAttackSeconds, 8.0F) * 0.08F,
+            -4.0F, 4.0F);
+    }
+    case TrainingStage::Dodge:
+        return std::clamp(
+            static_cast<float>(std::min(metrics.dodgesSucceeded, 6U)) * 0.55F
+            - static_cast<float>(std::min(metrics.incomingProjectileHits, 6U))
+                * 0.45F
+            - static_cast<float>(std::min(metrics.unproductiveReversals, 8U))
+                * 0.08F, -4.0F, 4.0F);
+    case TrainingStage::Duel:
+    case TrainingStage::RealMaps:
+        return scoreEnemyFitness(metrics, archetype);
+    case TrainingStage::Positioning:
+        return scoreEnemyFitness(metrics, archetype)
+            + (metrics.attacksLanded > 0U
+                ? static_cast<float>(std::min(metrics.coverEntries, 1U))
+                    * 0.35F : 0.0F);
+    }
+    return 0.0F;
+}
+
 } // namespace gdp::game::ai

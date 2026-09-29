@@ -4,8 +4,11 @@
 #include "entities/EntityManager.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
+#include "gameplay/EnemySensors.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/RoomTraversal.hpp"
 #include "persistence/WorkerBrainStore.hpp"
+#include "world/WorldGenerator.hpp"
 
 #include <algorithm>
 #include <array>
@@ -18,6 +21,7 @@
 #include <optional>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -32,8 +36,8 @@ constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
 constexpr int bossEpisodeSteps = 720;
-constexpr std::size_t scenarioCount = 5U;
-constexpr std::size_t holdoutScenarioCount = 2U;
+constexpr std::size_t scenarioCount = 7U;
+constexpr std::size_t holdoutScenarioCount = 7U;
 constexpr std::size_t scenarioRepetitions = 2U;
 constexpr auto trainingBrainShape = gameplay::enemyBrainShape(
     gameplay::EnemyBrainContract::Tactical);
@@ -134,7 +138,7 @@ constexpr std::array<TrainingScenario, 7> bossScenarios{{
     {PlayerPattern::Peek, CoverPattern::Center, 45.0F, 0.70F, 1.1F},
     {PlayerPattern::Bhop, CoverPattern::Open, -20.0F, 0.52F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -50.0F, 0.52F, 1.1F},
-    {PlayerPattern::Advance, CoverPattern::Right, 55.0F, 0.25F, 1.1F},
+    {PlayerPattern::Advance, CoverPattern::Right, 55.0F, 0.52F, 1.1F},
 }};
 
 const TrainingScenario& scenarioFor(
@@ -228,6 +232,31 @@ wkc::core::Vec3 playerPosition(
     return {};
 }
 
+wkc::core::Vec3 aimStagePlayerPosition(
+    const float time, const float direction) noexcept
+{
+    if (time < 1.0F) {
+        return {};
+    }
+    if (time < 2.0F) {
+        return {direction * (time - 1.0F) * 0.5F, 0.0F, 0.0F};
+    }
+    if (time < 3.0F) {
+        return {direction * (0.5F + (time - 2.0F) * 1.0F), 0.0F, 0.0F};
+    }
+    if (time < 4.0F) {
+        return {direction * (1.5F - (time - 3.0F) * 2.0F), 0.0F, 0.0F};
+    }
+    if (time < 5.0F) {
+        return {direction * (-0.5F + (time - 4.0F) * 1.4F), 0.0F, 0.0F};
+    }
+    if (time < 6.0F) {
+        return {direction * (0.9F + (time - 5.0F) * 0.9F), 0.0F, 0.0F};
+    }
+    return {direction * (1.8F - (time - 6.0F) * 0.7F), 0.0F,
+        (time - 6.0F) * 0.9F};
+}
+
 gameplay::EnemyUpdateSummary updateTrainingEnemy(
     const EnemyArchetype archetype,
     entities::EntityManager& manager,
@@ -235,9 +264,11 @@ gameplay::EnemyUpdateSummary updateTrainingEnemy(
     const std::uint32_t roomId,
     const gameplay::CollisionWorld& arena,
     gameplay::NeuralEnemyExperiment& brain,
-    std::vector<gameplay::EnemyProjectile>& shots)
+    std::vector<gameplay::EnemyProjectile>& shots,
+    const TrainingStage stage)
 {
-    const gameplay::EnemyPerception perception{.projectiles = &shots};
+    const gameplay::EnemyPerception perception{.projectiles = &shots,
+        .allowAttacks = stage >= TrainingStage::FireControl};
     switch (archetype) {
     case EnemyArchetype::Worker:
         return gameplay::updateWorkers(manager, player, roomId, arena,
@@ -282,6 +313,58 @@ float facingAlignment(
         + std::cos(yaw) * (target.z - position.z) / distance;
 }
 
+struct IncomingTrainingShot {
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 velocity{};
+    float targetDistance{0.0F};
+    float traveledDistance{0.0F};
+};
+
+void aimTrainingPlayerAt(gameplay::Player& player,
+    const wkc::core::Vec3 target) noexcept
+{
+    constexpr float degreesPerRadian = 57.29577951308232F;
+    const wkc::core::Vec3 delta = target - player.cameraPosition();
+    const float desiredYaw = std::atan2(delta.z, delta.x) * degreesPerRadian;
+    const float yawDelta = std::remainder(
+        desiredYaw - player.state().yawDegrees, 360.0F);
+    player.applyLook({yawDelta / player.mouseSensitivity(), 0.0F});
+}
+
+struct IncomingShotResult {
+    bool finished{false};
+    bool hit{false};
+    bool dodged{false};
+};
+
+IncomingShotResult advanceIncomingShot(IncomingTrainingShot& shot,
+    const wkc::core::Vec3 enemyFeet, const float enemyRadius,
+    const gameplay::CollisionWorld& arena) noexcept
+{
+    const wkc::core::Vec3 step = shot.velocity * fixedStep;
+    const int samples = std::max(1, static_cast<int>(
+        std::ceil(wkc::core::length(step) / 0.06F)));
+    const wkc::core::Vec3 delta = step * (1.0F / static_cast<float>(samples));
+    for (int sample = 0; sample < samples; ++sample) {
+        const wkc::core::Vec3 next = shot.position + delta;
+        if (!gameplay::hasLineOfSight(shot.position, next, arena)) {
+            return {true, false, false};
+        }
+        shot.position = next;
+        shot.traveledDistance += wkc::core::length(delta);
+        if (std::hypot(next.x - enemyFeet.x, next.z - enemyFeet.z)
+                <= enemyRadius + 0.10F
+            && next.y >= enemyFeet.y + 0.10F
+            && next.y <= enemyFeet.y + 1.8F) {
+            return {true, true, false};
+        }
+        if (shot.traveledDistance >= shot.targetDistance + 0.5F) {
+            return {true, false, true};
+        }
+    }
+    return {};
+}
+
 WorkerFitnessMetrics simulateEpisode(
     const wkc::ai::Genome& genome,
     const wkc::core::Seed seed,
@@ -289,23 +372,108 @@ WorkerFitnessMetrics simulateEpisode(
     const EnemyArchetype archetype)
 {
     const TrainingProfile profile = profileFor(archetype);
+    const TrainingStage stage = static_cast<TrainingStage>(scenario + 1U);
     const TrainingScenario& plan = scenarioFor(archetype, scenario);
     wkc::core::RandomStream random{seed};
     const float workerX = random.rangeFloat(-0.8F, 0.8F);
-    const float workerZ = random.rangeFloat(profile.spawnMin, profile.spawnMax);
+    const float workerZ = stage == TrainingStage::Locomotion
+            && archetype != EnemyArchetype::Worker
+        ? archetype == EnemyArchetype::IndustrialRobot
+            ? random.rangeFloat(14.2F, 14.8F)
+            : random.rangeFloat(profile.preferredMaximum + 2.5F,
+                profile.preferredMaximum + 3.5F)
+        : archetype == EnemyArchetype::IndustrialRobot
+            && plan.initialHealthRatio < 0.33F
+        ? random.rangeFloat(1.7F, 2.3F)
+        : archetype == EnemyArchetype::IndustrialRobot
+            && plan.initialHealthRatio < 0.66F
+            ? random.rangeFloat(5.0F, 7.0F)
+            : random.rangeFloat(profile.spawnMin, profile.spawnMax);
     const float sweep = random.rangeFloat(0.5F, 1.8F);
     const float direction = random.chance(0.5F) ? 1.0F : -1.0F;
     const float phase = random.rangeFloat(0.0F, 3.0F);
-    const gameplay::CollisionWorld arena{
-        {{-16.0F, 0.0F, -16.0F}, {16.0F, 4.0F, 16.0F}}, coverFor(plan.cover)};
-    gameplay::Player player;
-    player.spawn({0.0F, 0.0F, 0.0F});
+    wkc::core::Vec3 arenaOrigin{};
+    std::uint32_t roomId = 1U;
+    std::optional<world::World> generatedWorld;
+    const std::vector<wkc::core::Aabb> stageObstacles
+        = stage == TrainingStage::Locomotion
+            ? std::vector<wkc::core::Aabb>{{{-0.75F, 0.0F, 1.4F},
+                {0.75F, 0.75F, 2.3F}}}
+        : stage == TrainingStage::Dodge
+            ? std::vector<wkc::core::Aabb>{}
+        : stage == TrainingStage::Aim
+            ? coverFor(CoverPattern::Right) : coverFor(plan.cover);
+    gameplay::CollisionWorld arena{
+        {{-16.0F, 0.0F, -16.0F}, {16.0F, 4.0F, 16.0F}}, stageObstacles};
+    if (stage == TrainingStage::RealMaps) {
+        const auto generated = world::generateWorld(seed,
+            {.roomCount = 7U, .loopBudget = 1U});
+        if (!generated.succeeded()) {
+            throw std::runtime_error("cannot generate stage-seven training world");
+        }
+        generatedWorld = *generated.world;
+        const auto start = std::find_if(generatedWorld->rooms.begin(),
+            generatedWorld->rooms.end(), [](const world::RoomInstance& room) {
+                return room.role == world::RoomRole::Start;
+            });
+        if (start == generatedWorld->rooms.end()) {
+            throw std::runtime_error("stage-seven world has no start room");
+        }
+        roomId = start->id;
+        arenaOrigin = {
+            (start->worldBounds.minimum.x + start->worldBounds.maximum.x)
+                * 0.5F,
+            start->worldBounds.minimum.y,
+            (start->worldBounds.minimum.z + start->worldBounds.maximum.z)
+                * 0.5F};
+        arena = gameplay::makeRoomNavigationCollision(
+            *generatedWorld, roomId, false);
+    }
     entities::EntityManager manager;
-    constexpr std::uint32_t roomId = 1U;
+    wkc::core::Vec3 enemyStart = arenaOrigin
+        + wkc::core::Vec3{workerX, 0.0F, workerZ};
+    bool corridorSpawn = false;
+    if (generatedWorld) {
+        for (const world::CorridorPath& corridor : generatedWorld->corridors) {
+            if ((corridor.firstRoom == roomId || corridor.secondRoom == roomId)
+                && corridor.points.size() > 1U) {
+                const bool forward = corridor.firstRoom == roomId;
+                const wkc::core::Vec3 doorway = forward
+                    ? corridor.points.front() : corridor.points.back();
+                const wkc::core::Vec3 next = forward
+                    ? corridor.points[1U]
+                    : corridor.points[corridor.points.size() - 2U];
+                const wkc::core::Vec3 outward
+                    = wkc::core::normalized(next - doorway);
+                const wkc::core::Vec3 towardRoom
+                    = wkc::core::normalized(arenaOrigin - doorway);
+                const wkc::core::Vec3 playerCandidate
+                    = doorway + towardRoom * 1.4F;
+                const wkc::core::Vec3 enemyCandidate
+                    = doorway + outward * 2.2F;
+                if (arena.canOccupy(playerCandidate,
+                        {.radius = 0.35F, .height = 1.8F})
+                    && arena.canOccupy(enemyCandidate,
+                        {.radius = 0.35F, .height = 1.8F})) {
+                    arenaOrigin = playerCandidate;
+                    enemyStart = enemyCandidate;
+                    corridorSpawn = true;
+                    break;
+                }
+            }
+        }
+    }
+    gameplay::Player player;
+    player.spawn(arenaOrigin);
+    constexpr float degreesPerRadian = 57.29577951308232F;
+    const wkc::core::Vec3 initialTarget = arenaOrigin - enemyStart;
+    const float initialYaw = generatedWorld
+        ? std::atan2(initialTarget.x, initialTarget.z) * degreesPerRadian
+            + plan.facingOffsetDegrees
+        : 180.0F + plan.facingOffsetDegrees;
     const entities::EntityId worker = manager.createEnemy({
-        .transform = {.position = {workerX, 0.0F, workerZ},
-            .rotationDegrees = {0.0F,
-                180.0F + plan.facingOffsetDegrees, 0.0F}},
+        .transform = {.position = enemyStart,
+            .rotationDegrees = {0.0F, initialYaw, 0.0F}},
         .roomId = roomId,
         .archetype = archetype,
         .health = profile.health,
@@ -316,7 +484,7 @@ WorkerFitnessMetrics simulateEpisode(
     std::optional<entities::EntityId> supportAlly;
     if (archetype == EnemyArchetype::Officer) {
         const auto ally = manager.createEnemy({
-            .transform = {.position = {
+            .transform = {.position = arenaOrigin + wkc::core::Vec3{
                 scenario % 2U == 0U ? 2.0F : -3.0F, 0.0F,
                 scenario % 3U == 0U ? 2.0F : 4.0F}},
             .roomId = roomId,
@@ -328,7 +496,7 @@ WorkerFitnessMetrics simulateEpisode(
         supportAlly = ally;
     } else if (archetype == EnemyArchetype::Engineer) {
         const auto ally = manager.createEnemy({
-            .transform = {.position = {
+            .transform = {.position = arenaOrigin + wkc::core::Vec3{
                 scenario % 2U == 0U ? 2.0F : -3.0F, 0.0F,
                 scenario % 3U == 0U ? 2.0F : 4.0F}},
             .roomId = roomId,
@@ -341,9 +509,13 @@ WorkerFitnessMetrics simulateEpisode(
     gameplay::NeuralEnemyExperiment brain{
         seed, archetype, gameplay::EnemyBrainContract::Tactical};
     brain.genome = genome;
+    brain.controlAll = true;
     brain.logSelection = false;
     WorkerFitnessMetrics metrics;
+    metrics.realMapEpisodes = generatedWorld ? 1U : 0U;
+    metrics.corridorSpawns = corridorSpawn ? 1U : 0U;
     gameplay::EnemyProjectileSystem enemyProjectiles;
+    std::optional<IncomingTrainingShot> incomingShot;
     float shotCooldown = 1.0F;
     float previousForwardIntent = 0.0F;
     float previousStrafeIntent = 0.0F;
@@ -366,7 +538,9 @@ WorkerFitnessMetrics simulateEpisode(
             ally->attackCooldown = std::max(
                 0.0F, ally->attackCooldown - fixedStep);
         }
-        if (plan.player == PlayerPattern::Bhop) {
+        const PlayerPattern playerPattern = stage == TrainingStage::RealMaps
+            && (seed & 1U) != 0U ? PlayerPattern::Bhop : plan.player;
+        if (playerPattern == PlayerPattern::Bhop) {
             const float previousVerticalSpeed = player.state().velocity.y;
             gameplay::PlayerCommand command;
             command.moveForward = tick < 10 ? 1.0F : 0.0F;
@@ -380,22 +554,53 @@ WorkerFitnessMetrics simulateEpisode(
             metrics.peakPlayerSpeed = std::max(metrics.peakPlayerSpeed,
                 std::hypot(velocity.x, velocity.z));
         } else {
-            const wkc::core::Vec3 nextPlayerPosition = playerPosition(
-                plan.player, time, direction, sweep, phase);
+            const wkc::core::Vec3 nextPlayerPosition
+                = (stage == TrainingStage::Aim
+                    ? aimStagePlayerPosition(time, direction)
+                    : playerPosition(playerPattern, time, direction,
+                        sweep, phase)) + arenaOrigin;
             if (arena.canOccupy(nextPlayerPosition,
                     {.radius = 0.35F, .height = 1.8F})) {
                 (void)player.relocate(nextPlayerPosition, -90.0F);
             }
         }
+        if (stage >= TrainingStage::Dodge) {
+            aimTrainingPlayerAt(player,
+                entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F});
+        }
+        if (stage == TrainingStage::Dodge && !incomingShot
+            && shotCooldown <= 0.0F
+            && planarDistance(entity->transform.position,
+                player.state().position) <= profile.playerAttackRange) {
+            const wkc::core::Vec3 origin = player.cameraPosition();
+            const wkc::core::Vec3 target = entity->transform.position
+                + wkc::core::Vec3{0.0F, 1.0F, 0.0F};
+            if (gameplay::hasLineOfSight(origin, target, arena)) {
+                const wkc::core::Vec3 offset = target - origin;
+                const float distance = wkc::core::length(offset);
+                incomingShot = IncomingTrainingShot{
+                    origin, offset * (13.0F / distance), distance, 0.0F};
+                ++metrics.dodgeOpportunities;
+                shotCooldown = plan.playerShotInterval;
+            }
+        }
         const wkc::core::Vec3 before = entity->transform.position;
+        const bool exposedBefore = gameplay::hasLineOfSight(
+            player.cameraPosition(),
+            before + wkc::core::Vec3{0.0F, 1.0F, 0.0F}, arena);
         const float previousAlignment = facingAlignment(before,
             entity->transform.rotationDegrees.y, player.state().position);
         const float playerHealthBefore = player.state().health;
         const std::uint64_t controlledBefore = brain.controlledTicks;
         std::vector<gameplay::EnemyProjectile> spawnedShots;
         const auto summary = updateTrainingEnemy(
-            archetype, manager, player, roomId, arena, brain, spawnedShots);
+            archetype, manager, player, roomId, arena, brain, spawnedShots,
+            stage);
         const bool controlled = brain.controlledTicks != controlledBefore;
+        const auto motor = brain.motors.find(worker.packed());
+        const std::array<float, 5> neutralActions{};
+        const std::array<float, 5>& actions = motor != brain.motors.end()
+            ? motor->second.outputs : neutralActions;
         enemyProjectiles.spawn(spawnedShots);
         const auto projectileEvents = enemyProjectiles.update(
             fixedStep, player, arena);
@@ -430,6 +635,18 @@ WorkerFitnessMetrics simulateEpisode(
             = phaseProfile(archetype, profile, healthRatio);
         const float tacticalProgress = rangeError(distanceBefore, currentProfile)
             - rangeError(distance, currentProfile);
+        const bool exposedAfter = gameplay::hasLineOfSight(
+            player.cameraPosition(), entity->transform.position
+                + wkc::core::Vec3{0.0F, 1.0F, 0.0F}, arena);
+        metrics.exposedSeconds += exposedAfter ? fixedStep : 0.0F;
+        metrics.coverSeconds += exposedAfter ? 0.0F : fixedStep;
+        metrics.rangeErrorSeconds += rangeError(distance, currentProfile)
+            * fixedStep;
+        metrics.distanceSum += distance;
+        ++metrics.distanceSamples;
+        if (controlled && exposedBefore && !exposedAfter) {
+            ++metrics.coverEntries;
+        }
         totalTacticalProgress += tacticalProgress;
         if (controlled) {
             metrics.tacticalProgressMeters += tacticalProgress;
@@ -461,12 +678,34 @@ WorkerFitnessMetrics simulateEpisode(
         metrics.bossPursuitSeconds += static_cast<float>(
             summary.bossPursuit) * fixedStep;
         metrics.survivalSeconds += fixedStep;
+        if (incomingShot) {
+            const IncomingShotResult incoming = advanceIncomingShot(*incomingShot,
+                entity->transform.position,
+                archetype == EnemyArchetype::IndustrialRobot ? 0.52F : 0.35F,
+                arena);
+            if (incoming.finished) {
+                incomingShot.reset();
+                if (incoming.hit) {
+                    const float healthBefore = enemy->health;
+                    (void)gameplay::applyDamage(manager, worker, 8.0F);
+                    ++metrics.incomingProjectileHits;
+                    if (controlled) {
+                        metrics.damageReceived += healthBefore - enemy->health;
+                    } else {
+                        metrics.fallbackDamageReceived
+                            += healthBefore - enemy->health;
+                    }
+                } else if (incoming.dodged && controlled) {
+                    ++metrics.dodgesSucceeded;
+                }
+            }
+        }
         const bool playerVisible = gameplay::hasLineOfSight(
                 entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
                 player.cameraPosition(), arena);
         if (controlled) {
-            const float forward = std::clamp(brain.outputs[0], -1.0F, 1.0F);
-            const float strafe = std::clamp(brain.outputs[1], -1.0F, 1.0F);
+            const float forward = std::clamp(actions[0], -1.0F, 1.0F);
+            const float strafe = std::clamp(actions[1], -1.0F, 1.0F);
             const DirectionalCredit credit = directionalMovementCredit(
                 forward, strafe, fixedStep);
             metrics.forwardCreditSeconds += credit.forward;
@@ -477,7 +716,7 @@ WorkerFitnessMetrics simulateEpisode(
                     || (previousForwardIntent < -0.3F && forward > 0.3F)
                     || (previousStrafeIntent > 0.3F && strafe < -0.3F)
                     || (previousStrafeIntent < -0.3F && strafe > 0.3F));
-            const bool underThreat = playerVisible
+            const bool underThreat = stage >= TrainingStage::Dodge && playerVisible
                 && distance <= profile.playerAttackRange
                 && shotCooldown <= 0.2F;
             const float currentAlignment = facingAlignment(
@@ -500,9 +739,10 @@ WorkerFitnessMetrics simulateEpisode(
         if (controlled && distance <= currentProfile.preferredMaximum + 2.0F
             && playerVisible) {
             metrics.contactSeconds += fixedStep;
-            if (archetype != EnemyArchetype::Worker && distance > 1.0e-5F) {
+            if (distance > 1.0e-5F) {
                 constexpr float radiansPerDegree = 0.01745329251994329577F;
-                constexpr float aimCosine = 0.9781476007F; // 12 degrees.
+                const float aimCosine = archetype == EnemyArchetype::Worker
+                    ? 0.8191520443F : 0.9781476007F;
                 const float yaw = entity->transform.rotationDegrees.y
                     * radiansPerDegree;
                 const wkc::core::Vec3 forward{
@@ -519,7 +759,7 @@ WorkerFitnessMetrics simulateEpisode(
             }
         }
         const float requestedMovement = std::hypot(
-            brain.outputs[0], brain.outputs[1]);
+            actions[0], actions[1]);
         if (controlled && movement < 0.002F
             && rangeError(distance, currentProfile) > 0.5F
             && requestedMovement < 0.1F) {
@@ -528,7 +768,7 @@ WorkerFitnessMetrics simulateEpisode(
         if (controlled && movement < 0.002F && requestedMovement > 0.3F) {
             metrics.blockedSeconds += fixedStep;
         }
-        if (controlled && brain.outputs[3] > 0.65F
+        if (controlled && actions[3] > 0.65F
             && summary.attacking == 0U) {
             metrics.wastedAttackSeconds += fixedStep;
         }
@@ -542,7 +782,8 @@ WorkerFitnessMetrics simulateEpisode(
             break;
         }
         shotCooldown -= fixedStep;
-        if (shotCooldown <= 0.0F && distance <= profile.playerAttackRange
+        if (stage >= TrainingStage::Duel && shotCooldown <= 0.0F
+            && distance <= profile.playerAttackRange
             && gameplay::hasLineOfSight(
                 player.cameraPosition(),
                 entity->transform.position
@@ -583,6 +824,10 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.tacticalProgressMeters += sample.tacticalProgressMeters;
     total.proximitySeconds += sample.proximitySeconds;
     total.aimSeconds += sample.aimSeconds;
+    total.exposedSeconds += sample.exposedSeconds;
+    total.coverSeconds += sample.coverSeconds;
+    total.rangeErrorSeconds += sample.rangeErrorSeconds;
+    total.distanceSum += sample.distanceSum;
     total.bossLongRangeSeconds += sample.bossLongRangeSeconds;
     total.bossPressureSeconds += sample.bossPressureSeconds;
     total.bossPursuitSeconds += sample.bossPursuitSeconds;
@@ -600,6 +845,13 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.shotsBlocked += sample.shotsBlocked;
     total.shotsDodged += sample.shotsDodged;
     total.reloadsStarted += sample.reloadsStarted;
+    total.dodgeOpportunities += sample.dodgeOpportunities;
+    total.dodgesSucceeded += sample.dodgesSucceeded;
+    total.incomingProjectileHits += sample.incomingProjectileHits;
+    total.coverEntries += sample.coverEntries;
+    total.distanceSamples += sample.distanceSamples;
+    total.realMapEpisodes += sample.realMapEpisodes;
+    total.corridorSpawns += sample.corridorSpawns;
     total.fallbackAttacksLanded += sample.fallbackAttacksLanded;
     total.fallbackShotsFired += sample.fallbackShotsFired;
     total.playerEliminations += sample.playerEliminations;
@@ -617,24 +869,25 @@ WorkerEvaluation evaluateGenome(
     const wkc::core::Seed scenarioSeed,
     const EnemyArchetype archetype,
     const bool holdout = false,
-    const bool trainAllScenarios = false)
+    const bool trainAllScenarios = false,
+    const std::size_t unlockedStages = scenarioCount)
 {
     WorkerEvaluation evaluation;
     float worst = std::numeric_limits<float>::infinity();
-    const std::size_t firstScenario
-        = holdout && !trainAllScenarios ? scenarioCount : 0U;
-    const std::size_t count = trainAllScenarios
-        ? scenarioCount + holdoutScenarioCount
-        : holdout ? holdoutScenarioCount : scenarioCount;
+    const std::size_t count = holdout ? holdoutScenarioCount
+        : std::clamp(unlockedStages, std::size_t{1}, scenarioCount);
+    const std::size_t repetitions = trainAllScenarios
+        ? scenarioRepetitions * 2U : scenarioRepetitions;
     for (std::size_t offset = 0U; offset < count; ++offset) {
-        const std::size_t scenario = firstScenario + offset;
+        const std::size_t scenario = offset;
         for (std::size_t repetition = 0U;
-             repetition < scenarioRepetitions; ++repetition) {
+             repetition < repetitions; ++repetition) {
             const WorkerFitnessMetrics metrics = simulateEpisode(genome,
                 wkc::core::deriveSeed(scenarioSeed, trainingScenarioDomain,
-                    scenario * scenarioRepetitions + repetition), scenario,
+                    scenario * repetitions + repetition), scenario,
                 archetype);
-            const float scenarioScore = scoreEnemyFitness(metrics, archetype);
+            const float scenarioScore = scoreTrainingStage(metrics, archetype,
+                static_cast<TrainingStage>(scenario + 1U));
             evaluation.score += scenarioScore;
             worst = std::min(worst, scenarioScore);
             addMetrics(evaluation.metrics, metrics);
@@ -643,7 +896,7 @@ WorkerEvaluation evaluateGenome(
     evaluation.worstScenario = worst;
     evaluation.score = 0.75F
         * (evaluation.score
-            / static_cast<float>(count * scenarioRepetitions))
+            / static_cast<float>(count * repetitions))
         + 0.25F * worst;
     return evaluation;
 }
@@ -669,23 +922,32 @@ wkc::ai::Genome curriculumGenome(
         wkc::ai::NeuralNetwork{inputCount, hiddenCount, outputCount},
         0.0F, generation, id};
     auto parameters = genome.network.parameters();
-    // Hidden 0 reacts to visibility, 1 turns toward signed target angle,
-    // and 2 approaches when the target is far. The remaining neurons start
-    // free for evolution; this is a baseline, not a scripted final policy.
+    // A small, directionally correct starting policy. Sensor angle is positive
+    // to the enemy's left, while positive yaw turns right. Hidden 1 uses
+    // distance for approach/retreat; the attack neuron is gated by visibility.
     constexpr std::size_t hiddenStride = inputCount + 1U;
     constexpr std::size_t outputStride = hiddenCount + 1U;
     constexpr std::size_t outputBase = hiddenCount * hiddenStride;
-    parameters[2] = 1.0F;
-    parameters[hiddenStride + 1U] = -1.0F;
-    parameters[2U * hiddenStride] = -1.0F;
+    parameters[1U] = 1.0F;
+    parameters[hiddenStride] = -1.0F;
+    parameters[2U * hiddenStride + 2U] = 1.0F;
+    parameters[3U * hiddenStride + static_cast<std::size_t>(
+        gameplay::TacticalEnemySensor::Ammo)] = -1.0F;
+    parameters[4U * hiddenStride + static_cast<std::size_t>(
+        gameplay::TacticalEnemySensor::PlayerAimThreat)] = 1.0F;
     if (archetype == EnemyArchetype::Worker) {
         parameters[outputBase + hiddenCount] = 0.7F;
     } else {
-        parameters[outputBase + 2U] = 0.8F;
+        parameters[outputBase + 1U] = 1.0F;
     }
-    parameters[outputBase + 2U * outputStride + 1U] = 1.0F;
-    parameters[outputBase + 3U * outputStride] = 1.0F;
-    parameters[outputBase + 3U * outputStride + hiddenCount] = 0.25F;
+    parameters[outputBase + outputStride + 4U] = id % 2U == 0U ? 1.0F : -1.0F;
+    parameters[outputBase + outputStride + hiddenCount]
+        = id % 2U == 0U ? 0.2F : -0.2F;
+    parameters[outputBase + 2U * outputStride] = -1.0F;
+    parameters[outputBase + 3U * outputStride + 2U] = 1.0F;
+    parameters[outputBase + 3U * outputStride + hiddenCount] = 0.2F;
+    parameters[outputBase + 4U * outputStride + 3U] = 1.0F;
+    parameters[outputBase + 4U * outputStride + hiddenCount] = 0.25F;
     return genome;
 }
 
@@ -866,24 +1128,53 @@ WorkerTrainingResult runEnemyTraining(
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
                << " reward_rules=3"
                << " brain_contract=2"
-               << " curriculum=" << (options.trainAllScenarios ? 3 : 2)
+               << " curriculum=" << (options.trainAllScenarios ? 9 : 8)
+               << " stage_immigrants=2"
+               << " runtime_control_all=1"
                << " seed=" << seed
                << " population=" << options.population
                << " generations=" << options.generations
                << " cooldown_ms=" << options.cooldownMilliseconds
                << " start_generation=" << firstGeneration
-               << " scenarios=" << (options.trainAllScenarios
-                    ? scenarioCount + holdoutScenarioCount : scenarioCount)
-               << " holdout_scenarios=" << (options.trainAllScenarios
-                    ? scenarioCount + holdoutScenarioCount : holdoutScenarioCount)
-               << " repetitions=" << scenarioRepetitions << '\n';
+               << " stages=" << scenarioCount
+               << " scenarios=" << scenarioCount
+               << " holdout_scenarios=" << holdoutScenarioCount
+               << " repetitions=" << (options.trainAllScenarios
+                    ? scenarioRepetitions * 2U : scenarioRepetitions) << '\n';
         for (std::uint32_t offset = 0; offset < options.generations; ++offset) {
             const std::uint32_t generation = firstGeneration + offset;
+            const std::size_t unlockedStages = resume ? scenarioCount
+                : std::min(scenarioCount, std::size_t{1}
+                    + (static_cast<std::size_t>(offset) * scenarioCount)
+                        / options.generations);
+            result.completedStages = static_cast<std::uint32_t>(unlockedStages);
+            if (!resume && offset > 0U && population.size() >= 4U) {
+                const std::size_t previousStages = std::min(scenarioCount,
+                    std::size_t{1}
+                        + (static_cast<std::size_t>(offset - 1U)
+                            * scenarioCount) / options.generations);
+                if (unlockedStages > previousStages) {
+                    for (std::size_t immigrant = 0U; immigrant < 2U;
+                         ++immigrant) {
+                        const std::size_t index
+                            = population.size() - 2U + immigrant;
+                        wkc::ai::Genome seeded = curriculumGenome(
+                            options.archetype, generation,
+                            static_cast<std::uint32_t>(index));
+                        wkc::ai::mutate(seeded, wkc::core::deriveSeed(
+                                populationSeed, initialBrainDomain,
+                                (static_cast<std::uint64_t>(generation) << 8U)
+                                    | immigrant),
+                            0.04F, 0.06F);
+                        population[index] = std::move(seeded);
+                    }
+                }
+            }
             float total = 0.0F;
             for (wkc::ai::Genome& genome : population) {
                 genome.fitness = evaluateGenome(
                     genome, commonScenarios, options.archetype,
-                    false, options.trainAllScenarios).score;
+                    false, options.trainAllScenarios, unlockedStages).score;
                 total += genome.fitness;
             }
             std::sort(population.begin(), population.end(),
@@ -903,7 +1194,9 @@ WorkerTrainingResult runEnemyTraining(
                     options.archetype, false, options.trainAllScenarios);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
+                   << " stage=" << unlockedStages << '/' << scenarioCount
                    << " best=" << std::fixed << std::setprecision(3) << best
+                   << " full_score=" << bestEvaluation.score
                    << " mean=" << total / static_cast<float>(population.size())
                    << " worst_scenario=" << bestEvaluation.worstScenario
                    << " damage_dealt=" << bestMetrics.damageDealt
@@ -915,6 +1208,19 @@ WorkerTrainingResult runEnemyTraining(
                    << " blocked_shots=" << bestMetrics.shotsBlocked
                    << " dodged_shots=" << bestMetrics.shotsDodged
                    << " reloads=" << bestMetrics.reloadsStarted
+                   << " dodge_opportunities=" << bestMetrics.dodgeOpportunities
+                   << " dodges=" << bestMetrics.dodgesSucceeded
+                   << " incoming_hits=" << bestMetrics.incomingProjectileHits
+                   << " cover_entries=" << bestMetrics.coverEntries
+                   << " cover_s=" << bestMetrics.coverSeconds
+                   << " exposed_s=" << bestMetrics.exposedSeconds
+                   << " mean_distance=" << (bestMetrics.distanceSamples > 0U
+                        ? bestMetrics.distanceSum
+                            / static_cast<float>(bestMetrics.distanceSamples)
+                        : 0.0F)
+                   << " range_error_s=" << bestMetrics.rangeErrorSeconds
+                   << " real_map_episodes=" << bestMetrics.realMapEpisodes
+                   << " corridor_spawns=" << bestMetrics.corridorSpawns
                    << " fallback_hits=" << bestMetrics.fallbackAttacksLanded
                    << " fallback_shots=" << bestMetrics.fallbackShotsFired
                    << " range_progress=" << bestMetrics.tacticalProgressMeters
@@ -975,6 +1281,8 @@ WorkerTrainingResult runEnemyTraining(
         output << "AI_RESULT generation=" << result.lastGeneration
                << " reward_rules=3"
                << " brain_contract=2"
+               << " runtime_control_all=1"
+               << " stages_completed=" << result.completedStages
                << " train_best=" << result.finalBest
                << " holdout=" << result.holdoutFitness;
         if (result.lastCheckpoint) {

@@ -145,6 +145,39 @@ void testFitness()
     movementCommand.strafeCreditSeconds = 8.0F;
     expect(scoreWorkerFitness(movementCommand) == scoreWorkerFitness(baseline),
         "movement commands have diagnostic credit, not automatic reward");
+    WorkerFitnessMetrics dodging = baseline;
+    dodging.dodgeOpportunities = 1U;
+    dodging.dodgesSucceeded = 1U;
+    expect(scoreTrainingStage(dodging,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::Dodge)
+            > scoreTrainingStage(baseline,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::Dodge),
+        "dodge stage rewards a verified avoided projectile");
+    WorkerFitnessMetrics strafing = baseline;
+    strafing.strafeCreditSeconds = 20.0F;
+    expect(scoreTrainingStage(strafing,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::Dodge)
+            == scoreTrainingStage(baseline,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::Dodge),
+        "dodge stage never rewards strafe without a real threat");
+    WorkerFitnessMetrics covered = baseline;
+    covered.coverEntries = 1U;
+    const auto guard = gdp::entities::EnemyArchetype::Guard;
+    expect(scoreTrainingStage(covered, guard, TrainingStage::Positioning)
+            > scoreTrainingStage(baseline, guard, TrainingStage::Positioning),
+        "positioning stage credits cover only when paired with a real hit");
+    covered.attacksLanded = 0U;
+    WorkerFitnessMetrics noHit = baseline;
+    noHit.attacksLanded = 0U;
+    expect(scoreTrainingStage(covered, guard, TrainingStage::Positioning)
+            == scoreTrainingStage(noHit, guard, TrainingStage::Positioning),
+        "passive cover cannot replace combat in positioning stage");
+    covered.attacksLanded = 1U;
+    covered.coverEntries = 20U;
+    expect(scoreTrainingStage(covered, guard, TrainingStage::Positioning)
+            - scoreTrainingStage(baseline, guard,
+                TrainingStage::Positioning) < 0.5F,
+        "repeated cover entry cannot farm unlimited reward");
     const WorkerFitnessMetrics shapingOnly{
         .damageDealt = 1000.0F,
         .tacticalProgressMeters = 100.0F,
@@ -186,13 +219,18 @@ void testTrainingAndPersistence()
     std::ostringstream output;
     const WorkerTrainingResult first = runWorkerTraining(options, output);
     expect(first.succeeded && first.champion && first.lastCheckpoint
-            && first.lastGeneration == 2U,
+            && first.lastGeneration == 2U && first.completedStages == 4U,
         "automated training produces a champion and final checkpoint");
     expect(output.str().find("reward_rules=3") != std::string::npos
             && output.str().find("brain_contract=2") != std::string::npos
-            && output.str().find("curriculum=2") != std::string::npos
-            && output.str().find("scenarios=5") != std::string::npos
-            && output.str().find("holdout_scenarios=2") != std::string::npos
+            && output.str().find("curriculum=8") != std::string::npos
+            && output.str().find("stage_immigrants=2") != std::string::npos
+            && output.str().find("runtime_control_all=1") != std::string::npos
+            && output.str().find("scenarios=7") != std::string::npos
+            && output.str().find("holdout_scenarios=7") != std::string::npos
+            && output.str().find("stage=1/7") != std::string::npos
+            && output.str().find("stage=4/7") != std::string::npos
+            && output.str().find("stages_completed=4") != std::string::npos
             && output.str().find("repetitions=2") != std::string::npos
             && output.str().find("worst_scenario=") != std::string::npos
             && output.str().find("blocked_s=") != std::string::npos
@@ -202,12 +240,14 @@ void testTrainingAndPersistence()
             && output.str().find("fallback_damage_dealt=") != std::string::npos
             && output.str().find("reversals=") != std::string::npos
             && output.str().find("neural_ticks=") != std::string::npos
+            && reportedMetric(output.str(), "fallback_ticks=") > 0.0F
             && reportedMetric(output.str(), "player_jumps=") >= 2.0F
             && reportedMetric(output.str(), "player_peak_speed=") > 4.5F,
         "training reports scenario count and reward-penalty evidence");
     if (first.succeeded && first.champion && first.lastCheckpoint) {
-        expect(first.finalBest >= first.initialBest - 1e-4F,
-            "elitism preserves the best score on fixed scenarios");
+        expect(std::isfinite(first.initialBest)
+                && std::isfinite(first.finalBest),
+            "scores remain finite across curriculum stage transitions");
         const auto saved = gdp::persistence::loadWorkerBrain(*first.lastCheckpoint);
         expect(saved && saved->trainingSeed == options.seed
                 && saved->genome.generation == 2U
@@ -313,11 +353,13 @@ void testTrainingAndPersistence()
         const WorkerTrainingResult broad = runWorkerTraining(
             allScenarios, allScenariosOutput);
         expect(broad.succeeded && broad.champion
-                && allScenariosOutput.str().find("curriculum=3")
+                && allScenariosOutput.str().find("curriculum=9")
                     != std::string::npos
                 && allScenariosOutput.str().find("scenarios=7")
                     != std::string::npos
                 && allScenariosOutput.str().find("holdout_scenarios=7")
+                    != std::string::npos
+                && allScenariosOutput.str().find("repetitions=4")
                     != std::string::npos,
             "all-scenarios curriculum trains and holds out all seven situations");
         std::ostringstream repeatBroadOutput;
@@ -391,6 +433,11 @@ void testOtherArchetypes()
         expect(reportedMetric(output.str(), "player_jumps=") >= 2.0F
                 && reportedMetric(output.str(), "player_peak_speed=") > 4.5F,
             "every archetype trains against a physics-based Bhop scenario");
+        expect(reportedMetric(output.str(), "dodge_opportunities=") > 0.0F,
+            "every archetype faces an actual incoming projectile in dodge stage");
+        expect(reportedMetric(output.str(), "shots=")
+                + reportedMetric(output.str(), "fallback_shots=") > 0.0F,
+            "every ranged archetype exercises real projectiles in training");
         if (archetype == EnemyArchetype::IndustrialRobot) {
             expect(reportedMetric(output.str(), "boss_long_s=") > 0.0F
                     && reportedMetric(output.str(), "boss_pressure_s=") > 0.0F

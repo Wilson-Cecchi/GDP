@@ -1097,7 +1097,8 @@ bool updateNeuralEnemy(
         = player.state().position - entity.transform.position;
     const float attackDistance = wkc::core::length(
         {attackOffset.x, 0.0F, attackOffset.z});
-    const bool attackRequested = (*outputs)[3] > 0.65F;
+    const bool attackRequested = perception.allowAttacks
+        && (*outputs)[3] > 0.65F;
     if (tactical && enemy.archetype
             != gdp::entities::EnemyArchetype::Worker
         && perception.projectiles != nullptr && (*outputs)[4] > 0.65F
@@ -1363,7 +1364,7 @@ EnemyUpdateSummary updateWorkers(
             turnEnemyToward(
                 *entity, player.state().position - entity->transform.position,
                 step, targetTurnRateDegreesPerSecond);
-            if (enemy->attackCooldown <= 0.0F) {
+            if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
                 player.applyDamage(config.attackDamage);
                 enemy->attackCooldown = config.attackInterval;
                 ++summary.attacksLanded;
@@ -1500,7 +1501,7 @@ EnemyUpdateSummary updateGuards(
         turnEnemyToward(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
-        if (enemy->attackCooldown <= 0.0F) {
+        if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
                     config.attackDamage, perception, false, summary)) {
                 enemy->attackCooldown = config.attackInterval;
@@ -1665,7 +1666,7 @@ EnemyUpdateSummary updateOfficers(
         turnEnemyToward(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
-        if (enemy->attackCooldown <= 0.0F) {
+        if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
                     config.attackDamage, perception, false, summary)) {
                 enemy->attackCooldown = config.attackInterval;
@@ -1871,7 +1872,7 @@ EnemyUpdateSummary updateEngineers(
         turnEnemyToward(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
-        if (enemy->attackCooldown <= 0.0F) {
+        if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
                     config.attackDamage, perception, false, summary)) {
                 enemy->attackCooldown = config.attackInterval;
@@ -2064,7 +2065,7 @@ EnemyUpdateSummary updateIndustrialRobots(
         turnEnemyToward(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
-        if (enemy->attackCooldown <= 0.0F) {
+        if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
                     attackDamage, perception, false, summary)) {
                 enemy->attackCooldown = attackInterval;

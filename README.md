@@ -632,24 +632,31 @@ especializados das pastas numeradas.
   existentes; a rede controla movimento, rotação e ataque.
   A contagem de suporte/reparo aparece no log de treino, mas não entra no
   fitness porque essas ações ainda não são decisões da rede.
-  O movimento lateral da rede é limitado a um ajuste curto de direção; um
-  pedido somente lateral vira um passo cauteloso para frente, evitando que o
-  modelo deslize de lado. Cérebros salvos anteriormente continuam carregando,
-  mas vale treiná-los novamente para ajustar a política ao novo movimento.
-- **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa arenas
-  determinísticas sem abrir janela ou inicializar renderização/áudio. O
-  currículo 2 usa cinco cenários de treino por arquétipo, com duas seeds cada,
-  e dois cenários diferentes, também duplicados, para avaliar o campeão fora
-  do treino. `--all-scenarios` usa os sete cenários disponíveis de cada
-  arquétipo no treino e avalia os mesmos tipos de situação com seeds separadas
-  (currículo 3). São arenas simplificadas, não todos os mapas gerados pelo jogo.
+  Nos cérebros legados, o movimento lateral continua limitado a um ajuste
+  curto de direção e um pedido apenas lateral vira um passo cauteloso para
+  frente. Cérebros táticos v3 usam frente e lateral independentes, com
+  normalização da diagonal. Assim os arquivos antigos continuam carregando
+  sem reinterpretar seus pesos.
+- **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa
+  simulações determinísticas sem abrir janela ou inicializar renderização/áudio.
+  O currículo 8 libera, ao longo das gerações, sete estágios: locomoção, mira,
+  controle de tiro, esquiva, duelo, posicionamento e mapas gerados. Cada estágio
+  usa duas seeds de treino por arquétipo; o holdout avalia os sete estágios com
+  seeds independentes. `--all-scenarios` aumenta para quatro seeds por estágio
+  (currículo 9). Dois candidatos iniciais são reintroduzidos ao abrir cada
+  estágio, para que uma fase sem combate não elimine todas as políticas que
+  sabem atirar. Use pelo menos sete gerações para completar os sete estágios;
+  treinos mais curtos são diagnósticos e exibem `stages_completed`.
+  O treino usa `controlAll=true`, como o jogo, com estado motor e fallback por
+  inimigo; `runtime_control_all=1` no log confirma esse contrato.
   Worker pratica perseguição e ataque próximo; Guard, alinhamento
   de mira e faixa de tiro; Officer, posicionamento junto a aliados; Engineer,
   sobrevivência e alcance de reparo; IndustrialRobot, as três faixas de HP e
   combate mais longo. Movimento do jogador, orientação inicial, cobertura e
   cadência dos disparos recebidos variam. Um dos cenários de treino usa
-  `Player::fixedUpdate` para saltos/Bhop reais; os demais ainda usam trajetórias
-  roteirizadas. As regras de recompensa `reward_rules=3` pontuam apenas dano,
+  `Player::fixedUpdate` para saltos/Bhop reais; a etapa final também pode usar
+  Bhop em um mundo gerado com corredor. Os demais usam trajetórias roteirizadas.
+  As regras de recompensa `reward_rules=3` pontuam apenas dano,
   acertos e eliminações de autoria neural; dano durante fallback e suporte
   automático aparecem no log, mas não rendem pontos ofensivos. Dano recebido
   penaliza o episódio mesmo durante fallback. Eliminar o Player vale
@@ -683,9 +690,9 @@ especializados das pastas numeradas.
   significados diferentes. `--ai-training all` treina os
   cinco arquétipos em sequência e salva cada um em uma subpasta de `--save-dir`;
   `--resume` exige um tipo específico. O treino ainda usa
-  arenas simplificadas e não ensina navegação completa, flanqueamento ou
-  coordenação entre inimigos; melhora de fitness não equivale a aprovação de
-  gameplay, que ainda requer playtest.
+  arenas simplificadas nos seis primeiros estágios e não ensina coordenação
+  entre inimigos; melhora de fitness não equivale a aprovação de gameplay,
+  que ainda requer playtest.
   Em notebooks que aquecem sob carga contínua, `--cooldown-ms N` faz uma pausa
   de N milissegundos entre gerações, sem alterar os pesos ou a pontuação.
   A pausa não substitui o monitoramento da temperatura: interrompa o treino
@@ -700,7 +707,9 @@ especializados das pastas numeradas.
   disparados, acertos reais, tiros bloqueados e tiros evitados pelo Player.
   O Player ainda usa hitscan: a defesa da IA contra ele depende de antecipar
   mira e buscar cobertura, não de desviar depois que o tiro foi disparado.
-  Os estágios isolados e mapas com corredores/portas ainda estão em construção.
+  A etapa final usa a navegação de mundos gerados e posições em corredor;
+  treino e holdout variam as seeds. Portas fechadas e múltiplos cômodos em
+  sequência ainda não são cobertos por todos os exercícios.
   Para aproveitar a política inicial e a mira mais exigente, comece uma
   população nova, usando um diretório de saída novo e vazio.
 
@@ -728,7 +737,8 @@ especializados das pastas numeradas.
   seed indicada, com obstáculos de teste fixos, atualização real dos inimigos a
   60 Hz e o mesmo movimento do jogador nas duas políticas. O CSV informa dano
   causado ao jogador, acertos, deslocamento dos inimigos, menor distância,
-  tempo até derrota e quantos ticks foram realmente controlados pela rede.
+  tempo até derrota, ticks controlados pela rede, projéteis disparados,
+  bloqueados e esquivados, além das recargas.
   Pode-se avaliar um checkpoint ainda não promovido sem alterar os assets:
 
   ```bash
