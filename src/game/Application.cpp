@@ -789,6 +789,7 @@ bool Application::initializeRun()
                 return false;
             }
             neuralEnemyExperiment_->genome = record->genome;
+            neuralEnemyExperiment_->contract = record->contract;
         }
     } else {
         neuralEnemyExperiment_.reset();
@@ -815,6 +816,7 @@ bool Application::initializeRun()
                     config_.worldSeed, SeedDomain::NeuralWorker,
                     static_cast<std::uint64_t>(archetype)), archetype);
                 brain->genome = std::move(records[index]->genome);
+                brain->contract = records[index]->contract;
                 brain->controlAll = true;
                 brain->logSelection = false;
                 log(LogLevel::Info,

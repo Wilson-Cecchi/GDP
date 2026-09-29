@@ -14,12 +14,6 @@
 namespace gdp::persistence {
 namespace {
 
-constexpr std::size_t inputCount = 7;
-constexpr std::size_t hiddenCount = 8;
-constexpr std::size_t outputCount = 4;
-constexpr std::size_t parameterCount = hiddenCount * (inputCount + 1)
-    + outputCount * (hiddenCount + 1);
-
 bool pathOccupied(const std::filesystem::path& path) noexcept
 {
     std::error_code error;
@@ -34,8 +28,10 @@ bool pathOccupied(const std::filesystem::path& path) noexcept
 bool validRecord(const WorkerBrainRecord& record) noexcept
 {
     const auto& network = record.genome.network;
-    if (network.inputCount() != inputCount || network.hiddenCount() != hiddenCount
-        || network.outputCount() != outputCount
+    const auto shape = gdp::gameplay::enemyBrainShape(record.contract);
+    if (shape.inputs == 0U || network.inputCount() != shape.inputs
+        || network.hiddenCount() != shape.hidden
+        || network.outputCount() != shape.outputs
         || !std::isfinite(record.genome.fitness)
         || record.archetype > gdp::entities::EnemyArchetype::IndustrialRobot) {
         return false;
@@ -51,14 +47,22 @@ bool validRecord(const WorkerBrainRecord& record) noexcept
 std::string serialize(const WorkerBrainRecord& record)
 {
     std::ostringstream output;
-    output << "GDP_ENEMY_BRAIN 2\n"
-           << "archetype " << static_cast<unsigned>(record.archetype) << '\n'
+    if (record.contract == gdp::gameplay::EnemyBrainContract::Tactical) {
+        output << "GDP_ENEMY_BRAIN 3\n";
+    } else {
+        output << "GDP_ENEMY_BRAIN 2\n";
+    }
+    output << "archetype " << static_cast<unsigned>(record.archetype) << '\n';
+    if (record.contract == gdp::gameplay::EnemyBrainContract::Tactical) {
+        output << "contract 2\n";
+    }
+    output
            << "seed " << record.trainingSeed << '\n'
            << "generation " << record.genome.generation << '\n'
            << "id " << record.genome.id << '\n'
            << "fitness_bits " << std::bit_cast<std::uint32_t>(record.genome.fitness)
            << '\n'
-           << "weights " << parameterCount << '\n';
+           << "weights " << record.genome.network.parameters().size() << '\n';
     for (const float weight : record.genome.network.parameters()) {
         output << std::bit_cast<std::uint32_t>(weight) << '\n';
     }
@@ -111,15 +115,30 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
     std::size_t weightCount = 0;
     if (!(input >> magic >> version)
         || !((magic == "GDP_WORKER_BRAIN" && version == 1U)
-            || (magic == "GDP_ENEMY_BRAIN" && version == 2U))) {
+            || (magic == "GDP_ENEMY_BRAIN"
+                && (version == 2U || version == 3U)))) {
         return std::nullopt;
     }
-    if (version == 2U && (!(input >> key >> archetypeNumber)
+    if (version >= 2U && (!(input >> key >> archetypeNumber)
             || key != "archetype"
             || archetypeNumber > static_cast<unsigned>(
                 gdp::entities::EnemyArchetype::IndustrialRobot))) {
         return std::nullopt;
     }
+    gdp::gameplay::EnemyBrainContract contract
+        = gdp::gameplay::EnemyBrainContract::Legacy;
+    if (version == 3U) {
+        unsigned contractNumber = 0U;
+        if (!(input >> key >> contractNumber) || key != "contract"
+            || contractNumber != static_cast<unsigned>(
+                gdp::gameplay::EnemyBrainContract::Tactical)) {
+            return std::nullopt;
+        }
+        contract = gdp::gameplay::EnemyBrainContract::Tactical;
+    }
+    const auto shape = gdp::gameplay::enemyBrainShape(contract);
+    const std::size_t parameterCount = shape.hidden * (shape.inputs + 1U)
+        + shape.outputs * (shape.hidden + 1U);
     if (!(input >> key >> seed) || key != "seed"
         || !(input >> key >> generation) || key != "generation"
         || !(input >> key >> id) || key != "id"
@@ -129,10 +148,12 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
         return std::nullopt;
     }
     WorkerBrainRecord record{
-        wkc::ai::Genome{wkc::ai::NeuralNetwork{inputCount, hiddenCount, outputCount},
+        wkc::ai::Genome{wkc::ai::NeuralNetwork{
+                shape.inputs, shape.hidden, shape.outputs},
             std::bit_cast<float>(fitnessBits), generation, id},
         seed,
-        static_cast<gdp::entities::EnemyArchetype>(archetypeNumber)};
+        static_cast<gdp::entities::EnemyArchetype>(archetypeNumber),
+        contract};
     for (float& weight : record.genome.network.parameters()) {
         std::uint32_t bits = 0;
         if (!(input >> bits)) {
@@ -210,6 +231,7 @@ bool saveEnemyBrain(
         const auto validation = loadEnemyBrain(temporary);
         if (!validation || validation->trainingSeed != record.trainingSeed
             || validation->archetype != record.archetype
+            || validation->contract != record.contract
             || validation->genome.generation != record.genome.generation
             || validation->genome.id != record.genome.id
             || validation->genome.fitness != record.genome.fitness

@@ -109,6 +109,9 @@ struct EnemyData {
     float investigationTime{0.0F};
     float alertTime{0.0F};
     float recoverTime{0.0F};
+    std::uint32_t magazineAmmo{8U};
+    std::uint32_t reserveAmmo{40U};
+    float reloadRemaining{0.0F};
 };
 
 struct ItemData {

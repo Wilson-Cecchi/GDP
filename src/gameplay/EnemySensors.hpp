@@ -23,7 +23,34 @@ enum class EnemySensor : std::size_t {
 
 using EnemySensorValues = std::array<float, static_cast<std::size_t>(EnemySensor::Count)>;
 
+enum class TacticalEnemySensor : std::size_t {
+    PlayerDistance,
+    PlayerAngle,
+    PlayerVisible,
+    Health,
+    WallFront,
+    WallLeft,
+    WallRight,
+    PlayerVelocityForward,
+    PlayerVelocityRight,
+    PlayerAimThreat,
+    Ammo,
+    Reloading,
+    Count,
+};
+
+using TacticalEnemySensorValues = std::array<float,
+    static_cast<std::size_t>(TacticalEnemySensor::Count)>;
+
 [[nodiscard]] EnemySensorValues sampleEnemySensors(
+    const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy,
+    const Player& player,
+    const CollisionWorld& collisionWorld,
+    bool playerVisible,
+    float detectionRange) noexcept;
+
+[[nodiscard]] TacticalEnemySensorValues sampleTacticalEnemySensors(
     const gdp::entities::Entity& entity,
     const gdp::entities::EnemyData& enemy,
     const Player& player,

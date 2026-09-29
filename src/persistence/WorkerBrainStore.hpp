@@ -2,6 +2,7 @@
 
 #include "ai/Genome.hpp"
 #include "entities/EntityManager.hpp"
+#include "gameplay/EnemyBrainContract.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -14,6 +15,8 @@ struct WorkerBrainRecord {
     wkc::ai::Genome genome;
     wkc::core::Seed trainingSeed{0};
     gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
+    gdp::gameplay::EnemyBrainContract contract{
+        gdp::gameplay::EnemyBrainContract::Legacy};
 };
 
 using EnemyBrainRecord = WorkerBrainRecord;

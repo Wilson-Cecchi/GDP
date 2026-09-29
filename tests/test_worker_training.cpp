@@ -181,6 +181,7 @@ void testTrainingAndPersistence()
             && first.lastGeneration == 2U,
         "automated training produces a champion and final checkpoint");
     expect(output.str().find("reward_rules=2") != std::string::npos
+            && output.str().find("brain_contract=2") != std::string::npos
             && output.str().find("curriculum=2") != std::string::npos
             && output.str().find("scenarios=5") != std::string::npos
             && output.str().find("holdout_scenarios=2") != std::string::npos
@@ -201,7 +202,9 @@ void testTrainingAndPersistence()
             "elitism preserves the best score on fixed scenarios");
         const auto saved = gdp::persistence::loadWorkerBrain(*first.lastCheckpoint);
         expect(saved && saved->trainingSeed == options.seed
-                && saved->genome.generation == 2U,
+                && saved->genome.generation == 2U
+                && saved->contract
+                    == gdp::gameplay::EnemyBrainContract::Tactical,
             "checkpoint loads with seed and generation");
         if (saved) {
             expect(std::equal(saved->genome.network.parameters().begin(),
@@ -209,15 +212,21 @@ void testTrainingAndPersistence()
                     first.champion->network.parameters().begin()),
                 "checkpoint preserves every weight exactly");
         }
+        wkc::ai::Genome legacyGenome{
+            wkc::ai::NeuralNetwork{7U, 8U, 4U},
+            first.champion->fitness,
+            first.champion->generation,
+            first.champion->id};
+        legacyGenome.network.randomize(42U, 0.5F);
         std::ostringstream legacyBody;
         legacyBody << "GDP_WORKER_BRAIN 1\nseed " << options.seed
-                   << "\ngeneration " << first.champion->generation
-                   << "\nid " << first.champion->id
+                   << "\ngeneration " << legacyGenome.generation
+                   << "\nid " << legacyGenome.id
                    << "\nfitness_bits "
-                   << std::bit_cast<std::uint32_t>(first.champion->fitness)
+                   << std::bit_cast<std::uint32_t>(legacyGenome.fitness)
                    << "\nweights "
-                   << first.champion->network.parameters().size() << '\n';
-        for (const float weight : first.champion->network.parameters()) {
+                   << legacyGenome.network.parameters().size() << '\n';
+        for (const float weight : legacyGenome.network.parameters()) {
             legacyBody << std::bit_cast<std::uint32_t>(weight) << '\n';
         }
         const fs::path legacyPath = root / "legacy_worker.brain";
@@ -228,21 +237,36 @@ void testTrainingAndPersistence()
         }
         const auto legacy = gdp::persistence::loadWorkerBrain(legacyPath);
         expect(legacy && legacy->archetype
-                == gdp::entities::EnemyArchetype::Worker,
+                == gdp::entities::EnemyArchetype::Worker
+                && legacy->contract
+                    == gdp::gameplay::EnemyBrainContract::Legacy,
             "version-one Worker checkpoints remain loadable");
+        WorkerTrainingOptions legacyResume = options;
+        legacyResume.resumeBrain = legacyPath;
+        legacyResume.saveDirectory.reset();
+        std::ostringstream legacyResumeOutput;
+        expect(!runWorkerTraining(legacyResume, legacyResumeOutput).succeeded,
+            "old motor contract cannot silently resume tactical training");
         expect(!gdp::persistence::saveWorkerBrain(
-                *first.lastCheckpoint, {*first.champion, options.seed}),
+                *first.lastCheckpoint,
+                {*first.champion, options.seed,
+                    gdp::entities::EnemyArchetype::Worker,
+                    gdp::gameplay::EnemyBrainContract::Tactical}),
             "saving never overwrites an existing checkpoint");
         wkc::ai::Genome invalidGenome = *first.champion;
         invalidGenome.network.parameters()[0] = 2.0F;
         expect(!gdp::persistence::saveWorkerBrain(
-                root / "invalid.brain", {invalidGenome, options.seed}),
+                root / "invalid.brain", {invalidGenome, options.seed,
+                    gdp::entities::EnemyArchetype::Worker,
+                    gdp::gameplay::EnemyBrainContract::Tactical}),
             "out-of-range weights cannot be saved");
         const fs::path danglingLink = root / "dangling.brain";
         fs::create_symlink(root / "absent.brain", danglingLink, error);
         if (!error) {
             expect(!gdp::persistence::saveWorkerBrain(
-                    danglingLink, {*first.champion, options.seed})
+                    danglingLink, {*first.champion, options.seed,
+                        gdp::entities::EnemyArchetype::Worker,
+                        gdp::gameplay::EnemyBrainContract::Tactical})
                     && fs::is_symlink(danglingLink),
                 "saving never replaces a dangling symbolic link");
         }

@@ -675,7 +675,12 @@ especializados das pastas numeradas.
   do mesmo arquétipo (não reproduz exatamente a população anterior). Um treino
   novo não substitui automaticamente os assets distribuídos: escolha, teste e
   promova manualmente os novos campeões a `assets/ai/`. Arquivos
-  antigos de Worker ainda podem ser carregados. `--ai-training all` treina os
+  antigos de Worker ainda podem ser carregados no jogo. Treinos novos usam o
+  contrato tático de cérebro (`GDP_ENEMY_BRAIN 3`): sensores de velocidade e
+  ameaça do Player, munição e recarga, além de strafe independente e uma ação
+  de recarga. Os arquivos anteriores continuam jogáveis, mas não podem ser
+  usados com `--resume` no contrato novo, pois seus pesos têm dimensões e
+  significados diferentes. `--ai-training all` treina os
   cinco arquétipos em sequência e salva cada um em uma subpasta de `--save-dir`;
   `--resume` exige um tipo específico. O treino ainda usa
   arenas simplificadas e não ensina navegação completa, flanqueamento ou
@@ -686,16 +691,15 @@ especializados das pastas numeradas.
   A pausa não substitui o monitoramento da temperatura: interrompa o treino
   se a CPU se aproximar do limite térmico informado pelo hardware.
   Pontuações de `reward_rules=2` não são comparáveis numericamente às de runs
-  anteriores; `--resume` de um cérebro antigo só reutiliza seus pesos como
-  ponto de partida. Os checkpoints gerados não substituem os ativos sem
+  anteriores. `--resume` aceita apenas um checkpoint do contrato tático novo;
+  um cérebro antigo continua jogável, mas o treino novo precisa começar fresco.
+  Os checkpoints gerados não substituem os ativos sem
   avaliação comparativa e aprovação visual. Mira por evento real, munição/
   recarga inimiga, esquiva de projéteis, corredores/portas e estágios de
   treinamento separados ainda exigem implementação específica; o treino não
   declara precisão de tiro ou esquivas que o combate atual não consegue medir.
-  Cérebros do currículo anterior continuam carregando e podem ser usados em
-  `--resume`, mas as pontuações antigas não são comparáveis às novas. Para
-  aproveitar a política inicial e a mira mais exigente, prefira começar uma
-  nova população sem `--resume`, usando um diretório de saída novo e vazio.
+  Para aproveitar a política inicial e a mira mais exigente, comece uma
+  população nova, usando um diretório de saída novo e vazio.
 
   Exemplo após compilar o preset Debug (use um diretório novo ou vazio):
 

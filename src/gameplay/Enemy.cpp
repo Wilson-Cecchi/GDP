@@ -16,10 +16,6 @@
 namespace gdp::gameplay {
 namespace {
 
-constexpr std::size_t neuralWorkerInputCount = static_cast<std::size_t>(EnemySensor::Count);
-constexpr std::size_t neuralWorkerHiddenCount = 8;
-constexpr std::size_t neuralWorkerOutputCount = 4;
-
 float planarDistanceSquared(
     const wkc::core::Vec3 first,
     const wkc::core::Vec3 second) noexcept
@@ -909,7 +905,7 @@ bool updateNeuralEnemy(
         return false;
     }
     float* decisionSecondsRemaining = &experiment->decisionSecondsRemaining;
-    std::array<float, 4>* outputs = &experiment->outputs;
+    std::array<float, 5>* outputs = &experiment->outputs;
     NeuralEnemyMotorState* motor = nullptr;
     if (experiment->controlAll) {
         motor = &experiment->motors[id.packed()];
@@ -924,9 +920,15 @@ bool updateNeuralEnemy(
     ++experiment->controlledTicks;
     *decisionSecondsRemaining -= step;
     if (*decisionSecondsRemaining <= 0.0F) {
-        const EnemySensorValues sensors = sampleEnemySensors(
-            entity, enemy, player, collisionWorld, lineOfSight, detectionRange);
-        const std::vector<float> decision = experiment->genome.network.forward(sensors);
+        const std::vector<float> decision = experiment->contract
+                == EnemyBrainContract::Tactical
+            ? experiment->genome.network.forward(sampleTacticalEnemySensors(
+                entity, enemy, player, collisionWorld, lineOfSight,
+                detectionRange))
+            : experiment->genome.network.forward(sampleEnemySensors(
+                entity, enemy, player, collisionWorld, lineOfSight,
+                detectionRange));
+        outputs->fill(0.0F);
         std::copy(decision.begin(), decision.end(), outputs->begin());
         *decisionSecondsRemaining = 0.1F;
     }
@@ -937,17 +939,22 @@ bool updateNeuralEnemy(
     const float yaw = currentYawDegrees * radiansPerDegree;
     const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
     const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
-    // Keep locomotion aligned with the visible facing direction. Older brains
-    // may request lateral motion without forward motion; turn that into a
-    // cautious forward step instead of making them stall after this fix.
+    // Legacy weights were trained with coupled lateral intent. New brains use
+    // independent orthogonal axes with the same diagonal normalization as the
+    // Player; changing old weights' meaning would silently break them.
     constexpr float maximumStrafeRatio = 0.25F;
-    const float forwardIntent = std::abs((*outputs)[0]) < 0.15F
-        ? std::abs((*outputs)[1]) * 0.35F
-        : (*outputs)[0];
-    const float lateral = (*outputs)[1]
-        * std::abs(forwardIntent) * maximumStrafeRatio;
-    const wkc::core::Vec3 desired = forward * forwardIntent
+    const bool tactical = experiment->contract == EnemyBrainContract::Tactical;
+    const float forwardIntent = tactical
+        ? std::clamp((*outputs)[0], -1.0F, 1.0F)
+        : std::abs((*outputs)[0]) < 0.15F
+            ? std::abs((*outputs)[1]) * 0.35F : (*outputs)[0];
+    const float lateral = tactical
+        ? std::clamp((*outputs)[1], -1.0F, 1.0F)
+        : (*outputs)[1] * std::abs(forwardIntent) * maximumStrafeRatio;
+    const wkc::core::Vec3 rawDesired = forward * forwardIntent
         + right * lateral;
+    const wkc::core::Vec3 desired = wkc::core::length(rawDesired) > 1.0F
+        ? wkc::core::normalized(rawDesired) : rawDesired;
     const float distanceBeforeMovement = std::sqrt(
         planarDistanceSquared(entity.transform.position, player.state().position));
     const bool holdMeleeRange = motor != nullptr
@@ -1079,10 +1086,14 @@ bool updateNeuralEnemy(
 
 NeuralEnemyExperiment::NeuralEnemyExperiment(
     const wkc::core::Seed seed,
-    const gdp::entities::EnemyArchetype selectedArchetype)
+    const gdp::entities::EnemyArchetype selectedArchetype,
+    const EnemyBrainContract selectedContract)
     : genome{wkc::ai::NeuralNetwork{
-          neuralWorkerInputCount, neuralWorkerHiddenCount, neuralWorkerOutputCount}}
+          enemyBrainShape(selectedContract).inputs,
+          enemyBrainShape(selectedContract).hidden,
+          enemyBrainShape(selectedContract).outputs}}
     , archetype{selectedArchetype}
+    , contract{selectedContract}
 {
     genome.network.randomize(seed, 0.5F);
 }

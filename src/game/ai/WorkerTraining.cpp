@@ -35,9 +35,11 @@ constexpr int bossEpisodeSteps = 720;
 constexpr std::size_t scenarioCount = 5U;
 constexpr std::size_t holdoutScenarioCount = 2U;
 constexpr std::size_t scenarioRepetitions = 2U;
-constexpr std::size_t inputCount = 7;
-constexpr std::size_t hiddenCount = 8;
-constexpr std::size_t outputCount = 4;
+constexpr auto trainingBrainShape = gameplay::enemyBrainShape(
+    gameplay::EnemyBrainContract::Tactical);
+constexpr std::size_t inputCount = trainingBrainShape.inputs;
+constexpr std::size_t hiddenCount = trainingBrainShape.hidden;
+constexpr std::size_t outputCount = trainingBrainShape.outputs;
 
 using gdp::entities::EnemyArchetype;
 
@@ -334,7 +336,8 @@ WorkerFitnessMetrics simulateEpisode(
         });
         manager.findData<entities::EnemyData>(ally)->health = 25.0F;
     }
-    gameplay::NeuralEnemyExperiment brain{seed, archetype};
+    gameplay::NeuralEnemyExperiment brain{
+        seed, archetype, gameplay::EnemyBrainContract::Tactical};
     brain.genome = genome;
     brain.logSelection = false;
     WorkerFitnessMetrics metrics;
@@ -761,6 +764,10 @@ WorkerTrainingResult runEnemyTraining(
                 result.error = "cannot load a matching enemy brain for resume";
                 return result;
             }
+            if (resume->contract != gameplay::EnemyBrainContract::Tactical) {
+                result.error = "legacy brain cannot resume the tactical training contract";
+                return result;
+            }
             if (options.seedExplicit && seed != resume->trainingSeed) {
                 result.error = "resume brain seed does not match --seed";
                 return result;
@@ -820,6 +827,7 @@ WorkerTrainingResult runEnemyTraining(
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
                << " reward_rules=2"
+               << " brain_contract=2"
                << " curriculum=" << (options.trainAllScenarios ? 3 : 2)
                << " seed=" << seed
                << " population=" << options.population
@@ -895,7 +903,8 @@ WorkerTrainingResult runEnemyTraining(
                     = checkpointPath(*options.saveDirectory, generation,
                         options.archetype);
                 if (!persistence::saveEnemyBrain(path,
-                        {*result.champion, seed, options.archetype})) {
+                        {*result.champion, seed, options.archetype,
+                            gameplay::EnemyBrainContract::Tactical})) {
                     result.error = "failed to save enemy brain checkpoint";
                     return result;
                 }
@@ -922,6 +931,7 @@ WorkerTrainingResult runEnemyTraining(
             options.trainAllScenarios).score;
         output << "AI_RESULT generation=" << result.lastGeneration
                << " reward_rules=2"
+               << " brain_contract=2"
                << " train_best=" << result.finalBest
                << " holdout=" << result.holdoutFitness;
         if (result.lastCheckpoint) {

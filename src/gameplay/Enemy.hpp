@@ -3,6 +3,7 @@
 #include "ai/Genome.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/EnemyBrainContract.hpp"
 #include "gameplay/Player.hpp"
 
 #include <cstddef>
@@ -135,7 +136,7 @@ struct EnemyPerception {
 
 struct NeuralEnemyMotorState {
     float decisionSecondsRemaining{0.0F};
-    std::array<float, 4> outputs{};
+    std::array<float, 5> outputs{};
     float ineffectiveSeconds{0.0F};
     float scriptedSecondsRemaining{0.0F};
 };
@@ -145,16 +146,18 @@ struct NeuralEnemyMotorState {
 struct NeuralEnemyExperiment {
     explicit NeuralEnemyExperiment(wkc::core::Seed seed,
         gdp::entities::EnemyArchetype archetype
-            = gdp::entities::EnemyArchetype::Worker);
+            = gdp::entities::EnemyArchetype::Worker,
+        EnemyBrainContract contract = EnemyBrainContract::Legacy);
 
     wkc::ai::Genome genome;
     gdp::entities::EnemyArchetype archetype{gdp::entities::EnemyArchetype::Worker};
+    EnemyBrainContract contract{EnemyBrainContract::Legacy};
     bool controlAll{false};
     bool logSelection{true};
     std::optional<gdp::entities::EntityId> selected;
     std::uint64_t controlledTicks{0U};
     float decisionSecondsRemaining{0.0F};
-    std::array<float, 4> outputs{};
+    std::array<float, 5> outputs{};
     std::unordered_map<std::uint64_t, NeuralEnemyMotorState> motors;
 };
 

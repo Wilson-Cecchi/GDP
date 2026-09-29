@@ -75,4 +75,45 @@ EnemySensorValues sampleEnemySensors(
     };
 }
 
+TacticalEnemySensorValues sampleTacticalEnemySensors(
+    const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy,
+    const Player& player,
+    const CollisionWorld& collisionWorld,
+    const bool playerVisible,
+    const float detectionRange) noexcept
+{
+    const EnemySensorValues legacy = sampleEnemySensors(
+        entity, enemy, player, collisionWorld, playerVisible, detectionRange);
+    TacticalEnemySensorValues values{};
+    std::copy(legacy.begin(), legacy.end(), values.begin());
+    if (playerVisible && player.state().alive) {
+        constexpr float radiansPerDegree = 0.01745329251994329577F;
+        const float yaw = std::isfinite(entity.transform.rotationDegrees.y)
+            ? entity.transform.rotationDegrees.y * radiansPerDegree : 0.0F;
+        const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
+        const wkc::core::Vec3 right{forward.z, 0.0F, -forward.x};
+        const wkc::core::Vec3 velocity = player.state().velocity;
+        values[static_cast<std::size_t>(
+            TacticalEnemySensor::PlayerVelocityForward)] = std::clamp(
+                wkc::core::dot(velocity, forward) / 7.2F, -1.0F, 1.0F);
+        values[static_cast<std::size_t>(
+            TacticalEnemySensor::PlayerVelocityRight)] = std::clamp(
+                wkc::core::dot(velocity, right) / 7.2F, -1.0F, 1.0F);
+        const wkc::core::Vec3 towardEnemy = wkc::core::normalized(
+            entity.transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F}
+                - player.cameraPosition());
+        values[static_cast<std::size_t>(
+            TacticalEnemySensor::PlayerAimThreat)] = std::clamp(
+                wkc::core::dot(player.forwardDirection(), towardEnemy),
+                -1.0F, 1.0F);
+    }
+    values[static_cast<std::size_t>(TacticalEnemySensor::Ammo)] = std::clamp(
+        static_cast<float>(enemy.magazineAmmo) / 8.0F * 2.0F - 1.0F,
+        -1.0F, 1.0F);
+    values[static_cast<std::size_t>(TacticalEnemySensor::Reloading)]
+        = enemy.reloadRemaining > 0.0F ? 1.0F : -1.0F;
+    return values;
+}
+
 } // namespace gdp::gameplay

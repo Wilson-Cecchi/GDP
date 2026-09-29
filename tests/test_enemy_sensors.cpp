@@ -68,6 +68,63 @@ void testSensors()
             && sensor(hidden, EnemySensor::PlayerAngle) == 0.0F
             && sensor(hidden, EnemySensor::PlayerVisible) == -1.0F,
         "hidden player channels use neutral or absent values");
+
+    enemy.magazineAmmo = 4U;
+    const TacticalEnemySensorValues tactical = sampleTacticalEnemySensors(
+        entity, enemy, player, world, true, 10.0F);
+    expect(tactical.size() == enemyBrainShape(EnemyBrainContract::Tactical).inputs
+            && tactical[static_cast<std::size_t>(TacticalEnemySensor::Ammo)] == 0.0F,
+        "tactical brain receives its versioned sensor count and ammo ratio");
+    const TacticalEnemySensorValues hiddenTactical = sampleTacticalEnemySensors(
+        entity, enemy, player, world, false, 10.0F);
+    expect(hiddenTactical[static_cast<std::size_t>(
+                TacticalEnemySensor::PlayerVelocityForward)] == 0.0F
+            && hiddenTactical[static_cast<std::size_t>(
+                TacticalEnemySensor::PlayerVelocityRight)] == 0.0F
+            && hiddenTactical[static_cast<std::size_t>(
+                TacticalEnemySensor::PlayerAimThreat)] == 0.0F,
+        "hidden player velocity and aim do not leak to tactical sensors");
+}
+
+void testTacticalMovement()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const auto simulate = [&](const bool forwardRequested) {
+        EntityManager manager;
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 3.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1U,
+            .archetype = EnemyArchetype::Guard,
+        });
+        NeuralEnemyExperiment brain{42U, EnemyArchetype::Guard,
+            EnemyBrainContract::Tactical};
+        auto parameters = brain.genome.network.parameters();
+        std::fill(parameters.begin(), parameters.end(), 0.0F);
+        constexpr std::size_t outputBase = 12U * (12U + 1U);
+        constexpr std::size_t outputStride = 12U + 1U;
+        parameters[outputBase + outputStride + 12U] = 1.0F;
+        if (forwardRequested) {
+            parameters[outputBase + 12U] = 1.0F;
+        }
+        brain.controlAll = true;
+        brain.logSelection = false;
+        (void)updateGuards(manager, player, 1U, room, 0.1F,
+            GuardConfig{}, {}, &brain);
+        return manager.find(id)->transform.position;
+    };
+    const auto strafe = simulate(false);
+    const auto diagonal = simulate(true);
+    expect(std::abs(strafe.x) > 0.02F && std::abs(strafe.z - 3.0F) < 0.005F,
+        "tactical strafe is independent from forward movement");
+    expect(std::hypot(diagonal.x, diagonal.z - 3.0F) <= 0.111F
+            && std::abs(std::abs(diagonal.x) - std::abs(diagonal.z - 3.0F))
+                < 0.01F,
+        "tactical diagonal is normalized without slowing either axis to half");
 }
 
 void forceAttack(gdp::gameplay::NeuralWorkerExperiment& experiment)
@@ -432,6 +489,7 @@ void testActiveWorkerMaintainsMeleeThreat()
 int main()
 {
     testSensors();
+    testTacticalMovement();
     testExperimentalWorker();
     testExperimentalArchetypes();
     testNeuralLocomotionFacing();

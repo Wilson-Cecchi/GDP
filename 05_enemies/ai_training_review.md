@@ -245,3 +245,13 @@ antigos e novos não devem ser comparados diretamente. Ainda faltam os estágios
 isolados de mira/tiro/esquiva e geometrias de corredor/porta. Como o ataque
 inimigo não tem evento de tiro, munição ou projétil, não foram inventadas
 recompensas por precisão, recarga ou esquiva de tiro já disparado.
+
+**Contrato tático v3 (em implementação):** treinos novos geram cérebros com
+12 entradas, 12 neurônios ocultos e 5 saídas. Os sete sensores antigos mantêm
+seus índices; os novos registram velocidade visível do Player em eixos locais,
+ameaça de mira, munição e recarga. As saídas passam a representar frente,
+strafe independente, giro, ataque e recarga. O arquivo `GDP_ENEMY_BRAIN 3`
+registra o contrato e seu checksum. Arquivos v1/v2 continuam carregáveis com
+movimento legado, mas não servem como `--resume` do formato novo. A ação de
+recarga e os eventos de projétil ainda precisam ser ligados ao combate; este
+checkpoint preserva o gameplay antigo até isso estar validado.

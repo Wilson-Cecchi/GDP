@@ -285,6 +285,7 @@ std::optional<ScenarioResult> runScenario(
     if (neural) {
         brain.emplace(world.masterSeed, archetype);
         brain->genome = record.genome;
+        brain->contract = record.contract;
         brain->controlAll = true;
         brain->logSelection = false;
     }
@@ -373,6 +374,7 @@ std::optional<DuelResult> runDuelScenario(
     if (neural) {
         brain.emplace(world.masterSeed, archetype);
         brain->genome = record.genome;
+        brain->contract = record.contract;
         brain->controlAll = true;
         brain->logSelection = false;
     }
