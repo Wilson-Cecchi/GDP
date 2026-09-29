@@ -52,10 +52,12 @@ piso/teto e uma união de volumes navegáveis e resolve X e Z separadamente cont
 AABBs, permitindo deslizamento. Origem e rotação do `RoomModule` transformam
 bounds e sólidos juntos. Uma edge fechada mantém seu corredor fora da união.
 Olhar para a porta e usar `E` inicia `Opening`; a rota entra na união a 90% de
-abertura. A porta permanece aberta enquanto o jogador ocupa o vão/corredor,
-aguarda 1,6 s após a saída e então fecha. Cruzar os bounds do destino troca o
-`roomId` automaticamente sem zerar velocidade; HP, inventário, progressão e arma
-são preservados. Lockdown bloqueia imediatamente a rota e força `Closing/Locked`.
+abertura. A porta permanece aberta enquanto Player ou inimigo vivo ocupa o
+vão/corredor, aguarda 1,6 s após a saída e então fecha. Ao cruzar os bounds do
+destino, o Player troca de `roomId` sem zerar velocidade; HP, inventário,
+progressão e arma são preservados. Lockdown sela a rota depois que todos
+liberam a passagem; um inimigo originário ainda vivo fora da sala mantém a
+saída recuperável.
 As transições reais para abrir, fechar e concluir a trava emitem cues
 espacializados distintos; interagir repetidamente durante `Opening/Open` não
 duplica o som.
@@ -63,7 +65,9 @@ duplica o som.
 Na Fase 14, a união visual acompanha a união navegável: conteúdo e decoração da
 sala diretamente conectada são enviados ao renderer antes da entrada, cada sala
 mantém seu próprio material e a luz ambiente converge durante o corredor. A IA
-e as regras de coleta continuam limitadas ao `roomId` atual.
+agora também pode perseguir e atacar através de passagens abertas, enquanto a
+coleta continua limitada ao `roomId` atual. Portas fechadas continuam bloqueando
+ambos os lados; inimigos não abrem portas por conta própria.
 
 ## Câmera
 

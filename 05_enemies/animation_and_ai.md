@@ -261,10 +261,11 @@ A Fase 103 permite iniciar a mesma investigação sem aquisição visual. Dispar
 consumidos geram um estímulo de raio-base `18 m`; o alcance efetivo é o menor
 entre esse raio e a audição do papel: `10 m` Worker, `15 m` Guard, `17 m`
 Officer, `13 m` Engineer e `22 m` IndustrialRobot. O sinal atravessa cobertura,
-mas não atravessa o limite lógico da sala ativa e ignora inimigos dormentes ou
-mortos. Cooldown e clique seco não produzem estímulo. Uma visão confirmada no
-fixed update sempre substitui a origem ouvida pela posição realmente observada.
-O processo não consome RNG e permanece independente da reprodução de áudio.
+mas não ignora portas fechadas: alcança apenas a sala atual e vizinhas com
+passagem transitável; inimigos dormentes ou mortos são ignorados. Cooldown e
+clique seco não produzem estímulo. Uma visão confirmada no fixed update sempre
+substitui a origem ouvida pela posição realmente observada. O processo não
+consome RNG e permanece independente da reprodução de áudio.
 
 A Fase 104 separa a reação inicial em `Alert`. Ao primeiro ruído sem memória
 ativa, o inimigo fica imóvel, vira para a origem e suspende ataque, suporte e
@@ -306,3 +307,18 @@ identidade define qual lado de um sólido entra primeiro no desempate; quando a
 colisão ativa `avoidanceSide`, o próximo cálculo usa esse lado e consegue
 replanejar. Separação e teste contínuo dos volumes permanecem no movimento
 final, portanto a escolha de rota não permite atravessar aliados.
+
+## Validação do treino longo (2026-09-29)
+
+O treino `all-scenarios-10k-424242-20260928-fast` chegou à geração 10.000 nos
+cinco arquétipos (Worker retomou da 161), mas os checkpoints continuam
+experimentais. Em
+`gdp_ai_gameplay_eval` (10 seeds, 360 frames por cenário, mesmos cenários e
+regras para ambos os conjuntos), o dano total causado ao Player pelos novos
+cérebros versus os assets atuais foi: Worker `50/950`, Guard `2280/2520`,
+Officer `660/1620`, Engineer `1650/1650` e IndustrialRobot `1220/2640`. No
+cenário de cobertura do boss, `80/320`. Esses totais agregam cenários e seeds;
+não são uma taxa de vitória de partidas completas. Apesar do fitness e holdout
+positivos no treino, o comportamento fora dessas arenas regrediu; nenhum dos
+cinco foi promovido a `assets/ai/`. Uma nova promoção exige reavaliar combate,
+cobertura, navegação e playtest no jogo real.

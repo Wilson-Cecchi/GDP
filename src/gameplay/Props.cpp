@@ -33,14 +33,19 @@ wkc::core::Aabb propCollisionBounds(
 CollisionWorld collisionWorldWithProps(
     const CollisionWorld& base,
     const gdp::entities::EntityManager& manager,
-    const std::uint32_t roomId)
+    const std::uint32_t roomId,
+    const std::span<const std::uint32_t> additionalRoomIds)
 {
     std::vector<wkc::core::Aabb> solids = base.solids();
     for (const gdp::entities::EntityId id : manager.query(gdp::entities::EntityKind::Prop)) {
         const gdp::entities::Entity* entity = manager.find(id);
         const gdp::entities::PropData* prop
             = manager.findData<gdp::entities::PropData>(id);
-        if (entity == nullptr || prop == nullptr || entity->roomId != roomId
+        const bool roomIncluded = entity != nullptr
+            && (entity->roomId == roomId
+                || std::find(additionalRoomIds.begin(), additionalRoomIds.end(),
+                       entity->roomId) != additionalRoomIds.end());
+        if (entity == nullptr || prop == nullptr || !roomIncluded
             || !prop->solid || prop->state == gdp::entities::PropState::Destroyed
             || prop->maximumHealth <= 0.0F) {
             continue;

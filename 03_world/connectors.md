@@ -60,11 +60,16 @@ Player/inimigos por bug.
 
 Na implementação atual, interação próxima e orientada solicita `Opening`, mas o
 Player atravessa fisicamente a abertura, percorre o corredor e só troca de
-`roomId` quando seu collider entra inteiro na sala seguinte. `DoorRuntime`
-avança por fixed update; `doorPanelTravel()` aplica `smoothstep` ao snapshot dos
-painéis e o mesmo valor libera colisão a 90%. Player dentro do corredor/próximo
-ao connector ou Enemy ativo e vivo no limiar mantém a porta aberta ou reverte
-`Closing`. Durante `RoomEvent`, lockdown fecha apenas após liberar a passagem.
+`roomId` quando seu collider entra inteiro na sala seguinte. Inimigos seguem a
+mesma regra: só atravessam uma passagem já aberta pelo Player, nunca solicitam
+abertura por conta própria, e assumem o novo `roomId` após liberar todo o
+collider. `DoorRuntime` avança por fixed update; `doorPanelTravel()` aplica
+`smoothstep` ao snapshot dos painéis e o mesmo valor libera colisão a 90%.
+Player ou Enemy vivo no limiar ou em qualquer ponto do corredor mantém a porta
+aberta ou reverte `Closing`. Durante `RoomEvent`, lockdown fecha apenas após
+liberar a passagem. A sobreposição dos volumes caminháveis também cobre o
+collider do IndustrialRobot (raio de 0,52 m), evitando uma faixa inválida entre
+sala e corredor que bloquearia inimigos maiores.
 
 ## Used connector
 

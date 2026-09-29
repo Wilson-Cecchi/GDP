@@ -50,6 +50,14 @@ resultado que realmente toca uma superfície inclui `ImpactResult`: posição do
 primeiro contato, normal oposta ao raio e material `Metal`, `Composite` ou
 `Flesh`. Miss, cooldown e arma vazia não fabricam impacto.
 
+A IA também atualiza inimigos nas salas ligadas à sala atual por corredores com
+porta transitável. Visão, ataque e perseguição usam a colisão contínua dessas
+salas e a cobertura de ambas; uma porta fechada não dá visão nem passagem. A
+ocupação por um inimigo no meio do corredor impede seu fechamento, e sua sala
+lógica só muda quando o collider entra inteiro no próximo cômodo. O boss pode
+ser enfrentado na passagem aberta: uma morte antes de entrar na sala conclui a
+partida, sem exigir uma segunda entrada artificial.
+
 Na Fase 134, `HitResult` também identifica `Standard` ou `WeakPoint`. Inimigos
 orgânicos usam um volume menor sobre a cabeça; o IndustrialRobot usa o sensor
 superior metálico. O ponto de impacto vem da superfície desse volume menor, e

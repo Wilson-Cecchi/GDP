@@ -25,7 +25,12 @@ std::size_t liveEnemiesInRoom(
     for (const gdp::entities::EntityId id
         : manager.query(gdp::entities::EntityKind::Enemy)) {
         const gdp::entities::Entity* entity = manager.find(id);
-        if (entity != nullptr && entity->roomId == roomId && enemyIsAlive(manager, id)) {
+        const gdp::entities::EnemyData* enemy
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (entity != nullptr && enemy != nullptr
+            && (enemy->originRoomId == roomId || entity->roomId == roomId)
+            && enemy->active
+            && enemy->behavior != gdp::entities::EnemyBehaviorState::Dead) {
             ++count;
         }
     }
@@ -203,6 +208,30 @@ RoomEventUpdateSummary updateRoomEvent(
 bool isRoomLocked(const RoomEventRuntime& runtime) noexcept
 {
     return runtime.plan.locksRoom && runtime.phase == RoomEventPhase::Active;
+}
+
+bool shouldSealRoomDoors(
+    const RoomEventRuntime& runtime,
+    const gdp::entities::EntityManager& manager)
+{
+    if (!isRoomLocked(runtime)) {
+        return false;
+    }
+    // An enemy still owed to this room may have chased the player outside.
+    // Keep the route recoverable until that enemy returns or is defeated.
+    for (const gdp::entities::EntityId id
+         : manager.query(gdp::entities::EntityKind::Enemy)) {
+        const gdp::entities::Entity* entity = manager.find(id);
+        const gdp::entities::EnemyData* enemy
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (entity != nullptr && enemy != nullptr && enemy->active
+            && enemy->behavior != gdp::entities::EnemyBehaviorState::Dead
+            && enemy->originRoomId == runtime.roomId
+            && entity->roomId != runtime.roomId) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::string_view roomEventTypeName(const gdp::world::RoomEventType type) noexcept

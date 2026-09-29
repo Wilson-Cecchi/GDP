@@ -1757,6 +1757,14 @@ conexões, evitando que a parede da próxima saída desapareça somente ao troca
 problemáticas; auditorias ampliadas validaram 10.000 mundos gerados e 2.000
 mundos atravessados.
 
+Em combate entre salas, uma porta aberta agora expõe os inimigos à visão do
+Player e vice-versa: eles podem atacar e perseguir pelos corredores, mas não
+abrem portas fechadas. A porta ocupada permanece transitável até o inimigo
+liberar a passagem; o collider maior do boss também cabe nas juntas entre sala
+e corredor. Matar o boss pela passagem aberta encerra a run imediatamente.
+Como esse combate altera tempos comparáveis, recordes de Speedrun usam regras
+`32`; checkpoints de Campaign permanecem na versão `31`.
+
 O mesmo pipeline já oferece o tema Storage: metal amarronzado envelhecido,
 marcação logística curta, concreto empoeirado com marcas de arrasto e teto
 escuro com vigas. Combat Room acrescenta placas blindadas verde-oliva com 1–3

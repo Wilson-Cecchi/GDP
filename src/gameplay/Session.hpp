@@ -65,7 +65,8 @@ public:
         bool playerAlive,
         gdp::world::RoomRole currentRoomRole,
         bool bossExists,
-        bool bossAlive) noexcept;
+        bool bossAlive,
+        bool bossAccessible = false) noexcept;
     [[nodiscard]] std::optional<wkc::core::Seed> restart(
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;

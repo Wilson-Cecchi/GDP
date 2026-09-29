@@ -1,8 +1,8 @@
 # Gameplay — Eventos procedurais de sala
 
 > **Estado:** geração, validação e runtime funcional implementados no terceiro
-> incremento da Fase 12. Transições físicas entre salas ainda não existem; a
-> START oferece o fluxo jogável pelo terminal.
+> incremento da Fase 12. A START oferece o fluxo jogável pelo terminal;
+> transições entre salas e combate nos corredores já são físicos e contínuos.
 
 ## Plano determinístico
 
@@ -32,6 +32,13 @@ na sala dona do plano, usa archetype/HP/posição/`visualSeed` precomputados e
 registra os novos handles no `RoomInstance`. Lockdown permanece ativo até a
 condição de limpeza; a conclusão cria uma única recompensa. Eventos completos
 não reativam nem duplicam entidades.
+
+A limpeza considera a sala de origem de cada inimigo, preservada ao nascer,
+e também intrusos ainda vivos dentro da sala. Perseguir o Player por um
+corredor e assumir outro `roomId` não conta como morte nem libera prematuramente
+onda ou recompensa da sala original. Enquanto um inimigo da sala estiver vivo
+do lado de fora, as portas deixam de ser seladas pelo lockdown para que o
+Player possa persegui-lo; quando ele retorna ou morre, a trava volta a valer.
 
 Na START, usar o terminal ativa uma emboscada de um Worker adicional. A sala
 precisa ficar sem inimigos para liberar Ammo. O título da janela mostra tipo,

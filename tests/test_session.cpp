@@ -42,6 +42,33 @@ void testBossVictoryRequiresARealEngagement()
         "a completed run has a stable terminal state");
 }
 
+void testBossCanBeDefeatedFromAnOpenCorridor()
+{
+    using namespace gdp;
+    gameplay::SessionSystem closed{7U};
+    expect(!closed.update(true, world::RoomRole::Normal, true, false, false).changed
+            && !closed.state().bossEngaged,
+        "an inaccessible defeated boss does not end an unrelated room");
+
+    gameplay::SessionSystem corridor{8U};
+    expect(!corridor.update(true, world::RoomRole::Normal, true, true, true).changed
+            && corridor.state().bossEngaged,
+        "opening the Boss corridor engages the boss before room entry");
+    expect(corridor.update(true, world::RoomRole::Normal, true, false, true).phase
+            == gameplay::SessionPhase::Victory,
+        "killing the boss from an open corridor immediately completes the run");
+
+    gameplay::SessionSystem singleFrame{9U};
+    expect(singleFrame.update(true, world::RoomRole::Normal, true, false, true).phase
+            == gameplay::SessionPhase::Victory,
+        "a lethal shot on the first accessible frame cannot leave the run stuck");
+
+    gameplay::SessionSystem enterAfterKill{10U};
+    expect(enterAfterKill.update(true, world::RoomRole::Boss, true, false).phase
+            == gameplay::SessionPhase::Victory,
+        "entering a Boss room after an earlier kill still resolves victory");
+}
+
 void testDeterministicRunTimer()
 {
     using namespace gdp;
@@ -253,6 +280,8 @@ void testBossStatusUsesArchetypeAndRoomOwnership()
         "dead local Boss is not masked by a live robot in another room");
     expect(gameplay::bossStatus(entities, 7U) == gameplay::BossStatus{},
         "a room without an IndustrialRobot has no Boss status");
+    expect(gameplay::bossStatus(entities, 0U) == gameplay::BossStatus{true, true},
+        "global Boss status still tracks a boss that has crossed into another room");
     expect(entities.findData<entities::EnemyData>(remoteRobot)->behavior
             != entities::EnemyBehaviorState::Dead,
         "Boss status inspection never mutates remote entities");
@@ -284,6 +313,7 @@ void testRestartSeedRegeneratesAReproducibleWorld()
 int main()
 {
     testBossVictoryRequiresARealEngagement();
+    testBossCanBeDefeatedFromAnOpenCorridor();
     testDeterministicRunTimer();
     testSpeedrunModeTimerRules();
     testDefeatAndDeterministicRestart();

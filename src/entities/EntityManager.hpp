@@ -90,6 +90,7 @@ struct PlayerData {
 
 struct EnemyData {
     EnemyArchetype archetype{EnemyArchetype::Worker};
+    std::uint32_t originRoomId{0};
     float health{50.0F};
     float maximumHealth{50.0F};
     EnemyBehaviorState behavior{EnemyBehaviorState::Idle};

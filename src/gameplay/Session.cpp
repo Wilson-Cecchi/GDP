@@ -16,7 +16,8 @@ SessionUpdate SessionSystem::update(
     const bool playerAlive,
     const gdp::world::RoomRole currentRoomRole,
     const bool bossExists,
-    const bool bossAlive) noexcept
+    const bool bossAlive,
+    const bool bossAccessible) noexcept
 {
     SessionUpdate update{state_.phase, state_.phase, false};
     if (state_.phase != SessionPhase::Playing) {
@@ -24,9 +25,10 @@ SessionUpdate SessionSystem::update(
     }
     if (!playerAlive) {
         state_.phase = SessionPhase::Defeat;
-    } else if (currentRoomRole == gdp::world::RoomRole::Boss && bossExists) {
-        state_.bossEngaged = state_.bossEngaged || bossAlive;
-        if (state_.bossEngaged && !bossAlive) {
+    } else if (bossExists && (currentRoomRole == gdp::world::RoomRole::Boss
+                   || bossAccessible || state_.bossEngaged)) {
+        state_.bossEngaged = true;
+        if (!bossAlive) {
             state_.phase = SessionPhase::Victory;
         }
     }
@@ -176,7 +178,8 @@ BossStatus bossStatus(
         const gdp::entities::Entity* entity = entities.find(id);
         const gdp::entities::EnemyData* enemy
             = entities.findData<gdp::entities::EnemyData>(id);
-        if (entity == nullptr || enemy == nullptr || entity->roomId != roomId
+        if (entity == nullptr || enemy == nullptr
+            || (roomId != 0U && entity->roomId != roomId)
             || enemy->archetype
                 != gdp::entities::EnemyArchetype::IndustrialRobot) {
             continue;

@@ -52,6 +52,9 @@ struct RoomEventUpdateSummary {
     float fixedStepSeconds);
 
 [[nodiscard]] bool isRoomLocked(const RoomEventRuntime& runtime) noexcept;
+[[nodiscard]] bool shouldSealRoomDoors(
+    const RoomEventRuntime& runtime,
+    const gdp::entities::EntityManager& manager);
 [[nodiscard]] std::string_view roomEventTypeName(
     gdp::world::RoomEventType type) noexcept;
 [[nodiscard]] std::string_view roomEventPhaseName(RoomEventPhase phase) noexcept;

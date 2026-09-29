@@ -169,6 +169,22 @@ void testPropDamageCollisionAndDrops()
     const CollisionWorld base{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
     expect(collisionWorldWithProps(base, manager, 4).solids().size() == 1U,
         "intact solid prop contributes collision in its active room");
+    const EntityId neighboringCover = manager.createProp({
+        .transform = {.position = {2.0F, 0.0F, -2.0F},
+            .scale = {1.0F, 2.0F, 1.0F}},
+        .roomId = 5,
+        .type = PropType::Barricade,
+        .solid = true,
+        .health = 100.0F,
+        .maximumHealth = 100.0F,
+    });
+    const std::array neighboringRoom{5U};
+    expect(collisionWorldWithProps(base, manager, 4).solids().size() == 1U
+            && collisionWorldWithProps(base, manager, 4, neighboringRoom)
+                .solids().size() == 2U,
+        "cross-room enemy navigation includes cover from a connected room only");
+    (void)manager.destroy(neighboringCover);
+    (void)manager.flushDestroyed();
 
     const PropDamageResult damaged = damageProp(manager, crate, 34.0F);
     const PropData* data = manager.findData<PropData>(crate);

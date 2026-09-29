@@ -53,6 +53,7 @@ EntityId EntityManager::createEnemy(const EnemyCreateInfo& info)
         info.roomId,
         EnemyData{
             .archetype = info.archetype,
+            .originRoomId = info.roomId,
             .health = health,
             .maximumHealth = health,
             .behavior = EnemyBehaviorState::Idle,

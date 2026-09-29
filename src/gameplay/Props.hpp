@@ -5,6 +5,7 @@
 #include "gameplay/Collision.hpp"
 
 #include <cstdint>
+#include <span>
 
 namespace gdp::gameplay {
 
@@ -26,7 +27,8 @@ struct PropDamageResult {
 [[nodiscard]] CollisionWorld collisionWorldWithProps(
     const CollisionWorld& base,
     const gdp::entities::EntityManager& manager,
-    std::uint32_t roomId);
+    std::uint32_t roomId,
+    std::span<const std::uint32_t> additionalRoomIds = {});
 
 [[nodiscard]] PropDamageResult damageProp(
     gdp::entities::EntityManager& manager,

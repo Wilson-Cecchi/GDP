@@ -63,7 +63,9 @@ wkc::core::Aabb corridorSegmentVolume(
 {
     // The longitudinal overlap lets a circular character pass continuously
     // between volumes after each AABB is inset by its collision radius.
-    constexpr float endpointOverlap = 0.65F;
+    // The robot has the largest collider (radius 0.52). The inset room and
+    // corridor volumes must still overlap after both have lost that radius.
+    constexpr float endpointOverlap = 1.12F;
     const float halfWidth = width * 0.5F;
     const float floor = std::min(first.y, second.y);
     const float ceiling = std::max(first.y, second.y) + height;
@@ -317,6 +319,60 @@ std::optional<float> corridorProgressAt(
         return std::nullopt;
     }
     return std::clamp(closestProgress, 0.0F, 1.0F);
+}
+
+bool livingEnemyOccupiesCorridor(
+    const gdp::world::World& world,
+    const gdp::world::CorridorPath& corridor,
+    const gdp::entities::EntityManager& manager) noexcept
+{
+    for (const gdp::entities::EntityId id
+         : manager.query(gdp::entities::EntityKind::Enemy)) {
+        const gdp::entities::Entity* entity = manager.find(id);
+        const gdp::entities::EnemyData* enemy
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (entity == nullptr || enemy == nullptr || !enemy->active
+            || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
+            continue;
+        }
+        const CharacterCollider collider = enemy->archetype
+                == gdp::entities::EnemyArchetype::IndustrialRobot
+            ? CharacterCollider{0.52F, 1.9F}
+            : CharacterCollider{0.35F, 1.8F};
+        if (!roomContainingCharacter(world, entity->transform.position, collider)
+            && corridorProgressAt(corridor, entity->transform.position)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void updateEnemyRoomMembership(
+    const gdp::world::World& world,
+    gdp::entities::EntityManager& manager) noexcept
+{
+    for (const gdp::entities::EntityId id
+         : manager.query(gdp::entities::EntityKind::Enemy)) {
+        gdp::entities::Entity* entity = manager.find(id);
+        gdp::entities::EnemyData* enemy
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (entity == nullptr || enemy == nullptr) {
+            continue;
+        }
+        const CharacterCollider collider = enemy->archetype
+                == gdp::entities::EnemyArchetype::IndustrialRobot
+            ? CharacterCollider{0.52F, 1.9F}
+            : CharacterCollider{0.35F, 1.8F};
+        const auto room = roomContainingCharacter(
+            world, entity->transform.position, collider);
+        if (room && *room != entity->roomId) {
+            entity->roomId = *room;
+            enemy->patrolOrigin = entity->transform.position;
+            enemy->patrolWaypoint = 0U;
+            enemy->patrolWaypointTime = 0.0F;
+            enemy->patrolPauseTime = 0.0F;
+        }
+    }
 }
 
 } // namespace gdp::gameplay

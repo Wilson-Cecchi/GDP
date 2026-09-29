@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Math.hpp"
+#include "entities/EntityManager.hpp"
 #include "gameplay/Collision.hpp"
 #include "world/World.hpp"
 
@@ -43,5 +44,14 @@ struct RoomTransition {
 [[nodiscard]] std::optional<float> corridorProgressAt(
     const gdp::world::CorridorPath& corridor,
     wkc::core::Vec3 feetPosition) noexcept;
+
+[[nodiscard]] bool livingEnemyOccupiesCorridor(
+    const gdp::world::World& world,
+    const gdp::world::CorridorPath& corridor,
+    const gdp::entities::EntityManager& manager) noexcept;
+
+void updateEnemyRoomMembership(
+    const gdp::world::World& world,
+    gdp::entities::EntityManager& manager) noexcept;
 
 } // namespace gdp::gameplay

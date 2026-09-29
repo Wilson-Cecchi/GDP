@@ -214,6 +214,11 @@ void testLockdownAndSupplyRuntime()
     expect(wave.enemiesSpawned == 1U && wave.wavesSpawned == 1U,
         "cleared Arena initial encounter releases its deterministic event wave");
     killAllEnemies(manager, 8);
+    const EntityId intruder = manager.createEnemy({.roomId = 9});
+    manager.find(intruder)->roomId = 8U;
+    expect(!updateRoomEvent(arena, manager, true, false, 1.0F).completed,
+        "a live intruder inside the Arena still prevents premature room clear");
+    (void)applyDamage(manager, intruder, 1'000.0F);
     const RoomEventUpdateSummary arenaComplete
         = updateRoomEvent(arena, manager, true, false, 1.0F);
     expect(arenaComplete.completed && arenaComplete.rewardsSpawned == 1U
@@ -256,11 +261,17 @@ void testAdjacentEventWaveIsStagedDormant()
             && manager.queryRoom(8).size() == 2U,
         "staging is idempotent and cannot duplicate the previewed wave");
 
+    manager.find(baseline)->roomId = 9U;
+    expect(manager.findData<EnemyData>(baseline)->originRoomId == 8U,
+        "cross-room pursuit retains the enemy's event origin room");
+
     const RoomEventUpdateSummary entered
         = updateRoomEvent(runtime, manager, true, false, 0.0F);
     expect(entered.activated && entered.enemiesSpawned == 0U
             && runtime.nextWave == 0U,
-        "inactive staged enemies do not bypass Arena baseline-clear pacing");
+        "enemy chasing into a corridor cannot bypass Arena baseline-clear pacing");
+    expect(isRoomLocked(runtime) && !shouldSealRoomDoors(runtime, manager),
+        "lockdown leaves a recoverable exit while its live enemy is outside");
     (void)applyDamage(manager, baseline, 1'000.0F);
     const RoomEventUpdateSummary released
         = updateRoomEvent(runtime, manager, true, false, 1.0F);
@@ -269,6 +280,8 @@ void testAdjacentEventWaveIsStagedDormant()
             && stagedEnemy != nullptr && stagedEnemy->active
             && runtime.nextWave == 1U,
         "event releases the already visible enemy instead of creating a pop-in duplicate");
+    expect(shouldSealRoomDoors(runtime, manager),
+        "lockdown can seal again once the escaped enemy is defeated");
 
     RoomEventRuntime terminal = makeRoomEventRuntime(generateRoomEventPlan(
         99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);

@@ -2320,7 +2320,7 @@ void Application::fixedUpdate(const double fixedStep)
             return runtime.roomId == playerRoom;
         });
     const bool doorsLocked = collisionEvent != roomEvents_.end()
-        && gameplay::isRoomLocked(*collisionEvent);
+        && gameplay::shouldSealRoomDoors(*collisionEvent, entities_);
     const auto playDoorAudio = [this](
         const gdp::audio::AudioEventKind kind,
         const world::EdgeId edge) {
@@ -2356,7 +2356,14 @@ void Application::fixedUpdate(const double fixedStep)
         for (auto& [edge, door] : doorRuntimes_) {
             const bool locked = doorsLocked
                 && edgeTouchesRoom(*world_, edge, playerRoom);
+            const auto corridor = std::find_if(world_->corridors.begin(),
+                world_->corridors.end(), [edge](const world::CorridorPath& path) {
+                    return path.edge == edge;
+                });
             const bool occupied = occupiedCorridorEdge == edge
+                || (corridor != world_->corridors.end()
+                    && gameplay::livingEnemyOccupiesCorridor(
+                        *world_, *corridor, entities_))
                 || positionNearDoor(*world_, edge, player_.state().position)
                 || std::any_of(
                     enemyIds.begin(), enemyIds.end(),
@@ -2474,7 +2481,7 @@ void Application::fixedUpdate(const double fixedStep)
                     return runtime.roomId == playerRoom;
                 });
             const bool locked = currentEvent != roomEvents_.end()
-                && gameplay::isRoomLocked(*currentEvent);
+                && gameplay::shouldSealRoomDoors(*currentEvent, entities_);
             if (locked) {
                 log(LogLevel::Info, "Door locked by active room event");
             } else {
@@ -2782,28 +2789,83 @@ void Application::fixedUpdate(const double fixedStep)
         auto& brain = activeEnemyBrains_[static_cast<std::size_t>(archetype)];
         return brain ? &*brain : nullptr;
     };
-    const gameplay::EnemyUpdateSummary workers = gameplay::updateWorkers(
-        entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.worker, perception,
-        brainFor(entities::EnemyArchetype::Worker));
-    const gameplay::EnemyUpdateSummary guards = gameplay::updateGuards(
-        entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.guard, perception,
-        brainFor(entities::EnemyArchetype::Guard));
-    const gameplay::EnemyUpdateSummary officers = gameplay::updateOfficers(
-        entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.officer, perception,
-        brainFor(entities::EnemyArchetype::Officer));
-    const gameplay::EnemyUpdateSummary engineers = gameplay::updateEngineers(
-        entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.engineer, perception,
-        brainFor(entities::EnemyArchetype::Engineer));
-    const gameplay::EnemyUpdateSummary robots = gameplay::updateIndustrialRobots(
-        entities_, player_, playerRoom, collisionWorld_, step,
-        difficultyConfigs.industrialRobot, perception,
-        brainFor(entities::EnemyArchetype::IndustrialRobot));
-    const std::size_t attacksLanded = workers.attacksLanded + guards.attacksLanded
-        + officers.attacksLanded + engineers.attacksLanded + robots.attacksLanded;
+    const auto openNeighbors = [this, &blockedDoorEdges](const world::RoomId roomId) {
+        std::vector<world::RoomId> neighbors;
+        if (!world_) {
+            return neighbors;
+        }
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            if (std::find(blockedDoorEdges.begin(), blockedDoorEdges.end(), corridor.edge)
+                != blockedDoorEdges.end()) {
+                continue;
+            }
+            const world::RoomId neighbor = corridor.firstRoom == roomId
+                ? corridor.secondRoom
+                : corridor.secondRoom == roomId ? corridor.firstRoom : 0U;
+            if (neighbor != 0U
+                && std::find(neighbors.begin(), neighbors.end(), neighbor)
+                    == neighbors.end()) {
+                neighbors.push_back(neighbor);
+            }
+        }
+        return neighbors;
+    };
+    std::vector<world::RoomId> activeEnemyRooms{playerRoom};
+    const auto playerRoomNeighbors = openNeighbors(playerRoom);
+    activeEnemyRooms.insert(activeEnemyRooms.end(),
+        playerRoomNeighbors.begin(), playerRoomNeighbors.end());
+    // Keep updating an enemy already between rooms even if the player has
+    // moved beyond the adjacent room. Its source room remains authoritative
+    // until its whole collider enters the destination.
+    if (world_) {
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            if (!gameplay::livingEnemyOccupiesCorridor(
+                    *world_, corridor, entities_)) {
+                continue;
+            }
+            for (const world::RoomId endpoint
+                 : {corridor.firstRoom, corridor.secondRoom}) {
+                if (std::find(activeEnemyRooms.begin(), activeEnemyRooms.end(),
+                        endpoint) == activeEnemyRooms.end()) {
+                    activeEnemyRooms.push_back(endpoint);
+                }
+            }
+        }
+    }
+    std::size_t attacksLanded = 0U;
+    for (const world::RoomId enemyRoom : activeEnemyRooms) {
+        const auto neighbors = openNeighbors(enemyRoom);
+        const gameplay::CollisionWorld enemyBase = enemyRoom == playerRoom
+            ? baseCollisionWorld_
+            : gameplay::makeRoomNavigationCollision(
+                *world_, enemyRoom, false, blockedDoorEdges);
+        const gameplay::CollisionWorld enemyCollision
+            = gameplay::collisionWorldWithProps(
+                enemyBase, entities_, enemyRoom, neighbors);
+        attacksLanded += gameplay::updateWorkers(
+            entities_, player_, enemyRoom, enemyCollision, step,
+            difficultyConfigs.worker, perception,
+            brainFor(entities::EnemyArchetype::Worker)).attacksLanded;
+        attacksLanded += gameplay::updateGuards(
+            entities_, player_, enemyRoom, enemyCollision, step,
+            difficultyConfigs.guard, perception,
+            brainFor(entities::EnemyArchetype::Guard)).attacksLanded;
+        attacksLanded += gameplay::updateOfficers(
+            entities_, player_, enemyRoom, enemyCollision, step,
+            difficultyConfigs.officer, perception,
+            brainFor(entities::EnemyArchetype::Officer)).attacksLanded;
+        attacksLanded += gameplay::updateEngineers(
+            entities_, player_, enemyRoom, enemyCollision, step,
+            difficultyConfigs.engineer, perception,
+            brainFor(entities::EnemyArchetype::Engineer)).attacksLanded;
+        attacksLanded += gameplay::updateIndustrialRobots(
+            entities_, player_, enemyRoom, enemyCollision, step,
+            difficultyConfigs.industrialRobot, perception,
+            brainFor(entities::EnemyArchetype::IndustrialRobot)).attacksLanded;
+    }
+    if (world_) {
+        gameplay::updateEnemyRoomMembership(*world_, entities_);
+    }
     if (audio_ && attacksLanded > 0U) {
         audio_->play(gdp::audio::AudioEventKind::PlayerHurt,
             config_.worldSeed, audioEventCounter_++);
@@ -2920,6 +2982,7 @@ void Application::fixedUpdate(const double fixedStep)
 
     world::RoomRole currentRoomRole = world::RoomRole::Count;
     gameplay::BossStatus boss;
+    bool bossAccessible = false;
     if (world_) {
         const auto currentRoom = std::find_if(
             world_->rooms.begin(), world_->rooms.end(),
@@ -2929,12 +2992,32 @@ void Application::fixedUpdate(const double fixedStep)
         if (currentRoom != world_->rooms.end()) {
             currentRoomRole = currentRoom->role;
         }
-    }
-    if (currentRoomRole == world::RoomRole::Boss) {
-        boss = gameplay::bossStatus(entities_, playerRoom);
+        const auto bossRoom = std::find_if(world_->rooms.begin(),
+            world_->rooms.end(), [](const world::RoomInstance& room) {
+                return room.role == world::RoomRole::Boss;
+            });
+        if (bossRoom != world_->rooms.end()) {
+            boss = gameplay::bossStatus(entities_, 0U);
+            bossAccessible = bossRoom->id == playerRoom;
+            for (const world::CorridorPath& corridor : world_->corridors) {
+                const bool connectsPlayerToBoss
+                    = (corridor.firstRoom == playerRoom
+                        && corridor.secondRoom == bossRoom->id)
+                    || (corridor.secondRoom == playerRoom
+                        && corridor.firstRoom == bossRoom->id);
+                if (!connectsPlayerToBoss) {
+                    continue;
+                }
+                const auto door = doorRuntimes_.find(corridor.edge);
+                bossAccessible = bossAccessible
+                    || (door != doorRuntimes_.end()
+                        && gameplay::isDoorPassable(door->second));
+            }
+        }
     }
     const gameplay::SessionUpdate sessionUpdate = session_.update(
-        player_.state().alive, currentRoomRole, boss.exists, boss.alive);
+        player_.state().alive, currentRoomRole, boss.exists, boss.alive,
+        bossAccessible);
     if (sessionUpdate.changed) {
         interactionPending_ = false;
         jumpPending_ = false;
@@ -3425,7 +3508,7 @@ void Application::render()
     if (activeEvent != roomEvents_.end()) {
         title << " | Event " << gameplay::roomEventTypeName(activeEvent->plan.type)
               << ':' << gameplay::roomEventPhaseName(activeEvent->phase);
-        if (gameplay::isRoomLocked(*activeEvent)) {
+        if (gameplay::shouldSealRoomDoors(*activeEvent, entities_)) {
             title << " [LOCKDOWN]";
         }
     }
@@ -3623,7 +3706,7 @@ void Application::render()
                 return std::any_of(
                     roomEvents_.begin(), roomEvents_.end(),
                     [this, edge](const gameplay::RoomEventRuntime& runtime) {
-                        return gameplay::isRoomLocked(runtime)
+                        return gameplay::shouldSealRoomDoors(runtime, entities_)
                             && edgeTouchesRoom(*world_, edge, runtime.roomId);
                     });
             };
@@ -3653,7 +3736,8 @@ void Application::render()
         }
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
-        title << (renderedRoomRole == world::RoomRole::Boss
+        title << (session_.state().bossEngaged
+                || renderedRoomRole == world::RoomRole::Boss
                 ? " | OBJECTIVE: DEFEAT BOSS"
                 : " | OBJECTIVE: REACH BOSS");
     }
@@ -3838,7 +3922,8 @@ void Application::render()
         hud.objective = visual::ObjectiveRenderState::Victory;
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
         hud.objective = visual::ObjectiveRenderState::Defeat;
-    } else if (renderedRoomRole == world::RoomRole::Boss) {
+    } else if (session_.state().bossEngaged
+        || renderedRoomRole == world::RoomRole::Boss) {
         hud.objective = visual::ObjectiveRenderState::DefeatBoss;
     } else {
         hud.objective = visual::ObjectiveRenderState::ReachBoss;
@@ -3851,7 +3936,7 @@ void Application::render()
         } else if (activeEvent->plan.type != world::RoomEventType::None) {
             hud.event = visual::HudEventState::Completed;
         }
-        hud.eventLocked = gameplay::isRoomLocked(*activeEvent);
+        hud.eventLocked = gameplay::shouldSealRoomDoors(*activeEvent, entities_);
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing && world_) {
         const std::optional<gameplay::RoomTransition> transition

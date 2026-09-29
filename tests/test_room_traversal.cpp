@@ -2,8 +2,10 @@
 #include "gameplay/Collision.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Door.hpp"
+#include "gameplay/Enemy.hpp"
 #include "gameplay/Player.hpp"
 #include "gameplay/RoomTraversal.hpp"
+#include "gameplay/Session.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldGenerator.hpp"
 
@@ -54,7 +56,8 @@ const gdp::world::ConnectorInstance* connectorForEdge(
 bool moveToWaypoint(
     const gdp::gameplay::CollisionWorld& collision,
     wkc::core::Vec3& position,
-    const wkc::core::Vec3 target)
+    const wkc::core::Vec3 target,
+    const gdp::gameplay::CharacterCollider collider = {})
 {
     constexpr float fixedStep = 1.0F / 120.0F;
     constexpr float speed = 4.5F;
@@ -69,7 +72,7 @@ bool moveToWaypoint(
         }
         velocity = offset * (speed / distance);
         const gdp::gameplay::CharacterMotionResult motion
-            = collision.moveCharacter(position, velocity, fixedStep, {});
+            = collision.moveCharacter(position, velocity, fixedStep, collider);
         if (wkc::core::nearlyEqual(position, motion.position, 1.0e-6F)) {
             return false;
         }
@@ -78,7 +81,9 @@ bool moveToWaypoint(
     return false;
 }
 
-bool everyCorridorTraversesBothWays(const gdp::world::World& world)
+bool everyCorridorTraversesBothWays(
+    const gdp::world::World& world,
+    const gdp::gameplay::CharacterCollider collider = {})
 {
     using namespace gdp;
     for (const world::CorridorPath& corridor : world.corridors) {
@@ -108,7 +113,7 @@ bool everyCorridorTraversesBothWays(const gdp::world::World& world)
             wkc::core::Vec3 position = sourceDoor->worldPosition
                 - (sourceDoor->worldNormal * 0.55F);
             for (const wkc::core::Vec3 waypoint : waypoints) {
-                if (!moveToWaypoint(navigation, position, waypoint)) {
+                if (!moveToWaypoint(navigation, position, waypoint, collider)) {
                     return false;
                 }
             }
@@ -365,6 +370,24 @@ void testCorridorTraversalSeedBatch()
         "500 deterministic worlds keep every corridor traversable in both directions");
 }
 
+void testGeneratedDoorsFitTheLargestEnemyCollider()
+{
+    using namespace gdp;
+    bool allTraversable = true;
+    for (wkc::core::Seed seed = 0U; seed < 32U; ++seed) {
+        const world::WorldGenerationResult generated = world::generateWorld(seed);
+        if (!generated.world || !everyCorridorTraversesBothWays(
+                *generated.world, {.radius = 0.52F, .height = 1.9F})) {
+            std::cerr << "Robot corridor clearance failed at seed "
+                      << seed << '\n';
+            allTraversable = false;
+            break;
+        }
+    }
+    expect(allTraversable,
+        "generated straight and bent passages fit the boss collider in both directions");
+}
+
 void testOpenCorridorShotsReachNextRoom()
 {
     using namespace gdp;
@@ -415,6 +438,294 @@ void testOpenCorridorShotsReachNextRoom()
     }
     expect(allReachable,
         "shots from generated corridors reach enemies just inside the next room");
+}
+
+void testBossKillBeforeRoomEntryFinishesRun()
+{
+    using namespace gdp;
+    const world::WorldGenerationResult generated = world::generateWorld(0U);
+    expect(generated.succeeded(), "corridor boss-fight world generates");
+    if (!generated.world) {
+        return;
+    }
+    const world::World& world = *generated.world;
+    const auto bossRoom = std::find_if(world.rooms.begin(), world.rooms.end(),
+        [](const world::RoomInstance& room) {
+            return room.role == world::RoomRole::Boss;
+        });
+    expect(bossRoom != world.rooms.end(),
+        "boss-fight world contains the Boss room");
+    if (bossRoom == world.rooms.end()) {
+        return;
+    }
+    const auto route = std::find_if(world.corridors.begin(), world.corridors.end(),
+        [&bossRoom](const world::CorridorPath& corridor) {
+            return corridor.firstRoom == bossRoom->id
+                || corridor.secondRoom == bossRoom->id;
+        });
+    expect(bossRoom != world.rooms.end() && route != world.corridors.end(),
+        "boss room is connected to a playable corridor");
+    if (bossRoom == world.rooms.end() || route == world.corridors.end()) {
+        return;
+    }
+    const world::ConnectorInstance* door = connectorForEdge(*bossRoom, route->edge);
+    expect(door != nullptr && route->points.size() >= 3U,
+        "boss entry has a door and corridor approach");
+    if (door == nullptr || route->points.size() < 3U) {
+        return;
+    }
+    const world::RoomId sourceRoom = route->firstRoom == bossRoom->id
+        ? route->secondRoom : route->firstRoom;
+    wkc::core::Vec3 origin = route->firstRoom == bossRoom->id
+        ? route->points[1U] : route->points[route->points.size() - 2U];
+    origin.y = 1.0F;
+    wkc::core::Vec3 target
+        = door->worldPosition - door->worldNormal * 0.75F;
+    target.y = 1.0F;
+    entities::EntityManager manager;
+    (void)manager.createEnemy({
+        .transform = {.position = {target.x, 0.0F, target.z}},
+        .roomId = bossRoom->id,
+        .archetype = entities::EnemyArchetype::IndustrialRobot,
+        .health = 220.0F,
+    });
+    gameplay::Weapon weapon({.damage = 500.0F, .fireInterval = 0.0F,
+        .range = 30.0F});
+    const gameplay::CollisionWorld navigation
+        = gameplay::makeRoomNavigationCollision(world, sourceRoom, false);
+    const std::array reachableRoom{bossRoom->id};
+    const gameplay::ShotResult shot = gameplay::fireHitscan(
+        weapon, origin, wkc::core::normalized(target - origin),
+        sourceRoom, navigation, manager, 1.0F, reachableRoom);
+    const gameplay::BossStatus status = gameplay::bossStatus(manager, 0U);
+    gameplay::SessionSystem session{0U};
+    const gameplay::SessionUpdate resolved = session.update(
+        true, world::RoomRole::Normal, status.exists, status.alive, true);
+    expect(shot.outcome == gameplay::ShotOutcome::Killed
+            && status == gameplay::BossStatus{true, false}
+            && resolved.phase == gameplay::SessionPhase::Victory,
+        "a lethal shot from the corridor resolves victory without entering Boss");
+}
+
+void testEnemiesUseOpenCorridorsButDoNotOpenClosedDoors()
+{
+    using namespace gdp;
+    const world::WorldGenerationResult generated = world::generateWorld(0U);
+    expect(generated.succeeded(), "enemy corridor regression world generates");
+    if (!generated.world) {
+        return;
+    }
+    const world::World& world = *generated.world;
+    const auto route = std::find_if(world.corridors.begin(), world.corridors.end(),
+        [](const world::CorridorPath& corridor) {
+            return corridor.shape == world::CorridorShape::Straight;
+        });
+    expect(route != world.corridors.end(),
+        "enemy corridor regression world has a straight route");
+    if (route == world.corridors.end()) {
+        return;
+    }
+    const world::RoomInstance* source = findRoom(world, route->firstRoom);
+    const world::RoomInstance* destination = findRoom(world, route->secondRoom);
+    const world::ConnectorInstance* sourceDoor = source == nullptr
+        ? nullptr : connectorForEdge(*source, route->edge);
+    const world::ConnectorInstance* destinationDoor = destination == nullptr
+        ? nullptr : connectorForEdge(*destination, route->edge);
+    expect(sourceDoor != nullptr && destinationDoor != nullptr,
+        "enemy corridor route has both door endpoints");
+    if (sourceDoor == nullptr || destinationDoor == nullptr) {
+        return;
+    }
+
+    const wkc::core::Vec3 playerPosition
+        = sourceDoor->worldPosition - sourceDoor->worldNormal * 0.80F;
+    const wkc::core::Vec3 enemyPosition
+        = destinationDoor->worldPosition - destinationDoor->worldNormal * 0.55F;
+    const wkc::core::Vec3 towardPlayer
+        = wkc::core::normalized(playerPosition - enemyPosition);
+    const float enemyYaw = std::atan2(towardPlayer.x, towardPlayer.z)
+        * (180.0F / std::acos(-1.0F));
+    gameplay::Player player;
+    player.spawn(playerPosition);
+    gameplay::WorkerConfig config;
+    config.detectionRange = 100.0F;
+    config.investigation.visionHalfAngleDegrees = 180.0F;
+    config.moveSpeed = 3.0F;
+    config.attackRange = 0.10F;
+    config.attackDamage = 0.0F;
+
+    entities::EntityManager closedManager;
+    const entities::EntityId blocked = closedManager.createEnemy({
+        .transform = {.position = enemyPosition,
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
+        .roomId = destination->id,
+    });
+    const std::array blockedEdges{route->edge};
+    const gameplay::CollisionWorld closedNavigation
+        = gameplay::makeRoomNavigationCollision(
+            world, destination->id, false, blockedEdges);
+    gameplay::DoorRuntime closedDoor = gameplay::makeDoorRuntime(route->edge);
+    for (int tick = 0; tick < 240; ++tick) {
+        (void)gameplay::updateWorkers(closedManager, player,
+            destination->id, closedNavigation, 1.0F / 60.0F, config);
+        gameplay::updateEnemyRoomMembership(world, closedManager);
+        (void)gameplay::updateDoor(closedDoor, 1.0F / 60.0F, false, false);
+    }
+    const entities::Entity* blockedEnemy = closedManager.find(blocked);
+    expect(blockedEnemy != nullptr
+            && blockedEnemy->roomId == destination->id
+            && gameplay::roomContainingCharacter(
+                world, blockedEnemy->transform.position,
+                {.radius = 0.35F, .height = 1.8F}) == destination->id
+            && !gameplay::isDoorPassable(closedDoor),
+        "enemy cannot open or pass a closed corridor door");
+
+    entities::EntityManager openManager;
+    const entities::EntityId pursuing = openManager.createEnemy({
+        .transform = {.position = enemyPosition,
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
+        .roomId = destination->id,
+    });
+    const gameplay::CollisionWorld openNavigation
+        = gameplay::makeRoomNavigationCollision(world, destination->id, false);
+    gameplay::DoorRuntime openDoor = gameplay::makeDoorRuntime(route->edge);
+    expect(gameplay::requestDoorOpen(openDoor, false),
+        "player-opened door is the prerequisite for enemy corridor pursuit");
+    (void)gameplay::updateDoor(openDoor, 1.0F, false, true);
+    bool enteredCorridor = false;
+    bool reachedSource = false;
+    bool stayedPassableWhileOccupied = true;
+    for (int tick = 0; tick < 1800; ++tick) {
+        (void)gameplay::updateWorkers(openManager, player,
+            destination->id, openNavigation, 1.0F / 60.0F, config);
+        gameplay::updateEnemyRoomMembership(world, openManager);
+        const entities::Entity* enemy = openManager.find(pursuing);
+        if (enemy == nullptr) {
+            break;
+        }
+        const bool inCorridor = !gameplay::roomContainingCharacter(
+            world, enemy->transform.position,
+            {.radius = 0.35F, .height = 1.8F})
+            && gameplay::corridorProgressAt(*route, enemy->transform.position);
+        enteredCorridor = enteredCorridor || inCorridor;
+        if (inCorridor) {
+            (void)gameplay::updateDoor(openDoor, 2.0F, false,
+                gameplay::livingEnemyOccupiesCorridor(world, *route, openManager));
+            stayedPassableWhileOccupied = stayedPassableWhileOccupied
+                && gameplay::isDoorPassable(openDoor);
+        }
+        if (enemy->roomId == source->id) {
+            reachedSource = true;
+            break;
+        }
+    }
+    if (!reachedSource) {
+        const entities::Entity* enemy = openManager.find(pursuing);
+        const entities::EnemyData* data
+            = openManager.findData<entities::EnemyData>(pursuing);
+        if (enemy != nullptr && data != nullptr) {
+            std::cerr << "Enemy corridor diagnosis: shape="
+                      << static_cast<int>(route->shape)
+                      << " player=(" << playerPosition.x << ',' << playerPosition.z
+                      << ") enemy=(" << enemy->transform.position.x << ','
+                      << enemy->transform.position.z << ") start=("
+                      << enemyPosition.x << ',' << enemyPosition.z
+                      << ") behavior=" << static_cast<int>(data->behavior)
+                      << " corridor=" << enteredCorridor << '\n';
+        }
+    }
+    expect(enteredCorridor && stayedPassableWhileOccupied,
+        "enemy enters the open corridor and keeps its door passable throughout transit");
+    expect(reachedSource,
+        "enemy reaches the player room and adopts its new room ownership");
+
+    // The biggest enemy follows the same open passage rather than treating
+    // the connector as a player-only transition.
+    entities::EntityManager robotManager;
+    const entities::EntityId robot = robotManager.createEnemy({
+        .transform = {.position = enemyPosition,
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
+        .roomId = destination->id,
+        .archetype = entities::EnemyArchetype::IndustrialRobot,
+        .health = 220.0F,
+    });
+    auto* robotData = robotManager.findData<entities::EnemyData>(robot);
+    robotData->health = 20.0F; // Pursuit phase: the boss actively closes distance.
+    gameplay::IndustrialRobotConfig robotConfig;
+    robotConfig.detectionRange = 100.0F;
+    robotConfig.investigation.visionHalfAngleDegrees = 180.0F;
+    robotConfig.pursuitMoveSpeed = 3.0F;
+    robotConfig.pursuitAttackRange = 0.10F;
+    robotConfig.pursuitDamage = 0.0F;
+    bool robotReachedSource = false;
+    for (int tick = 0; tick < 1800; ++tick) {
+        (void)gameplay::updateIndustrialRobots(robotManager, player,
+            destination->id, openNavigation, 1.0F / 60.0F, robotConfig);
+        gameplay::updateEnemyRoomMembership(world, robotManager);
+        const entities::Entity* enemy = robotManager.find(robot);
+        if (enemy != nullptr && enemy->roomId == source->id) {
+            robotReachedSource = true;
+            break;
+        }
+    }
+    if (!robotReachedSource) {
+        const entities::Entity* enemy = robotManager.find(robot);
+        if (enemy != nullptr) {
+            std::cerr << "Robot corridor diagnosis: start=("
+                      << enemyPosition.x << ',' << enemyPosition.z
+                      << ") final=(" << enemy->transform.position.x << ','
+                      << enemy->transform.position.z << ") room="
+                      << enemy->roomId << '\n';
+        }
+    }
+    expect(robotReachedSource,
+        "boss crosses an open doorway and corridor without sticking at the threshold");
+
+    gameplay::Player corridorPlayer;
+    corridorPlayer.spawn(destinationDoor->worldPosition
+        + destinationDoor->worldNormal * 0.25F);
+    expect(!gameplay::roomContainingCharacter(
+            world, corridorPlayer.state().position, corridorPlayer.collider()),
+        "combat fixture places the player physically inside the corridor");
+    entities::EntityManager attackManager;
+    (void)attackManager.createEnemy({
+        .transform = {.position = enemyPosition,
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
+        .roomId = destination->id,
+    });
+    gameplay::WorkerConfig attackConfig;
+    attackConfig.investigation.visionHalfAngleDegrees = 180.0F;
+    const auto attack = gameplay::updateWorkers(attackManager, corridorPlayer,
+        destination->id, openNavigation, 1.0F / 60.0F, attackConfig);
+    expect(attack.attacksLanded == 1U
+            && corridorPlayer.state().health < 100.0F,
+        "enemy in the next room can see and damage the player in an open corridor");
+
+    gameplay::Player bossTarget;
+    bossTarget.spawn(corridorPlayer.state().position);
+    entities::EntityManager bossAttackManager;
+    (void)bossAttackManager.createEnemy({
+        .transform = {.position = enemyPosition,
+            .rotationDegrees = {0.0F, enemyYaw, 0.0F}},
+        .roomId = destination->id,
+        .archetype = entities::EnemyArchetype::IndustrialRobot,
+        .health = 220.0F,
+    });
+    gameplay::IndustrialRobotConfig bossAttackConfig;
+    bossAttackConfig.investigation.visionHalfAngleDegrees = 180.0F;
+    bool bossAttackedCorridor = false;
+    for (int tick = 0; tick < 600 && bossTarget.state().alive; ++tick) {
+        const auto update = gameplay::updateIndustrialRobots(
+            bossAttackManager, bossTarget, destination->id,
+            openNavigation, 1.0F / 60.0F, bossAttackConfig);
+        bossAttackedCorridor = bossAttackedCorridor
+            || update.attacksLanded > 0U;
+        if (bossAttackedCorridor) {
+            break;
+        }
+    }
+    expect(bossAttackedCorridor,
+        "full-health boss can attack a visible player in the corridor");
 }
 
 void testLockdownEntryKeepsPlayerMobile()
@@ -599,6 +910,8 @@ int main()
 {
     testEveryGeneratedConnectionTraversesBothWays();
     testOpenCorridorShotsReachNextRoom();
+    testBossKillBeforeRoomEntryFinishesRun();
+    testEnemiesUseOpenCorridorsButDoNotOpenClosedDoors();
     testRangeInvalidInputAndPlayerRelocation();
     testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();
@@ -606,6 +919,7 @@ int main()
     testDoorPanelTravelMatchesPassability();
     testPreviouslyBrokenCorridorSeedsTraverseBothWays();
     testCorridorTraversalSeedBatch();
+    testGeneratedDoorsFitTheLargestEnemyCollider();
     testLockdownEntryKeepsPlayerMobile();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
 

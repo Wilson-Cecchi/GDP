@@ -93,7 +93,10 @@ std::optional<wkc::core::Vec3> navigationWaypoint(
     std::vector<wkc::core::Vec3> nodes{start, target};
     nodes.reserve(2U + (collisionWorld.solids().size() * 4U)
         + (collisionWorld.walkableVolumes().size() * 4U));
-    const float clearance = std::max(collider.radius, 0.0F) + 0.10F;
+    // A robot must fit the 1.2 m corridors even at a bend: radius 0.52 m
+    // leaves only 0.08 m lateral clearance on each side.
+    const float clearance = std::max(collider.radius, 0.0F)
+        + (collider.radius >= 0.50F ? 0.04F : 0.10F);
     for (const wkc::core::Aabb solid : collisionWorld.solids()) {
         const float firstX = preferredSide < 0
             ? solid.minimum.x - clearance : solid.maximum.x + clearance;
