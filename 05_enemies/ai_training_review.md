@@ -10,7 +10,7 @@ em 2026-09-29; esta revisão se baseia também no código e nos testes atuais.
 
 | Área solicitada | Estado verificado | Código principal |
 | --- | --- | --- |
-| Movimento do Player | `PlayerCommand` oferece frente/lado, agachar, caminhar silenciosamente e pular. `Player::fixedUpdate` limita cada eixo a `[-1, 1]`, soma bases ortogonais, normaliza somente quando o módulo supera 1 e aplica velocidade de postura. A diagonal já não ganha velocidade. | `src/gameplay/Player.hpp`, `Player.cpp`, `tests/test_gameplay.cpp` |
+| Movimento do Player | `PlayerCommand` oferece frente/lado, agachar, caminhar silenciosamente e pular. `Player::fixedUpdate` limita cada eixo a `[-1, 1]`, soma bases ortogonais, normaliza somente quando o módulo supera 1 e aplica velocidade de postura. A diagonal já não ganha velocidade. Bhop permite conservar e ganhar impulso limitado por air-strafe e saltos encadeados. | `src/gameplay/Player.hpp`, `Player.cpp`, `tests/test_gameplay.cpp` |
 | Movimento dos inimigos | A IA roteirizada escolhe destino e orientação via navegação; a neural emite movimento local. `moveEnemy` aplica separação, colisão e desvio. O vetor neural tem velocidade limitada, mas o lateral é multiplicado pela intenção frontal e limitado a 25%; um comando só lateral vira um passo frontal. Isso **não** representa dois eixos independentes. Avanço negativo ainda produz recuo real. | `src/gameplay/Enemy.cpp` |
 | Representação de ações | Cada cérebro tem 7 entradas, 8 neurônios ocultos e 4 saídas: frente, lado, giro, pedido de ataque. As saídas são atualizadas a 10 Hz. Não há ação neural de recarga, escolha de cobertura, salto, suporte ou arma. A política não tem memória recorrente; informação temporal só existe nos estados roteirizados externos. | `src/gameplay/EnemySensors.hpp`, `Enemy.cpp`, `src/ai/NeuralNetwork.cpp` |
 | Direção e normalização | O Player usa yaw 0° em `+X`; o Enemy usa yaw 0° em `+Z`. São convenções locais diferentes, mas ambas têm bases ortogonais frente/lado. Player normaliza a soma acima de 1; Enemy calcula direção normalizada e velocidade `min(|vetor|,1) * moveSpeed`, portanto não excede o limite físico. A restrição neural lateral é uma **política**, não uma necessidade da normalização. | `src/gameplay/Player.cpp`, `Enemy.cpp` |
@@ -174,8 +174,12 @@ arquétipos `Shotgun`, `SMG` ou `Sniper`.
    cobertura, exposição, flanco e aliados. Usar perfis reais; impedir vitória
    por mera sobrevivência passiva ou por fallback roteirizado.
 7. **Combate real e promoção (estágio 7):** amostrar mundos/portas/corredores,
-   posições e ações do Player distintos. Separar famílias de mapas e padrões
-   entre treino, validação fixa e avaliação aleatória. Comparar com cérebro
+   posições e ações do Player distintos, inclusive encadeamento de saltos,
+   air-strafe e velocidade do Bhop. O treino atual reloca o Player diretamente
+   em trajetórias sintéticas; para representar Bhop, usar o movimento físico
+   real nos novos cenários, sem teletransportá-lo a cada tick. Separar famílias
+   de mapas e padrões entre treino, validação fixa e avaliação aleatória.
+   Comparar com cérebro
    distribuído e IA roteirizada nas mesmas seeds e no jogo visual. Só promover
    um candidato após métricas e playtest satisfatórios; manter rollback.
 

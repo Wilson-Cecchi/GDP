@@ -103,6 +103,7 @@ private:
     float quietWalkMultiplier_{0.52F};
     float jumpSpeed_{6.2F};
     float gravity_{-20.0F};
+    float jumpBufferSeconds_{0.0F};
     float mouseSensitivity_{0.12F};
     bool invertMouseY_{false};
     float standingEyeHeight_{1.62F};

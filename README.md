@@ -599,6 +599,11 @@ especializados das pastas numeradas.
 - **Referência de controles:** `CONTROLS` no título e na pausa lista os comandos
   implementados. `Esc`, `Enter` ou clique em `BACK` retorna ao menu de origem;
   abrir a página durante uma run não avança a simulação.
+- **Bunny hop do Player:** saltos encadeados conservam impulso horizontal e
+  air-strafe pode elevar a velocidade até `7,2 m/s` (`1,6×` a caminhada);
+  uma janela de `0,12 s` aceita o próximo pressionamento de `Espaço` pouco
+  antes de aterrissar. Caminhada, diagonal normalizada, agachamento e modo
+  silencioso mantêm seus limites; não há repetição automática ao segurar a tecla.
 - **Base de neuroevolução — núcleo genérico:** `wkc_forge_ai` fornece uma rede
   feedforward pequena (uma camada oculta, `tanh`) e genomas copiáveis com
   inicialização, mutação e cruzamento determinísticos por seed independente.

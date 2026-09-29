@@ -62,6 +62,20 @@ seleciona passos suaves. Passos normais atraem inimigos ativos na mesma sala
 até 4 m; os suaves (inclusive agachado) alcançam apenas 0,75 m. Visão, tiro
 e outras fontes de alerta não são suprimidos por `Shift`.
 
+## Bunny hop
+
+O Player pode usar saltos encadeados como locomoção. A caminhada no chão
+permanece em `4,5 m/s`, com diagonal normalizada. No ar, a velocidade
+horizontal é conservada com leve arrasto e pode aumentar por controle aéreo
+direcional até `7,2 m/s` (`1,6×` a caminhada). Segurar apenas para frente não
+gera aceleração ilimitada: o ganho vem do air-strafe e da mudança de direção.
+Pressionar `Espaço` até `0,12 s` antes da aterrissagem guarda o pedido de salto
+e permite encadear sem perder a velocidade acumulada. É preciso pressionar de
+novo a cada salto; segurar a tecla não automatiza a sequência. Aterrissar sem
+encadear retorna à velocidade normal de caminhada. Agachamento continua
+bloqueando o salto; `Shift` limita o deslocamento aéreo à velocidade silenciosa.
+Colisões ainda restringem o movimento, e o bônus não entra no checkpoint.
+
 ## Armadura
 
 O Player nasce com `0/50` de Armor. Cada ponto absorve um ponto de dano antes

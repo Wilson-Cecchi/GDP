@@ -11,6 +11,30 @@ namespace {
 constexpr CharacterCollider standingCollider{0.3F, 1.8F};
 constexpr CharacterCollider crouchingCollider{0.3F, 1.15F};
 constexpr float crouchTransitionSpeed = 7.5F;
+constexpr float jumpBufferDuration = 0.12F;
+constexpr float bunnyHopSpeedMultiplier = 1.6F;
+constexpr float airAcceleration = 18.0F;
+constexpr float airDragPerSecond = 0.12F;
+
+wkc::core::Vec3 steerInAir(
+    wkc::core::Vec3 horizontal,
+    const wkc::core::Vec3 desired,
+    const float targetSpeed,
+    const float maximumSpeed,
+    const float step) noexcept
+{
+    horizontal = horizontal * std::max(0.0F, 1.0F - airDragPerSecond * step);
+    const float speedToAdd = targetSpeed - wkc::core::dot(horizontal, desired);
+    if (wkc::core::length(desired) > 1.0e-6F && speedToAdd > 0.0F) {
+        horizontal = horizontal + desired
+            * std::min(speedToAdd, airAcceleration * step);
+    }
+    const float speed = wkc::core::length(horizontal);
+    if (speed > maximumSpeed) {
+        horizontal = horizontal * (maximumSpeed / speed);
+    }
+    return horizontal;
+}
 
 std::optional<float> rayAabbDistance(
     const wkc::core::Vec3 origin,
@@ -53,6 +77,7 @@ std::optional<float> rayAabbDistance(
 void Player::spawn(const wkc::core::Vec3 feetPosition, const float yawDegrees) noexcept
 {
     state_ = {};
+    jumpBufferSeconds_ = 0.0F;
     state_.position = feetPosition;
     state_.yawDegrees = std::remainder(yawDegrees, 360.0F);
     state_.grounded = false;
@@ -70,6 +95,7 @@ bool Player::relocate(
     }
     state_.position = feetPosition;
     state_.velocity = {};
+    jumpBufferSeconds_ = 0.0F;
     state_.yawDegrees = std::remainder(yawDegrees, 360.0F);
     state_.pitchDegrees = 0.0F;
     state_.grounded = false;
@@ -149,19 +175,43 @@ void Player::fixedUpdate(
     const float stanceSpeed = moveSpeed_
         * (state_.crouching ? crouchMoveMultiplier_ : 1.0F)
         * (command.quietWalk ? quietWalkMultiplier_ : 1.0F);
-    state_.velocity.x = desired.x * stanceSpeed;
-    state_.velocity.z = desired.z * stanceSpeed;
+    const bool canJump = !state_.crouching
+        && state_.crouchAmount <= 1.0e-4F;
+    jumpBufferSeconds_ = canJump
+        ? (command.jump ? jumpBufferDuration
+                        : std::max(0.0F, jumpBufferSeconds_ - fixedStepSeconds))
+        : 0.0F;
     bool jumpGrounded = state_.grounded;
-    if (command.jump && !jumpGrounded) {
+    if (!jumpGrounded && (jumpBufferSeconds_ > 0.0F
+            || state_.velocity.y == 0.0F)) {
         jumpGrounded = collisionWorld.moveCharacter(
             state_.position, {0.0F, -1.0F, 0.0F},
             1.0e-4F, collider_).grounded;
     }
-    if (command.jump && jumpGrounded && !state_.crouching
-        && state_.crouchAmount <= 1.0e-4F) {
+    const bool launchJump = jumpBufferSeconds_ > 0.0F && jumpGrounded;
+    wkc::core::Vec3 horizontal{
+        state_.velocity.x, 0.0F, state_.velocity.z};
+    if (launchJump) {
+        // A buffered landing launches before ground movement can erase the
+        // horizontal speed earned by an earlier air strafe.
+        if (wkc::core::length(horizontal) < stanceSpeed) {
+            horizontal = desired * stanceSpeed;
+        }
         state_.velocity.y = jumpSpeed_;
         state_.grounded = false;
+        jumpBufferSeconds_ = 0.0F;
     }
+    if (launchJump || !jumpGrounded) {
+        const float maximumSpeed = command.quietWalk || state_.crouching
+            ? stanceSpeed : moveSpeed_ * bunnyHopSpeedMultiplier;
+        horizontal = steerInAir(horizontal, desired,
+            stanceSpeed, maximumSpeed, fixedStepSeconds);
+    } else {
+        // Ordinary walking retains its original immediate response and speed.
+        horizontal = desired * stanceSpeed;
+    }
+    state_.velocity.x = horizontal.x;
+    state_.velocity.z = horizontal.z;
     state_.velocity.y += gravity_ * fixedStepSeconds;
 
     const CharacterMotionResult motion = collisionWorld.moveCharacter(
@@ -210,6 +260,7 @@ void Player::applyDamage(const float amount) noexcept
     if (state_.health <= 0.0F) {
         state_.alive = false;
         state_.velocity = {};
+        jumpBufferSeconds_ = 0.0F;
     }
 }
 

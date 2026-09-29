@@ -79,6 +79,80 @@ void testMovement()
         "quiet walk reduces grounded movement without changing direction");
 }
 
+void testBunnyHopMovement()
+{
+    using namespace gdp::gameplay;
+    constexpr float step = 1.0F / 60.0F;
+    const CollisionWorld openRoom{
+        {{-50.0F, 0.0F, -50.0F}, {50.0F, 5.0F, 50.0F}}};
+    const auto speed = [](const Player& player) {
+        return std::hypot(
+            player.state().velocity.x, player.state().velocity.z);
+    };
+
+    Player diagonalLaunch;
+    diagonalLaunch.spawn({0.0F, 0.0F, 0.0F});
+    diagonalLaunch.fixedUpdate({.moveForward = 1.0F,
+        .moveRight = 1.0F, .jump = true}, step, openRoom);
+    expect(wkc::core::nearlyEqual(speed(diagonalLaunch), 4.5F, 1.0e-4F),
+        "diagonal jump starts at normal walking speed, not a diagonal boost");
+
+    Player straightJump;
+    straightJump.spawn({0.0F, 0.0F, 0.0F});
+    straightJump.fixedUpdate({.moveForward = 1.0F, .jump = true},
+        step, openRoom);
+    updateMany(straightJump, {.moveForward = 1.0F}, openRoom, 25);
+    expect(wkc::core::nearlyEqual(speed(straightJump), 4.5F, 1.0e-4F),
+        "holding forward in the air does not generate free bunny-hop speed");
+
+    Player hopper;
+    hopper.spawn({0.0F, 0.0F, 0.0F});
+    hopper.fixedUpdate({.moveForward = 1.0F, .jump = true}, step, openRoom);
+    for (int tick = 0; tick < 18; ++tick) {
+        hopper.fixedUpdate({.moveRight = 1.0F}, step, openRoom);
+        expect(speed(hopper) <= 7.2F + 1.0e-4F,
+            "air strafing never exceeds the bunny-hop speed cap");
+    }
+    expect(speed(hopper) > 5.0F && !hopper.state().grounded,
+        "air strafing builds useful speed beyond ordinary walking");
+
+    bool buffered = false;
+    bool chained = false;
+    for (int tick = 0; tick < 90 && !chained; ++tick) {
+        const bool pressJump = !buffered
+            && hopper.state().velocity.y < 0.0F
+            && hopper.state().position.y < 0.30F;
+        hopper.fixedUpdate(
+            {.moveRight = 1.0F, .jump = pressJump}, step, openRoom);
+        buffered = buffered || pressJump;
+        chained = buffered && hopper.state().velocity.y > 0.0F
+            && !hopper.state().grounded;
+    }
+    expect(buffered && chained && speed(hopper) > 4.5F,
+        "a jump pressed shortly before landing chains without erasing momentum");
+    updateMany(hopper, {.moveForward = 1.0F}, openRoom, 120);
+    expect(hopper.state().grounded
+            && wkc::core::nearlyEqual(speed(hopper), 4.5F, 1.0e-4F),
+        "landing without another jump returns to ordinary walking speed");
+
+    Player earlyRequest;
+    earlyRequest.spawn({0.0F, 0.0F, 0.0F});
+    earlyRequest.fixedUpdate({.jump = true}, step, openRoom);
+    updateMany(earlyRequest, {}, openRoom, 10);
+    earlyRequest.fixedUpdate({.jump = true}, step, openRoom);
+    updateMany(earlyRequest, {}, openRoom, 120);
+    expect(earlyRequest.state().grounded,
+        "an early airborne jump request expires before landing");
+
+    Player quiet;
+    quiet.spawn({0.0F, 0.0F, 0.0F});
+    quiet.fixedUpdate({.moveForward = 1.0F,
+        .quietWalk = true, .jump = true}, step, openRoom);
+    updateMany(quiet, {.moveRight = 1.0F, .quietWalk = true}, openRoom, 18);
+    expect(speed(quiet) <= 4.5F * 0.52F + 1.0e-4F,
+        "quiet walking cannot retain a fast air-strafe speed");
+}
+
 void testFootstepCadence()
 {
     using namespace gdp::gameplay;
@@ -428,6 +502,7 @@ void testInteractionAndLife()
 int main()
 {
     testMovement();
+    testBunnyHopMovement();
     testFootstepCadence();
     testCosmeticViewMotion();
     testCollisionAndGravity();
