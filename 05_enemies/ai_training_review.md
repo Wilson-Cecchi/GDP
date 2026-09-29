@@ -332,6 +332,20 @@ Validação local desta fase: build Debug concluído e `ctest --test-dir
 build/debug --output-on-failure` passou em 59/59 testes. Isso confirma as
 invariantes automatizadas e não substitui uma partida visual completa.
 
+**Playtest isolado dos candidatos:** `--test-brain-dir DIR` carrega todos os
+cinco cérebros de `DIR/{worker,guard,officer,engineer,robot}.brain`, exigindo
+arquivos válidos do tipo correspondente. Os cinco checkpoints da geração 14
+foram copiados somente para
+`build/ai-test/tactical-runtime-20260929/`; `assets/ai/` permanece intacto.
+Executar `build/debug/gdp --test-brain-dir
+build/ai-test/tactical-runtime-20260929` abre o jogo com os candidatos, e
+executar `build/debug/gdp` volta à IA ativa. Uma inicialização headless de
+três frames confirmou os cinco carregamentos como geração 14. A comparação
+curta nas três seeds da tabela acima foi repetida com essa pasta e reproduziu
+os mesmos totais. Trata-se de teste jogável, **não de promoção**: observar
+especialmente mira do Guard contra Bhop/strafe e navegação do Robot atrás de
+cobertura antes de decidir por qualquer substituição permanente.
+
 **Ajuste de seleção após a rodada curta:** um primeiro treino de sete gerações
 mostrou que boa locomoção nas primeiras etapas não conserva necessariamente
 a capacidade de atirar nas últimas. O currículo 6 (7 com quatro seeds por

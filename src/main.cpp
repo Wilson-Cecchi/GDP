@@ -20,7 +20,7 @@ void printUsage(const std::string_view executable)
     std::cout << "Usage: " << executable
               << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N]"
                  " [--scripted-enemies] [--experimental-neural-enemy TYPE]"
-                 " [--neural-brain FILE] [--help]\n"
+                 " [--neural-brain FILE] [--test-brain-dir DIR] [--help]\n"
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
@@ -33,6 +33,7 @@ void printUsage(const std::string_view executable)
               << "  --experimental-neural-enemy TYPE  Test one neural enemy of TYPE.\n"
               << "  --experimental-neural-worker  Alias for Worker playtesting.\n"
               << "  --neural-brain FILE  Load a matching saved experimental brain.\n"
+              << "  --test-brain-dir DIR  Test all five TYPE.brain files without replacing bundled AI.\n"
               << "  --ai-training TYPE  Train worker, guard, officer, engineer, robot, or all.\n"
               << "  --population N      Training population (2..128, default 16).\n"
               << "  --generations N     Training generations (1..10000, default 10).\n"
@@ -165,6 +166,19 @@ int main(const int argc, char* argv[])
             continue;
         }
 
+        if (argument == "--test-brain-dir") {
+            if (index + 1 >= argc) {
+                std::cerr << "Missing value after --test-brain-dir\n";
+                return 2;
+            }
+            config.testBrainDirectory = std::filesystem::path{argv[++index]};
+            if (config.testBrainDirectory->empty()) {
+                std::cerr << "Empty test brain directory\n";
+                return 2;
+            }
+            continue;
+        }
+
         if (argument == "--ai-training") {
             if (index + 1 >= argc) {
                 std::cerr << "Missing archetype after --ai-training\n";
@@ -283,7 +297,7 @@ int main(const int argc, char* argv[])
     if (trainingMode) {
         if (config.benchmarkQuality || config.frameLimit
             || config.scriptedEnemies || config.experimentalNeuralEnemy
-            || config.neuralBrainPath) {
+            || config.neuralBrainPath || config.testBrainDirectory) {
             std::cerr << "Training cannot be combined with gameplay or benchmark options\n";
             return 2;
         }
@@ -339,6 +353,11 @@ int main(const int argc, char* argv[])
     }
     if (config.scriptedEnemies && config.experimentalNeuralEnemy) {
         std::cerr << "--scripted-enemies cannot be combined with experimental neural AI\n";
+        return 2;
+    }
+    if (config.testBrainDirectory && (config.scriptedEnemies
+            || config.experimentalNeuralEnemy || config.neuralBrainPath)) {
+        std::cerr << "--test-brain-dir cannot be combined with other enemy AI modes\n";
         return 2;
     }
     if (config.headless && config.benchmarkQuality) {

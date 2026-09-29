@@ -794,14 +794,24 @@ bool Application::initializeRun()
     } else {
         neuralEnemyExperiment_.reset();
         const char* const basePath = SDL_GetBasePath();
-        if (basePath == nullptr) {
+        if (basePath == nullptr && !config_.testBrainDirectory) {
             log(LogLevel::Warning,
                 "Cannot find bundled enemy brains; using scripted AI");
         } else {
-            auto records = ai::loadActiveEnemyBrains(
-                std::filesystem::path{basePath} / "ai");
+            const std::filesystem::path brainDirectory
+                = config_.testBrainDirectory.value_or(
+                    std::filesystem::path{basePath != nullptr ? basePath : ""}
+                        / "ai");
+            auto records = ai::loadActiveEnemyBrains(brainDirectory);
             constexpr std::array<std::string_view, ai::activeEnemyBrainCount> names{
                 "worker", "guard", "officer", "engineer", "robot"};
+            if (config_.testBrainDirectory
+                && std::any_of(records.begin(), records.end(),
+                    [](const auto& record) { return !record; })) {
+                log(LogLevel::Error,
+                    "Test brain directory needs five valid matching TYPE.brain files");
+                return false;
+            }
             for (std::size_t index = 0U; index < records.size(); ++index) {
                 if (!records[index]) {
                     log(LogLevel::Warning,
@@ -811,6 +821,8 @@ bool Application::initializeRun()
                 }
                 const auto archetype
                     = static_cast<entities::EnemyArchetype>(index);
+                const std::uint32_t brainGeneration
+                    = records[index]->genome.generation;
                 auto& brain = activeEnemyBrains_[index];
                 brain.emplace(wkc::core::deriveSeed(
                     config_.worldSeed, SeedDomain::NeuralWorker,
@@ -819,8 +831,11 @@ bool Application::initializeRun()
                 brain->contract = records[index]->contract;
                 brain->controlAll = true;
                 brain->logSelection = false;
-                log(LogLevel::Info,
-                    std::string{"Trained enemy brain active: "}
+                log(LogLevel::Info, config_.testBrainDirectory
+                    ? std::string{"Test enemy brain active: "}
+                        + std::string{names[index]} + " generation "
+                        + std::to_string(brainGeneration)
+                    : std::string{"Trained enemy brain active: "}
                         + std::string{names[index]});
             }
         }

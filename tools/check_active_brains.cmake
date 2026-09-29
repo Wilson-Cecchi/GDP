@@ -1,5 +1,5 @@
-if(NOT DEFINED GDP_EXECUTABLE)
-    message(FATAL_ERROR "GDP_EXECUTABLE is required")
+if(NOT DEFINED GDP_EXECUTABLE OR NOT DEFINED GDP_BRAIN_DIR)
+    message(FATAL_ERROR "GDP_EXECUTABLE and GDP_BRAIN_DIR are required")
 endif()
 
 execute_process(
@@ -28,4 +28,41 @@ if(NOT scripted_result EQUAL 0
     OR NOT scripted_error MATCHES "Scripted enemy AI selected"
     OR scripted_error MATCHES "Trained enemy brain active:")
     message(FATAL_ERROR "Scripted AI fallback did not activate cleanly: ${scripted_error}")
+endif()
+
+execute_process(
+    COMMAND "${GDP_EXECUTABLE}" --headless --frames 3 --seed 42
+        --test-brain-dir "${GDP_BRAIN_DIR}"
+    RESULT_VARIABLE test_result
+    ERROR_VARIABLE test_error
+)
+if(NOT test_result EQUAL 0)
+    message(FATAL_ERROR "Test-brain mode failed: ${test_error}")
+endif()
+foreach(type worker guard officer engineer robot)
+    if(NOT test_error MATCHES "Test enemy brain active: ${type} generation 200")
+        message(FATAL_ERROR "Test-brain ${type} did not activate: ${test_error}")
+    endif()
+endforeach()
+
+execute_process(
+    COMMAND "${GDP_EXECUTABLE}" --headless --frames 3 --seed 42
+        --test-brain-dir "${GDP_BRAIN_DIR}/does-not-exist"
+    RESULT_VARIABLE missing_result
+    ERROR_VARIABLE missing_error
+)
+if(missing_result EQUAL 0
+    OR NOT missing_error MATCHES "Test brain directory needs five valid matching")
+    message(FATAL_ERROR "Incomplete test-brain directory was accepted: ${missing_error}")
+endif()
+
+execute_process(
+    COMMAND "${GDP_EXECUTABLE}" --headless --frames 3 --seed 42
+        --scripted-enemies --test-brain-dir "${GDP_BRAIN_DIR}"
+    RESULT_VARIABLE conflict_result
+    ERROR_VARIABLE conflict_error
+)
+if(conflict_result EQUAL 0
+    OR NOT conflict_error MATCHES "cannot be combined with other enemy AI modes")
+    message(FATAL_ERROR "Conflicting enemy AI modes were accepted: ${conflict_error}")
 endif()

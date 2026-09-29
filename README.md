@@ -625,6 +625,13 @@ especializados das pastas numeradas.
   os pesos treinados do seu arquétipo. Se um arquivo estiver ausente ou inválido,
   somente aquele arquétipo volta à IA anterior. `--scripted-enemies` força a IA
   anterior para todos; a opção experimental continua isolando um único inimigo.
+  Para testar uma coleção completa sem alterar `assets/ai/`, use
+  `--test-brain-dir DIR`: a pasta precisa conter `worker.brain`, `guard.brain`,
+  `officer.brain`, `engineer.brain` e `robot.brain`, todos válidos e do tipo
+  correto. Se faltar algum, o jogo interrompe a inicialização da partida em
+  vez de misturar silenciosamente cérebros antigos e novos. O modo de teste
+  não pode ser combinado com `--scripted-enemies` ou com a opção experimental
+  de um único inimigo; sem a flag, o jogo volta aos cérebros distribuídos.
   No jogo normal, a navegação e a mira têm salvaguardas para manter o combate
   legível; se um cérebro não progride nem consegue atacar por dois segundos,
   o inimigo usa temporariamente a IA anterior.

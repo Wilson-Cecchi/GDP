@@ -54,6 +54,7 @@ struct ApplicationConfig {
     bool scriptedEnemies{false};
     std::optional<entities::EnemyArchetype> experimentalNeuralEnemy;
     std::optional<std::filesystem::path> neuralBrainPath;
+    std::optional<std::filesystem::path> testBrainDirectory;
     std::optional<std::uint64_t> frameLimit;
     std::optional<gameplay::GraphicsQuality> benchmarkQuality;
     int windowWidth{1280};

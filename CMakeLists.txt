@@ -490,6 +490,7 @@ if(GDP_BUILD_TESTS)
     add_test(NAME active_enemy_brains_headless
         COMMAND ${CMAKE_COMMAND}
             -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>
+            -DGDP_BRAIN_DIR=${CMAKE_CURRENT_SOURCE_DIR}/assets/ai
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_active_brains.cmake)
     set_tests_properties(active_enemy_brains_headless PROPERTIES TIMEOUT 15)
 
