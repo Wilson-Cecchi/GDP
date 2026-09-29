@@ -723,6 +723,23 @@ especializados das pastas numeradas.
   jogador, isoladamente, não aprova um cérebro; cobertura, navegação, legibilidade
   e equilíbrio ainda precisam de playtest.
 
+  Para uma primeira comparação em **duelo bilateral**, adicione `--duel`:
+
+  ```bash
+  build/debug/gdp_ai_gameplay_eval --duel --seed 12345 --frames 360
+  ```
+
+  Esta opção mantém o CSV antigo inalterado quando ausente. No duelo, um bot
+  fixo controla o Player pela física real em solo ou com saltos/Bhop encadeados,
+  mira no centro do inimigo e atira usando `Weapon`/`fireHitscan`. O CSV registra
+  vitória, derrota ou limite de tempo, tiros e acertos do Player, acertos do
+  inimigo, dano bilateral, saltos, pico de velocidade e deslocamentos. A arma
+  fraca do bot é apenas um instrumento de avaliação, não um ajuste de balanceamento
+  da campanha. O espaço é aberto e não contém objetos/portas: a mira automática
+  e esse cenário sintético não comprovam qualidade de navegação, precisão contra
+  jogadores humanos ou desempenho em uma partida completa. Compare políticas
+  nas mesmas seeds e valide visualmente antes de promover qualquer cérebro.
+
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
 testes. O núcleo inclui streams aleatórios determinísticos, derivação genérica e

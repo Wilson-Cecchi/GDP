@@ -197,8 +197,11 @@ novos eventos; um reward maior sozinho não é critério de promoção.
   fallback, recompensa telescópica, anti-oscilação contextual e escala relativa
   dos termos terminais.
 - `tools/check_ai_gameplay_eval.cmake` verifica duas execuções idênticas e
-  presença de linhas, não qualidade. A saída atual tem dano, hits, deslocamento,
-  menor/distância final e ticks neurais; faltam as métricas pedidas acima.
+  presença de linhas, não qualidade. O modo padrão tem dano, hits, deslocamento,
+  menor/distância final e ticks neurais. O modo `--duel`, implementado depois
+  desta auditoria, acrescenta tiros reais do Player, desfecho, dano bilateral,
+  saltos e velocidade por física real; ainda faltam exposição, cobertura,
+  colisões, reversões, autoria do movimento e várias métricas propostas.
 - Os checkpoints de 10.000 gerações permanecem experimentais. A validação
   registrada em `animation_and_ai.md` encontrou regressão de combate frente
   aos assets atuais em 10 seeds. Como os currículos/holdouts podem diferir,
@@ -214,3 +217,13 @@ Os testes locais `gameplay_systems`, `enemy_sensors_systems`,
 `worker_training_systems` e `ai_gameplay_eval_deterministic` passaram (4/4).
 Eles validam o comportamento existente e a reprodutibilidade, não os estágios
 novos propostos neste documento.
+
+**Primeiro passo do estágio 0 (2026-09-29):** `gdp_ai_gameplay_eval --duel`
+compara as duas políticas para os cinco arquétipos em `ground_strafe` e `bhop`.
+O Player usa `Player::fixedUpdate`, sem relocação por tick, e atira com
+`fireHitscan`; a arma/mira são fixas para comparar as políticas sob condições
+iguais. O teste automático exige 20 linhas determinísticas, tiros/acertos,
+múltiplos saltos e velocidade de Bhop superior à de caminhada. Isto **não**
+encerra o estágio 0: faltam telemetria por decisão, cobertura/portas e uma
+amostra robusta de seeds. Nenhum reward, formato de cérebro ou asset promovido
+foi alterado.
