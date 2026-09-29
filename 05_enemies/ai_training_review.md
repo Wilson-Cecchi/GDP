@@ -227,3 +227,21 @@ múltiplos saltos e velocidade de Bhop superior à de caminhada. Isto **não**
 encerra o estágio 0: faltam telemetria por decisão, cobertura/portas e uma
 amostra robusta de seeds. Nenhum reward, formato de cérebro ou asset promovido
 foi alterado.
+
+**Regras de treino v2 (2026-09-29):** o módulo
+`src/game/ai/TrainingReward.cpp` passou a aplicar terminal `+10/-10` e teto
+de `±4` por episódio para todos os termos auxiliares. Dano causado, acerto e
+eliminação durante fallback são registrados à parte e não rendem fitness neural; suporte
+automático não rende fitness. Dano recebido durante fallback ainda penaliza a
+sobrevivência do episódio. `approachMeters` foi substituído por progresso
+assinado na faixa tática, limitado pelo progresso líquido total para não
+premiar ciclos. Reversões sem melhora de faixa ou mira, quando não há disparo
+iminente do Player, recebem penalidade. Atribuição proporcional de avanço,
+recuo e strafe é apenas diagnóstica, separada da velocidade física. O currículo
+tem agora cinco cenários de treino e dois de holdout por arquétipo; um cenário
+de treino usa Bhop pela física real do Player. O log marca `reward_rules=2`.
+Os cérebros ativos, os sensores e o formato `.brain` **não mudaram**; scores
+antigos e novos não devem ser comparados diretamente. Ainda faltam os estágios
+isolados de mira/tiro/esquiva e geometrias de corredor/porta. Como o ataque
+inimigo não tem evento de tiro, munição ou projétil, não foram inventadas
+recompensas por precisão, recarga ou esquiva de tiro já disparado.

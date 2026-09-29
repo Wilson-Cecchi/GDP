@@ -14,8 +14,10 @@ namespace gdp::game::ai {
 struct WorkerFitnessMetrics {
     float damageDealt{0.0F};
     float damageReceived{0.0F};
+    float fallbackDamageDealt{0.0F};
+    float fallbackDamageReceived{0.0F};
     float survivalSeconds{0.0F};
-    float approachMeters{0.0F};
+    float tacticalProgressMeters{0.0F};
     float proximitySeconds{0.0F};
     float idleSeconds{0.0F};
     float contactSeconds{0.0F};
@@ -25,15 +27,36 @@ struct WorkerFitnessMetrics {
     float bossPursuitSeconds{0.0F};
     float blockedSeconds{0.0F};
     float wastedAttackSeconds{0.0F};
+    float forwardCreditSeconds{0.0F};
+    float retreatCreditSeconds{0.0F};
+    float strafeCreditSeconds{0.0F};
+    float peakPlayerSpeed{0.0F};
     std::uint32_t attacksLanded{0};
+    std::uint32_t fallbackAttacksLanded{0};
+    std::uint32_t playerEliminations{0};
+    std::uint32_t fallbackPlayerEliminations{0};
     std::uint32_t deaths{0};
     std::uint32_t supportActions{0};
+    std::uint32_t unproductiveReversals{0};
+    std::uint32_t neuralTicks{0};
+    std::uint32_t fallbackTicks{0};
+    std::uint32_t playerJumps{0};
+};
+
+struct DirectionalCredit {
+    float forward{0.0F};
+    float retreat{0.0F};
+    float strafe{0.0F};
 };
 
 [[nodiscard]] float scoreWorkerFitness(const WorkerFitnessMetrics& metrics) noexcept;
 [[nodiscard]] float scoreEnemyFitness(
     const WorkerFitnessMetrics& metrics,
     gdp::entities::EnemyArchetype archetype) noexcept;
+[[nodiscard]] float creditedTacticalProgress(
+    float neuralProgress, float totalProgress) noexcept;
+[[nodiscard]] DirectionalCredit directionalMovementCredit(
+    float forward, float strafe, float durationSeconds) noexcept;
 [[nodiscard]] float evaluateWorkerGenome(
     const wkc::ai::Genome& genome,
     wkc::core::Seed scenarioSeed);

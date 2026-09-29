@@ -36,7 +36,7 @@ void printUsage(const std::string_view executable)
               << "  --ai-training TYPE  Train worker, guard, officer, engineer, robot, or all.\n"
               << "  --population N      Training population (2..128, default 16).\n"
               << "  --generations N     Training generations (1..10000, default 10).\n"
-              << "  --all-scenarios     Train all six scenarios per type; test on separate seeds.\n"
+              << "  --all-scenarios     Train all seven scenarios per type; test on separate seeds.\n"
               << "  --cooldown-ms N     Sleep 1..10000 ms between generations to limit heat.\n"
               << "  --save-dir DIR      Save one best-brain checkpoint per generation.\n"
               << "  --resume FILE       Seed a new training run from a checkpoint.\n"

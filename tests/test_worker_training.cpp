@@ -38,11 +38,21 @@ float reportedMetric(const std::string& output, const std::string_view key)
 void testFitness()
 {
     using namespace gdp::game::ai;
+    expect(creditedTacticalProgress(3.0F, 0.0F) == 0.0F
+            && creditedTacticalProgress(3.0F, 1.0F) == 1.0F
+            && creditedTacticalProgress(-2.0F, 3.0F) == -2.0F,
+        "fallback regressions cannot be farmed as neural tactical progress");
+    const DirectionalCredit diagonal = directionalMovementCredit(1.0F, 1.0F, 1.0F);
+    const DirectionalCredit reverse = directionalMovementCredit(-1.0F, 1.0F, 1.0F);
+    expect(diagonal.forward == 0.5F && diagonal.strafe == 0.5F
+            && diagonal.retreat == 0.0F
+            && reverse.retreat == 0.5F && reverse.strafe == 0.5F,
+        "directional credit is normalized without changing physical movement");
     const WorkerFitnessMetrics baseline{
         .damageDealt = 10.0F,
         .damageReceived = 5.0F,
         .survivalSeconds = 3.0F,
-        .approachMeters = 2.0F,
+        .tacticalProgressMeters = 2.0F,
         .proximitySeconds = 1.0F,
         .idleSeconds = 1.0F,
         .attacksLanded = 1U,
@@ -72,6 +82,17 @@ void testFitness()
     worse.deaths = 1U;
     expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
         "death reduces fitness");
+    WorkerFitnessMetrics progress = baseline;
+    progress.tacticalProgressMeters += 1.0F;
+    expect(scoreWorkerFitness(progress) > scoreWorkerFitness(baseline),
+        "net progress toward tactical range is rewarded");
+    progress.tacticalProgressMeters -= 3.0F;
+    expect(scoreWorkerFitness(progress) < scoreWorkerFitness(baseline),
+        "losing tactical range removes earlier credit");
+    WorkerFitnessMetrics oscillating = baseline;
+    oscillating.unproductiveReversals = 2U;
+    expect(scoreWorkerFitness(oscillating) < scoreWorkerFitness(baseline),
+        "unproductive command reversals are penalized");
     WorkerFitnessMetrics contact = baseline;
     contact.contactSeconds += 2.0F;
     expect(scoreWorkerFitness(contact) > scoreWorkerFitness(baseline),
@@ -100,17 +121,37 @@ void testFitness()
     WorkerFitnessMetrics supported = baseline;
     supported.supportActions += 2U;
     expect(scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Engineer)
-            - scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Engineer)
-            > scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Officer)
-                - scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Officer),
-        "Engineer values support more highly than Officer");
-    supported.supportActions = 100U;
-    WorkerFitnessMetrics cappedSupport = supported;
-    cappedSupport.supportActions = 4U;
-    expect(scoreEnemyFitness(supported, gdp::entities::EnemyArchetype::Engineer)
-            == scoreEnemyFitness(cappedSupport,
-                gdp::entities::EnemyArchetype::Engineer),
-        "support reward is capped to avoid farming scripted actions");
+            == scoreEnemyFitness(baseline, gdp::entities::EnemyArchetype::Engineer),
+        "automatic support actions do not reward the neural policy");
+    WorkerFitnessMetrics fallback = baseline;
+    fallback.fallbackDamageDealt = 100.0F;
+    fallback.fallbackAttacksLanded = 10U;
+    fallback.fallbackPlayerEliminations = 1U;
+    expect(scoreWorkerFitness(fallback) == scoreWorkerFitness(baseline),
+        "scripted fallback combat does not reward the neural policy");
+    fallback.fallbackDamageReceived = 10.0F;
+    expect(scoreWorkerFitness(fallback) < scoreWorkerFitness(baseline),
+        "damage received during fallback still counts against survival");
+    WorkerFitnessMetrics movementCommand = baseline;
+    movementCommand.forwardCreditSeconds = 8.0F;
+    movementCommand.strafeCreditSeconds = 8.0F;
+    expect(scoreWorkerFitness(movementCommand) == scoreWorkerFitness(baseline),
+        "movement commands have diagnostic credit, not automatic reward");
+    const WorkerFitnessMetrics shapingOnly{
+        .damageDealt = 1000.0F,
+        .tacticalProgressMeters = 100.0F,
+        .proximitySeconds = 100.0F,
+        .contactSeconds = 100.0F,
+        .attacksLanded = 100U,
+    };
+    WorkerFitnessMetrics winner;
+    winner.playerEliminations = 1U;
+    expect(scoreWorkerFitness(winner) > scoreWorkerFitness(shapingOnly),
+        "eliminating the player outweighs all auxiliary reward");
+    WorkerFitnessMetrics dead = shapingOnly;
+    dead.deaths = 1U;
+    expect(scoreWorkerFitness(dead) < 0.0F,
+        "death outweighs even maximum auxiliary reward");
 }
 
 void testTrainingAndPersistence()
@@ -139,14 +180,21 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U,
         "automated training produces a champion and final checkpoint");
-    expect(output.str().find("curriculum=2") != std::string::npos
-            && output.str().find("scenarios=4") != std::string::npos
+    expect(output.str().find("reward_rules=2") != std::string::npos
+            && output.str().find("curriculum=2") != std::string::npos
+            && output.str().find("scenarios=5") != std::string::npos
             && output.str().find("holdout_scenarios=2") != std::string::npos
             && output.str().find("repetitions=2") != std::string::npos
             && output.str().find("worst_scenario=") != std::string::npos
             && output.str().find("blocked_s=") != std::string::npos
             && output.str().find("wasted_attack_s=") != std::string::npos
-            && output.str().find("aim_s=") != std::string::npos,
+            && output.str().find("aim_s=") != std::string::npos
+            && output.str().find("range_progress=") != std::string::npos
+            && output.str().find("fallback_damage_dealt=") != std::string::npos
+            && output.str().find("reversals=") != std::string::npos
+            && output.str().find("neural_ticks=") != std::string::npos
+            && reportedMetric(output.str(), "player_jumps=") >= 2.0F
+            && reportedMetric(output.str(), "player_peak_speed=") > 4.5F,
         "training reports scenario count and reward-penalty evidence");
     if (first.succeeded && first.champion && first.lastCheckpoint) {
         expect(first.finalBest >= first.initialBest - 1e-4F,
@@ -235,11 +283,11 @@ void testTrainingAndPersistence()
         expect(broad.succeeded && broad.champion
                 && allScenariosOutput.str().find("curriculum=3")
                     != std::string::npos
-                && allScenariosOutput.str().find("scenarios=6")
+                && allScenariosOutput.str().find("scenarios=7")
                     != std::string::npos
-                && allScenariosOutput.str().find("holdout_scenarios=6")
+                && allScenariosOutput.str().find("holdout_scenarios=7")
                     != std::string::npos,
-            "all-scenarios curriculum trains and holds out all six situations");
+            "all-scenarios curriculum trains and holds out all seven situations");
         std::ostringstream repeatBroadOutput;
         const WorkerTrainingResult repeatBroad = runWorkerTraining(
             allScenarios, repeatBroadOutput);
@@ -308,6 +356,9 @@ void testOtherArchetypes()
         expect(trained.succeeded && trained.lastCheckpoint
                 && trained.champion && trained.lastGeneration == 2U,
             "each enemy archetype trains and saves a brain");
+        expect(reportedMetric(output.str(), "player_jumps=") >= 2.0F
+                && reportedMetric(output.str(), "player_peak_speed=") > 4.5F,
+            "every archetype trains against a physics-based Bhop scenario");
         if (archetype == EnemyArchetype::IndustrialRobot) {
             expect(reportedMetric(output.str(), "boss_long_s=") > 0.0F
                     && reportedMetric(output.str(), "boss_pressure_s=") > 0.0F

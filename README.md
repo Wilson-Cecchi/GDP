@@ -638,18 +638,27 @@ especializados das pastas numeradas.
   mas vale treiná-los novamente para ajustar a política ao novo movimento.
 - **Treinamento automático dos cinco arquétipos:** `--ai-training TIPO` executa arenas
   determinísticas sem abrir janela ou inicializar renderização/áudio. O
-  currículo 2 usa quatro cenários de treino por arquétipo, com duas seeds cada,
+  currículo 2 usa cinco cenários de treino por arquétipo, com duas seeds cada,
   e dois cenários diferentes, também duplicados, para avaliar o campeão fora
-  do treino. `--all-scenarios` usa os seis cenários disponíveis de cada
+  do treino. `--all-scenarios` usa os sete cenários disponíveis de cada
   arquétipo no treino e avalia os mesmos tipos de situação com seeds separadas
   (currículo 3). São arenas simplificadas, não todos os mapas gerados pelo jogo.
   Worker pratica perseguição e ataque próximo; Guard, alinhamento
   de mira e faixa de tiro; Officer, posicionamento junto a aliados; Engineer,
   sobrevivência e alcance de reparo; IndustrialRobot, as três faixas de HP e
   combate mais longo. Movimento do jogador, orientação inicial, cobertura e
-  cadência dos disparos recebidos variam. A pontuação de cada papel combina
-  dano, acertos e objetivos táticos limitados, com punições por dano recebido,
-  morte, inatividade, colisão e pedidos de ataque inviáveis. Os disparos neurais
+  cadência dos disparos recebidos variam. Um dos cenários de treino usa
+  `Player::fixedUpdate` para saltos/Bhop reais; os demais ainda usam trajetórias
+  roteirizadas. As regras de recompensa `reward_rules=2` pontuam apenas dano,
+  acertos e eliminações de autoria neural; dano durante fallback e suporte
+  automático aparecem no log, mas não rendem pontos ofensivos. Dano recebido
+  penaliza o episódio mesmo durante fallback. Eliminar o Player vale
+  `+10`, morrer vale `-10`, e a soma dos termos auxiliares fica entre `-4` e
+  `+4` por episódio. O progresso na faixa ideal é líquido e limitado contra
+  ciclos de aproximação/recuo; reversões improdutivas são punidas, mas uma
+  reação a ameaça de tiro iminente não é. Avanço, recuo e strafe recebem
+  atribuição diagnóstica proporcional à intenção, sem recompensa por apenas
+  comandar uma direção. Os disparos neurais
   remotos exigem alinhamento de 12°; Worker usa 35° para ataque próximo. A
   população inicial inclui uma política simples que percebe, gira e tenta
   atacar, além de indivíduos aleatórios; a evolução pode superá-la. A seleção
@@ -676,6 +685,13 @@ especializados das pastas numeradas.
   de N milissegundos entre gerações, sem alterar os pesos ou a pontuação.
   A pausa não substitui o monitoramento da temperatura: interrompa o treino
   se a CPU se aproximar do limite térmico informado pelo hardware.
+  Pontuações de `reward_rules=2` não são comparáveis numericamente às de runs
+  anteriores; `--resume` de um cérebro antigo só reutiliza seus pesos como
+  ponto de partida. Os checkpoints gerados não substituem os ativos sem
+  avaliação comparativa e aprovação visual. Mira por evento real, munição/
+  recarga inimiga, esquiva de projéteis, corredores/portas e estágios de
+  treinamento separados ainda exigem implementação específica; o treino não
+  declara precisão de tiro ou esquivas que o combate atual não consegue medir.
   Cérebros do currículo anterior continuam carregando e podem ser usados em
   `--resume`, mas as pontuações antigas não são comparáveis às novas. Para
   aproveitar a política inicial e a mira mais exigente, prefira começar uma

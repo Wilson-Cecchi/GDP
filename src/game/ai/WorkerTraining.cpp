@@ -32,7 +32,7 @@ constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
 constexpr int bossEpisodeSteps = 720;
-constexpr std::size_t scenarioCount = 4U;
+constexpr std::size_t scenarioCount = 5U;
 constexpr std::size_t holdoutScenarioCount = 2U;
 constexpr std::size_t scenarioRepetitions = 2U;
 constexpr std::size_t inputCount = 7;
@@ -68,6 +68,7 @@ enum class PlayerPattern : std::uint8_t {
     Retreat,
     Zigzag,
     Peek,
+    Bhop,
 };
 
 enum class CoverPattern : std::uint8_t {
@@ -86,45 +87,50 @@ struct TrainingScenario {
 };
 
 // The last two cases are holdout-only in the default curriculum. The broad
-// curriculum trains all six and evaluates them again with independent seeds.
+// curriculum trains all seven and evaluates them again with independent seeds.
 // In particular, the boss starts in all three health phases.
-constexpr std::array<TrainingScenario, 6> workerScenarios{{
+constexpr std::array<TrainingScenario, 7> workerScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -30.0F, 1.0F, 1.4F},
     {PlayerPattern::Advance, CoverPattern::Left, 40.0F, 1.0F, 1.2F},
     {PlayerPattern::Zigzag, CoverPattern::Right, -45.0F, 1.0F, 1.4F},
+    {PlayerPattern::Bhop, CoverPattern::Open, 20.0F, 1.0F, 1.4F},
     {PlayerPattern::Peek, CoverPattern::Center, 25.0F, 1.0F, 1.1F},
     {PlayerPattern::Retreat, CoverPattern::Right, -55.0F, 1.0F, 1.1F},
 }};
-constexpr std::array<TrainingScenario, 6> guardScenarios{{
+constexpr std::array<TrainingScenario, 7> guardScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Advance, CoverPattern::Left, 30.0F, 1.0F, 1.2F},
     {PlayerPattern::Zigzag, CoverPattern::Right, -35.0F, 1.0F, 1.4F},
     {PlayerPattern::Peek, CoverPattern::Center, 45.0F, 1.0F, 1.4F},
+    {PlayerPattern::Bhop, CoverPattern::Open, -20.0F, 1.0F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -50.0F, 1.0F, 1.1F},
     {PlayerPattern::Advance, CoverPattern::Right, 55.0F, 1.0F, 1.1F},
 }};
-constexpr std::array<TrainingScenario, 6> officerScenarios{{
+constexpr std::array<TrainingScenario, 7> officerScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Advance, CoverPattern::Center, 35.0F, 1.0F, 1.2F},
     {PlayerPattern::Retreat, CoverPattern::Left, -35.0F, 1.0F, 1.4F},
     {PlayerPattern::Peek, CoverPattern::Right, 45.0F, 1.0F, 1.4F},
+    {PlayerPattern::Bhop, CoverPattern::Open, 20.0F, 1.0F, 1.4F},
     {PlayerPattern::Zigzag, CoverPattern::Center, -50.0F, 1.0F, 1.1F},
     {PlayerPattern::Advance, CoverPattern::Left, 55.0F, 1.0F, 1.1F},
 }};
-constexpr std::array<TrainingScenario, 6> engineerScenarios{{
+constexpr std::array<TrainingScenario, 7> engineerScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Right, -30.0F, 1.0F, 1.4F},
     {PlayerPattern::Advance, CoverPattern::Center, 40.0F, 1.0F, 1.2F},
     {PlayerPattern::Peek, CoverPattern::Left, -45.0F, 1.0F, 1.4F},
+    {PlayerPattern::Bhop, CoverPattern::Open, 20.0F, 1.0F, 1.4F},
     {PlayerPattern::Zigzag, CoverPattern::Right, 50.0F, 1.0F, 1.1F},
     {PlayerPattern::Advance, CoverPattern::Center, -55.0F, 1.0F, 1.1F},
 }};
-constexpr std::array<TrainingScenario, 6> bossScenarios{{
+constexpr std::array<TrainingScenario, 7> bossScenarios{{
     {PlayerPattern::Sweep, CoverPattern::Open, 0.0F, 1.0F, 1.4F},
     {PlayerPattern::Advance, CoverPattern::Left, 35.0F, 0.58F, 1.2F},
     {PlayerPattern::Zigzag, CoverPattern::Right, -35.0F, 0.28F, 1.4F},
     {PlayerPattern::Peek, CoverPattern::Center, 45.0F, 0.70F, 1.1F},
+    {PlayerPattern::Bhop, CoverPattern::Open, -20.0F, 0.52F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -50.0F, 0.52F, 1.1F},
     {PlayerPattern::Advance, CoverPattern::Right, 55.0F, 0.25F, 1.1F},
 }};
@@ -215,6 +221,7 @@ wkc::core::Vec3 playerPosition(
     case PlayerPattern::Peek:
         return {direction * (1.1F + sweep * 0.65F
                 * std::sin(time * 0.9F + phase)), 0.0F, 0.3F};
+    case PlayerPattern::Bhop: return {};
     }
     return {};
 }
@@ -254,6 +261,21 @@ float planarDistance(
     const float x = first.x - second.x;
     const float z = first.z - second.z;
     return std::sqrt(x * x + z * z);
+}
+
+float facingAlignment(
+    const wkc::core::Vec3 position,
+    const float yawDegrees,
+    const wkc::core::Vec3 target) noexcept
+{
+    constexpr float radiansPerDegree = 0.01745329251994329577F;
+    const float distance = planarDistance(position, target);
+    if (distance <= 1.0e-5F) {
+        return 1.0F;
+    }
+    const float yaw = yawDegrees * radiansPerDegree;
+    return std::sin(yaw) * (target.x - position.x) / distance
+        + std::cos(yaw) * (target.z - position.z) / distance;
 }
 
 WorkerFitnessMetrics simulateEpisode(
@@ -316,13 +338,11 @@ WorkerFitnessMetrics simulateEpisode(
     brain.genome = genome;
     brain.logSelection = false;
     WorkerFitnessMetrics metrics;
-    const float initialDistance = planarDistance(
-        manager.find(worker)->transform.position, player.state().position);
-    const TrainingProfile initialProfile = phaseProfile(
-        archetype, profile, plan.initialHealthRatio);
-    float closestRangeError = rangeError(initialDistance,
-        initialProfile);
     float shotCooldown = 1.0F;
+    float previousForwardIntent = 0.0F;
+    float previousStrafeIntent = 0.0F;
+    float totalTacticalProgress = 0.0F;
+    bool previousNeuralDecision = false;
     const int steps = archetype == EnemyArchetype::IndustrialRobot
         ? bossEpisodeSteps : episodeSteps;
     for (int tick = 0; tick < steps; ++tick) {
@@ -340,32 +360,63 @@ WorkerFitnessMetrics simulateEpisode(
             ally->attackCooldown = std::max(
                 0.0F, ally->attackCooldown - fixedStep);
         }
-        const wkc::core::Vec3 nextPlayerPosition = playerPosition(
-            plan.player, time, direction, sweep, phase);
-        if (arena.canOccupy(nextPlayerPosition,
-                {.radius = 0.35F, .height = 1.8F})) {
-            (void)player.relocate(nextPlayerPosition, -90.0F);
+        if (plan.player == PlayerPattern::Bhop) {
+            const float previousVerticalSpeed = player.state().velocity.y;
+            gameplay::PlayerCommand command;
+            command.moveForward = tick < 10 ? 1.0F : 0.0F;
+            command.moveRight = ((tick / 45) % 2 == 0 ? direction : -direction);
+            command.jump = tick == 0 || player.state().grounded;
+            player.fixedUpdate(command, fixedStep, arena);
+            const wkc::core::Vec3 velocity = player.state().velocity;
+            if (previousVerticalSpeed <= 0.0F && velocity.y > 0.0F) {
+                ++metrics.playerJumps;
+            }
+            metrics.peakPlayerSpeed = std::max(metrics.peakPlayerSpeed,
+                std::hypot(velocity.x, velocity.z));
+        } else {
+            const wkc::core::Vec3 nextPlayerPosition = playerPosition(
+                plan.player, time, direction, sweep, phase);
+            if (arena.canOccupy(nextPlayerPosition,
+                    {.radius = 0.35F, .height = 1.8F})) {
+                (void)player.relocate(nextPlayerPosition, -90.0F);
+            }
         }
         const wkc::core::Vec3 before = entity->transform.position;
+        const float previousAlignment = facingAlignment(before,
+            entity->transform.rotationDegrees.y, player.state().position);
         const float playerHealthBefore = player.state().health;
         const std::uint64_t controlledBefore = brain.controlledTicks;
         const auto summary = updateTrainingEnemy(
             archetype, manager, player, roomId, arena, brain);
         const bool controlled = brain.controlledTicks != controlledBefore;
+        if (controlled) {
+            ++metrics.neuralTicks;
+        } else {
+            ++metrics.fallbackTicks;
+        }
         const float movement = planarDistance(before, entity->transform.position);
+        const float distanceBefore = planarDistance(
+            before, player.state().position);
         const float distance = planarDistance(
             entity->transform.position, player.state().position);
         const float healthRatio = enemy->maximumHealth > 0.0F
             ? enemy->health / enemy->maximumHealth : 0.0F;
         const TrainingProfile currentProfile
             = phaseProfile(archetype, profile, healthRatio);
+        const float tacticalProgress = rangeError(distanceBefore, currentProfile)
+            - rangeError(distance, currentProfile);
+        totalTacticalProgress += tacticalProgress;
         if (controlled) {
-            closestRangeError = std::min(
-                closestRangeError, rangeError(distance, currentProfile));
+            metrics.tacticalProgressMeters += tacticalProgress;
+            metrics.damageDealt += std::max(
+                0.0F, playerHealthBefore - player.state().health);
+            metrics.attacksLanded += static_cast<std::uint32_t>(summary.attacksLanded);
+        } else {
+            metrics.fallbackDamageDealt += std::max(
+                0.0F, playerHealthBefore - player.state().health);
+            metrics.fallbackAttacksLanded += static_cast<std::uint32_t>(
+                summary.attacksLanded);
         }
-        metrics.damageDealt += std::max(
-            0.0F, playerHealthBefore - player.state().health);
-        metrics.attacksLanded += static_cast<std::uint32_t>(summary.attacksLanded);
         metrics.supportActions += static_cast<std::uint32_t>(
             summary.commandsIssued + summary.repairsPerformed);
         metrics.bossLongRangeSeconds += static_cast<float>(
@@ -378,6 +429,35 @@ WorkerFitnessMetrics simulateEpisode(
         const bool playerVisible = gameplay::hasLineOfSight(
                 entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
                 player.cameraPosition(), arena);
+        if (controlled) {
+            const float forward = std::clamp(brain.outputs[0], -1.0F, 1.0F);
+            const float strafe = std::clamp(brain.outputs[1], -1.0F, 1.0F);
+            const DirectionalCredit credit = directionalMovementCredit(
+                forward, strafe, fixedStep);
+            metrics.forwardCreditSeconds += credit.forward;
+            metrics.retreatCreditSeconds += credit.retreat;
+            metrics.strafeCreditSeconds += credit.strafe;
+            const bool reversed = previousNeuralDecision
+                && ((previousForwardIntent > 0.3F && forward < -0.3F)
+                    || (previousForwardIntent < -0.3F && forward > 0.3F)
+                    || (previousStrafeIntent > 0.3F && strafe < -0.3F)
+                    || (previousStrafeIntent < -0.3F && strafe > 0.3F));
+            const bool underThreat = playerVisible
+                && distance <= profile.playerAttackRange
+                && shotCooldown <= 0.2F;
+            const float currentAlignment = facingAlignment(
+                entity->transform.position,
+                entity->transform.rotationDegrees.y,
+                player.state().position);
+            if (reversed && tacticalProgress <= 0.0F
+                && currentAlignment <= previousAlignment + 0.01F
+                && !underThreat) {
+                ++metrics.unproductiveReversals;
+            }
+            previousForwardIntent = forward;
+            previousStrafeIntent = strafe;
+        }
+        previousNeuralDecision = controlled;
         if (controlled && distance >= currentProfile.preferredMinimum
             && distance <= currentProfile.preferredMaximum && playerVisible) {
             metrics.proximitySeconds += fixedStep;
@@ -417,6 +497,14 @@ WorkerFitnessMetrics simulateEpisode(
             && summary.attacking == 0U) {
             metrics.wastedAttackSeconds += fixedStep;
         }
+        if (!player.state().alive) {
+            if (controlled) {
+                metrics.playerEliminations = 1U;
+            } else {
+                metrics.fallbackPlayerEliminations = 1U;
+            }
+            break;
+        }
         shotCooldown -= fixedStep;
         if (shotCooldown <= 0.0F && distance <= profile.playerAttackRange
             && gameplay::hasLineOfSight(
@@ -425,12 +513,16 @@ WorkerFitnessMetrics simulateEpisode(
                     + wkc::core::Vec3{0.0F, 1.0F, 0.0F}, arena)) {
             const float healthBefore = enemy->health;
             (void)gameplay::applyDamage(manager, worker, 8.0F);
-            metrics.damageReceived += healthBefore - enemy->health;
+            if (controlled) {
+                metrics.damageReceived += healthBefore - enemy->health;
+            } else {
+                metrics.fallbackDamageReceived += healthBefore - enemy->health;
+            }
             shotCooldown = plan.playerShotInterval;
         }
     }
-    metrics.approachMeters = std::max(
-        0.0F, rangeError(initialDistance, initialProfile) - closestRangeError);
+    metrics.tacticalProgressMeters = creditedTacticalProgress(
+        metrics.tacticalProgressMeters, totalTacticalProgress);
     if (const entities::EnemyData* enemy
         = manager.findData<entities::EnemyData>(worker);
         enemy != nullptr && enemy->behavior == entities::EnemyBehaviorState::Dead) {
@@ -449,8 +541,10 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
 {
     total.damageDealt += sample.damageDealt;
     total.damageReceived += sample.damageReceived;
+    total.fallbackDamageDealt += sample.fallbackDamageDealt;
+    total.fallbackDamageReceived += sample.fallbackDamageReceived;
     total.survivalSeconds += sample.survivalSeconds;
-    total.approachMeters += sample.approachMeters;
+    total.tacticalProgressMeters += sample.tacticalProgressMeters;
     total.proximitySeconds += sample.proximitySeconds;
     total.aimSeconds += sample.aimSeconds;
     total.bossLongRangeSeconds += sample.bossLongRangeSeconds;
@@ -460,9 +554,21 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.contactSeconds += sample.contactSeconds;
     total.blockedSeconds += sample.blockedSeconds;
     total.wastedAttackSeconds += sample.wastedAttackSeconds;
+    total.forwardCreditSeconds += sample.forwardCreditSeconds;
+    total.retreatCreditSeconds += sample.retreatCreditSeconds;
+    total.strafeCreditSeconds += sample.strafeCreditSeconds;
+    total.peakPlayerSpeed = std::max(
+        total.peakPlayerSpeed, sample.peakPlayerSpeed);
     total.attacksLanded += sample.attacksLanded;
+    total.fallbackAttacksLanded += sample.fallbackAttacksLanded;
+    total.playerEliminations += sample.playerEliminations;
+    total.fallbackPlayerEliminations += sample.fallbackPlayerEliminations;
     total.deaths += sample.deaths;
     total.supportActions += sample.supportActions;
+    total.unproductiveReversals += sample.unproductiveReversals;
+    total.neuralTicks += sample.neuralTicks;
+    total.fallbackTicks += sample.fallbackTicks;
+    total.playerJumps += sample.playerJumps;
 }
 
 WorkerEvaluation evaluateGenome(
@@ -613,68 +719,6 @@ bool prepareOutputDirectory(const std::filesystem::path& directory)
 
 } // namespace
 
-float scoreWorkerFitness(const WorkerFitnessMetrics& metrics) noexcept
-{
-    return scoreEnemyFitness(metrics, EnemyArchetype::Worker);
-}
-
-float scoreEnemyFitness(
-    const WorkerFitnessMetrics& metrics,
-    const EnemyArchetype archetype) noexcept
-{
-    struct Weights {
-        float damage;
-        float hits;
-        float approach;
-        float range;
-        float contact;
-        float aim;
-        float support;
-        float survival;
-        float received;
-        float idle;
-        float blocked;
-        float wastedAttack;
-        float death;
-    };
-    // Damage remains useful, but each role has a different tactical objective.
-    // All shaping terms are bounded to prevent harmless camping from winning.
-    const Weights weights = [&]() -> Weights {
-        switch (archetype) {
-        case EnemyArchetype::Worker:
-            return {4.0F, 2.0F, 1.5F, 0.5F, 0.25F, 0.0F, 0.0F,
-                0.1F, 0.35F, 0.5F, 1.5F, 0.6F, 8.0F};
-        case EnemyArchetype::Guard:
-            return {3.2F, 3.0F, 1.2F, 0.8F, 0.25F, 1.2F, 0.0F,
-                0.12F, 0.5F, 0.7F, 1.8F, 1.0F, 10.0F};
-        case EnemyArchetype::Officer:
-            return {2.8F, 2.5F, 1.0F, 0.9F, 0.2F, 1.0F, 2.0F,
-                0.15F, 0.55F, 0.6F, 1.8F, 1.0F, 10.0F};
-        case EnemyArchetype::Engineer:
-            return {2.2F, 2.0F, 0.8F, 0.7F, 0.2F, 0.8F, 3.0F,
-                0.2F, 0.65F, 0.6F, 1.8F, 1.0F, 10.0F};
-        case EnemyArchetype::IndustrialRobot:
-            return {2.0F, 2.0F, 1.2F, 1.1F, 0.2F, 1.5F, 0.0F,
-                0.2F, 0.3F, 0.8F, 2.0F, 1.3F, 16.0F};
-        }
-        return {};
-    }();
-    return metrics.damageDealt * weights.damage
-        + static_cast<float>(metrics.attacksLanded) * weights.hits
-        + std::min(metrics.approachMeters, 6.0F) * weights.approach
-        + std::min(metrics.proximitySeconds, 8.0F) * weights.range
-        + std::min(metrics.contactSeconds, 8.0F) * weights.contact
-        + std::min(metrics.aimSeconds, 4.0F) * weights.aim
-        + static_cast<float>(std::min(metrics.supportActions, 4U))
-            * weights.support
-        + metrics.survivalSeconds * weights.survival
-        - metrics.damageReceived * weights.received
-        - metrics.idleSeconds * weights.idle
-        - metrics.blockedSeconds * weights.blocked
-        - metrics.wastedAttackSeconds * weights.wastedAttack
-        - static_cast<float>(metrics.deaths) * weights.death;
-}
-
 float evaluateWorkerGenome(
     const wkc::ai::Genome& genome,
     const wkc::core::Seed scenarioSeed)
@@ -775,6 +819,7 @@ WorkerTrainingResult runEnemyTraining(
             seed, trainingScenarioDomain,
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
+               << " reward_rules=2"
                << " curriculum=" << (options.trainAllScenarios ? 3 : 2)
                << " seed=" << seed
                << " population=" << options.population
@@ -817,8 +862,11 @@ WorkerTrainingResult runEnemyTraining(
                    << " worst_scenario=" << bestEvaluation.worstScenario
                    << " damage_dealt=" << bestMetrics.damageDealt
                    << " damage_received=" << bestMetrics.damageReceived
+                   << " fallback_damage_dealt=" << bestMetrics.fallbackDamageDealt
+                   << " fallback_damage_received=" << bestMetrics.fallbackDamageReceived
                    << " hits=" << bestMetrics.attacksLanded
-                   << " approach=" << bestMetrics.approachMeters
+                   << " fallback_hits=" << bestMetrics.fallbackAttacksLanded
+                   << " range_progress=" << bestMetrics.tacticalProgressMeters
                    << " proximity_s=" << bestMetrics.proximitySeconds
                    << " contact_s=" << bestMetrics.contactSeconds
                    << " aim_s=" << bestMetrics.aimSeconds
@@ -829,6 +877,16 @@ WorkerTrainingResult runEnemyTraining(
                    << " idle_s=" << bestMetrics.idleSeconds
                    << " blocked_s=" << bestMetrics.blockedSeconds
                    << " wasted_attack_s=" << bestMetrics.wastedAttackSeconds
+                   << " forward_credit_s=" << bestMetrics.forwardCreditSeconds
+                   << " retreat_credit_s=" << bestMetrics.retreatCreditSeconds
+                   << " strafe_credit_s=" << bestMetrics.strafeCreditSeconds
+                   << " reversals=" << bestMetrics.unproductiveReversals
+                   << " neural_ticks=" << bestMetrics.neuralTicks
+                   << " fallback_ticks=" << bestMetrics.fallbackTicks
+                   << " player_jumps=" << bestMetrics.playerJumps
+                   << " player_peak_speed=" << bestMetrics.peakPlayerSpeed
+                   << " kills=" << bestMetrics.playerEliminations
+                   << " fallback_kills=" << bestMetrics.fallbackPlayerEliminations
                    << " deaths=" << bestMetrics.deaths
                    << " support=" << bestMetrics.supportActions
                    << '\n';
@@ -863,6 +921,7 @@ WorkerTrainingResult runEnemyTraining(
             *result.champion, holdoutSeed, options.archetype, true,
             options.trainAllScenarios).score;
         output << "AI_RESULT generation=" << result.lastGeneration
+               << " reward_rules=2"
                << " train_best=" << result.finalBest
                << " holdout=" << result.holdoutFitness;
         if (result.lastCheckpoint) {
