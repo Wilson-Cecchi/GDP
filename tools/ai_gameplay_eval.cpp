@@ -236,25 +236,45 @@ std::optional<ScenarioResult> runScenario(
     const Vec3 center = (room->worldBounds.minimum
         + room->worldBounds.maximum) * 0.5F;
     const float floor = room->worldBounds.minimum.y;
-    const float playerZ = center.z - 2.3F;
-    const float enemyZ = center.z + 2.5F;
+    // Keep the two policies on exactly the same fixture, but make different
+    // seeds exercise genuinely different relative positions and obstacle sizes.
+    // Previously only the generated room changed while these combat layouts
+    // stayed fixed, so a multi-seed comparison repeated nearly one encounter.
+    wkc::core::RandomStream fixtureRandom{wkc::core::deriveSeed(
+        world.masterSeed, 0x434f4d4241544658ULL,
+        static_cast<std::uint64_t>(archetype) * scenarioNames.size()
+            + scenario)};
+    const float lateral = fixtureRandom.rangeFloat(-1.0F, 1.0F);
+    const float playerX = center.x - lateral * 0.5F;
+    const float enemyX = center.x + lateral * 0.5F;
+    const float playerZ = center.z - fixtureRandom.rangeFloat(2.1F, 2.8F);
+    const float enemyZ = center.z + fixtureRandom.rangeFloat(2.2F, 3.0F);
+    const float coverX = center.x + fixtureRandom.rangeFloat(-0.15F, 0.15F);
+    const float platformHalfWidth = fixtureRandom.rangeFloat(0.9F, 1.25F);
+    const float platformHeight = fixtureRandom.rangeFloat(0.95F, 1.2F);
+    const float movement = fixtureRandom.rangeFloat(
+        scenario == 3U ? 0.6F : 0.9F, scenario == 3U ? 1.0F : 1.3F);
+    const float movementPhase = fixtureRandom.rangeFloat(-0.8F, 0.8F);
     const bool elevated = scenario == 2U;
     const bool grouped = scenario == 3U;
     const bool covered = scenario == 1U || scenario == 4U;
-    const Vec3 initialPlayer{center.x,
-        floor + (elevated ? 1.2F : 0.0F), playerZ};
+    const Vec3 initialPlayer{playerX,
+        floor + (elevated ? platformHeight + 0.1F : 0.0F), playerZ};
 
     std::vector<wkc::core::Aabb> solids;
     if (covered) {
-        const float halfWidth = scenario == 4U ? 1.1F : 0.75F;
+        const float halfWidth = scenario == 4U
+            ? fixtureRandom.rangeFloat(1.0F, 1.3F)
+            : fixtureRandom.rangeFloat(0.7F, 0.95F);
         solids.push_back({
-            {center.x - halfWidth, floor, center.z - 0.55F},
-            {center.x + halfWidth, floor + 2.4F, center.z + 0.55F}});
+            {coverX - halfWidth, floor, center.z - 0.55F},
+            {coverX + halfWidth, floor + 2.4F, center.z + 0.55F}});
     }
     if (elevated) {
         solids.push_back({
-            {center.x - 1.1F, floor, playerZ - 1.1F},
-            {center.x + 1.1F, floor + 1.1F, playerZ + 1.1F}});
+            {playerX - platformHalfWidth, floor, playerZ - 1.1F},
+            {playerX + platformHalfWidth, floor + platformHeight,
+                playerZ + 1.1F}});
     }
     const CollisionWorld collision{room->worldBounds, std::move(solids)};
     if (!collision.canOccupy(initialPlayer)) {
@@ -269,7 +289,7 @@ std::optional<ScenarioResult> runScenario(
     for (std::size_t index = 0U; index < enemyCount; ++index) {
         const float xOffset = grouped
             ? (static_cast<float>(index) - 1.0F) * 1.6F : 0.0F;
-        const Vec3 position{center.x + xOffset, floor,
+        const Vec3 position{enemyX + xOffset, floor,
             enemyZ + (grouped && index == 1U ? 0.4F : 0.0F)};
         if (!collision.canOccupy(position)) {
             return std::nullopt;
@@ -307,8 +327,8 @@ std::optional<ScenarioResult> runScenario(
     for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
         if (scenario == 0U || grouped) {
             const float time = static_cast<float>(frame) * fixedStep;
-            const float movement = grouped ? 0.8F : 1.1F;
-            const Vec3 next{center.x + movement * std::sin(time * 0.85F),
+            const Vec3 next{playerX
+                    + movement * std::sin(time * 0.85F + movementPhase),
                 floor, playerZ};
             if (collision.canOccupy(next)) {
                 (void)player.relocate(next, -90.0F);

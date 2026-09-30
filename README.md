@@ -741,8 +741,9 @@ especializados das pastas numeradas.
   IA anterior (`scripted`) e os cérebros carregados (`neural`) em cinco situações:
   espaço aberto, cobertura central, jogador elevado, grupo e cobertura do boss
   (esta última apenas para o robô). Usa salas Start/Boss de um mundo gerado pela
-  seed indicada, com obstáculos de teste fixos, atualização real dos inimigos a
-  60 Hz e o mesmo movimento do jogador nas duas políticas. O CSV informa dano
+  seed indicada. Obstáculos e posições de teste variam de forma determinística
+  com a seed; os inimigos são atualizados a 60 Hz e o jogador segue o mesmo
+  movimento nas duas políticas. O CSV informa dano
   causado ao jogador, acertos, deslocamento dos inimigos, menor distância,
   tempo até derrota, ticks controlados pela rede, projéteis disparados,
   bloqueados e esquivados, além das recargas.

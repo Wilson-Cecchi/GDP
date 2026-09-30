@@ -51,6 +51,7 @@ struct WorkerFitnessMetrics {
     std::uint32_t shotsBlocked{0};
     std::uint32_t shotsDodged{0};
     std::uint32_t reloadsStarted{0};
+    std::uint32_t prematureReloads{0};
     std::uint32_t dodgeOpportunities{0};
     std::uint32_t dodgesSucceeded{0};
     std::uint32_t incomingProjectileHits{0};

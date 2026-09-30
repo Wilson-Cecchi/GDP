@@ -137,7 +137,9 @@ constexpr std::array<TrainingScenario, 7> bossScenarios{{
     {PlayerPattern::Advance, CoverPattern::Left, 35.0F, 0.58F, 1.2F},
     {PlayerPattern::Zigzag, CoverPattern::Right, -35.0F, 0.28F, 1.4F},
     {PlayerPattern::Peek, CoverPattern::Center, 45.0F, 0.70F, 1.1F},
-    {PlayerPattern::Bhop, CoverPattern::Open, -20.0F, 0.52F, 1.4F},
+    // The duel evaluator starts the boss healthy. Keep this Bhop exercise in
+    // its long-range phase; RealMaps still tests Bhop during pressure phase.
+    {PlayerPattern::Bhop, CoverPattern::Open, -20.0F, 1.0F, 1.4F},
     {PlayerPattern::Retreat, CoverPattern::Center, -50.0F, 0.52F, 1.1F},
     {PlayerPattern::Advance, CoverPattern::Right, 55.0F, 0.52F, 1.1F},
 }};
@@ -615,6 +617,7 @@ WorkerFitnessMetrics simulateEpisode(
         const float previousAlignment = facingAlignment(before,
             entity->transform.rotationDegrees.y, player.state().position);
         const float playerHealthBefore = player.state().health;
+        const std::uint32_t magazineBefore = enemy->magazineAmmo;
         const std::uint64_t controlledBefore = brain.controlledTicks;
         std::vector<gameplay::EnemyProjectile> spawnedShots;
         const auto summary = updateTrainingEnemy(
@@ -683,6 +686,12 @@ WorkerFitnessMetrics simulateEpisode(
             metrics.shotsFired += static_cast<std::uint32_t>(summary.shotsFired);
             metrics.reloadsStarted += static_cast<std::uint32_t>(
                 summary.reloadsStarted);
+            // A voluntary reload with at least half the magazine remaining
+            // delays offense; an empty-magazine reload is not wasteful.
+            if (summary.reloadsStarted > 0U && magazineBefore >= 4U) {
+                metrics.prematureReloads += static_cast<std::uint32_t>(
+                    summary.reloadsStarted);
+            }
         } else {
             if (archetype == EnemyArchetype::Worker) {
                 metrics.fallbackDamageDealt += std::max(
@@ -907,6 +916,7 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.shotsBlocked += sample.shotsBlocked;
     total.shotsDodged += sample.shotsDodged;
     total.reloadsStarted += sample.reloadsStarted;
+    total.prematureReloads += sample.prematureReloads;
     total.dodgeOpportunities += sample.dodgeOpportunities;
     total.dodgesSucceeded += sample.dodgesSucceeded;
     total.incomingProjectileHits += sample.incomingProjectileHits;
@@ -1209,9 +1219,9 @@ WorkerTrainingResult runEnemyTraining(
             seed, trainingScenarioDomain,
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
-               << " reward_rules=4"
+               << " reward_rules=5"
                << " brain_contract=2"
-               << " curriculum=" << (options.trainAllScenarios ? 11 : 10)
+               << " curriculum=" << (options.trainAllScenarios ? 13 : 12)
                << " stage_immigrants=2"
                << " runtime_control_all=1"
                << " seed=" << seed
@@ -1302,6 +1312,7 @@ WorkerTrainingResult runEnemyTraining(
                    << " blocked_shots=" << bestMetrics.shotsBlocked
                    << " dodged_shots=" << bestMetrics.shotsDodged
                    << " reloads=" << bestMetrics.reloadsStarted
+                   << " premature_reloads=" << bestMetrics.prematureReloads
                    << " dodge_opportunities=" << bestMetrics.dodgeOpportunities
                    << " dodges=" << bestMetrics.dodgesSucceeded
                    << " incoming_hits=" << bestMetrics.incomingProjectileHits
@@ -1375,7 +1386,7 @@ WorkerTrainingResult runEnemyTraining(
             options.trainAllScenarios);
         result.holdoutFitness = holdout.score;
         output << "AI_RESULT generation=" << result.lastGeneration
-               << " reward_rules=4"
+               << " reward_rules=5"
                << " brain_contract=2"
                << " runtime_control_all=1"
                << " stages_completed=" << result.completedStages
@@ -1385,6 +1396,8 @@ WorkerTrainingResult runEnemyTraining(
                << holdout.combatEpisodesWithHit
                << " holdout_combat_competent=" << holdout.combatCompetent
                << " holdout_hits=" << holdout.metrics.attacksLanded
+               << " holdout_premature_reloads="
+               << holdout.metrics.prematureReloads
                << " holdout_dodges=" << holdout.metrics.dodgesSucceeded
                << " holdout_dodge_opportunities="
                << holdout.metrics.dodgeOpportunities

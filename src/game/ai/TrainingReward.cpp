@@ -111,6 +111,7 @@ float scoreEnemyFitness(
         - std::min(metrics.wastedAttackSeconds, 8.0F) * profile.wastedAttack
         - static_cast<float>(std::min(misses, 8U)) * 0.06F
         - static_cast<float>(std::min(metrics.shotsBlocked, 8U)) * 0.14F
+        - static_cast<float>(std::min(metrics.prematureReloads, 6U)) * 0.55F
         - static_cast<float>(std::min(metrics.unproductiveReversals, 8U))
             * profile.reversal;
     // An entire episode of shaping cannot outweigh either terminal event.
@@ -142,6 +143,7 @@ float scoreTrainingStage(const WorkerFitnessMetrics& metrics,
             + static_cast<float>(std::min(metrics.attacksLanded, 4U)) * 0.22F
             - static_cast<float>(std::min(misses, 8U)) * 0.08F
             - static_cast<float>(std::min(metrics.shotsBlocked, 8U)) * 0.18F
+            - static_cast<float>(std::min(metrics.prematureReloads, 6U)) * 0.55F
             - std::min(metrics.wastedAttackSeconds, 8.0F) * 0.08F,
             -4.0F, 4.0F);
     }

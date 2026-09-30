@@ -71,6 +71,26 @@ void testFitness()
             < scoreEnemyFitness(baseline,
                 gdp::entities::EnemyArchetype::Guard),
         "missed and obstructed shots cost bounded reward");
+    WorkerFitnessMetrics prematureReload = baseline;
+    prematureReload.prematureReloads = 2U;
+    expect(scoreEnemyFitness(prematureReload,
+            gdp::entities::EnemyArchetype::IndustrialRobot)
+            < scoreEnemyFitness(baseline,
+                gdp::entities::EnemyArchetype::IndustrialRobot)
+            && scoreTrainingStage(prematureReload,
+                gdp::entities::EnemyArchetype::IndustrialRobot,
+                TrainingStage::FireControl)
+                < scoreTrainingStage(baseline,
+                    gdp::entities::EnemyArchetype::IndustrialRobot,
+                    TrainingStage::FireControl),
+        "premature reloads reduce both combat and fire-control reward");
+    WorkerFitnessMetrics necessaryReload = baseline;
+    necessaryReload.reloadsStarted = 2U;
+    expect(scoreEnemyFitness(necessaryReload,
+            gdp::entities::EnemyArchetype::IndustrialRobot)
+            == scoreEnemyFitness(baseline,
+                gdp::entities::EnemyArchetype::IndustrialRobot),
+        "necessary reloads are not penalized");
     WorkerFitnessMetrics worse = baseline;
     worse.damageReceived += 10.0F;
     expect(scoreWorkerFitness(worse) < scoreWorkerFitness(baseline),
@@ -262,9 +282,9 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U && first.completedStages == 4U,
         "automated training produces a champion and final checkpoint");
-    expect(output.str().find("reward_rules=4") != std::string::npos
+    expect(output.str().find("reward_rules=5") != std::string::npos
             && output.str().find("brain_contract=2") != std::string::npos
-            && output.str().find("curriculum=10") != std::string::npos
+            && output.str().find("curriculum=12") != std::string::npos
             && output.str().find("stage_immigrants=2") != std::string::npos
             && output.str().find("runtime_control_all=1") != std::string::npos
             && output.str().find("scenarios=7") != std::string::npos
@@ -277,6 +297,7 @@ void testTrainingAndPersistence()
             && output.str().find("worst_scenario=") != std::string::npos
             && output.str().find("combat_hit_episodes=") != std::string::npos
             && output.str().find("dodge_lateral_m=") != std::string::npos
+            && output.str().find("premature_reloads=") != std::string::npos
             && output.str().find("holdout_combat_competent=")
                 != std::string::npos
             && output.str().find("stage_scores=") != std::string::npos
@@ -414,7 +435,7 @@ void testTrainingAndPersistence()
         const WorkerTrainingResult broad = runWorkerTraining(
             allScenarios, allScenariosOutput);
         expect(broad.succeeded && broad.champion
-                && allScenariosOutput.str().find("curriculum=11")
+                && allScenariosOutput.str().find("curriculum=13")
                     != std::string::npos
                 && allScenariosOutput.str().find("scenarios=7")
                     != std::string::npos

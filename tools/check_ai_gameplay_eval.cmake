@@ -43,9 +43,20 @@ execute_process(
     COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
         --seed 42 --frames 90
     RESULT_VARIABLE alternate_seed_result
+    OUTPUT_VARIABLE alternate_seed_output
     ERROR_VARIABLE alternate_seed_error)
 if(NOT alternate_seed_result EQUAL 0)
     message(FATAL_ERROR "Alternate seed failed: ${alternate_seed_error}")
+endif()
+string(REGEX MATCH "neural,open,robot,12345,[^\n]*"
+    first_open_robot "${first_output}")
+string(REGEX MATCH "neural,open,robot,42,[^\n]*"
+    alternate_open_robot "${alternate_seed_output}")
+string(REPLACE ",12345," ",SEED," first_open_robot "${first_open_robot}")
+string(REPLACE ",42," ",SEED," alternate_open_robot "${alternate_open_robot}")
+if(first_open_robot STREQUAL "" OR alternate_open_robot STREQUAL ""
+    OR first_open_robot STREQUAL alternate_open_robot)
+    message(FATAL_ERROR "Distinct seeds repeated the same open robot fixture")
 endif()
 
 execute_process(

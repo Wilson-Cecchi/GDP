@@ -416,3 +416,59 @@ ativo**. No duelo bilateral da mesma seed e 360 frames, os dois tiveram um
 acerto no jogador em solo (12 de dano) e quatro contra Bhop; o candidato novo
 causou 42 contra 44 de dano no Bhop. Faltam mais seeds e partida visual para
 julgar navegação, precisão e balanceamento.
+
+**Regras de treino v5 (2026-09-30, em validação):** uma bateria de 10 seeds no
+avaliador revelou que o candidato v4 de esquiva causou menos dano em área
+aberta (468 contra 480) e contra jogador elevado (432 contra 480) que o
+checkpoint anterior, embora a nota de treino do boss tivesse melhorado.
+Também iniciou recargas repetidas com munição disponível: em um cenário aberto
+de 360 frames, quatro disparos vieram acompanhados de quatro recargas. No
+treino v5, uma recarga iniciada por controle neural com pelo menos metade do
+carregador de oito tiros ainda cheia é registrada como `premature_reloads` e reduz a nota
+dos estágios de tiro e combate. Recarga com menos de quatro tiros não sofre
+essa penalidade. Isso muda **somente a seleção durante treino**, não a regra
+de recarga no jogo nem os cérebros ativos. O log usa `reward_rules=5`.
+
+O avaliador comum agora varia deterministamente separação, deslocamento
+lateral, largura da cobertura e dimensões da plataforma elevada conforme
+seed/arquétipo/cenário, sempre mantendo exatamente o mesmo arranjo para
+política roteirizada e neural. Antes, seeds diferentes podiam repetir o mesmo
+combate relativo, apesar de gerar salas diferentes. O duelo bilateral já
+variava sua posição inicial por seed. Resultados numéricos do avaliador antigo
+e do novo **não são diretamente comparáveis**; comparar os dois cérebros com
+o mesmo binário e o mesmo conjunto de seeds.
+
+**Rodada curta do boss, sem promoção:** com 20 gerações/população 8 a partir da
+geração 134, a penalidade de recarga produziu o checkpoint 154: no holdout,
+11/19 esquivas, 34 acertos neurais e seis recargas prematuras. Para cobrir o
+duelo Bhop de vida cheia do avaliador, o cenário Duel do Robot agora começa
+com HP integral (fase de longo alcance); o Bhop do estágio RealMaps continua
+na fase de pressão. O log identifica esse arranjo como `curriculum=12` (ou 13
+com `--all-scenarios`). Depois de mais 20 gerações a partir do checkpoint 154,
+o checkpoint 174 obteve no holdout 12/17 esquivas, 34 acertos neurais e uma
+recarga prematura.
+
+Comparação pareada do Robot antigo (114) com o candidato 174 em 10 seeds
+`42, 12345, 424242, 7, 19, 1001, 9901, 111222333, 20260930, 56789`,
+usando o avaliador com cenários variados: em 360 frames, o dano neural total
+subiu de 480 para 600 em área aberta, de 480 para 576 contra jogador elevado
+e de 80 para 208 na cobertura do boss. O grupo saturou em 1000 nos dois.
+Na cobertura central estática, 360 frames eram curtos demais para o flanco:
+o candidato marcou 0 contra 36 do antigo; em 720 frames, marcou 408 contra
+300 e terminou a 1,60 m do jogador em média, contra 3,85 m do antigo.
+No duelo bilateral de 360 frames, dano ao Player em solo ficou em 144 nos dois,
+mas em Bhop caiu de 478 para 448. Esses totais não provam superioridade em
+partida real. O candidato 174 permanece **apenas para playtest isolado**; não
+substituir `assets/ai/robot.brain` sem avaliar essa perda contra Bhop e a
+sensação de movimento/cobertura no jogo.
+
+**Controle contra o cérebro realmente distribuído:** o checkpoint 114 acima é
+um ancestral de treino, não `assets/ai/robot.brain` (geração 200). Contra esse
+asset ativo, nas mesmas 10 seeds e 720 frames, o candidato 174 causou 960
+contra 948 de dano em área aberta, 408 contra 480 em cobertura central, 936
+contra 960 contra jogador elevado e 944 contra 496 na cobertura do boss.
+Nesta última situação derrotou o Player em 4/10 seeds, contra 0/10 do ativo.
+No duelo bilateral de 360 frames, empatou em solo (144 de dano) e perdeu em
+Bhop (448 contra 480). Esse salto de letalidade pode ser desejável para o
+boss, mas também pode desbalancear a campanha. Até playtest humano, o asset
+ativo permanece inalterado.
