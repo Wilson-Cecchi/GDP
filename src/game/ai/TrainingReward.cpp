@@ -145,21 +145,42 @@ float scoreTrainingStage(const WorkerFitnessMetrics& metrics,
             - std::min(metrics.wastedAttackSeconds, 8.0F) * 0.08F,
             -4.0F, 4.0F);
     }
-    case TrainingStage::Dodge:
+    case TrainingStage::Dodge: {
+        // A failed but lateral near-miss supplies a bounded learning gradient.
+        // Successful avoidance remains worth more than any single hit, and
+        // movement without a projectile hit cannot earn this partial credit.
+        const float nearMiss = metrics.incomingProjectileHits > 0U
+            ? std::min(metrics.dodgeLateralMeters
+                    / static_cast<float>(metrics.incomingProjectileHits), 0.6F)
+                / 0.6F * 0.7F
+            : 0.0F;
         return std::clamp(
             static_cast<float>(std::min(metrics.dodgesSucceeded, 6U)) * 0.55F
             - static_cast<float>(std::min(metrics.incomingProjectileHits, 6U))
                 * 0.45F
+            + nearMiss
             - static_cast<float>(std::min(metrics.unproductiveReversals, 8U))
                 * 0.08F, -4.0F, 4.0F);
+    }
     case TrainingStage::Duel:
     case TrainingStage::RealMaps:
-        return scoreEnemyFitness(metrics, archetype);
-    case TrainingStage::Positioning:
-        return scoreEnemyFitness(metrics, archetype)
+        // Survival and proximity are not a substitute for doing the job of a
+        // melee attacker or a ranged support unit in a combat episode.
+        return (archetype == gdp::entities::EnemyArchetype::Worker
+                || archetype == gdp::entities::EnemyArchetype::Engineer)
+                && metrics.attacksLanded == 0U
+            ? std::min(scoreEnemyFitness(metrics, archetype), -1.5F)
+            : scoreEnemyFitness(metrics, archetype);
+    case TrainingStage::Positioning: {
+        const float combat = scoreEnemyFitness(metrics, archetype)
             + (metrics.attacksLanded > 0U
                 ? static_cast<float>(std::min(metrics.coverEntries, 1U))
                     * 0.35F : 0.0F);
+        return (archetype == gdp::entities::EnemyArchetype::Worker
+                || archetype == gdp::entities::EnemyArchetype::Engineer)
+                && metrics.attacksLanded == 0U
+            ? std::min(combat, -1.5F) : combat;
+    }
     }
     return 0.0F;
 }

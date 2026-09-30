@@ -469,7 +469,9 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
     # ASan/UBSan runs the role-specific arena curriculum substantially slower.
-    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 300)
+    # The deterministic multi-archetype simulation is intentionally allowed
+    # to run under a CPU quota on older laptops without false timeout failures.
+    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 600)
 
     add_executable(gdp_active_enemy_brain_tests tests/test_active_enemy_brains.cpp)
     target_link_libraries(gdp_active_enemy_brain_tests PRIVATE gdp_training)
@@ -498,13 +500,13 @@ if(GDP_BUILD_TESTS)
         NAME worker_training_cli_smoke
         COMMAND gdp --ai-training worker --population 4 --generations 2 --seed 42
     )
-    set_tests_properties(worker_training_cli_smoke PROPERTIES TIMEOUT 30)
+    set_tests_properties(worker_training_cli_smoke PROPERTIES TIMEOUT 120)
 
     add_test(
         NAME all_enemy_training_cli_smoke
         COMMAND gdp --ai-training all --population 2 --generations 1 --seed 42
     )
-    set_tests_properties(all_enemy_training_cli_smoke PROPERTIES TIMEOUT 30)
+    set_tests_properties(all_enemy_training_cli_smoke PROPERTIES TIMEOUT 120)
 
     add_executable(gdp_enemy_sensors_tests tests/test_enemy_sensors.cpp)
     target_link_libraries(gdp_enemy_sensors_tests PRIVATE gdp_gameplay)

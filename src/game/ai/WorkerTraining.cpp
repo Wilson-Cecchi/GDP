@@ -39,6 +39,7 @@ constexpr int bossEpisodeSteps = 720;
 constexpr std::size_t scenarioCount = 7U;
 constexpr std::size_t holdoutScenarioCount = 7U;
 constexpr std::size_t scenarioRepetitions = 2U;
+constexpr std::size_t maximumScenarioRepetitions = scenarioRepetitions * 2U;
 constexpr auto trainingBrainShape = gameplay::enemyBrainShape(
     gameplay::EnemyBrainContract::Tactical);
 constexpr std::size_t inputCount = trainingBrainShape.inputs;
@@ -316,9 +317,31 @@ float facingAlignment(
 struct IncomingTrainingShot {
     wkc::core::Vec3 position{};
     wkc::core::Vec3 velocity{};
+    wkc::core::Vec3 originalTarget{};
     float targetDistance{0.0F};
     float traveledDistance{0.0F};
 };
+
+float shotLateralDisplacement(const IncomingTrainingShot& shot,
+    const wkc::core::Vec3 enemyFeet) noexcept
+{
+    const float planarSpeed = std::hypot(shot.velocity.x, shot.velocity.z);
+    if (planarSpeed <= 1.0e-5F) {
+        return 0.0F;
+    }
+    const wkc::core::Vec3 offset = enemyFeet - shot.originalTarget;
+    return std::abs(shot.velocity.x * offset.z
+        - shot.velocity.z * offset.x) / planarSpeed;
+}
+
+float trainingShotSpeed(const EnemyArchetype archetype) noexcept
+{
+    // The Worker and Robot cannot move beyond their collision radii before a
+    // 13 m/s shot reaches them at the Dodge-stage spawn distances. Give this
+    // synthetic anticipation exercise a reachable, role-specific window.
+    return archetype == EnemyArchetype::Worker
+        || archetype == EnemyArchetype::IndustrialRobot ? 6.0F : 13.0F;
+}
 
 void aimTrainingPlayerAt(gameplay::Player& player,
     const wkc::core::Vec3 target) noexcept
@@ -579,7 +602,8 @@ WorkerFitnessMetrics simulateEpisode(
                 const wkc::core::Vec3 offset = target - origin;
                 const float distance = wkc::core::length(offset);
                 incomingShot = IncomingTrainingShot{
-                    origin, offset * (13.0F / distance), distance, 0.0F};
+                    origin, offset * (trainingShotSpeed(archetype) / distance),
+                    target, distance, 0.0F};
                 ++metrics.dodgeOpportunities;
                 shotCooldown = plan.playerShotInterval;
             }
@@ -684,6 +708,13 @@ WorkerFitnessMetrics simulateEpisode(
                 archetype == EnemyArchetype::IndustrialRobot ? 0.52F : 0.35F,
                 arena);
             if (incoming.finished) {
+                // Credit only lateral displacement from the actual shot line,
+                // and only while neural control still failed to avoid a hit.
+                // Generic strafing or movement behind cover earns nothing.
+                if (incoming.hit && controlled) {
+                    metrics.dodgeLateralMeters += shotLateralDisplacement(
+                        *incomingShot, entity->transform.position);
+                }
                 incomingShot.reset();
                 if (incoming.hit) {
                     const float healthBefore = enemy->health;
@@ -736,7 +767,10 @@ WorkerFitnessMetrics simulateEpisode(
             && distance <= currentProfile.preferredMaximum && playerVisible) {
             metrics.proximitySeconds += fixedStep;
         }
-        if (controlled && distance <= currentProfile.preferredMaximum + 2.0F
+        const float contactRange = archetype == EnemyArchetype::Worker
+            ? gameplay::WorkerConfig{}.attackRange
+            : currentProfile.preferredMaximum + 2.0F;
+        if (controlled && distance <= contactRange
             && playerVisible) {
             metrics.contactSeconds += fixedStep;
             if (distance > 1.0e-5F) {
@@ -812,7 +846,34 @@ struct WorkerEvaluation {
     float score{0.0F};
     float worstScenario{0.0F};
     WorkerFitnessMetrics metrics{};
+    std::array<float, scenarioCount> stageScores{};
+    std::array<std::uint32_t, scenarioCount> stageHitEpisodes{};
+    std::array<std::uint32_t, scenarioCount> stageDodges{};
+    std::array<std::uint32_t, scenarioCount> stageDodgeOpportunities{};
+    std::uint32_t combatEpisodesWithHit{0U};
+    bool combatCompetent{true};
 };
+
+void appendStageDiagnostics(std::ostream& output,
+    const WorkerEvaluation& evaluation)
+{
+    output << " stage_scores=";
+    for (std::size_t stage = 0U; stage < scenarioCount; ++stage) {
+        if (stage > 0U) output << ',';
+        output << evaluation.stageScores[stage];
+    }
+    output << " stage_hit_episodes=";
+    for (std::size_t stage = 0U; stage < scenarioCount; ++stage) {
+        if (stage > 0U) output << ',';
+        output << evaluation.stageHitEpisodes[stage];
+    }
+    output << " stage_dodges=";
+    for (std::size_t stage = 0U; stage < scenarioCount; ++stage) {
+        if (stage > 0U) output << ',';
+        output << evaluation.stageDodges[stage] << '/'
+               << evaluation.stageDodgeOpportunities[stage];
+    }
+}
 
 void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
 {
@@ -831,6 +892,7 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.bossLongRangeSeconds += sample.bossLongRangeSeconds;
     total.bossPressureSeconds += sample.bossPressureSeconds;
     total.bossPursuitSeconds += sample.bossPursuitSeconds;
+    total.dodgeLateralMeters += sample.dodgeLateralMeters;
     total.idleSeconds += sample.idleSeconds;
     total.contactSeconds += sample.contactSeconds;
     total.blockedSeconds += sample.blockedSeconds;
@@ -884,13 +946,23 @@ WorkerEvaluation evaluateGenome(
              repetition < repetitions; ++repetition) {
             const WorkerFitnessMetrics metrics = simulateEpisode(genome,
                 wkc::core::deriveSeed(scenarioSeed, trainingScenarioDomain,
-                    scenario * repetitions + repetition), scenario,
+                    scenario * maximumScenarioRepetitions + repetition), scenario,
                 archetype);
             const float scenarioScore = scoreTrainingStage(metrics, archetype,
                 static_cast<TrainingStage>(scenario + 1U));
             evaluation.score += scenarioScore;
+            evaluation.stageScores[scenario] += scenarioScore
+                / static_cast<float>(repetitions);
+            evaluation.stageHitEpisodes[scenario] += metrics.attacksLanded > 0U;
+            evaluation.stageDodges[scenario] += metrics.dodgesSucceeded;
+            evaluation.stageDodgeOpportunities[scenario]
+                += metrics.dodgeOpportunities;
             worst = std::min(worst, scenarioScore);
             addMetrics(evaluation.metrics, metrics);
+            if (scenario + 1U >= static_cast<std::size_t>(TrainingStage::Duel)
+                && metrics.attacksLanded > 0U) {
+                ++evaluation.combatEpisodesWithHit;
+            }
         }
     }
     evaluation.worstScenario = worst;
@@ -898,6 +970,17 @@ WorkerEvaluation evaluateGenome(
         * (evaluation.score
             / static_cast<float>(count * repetitions))
         + 0.25F * worst;
+    // A melee attacker or Engineer that never participates in a representative
+    // share of the combat stages must not beat a risky but useful policy by
+    // merely avoiding the terminal death penalty. Early curriculum stages
+    // remain unconstrained so they can learn movement and aim first.
+    if (count == scenarioCount
+        && (archetype == EnemyArchetype::Worker
+            || archetype == EnemyArchetype::Engineer)
+        && evaluation.combatEpisodesWithHit < repetitions) {
+        evaluation.combatCompetent = false;
+        evaluation.score = -20.0F + evaluation.score * 0.01F;
+    }
     return evaluation;
 }
 
@@ -1126,9 +1209,9 @@ WorkerTrainingResult runEnemyTraining(
             seed, trainingScenarioDomain,
             static_cast<std::uint64_t>(options.archetype));
         output << "AI_TRAINING archetype=" << archetypeName(options.archetype)
-               << " reward_rules=3"
+               << " reward_rules=4"
                << " brain_contract=2"
-               << " curriculum=" << (options.trainAllScenarios ? 9 : 8)
+               << " curriculum=" << (options.trainAllScenarios ? 11 : 10)
                << " stage_immigrants=2"
                << " runtime_control_all=1"
                << " seed=" << seed
@@ -1143,6 +1226,12 @@ WorkerTrainingResult runEnemyTraining(
                     ? scenarioRepetitions * 2U : scenarioRepetitions) << '\n';
         for (std::uint32_t offset = 0; offset < options.generations; ++offset) {
             const std::uint32_t generation = firstGeneration + offset;
+            // Every candidate in a generation sees the same fixtures, while
+            // successive generations sample new deterministic maps and player
+            // trajectories. Holdout seeds remain independent and unchanged.
+            const wkc::core::Seed generationScenarios
+                = wkc::core::deriveSeed(commonScenarios,
+                    trainingScenarioDomain, generation);
             const std::size_t unlockedStages = resume ? scenarioCount
                 : std::min(scenarioCount, std::size_t{1}
                     + (static_cast<std::size_t>(offset) * scenarioCount)
@@ -1173,7 +1262,7 @@ WorkerTrainingResult runEnemyTraining(
             float total = 0.0F;
             for (wkc::ai::Genome& genome : population) {
                 genome.fitness = evaluateGenome(
-                    genome, commonScenarios, options.archetype,
+                    genome, generationScenarios, options.archetype,
                     false, options.trainAllScenarios, unlockedStages).score;
                 total += genome.fitness;
             }
@@ -1190,17 +1279,22 @@ WorkerTrainingResult runEnemyTraining(
             result.lastGeneration = generation;
             result.champion = population.front();
             const WorkerEvaluation bestEvaluation
-                = evaluateGenome(*result.champion, commonScenarios,
+                = evaluateGenome(*result.champion, generationScenarios,
                     options.archetype, false, options.trainAllScenarios);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
+                   << " scenario_seed=" << generationScenarios
                    << " stage=" << unlockedStages << '/' << scenarioCount
                    << " best=" << std::fixed << std::setprecision(3) << best
                    << " full_score=" << bestEvaluation.score
                    << " mean=" << total / static_cast<float>(population.size())
                    << " worst_scenario=" << bestEvaluation.worstScenario
-                   << " damage_dealt=" << bestMetrics.damageDealt
-                   << " damage_received=" << bestMetrics.damageReceived
+                   << " combat_hit_episodes="
+                   << bestEvaluation.combatEpisodesWithHit
+                   << " combat_competent=" << bestEvaluation.combatCompetent
+                   << " damage_dealt=" << bestMetrics.damageDealt;
+            appendStageDiagnostics(output, bestEvaluation);
+            output << " damage_received=" << bestMetrics.damageReceived
                    << " fallback_damage_dealt=" << bestMetrics.fallbackDamageDealt
                    << " fallback_damage_received=" << bestMetrics.fallbackDamageReceived
                    << " hits=" << bestMetrics.attacksLanded
@@ -1211,6 +1305,7 @@ WorkerTrainingResult runEnemyTraining(
                    << " dodge_opportunities=" << bestMetrics.dodgeOpportunities
                    << " dodges=" << bestMetrics.dodgesSucceeded
                    << " incoming_hits=" << bestMetrics.incomingProjectileHits
+                   << " dodge_lateral_m=" << bestMetrics.dodgeLateralMeters
                    << " cover_entries=" << bestMetrics.coverEntries
                    << " cover_s=" << bestMetrics.coverSeconds
                    << " exposed_s=" << bestMetrics.exposedSeconds
@@ -1275,16 +1370,27 @@ WorkerTrainingResult runEnemyTraining(
         }
         const wkc::core::Seed holdoutSeed
             = wkc::core::deriveSeed(seed, holdoutScenarioDomain, 0U);
-        result.holdoutFitness = evaluateGenome(
+        const WorkerEvaluation holdout = evaluateGenome(
             *result.champion, holdoutSeed, options.archetype, true,
-            options.trainAllScenarios).score;
+            options.trainAllScenarios);
+        result.holdoutFitness = holdout.score;
         output << "AI_RESULT generation=" << result.lastGeneration
-               << " reward_rules=3"
+               << " reward_rules=4"
                << " brain_contract=2"
                << " runtime_control_all=1"
                << " stages_completed=" << result.completedStages
                << " train_best=" << result.finalBest
-               << " holdout=" << result.holdoutFitness;
+               << " holdout=" << result.holdoutFitness
+               << " holdout_combat_hit_episodes="
+               << holdout.combatEpisodesWithHit
+               << " holdout_combat_competent=" << holdout.combatCompetent
+               << " holdout_hits=" << holdout.metrics.attacksLanded
+               << " holdout_dodges=" << holdout.metrics.dodgesSucceeded
+               << " holdout_dodge_opportunities="
+               << holdout.metrics.dodgeOpportunities
+               << " holdout_dodge_lateral_m="
+               << holdout.metrics.dodgeLateralMeters;
+        appendStageDiagnostics(output, holdout);
         if (result.lastCheckpoint) {
             output << " brain=" << result.lastCheckpoint->string();
         }

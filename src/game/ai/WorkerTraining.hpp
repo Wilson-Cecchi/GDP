@@ -41,6 +41,7 @@ struct WorkerFitnessMetrics {
     float bossPursuitSeconds{0.0F};
     float blockedSeconds{0.0F};
     float wastedAttackSeconds{0.0F};
+    float dodgeLateralMeters{0.0F};
     float forwardCreditSeconds{0.0F};
     float retreatCreditSeconds{0.0F};
     float strafeCreditSeconds{0.0F};

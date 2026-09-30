@@ -1,6 +1,7 @@
 #include "game/ai/WorkerTraining.hpp"
 
 #include "core/Hash.hpp"
+#include "gameplay/EnemyBrainContract.hpp"
 #include "persistence/WorkerBrainStore.hpp"
 
 #include <algorithm>
@@ -160,6 +161,23 @@ void testFitness()
             == scoreTrainingStage(baseline,
                 gdp::entities::EnemyArchetype::Guard, TrainingStage::Dodge),
         "dodge stage never rewards strafe without a real threat");
+    WorkerFitnessMetrics directHit = baseline;
+    directHit.incomingProjectileHits = 1U;
+    WorkerFitnessMetrics partialDodge = directHit;
+    partialDodge.dodgeLateralMeters = 0.3F;
+    WorkerFitnessMetrics noThreat = baseline;
+    noThreat.dodgeLateralMeters = 0.3F;
+    const float directHitScore = scoreTrainingStage(directHit, boss,
+        TrainingStage::Dodge);
+    const float partialDodgeScore = scoreTrainingStage(partialDodge, boss,
+        TrainingStage::Dodge);
+    expect(partialDodgeScore > directHitScore
+            && partialDodgeScore < scoreTrainingStage(dodging, boss,
+                TrainingStage::Dodge),
+        "real lateral displacement improves a failed dodge but not beyond avoidance");
+    expect(scoreTrainingStage(noThreat, boss, TrainingStage::Dodge)
+            == scoreTrainingStage(baseline, boss, TrainingStage::Dodge),
+        "lateral movement without an incoming hit earns no partial dodge credit");
     WorkerFitnessMetrics covered = baseline;
     covered.coverEntries = 1U;
     const auto guard = gdp::entities::EnemyArchetype::Guard;
@@ -178,6 +196,29 @@ void testFitness()
             - scoreTrainingStage(baseline, guard,
                 TrainingStage::Positioning) < 0.5F,
         "repeated cover entry cannot farm unlimited reward");
+    WorkerFitnessMetrics passiveCombat = baseline;
+    passiveCombat.attacksLanded = 0U;
+    passiveCombat.damageDealt = 0.0F;
+    passiveCombat.tacticalProgressMeters = 4.0F;
+    passiveCombat.proximitySeconds = 8.0F;
+    passiveCombat.contactSeconds = 8.0F;
+    for (const auto archetype : {gdp::entities::EnemyArchetype::Worker,
+             gdp::entities::EnemyArchetype::Engineer}) {
+        expect(scoreTrainingStage(passiveCombat, archetype, TrainingStage::Duel)
+                <= -1.5F
+                && scoreTrainingStage(passiveCombat, archetype,
+                    TrainingStage::Positioning) <= -1.5F
+                && scoreTrainingStage(passiveCombat, archetype,
+                    TrainingStage::RealMaps) <= -1.5F,
+            "passive combat cannot farm proximity and positioning reward");
+    }
+    const auto tacticalShape = gdp::gameplay::enemyBrainShape(
+        gdp::gameplay::EnemyBrainContract::Tactical);
+    const wkc::ai::Genome passiveWorker{
+        wkc::ai::NeuralNetwork{tacticalShape.inputs, tacticalShape.hidden,
+            tacticalShape.outputs}, 0.0F, 0U, 0U};
+    expect(evaluateWorkerGenome(passiveWorker, 42U) < -19.0F,
+        "a non-attacking Worker cannot win selection by merely surviving");
     const WorkerFitnessMetrics shapingOnly{
         .damageDealt = 1000.0F,
         .tacticalProgressMeters = 100.0F,
@@ -221,18 +262,26 @@ void testTrainingAndPersistence()
     expect(first.succeeded && first.champion && first.lastCheckpoint
             && first.lastGeneration == 2U && first.completedStages == 4U,
         "automated training produces a champion and final checkpoint");
-    expect(output.str().find("reward_rules=3") != std::string::npos
+    expect(output.str().find("reward_rules=4") != std::string::npos
             && output.str().find("brain_contract=2") != std::string::npos
-            && output.str().find("curriculum=8") != std::string::npos
+            && output.str().find("curriculum=10") != std::string::npos
             && output.str().find("stage_immigrants=2") != std::string::npos
             && output.str().find("runtime_control_all=1") != std::string::npos
             && output.str().find("scenarios=7") != std::string::npos
             && output.str().find("holdout_scenarios=7") != std::string::npos
             && output.str().find("stage=1/7") != std::string::npos
             && output.str().find("stage=4/7") != std::string::npos
+            && output.str().find("scenario_seed=") != std::string::npos
             && output.str().find("stages_completed=4") != std::string::npos
             && output.str().find("repetitions=2") != std::string::npos
             && output.str().find("worst_scenario=") != std::string::npos
+            && output.str().find("combat_hit_episodes=") != std::string::npos
+            && output.str().find("dodge_lateral_m=") != std::string::npos
+            && output.str().find("holdout_combat_competent=")
+                != std::string::npos
+            && output.str().find("stage_scores=") != std::string::npos
+            && output.str().find("stage_hit_episodes=") != std::string::npos
+            && output.str().find("stage_dodges=") != std::string::npos
             && output.str().find("blocked_s=") != std::string::npos
             && output.str().find("wasted_attack_s=") != std::string::npos
             && output.str().find("aim_s=") != std::string::npos
@@ -244,6 +293,18 @@ void testTrainingAndPersistence()
             && reportedMetric(output.str(), "player_jumps=") >= 2.0F
             && reportedMetric(output.str(), "player_peak_speed=") > 4.5F,
         "training reports scenario count and reward-penalty evidence");
+    const std::string report = output.str();
+    const std::string seedLabel = "scenario_seed=";
+    const std::size_t firstSeed = report.find(seedLabel);
+    const std::size_t secondSeed = firstSeed == std::string::npos
+        ? std::string::npos
+        : report.find(seedLabel, firstSeed + seedLabel.size());
+    expect(firstSeed != std::string::npos
+            && secondSeed != std::string::npos
+            && report.substr(firstSeed, report.find(' ', firstSeed) - firstSeed)
+                != report.substr(secondSeed,
+                    report.find(' ', secondSeed) - secondSeed),
+        "successive generations train on different deterministic fixtures");
     if (first.succeeded && first.champion && first.lastCheckpoint) {
         expect(std::isfinite(first.initialBest)
                 && std::isfinite(first.finalBest),
@@ -353,7 +414,7 @@ void testTrainingAndPersistence()
         const WorkerTrainingResult broad = runWorkerTraining(
             allScenarios, allScenariosOutput);
         expect(broad.succeeded && broad.champion
-                && allScenariosOutput.str().find("curriculum=9")
+                && allScenariosOutput.str().find("curriculum=11")
                     != std::string::npos
                 && allScenariosOutput.str().find("scenarios=7")
                     != std::string::npos

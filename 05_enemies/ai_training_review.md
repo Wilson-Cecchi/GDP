@@ -354,3 +354,65 @@ quando um estágio é liberado; seus pesos respeitam o limite do arquivo
 `.brain`. A primeira comparação pareada em `gdp_ai_gameplay_eval --duel`,
 seed 12345 e 360 frames, mostrou regressões dos candidatos da rodada v2
 em Guard, Engineer e Robot contra Bhop. Esses candidatos não foram promovidos.
+
+**Regras de treino v4 (após a rodada até a geração 114):** a inspeção da rodada
+longa mostrou que o Worker deixou de causar dano para evitar mortes; o Engineer
+melhorou na esquiva, mas manteve poucos acertos; e o Robot não esquivou de
+nenhum disparo sintético nas 100 gerações observadas. O treino agora limita a
+nota de episódios de duelo/posicionamento/mapa real sem acerto neural para
+Worker e Engineer. Na seleção depois de liberar os sete estágios, esses dois
+tipos precisam acertar em pelo menos uma repetição equivalente de episódios de
+combate; sem isso, recebem uma nota de inelegibilidade inferior a qualquer
+episódio normal. Aproximação e contato não compensam a ausência de ataque.
+Para Worker, o tempo de contato passa a exigir a distância real do golpe
+(1,15 m), em vez de até 4 m. Esses limites não são aplicados às etapas
+iniciais de locomoção/mira, nas quais atacar está desabilitado.
+
+O disparo sintético do estágio de esquiva foi reduzido a 6 m/s somente contra
+Worker e Robot: com os raios, velocidades de movimento e distâncias iniciais
+desses tipos, os 13 m/s anteriores não davam tempo lateral suficiente para
+evitar um tiro apontado ao centro. Isso **não** muda o tiro hitscan do Player no
+jogo nem prova esquiva pós-disparo; é um exercício de antecipação à mira. Guard,
+Officer e Engineer mantêm 13 m/s. As seeds de cada estágio usam uma posição
+fixa por cenário e repetição, de modo que as duas primeiras repetições do modo
+normal e do `--all-scenarios` coincidam. O log v4 registra, por estágio,
+pontuação, episódios com acerto e esquivas/oportunidades, além da elegibilidade
+de combate na geração e no holdout. Na linha `AI_GENERATION`, esses campos
+por estágio descrevem a reavaliação completa do campeão (`full_score`), mesmo
+quando a seleção da geração ainda usa menos estágios (`stage=N/7`). Comparar
+políticas com o mesmo build,
+quantidade de repetições e seeds; scores v3 e v4 não são comparáveis. O formato
+dos cérebros e os assets ativos permanecem iguais. Nenhuma promoção deve
+ocorrer sem comparação pareada de gameplay e playtest visual.
+
+Cada geração v4 deriva uma nova seed de situações a partir da seed principal e
+do número absoluto de geração. Todos os candidatos daquela geração veem os
+mesmos cenários, preservando uma seleção justa, mas a sequência percorre mapas
+e trajetórias diferentes em vez de decorar uma única amostra por horas. O log
+inclui `scenario_seed`; ao retomar um checkpoint, o mesmo número de geração
+reproduz a mesma amostra. O holdout fica fixo e independente. Por causa dessa
+rotação, uma subida ou queda isolada de `train_best` entre gerações não mede
+melhora de política; usar holdout pareado e gameplay para decidir promoção.
+
+Para dar um sinal de aprendizagem antes da primeira esquiva completa, o estágio
+de Dodge também mede a distância **lateral à trajetória do disparo que acertou**
+durante o controle neural. Esse crédito parcial é limitado a 0,7 ponto por
+episódio (contra a penalidade de 0,45 por acerto); uma esquiva efetiva ainda
+vale mais. Andar lateralmente sem projétil, ou um disparo bloqueado pelo cenário,
+não gera esse crédito. O log informa `dodge_lateral_m` e
+`holdout_dodge_lateral_m`. Trata-se de recompensa no exercício sintético, sem
+alterar o dano ou os projéteis no jogo.
+
+**Rodada diagnóstica v4, sem promoção (2026-09-30):** retomando o checkpoint
+do Robot da geração 114 por 20 gerações, população 8, seed 42 e duas repetições
+por cenário, o campeão da geração 134 fez 11 esquivas em 16 oportunidades no
+holdout fixo, com `holdout=1.280` e 30 acertos neurais. A rodada curta anterior
+à recompensa lateral terminara sem esquivas (0/19–20 por geração). A comparação
+de gameplay em seed 12345 por 360 frames, entretanto, não confirmou melhoria
+geral: dano igual em área aberta (48), menor contra jogador elevado (36 contra
+48) e ambos os checkpoints sem acerto no cenário de cobertura do boss. A
+esquiva do exercício sintético é promissora, mas **não autoriza trocar o cérebro
+ativo**. No duelo bilateral da mesma seed e 360 frames, os dois tiveram um
+acerto no jogador em solo (12 de dano) e quatro contra Bhop; o candidato novo
+causou 42 contra 44 de dano no Bhop. Faltam mais seeds e partida visual para
+julgar navegação, precisão e balanceamento.
