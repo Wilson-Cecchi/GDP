@@ -508,3 +508,47 @@ encerra a investigação e devolve o inimigo à recuperação/patrulha. Como a
 duração altera encontros, Campaign/Speedrun rules avançam para 34/35. Os
 arquivos `.brain` permanecem iguais; um novo playtest deve avaliar a pressão
 dos inimigos atrás de cobertura.
+
+**Bateria de treino e gate de gameplay (2026-10-01):** foram retomados os cinco
+arquétipos com seed 42, população 8, 16 gerações e `--all-scenarios`, sempre em
+diretórios novos `build/ai-runs/tactical-v5-20261001-{worker,guard,officer,engineer,robot}`.
+Worker, Guard, Officer e Engineer partiram da geração 114; Robot partiu da 174.
+Todos completaram os sete estágios e salvaram a geração 130 (Robot: 190).
+`reward_rules=5` e `runtime_control_all=1` foram confirmados nos logs. Não houve
+treino simultâneo; o sensor da CPU chegou a 92 °C (limite crítico informado:
+100 °C), então esta rodada não foi estendida nesta máquina.
+
+A comparação pareada usou o mesmo binário Release e `gdp_ai_gameplay_eval`,
+com 360 frames por cenário e seeds independentes da seed de treino. Os números
+abaixo são somas de dano ao Player nos cenários de mapa (Engineer: 15 seeds;
+demais: 10), sempre **asset ativo → checkpoint final**:
+
+| Arquétipo | Mapas | Duelo (solo + Bhop) | Decisão |
+| --- | ---: | ---: | --- |
+| Worker | 740 → 0 | 100 → 60 | Reprovado: não acerta nos mapas. |
+| Guard | 2464 → 1144 | 312 → 72 | Reprovado: regressão grande de combate. |
+| Officer | 1560 → 1548 | 138 → 138 | Pendente: ver comparação do checkpoint 115 abaixo. |
+| Engineer | 2375 → 2250 | 230 → 205 | Reprovado: também perde deslocamento nos mapas. |
+| Robot | 2428 → 128 | 614 → 578 | Reprovado: quase para de atirar nos mapas. |
+
+Os checkpoints intermediários também foram triados em três seeds antes da
+decisão. O Officer 115 foi o único candidato razoável para um playtest isolado:
+em 15 seeds/360 frames, causou 2310 contra 2364 de dano total do ativo, e 228
+contra 210 no duelo; seu deslocamento somado nos mapas foi 245,1 m contra
+48,8 m do ativo. Porém, na cobertura central causou 132 contra 162 de dano; no
+duelo Bhop, 174 contra 192. Em 720 frames, o dano total foi 3768 contra 3690,
+mas a cobertura central ainda regrediu: 492 contra 600. É uma troca de
+mobilidade por pressão em cobertura, não uma aprovação automática.
+
+Para a próxima partida humana há um pacote experimental completo em
+`build/ai-test/officer-v5-20261001/`, com apenas o Officer 115 e os outros
+quatro cérebros ativos. Iniciar com:
+
+```bash
+build/release/gdp --test-brain-dir build/ai-test/officer-v5-20261001
+```
+
+O modo `--test-brain-dir` confirma cada geração carregada no log. Nenhum
+arquivo em `assets/ai/` foi substituído: a aprovação visual do movimento,
+cobertura e equilíbrio continua necessária antes de promover o Officer.
+Pontuação de treino/holdout sozinha não foi usada como gate.
