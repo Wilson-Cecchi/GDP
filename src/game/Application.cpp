@@ -1,6 +1,7 @@
 #include "game/Application.hpp"
 
 #include "game/audio/AudioSystem.hpp"
+#include "game/HudBoss.hpp"
 #include "game/HudMap.hpp"
 #include "game/SeedDomains.hpp"
 #include "core/Hash.hpp"
@@ -3956,6 +3957,7 @@ void Application::render()
     } else {
         hud.objective = visual::ObjectiveRenderState::ReachBoss;
     }
+    hud.boss = buildBossHud(entities_, session_.state());
     if (activeEvent != roomEvents_.end()) {
         if (activeEvent->phase == gameplay::RoomEventPhase::Dormant) {
             hud.event = visual::HudEventState::Dormant;

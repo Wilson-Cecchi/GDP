@@ -152,3 +152,24 @@ inferior em resoluções normais, sem ocupar o centro da mira.
 ## Escala
 
 Layout deve funcionar em 16:9, 16:10 e ultrawide sem depender de pixels fixos.
+
+## Confronto do boss
+
+Após `SessionState::bossEngaged`, o painel superior direito de objetivo recebe
+uma barra de HP, o percentual de vida e a fase do IndustrialRobot. As fases são
+calculadas pela mesma função do combate, `industrialRobotPhase`: `RANGE` acima
+de 66%, `PRESSURE` acima de 33% até 66% e `PURSUIT` até 33%. O percentual usa a
+vida máxima daquela instância, inclusive a escala de andar da Campaign.
+
+`buildBossHud` transforma apenas o estado autoritativo em um snapshot visual.
+O boss pode ser engajado no corredor e atravessar portas abertas; mudar sua
+sala lógica não remove a indicação. Antes do engajamento, inimigos inativos,
+boss morto ou estado terminal não revelam uma barra. Pausa conserva o mesmo
+valor e reiniciar exige um novo engajamento. Saúde inválida é rejeitada antes
+de chegar ao renderer.
+
+O bloco usa a moldura, texto e cor de alerta da HUD Rail existente. A altura do
+painel é reservada antes do posicionamento do evento, evitando sobreposição
+entre esses blocos. Não introduz textura, material, regra de dano ou cue novo.
+As verificações de pixels e capturas de fixture cobrem 1280×720, 960×540 e
+320×200; a avaliação de legibilidade durante uma partida continua no playtest.

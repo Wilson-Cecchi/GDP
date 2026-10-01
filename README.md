@@ -599,6 +599,12 @@ especializados das pastas numeradas.
 - **Referência de controles:** `CONTROLS` no título e na pausa lista os comandos
   implementados. `Esc`, `Enter` ou clique em `BACK` retorna ao menu de origem;
   abrir a página durante uma run não avança a simulação.
+- **Leitura do confronto do boss:** após engajar o IndustrialRobot, inclusive
+  pela porta aberta do corredor, o painel de objetivo mostra sua vida em barra
+  e percentual e a fase real de combate: `RANGE`, `PRESSURE` ou `PURSUIT`.
+  A indicação acompanha o boss entre salas, congela junto da pausa e desaparece
+  na vitória, derrota ou reinício. Usa a moldura Rail existente e não altera
+  vida, dano, IA, limiares de fase ou regras de Campaign/Speedrun.
 - **Bunny hop do Player:** saltos encadeados conservam impulso horizontal e
   air-strafe pode elevar a velocidade até `7,2 m/s` (`1,6×` a caminhada);
   uma janela de `0,12 s` aceita o próximo pressionamento de `Espaço` pouco

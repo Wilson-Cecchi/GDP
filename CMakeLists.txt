@@ -330,6 +330,7 @@ add_executable(
     gdp
     src/main.cpp
     src/game/Application.cpp
+    src/game/HudBoss.cpp
     src/game/HudMap.cpp
     src/game/LaunchSeed.cpp
     src/game/PerformanceMonitor.cpp
@@ -830,6 +831,14 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME hud_map_systems COMMAND gdp_hud_map_tests)
     set_tests_properties(hud_map_systems PROPERTIES TIMEOUT 10)
+
+    add_executable(gdp_hud_boss_tests tests/test_hud_boss.cpp src/game/HudBoss.cpp)
+    target_link_libraries(gdp_hud_boss_tests PRIVATE gdp_gameplay)
+    gdp_enable_warnings(gdp_hud_boss_tests)
+    gdp_enable_sanitizers(gdp_hud_boss_tests)
+
+    add_test(NAME hud_boss_systems COMMAND gdp_hud_boss_tests)
+    set_tests_properties(hud_boss_systems PROPERTIES TIMEOUT 10)
 
     add_test(NAME bootstrap_headless COMMAND gdp --headless --frames 3)
     set_tests_properties(bootstrap_headless PROPERTIES TIMEOUT 10)

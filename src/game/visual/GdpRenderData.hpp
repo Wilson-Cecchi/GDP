@@ -518,12 +518,26 @@ struct HudMapData {
     wkc::core::Vec2 playerForward{0.0F, -1.0F};
 };
 
+enum class HudBossPhase : std::uint8_t {
+    LongRange,
+    Pressure,
+    Pursuit,
+};
+
+struct HudBossData {
+    bool visible{false};
+    float health{0.0F};
+    float maximumHealth{0.0F};
+    HudBossPhase phase{HudBossPhase::LongRange};
+};
+
 struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
     bool flashlightOn{false};
     bool infoOverlay{false};
     HudMapData map{};
+    HudBossData boss{};
     std::uint64_t runSeed{0U};
     std::uint64_t score{0U};
     std::uint32_t enemiesKilled{0U};

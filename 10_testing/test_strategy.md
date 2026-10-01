@@ -152,6 +152,14 @@ uma revisão de textura, primeiro registrar e aprovar a proposta conforme
 Um framebuffer estável não significa que a direção visual foi aprovada, e uma
 prancha aprovada não permite aceitar pixels ausentes, NaN ou perda de contraste.
 
+`hud_boss_systems` verifica o engajamento pelo corredor, snapshot de HP real,
+limiares exatos das três fases, mudança de sala do boss, exclusão de inimigos
+inativos e ocultação após morte, resultado ou replay. O gate OpenGL diferencia
+vida cheia/parcial, mudança de fase e ocultação em 1280×720, 960×540 e 320×200.
+`GDP_BOSS_HUD_CAPTURE_DIR=/caminho/absoluto` permite salvar os mesmos frames de
+fixture em BMP para inspeção. Essas capturas exercem o renderer real, mas não
+substituem um playtest integrado de balanceamento ou aprovação artística.
+
 O gate estrutural da Fase 20 valida os 23 módulos, as três classes de tamanho,
 os papéis especiais e todos os connectors nas quatro rotações. O batch de 1.000
 mundos exige AABBs sem overlap e corredores limitados; o de 500 mundos percorre

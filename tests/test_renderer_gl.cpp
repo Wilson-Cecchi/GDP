@@ -7,8 +7,126 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
+#include <string>
 #include <vector>
+
+namespace {
+
+bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* const captureDirectory = std::getenv("GDP_BOSS_HUD_CAPTURE_DIR");
+    bool passed = true;
+    for (const auto dimensions : {std::array{1280, 720},
+             std::array{960, 540}, std::array{320, 200}}) {
+        const int width = dimensions[0];
+        const int height = dimensions[1];
+        HudRenderData hud;
+        hud.visible = true;
+        hud.objective = ObjectiveRenderState::DefeatBoss;
+        hud.magazineAmmo = 8U;
+        hud.reserveAmmo = 36U;
+        hud.experienceForNextLevel = 100U;
+        hud.runTimerVisible = true;
+        hud.elapsedRunTicks = 4300U;
+        hud.event = HudEventState::Active;
+        hud.eventLocked = true;
+        hud.map.visible = true;
+        hud.map.roomCount = 2U;
+        hud.map.rooms[0] = {1U, {0.0F, 0.0F}, true, true, true,
+            {-4.0F, -4.0F}, {4.0F, 4.0F}};
+        hud.map.rooms[1] = {2U, {0.0F, -12.0F}, true, true, false,
+            {-5.0F, -17.0F}, {5.0F, -7.0F}};
+        hud.map.linkCount = 1U;
+        hud.map.links[0].first = 0U;
+        hud.map.links[0].second = 1U;
+        hud.map.links[0].known = true;
+        hud.map.links[0].pointCount = 2U;
+        hud.map.links[0].points[0] = {0.0F, -4.0F};
+        hud.map.links[0].points[1] = {0.0F, -7.0F};
+        constexpr std::array boss{
+            EnemyRenderData{{1.5F, 0.0F, -0.5F}, true, 666U,
+                EnemyVisualRole::IndustrialRobot}};
+        const auto renderPixels = [&](const HudRenderData& snapshot) {
+            passed &= renderer.render(width, height, {}, boss, {}, {}, {},
+                {}, {}, {}, {}, snapshot);
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            return pixels;
+        };
+        const auto baseline = renderPixels(hud);
+        hud.boss = {true, 200.0F, 200.0F, HudBossPhase::LongRange};
+        const auto full = renderPixels(hud);
+        hud.boss.health = 100.0F;
+        const auto half = renderPixels(hud);
+        const auto longestWarningRun = [&](const std::vector<std::uint8_t>& pixels) {
+            int longest = 0;
+            for (int y = height / 2; y < height; ++y) {
+                int run = 0;
+                for (int x = width / 2; x < width; ++x) {
+                    const auto offset = static_cast<std::size_t>((y * width + x) * 4);
+                    const bool warning = pixels[offset] > 200U
+                        && pixels[offset + 1U] > 80U && pixels[offset + 1U] < 200U
+                        && pixels[offset + 2U] < 80U;
+                    run = warning ? run + 1 : 0;
+                    longest = std::max(longest, run);
+                }
+            }
+            return longest;
+        };
+        const int fullBar = longestWarningRun(full);
+        const int halfBar = longestWarningRun(half);
+        passed &= fullBar > 40 && std::abs(halfBar * 2 - fullBar) <= 1;
+        hud.boss.phase = HudBossPhase::Pressure;
+        const auto pressure = renderPixels(hud);
+        hud.boss.health = 32.0F;
+        hud.boss.phase = HudBossPhase::Pursuit;
+        const auto pursuit = renderPixels(hud);
+        passed &= full != baseline && half != full && pressure != half
+            && pursuit != pressure;
+
+        if (captureDirectory != nullptr) {
+            const auto saveCapture = [&](const std::vector<std::uint8_t>& pixels,
+                const std::string& phase) {
+                std::vector<std::uint8_t> topDown(pixels.size());
+                const std::size_t stride = static_cast<std::size_t>(width * 4);
+                for (int row = 0; row < height; ++row) {
+                    std::copy_n(pixels.data() + static_cast<std::size_t>(height - row - 1)
+                        * stride, stride, topDown.data() + static_cast<std::size_t>(row)
+                        * stride);
+                }
+                const std::filesystem::path directory{captureDirectory};
+                std::filesystem::create_directories(directory);
+                const auto path = directory / ("boss-hud-" + std::to_string(width)
+                    + "x" + std::to_string(height) + "-" + phase + ".bmp");
+                SDL_Surface* const surface = SDL_CreateSurfaceFrom(width, height,
+                    SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                const bool saved = surface != nullptr
+                    && SDL_SaveBMP(surface, path.string().c_str());
+                SDL_DestroySurface(surface);
+                return saved;
+            };
+            passed &= saveCapture(full, "range") && saveCapture(pressure, "pressure")
+                && saveCapture(pursuit, "pursuit");
+        }
+        hud.boss.visible = false;
+        passed &= renderPixels(hud) == baseline;
+        hud.objective = ObjectiveRenderState::Victory;
+        const auto victory = renderPixels(hud);
+        hud.boss.visible = true;
+        passed &= renderPixels(hud) == victory;
+    }
+    if (!passed) {
+        std::cerr << "Boss HUD health/phase/visibility rendering failed\n";
+    }
+    return passed;
+}
+
+} // namespace
 
 int main()
 {
@@ -31,8 +149,8 @@ int main()
 
     SDL_Window* const window = SDL_CreateWindow(
         "GDP renderer test",
-        width,
-        height,
+        1280,
+        720,
         SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
     if (window == nullptr) {
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
@@ -1614,6 +1732,9 @@ int main()
                           << " firing=" << firingViewmodelChangedChannels
                           << " impactRendered=" << renderedImpacts << '\n';
             }
+            // Exercise the gameplay HUD at real drawable sizes after the small
+            // fixed-scene checks; these snapshots do not change combat state.
+            passed = validateBossHud(renderer) && passed;
         }
     }
 

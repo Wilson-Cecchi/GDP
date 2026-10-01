@@ -2282,10 +2282,17 @@ bool GdpRenderer::render(
     };
     const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
         || hud.objective == ObjectiveRenderState::DefeatBoss;
+    const bool showBoss = hud.visible && hud.boss.visible
+        && hud.objective == ObjectiveRenderState::DefeatBoss
+        && std::isfinite(hud.boss.health) && hud.boss.health > 0.0F
+        && std::isfinite(hud.boss.maximumHealth) && hud.boss.maximumHealth > 0.0F;
+    const float bossHealthRatio = showBoss
+        ? std::clamp(hud.boss.health / hud.boss.maximumHealth, 0.0F, 1.0F) : 0.0F;
     const int topRightLines = (topRightObjective ? 2 : 0)
         + (hud.visible && hud.runTimerVisible ? 1 : 0)
         + (hud.visible && hud.runTimerVisible && hud.speedrunMode
-                && hud.speedrunRecordVisible ? 1 : 0);
+                && hud.speedrunRecordVisible ? 1 : 0)
+        + (showBoss ? 3 : 0);
     const int topRightHeight = topRightLines == 0 ? 0
         : (hudPadding * 2) + (topRightLines * hudLineHeight);
     const auto drawSelectedRow = [&](const UiRect row,
@@ -3214,6 +3221,23 @@ bool GdpRenderer::render(
     }
     std::string timerText;
     std::string bestText;
+    std::string bossHealthText;
+    std::string_view bossPhaseText;
+    if (showBoss) {
+        bossHealthText = "BOSS " + std::to_string(
+            static_cast<int>(std::ceil(bossHealthRatio * 100.0F))) + "%";
+        switch (hud.boss.phase) {
+        case HudBossPhase::LongRange:
+            bossPhaseText = "PHASE 1/3 RANGE";
+            break;
+        case HudBossPhase::Pressure:
+            bossPhaseText = "PHASE 2/3 PRESSURE";
+            break;
+        case HudBossPhase::Pursuit:
+            bossPhaseText = "PHASE 3/3 PURSUIT";
+            break;
+        }
+    }
     if (hud.visible && hud.runTimerVisible) {
         const std::string timerPrefix = hud.speedrunMode
             ? "SPEEDRUN "
@@ -3233,6 +3257,8 @@ bool GdpRenderer::render(
             bitmapTextWidth(objectiveText, hudScale),
             bitmapTextWidth(timerText, hudScale),
             bitmapTextWidth(bestText, hudScale),
+            bitmapTextWidth(bossHealthText, hudScale),
+            bitmapTextWidth(showBoss ? "PHASE 2/3 PRESSURE" : "", hudScale),
         }) + (hudPadding * 2);
         const int topRightX = std::max(hudMargin,
             width - hudMargin - topRightWidth);
@@ -3257,6 +3283,20 @@ bool GdpRenderer::render(
         if (!bestText.empty()) {
             drawBitmapText(textX, lineY, hudScale, bestText,
                 uiTheme.warning);
+            lineY -= hudLineHeight;
+        }
+        if (showBoss) {
+            drawBitmapText(textX, lineY, hudScale, bossHealthText, textColor);
+            lineY -= hudLineHeight;
+            drawBitmapText(textX, lineY, hudScale, bossPhaseText, uiTheme.warning);
+            lineY -= hudLineHeight;
+            const int barWidth = topRightWidth - (hudPadding * 2);
+            const int filledWidth = std::max(1, static_cast<int>(std::round(
+                static_cast<float>(barWidth) * bossHealthRatio)));
+            drawSolidRect(textX, lineY + (2 * hudScale), barWidth,
+                3 * hudScale, uiTheme.panelBorder);
+            drawSolidRect(textX, lineY + (2 * hudScale), filledWidth,
+                3 * hudScale, uiTheme.warning);
         }
     }
     if (hud.objective == ObjectiveRenderState::Victory
