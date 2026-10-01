@@ -155,7 +155,7 @@ Layout deve funcionar em 16:9, 16:10 e ultrawide sem depender de pixels fixos.
 
 ## Confronto do boss
 
-Após `SessionState::bossEngaged`, o painel superior direito de objetivo recebe
+Após `SessionState::bossEngaged`, um painel próprio no topo central recebe
 uma barra de HP, o percentual de vida e a fase do IndustrialRobot. As fases são
 calculadas pela mesma função do combate, `industrialRobotPhase`: `RANGE` acima
 de 66%, `PRESSURE` acima de 33% até 66% e `PURSUIT` até 33%. O percentual usa a
@@ -168,8 +168,11 @@ boss morto ou estado terminal não revelam uma barra. Pausa conserva o mesmo
 valor e reiniciar exige um novo engajamento. Saúde inválida é rejeitada antes
 de chegar ao renderer.
 
-O bloco usa a moldura, texto e cor de alerta da HUD Rail existente. A altura do
-painel é reservada antes do posicionamento do evento, evitando sobreposição
-entre esses blocos. Não introduz textura, material, regra de dano ou cue novo.
-As verificações de pixels e capturas de fixture cobrem 1280×720, 960×540 e
-320×200; a avaliação de legibilidade durante uma partida continua no playtest.
+O bloco usa a moldura, texto e cor de alerta da HUD Rail existente. Sua largura
+permanece fixa entre as fases, com barra centralizada e preenchimento da
+esquerda para a direita. Em telas compactas, título e fase usam duas linhas.
+Os painéis de objetivo, evento, mapa e desempenho reservam espaço abaixo dessa
+faixa durante o confronto. Se faltar espaço para o mapa sem cobrir os recursos,
+ele se recolhe. Não introduz textura, material, regra de dano ou cue novo.
+As verificações de pixels e capturas de fixture cobrem 1280×720, 960×540,
+640×360 e 320×200; a avaliação em partida continua no playtest.

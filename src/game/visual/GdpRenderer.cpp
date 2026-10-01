@@ -2288,11 +2288,20 @@ bool GdpRenderer::render(
         && std::isfinite(hud.boss.maximumHealth) && hud.boss.maximumHealth > 0.0F;
     const float bossHealthRatio = showBoss
         ? std::clamp(hud.boss.health / hud.boss.maximumHealth, 0.0F, 1.0F) : 0.0F;
+    const int bossPanelWidth = showBoss
+        ? std::min(std::max(1, width - (hudMargin * 2)),
+            std::max(220, std::min(240 * hudScale, width * 2 / 5))) : 0;
+    const bool bossTwoLines = bossPanelWidth < (hudPadding * 2)
+        + bitmapTextWidth("BOSS 100%", hudScale)
+        + bitmapTextWidth("PHASE 2/3 PRESSURE", hudScale) + (6 * hudScale);
+    const int bossPanelHeight = showBoss
+        ? (hudPadding * 2) + (hudLineHeight * (bossTwoLines ? 2 : 1))
+            + (6 * hudScale) : 0;
+    const int topCornerOffset = showBoss ? bossPanelHeight + (3 * hudScale) : 0;
     const int topRightLines = (topRightObjective ? 2 : 0)
         + (hud.visible && hud.runTimerVisible ? 1 : 0)
         + (hud.visible && hud.runTimerVisible && hud.speedrunMode
-                && hud.speedrunRecordVisible ? 1 : 0)
-        + (showBoss ? 3 : 0);
+                && hud.speedrunRecordVisible ? 1 : 0);
     const int topRightHeight = topRightLines == 0 ? 0
         : (hudPadding * 2) + (topRightLines * hudLineHeight);
     const auto drawSelectedRow = [&](const UiRect row,
@@ -2821,7 +2830,7 @@ bool GdpRenderer::render(
             const int eventHeight = (7 * hudScale) + (hudPadding * 2);
             const int eventX = std::max(hudMargin, width - hudMargin - eventWidth);
             const int eventY = std::max(hudMargin,
-                height - hudMargin - topRightHeight
+                height - hudMargin - topCornerOffset - topRightHeight
                     - (topRightHeight > 0 ? 3 * hudScale : 0) - eventHeight);
             drawHudRailPanel(
                 {eventX, eventY, eventWidth, eventHeight}, hudScale, eventColor);
@@ -3068,7 +3077,7 @@ bool GdpRenderer::render(
         performancePanelHeight = panelHeight;
         const int panelX = hudMargin;
         const int panelY = std::max(
-            hudMargin, height - hudMargin - panelHeight);
+            hudMargin, height - hudMargin - topCornerOffset - panelHeight);
         drawIndustrialPanel(
             {panelX, panelY, panelWidth, panelHeight}, 1, performanceColor);
         int textY = panelY + panelHeight - performancePadding - 7;
@@ -3090,8 +3099,10 @@ bool GdpRenderer::render(
         const int performanceHeight = hud.performanceOverlay
             ? performancePanelHeight + (3 * hudScale) : 0;
         const int mapX = hudMargin;
-        const int mapY = height - hudMargin - mapHeight - performanceHeight;
-        if (mapY >= hudMargin && mapWidth + (hudMargin * 2) <= width) {
+        const int mapY = height - hudMargin - topCornerOffset
+            - mapHeight - performanceHeight;
+        const int minimumMapY = showBoss ? hudMargin + (48 * hudScale) : hudMargin;
+        if (mapY >= minimumMapY && mapWidth + (hudMargin * 2) <= width) {
             drawHudRailPanel({mapX, mapY, mapWidth, mapHeight},
                 hudScale, cyanColor);
             drawBitmapText(mapX + hudPadding,
@@ -3257,13 +3268,11 @@ bool GdpRenderer::render(
             bitmapTextWidth(objectiveText, hudScale),
             bitmapTextWidth(timerText, hudScale),
             bitmapTextWidth(bestText, hudScale),
-            bitmapTextWidth(bossHealthText, hudScale),
-            bitmapTextWidth(showBoss ? "PHASE 2/3 PRESSURE" : "", hudScale),
         }) + (hudPadding * 2);
         const int topRightX = std::max(hudMargin,
             width - hudMargin - topRightWidth);
         const int topRightY = std::max(hudMargin,
-            height - hudMargin - topRightHeight);
+            height - hudMargin - topCornerOffset - topRightHeight);
         drawHudRailPanel({topRightX, topRightY, topRightWidth,
             topRightHeight}, hudScale, objectiveColor);
         int lineY = topRightY + topRightHeight - hudPadding - (7 * hudScale);
@@ -3285,19 +3294,26 @@ bool GdpRenderer::render(
                 uiTheme.warning);
             lineY -= hudLineHeight;
         }
-        if (showBoss) {
-            drawBitmapText(textX, lineY, hudScale, bossHealthText, textColor);
-            lineY -= hudLineHeight;
-            drawBitmapText(textX, lineY, hudScale, bossPhaseText, uiTheme.warning);
-            lineY -= hudLineHeight;
-            const int barWidth = topRightWidth - (hudPadding * 2);
-            const int filledWidth = std::max(1, static_cast<int>(std::round(
-                static_cast<float>(barWidth) * bossHealthRatio)));
-            drawSolidRect(textX, lineY + (2 * hudScale), barWidth,
-                3 * hudScale, uiTheme.panelBorder);
-            drawSolidRect(textX, lineY + (2 * hudScale), filledWidth,
-                3 * hudScale, uiTheme.warning);
-        }
+    }
+    if (showBoss) {
+        const int bossX = (width - bossPanelWidth) / 2;
+        const int bossY = height - hudMargin - bossPanelHeight;
+        drawHudRailPanel({bossX, bossY, bossPanelWidth, bossPanelHeight},
+            hudScale, uiTheme.warning);
+        const int textX = bossX + hudPadding;
+        const int textY = bossY + bossPanelHeight - hudPadding - (7 * hudScale);
+        drawBitmapText(textX, textY, hudScale, bossHealthText, textColor);
+        const int phaseX = bossTwoLines ? textX
+            : bossX + bossPanelWidth - hudPadding - bitmapTextWidth(bossPhaseText, hudScale);
+        drawBitmapText(phaseX, textY - (bossTwoLines ? hudLineHeight : 0),
+            hudScale, bossPhaseText, uiTheme.warning);
+        const int barWidth = bossPanelWidth - (hudPadding * 2);
+        const int filledWidth = std::max(1, static_cast<int>(std::round(
+            static_cast<float>(barWidth) * bossHealthRatio)));
+        drawSolidRect(textX, bossY + hudPadding, barWidth,
+            4 * hudScale, uiTheme.panelBorder);
+        drawSolidRect(textX, bossY + hudPadding, filledWidth,
+            4 * hudScale, uiTheme.warning);
     }
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {

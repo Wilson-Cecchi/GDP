@@ -21,7 +21,7 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
     const char* const captureDirectory = std::getenv("GDP_BOSS_HUD_CAPTURE_DIR");
     bool passed = true;
     for (const auto dimensions : {std::array{1280, 720},
-             std::array{960, 540}, std::array{320, 200}}) {
+             std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
         const int width = dimensions[0];
         const int height = dimensions[1];
         HudRenderData hud;
@@ -64,23 +64,36 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
         hud.boss.health = 100.0F;
         const auto half = renderPixels(hud);
         const auto longestWarningRun = [&](const std::vector<std::uint8_t>& pixels) {
-            int longest = 0;
-            for (int y = height / 2; y < height; ++y) {
+            std::array<int, 3> longest{0, 0, 0};
+            for (int y = height * 3 / 4; y < height; ++y) {
                 int run = 0;
-                for (int x = width / 2; x < width; ++x) {
+                for (int x = 0; x < width; ++x) {
                     const auto offset = static_cast<std::size_t>((y * width + x) * 4);
                     const bool warning = pixels[offset] > 200U
                         && pixels[offset + 1U] > 80U && pixels[offset + 1U] < 200U
                         && pixels[offset + 2U] < 80U;
                     run = warning ? run + 1 : 0;
-                    longest = std::max(longest, run);
+                    if (run > longest[0]) {
+                        longest = {run, x - run + 1, x};
+                    }
                 }
             }
             return longest;
         };
-        const int fullBar = longestWarningRun(full);
-        const int halfBar = longestWarningRun(half);
-        passed &= fullBar > 40 && std::abs(halfBar * 2 - fullBar) <= 1;
+        const auto fullBar = longestWarningRun(full);
+        const auto halfBar = longestWarningRun(half);
+        passed &= fullBar[0] > 40 && std::abs(halfBar[0] * 2 - fullBar[0]) <= 1
+            && std::abs(fullBar[1] + fullBar[2] + 1 - width) <= 1;
+        // Long Campaign timer text and F3 must not cover or move the central bar.
+        HudRenderData campaignHud = hud;
+        campaignHud.boss.health = 200.0F;
+        campaignHud.campaignMode = true;
+        campaignHud.campaignFloor = 2U;
+        campaignHud.campaignFloorCount = 3U;
+        campaignHud.campaignThreatPercent = 110U;
+        passed &= longestWarningRun(renderPixels(campaignHud)) == fullBar;
+        campaignHud.performanceOverlay = true;
+        passed &= longestWarningRun(renderPixels(campaignHud)) == fullBar;
         hud.boss.phase = HudBossPhase::Pressure;
         const auto pressure = renderPixels(hud);
         hud.boss.health = 32.0F;

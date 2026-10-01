@@ -155,7 +155,9 @@ prancha aprovada não permite aceitar pixels ausentes, NaN ou perda de contraste
 `hud_boss_systems` verifica o engajamento pelo corredor, snapshot de HP real,
 limiares exatos das três fases, mudança de sala do boss, exclusão de inimigos
 inativos e ocultação após morte, resultado ou replay. O gate OpenGL diferencia
-vida cheia/parcial, mudança de fase e ocultação em 1280×720, 960×540 e 320×200.
+vida cheia/parcial, mudança de fase e ocultação em 1280×720, 960×540, 640×360 e
+320×200. Verifica a barra no topo central, redução proporcional do preenchimento
+e posição preservada com o cronômetro da Campaign e o overlay F3.
 `GDP_BOSS_HUD_CAPTURE_DIR=/caminho/absoluto` permite salvar os mesmos frames de
 fixture em BMP para inspeção. Essas capturas exercem o renderer real, mas não
 substituem um playtest integrado de balanceamento ou aprovação artística.

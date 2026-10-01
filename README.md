@@ -600,7 +600,7 @@ especializados das pastas numeradas.
   implementados. `Esc`, `Enter` ou clique em `BACK` retorna ao menu de origem;
   abrir a página durante uma run não avança a simulação.
 - **Leitura do confronto do boss:** após engajar o IndustrialRobot, inclusive
-  pela porta aberta do corredor, o painel de objetivo mostra sua vida em barra
+  pela porta aberta do corredor, um painel no topo central mostra sua vida em barra
   e percentual e a fase real de combate: `RANGE`, `PRESSURE` ou `PURSUIT`.
   A indicação acompanha o boss entre salas, congela junto da pausa e desaparece
   na vitória, derrota ou reinício. Usa a moldura Rail existente e não altera
