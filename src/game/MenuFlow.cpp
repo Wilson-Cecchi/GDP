@@ -18,7 +18,7 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
     };
     switch (s.page) {
     case MenuPage::Root:
-        view.title = "GDP"; view.subtitle = "INDUSTRIAL COMPLEX";
+        view.title = "IRON SEED"; view.subtitle = "INDUSTRIAL COMPLEX";
         if (testMode) { row("TEST MODE"); view.rows.back().command = MenuCommand::TestMode; }
         row("CAMPAIGN / STORY"); view.rows.back().destination = MenuPage::CampaignSlots;
         row("SPEEDRUN"); view.rows.back().destination = MenuPage::Speedrun;

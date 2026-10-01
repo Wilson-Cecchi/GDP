@@ -2702,8 +2702,8 @@ bool GdpRenderer::render(
             layout.panel.y, railWidth, layout.panel.height, uiTheme.panelBorder);
         drawMenuPanel(layout.panel, scale, cyanColor);
 
-        constexpr std::string_view title = "GDP";
-        constexpr std::string_view subtitle = "GENERATED DUNGEON PROTOCOL";
+        constexpr std::string_view title = "IRON SEED";
+        constexpr std::string_view subtitle = "INDUSTRIAL COMPLEX";
         drawBitmapText((width - bitmapTextWidth(title, 3 * scale)) / 2,
             layout.panel.y + layout.panel.height - (26 * scale),
             3 * scale, title, cyanColor);

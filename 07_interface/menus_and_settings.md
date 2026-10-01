@@ -9,6 +9,13 @@ referência da direção Tático: `visual/proposals/interface_visual_v3.html`.
 Logo claro, texto branco/cinza, seleção por sublinhado e fundo translúcido.
 Não há molduras ornamentais nem cartão grande de descrição à direita.
 O título fica à esquerda nas telas largas; submenus ficam centralizados.
+O nome exibido no título é **IRON SEED**, em ambos os idiomas. Os identificadores
+técnicos GDP (executável, diretório de preferências e saves) permanecem iguais;
+esta mudança de nome visual não exige migração nem altera a gameplay.
+Validação do nome: modelo, navegação SDL e pixels OpenGL passaram (3/3,
+Release); o título completo cabe em 1280×720, 960×540, 640×360 e 320×200.
+Capturas em `visual/validation/interface_ptbr_title_1280x720.png` e
+`visual/validation/iron_seed_title_320x200.png` registram a revisão.
 
 Em 1280×720, cada linha do título mede **348×30 px**, antes 608×50 px.
 A escala da tipografia/linhas é limitada a 2× também em Full HD/ultrawide;

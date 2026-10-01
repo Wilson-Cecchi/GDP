@@ -38,6 +38,8 @@ especializados das pastas numeradas.
 
 - **Menus atuais:** `TEST MODE` (arena dedicada de desenvolvimento),
   `CAMPAIGN / STORY`, `SPEEDRUN`, `SETTINGS` e `QUIT GAME`.
+  O título do menu inicial apresenta o nome **Iron Seed**; o executável e
+  os caminhos de saves continuam com os identificadores técnicos GDP.
   Campanha: 10 andares, três slots independentes, Easy/Normal/Hard, checkpoint
   no início do andar e armas adicionais aleatórias nas salas.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em

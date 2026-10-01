@@ -93,6 +93,9 @@ void layoutTests() {
     MenuFlowState state;
     std::array<CampaignSlotInfo, 3> slots{};
     auto view = makeMenuView(state, slots, {}, settings, true);
+    expect(view.title == "IRON SEED"
+        && makeMenuView(state, slots, {}, RuntimeSettings{}, true).title == "IRON SEED",
+        "Iron Seed branding is identical in Portuguese and English");
     expect(view.rows[0].text == "MODO DE TESTE" && view.rows[3].text == "CONFIGURAÇÕES", "all title labels use selected language");
     expect(activateMenu(state, view, slots) == MenuCommand::TestMode, "translated Test Mode still launches typed command");
     state.selection = 1U; (void)activateMenu(state, view, slots);
@@ -108,6 +111,13 @@ void layoutTests() {
         "right arrow restores Portuguese immediately");
     expect(languageForName("pt-BR") == Language::PortugueseBrazil && !languageForName("xx"), "language serialization identifiers are stable");
     using namespace gdp::game::visual;
+    for (const auto dimensions : {std::array{1280, 720}, std::array{960, 540},
+             std::array{640, 360}, std::array{320, 200}}) {
+        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
+        expect(static_cast<int>(uiTextLength("IRON SEED")) * 6 * 3 * root.scale
+            <= root.panel.width - 16 * root.scale,
+            "complete Iron Seed title fits without truncating or expanding the menu");
+    }
     for (const auto dimensions : {std::array{1280, 720}, std::array{1920, 1080}, std::array{2560, 1080}}) {
         const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
         expect(root.rows[0].width == 348 && root.rows[0].height == 30,
