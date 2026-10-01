@@ -4,6 +4,7 @@
 #include "entities/EntityManager.hpp"
 #include "game/LaunchSeed.hpp"
 #include "game/PerformanceMonitor.hpp"
+#include "game/MenuFlow.hpp"
 #include "game/ai/ActiveEnemyBrains.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "gameplay/Collision.hpp"
@@ -52,6 +53,7 @@ namespace gdp::game {
 struct ApplicationConfig {
     bool headless{false};
     bool scriptedEnemies{false};
+    bool testMode{false};
     std::optional<entities::EnemyArchetype> experimentalNeuralEnemy;
     std::optional<std::filesystem::path> neuralBrainPath;
     std::optional<std::filesystem::path> testBrainDirectory;
@@ -75,6 +77,7 @@ public:
     int run();
 
 private:
+    friend struct ApplicationMenuTestAccess;
     struct ActiveImpact {
         visual::ImpactRenderData render{};
         std::uint32_t roomId{0U};
@@ -84,6 +87,8 @@ private:
     bool initialize();
     bool initializeRun();
     void processEvents();
+    void processFrontendMenu();
+    [[nodiscard]] MenuView frontendMenuView() const;
     void fixedUpdate(double fixedStepSeconds);
     void updateEnemyAnimationTransitions(bool deadOnly);
     void render();
@@ -112,6 +117,12 @@ private:
     std::optional<gameplay::CampaignCarryover> campaignFloorEntry_;
     std::optional<gameplay::CampaignCheckpoint> campaignCheckpoint_;
     std::optional<std::filesystem::path> campaignCheckpointPath_;
+    std::array<CampaignSlotInfo, 3> campaignSlots_{};
+    std::size_t activeCampaignSlot_{0U};
+    std::array<std::optional<std::filesystem::path>, 3> campaignSlotPaths_{};
+    MenuFlowState menuFlow_{};
+    std::vector<gameplay::SpeedrunRecord> speedrunLeaderboard_;
+    std::optional<std::filesystem::path> speedrunLeaderboardPath_;
     float runDifficulty_{1.0F};
     gameplay::SessionSystem session_;
     gameplay::FeedbackState feedback_;

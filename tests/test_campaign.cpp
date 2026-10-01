@@ -228,11 +228,11 @@ void testCampaignDifficultyProgression()
     using namespace gdp::gameplay;
     expect(near(campaignDifficultyMultiplier(1U), 1.0F),
         "Campaign floor one preserves the original gameplay balance");
-    expect(near(campaignDifficultyMultiplier(2U), 1.1F)
-            && near(campaignDifficultyMultiplier(3U), 1.2F),
-        "Campaign threat increases by ten percent on each later floor");
+    expect(near(campaignDifficultyMultiplier(2U), 1.08F)
+            && near(campaignDifficultyMultiplier(3U), 1.16F),
+        "Campaign threat increases by eight percentage points on each later floor");
     expect(near(campaignDifficultyMultiplier(0U), 1.0F)
-            && near(campaignDifficultyMultiplier(99U), 1.2F),
+            && near(campaignDifficultyMultiplier(99U), 1.72F),
         "Campaign threat clamps invalid floor numbers safely");
 }
 

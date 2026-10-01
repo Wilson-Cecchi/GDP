@@ -101,7 +101,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 6\n"
+        "version = 7\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -134,7 +134,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 6\n"
+        "version = 7\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");

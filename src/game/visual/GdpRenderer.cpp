@@ -2281,7 +2281,8 @@ bool GdpRenderer::render(
             line, corner, accent);
     };
     const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
-        || hud.objective == ObjectiveRenderState::DefeatBoss;
+        || hud.objective == ObjectiveRenderState::DefeatBoss
+        || hud.objective == ObjectiveRenderState::TestArena;
     const bool showBoss = hud.visible && hud.boss.visible
         && hud.objective == ObjectiveRenderState::DefeatBoss
         && std::isfinite(hud.boss.health) && hud.boss.health > 0.0F
@@ -2356,6 +2357,43 @@ bool GdpRenderer::render(
             uiTheme.mutedText);
     };
 
+    if (hud.listMenu.active) {
+        const auto& menu = hud.listMenu;
+        const auto layout = makeListMenuLayout(width, height, menu.rows.size());
+        const int scale = layout.scale;
+        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        const auto fit = [&](const std::string& source, const int available, const int textScale) {
+            std::string text = source;
+            while (!text.empty() && bitmapTextWidth(text, textScale) > available) text.pop_back();
+            return text;
+        };
+        const auto title = fit(menu.title, layout.panel.width - 16 * scale, 2 * scale);
+        drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
+            layout.panel.y + layout.panel.height - 20 * scale, 2 * scale, title, cyanColor);
+        const auto subtitle = fit(menu.subtitle, layout.panel.width - 16 * scale, scale);
+        drawBitmapText((width - bitmapTextWidth(subtitle, scale)) / 2,
+            layout.panel.y + layout.panel.height - 32 * scale, scale, subtitle, uiTheme.mutedText);
+        for (std::size_t i = 0; i < layout.rows.size(); ++i) {
+            const auto row = layout.rows[i];
+            const bool enabled = i >= menu.enabled.size() || menu.enabled[i];
+            if (i == menu.selection && enabled) drawSelectedRow(row, scale, cyanColor);
+            const bool adjustable = i < menu.adjustable.size() && menu.adjustable[i];
+            const auto text = fit(menu.rows[i], row.width - (adjustable ? 48 : 12) * scale, scale);
+            drawBitmapText(row.x + 6 * scale, row.y + std::max(0, (row.height - 7 * scale) / 2),
+                scale, text, !enabled ? uiTheme.mutedText : i == menu.selection ? cyanColor : textColor);
+            if (adjustable) {
+                const int y = row.y + std::max(0, (row.height - 7 * scale) / 2);
+                drawBitmapText(row.x + row.width - 34 * scale, y, scale, "<", cyanColor);
+                drawBitmapText(row.x + row.width - 14 * scale, y, scale, ">", cyanColor);
+            }
+        }
+        constexpr std::string_view controls = "WASD / ARROWS  ENTER  ESC  MOUSE";
+        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2, layout.panel.y + 4 * scale, 1, controls, uiTheme.mutedText);
+        drawExitConfirmation();
+        glDisable(GL_SCISSOR_TEST);
+        glEnable(GL_DEPTH_TEST);
+        return glGetError() == GL_NO_ERROR;
+    }
     if (hud.controlsMenu) {
         const ControlsMenuLayout layout = makeControlsMenuLayout(width, height);
         const int scale = layout.scale;
@@ -2760,7 +2798,7 @@ bool GdpRenderer::render(
             hudScale, keysText, cyanColor);
 
         if (hud.flashlightOn && width >= 400) {
-            constexpr std::string_view lightText = "F  LIGHT ON";
+            const std::string lightText = hud.flashlightBinding + "  LIGHT ON";
             const int lightWidth = bitmapTextWidth(lightText, hudScale)
                 + (hudPadding * 2);
             const int lightHeight = (7 * hudScale) + (hudPadding * 2);
@@ -2838,17 +2876,17 @@ bool GdpRenderer::render(
                 hudScale, eventText, eventColor);
         }
 
-        std::string_view promptText;
+        std::string promptText;
         wkc::core::Vec3 promptColor{0.78F, 0.90F, 0.92F};
         if (hud.prompt == HudPrompt::OpenDoor) {
-            promptText = "E OPEN DOOR";
+            promptText = hud.interactBinding + " OPEN DOOR";
         } else if (hud.prompt == HudPrompt::DoorLocked) {
             promptText = "DOOR LOCKED";
             promptColor = {0.98F, 0.24F, 0.12F};
         } else if (hud.prompt == HudPrompt::UseTerminal) {
-            promptText = "E USE TERMINAL";
+            promptText = hud.interactBinding + " USE TERMINAL";
         } else if (hud.prompt == HudPrompt::Reload) {
-            promptText = "R RELOAD";
+            promptText = hud.reloadBinding + " RELOAD";
             promptColor = {0.98F, 0.62F, 0.14F};
         }
         if (!hud.paused && !promptText.empty()) {
@@ -3226,6 +3264,8 @@ bool GdpRenderer::render(
     wkc::core::Vec3 objectiveColor = cyanColor;
     if (hud.objective == ObjectiveRenderState::ReachBoss) {
         objectiveText = "REACH BOSS";
+    } else if (hud.objective == ObjectiveRenderState::TestArena) {
+        objectiveText = "TEST ARENA";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {
         objectiveText = "DEFEAT BOSS";
         objectiveColor = uiTheme.warning;

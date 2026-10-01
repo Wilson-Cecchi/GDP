@@ -29,7 +29,8 @@ InitialEntitySet populateInitialEntities(
     World& world,
     gdp::entities::EntityManager& manager,
     gdp::entities::PlayerCreateInfo player,
-    const float difficulty)
+    const float difficulty,
+    const bool campaignWeapons)
 {
     using namespace gdp::entities;
 
@@ -58,7 +59,7 @@ InitialEntitySet populateInitialEntities(
         roomDepths.push_back(node->depth);
         LootLayout layout = generateLootLayout(
             room.seed, room.role, room.theme, node->depth, room.lootZones,
-            safeDifficulty);
+            safeDifficulty, campaignWeapons);
         if (!validateLootLayout(layout, room.lootZones).isValid()) {
             return result;
         }
@@ -84,12 +85,14 @@ InitialEntitySet populateInitialEntities(
         };
         const auto addLoot = [&] {
             for (const LootDrop& drop : lootLayouts[roomIndex].drops) {
-                addToRoom(manager.createItem({
+                const auto id = manager.createItem({
                     .transform = {.position = drop.position},
                     .roomId = room.id,
                     .type = drop.type,
                     .quantity = drop.quantity,
-                }));
+                });
+                manager.findData<ItemData>(id)->spawnedWeaponArchetype = drop.weaponArchetype;
+                addToRoom(id);
             }
         };
         const auto addProps = [&] {

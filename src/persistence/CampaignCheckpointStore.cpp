@@ -70,6 +70,7 @@ struct Fields {
     std::optional<std::uint64_t> runIndex;
     std::optional<std::uint64_t> seedIndex;
     std::optional<std::uint64_t> floor;
+    std::optional<std::uint64_t> difficulty;
     std::optional<float> health;
     std::optional<float> maximumHealth;
     std::optional<float> armor;
@@ -141,6 +142,8 @@ bool assignField(
     std::optional<std::uint64_t>* unsignedTarget = nullptr;
     if (key == "version") {
         unsignedTarget = &fields.version;
+    } else if (key == "difficulty") {
+        unsignedTarget = &fields.difficulty;
     } else if (key == "rules_version") {
         unsignedTarget = &fields.rulesVersion;
     } else if (key == "initial_seed") {
@@ -216,6 +219,7 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
     output << std::setprecision(std::numeric_limits<float>::max_digits10)
            << "version = " << currentCampaignCheckpointFileVersion << '\n'
            << "rules_version = " << checkpoint.rulesVersion << '\n'
+           << "difficulty = " << static_cast<unsigned>(checkpoint.difficulty) << '\n'
            << "initial_seed = " << checkpoint.initialSeed << '\n'
            << "current_seed = " << checkpoint.currentSeed << '\n'
            << "run_index = " << checkpoint.runIndex << '\n'
@@ -313,6 +317,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             return result;
         }
         if (*fields.version != 3U
+            && *fields.version != 4U
             && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::UnsupportedVersion;
             return result;
@@ -415,6 +420,13 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
                     *eventsCompleted, *vitalityRank, *firepowerRank, *capacityRank},
             },
         };
+        if (*fields.version >= 5U) {
+            if (!fields.difficulty || *fields.difficulty >= static_cast<unsigned>(gameplay::Difficulty::Count)) {
+                result.status = CampaignCheckpointLoadStatus::Invalid;
+                return result;
+            }
+            checkpoint.difficulty = static_cast<gameplay::Difficulty>(*fields.difficulty);
+        }
         if (!gameplay::validateCampaignCheckpoint(checkpoint)) {
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;

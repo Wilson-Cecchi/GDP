@@ -36,6 +36,10 @@ enum class Key : std::uint8_t {
     Down,
     Left,
     Right,
+    B, C, H, I, J, K, L, M, N, O, P, T, U, V, X, Y, Z,
+    Digit0, Digit6, Digit7, Digit8, Digit9,
+    LeftAlt, RightAlt, Backspace, Delete, Home, End, PageUp, PageDown,
+    F1, F2, F4, F5, F6, F7, F8, F9, F10, F11, F12,
     Count,
 };
 

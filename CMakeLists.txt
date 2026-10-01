@@ -19,6 +19,7 @@ include(FetchContent)
 
 option(GDP_FETCH_SDL3 "Download SDL3 when no system package is available" ON)
 option(GDP_BUILD_TESTS "Build and register GDP tests" ON)
+option(GDP_ENABLE_TEST_MODE "Include the dedicated development test arena (disable for shipping)" ON)
 option(GDP_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
 find_package(SDL3 3.4 CONFIG QUIET)
@@ -166,6 +167,7 @@ add_library(
     gdp_gameplay
     STATIC
     src/gameplay/Campaign.cpp
+    src/gameplay/ControlBindings.cpp
     src/gameplay/Collision.cpp
     src/gameplay/Combat.cpp
     src/gameplay/Door.cpp
@@ -193,7 +195,7 @@ add_library(
 
 target_compile_features(gdp_gameplay PUBLIC cxx_std_20)
 target_include_directories(gdp_gameplay PUBLIC src)
-target_link_libraries(gdp_gameplay PUBLIC wkc_forge_core wkc_forge_ai gdp_entities)
+target_link_libraries(gdp_gameplay PUBLIC wkc_forge_core wkc_forge_ai gdp_entities wkc_forge_platform)
 gdp_enable_warnings(gdp_gameplay)
 gdp_enable_sanitizers(gdp_gameplay)
 
@@ -304,6 +306,7 @@ add_library(
     src/persistence/CampaignCheckpointStore.cpp
     src/persistence/SettingsStore.cpp
     src/persistence/SpeedrunRecordStore.cpp
+    src/persistence/SpeedrunLeaderboardStore.cpp
     src/persistence/WorkerBrainStore.cpp
 )
 
@@ -330,11 +333,17 @@ add_executable(
     gdp
     src/main.cpp
     src/game/Application.cpp
+    src/game/ApplicationMenus.cpp
+    src/game/MenuFlow.cpp
     src/game/HudBoss.cpp
     src/game/HudMap.cpp
     src/game/LaunchSeed.cpp
     src/game/PerformanceMonitor.cpp
 )
+target_compile_definitions(gdp PRIVATE GDP_ENABLE_TEST_MODE=$<BOOL:${GDP_ENABLE_TEST_MODE}>)
+if(GDP_ENABLE_TEST_MODE)
+    target_sources(gdp PRIVATE src/game/TestArena.cpp)
+endif()
 
 target_link_libraries(
     gdp
@@ -437,6 +446,25 @@ if(WIN32)
 endif()
 
 if(GDP_BUILD_TESTS)
+    add_executable(gdp_frontend_tests tests/test_frontend.cpp src/game/MenuFlow.cpp)
+    target_link_libraries(gdp_frontend_tests PRIVATE gdp_gameplay gdp_persistence gdp_visual_renderer)
+    gdp_enable_warnings(gdp_frontend_tests)
+    gdp_enable_sanitizers(gdp_frontend_tests)
+    add_test(NAME frontend_menu_systems COMMAND gdp_frontend_tests)
+    if(UNIX AND NOT APPLE AND GDP_ENABLE_TEST_MODE)
+        get_target_property(GDP_APPLICATION_TEST_SOURCES gdp SOURCES)
+        list(REMOVE_ITEM GDP_APPLICATION_TEST_SOURCES src/main.cpp)
+        get_target_property(GDP_APPLICATION_TEST_LIBRARIES gdp LINK_LIBRARIES)
+        add_executable(gdp_application_menu_tests tests/test_application_menus.cpp ${GDP_APPLICATION_TEST_SOURCES})
+        target_compile_definitions(gdp_application_menu_tests PRIVATE GDP_ENABLE_TEST_MODE=1)
+        target_link_libraries(gdp_application_menu_tests PRIVATE ${GDP_APPLICATION_TEST_LIBRARIES})
+        gdp_enable_warnings(gdp_application_menu_tests)
+        gdp_enable_sanitizers(gdp_application_menu_tests)
+        add_dependencies(gdp_application_menu_tests gdp_brain_assets)
+        add_test(NAME application_menu_integration COMMAND gdp_application_menu_tests)
+        set_tests_properties(application_menu_integration PROPERTIES
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy" TIMEOUT 120)
+    endif()
     include(CTest)
 
     add_test(
@@ -863,8 +891,8 @@ if(GDP_BUILD_TESTS)
         gdp_enable_warnings(gdp_capture_industrial_wall)
         gdp_enable_sanitizers(gdp_capture_industrial_wall)
 
-        add_executable(gdp_renderer_gl_tests tests/test_renderer_gl.cpp)
-        target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_visual_renderer)
+        add_executable(gdp_renderer_gl_tests tests/test_renderer_gl.cpp src/game/MenuFlow.cpp)
+        target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_visual_renderer gdp_gameplay)
         gdp_enable_warnings(gdp_renderer_gl_tests)
         gdp_enable_sanitizers(gdp_renderer_gl_tests)
 

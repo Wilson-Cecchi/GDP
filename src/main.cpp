@@ -26,6 +26,9 @@ void printUsage(const std::string_view executable)
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
                  " [--save-dir DIR] [--resume FILE]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
+#if GDP_ENABLE_TEST_MODE
+              << "  --test-mode          Open the dedicated development arena directly.\n"
+#endif
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
               << "  --seed N             Generate a deterministic world from unsigned integer N.\n"
@@ -136,6 +139,9 @@ int main(const int argc, char* argv[])
             config.headless = true;
             continue;
         }
+#if GDP_ENABLE_TEST_MODE
+        if (argument == "--test-mode") { config.testMode = true; continue; }
+#endif
 
         if (argument == "--scripted-enemies") {
             config.scriptedEnemies = true;

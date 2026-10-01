@@ -241,6 +241,7 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     if (settings.windowResolution >= WindowResolution::Count) {
         settings.windowResolution = WindowResolution::R1280x720;
     }
+    if (!validateControlBindings(settings.controls)) settings.controls = {};
     return settings;
 }
 

@@ -10,7 +10,10 @@
 namespace gdp::gameplay {
 
 inline constexpr std::uint64_t runTimerTicksPerSecond = 60U;
-inline constexpr std::uint32_t campaignFloorCount = 3U;
+inline constexpr std::uint32_t campaignFloorCount = 10U;
+enum class Difficulty : std::uint8_t { Easy, Normal, Hard, Count };
+[[nodiscard]] const char* difficultyName(Difficulty difficulty) noexcept;
+[[nodiscard]] float baseDifficultyMultiplier(Difficulty difficulty) noexcept;
 
 enum class SessionPhase : std::uint8_t {
     Playing,
@@ -22,6 +25,7 @@ enum class RunMode : std::uint8_t {
     Standard,
     Campaign,
     Speedrun,
+    TestMode,
     Count,
 };
 
@@ -42,6 +46,7 @@ struct SessionState {
     std::uint32_t campaignFloor{1U};
     bool bossEngaged{false};
     std::uint64_t elapsedRunTicks{0U};
+    Difficulty difficulty{Difficulty::Normal};
 };
 
 struct SessionUpdate {
@@ -70,13 +75,15 @@ public:
     [[nodiscard]] std::optional<wkc::core::Seed> restart(
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;
+    [[nodiscard]] bool selectDifficulty(Difficulty difficulty) noexcept;
     [[nodiscard]] bool selectRunSeed(wkc::core::Seed seed) noexcept;
     [[nodiscard]] bool restoreCampaignCheckpoint(
         wkc::core::Seed initialSeed,
         wkc::core::Seed currentSeed,
         std::uint32_t runIndex,
         std::uint32_t seedIndex,
-        std::uint32_t floor) noexcept;
+        std::uint32_t floor,
+        Difficulty difficulty = Difficulty::Normal) noexcept;
     void advanceRunTimer(bool gameplayActive = true) noexcept;
     [[nodiscard]] const SessionState& state() const noexcept;
 

@@ -80,6 +80,11 @@ void testSdlTranslation()
         std::pair{SDL_SCANCODE_DOWN, Key::Down},
         std::pair{SDL_SCANCODE_LEFT, Key::Left},
         std::pair{SDL_SCANCODE_RIGHT, Key::Right},
+        std::pair{SDL_SCANCODE_C, Key::C},
+        std::pair{SDL_SCANCODE_P, Key::P},
+        std::pair{SDL_SCANCODE_9, Key::Digit9},
+        std::pair{SDL_SCANCODE_LALT, Key::LeftAlt},
+        std::pair{SDL_SCANCODE_PAGEUP, Key::PageUp},
     };
     for (const auto& [scancode, key] : controlMappings) {
         wkc::platform::Input mappedInput;
@@ -116,12 +121,13 @@ void testSdlTranslation()
     crouchEvent = {};
     crouchEvent.type = SDL_EVENT_KEY_DOWN;
     crouchEvent.key.scancode = SDL_SCANCODE_C;
-    expect(!wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent),
-        "C no longer activates crouch");
+    expect(wkc::platform::handleSdlInputEvent(crouchInput, crouchEvent)
+            && crouchInput.isKeyDown(Key::C) && !crouchInput.isKeyDown(Key::LeftControl),
+        "C is a neutral remappable key, not the default crouch binding");
 
     event = {};
     event.type = SDL_EVENT_KEY_DOWN;
-    event.key.scancode = SDL_SCANCODE_F12;
+    event.key.scancode = SDL_SCANCODE_UNKNOWN;
     expect(!wkc::platform::handleSdlInputEvent(input, event),
         "unmapped SDL key is ignored");
 

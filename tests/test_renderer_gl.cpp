@@ -1,4 +1,5 @@
 #include "game/visual/GdpRenderer.hpp"
+#include "game/MenuFlow.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -14,6 +15,53 @@
 #include <vector>
 
 namespace {
+
+bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game;
+    using namespace gdp::game::visual;
+    bool passed = true;
+    const char* captureDirectory = std::getenv("GDP_MENU_CAPTURE_DIR");
+    std::array<CampaignSlotInfo, 3> slots{};
+    gdp::gameplay::CampaignCheckpoint checkpoint;
+    checkpoint.floor = 7U; checkpoint.difficulty = gdp::gameplay::Difficulty::Hard;
+    slots[1] = {checkpoint, true};
+    for (auto dimensions : {std::array{1280, 720}, std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
+        const int width = dimensions[0], height = dimensions[1];
+        for (auto page : {MenuPage::Root, MenuPage::CampaignSlots, MenuPage::Bindings}) {
+            MenuFlowState state; state.page = page;
+            const auto view = makeMenuView(state, slots, {}, {}, true);
+            HudRenderData hud;
+            hud.listMenu.active = true; hud.listMenu.title = view.title; hud.listMenu.subtitle = view.subtitle;
+            for (const auto& row : view.rows) {
+                hud.listMenu.rows.push_back(row.text); hud.listMenu.enabled.push_back(row.enabled);
+                hud.listMenu.adjustable.push_back(row.setting.has_value());
+            }
+            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            if (captureDirectory) {
+                std::vector<std::uint8_t> topDown(pixels.size());
+                const auto stride = static_cast<std::size_t>(width * 4);
+                for (int row = 0; row < height; ++row) std::copy_n(pixels.data() + static_cast<std::size_t>(height - row - 1) * stride,
+                    stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+                std::filesystem::create_directories(captureDirectory);
+                const auto path = std::filesystem::path{captureDirectory} / ("menu-" + std::to_string(static_cast<unsigned>(page))
+                    + "-" + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
+                auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+                SDL_DestroySurface(surface);
+            }
+            hud.listMenu.selection = view.rows.size() - 1U;
+            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            std::vector<std::uint8_t> changed(pixels.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, changed.data());
+            passed &= pixels != changed;
+        }
+    }
+    if (!passed) std::cerr << "Frontend menu pixel render failed\n";
+    return passed;
+}
 
 bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
 {
@@ -1748,6 +1796,7 @@ int main()
             // Exercise the gameplay HUD at real drawable sizes after the small
             // fixed-scene checks; these snapshots do not change combat state.
             passed = validateBossHud(renderer) && passed;
+            passed = validateFrontendMenus(renderer) && passed;
         }
     }
 

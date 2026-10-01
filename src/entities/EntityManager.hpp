@@ -128,6 +128,8 @@ struct ItemData {
     // Transient presentation timing; gameplay and saved ammunition stay put.
     std::optional<std::uint64_t> droppedVisualStartTick;
     float droppedVisualYawDegrees{0.0F};
+    // Generated pickups can specify a firearm without claiming it is a player drop.
+    std::optional<std::uint32_t> spawnedWeaponArchetype;
 };
 
 struct PropData {

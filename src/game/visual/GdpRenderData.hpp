@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <span>
+#include <vector>
 
 namespace gdp::game::visual {
 
@@ -269,6 +270,7 @@ enum class ObjectiveRenderState : std::uint8_t {
     DefeatBoss,
     Victory,
     Defeat,
+    TestArena,
 };
 
 enum class HudEventState : std::uint8_t {
@@ -409,6 +411,26 @@ struct PauseMenuLayout {
     UiRect exitButton{};
 };
 
+struct ListMenuLayout {
+    int scale{1};
+    UiRect panel{};
+    std::vector<UiRect> rows;
+};
+struct ListMenuRenderData {
+    bool active{false};
+    std::string title;
+    std::string subtitle;
+    std::vector<std::string> rows;
+    std::vector<bool> enabled;
+    std::vector<bool> adjustable;
+    std::size_t selection{0U};
+};
+[[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count);
+[[nodiscard]] std::optional<std::size_t> listMenuSelectionAt(int width, int height,
+    std::size_t count, float pointerX, float pointerY);
+[[nodiscard]] std::optional<int> listMenuAdjustmentDirectionAt(int width, int height,
+    std::size_t count, float pointerX, float pointerY);
+
 struct ControlsMenuLayout {
     int scale{1};
     UiRect panel{};
@@ -535,6 +557,9 @@ struct HudRenderData {
     ObjectiveRenderState objective{ObjectiveRenderState::None};
     bool visible{false};
     bool flashlightOn{false};
+    std::string interactBinding{"E"};
+    std::string reloadBinding{"R"};
+    std::string flashlightBinding{"F"};
     bool infoOverlay{false};
     HudMapData map{};
     HudBossData boss{};
@@ -578,6 +603,7 @@ struct HudRenderData {
     bool paused{false};
     HudPauseSelection pauseSelection{HudPauseSelection::Resume};
     bool mainMenu{false};
+    ListMenuRenderData listMenu{};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
     bool campaignContinueAvailable{false};
     std::uint32_t campaignContinueFloor{1U};

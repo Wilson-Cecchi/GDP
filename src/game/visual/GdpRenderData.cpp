@@ -10,7 +10,54 @@
 #include <vector>
 
 namespace gdp::game::visual {
+ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count)
+{
+    ListMenuLayout layout;
+    if (width < 32 || height < 48 || count == 0U || count > 24U) return layout;
+    const int n = static_cast<int>(count);
+    layout.scale = std::max(1, std::min(width / 620, height / (80 + n * 15)));
+    const int scale = layout.scale;
+    const int panelWidth = std::min(width - 12, 600 * scale);
+    const int rowHeight = std::max(8, std::min(16 * scale, (height - 60 * scale) / n));
+    const int panelHeight = std::min(height - 8, 58 * scale + n * rowHeight);
+    layout.panel = {(width - panelWidth) / 2, (height - panelHeight) / 2, panelWidth, panelHeight};
+    for (int i = 0; i < n; ++i) {
+        layout.rows.push_back({layout.panel.x + 8 * scale,
+            layout.panel.y + panelHeight - 40 * scale - (i + 1) * rowHeight,
+            panelWidth - 16 * scale, rowHeight - scale});
+    }
+    return layout;
+}
+std::optional<std::size_t> listMenuSelectionAt(const int width, const int height,
+    const std::size_t count, const float pointerX, const float pointerY)
+{
+    if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
+    const auto layout = makeListMenuLayout(width, height, count);
+    // SDL pointers have a top-left origin; UI rectangles have a bottom-left origin.
+    const float y = static_cast<float>(height) - pointerY;
+    for (std::size_t i = 0; i < layout.rows.size(); ++i) {
+        const auto r = layout.rows[i];
+        if (pointerX >= static_cast<float>(r.x) && pointerX < static_cast<float>(r.x + r.width)
+            && y >= static_cast<float>(r.y) && y < static_cast<float>(r.y + r.height)) return i;
+    }
+    return std::nullopt;
+}
+std::optional<int> listMenuAdjustmentDirectionAt(const int width, const int height,
+    const std::size_t count, const float pointerX, const float pointerY)
+{
+    const auto selected = listMenuSelectionAt(width, height, count, pointerX, pointerY);
+    if (!selected) return std::nullopt;
+    const auto layout = makeListMenuLayout(width, height, count);
+    const auto r = layout.rows[*selected];
+    const float right = static_cast<float>(r.x + r.width);
+    if (pointerX >= right - static_cast<float>(40 * layout.scale)
+        && pointerX < right - static_cast<float>(22 * layout.scale)) return -1;
+    if (pointerX >= right - static_cast<float>(20 * layout.scale)
+        && pointerX < right - static_cast<float>(2 * layout.scale)) return 1;
+    return std::nullopt;
+}
 namespace {
+
 
 struct EnemyMotionProfile {
     std::uint64_t idlePeriod{120U};

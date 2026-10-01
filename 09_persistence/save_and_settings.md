@@ -1,5 +1,33 @@
 # Persistence — Saves e configurações
 
+## Contrato atual — revisão de 2026-10-01
+
+- Três slots: `campaign_slot_1.toml` a `campaign_slot_3.toml`, no diretório
+  de preferências SDL de WKC/GDP. Schema 5 adiciona a dificuldade base;
+  schemas 3/4 compatíveis continuam legíveis e assumem Normal.
+  Checkpoint válido aceita andares 1–10; recursos e seed continuam validados.
+- O arquivo único legado `campaign_checkpoint.toml` é importado somente para
+  slot 1 vazio e válido. Após salvar/verificar o novo arquivo, o legado é
+  preservado em `campaign_checkpoint.legacy.toml`, que impede nova importação
+  após completar a campanha. Slots já existentes nunca são sobrescritos por
+  migração. Arquivos inválidos/incompatíveis ficam preservados e indisponíveis.
+- Settings schema 7 adiciona `binding_0` a `binding_21` com nomes estáveis.
+  Schemas 1–6 mantêm as configurações e recebem os controles originais.
+  Bindings inválidos ou duplicados recuperam o conjunto padrão, sem ações
+  inacessíveis. A gameplay usa o conjunto salvo, enquanto a UI permanece fixa.
+- `speedrun_leaderboard.txt` tem cabeçalho `GDP_SPEEDRUN_BOARD 1 N` e no máximo
+  10 registros de regras, ticks e seed, ordenados por ticks/seed. Somente
+  vitórias Hard entram. A regra de Speedrun 36 não reaproveita tempos das regras
+  antigas; seus arquivos não são apagados. O recorde único atual continua
+  alimentando o HUD e Best Seed, junto do primeiro colocado do placar.
+- Gravações conservam temporário, flush, validação e substituição final;
+  falha não remove o save anterior. Campanhas concluídas removem somente o
+  slot ativo. Execuções headless não acessam preferências do jogador.
+- Save no meio do andar e placar online continuam fora desta revisão.
+
+O restante deste documento registra a evolução histórica; referências a um
+slot, três andares ou settings v6 não descrevem mais o fluxo atual.
+
 > **Estado:** configurações e recorde de Speedrun persistentes; checkpoint único
 > de entrada de andar da Campaign implementado na Fase 81. Slots completos e
 > save no meio do andar permanecem planejados.

@@ -65,6 +65,47 @@ std::optional<Key> keyFromSdl(const SDL_Scancode scancode) noexcept
         return Key::Left;
     case SDL_SCANCODE_RIGHT:
         return Key::Right;
+    case SDL_SCANCODE_B: return Key::B;
+    case SDL_SCANCODE_C: return Key::C;
+    case SDL_SCANCODE_H: return Key::H;
+    case SDL_SCANCODE_I: return Key::I;
+    case SDL_SCANCODE_J: return Key::J;
+    case SDL_SCANCODE_K: return Key::K;
+    case SDL_SCANCODE_L: return Key::L;
+    case SDL_SCANCODE_M: return Key::M;
+    case SDL_SCANCODE_N: return Key::N;
+    case SDL_SCANCODE_O: return Key::O;
+    case SDL_SCANCODE_P: return Key::P;
+    case SDL_SCANCODE_T: return Key::T;
+    case SDL_SCANCODE_U: return Key::U;
+    case SDL_SCANCODE_V: return Key::V;
+    case SDL_SCANCODE_X: return Key::X;
+    case SDL_SCANCODE_Y: return Key::Y;
+    case SDL_SCANCODE_Z: return Key::Z;
+    case SDL_SCANCODE_0: return Key::Digit0;
+    case SDL_SCANCODE_6: return Key::Digit6;
+    case SDL_SCANCODE_7: return Key::Digit7;
+    case SDL_SCANCODE_8: return Key::Digit8;
+    case SDL_SCANCODE_9: return Key::Digit9;
+    case SDL_SCANCODE_LALT: return Key::LeftAlt;
+    case SDL_SCANCODE_RALT: return Key::RightAlt;
+    case SDL_SCANCODE_BACKSPACE: return Key::Backspace;
+    case SDL_SCANCODE_DELETE: return Key::Delete;
+    case SDL_SCANCODE_HOME: return Key::Home;
+    case SDL_SCANCODE_END: return Key::End;
+    case SDL_SCANCODE_PAGEUP: return Key::PageUp;
+    case SDL_SCANCODE_PAGEDOWN: return Key::PageDown;
+    case SDL_SCANCODE_F1: return Key::F1;
+    case SDL_SCANCODE_F2: return Key::F2;
+    case SDL_SCANCODE_F4: return Key::F4;
+    case SDL_SCANCODE_F5: return Key::F5;
+    case SDL_SCANCODE_F6: return Key::F6;
+    case SDL_SCANCODE_F7: return Key::F7;
+    case SDL_SCANCODE_F8: return Key::F8;
+    case SDL_SCANCODE_F9: return Key::F9;
+    case SDL_SCANCODE_F10: return Key::F10;
+    case SDL_SCANCODE_F11: return Key::F11;
+    case SDL_SCANCODE_F12: return Key::F12;
     default:
         return std::nullopt;
     }

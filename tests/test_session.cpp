@@ -208,8 +208,16 @@ void testCampaignAdvancesThreeDeterministicFloors()
     const auto thirdSeed
         = session.restart(gameplay::RunRestartMode::NextCampaignFloor);
     expect(thirdSeed && *thirdSeed == gameplay::seedForRun(firstSeed, 2U)
-            && session.state().campaignFloor == gameplay::campaignFloorCount,
-        "third floor is derived deterministically and reaches the Campaign cap");
+            && session.state().campaignFloor == 3U,
+        "third floor is derived deterministically without ending the ten-floor campaign");
+
+    for (std::uint32_t floor = 4U; floor <= gameplay::campaignFloorCount; ++floor) {
+        (void)session.update(true, world::RoomRole::Boss, true, false);
+        expect(gameplay::canAdvanceCampaign(session.state()), "intermediate victory advances campaign");
+        expect(session.restart(gameplay::RunRestartMode::NextCampaignFloor).has_value()
+                && session.state().campaignFloor == floor,
+            "campaign progresses to every floor through ten");
+    }
 
     (void)session.update(true, world::RoomRole::Boss, true, true);
     (void)session.update(true, world::RoomRole::Boss, true, false);
@@ -245,7 +253,7 @@ void testCampaignCheckpointRestoresOnlyPristineSessions()
             && !invalid.restoreCampaignCheckpoint(
                 initialSeed, currentSeed, 1U, seedIndex, 3U)
             && !invalid.restoreCampaignCheckpoint(
-                initialSeed, currentSeed, 4U, seedIndex, 4U)
+                initialSeed, currentSeed, 4U, seedIndex, gameplay::campaignFloorCount + 1U)
             && invalid.state().mode == gameplay::RunMode::Standard
             && invalid.state().currentSeed == 123U,
         "inconsistent checkpoint metadata is rejected without mutation");

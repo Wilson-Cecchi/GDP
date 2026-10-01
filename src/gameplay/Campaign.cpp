@@ -59,16 +59,18 @@ bool validateCampaignCheckpoint(
     return checkpoint.rulesVersion == currentCampaignRulesVersion
         && checkpoint.floor >= 1U
         && checkpoint.floor <= campaignFloorCount
+        && checkpoint.difficulty < Difficulty::Count
         && checkpoint.runIndex >= checkpoint.seedIndex
         && checkpoint.currentSeed
             == seedForRun(checkpoint.initialSeed, checkpoint.seedIndex)
         && validateCampaignCarryover(checkpoint.floorEntry);
 }
 
-float campaignDifficultyMultiplier(const std::uint32_t floor) noexcept
+float campaignDifficultyMultiplier(const std::uint32_t floor, const Difficulty difficulty) noexcept
 {
     const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
-    return 1.0F + (static_cast<float>(safeFloor - 1U) * 0.10F);
+    return std::min(2.0F, baseDifficultyMultiplier(difficulty)
+        + (static_cast<float>(safeFloor - 1U) * 0.08F));
 }
 
 } // namespace gdp::gameplay

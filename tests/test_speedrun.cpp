@@ -25,6 +25,7 @@ gdp::gameplay::SessionState completedSpeedrun(
     state.mode = gdp::gameplay::RunMode::Speedrun;
     state.currentSeed = seed;
     state.elapsedRunTicks = ticks;
+    state.difficulty = gdp::gameplay::Difficulty::Hard;
     return state;
 }
 

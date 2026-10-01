@@ -36,6 +36,17 @@ especializados das pastas numeradas.
 
 ## Estado da implementação
 
+- **Menus atuais:** `TEST MODE` (arena dedicada de desenvolvimento),
+  `CAMPAIGN / STORY`, `SPEEDRUN`, `SETTINGS` e `QUIT GAME`.
+  Campanha: 10 andares, três slots independentes, Easy/Normal/Hard, checkpoint
+  no início do andar e armas adicionais aleatórias nas salas.
+  Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
+  Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
+  botões do mouse e scroll. O estilo industrial existente foi preservado.
+  Para distribuição final sem arena, configure `-DGDP_ENABLE_TEST_MODE=OFF`;
+  o pacote de desenvolvimento atual mantém o Test Mode para validar mecânicas.
+  Detalhes e contratos atuais: `07_interface/menus_and_settings.md`.
+
 - **Fase 0 — Bootstrap:** implementada e validada.
 - **Fase 1 — Core:** implementada e validada (`Time`, `Input`, `Random`, `Hash`,
   derivação de seeds e matemática).
@@ -596,9 +607,10 @@ especializados das pastas numeradas.
   O cone frontal, a linha de visão, a sala ativa e o alcance normal com a
   lanterna desligada não mudam. Os atalhos `4` e `5` continuam reservados, sem
   equipamento ou item especial associado por enquanto.
-- **Referência de controles:** `CONTROLS` no título e na pausa lista os comandos
-  implementados. `Esc`, `Enter` ou clique em `BACK` retorna ao menu de origem;
-  abrir a página durante uma run não avança a simulação.
+- **Configurações de controles:** `SETTINGS > CONTROLS`, ou `CONTROLS` na pausa,
+  permite ajustar sensibilidade, Invert Y e remapear teclado, mouse e scroll.
+  `Esc` ou `BACK` retorna ao menu de origem; abrir a página durante uma run
+  não avança a simulação.
 - **Leitura do confronto do boss:** após engajar o IndustrialRobot, inclusive
   pela porta aberta do corredor, um painel no topo central mostra sua vida em barra
   e percentual e a fase real de combate: `RANGE`, `PRESSURE` ou `PURSUIT`.
@@ -1914,6 +1926,10 @@ sentidos e uma sala grande conectada no teste OpenGL. Nenhuma receita de textura
 foi alterada nesta fase; a revisão artística continua sujeita ao gate abaixo.
 
 ## Menu principal antes da run
+
+O parágrafo abaixo registra a Fase 21. O fluxo atual de título, campanha de
+10 andares/três slots, Speedrun Hard e Settings categorizado está descrito no
+início deste README e em `07_interface/menus_and_settings.md`.
 
 A Fase 21 separou a inicialização da plataforma da criação da run. Em modo
 gráfico, SDL, áudio, janela e renderer ficam prontos primeiro e exibem um menu

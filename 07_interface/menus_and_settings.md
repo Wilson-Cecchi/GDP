@@ -1,5 +1,90 @@
 # Interface — Menus e configurações
 
+## Fluxo atual — revisão de 2026-10-01
+
+Esta revisão substitui o fluxo histórico descrito abaixo. `MenuFlow` é o dono
+das páginas e comandos; `Application` aplica as ações ao jogo. O renderer recebe
+somente um snapshot de textos, seleção e linhas habilitadas. Desenho e hit test
+usam o mesmo `ListMenuLayout`, com conversão de coordenadas high-DPI.
+
+O menu principal contém `TEST MODE`, `CAMPAIGN / STORY`, `SPEEDRUN`, `SETTINGS`
+e `QUIT GAME`. WASD/setas, Enter, Esc, hover e clique funcionam em todos os
+submenus. Esc volta uma página; no título, abre a confirmação de saída.
+As teclas dos menus são fixas, independentemente dos bindings da gameplay.
+
+### Test Mode
+
+Arena única dedicada, de 32 × 40 m, com os cinco tipos de inimigo, coberturas
+altas, plataformas baixas, munição, saúde, pistola, carabina e faca. Não gera
+eventos de campanha nem termina a run quando o robô morre. A pausa permite
+reiniciar a área ou voltar ao título. A arena usa as IAs ativas do mesmo jogo.
+`--test-mode` abre diretamente a área, também aceitando seed e limite de frames.
+`GDP_ENABLE_TEST_MODE=OFF` exclui o código da arena, o atalho CLI e sua entrada
+do menu. A opção permanece ON nos builds de desenvolvimento atuais; deve ser
+OFF no build de distribuição final.
+
+### Campanha / História
+
+Primeiro escolher um dos três slots. Cada slot oferece `CONTINUE`, `NEW GAME`
+e `BACK`; Continue só fica ativo para checkpoint válido. Novo jogo pede
+Easy/Normal/Hard e exige confirmação antes de substituir um slot ocupado,
+inclusive quando seu arquivo está inválido ou incompatível. Cancel é a opção
+inicial; nenhum arquivo é apagado durante a seleção.
+
+São 10 andares com carry-over de HP, armor, munição, nível e progressão.
+O save representa **a entrada do andar**, não o ponto exato de saída. Repetir
+ou continuar restaura essa entrada; vencer os nove primeiros andares oferece
+Next Floor, e o décimo conclui a campanha. Concluir apaga somente o checkpoint
+do slot ativo. Abrir configurações, mudar de modo ou voltar ao título não troca
+nem apaga os outros saves.
+
+Dificuldade inicial: Easy 0,75×, Normal 1×, Hard 1,25×. Cada andar acrescenta
+0,08 ao multiplicador; no andar 10 resulta em 1,47× / 1,72× / 1,97×.
+O multiplicador alimenta população, comportamento, eventos e orçamento de loot.
+Esses valores são uma base para playtest, não balanceamento final.
+Salas elegíveis não iniciais/finais/secretas têm 55% de chance de um pickup
+extra de arma; os pickups de campanha escolhem carabina (70%) ou pistola (30%).
+As armas usam as zonas e a separação de loot existentes, e a mesma seed reproduz
+o conteúdo. Atualmente existem esses dois tipos de arma de fogo, mais a faca.
+Campanha/História ainda reutiliza a progressão jogável: esta revisão não adiciona
+roteiro, diálogos ou cenas narrativas.
+
+### Speedrun
+
+Submenu com Start Run, Leaderboard, Best Seed e Back. Toda run usa Hard; não
+existe seletor de dificuldade e o cronômetro continua durante pausa e settings.
+Leaderboard mantém os 10 menores tempos de vitória, em ordem, **neste computador**.
+Não existe backend online nesta etapa. Best Seed usa a seed do primeiro colocado
+e fica inativo sem recorde. Derrotas e runs de outros modos/dificuldades não
+entram no placar. Regras de Speedrun 36 isolam os novos tempos Hard dos anteriores.
+
+### Configurações e remapeamento
+
+Settings abre Display / Audio / Controls, no título ou na pausa, preservando
+a origem ao voltar. Display conserva FOV, perfis gráficos, resolução, fullscreen
+e VSync; Audio conserva Master/Effects/Ambient/UI. Controls conserva sensibilidade
+e Invert Y e adiciona duas páginas de bindings.
+
+Teclado, cinco botões do mouse e os dois sentidos do scroll são aceitos.
+Uma tecla já usada troca as duas ações, evitando bindings duplicados ou ações
+sem comando. Shift/Ctrl/Alt direitos são aliases dos esquerdos. Esc cancela
+captura e nunca é remapeável; F3 permanece reservado ao painel de desempenho.
+Reset Defaults restaura os comandos originais (Ctrl agacha, Shift caminha
+silenciosamente). Os slots 4 e 5 aparecem explicitamente como reservados,
+sem adicionar equipamento ou item especial funcional nesta etapa.
+
+As setas `<` / `>` clicáveis reduzem/aumentam configurações. Clicar no nome ou
+valor só seleciona. A/D e setas laterais também ajustam, sem mudança no contrato
+aprovado anteriormente. Alterações são aplicadas e gravadas imediatamente;
+Esc/Back e shutdown repetem uma gravação que tenha ficado pendente.
+
+Validação automatizada inclui modelos, persistência, teclas, mouse, slots,
+retorno à pausa, placar e arena em uma aplicação SDL/OpenGL real offscreen.
+Layouts/pixels também são exercitados em 1280×720, 960×540, 640×360 e 320×200.
+A aprovação de ergonomia e balanceamento continua sendo feita em gameplay.
+
+## Histórico anterior à revisão
+
 > **Estado:** menu principal funcional implementado na Fase 21, pausa in-game
 > funcional desde a Fase 19 e menu de resultado integrado na Fase 64.
 > Configurações runtime foram integradas na Fase 66, sua persistência segura na

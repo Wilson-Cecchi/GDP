@@ -25,7 +25,7 @@ SessionUpdate SessionSystem::update(
     }
     if (!playerAlive) {
         state_.phase = SessionPhase::Defeat;
-    } else if (bossExists && (currentRoomRole == gdp::world::RoomRole::Boss
+    } else if (state_.mode != RunMode::TestMode && bossExists && (currentRoomRole == gdp::world::RoomRole::Boss
                    || bossAccessible || state_.bossEngaged)) {
         state_.bossEngaged = true;
         if (!bossAlive) {
@@ -71,6 +71,16 @@ bool SessionSystem::selectRunMode(const RunMode mode) noexcept
         return false;
     }
     state_.mode = mode;
+    state_.difficulty = mode == RunMode::Speedrun ? Difficulty::Hard : Difficulty::Normal;
+    return true;
+}
+
+bool SessionSystem::selectDifficulty(const Difficulty difficulty) noexcept
+{
+    if (difficulty >= Difficulty::Count || state_.phase != SessionPhase::Playing
+        || state_.elapsedRunTicks != 0U || state_.bossEngaged
+        || (state_.mode == RunMode::Speedrun && difficulty != Difficulty::Hard)) return false;
+    state_.difficulty = difficulty;
     return true;
 }
 
@@ -89,11 +99,12 @@ bool SessionSystem::restoreCampaignCheckpoint(
     const wkc::core::Seed currentSeed,
     const std::uint32_t runIndex,
     const std::uint32_t seedIndex,
-    const std::uint32_t floor) noexcept
+    const std::uint32_t floor,
+    const Difficulty difficulty) noexcept
 {
     if (state_.phase != SessionPhase::Playing
         || state_.elapsedRunTicks != 0U || state_.bossEngaged
-        || floor < 1U || floor > campaignFloorCount
+        || floor < 1U || floor > campaignFloorCount || difficulty >= Difficulty::Count
         || runIndex < seedIndex
         || currentSeed != seedForRun(initialSeed, seedIndex)) {
         return false;
@@ -104,6 +115,7 @@ bool SessionSystem::restoreCampaignCheckpoint(
     state_.runIndex = runIndex;
     state_.seedIndex = seedIndex;
     state_.campaignFloor = floor;
+    state_.difficulty = difficulty;
     return true;
 }
 
@@ -154,10 +166,32 @@ const char* runModeName(const RunMode mode) noexcept
         return "Campaign";
     case RunMode::Speedrun:
         return "Speedrun";
+    case RunMode::TestMode:
+        return "Test Mode";
     case RunMode::Count:
         break;
     }
     return "Unknown";
+}
+
+const char* difficultyName(const Difficulty difficulty) noexcept
+{
+    switch (difficulty) {
+    case Difficulty::Easy: return "EASY";
+    case Difficulty::Normal: return "NORMAL";
+    case Difficulty::Hard: return "HARD";
+    case Difficulty::Count: break;
+    }
+    return "UNKNOWN";
+}
+
+float baseDifficultyMultiplier(const Difficulty difficulty) noexcept
+{
+    switch (difficulty) {
+    case Difficulty::Easy: return 0.75F;
+    case Difficulty::Hard: return 1.25F;
+    default: return 1.0F;
+    }
 }
 
 bool canAdvanceCampaign(const SessionState& state) noexcept

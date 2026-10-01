@@ -14,6 +14,7 @@ struct LootDrop {
     gdp::entities::ItemType type{gdp::entities::ItemType::Health};
     std::uint32_t quantity{1};
     wkc::core::Vec3 position{};
+    std::optional<std::uint32_t> weaponArchetype;
 
     constexpr bool operator==(const LootDrop&) const noexcept = default;
 };
@@ -53,7 +54,8 @@ struct LootValidationResult {
     RoomTheme theme,
     std::uint32_t depth,
     std::span<const SpawnZone> lootZones,
-    float difficulty = 1.0F);
+    float difficulty = 1.0F,
+    bool campaignWeapons = false);
 
 [[nodiscard]] LootValidationResult validateLootLayout(
     const LootLayout& layout,

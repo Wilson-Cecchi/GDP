@@ -16,6 +16,7 @@ struct InitialEntitySet {
     World& world,
     gdp::entities::EntityManager& manager,
     gdp::entities::PlayerCreateInfo player,
-    float difficulty = 1.0F);
+    float difficulty = 1.0F,
+    bool campaignWeapons = false);
 
 } // namespace gdp::world

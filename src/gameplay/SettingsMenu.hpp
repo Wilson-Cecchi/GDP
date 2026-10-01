@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gameplay/ControlBindings.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -81,6 +83,7 @@ struct RuntimeSettings {
     WindowResolution windowResolution{WindowResolution::R1280x720};
     bool fullscreen{false};
     bool verticalSync{true};
+    ControlBindings controls{};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
 };

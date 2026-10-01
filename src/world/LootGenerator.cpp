@@ -181,6 +181,7 @@ void addDrop(
         type,
         quantityFor(type, layout.seed, layout.depth, ordinal),
         choosePosition(layout.seed, ordinal, zones),
+        std::nullopt,
     });
     layout.spent += itemCost(type);
 }
@@ -203,7 +204,8 @@ LootLayout generateLootLayout(
     const RoomTheme theme,
     const std::uint32_t depth,
     const std::span<const SpawnZone> lootZones,
-    const float difficulty)
+    const float difficulty,
+    const bool campaignWeapons)
 {
     LootLayout layout;
     layout.seed = wkc::core::deriveSeed(roomSeed, gdp::game::SeedDomain::Loot, 0);
@@ -259,6 +261,12 @@ LootLayout generateLootLayout(
 
     wkc::core::RandomStream selection{wkc::core::deriveSeed(
         layout.seed, gdp::game::SeedDomain::Loot, 1)};
+    if (campaignWeapons && role != RoomRole::Start && role != RoomRole::Boss
+        && role != RoomRole::Secret && selection.chance(0.55F)) {
+        // Reserve space in the existing loot budget; positions still use the validated zones.
+        layout.budget += itemCost(gdp::entities::ItemType::Weapon);
+        addDrop(layout, gdp::entities::ItemType::Weapon, lootZones);
+    }
     while (layout.drops.size() < 3U && layout.spent < layout.budget) {
         const std::uint32_t remaining = layout.budget - layout.spent;
         gdp::entities::ItemType type = gdp::entities::ItemType::Ammo;
@@ -270,6 +278,10 @@ LootLayout generateLootLayout(
             type = gdp::entities::ItemType::Health;
         }
         addDrop(layout, type, lootZones);
+    }
+    if (campaignWeapons) {
+        for (auto& drop : layout.drops) if (drop.type == gdp::entities::ItemType::Weapon)
+            drop.weaponArchetype = selection.chance(0.7F) ? 1U : 0U;
     }
     layout.layoutHash = lootLayoutHash(layout);
     return layout;
@@ -295,7 +307,8 @@ LootValidationResult validateLootLayout(
     std::size_t keyCount = 0;
     for (std::size_t index = 0; index < layout.drops.size(); ++index) {
         const LootDrop& drop = layout.drops[index];
-        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Special) {
+        if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Special
+            || (drop.weaponArchetype && (drop.type != gdp::entities::ItemType::Weapon || *drop.weaponArchetype > 1U))) {
             result.errors.push_back(LootValidationError::InvalidDrop);
         }
         keyCount += drop.type == gdp::entities::ItemType::Key ? 1U : 0U;
@@ -333,6 +346,7 @@ std::uint64_t lootLayoutHash(const LootLayout& layout) noexcept
     for (const LootDrop& drop : layout.drops) {
         hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(drop.type));
         hash = wkc::core::hashCombine(hash, drop.quantity);
+        if (drop.weaponArchetype) hash = wkc::core::hashCombine(hash, 0x574541504F4EULL + *drop.weaponArchetype);
         hash = addFloat(hash, drop.position.x);
         hash = addFloat(hash, drop.position.y);
         hash = addFloat(hash, drop.position.z);

@@ -7,6 +7,7 @@ SpeedrunRecordResult considerSpeedrunResult(
     std::optional<SpeedrunRecord>& record) noexcept
 {
     if (session.mode != RunMode::Speedrun
+        || session.difficulty != Difficulty::Hard
         || session.phase != SessionPhase::Victory
         || session.elapsedRunTicks == 0U) {
         return SpeedrunRecordResult::Ineligible;

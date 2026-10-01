@@ -7,7 +7,7 @@
 
 namespace gdp::persistence {
 
-inline constexpr std::uint32_t currentSettingsVersion = 6U;
+inline constexpr std::uint32_t currentSettingsVersion = 7U;
 
 enum class SettingsLoadStatus : std::uint8_t {
     Loaded,

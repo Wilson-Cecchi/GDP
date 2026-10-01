@@ -3,6 +3,7 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/Progression.hpp"
 #include "gameplay/Weapon.hpp"
+#include "gameplay/Session.hpp"
 
 #include <cstdint>
 
@@ -26,6 +27,7 @@ struct CampaignCheckpoint {
     std::uint32_t seedIndex{0U};
     std::uint32_t floor{1U};
     CampaignCarryover floorEntry{};
+    Difficulty difficulty{Difficulty::Normal};
 
     constexpr bool operator==(const CampaignCheckpoint&) const noexcept = default;
 };
@@ -44,6 +46,7 @@ struct CampaignCheckpoint {
 [[nodiscard]] bool validateCampaignCheckpoint(
     const CampaignCheckpoint& checkpoint) noexcept;
 [[nodiscard]] float campaignDifficultyMultiplier(
-    std::uint32_t floor) noexcept;
+    std::uint32_t floor,
+    Difficulty difficulty = Difficulty::Normal) noexcept;
 
 } // namespace gdp::gameplay

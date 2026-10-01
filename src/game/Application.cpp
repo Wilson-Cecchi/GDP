@@ -4,6 +4,9 @@
 #include "game/HudBoss.hpp"
 #include "game/HudMap.hpp"
 #include "game/SeedDomains.hpp"
+#if GDP_ENABLE_TEST_MODE
+#include "game/TestArena.hpp"
+#endif
 #include "core/Hash.hpp"
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
@@ -16,6 +19,7 @@
 #include "gameplay/Speedrun.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SpeedrunRecordStore.hpp"
+#include "persistence/SpeedrunLeaderboardStore.hpp"
 #include "persistence/WorkerBrainStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "platform/SdlInput.hpp"
@@ -481,6 +485,7 @@ Application::Application(ApplicationConfig config)
     , collisionWorld_(baseCollisionWorld_)
     , session_(config_.worldSeed)
 {
+    if (config_.testMode) (void)session_.selectRunMode(gameplay::RunMode::TestMode);
 }
 
 Application::~Application()
@@ -765,6 +770,7 @@ bool Application::initialize()
     gameplay::openMainMenu(mainMenu_);
     log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     log(LogLevel::Info, "Main menu initialized before world generation");
+    if (config_.testMode) return initializeRun();
     return true;
 }
 
@@ -860,10 +866,13 @@ bool Application::initializeRun()
     weaponEquipRemaining_ = weaponEquipDuration;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
-        ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor)
-        : 1.0F;
+        ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor, session_.state().difficulty)
+        : gameplay::baseDifficultyMultiplier(session_.state().difficulty);
     const auto worldGenerationStart = Clock::now();
     world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
+#if GDP_ENABLE_TEST_MODE
+    if (session_.state().mode == gameplay::RunMode::TestMode) generation.world = makeTestArena(config_.worldSeed);
+#endif
     performanceMonitor_.setWorldGenerationMilliseconds(
         std::chrono::duration<double, std::milli>(
             Clock::now() - worldGenerationStart).count());
@@ -909,7 +918,16 @@ bool Application::initializeRun()
     } else {
         campaignFloorEntry_.reset();
     }
-    const world::InitialEntitySet initialEntities = world::populateInitialEntities(
+    world::InitialEntitySet initialEntities;
+#if GDP_ENABLE_TEST_MODE
+    if (session_.state().mode == gameplay::RunMode::TestMode) {
+        initialEntities = populateTestArena(*world_, entities_, {
+            .transform = {.position = player_.state().position}, .health = player_.state().health,
+            .armor = player_.state().armor, .maximumArmor = player_.state().maximumArmor});
+        (void)weapon_.equip(gameplay::WeaponArchetype::Carbine);
+    } else
+#endif
+    initialEntities = world::populateInitialEntities(
         *world_, entities_,
         {
             .transform = {.position = player_.state().position},
@@ -917,7 +935,7 @@ bool Application::initializeRun()
             .armor = player_.state().armor,
             .maximumArmor = player_.state().maximumArmor,
         },
-        runDifficulty_);
+        runDifficulty_, session_.state().mode == gameplay::RunMode::Campaign);
     if (!initialEntities.isValid()) {
         log(LogLevel::Error, "Initial entity population did not find a START room");
         return false;
@@ -947,6 +965,11 @@ bool Application::initializeRun()
         world::RoomEventPlan plan = world::generateRoomEventPlan(
             room.seed, room.role, room.theme, node->depth, room.enemyZones,
             runDifficulty_);
+        if (session_.state().mode == gameplay::RunMode::TestMode) {
+            plan = {};
+            plan.seed = room.seed; plan.role = room.role; plan.theme = room.theme;
+            plan.planHash = world::roomEventPlanHash(plan);
+        }
         if (!world::validateRoomEventPlan(plan, room.enemyZones).isValid()) {
             log(LogLevel::Error, "Room event plan failed deterministic validation");
             return false;
@@ -1224,291 +1247,8 @@ void Application::processEvents()
         return;
     }
 
-    if (settingsMenu_.active) {
-        playerCommand_ = {};
-        interactionPending_ = false;
-        jumpPending_ = false;
-        firePending_ = false;
-        fireHeld_ = false;
-        reloadPending_ = false;
-        weaponSwitchPending_.reset();
-        dropPending_ = false;
-
-        if (input_.wasKeyPressed(Key::Escape)) {
-            gameplay::closeSettingsMenu(settingsMenu_);
-            (void)savePersistedSettings();
-            playUiAudio(gdp::audio::AudioEventKind::UiBack);
-            return;
-        }
-
-        std::optional<visual::HudSettingsSelection> pointedSelection;
-        float pointerDrawableX = 0.0F;
-        float pointerDrawableY = 0.0F;
-        int drawableWidth = 0;
-        int drawableHeight = 0;
-        if (window_ != nullptr) {
-            int windowWidth = 0;
-            int windowHeight = 0;
-            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
-                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
-                && windowWidth > 0 && windowHeight > 0) {
-                const Vec2 pointer = input_.mousePosition();
-                pointerDrawableX = pointer.x * static_cast<float>(drawableWidth)
-                    / static_cast<float>(windowWidth);
-                pointerDrawableY = pointer.y * static_cast<float>(drawableHeight)
-                    / static_cast<float>(windowHeight);
-                pointedSelection = visual::settingsMenuSelectionAt(
-                    drawableWidth, drawableHeight,
-                    pointerDrawableX, pointerDrawableY);
-            }
-        }
-        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
-            const gameplay::SettingsMenuOption previousSelection
-                = settingsMenu_.selection;
-            gameplay::selectSettingsMenuOption(settingsMenu_,
-                static_cast<gameplay::SettingsMenuOption>(*pointedSelection));
-            if (settingsMenu_.selection != previousSelection) {
-                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-            }
-        }
-
-        const bool moveUp = input_.wasKeyPressed(Key::Up)
-            || input_.wasKeyPressed(Key::W);
-        const bool moveDown = input_.wasKeyPressed(Key::Down)
-            || input_.wasKeyPressed(Key::S);
-        if (moveUp != moveDown) {
-            const gameplay::SettingsMenuOption previousSelection
-                = settingsMenu_.selection;
-            gameplay::moveSettingsMenuSelection(
-                settingsMenu_, moveUp ? -1 : 1);
-            if (settingsMenu_.selection != previousSelection) {
-                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-            }
-        }
-
-        const bool adjustDown = input_.wasKeyPressed(Key::Left)
-            || input_.wasKeyPressed(Key::A);
-        const bool adjustUp = input_.wasKeyPressed(Key::Right)
-            || input_.wasKeyPressed(Key::D);
-        if (adjustDown != adjustUp
-            && gameplay::adjustRuntimeSetting(runtimeSettings_,
-                settingsMenu_.selection, adjustDown ? -1 : 1)) {
-            settingsDirty_ = true;
-            applyRuntimeSettings();
-            playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-        }
-
-        gameplay::SettingsMenuCommand command
-            = gameplay::SettingsMenuCommand::None;
-        if (input_.wasKeyPressed(Key::Enter)) {
-            command = gameplay::activateSettingsMenuSelection(settingsMenu_);
-        } else if (pointedSelection
-            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
-            gameplay::selectSettingsMenuOption(settingsMenu_,
-                static_cast<gameplay::SettingsMenuOption>(*pointedSelection));
-            if (settingsMenu_.selection == gameplay::SettingsMenuOption::Back) {
-                command = gameplay::activateSettingsMenuSelection(settingsMenu_);
-            } else {
-                const std::optional<int> direction
-                    = visual::settingsMenuAdjustmentDirectionAt(
-                        drawableWidth, drawableHeight,
-                        pointerDrawableX, pointerDrawableY);
-                if (direction && gameplay::adjustRuntimeSetting(runtimeSettings_,
-                    settingsMenu_.selection, *direction)) {
-                    settingsDirty_ = true;
-                    applyRuntimeSettings();
-                    playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-                }
-            }
-        }
-        if (command != gameplay::SettingsMenuCommand::None) {
-            (void)savePersistedSettings();
-            playUiAudio(gdp::audio::AudioEventKind::UiBack);
-        }
-        return;
-    }
-
-    if (mainMenu_.active) {
-        playerCommand_ = {};
-        interactionPending_ = false;
-        jumpPending_ = false;
-        firePending_ = false;
-        fireHeld_ = false;
-        reloadPending_ = false;
-        weaponSwitchPending_.reset();
-        dropPending_ = false;
-
-        if (input_.wasKeyPressed(Key::Escape)) {
-            gameplay::openExitConfirmation(exitConfirmation_);
-            playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
-            return;
-        }
-
-        std::optional<visual::HudMainMenuSelection> pointedSelection;
-        if (window_ != nullptr) {
-            int windowWidth = 0;
-            int windowHeight = 0;
-            int drawableWidth = 0;
-            int drawableHeight = 0;
-            if (SDL_GetWindowSize(window_, &windowWidth, &windowHeight)
-                && SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
-                && windowWidth > 0 && windowHeight > 0) {
-                const Vec2 pointer = input_.mousePosition();
-                pointedSelection = visual::mainMenuSelectionAt(
-                    drawableWidth, drawableHeight,
-                    pointer.x * static_cast<float>(drawableWidth)
-                        / static_cast<float>(windowWidth),
-                    pointer.y * static_cast<float>(drawableHeight)
-                        / static_cast<float>(windowHeight));
-            }
-        }
-        const auto mainMenuOptionFor
-            = [](const visual::HudMainMenuSelection selection) {
-                  if (selection == visual::HudMainMenuSelection::Settings) {
-                      return gameplay::MainMenuOption::Settings;
-                  }
-                  if (selection == visual::HudMainMenuSelection::Controls) {
-                      return gameplay::MainMenuOption::Controls;
-                  }
-                  if (selection
-                      == visual::HudMainMenuSelection::ContinueCampaign) {
-                      return gameplay::MainMenuOption::ContinueCampaign;
-                  }
-                  if (selection == visual::HudMainMenuSelection::Campaign) {
-                      return gameplay::MainMenuOption::Campaign;
-                  }
-                  if (selection == visual::HudMainMenuSelection::Speedrun) {
-                      return gameplay::MainMenuOption::Speedrun;
-                  }
-                  if (selection == visual::HudMainMenuSelection::BestSeed) {
-                      return gameplay::MainMenuOption::BestSeed;
-                  }
-                  return selection == visual::HudMainMenuSelection::ExitGame
-                      ? gameplay::MainMenuOption::ExitGame
-                      : gameplay::MainMenuOption::StartRun;
-              };
-        if (pointedSelection && input_.mouseDelta() != Vec2{}) {
-            const gameplay::MainMenuOption previousSelection
-                = mainMenu_.selection;
-            gameplay::selectMainMenuOption(
-                mainMenu_, mainMenuOptionFor(*pointedSelection));
-            if (mainMenu_.selection != previousSelection) {
-                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-            }
-        }
-
-        const bool moveUp = input_.wasKeyPressed(Key::Up)
-            || input_.wasKeyPressed(Key::W);
-        const bool moveDown = input_.wasKeyPressed(Key::Down)
-            || input_.wasKeyPressed(Key::S);
-        if (moveUp != moveDown) {
-            const gameplay::MainMenuOption previousSelection
-                = mainMenu_.selection;
-            gameplay::moveMainMenuSelection(mainMenu_, moveUp ? -1 : 1);
-            if (mainMenu_.selection != previousSelection) {
-                playUiAudio(gdp::audio::AudioEventKind::UiNavigate);
-            }
-        }
-
-        gameplay::MainMenuCommand command = gameplay::MainMenuCommand::None;
-        if (input_.wasKeyPressed(Key::Enter)) {
-            command = gameplay::activateMainMenuSelection(mainMenu_);
-        } else if (pointedSelection
-            && input_.wasMouseButtonPressed(MouseButton::Primary)) {
-            gameplay::selectMainMenuOption(
-                mainMenu_, mainMenuOptionFor(*pointedSelection));
-            command = gameplay::activateMainMenuSelection(mainMenu_);
-        }
-
-        const bool unavailableBestSeed
-            = command == gameplay::MainMenuCommand::BestSeed
-            && !speedrunRecord_;
-        const bool unavailableContinue
-            = command == gameplay::MainMenuCommand::ContinueCampaign
-            && !campaignCheckpoint_;
-        if (command != gameplay::MainMenuCommand::None) {
-            playUiAudio(unavailableBestSeed || unavailableContinue
-                    ? gdp::audio::AudioEventKind::UiBack
-                    : gdp::audio::AudioEventKind::UiConfirm);
-        }
-
-        if (command == gameplay::MainMenuCommand::StartRun
-            || command == gameplay::MainMenuCommand::ContinueCampaign
-            || command == gameplay::MainMenuCommand::Campaign
-            || command == gameplay::MainMenuCommand::Speedrun
-            || command == gameplay::MainMenuCommand::BestSeed) {
-            if (unavailableBestSeed) {
-                log(LogLevel::Info,
-                    "Best Seed requested without a local Speedrun record");
-                return;
-            }
-            if (unavailableContinue) {
-                log(LogLevel::Info,
-                    "Continue requested without a valid Campaign checkpoint");
-                return;
-            }
-            campaignCarryover_.reset();
-            campaignFloorEntry_.reset();
-            bool selectionAccepted = false;
-            if (command == gameplay::MainMenuCommand::ContinueCampaign) {
-                const gameplay::CampaignCheckpoint& checkpoint
-                    = *campaignCheckpoint_;
-                selectionAccepted = session_.restoreCampaignCheckpoint(
-                    checkpoint.initialSeed,
-                    checkpoint.currentSeed,
-                    checkpoint.runIndex,
-                    checkpoint.seedIndex,
-                    checkpoint.floor);
-                if (selectionAccepted) {
-                    config_.worldSeed = checkpoint.currentSeed;
-                    campaignCarryover_ = checkpoint.floorEntry;
-                    gameplay::closeMainMenu(mainMenu_);
-                }
-            } else {
-                const gameplay::RunMode mode
-                    = command == gameplay::MainMenuCommand::Speedrun
-                        || command == gameplay::MainMenuCommand::BestSeed
-                    ? gameplay::RunMode::Speedrun
-                    : command == gameplay::MainMenuCommand::Campaign
-                        ? gameplay::RunMode::Campaign
-                    : gameplay::RunMode::Standard;
-                selectionAccepted = session_.selectRunMode(mode);
-                if (command == gameplay::MainMenuCommand::BestSeed) {
-                    selectionAccepted = selectionAccepted
-                        && session_.selectRunSeed(speedrunRecord_->seed);
-                    if (selectionAccepted) {
-                        config_.worldSeed = speedrunRecord_->seed;
-                        gameplay::closeMainMenu(mainMenu_);
-                    }
-                }
-            }
-            if (command == gameplay::MainMenuCommand::ContinueCampaign) {
-                log(LogLevel::Info,
-                    "Main menu requested Campaign checkpoint continuation");
-            } else if (command == gameplay::MainMenuCommand::BestSeed) {
-                log(LogLevel::Info, "Main menu requested Best Seed challenge");
-            } else if (command == gameplay::MainMenuCommand::Campaign) {
-                log(LogLevel::Info, "Main menu requested Campaign start");
-            } else {
-                log(LogLevel::Info, command == gameplay::MainMenuCommand::Speedrun
-                        ? "Main menu requested Speedrun start"
-                        : "Main menu requested standard run start");
-            }
-            if (!selectionAccepted || !initializeRun()) {
-                fatalError_ = true;
-                running_ = false;
-            }
-        } else if (command == gameplay::MainMenuCommand::Settings) {
-            gameplay::openSettingsMenu(
-                settingsMenu_, gameplay::SettingsMenuOrigin::MainMenu);
-            log(LogLevel::Info, "Main menu opened settings");
-        } else if (command == gameplay::MainMenuCommand::Controls) {
-            controlsMenuActive_ = true;
-            log(LogLevel::Info, "Main menu opened controls");
-        } else if (command == gameplay::MainMenuCommand::ExitGame) {
-            gameplay::openExitConfirmation(exitConfirmation_);
-            log(LogLevel::Info, "Main menu opened exit confirmation");
-        }
+    if (settingsMenu_.active || mainMenu_.active) {
+        processFrontendMenu();
         return;
     }
 
@@ -1745,11 +1485,13 @@ void Application::processEvents()
             restartRequested_ = true;
             running_ = false;
         } else if (command == gameplay::PauseMenuCommand::Settings) {
+            menuFlow_ = {}; menuFlow_.page = MenuPage::Settings;
             gameplay::openSettingsMenu(
                 settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
             log(LogLevel::Info, "Pause menu opened settings");
         } else if (command == gameplay::PauseMenuCommand::Controls) {
-            controlsMenuActive_ = true;
+            menuFlow_ = {}; menuFlow_.page = MenuPage::Controls;
+            gameplay::openSettingsMenu(settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
             log(LogLevel::Info, "Pause menu opened controls");
         } else if (command == gameplay::PauseMenuCommand::MainMenu) {
             log(LogLevel::Info, "Pause menu requested main menu");
@@ -1764,45 +1506,30 @@ void Application::processEvents()
         return;
     }
 
-    playerCommand_.moveForward = (input_.isKeyDown(Key::W) ? 1.0F : 0.0F)
-        - (input_.isKeyDown(Key::S) ? 1.0F : 0.0F);
-    playerCommand_.moveRight = (input_.isKeyDown(Key::D) ? 1.0F : 0.0F)
-        - (input_.isKeyDown(Key::A) ? 1.0F : 0.0F);
-    playerCommand_.crouch = input_.isKeyDown(Key::LeftControl)
-        || input_.isKeyDown(Key::RightControl);
-    playerCommand_.quietWalk = input_.isKeyDown(Key::LeftShift)
-        || input_.isKeyDown(Key::RightShift);
-    jumpPending_ = jumpPending_ || input_.wasKeyPressed(Key::Space);
+    using gameplay::ControlAction;
+    const auto down = [&](ControlAction action) { return gameplay::controlDown(runtimeSettings_.controls, action, input_); };
+    const auto pressed = [&](ControlAction action) { return gameplay::controlPressed(runtimeSettings_.controls, action, input_); };
+    playerCommand_.moveForward = (down(ControlAction::Forward) ? 1.0F : 0.0F) - (down(ControlAction::Backward) ? 1.0F : 0.0F);
+    playerCommand_.moveRight = (down(ControlAction::Right) ? 1.0F : 0.0F) - (down(ControlAction::Left) ? 1.0F : 0.0F);
+    playerCommand_.crouch = down(ControlAction::Crouch);
+    playerCommand_.quietWalk = down(ControlAction::QuietWalk);
+    jumpPending_ = jumpPending_ || pressed(ControlAction::Jump);
     playerCommand_.jump = jumpPending_;
-    interactionPending_ = interactionPending_ || input_.wasKeyPressed(Key::E);
-    const bool firePressed
-        = input_.wasMouseButtonPressed(MouseButton::Primary);
-    const bool fireReleased
-        = input_.wasMouseButtonReleased(MouseButton::Primary);
-    firePending_ = firePending_ || firePressed;
-    if (firePressed || fireReleased) {
-        fireHeld_ = input_.isMouseButtonDown(MouseButton::Primary);
-    }
-    reloadPending_ = reloadPending_ || input_.wasKeyPressed(Key::R);
-    dropPending_ = dropPending_ || input_.wasKeyPressed(Key::G);
-    if (input_.wasKeyPressed(Key::F)) {
+    interactionPending_ = interactionPending_ || pressed(ControlAction::Interact);
+    firePending_ = firePending_ || pressed(ControlAction::Fire);
+    fireHeld_ = down(ControlAction::Fire);
+    reloadPending_ = reloadPending_ || pressed(ControlAction::Reload);
+    dropPending_ = dropPending_ || pressed(ControlAction::Drop);
+    if (pressed(ControlAction::Flashlight)) {
         flashlightOn_ = !flashlightOn_;
-        log(LogLevel::Info, flashlightOn_
-                ? "Flashlight enabled" : "Flashlight disabled");
+        log(LogLevel::Info, flashlightOn_ ? "Flashlight enabled" : "Flashlight disabled");
     }
-    if (input_.wasKeyPressed(Key::Digit1)) {
-        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
-    } else if (input_.wasKeyPressed(Key::Digit2)) {
-        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
-    } else if (input_.wasKeyPressed(Key::Digit3)) {
-        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
-    } else if (input_.wasKeyPressed(Key::Q)) {
-        weaponSwitchPending_ = weapon_.lastWeaponArchetype();
-    } else if (input_.mouseWheelDelta() != 0.0F) {
-        weaponSwitchPending_ = input_.mouseWheelDelta() > 0.0F
-            ? weapon_.nextWeaponArchetype()
-            : weapon_.previousWeaponArchetype();
-    }
+    if (pressed(ControlAction::Primary)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
+    else if (pressed(ControlAction::Secondary)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
+    else if (pressed(ControlAction::Melee)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
+    else if (pressed(ControlAction::LastWeapon)) weaponSwitchPending_ = weapon_.lastWeaponArchetype();
+    else if (pressed(ControlAction::NextWeapon)) weaponSwitchPending_ = weapon_.nextWeaponArchetype();
+    else if (pressed(ControlAction::PreviousWeapon)) weaponSwitchPending_ = weapon_.previousWeaponArchetype();
     playerCommand_.interact = interactionPending_;
 }
 
@@ -1884,6 +1611,7 @@ bool Application::returnToMainMenu()
     gameplay::resetViewMotion(viewMotion_);
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
+    menuFlow_ = {};
     gameplay::closeResultMenu(resultMenu_);
     gameplay::closeSettingsMenu(settingsMenu_);
     controlsMenuActive_ = false;
@@ -2104,11 +1832,15 @@ void Application::loadPersistedSpeedrunRecord()
     }
     speedrunRecordPath_
         = std::filesystem::path{preferenceDirectory} / "speedrun_record.toml";
+    speedrunLeaderboardPath_ = std::filesystem::path{preferenceDirectory} / "speedrun_leaderboard.txt";
     SDL_free(preferenceDirectory);
 
     const persistence::SpeedrunRecordLoadResult loaded
         = persistence::loadSpeedrunRecord(*speedrunRecordPath_);
     speedrunRecord_ = loaded.record;
+    speedrunLeaderboard_ = persistence::loadSpeedrunLeaderboard(*speedrunLeaderboardPath_);
+    if (speedrunLeaderboard_.empty() && speedrunRecord_) speedrunLeaderboard_.push_back(*speedrunRecord_);
+    if (!speedrunLeaderboard_.empty()) speedrunRecord_ = speedrunLeaderboard_.front();
     switch (loaded.status) {
     case persistence::SpeedrunRecordLoadStatus::Loaded:
         log(LogLevel::Info, "Local Speedrun record loaded from disk");
@@ -2151,49 +1883,35 @@ bool Application::savePersistedSpeedrunRecord()
 
 void Application::loadPersistedCampaignCheckpoint()
 {
-    if (campaignCheckpointLoaded_) {
-        return;
-    }
+    if (campaignCheckpointLoaded_) return;
     campaignCheckpointLoaded_ = true;
-    if (config_.headless || config_.benchmarkQuality) {
-        return;
+    if (config_.headless || config_.benchmarkQuality) return;
+    char* const pref = SDL_GetPrefPath("WKC", "GDP");
+    if (!pref) { log(LogLevel::Warning, "Campaign save directory unavailable"); return; }
+    const std::filesystem::path directory{pref};
+    SDL_free(pref);
+    for (std::size_t i = 0; i < campaignSlots_.size(); ++i) {
+        campaignSlotPaths_[i] = directory / ("campaign_slot_" + std::to_string(i + 1U) + ".toml");
+        const auto loaded = persistence::loadCampaignCheckpoint(*campaignSlotPaths_[i]);
+        campaignSlots_[i] = {loaded.checkpoint, loaded.status != persistence::CampaignCheckpointLoadStatus::Missing};
+        if (loaded.status != persistence::CampaignCheckpointLoadStatus::Loaded
+            && loaded.status != persistence::CampaignCheckpointLoadStatus::Missing)
+            log(LogLevel::Warning, "Campaign slot " + std::to_string(i + 1U) + " unavailable; existing file preserved");
     }
-
-    char* const preferenceDirectory = SDL_GetPrefPath("WKC", "GDP");
-    if (preferenceDirectory == nullptr) {
-        log(LogLevel::Warning,
-            sdlError("Campaign checkpoint preference path unavailable"));
-        return;
+    // Import the single legacy save only into an empty slot 1; retain a recoverable backup.
+    const auto legacy = directory / "campaign_checkpoint.toml";
+    const auto backup = directory / "campaign_checkpoint.legacy.toml";
+    std::error_code error;
+    if (!campaignSlots_[0].occupied && !std::filesystem::exists(backup, error) && !error) {
+        const auto loaded = persistence::loadCampaignCheckpoint(legacy);
+        if (loaded.checkpoint && persistence::saveCampaignCheckpoint(*campaignSlotPaths_[0], *loaded.checkpoint)) {
+            campaignSlots_[0] = {loaded.checkpoint, true};
+            std::filesystem::rename(legacy, backup, error);
+            log(LogLevel::Info, error ? "Legacy save imported; original retained" : "Legacy save imported into slot 1; backup retained");
+        }
     }
-    campaignCheckpointPath_
-        = std::filesystem::path{preferenceDirectory}
-        / "campaign_checkpoint.toml";
-    SDL_free(preferenceDirectory);
-
-    const persistence::CampaignCheckpointLoadResult loaded
-        = persistence::loadCampaignCheckpoint(*campaignCheckpointPath_);
-    campaignCheckpoint_ = loaded.checkpoint;
-    switch (loaded.status) {
-    case persistence::CampaignCheckpointLoadStatus::Loaded:
-        log(LogLevel::Info, "Campaign checkpoint loaded from disk");
-        break;
-    case persistence::CampaignCheckpointLoadStatus::Missing:
-        log(LogLevel::Info, "No Campaign checkpoint found");
-        break;
-    case persistence::CampaignCheckpointLoadStatus::Invalid:
-        log(LogLevel::Warning, "Invalid Campaign checkpoint ignored");
-        break;
-    case persistence::CampaignCheckpointLoadStatus::UnsupportedVersion:
-        log(LogLevel::Warning, "Unsupported Campaign checkpoint ignored");
-        break;
-    case persistence::CampaignCheckpointLoadStatus::IncompatibleRules:
-        log(LogLevel::Info,
-            "Campaign checkpoint belongs to an older rules version and was ignored");
-        break;
-    case persistence::CampaignCheckpointLoadStatus::IoError:
-        log(LogLevel::Warning, "Campaign checkpoint could not be read");
-        break;
-    }
+    campaignCheckpointPath_ = campaignSlotPaths_[0];
+    campaignCheckpoint_ = campaignSlots_[0].checkpoint;
 }
 
 bool Application::saveCurrentCampaignCheckpoint()
@@ -2212,6 +1930,7 @@ bool Application::saveCurrentCampaignCheckpoint()
         state.seedIndex,
         state.campaignFloor,
         *campaignFloorEntry_,
+        state.difficulty,
     };
     if (!gameplay::validateCampaignCheckpoint(checkpoint)) {
         log(LogLevel::Warning,
@@ -2230,6 +1949,7 @@ bool Application::saveCurrentCampaignCheckpoint()
         return false;
     }
     campaignCheckpoint_ = checkpoint;
+    campaignSlots_[activeCampaignSlot_] = {checkpoint, true};
     std::ostringstream message;
     message << "Campaign floor " << state.campaignFloor
             << " checkpoint saved to disk";
@@ -2250,6 +1970,7 @@ bool Application::clearPersistedCampaignCheckpoint()
     }
     campaignCheckpoint_.reset();
     log(LogLevel::Info, "Completed Campaign checkpoint removed from disk");
+    campaignSlots_[activeCampaignSlot_] = {};
     return true;
 }
 
@@ -2271,7 +1992,7 @@ void Application::fixedUpdate(const double fixedStep)
     gameplay::updateFeedback(feedback_, step);
     const bool aimRequested = player_.state().alive
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
-        && input_.isMouseButtonDown(MouseButton::Secondary);
+        && gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Aim, input_);
     aimBlend_ = std::clamp(aimBlend_
             + (aimRequested ? 1.0F : -1.0F) * step * 8.0F,
         0.0F, 1.0F);
@@ -3058,6 +2779,9 @@ void Application::fixedUpdate(const double fixedStep)
         dropPending_ = false;
         latestSpeedrunRecordResult_ = gameplay::considerSpeedrunResult(
             session_.state(), speedrunRecord_);
+        if (persistence::addSpeedrunLeaderboardResult(speedrunLeaderboard_, session_.state())
+            && speedrunLeaderboardPath_ && !persistence::saveSpeedrunLeaderboard(*speedrunLeaderboardPath_, speedrunLeaderboard_))
+            log(LogLevel::Warning, "Speedrun leaderboard could not be saved; previous file preserved");
         if (gameplay::speedrunRecordChanged(latestSpeedrunRecordResult_)) {
             std::ostringstream recordMessage;
             recordMessage << "New local Speedrun record: "
@@ -3250,74 +2974,25 @@ void Application::render()
         return;
     }
 
-    if (settingsMenu_.active) {
-        SDL_SetWindowTitle(window_, "GDP | SETTINGS");
+    if (settingsMenu_.active || mainMenu_.active) {
+        const auto view = frontendMenuView();
+        SDL_SetWindowTitle(window_, ("GDP | " + view.title).c_str());
         visual::HudRenderData hud;
-        hud.settingsMenu = true;
-        hud.settingsSelection = static_cast<visual::HudSettingsSelection>(
-            settingsMenu_.selection);
-        hud.masterVolumePercent = runtimeSettings_.masterVolumePercent;
-        hud.effectsVolumePercent = runtimeSettings_.effectsVolumePercent;
-        hud.ambientVolumePercent = runtimeSettings_.ambientVolumePercent;
-        hud.uiVolumePercent = runtimeSettings_.uiVolumePercent;
-        hud.mouseSensitivityPercent = runtimeSettings_.mouseSensitivityPercent;
-        hud.invertMouseY = runtimeSettings_.invertMouseY;
-        hud.fieldOfViewDegrees = runtimeSettings_.fieldOfViewDegrees;
-        hud.graphicsQuality = hudGraphicsQuality;
-        const gameplay::WindowResolutionSize windowSize
-            = gameplay::windowResolutionSize(runtimeSettings_.windowResolution);
-        hud.windowWidth = windowSize.width;
-        hud.windowHeight = windowSize.height;
-        hud.fullscreen = runtimeSettings_.fullscreen;
-        hud.verticalSync = runtimeSettings_.verticalSync;
-        if (!renderAndPresent([&] {
-                return renderer_->render(
-                    width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
-            }, "Renderer failed while drawing settings")) {
-            return;
+        hud.listMenu.active = true;
+        hud.listMenu.title = view.title;
+        hud.listMenu.subtitle = view.subtitle;
+        hud.listMenu.selection = menuFlow_.selection;
+        for (const auto& row : view.rows) {
+            hud.listMenu.rows.push_back(row.text);
+            hud.listMenu.enabled.push_back(row.enabled);
+            hud.listMenu.adjustable.push_back(row.setting.has_value());
         }
-        return;
-    }
-
-    if (mainMenu_.active) {
-        SDL_SetWindowTitle(window_, "GDP | MAIN MENU");
-        visual::HudRenderData hud;
-        hud.mainMenu = true;
-        if (mainMenu_.selection == gameplay::MainMenuOption::Settings) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::Settings;
-        } else if (mainMenu_.selection == gameplay::MainMenuOption::Controls) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::Controls;
-        } else if (mainMenu_.selection
-            == gameplay::MainMenuOption::ContinueCampaign) {
-            hud.mainMenuSelection
-                = visual::HudMainMenuSelection::ContinueCampaign;
-        } else if (mainMenu_.selection == gameplay::MainMenuOption::Campaign) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::Campaign;
-        } else if (mainMenu_.selection == gameplay::MainMenuOption::Speedrun) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::Speedrun;
-        } else if (mainMenu_.selection == gameplay::MainMenuOption::BestSeed) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::BestSeed;
-        } else if (mainMenu_.selection == gameplay::MainMenuOption::ExitGame) {
-            hud.mainMenuSelection = visual::HudMainMenuSelection::ExitGame;
-        }
-        hud.campaignContinueAvailable = campaignCheckpoint_.has_value();
-        hud.campaignContinueFloor
-            = campaignCheckpoint_ ? campaignCheckpoint_->floor : 1U;
-        hud.bestSeedAvailable = speedrunRecord_.has_value();
-        hud.bestSpeedrunTicks
-            = speedrunRecord_ ? speedrunRecord_->bestTicks : 0U;
         hud.exitConfirmation = exitConfirmation_.active;
-        if (exitConfirmation_.selection
-            == gameplay::ExitConfirmationOption::ExitGame) {
-            hud.exitConfirmationSelection
-                = visual::HudExitConfirmationSelection::ExitGame;
-        }
-        if (!renderAndPresent([&] {
-                return renderer_->render(
-                    width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
-            }, "Renderer failed while drawing the main menu")) {
-            return;
-        }
+        if (exitConfirmation_.selection == gameplay::ExitConfirmationOption::ExitGame)
+            hud.exitConfirmationSelection = visual::HudExitConfirmationSelection::ExitGame;
+        (void)renderAndPresent([&] {
+            return renderer_->render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+        }, "Renderer failed while drawing frontend menu");
         return;
     }
 
@@ -3428,10 +3103,9 @@ void Application::render()
         } else if (item->type == entities::ItemType::Armor) {
             role = visual::PickupVisualRole::Armor;
         } else if (item->type == entities::ItemType::Weapon) {
-            role = item->recoveredWeapon
-                    && item->recoveredWeapon->archetype
-                        == static_cast<std::uint32_t>(
-                            gameplay::WeaponArchetype::Pistol)
+            role = (item->recoveredWeapon ? std::optional{item->recoveredWeapon->archetype}
+                    : item->spawnedWeaponArchetype)
+                    == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Pistol)}
                 ? visual::PickupVisualRole::DroppedPistol
                 : visual::PickupVisualRole::Weapon;
         } else if (item->type == entities::ItemType::Special) {
@@ -3765,7 +3439,9 @@ void Application::render()
         }
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
-        title << (session_.state().bossEngaged
+        title << (session_.state().mode == gameplay::RunMode::TestMode
+                ? " | OBJECTIVE: TEST ARENA"
+                : session_.state().bossEngaged
                 || renderedRoomRole == world::RoomRole::Boss
                 ? " | OBJECTIVE: DEFEAT BOSS"
                 : " | OBJECTIVE: REACH BOSS");
@@ -3777,7 +3453,10 @@ void Application::render()
     visual::HudRenderData hud;
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
-    hud.infoOverlay = input_.isKeyDown(Key::Tab);
+    hud.interactBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Interact)]);
+    hud.reloadBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Reload)]);
+    hud.flashlightBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Flashlight)]);
+    hud.infoOverlay = gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Information, input_);
     if (world_) {
         hud.map = buildHudMap(*world_, visitedRooms_, playerRoom,
             player_.state().position, player_.planarForwardDirection());
@@ -3951,6 +3630,8 @@ void Application::render()
         hud.objective = visual::ObjectiveRenderState::Victory;
     } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
         hud.objective = visual::ObjectiveRenderState::Defeat;
+    } else if (session_.state().mode == gameplay::RunMode::TestMode) {
+        hud.objective = visual::ObjectiveRenderState::TestArena;
     } else if (session_.state().bossEngaged
         || renderedRoomRole == world::RoomRole::Boss) {
         hud.objective = visual::ObjectiveRenderState::DefeatBoss;

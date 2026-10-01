@@ -90,6 +90,9 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << (settings.fullscreen ? "true" : "false") << '\n'
            << "vertical_sync = "
            << (settings.verticalSync ? "true" : "false") << '\n';
+    for (std::size_t i = 0U; i < gameplay::controlActionCount; ++i) {
+        output << "binding_" << i << " = " << gameplay::bindingName(settings.controls.values[i]) << '\n';
+    }
     return output.str();
 }
 
@@ -137,7 +140,15 @@ SettingsLoadResult loadRuntimeSettings(
                 version = parseUnsigned(value);
                 continue;
             }
-            if (key == "master_volume") {
+            if (key.starts_with("binding_")) {
+                const auto index = parseUnsigned(key.substr(8U));
+                const auto binding = gameplay::bindingForName(value);
+                if (index && *index < gameplay::controlActionCount && binding) {
+                    result.settings.controls.values[static_cast<std::size_t>(*index)] = *binding;
+                } else {
+                    recovered = true;
+                }
+            } else if (key == "master_volume") {
                 recovered = !assignClamped(
                     result.settings.masterVolumePercent, value, 0U, 100U)
                     || recovered;
@@ -207,6 +218,10 @@ SettingsLoadResult loadRuntimeSettings(
             result.settings = {};
             result.status = SettingsLoadStatus::Invalid;
             return result;
+        }
+        if (!gameplay::validateControlBindings(result.settings.controls)) {
+            result.settings.controls = {};
+            recovered = true;
         }
         constexpr std::uint64_t oldestSupportedVersion = 1U;
         if (*version < oldestSupportedVersion

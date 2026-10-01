@@ -80,7 +80,10 @@ LootCollectionSummary collectNearbyLoot(
                         item->recoveredWeapon->reserveAmmo);
                 summary.weaponsRecovered += applied ? 1U : 0U;
             } else {
-                applied = weapon.equip(WeaponArchetype::Carbine);
+                const auto archetype = item->spawnedWeaponArchetype.value_or(
+                    static_cast<std::uint32_t>(WeaponArchetype::Carbine));
+                if (archetype <= static_cast<std::uint32_t>(WeaponArchetype::Carbine))
+                    applied = weapon.equip(static_cast<WeaponArchetype>(archetype));
             }
             summary.weaponsEquipped += applied ? 1U : 0U;
             break;

@@ -73,7 +73,8 @@ EntityId EntityManager::createItem(const ItemCreateInfo& info)
             .quantity = std::max(info.quantity, 1U),
             .recoveredWeapon = std::nullopt,
             .droppedVisualStartTick = std::nullopt,
-            .droppedVisualYawDegrees = 0.0F});
+            .droppedVisualYawDegrees = 0.0F,
+            .spawnedWeaponArchetype = std::nullopt});
 }
 
 EntityId EntityManager::createProp(const PropCreateInfo& info)
