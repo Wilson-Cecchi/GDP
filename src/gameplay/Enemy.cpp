@@ -733,14 +733,39 @@ bool playerVisibleToEnemy(
         player.cameraPosition(), collisionWorld);
 }
 
+float investigationWindow(
+    const InvestigationConfig config,
+    const float planarDistance,
+    const float moveSpeed) noexcept
+{
+    const float duration = std::isfinite(config.duration)
+        ? std::max(config.duration, 0.0F) : 0.0F;
+    const float maximumBonus = std::isfinite(config.maximumTravelBonus)
+        ? std::max(config.maximumTravelBonus, 0.0F) : 0.0F;
+    const float searchSpeed = moveSpeed * config.speedScale;
+    if (duration <= 0.0F || maximumBonus <= 0.0F
+        || !std::isfinite(planarDistance) || planarDistance <= 0.0F
+        || !std::isfinite(searchSpeed) || searchSpeed <= 0.0F) {
+        return duration;
+    }
+    const float arrivalDistance = std::isfinite(config.arrivalDistance)
+        ? std::max(config.arrivalDistance, 0.0F) : 0.0F;
+    const float journey = std::max(planarDistance - arrivalDistance, 0.0F);
+    const float estimatedSeconds = journey / searchSpeed;
+    return duration + std::clamp(
+        estimatedSeconds - duration, 0.0F, maximumBonus);
+}
+
 void rememberVisiblePlayer(
     gdp::entities::EnemyData& enemy,
     const Player& player,
-    InvestigationConfig config) noexcept
+    const InvestigationConfig config,
+    const float planarDistance,
+    const float moveSpeed) noexcept
 {
-    config.duration = std::max(config.duration, 0.0F);
     enemy.lastKnownPlayerPosition = player.state().position;
-    enemy.investigationTime = config.duration;
+    enemy.investigationTime = investigationWindow(
+        config, planarDistance, moveSpeed);
     enemy.recoverTime = 0.0F;
 }
 
@@ -1301,22 +1326,35 @@ std::size_t alertEnemiesToNoise(
         }
 
         InvestigationConfig investigation;
+        float moveSpeed = 0.0F;
         switch (enemy->archetype) {
         case EnemyArchetype::Worker:
             investigation = configs.worker.investigation;
+            moveSpeed = configs.worker.moveSpeed;
             break;
         case EnemyArchetype::Guard:
             investigation = configs.guard.investigation;
+            moveSpeed = configs.guard.moveSpeed;
             break;
         case EnemyArchetype::Officer:
             investigation = configs.officer.investigation;
+            moveSpeed = configs.officer.moveSpeed;
             break;
         case EnemyArchetype::Engineer:
             investigation = configs.engineer.investigation;
+            moveSpeed = configs.engineer.moveSpeed;
             break;
-        case EnemyArchetype::IndustrialRobot:
+        case EnemyArchetype::IndustrialRobot: {
             investigation = configs.industrialRobot.investigation;
+            const IndustrialRobotPhase phase = industrialRobotPhase(
+                enemy->health, enemy->maximumHealth, configs.industrialRobot);
+            moveSpeed = phase == IndustrialRobotPhase::LongRange
+                    ? configs.industrialRobot.longRangeMoveSpeed
+                : phase == IndustrialRobotPhase::Pressure
+                    ? configs.industrialRobot.pressureMoveSpeed
+                    : configs.industrialRobot.pursuitMoveSpeed;
             break;
+        }
         }
 
         const float hearingRange = std::isfinite(investigation.hearingRange)
@@ -1324,17 +1362,19 @@ std::size_t alertEnemiesToNoise(
         const float investigationDuration = std::isfinite(investigation.duration)
             ? std::max(investigation.duration, 0.0F) : 0.0F;
         const float effectiveRadius = std::min(stimulusRadius, hearingRange);
+        const float distanceSquared = planarDistanceSquared(
+            entity->transform.position, stimulus.position);
         if (effectiveRadius <= 0.0F || investigationDuration <= 0.0F
-            || planarDistanceSquared(
-                   entity->transform.position, stimulus.position)
-                > effectiveRadius * effectiveRadius) {
+            || !std::isfinite(distanceSquared)
+            || distanceSquared > effectiveRadius * effectiveRadius) {
             continue;
         }
 
         const bool newlyAlerted = enemy->investigationTime <= 0.0F
             && enemy->alertTime <= 0.0F && enemy->recoverTime <= 0.0F;
         enemy->lastKnownPlayerPosition = stimulus.position;
-        enemy->investigationTime = investigationDuration;
+        enemy->investigationTime = investigationWindow(
+            investigation, std::sqrt(distanceSquared), moveSpeed);
         enemy->recoverTime = 0.0F;
         if (newlyAlerted) {
             const float alertDuration = std::isfinite(investigation.alertDuration)
@@ -1394,7 +1434,8 @@ EnemyUpdateSummary updateWorkers(
             config.investigation.visionHalfAngleDegrees, 1.0F,
             collisionWorld, perception);
         if (lineOfSight) {
-            rememberVisiblePlayer(*enemy, player, config.investigation);
+            rememberVisiblePlayer(
+                *enemy, player, config.investigation, distance, config.moveSpeed);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1501,7 +1542,8 @@ EnemyUpdateSummary updateGuards(
             config.investigation.visionHalfAngleDegrees, 1.35F,
             collisionWorld, perception);
         if (lineOfSight) {
-            rememberVisiblePlayer(*enemy, player, config.investigation);
+            rememberVisiblePlayer(
+                *enemy, player, config.investigation, distance, config.moveSpeed);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1631,7 +1673,8 @@ EnemyUpdateSummary updateOfficers(
             config.investigation.visionHalfAngleDegrees, 1.4F,
             collisionWorld, perception);
         if (lineOfSight) {
-            rememberVisiblePlayer(*enemy, player, config.investigation);
+            rememberVisiblePlayer(
+                *enemy, player, config.investigation, distance, config.moveSpeed);
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1799,7 +1842,8 @@ EnemyUpdateSummary updateEngineers(
             config.investigation.visionHalfAngleDegrees, 1.25F,
             collisionWorld, perception);
         if (lineOfSight) {
-            rememberVisiblePlayer(*enemy, player, config.investigation);
+            rememberVisiblePlayer(
+                *enemy, player, config.investigation, distance, config.moveSpeed);
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -2066,7 +2110,8 @@ EnemyUpdateSummary updateIndustrialRobots(
             config.investigation.visionHalfAngleDegrees, 1.45F,
             collisionWorld, perception);
         if (lineOfSight) {
-            rememberVisiblePlayer(*enemy, player, config.investigation);
+            rememberVisiblePlayer(
+                *enemy, player, config.investigation, distance, moveSpeed);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,

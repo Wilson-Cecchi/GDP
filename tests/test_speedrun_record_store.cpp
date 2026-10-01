@@ -418,6 +418,15 @@ void testInvalidAndVersionedData()
             == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
         "records from before neural Worker memory remain isolated");
 
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 34\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
+        "records from before distance-aware investigation remain isolated");
+
     const gameplay::SpeedrunRecord invalid{
         gameplay::currentSpeedrunRulesVersion, 0U, 123U};
     expect(!persistence::saveSpeedrunRecord(path, invalid),

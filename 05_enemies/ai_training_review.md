@@ -494,3 +494,17 @@ ponto lembrado for alcançável, o inimigo observa em vez de pressionar uma
 parede até o tempo esgotar. Há regressões para perda de visão do Worker neural
 e alvo inacessível. Os arquivos `.brain` não mudam. A alteração de comportamento
 eleva Campaign/Speedrun rules para 33/34.
+
+**Tempo de investigação proporcional (2026-10-01):** visão confirmada e ruídos
+agora estimam o tempo mínimo para o inimigo percorrer, em linha reta, a
+distância até a última posição conhecida com sua velocidade de investigação.
+Quando o tempo base seria insuficiente, recebem uma margem limitada a `+2,5 s`
+(Worker), `+3 s` (Guard/Engineer), `+3,5 s` (Officer) ou `+5 s` (Robot).
+Alvos próximos mantêm o prazo anterior; velocidade nula ou configuração
+inválida não produz espera infinita. O cálculo usa somente a posição observada
+ou a origem do ruído, nunca a posição atual do Player escondido. Desvios e
+obstáculos podem exigir mais tempo que essa estimativa, mas o teto sempre
+encerra a investigação e devolve o inimigo à recuperação/patrulha. Como a
+duração altera encontros, Campaign/Speedrun rules avançam para 34/35. Os
+arquivos `.brain` permanecem iguais; um novo playtest deve avaliar a pressão
+dos inimigos atrás de cobertura.

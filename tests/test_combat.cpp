@@ -5,6 +5,7 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/Weapon.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -2416,6 +2417,162 @@ void testEnemyInvestigationLifecycle()
     }
 }
 
+void testDistanceAwareInvestigationWindow()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld open{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const CollisionWorld divided{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-8.0F, 0.0F, 2.7F}, {8.0F, 3.0F, 3.0F}}},
+    };
+    const EnemyDifficultyConfigs configs;
+    const EnemyPerception noAttacks{.allowAttacks = false};
+    for (const EnemyArchetype archetype : {
+             EnemyArchetype::Worker, EnemyArchetype::Guard,
+             EnemyArchetype::Officer, EnemyArchetype::Engineer,
+             EnemyArchetype::IndustrialRobot}) {
+        Player player;
+        player.spawn({1.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {1.0F, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 5U,
+            .archetype = archetype,
+        });
+        InvestigationConfig investigation;
+        float moveSpeed = 0.0F;
+        const auto updateRole = [&](const CollisionWorld& world,
+                                    const float step) {
+            switch (archetype) {
+            case EnemyArchetype::Worker:
+                return updateWorkers(
+                    manager, player, 5U, world, step, configs.worker, noAttacks);
+            case EnemyArchetype::Guard:
+                return updateGuards(
+                    manager, player, 5U, world, step, configs.guard, noAttacks);
+            case EnemyArchetype::Officer:
+                return updateOfficers(
+                    manager, player, 5U, world, step, configs.officer, noAttacks);
+            case EnemyArchetype::Engineer:
+                return updateEngineers(
+                    manager, player, 5U, world, step, configs.engineer, noAttacks);
+            case EnemyArchetype::IndustrialRobot:
+                return updateIndustrialRobots(manager, player, 5U, world,
+                    step, configs.industrialRobot, noAttacks);
+            }
+            return EnemyUpdateSummary{};
+        };
+        switch (archetype) {
+        case EnemyArchetype::Worker:
+            investigation = configs.worker.investigation;
+            moveSpeed = configs.worker.moveSpeed;
+            break;
+        case EnemyArchetype::Guard:
+            investigation = configs.guard.investigation;
+            moveSpeed = configs.guard.moveSpeed;
+            break;
+        case EnemyArchetype::Officer:
+            investigation = configs.officer.investigation;
+            moveSpeed = configs.officer.moveSpeed;
+            break;
+        case EnemyArchetype::Engineer:
+            investigation = configs.engineer.investigation;
+            moveSpeed = configs.engineer.moveSpeed;
+            break;
+        case EnemyArchetype::IndustrialRobot:
+            investigation = configs.industrialRobot.investigation;
+            moveSpeed = configs.industrialRobot.longRangeMoveSpeed;
+            break;
+        }
+        const float estimatedTravel = (6.0F - investigation.arrivalDistance)
+            / (moveSpeed * investigation.speedScale);
+        const float expectedWindow = investigation.duration + std::clamp(
+            estimatedTravel - investigation.duration,
+            0.0F, investigation.maximumTravelBonus);
+        (void)updateRole(open, 0.0F);
+        EnemyData* enemy = manager.findData<EnemyData>(id);
+        const bool rememberedSight = near(enemy->investigationTime, expectedWindow)
+            && expectedWindow > investigation.duration
+            && expectedWindow <= investigation.duration
+                + investigation.maximumTravelBonus
+            && enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+        const bool rememberedNoise = alertEnemiesToNoise(
+            manager, 5U, {{1.0F, 0.0F, 0.0F}, 20.0F}, configs) == 1U
+            && near(enemy->investigationTime, expectedWindow);
+        (void)player.relocate({4.0F, 0.0F, -30.0F}, -90.0F);
+        const EnemyUpdateSummary searching = updateRole(
+            divided, investigation.duration + 0.25F);
+        const bool stillSearching = searching.investigating == 1U
+            && enemy->investigationTime > 0.0F
+            && enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+        const EnemyUpdateSummary expired = updateRole(
+            divided, investigation.maximumTravelBonus + 1.0F);
+        expect(rememberedSight && rememberedNoise && stillSearching
+                && expired.recovering == 1U
+                && near(enemy->investigationTime, 0.0F),
+            "each role gets bounded travel time for sightings and noise, then gives up");
+    }
+
+    Player nearbyPlayer;
+    nearbyPlayer.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager nearbyManager;
+    const EntityId nearby = nearbyManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 5U,
+        .archetype = EnemyArchetype::Worker,
+    });
+    (void)updateWorkers(nearbyManager, nearbyPlayer, 5U, open, 0.0F,
+        configs.worker, noAttacks);
+    expect(near(nearbyManager.findData<EnemyData>(nearby)->investigationTime,
+            configs.worker.investigation.duration),
+        "nearby sightings retain the original short investigation window");
+
+    for (const EnemyArchetype archetype : {
+             EnemyArchetype::Worker, EnemyArchetype::IndustrialRobot}) {
+        Player player;
+        player.spawn({1.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const float startZ = archetype == EnemyArchetype::Worker
+            ? 6.0F : 5.0F;
+        const float arrivalDistance = archetype == EnemyArchetype::Worker
+            ? configs.worker.investigation.arrivalDistance
+            : configs.industrialRobot.investigation.arrivalDistance;
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {1.0F, 0.0F, startZ},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 5U,
+            .archetype = archetype,
+        });
+        const auto updateRole = [&](const float step) {
+            if (archetype == EnemyArchetype::Worker) {
+                return updateWorkers(manager, player, 5U, open, step,
+                    configs.worker, noAttacks);
+            }
+            return updateIndustrialRobots(manager, player, 5U, open, step,
+                configs.industrialRobot, noAttacks);
+        };
+        (void)updateRole(0.0F);
+        const float window = manager.findData<EnemyData>(id)->investigationTime;
+        (void)player.relocate({4.0F, 0.0F, -30.0F}, -90.0F);
+        bool reachedSighting = false;
+        const int ticks = static_cast<int>(std::ceil(window * 60.0F)) + 2;
+        for (int tick = 0; tick < ticks; ++tick) {
+            (void)updateRole(1.0F / 60.0F);
+            const wkc::core::Vec3 position = manager.find(id)->transform.position;
+            reachedSighting |= std::hypot(position.x - 1.0F, position.z)
+                <= arrivalDistance + 0.1F;
+        }
+        expect(reachedSighting,
+            "Worker and boss can physically reach a nearby last sighting before forgetting it");
+    }
+}
+
 void testEnemySearchWithoutHiddenPlayerTracking()
 {
     using namespace gdp::entities;
@@ -2817,6 +2974,7 @@ int main()
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();
+    testDistanceAwareInvestigationWindow();
     testEnemySearchWithoutHiddenPlayerTracking();
     testEnemySearchRejectsUnreachableFlanks();
     testEnemyNoisePerception();
