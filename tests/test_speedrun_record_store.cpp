@@ -400,6 +400,15 @@ void testInvalidAndVersionedData()
             == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
         "records from before cross-room enemy combat remain isolated");
 
+    writeText(path,
+        "version = 1\n"
+        "rules_version = 32\n"
+        "best_ticks = 600\n"
+        "seed = 123\n");
+    expect(persistence::loadSpeedrunRecord(path).status
+            == persistence::SpeedrunRecordLoadStatus::IncompatibleRules,
+        "records from before moving enemy searches remain isolated");
+
     const gameplay::SpeedrunRecord invalid{
         gameplay::currentSpeedrunRulesVersion, 0U, 123U};
     expect(!persistence::saveSpeedrunRecord(path, invalid),

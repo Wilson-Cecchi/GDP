@@ -472,3 +472,15 @@ No duelo bilateral de 360 frames, empatou em solo (144 de dano) e perdeu em
 Bhop (448 contra 480). Esse salto de letalidade pode ser desejável para o
 boss, mas também pode desbalancear a campanha. Até playtest humano, o asset
 ativo permanece inalterado.
+
+**Busca após perda de visão (2026-09-30):** os cinco arquétipos continuam
+investigando apenas a última posição confirmada por visão ou ruído. Após essa
+janela, a recuperação agora percorre dois pontos próximos determinísticos,
+respeitando colisão e navegação, e termina com uma breve varredura parada antes
+de voltar à patrulha. Destinos dentro de sólidos recuam para a posição lembrada;
+o Player escondido não fornece coordenadas novas, e a visão real interrompe a
+busca imediatamente. O raio e o tempo são calibrados por arquétipo, sem alterar
+os arquivos `.brain` ativos nem promover o candidato isolado 174. A mudança de
+combate eleva Campaign/Speedrun rules para 32/33, isolando checkpoints e
+recordes anteriores. Avaliações numéricas feitas com o binário anterior não
+devem ser comparadas diretamente a uma nova rodada.

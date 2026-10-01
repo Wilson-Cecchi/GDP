@@ -800,10 +800,45 @@ bool updateEnemyRecover(
     }
 
     enemy.behavior = EnemyBehaviorState::Recover;
-    separateEnemyIfNeeded(
-        manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
-        moveSpeed, step, collider);
-    if (step > 0.0F) {
+    bool moved = false;
+    const float searchRadius = std::isfinite(config.searchRadius)
+        ? std::max(config.searchRadius, 0.0F) : 0.0F;
+    // Finish with a brief stationary scan so a near-expired search does not
+    // unexpectedly displace enemies just before they resume their patrol.
+    const float finalScanTime = std::min(0.6F, config.recoverDuration * 0.25F);
+    if (searchRadius > 0.0F && enemy.recoverTime > finalScanTime
+        && step > 0.0F) {
+        constexpr float tau = 6.28318530717958647692F;
+        const std::uint64_t identity = wkc::core::hashCombine(
+            id.packed(), static_cast<std::uint64_t>(roomId));
+        const float baseAngle = patrolUnit(identity ^ 0x736561726368ULL) * tau;
+        const float phaseAngle = enemy.recoverTime
+                > config.recoverDuration * 0.5F ? 0.0F : tau * 0.5F;
+        const float angle = baseAngle + phaseAngle;
+        const wkc::core::Vec3 remembered{
+            enemy.lastKnownPlayerPosition.x, entity.transform.position.y,
+            enemy.lastKnownPlayerPosition.z};
+        const wkc::core::Vec3 candidate = remembered + wkc::core::Vec3{
+            std::cos(angle) * searchRadius, 0.0F,
+            std::sin(angle) * searchRadius};
+        const wkc::core::Vec3 target = collisionWorld.canOccupy(candidate, collider)
+            ? candidate : remembered;
+        const wkc::core::Vec3 previous = entity.transform.position;
+        if (collisionWorld.canOccupy(target, collider)) {
+            moveEnemyAndFaceTravel(
+                manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+                target, moveSpeed * std::max(config.speedScale, 0.0F),
+                step, collider);
+            moved = planarDistanceSquared(previous, entity.transform.position)
+                > 1.0e-8F;
+        }
+    }
+    if (!moved) {
+        separateEnemyIfNeeded(
+            manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
+            moveSpeed, step, collider);
+    }
+    if (!moved && step > 0.0F) {
         const float direction
             = ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1.0F : 1.0F;
         const float scanDirection = enemy.recoverTime
@@ -839,8 +874,15 @@ bool updateEnemyInvestigation(
         return false;
     }
 
+    const std::int8_t preferredSide = enemy.avoidanceSide != 0
+        ? enemy.avoidanceSide
+        : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
+    const wkc::core::Vec3 target = reachablePlayerApproach(
+        collisionWorld, entity.transform.position,
+        enemy.lastKnownPlayerPosition, collider, preferredSide)
+        .value_or(enemy.lastKnownPlayerPosition);
     const wkc::core::Vec3 offset
-        = enemy.lastKnownPlayerPosition - entity.transform.position;
+        = target - entity.transform.position;
     const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
     const float distance = wkc::core::length(planarOffset);
     if (distance <= config.arrivalDistance) {
@@ -855,7 +897,7 @@ bool updateEnemyInvestigation(
     const wkc::core::Vec3 previous = entity.transform.position;
     moveEnemyAndFaceTravel(
         manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
-        enemy.lastKnownPlayerPosition, moveSpeed * config.speedScale,
+        target, moveSpeed * config.speedScale,
         step, collider);
     enemy.behavior = planarDistanceSquared(previous, entity.transform.position)
             > 1.0e-8F

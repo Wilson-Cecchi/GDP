@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <string_view>
+#include <tuple>
 
 namespace {
 
@@ -2415,6 +2416,110 @@ void testEnemyInvestigationLifecycle()
     }
 }
 
+void testEnemySearchWithoutHiddenPlayerTracking()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+
+    const CollisionWorld open{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
+    const CollisionWorld blocked{
+        {{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}},
+        {{{-7.0F, 0.0F, -2.0F}, {7.0F, 3.0F, -1.8F}}},
+    };
+    const auto runFixture = [&](const EnemyArchetype archetype,
+                                const float hiddenX) {
+        EntityManager manager;
+        Player player;
+        player.spawn({1.0F, 0.0F, 0.0F});
+        const EntityId id = manager.createEnemy({
+            .transform = {.position = {1.0F, 0.0F, 1.5F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 5,
+            .archetype = archetype,
+        });
+        const InvestigationConfig investigation{
+            2.0F, 0.75F, 0.2F, 12.0F, 0.0F, 3.0F, 90.0F, 1.0F};
+        const auto updateRole = [&](const CollisionWorld& world,
+                                    const float step) {
+            switch (archetype) {
+            case EnemyArchetype::Worker: {
+                WorkerConfig config;
+                config.moveSpeed = 1.5F;
+                config.attackDamage = 0.0F;
+                config.investigation = investigation;
+                return updateWorkers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Guard: {
+                GuardConfig config;
+                config.moveSpeed = 1.5F;
+                config.attackDamage = 0.0F;
+                config.investigation = investigation;
+                return updateGuards(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Officer: {
+                OfficerConfig config;
+                config.moveSpeed = 1.5F;
+                config.attackDamage = 0.0F;
+                config.allyCooldownReduction = 0.0F;
+                config.investigation = investigation;
+                return updateOfficers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::Engineer: {
+                EngineerConfig config;
+                config.moveSpeed = 1.5F;
+                config.attackDamage = 0.0F;
+                config.repairAmount = 0.0F;
+                config.investigation = investigation;
+                return updateEngineers(manager, player, 5, world, step, config);
+            }
+            case EnemyArchetype::IndustrialRobot: {
+                IndustrialRobotConfig config;
+                config.longRangeMoveSpeed = 1.5F;
+                config.pressureMoveSpeed = 1.5F;
+                config.pursuitMoveSpeed = 1.5F;
+                config.longRangeDamage = 0.0F;
+                config.pressureDamage = 0.0F;
+                config.pursuitDamage = 0.0F;
+                config.investigation = investigation;
+                return updateIndustrialRobots(manager, player, 5, world, step, config);
+            }
+            }
+            return EnemyUpdateSummary{};
+        };
+
+        (void)updateRole(open, 0.0F);
+        (void)player.relocate({hiddenX, 0.0F, -3.0F}, -90.0F);
+        (void)updateRole(blocked, 2.1F);
+        const wkc::core::Vec3 start = manager.find(id)->transform.position;
+        const EnemyUpdateSummary first = updateRole(blocked, 0.5F);
+        const wkc::core::Vec3 firstPosition = manager.find(id)->transform.position;
+        (void)updateRole(blocked, 0.5F);
+        (void)updateRole(blocked, 1.0F);
+        const wkc::core::Vec3 secondPosition = manager.find(id)->transform.position;
+        const EnemyData* enemy = manager.findData<EnemyData>(id);
+        const bool searched = first.recovering == 1U
+            && enemy->behavior == EnemyBehaviorState::Recover
+            && firstPosition != start && secondPosition != firstPosition
+            && enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+        (void)updateRole(blocked, 1.1F);
+        const bool stopped = enemy->recoverTime == 0.0F
+            && enemy->lastKnownPlayerPosition == wkc::core::Vec3{};
+        return std::tuple{firstPosition, secondPosition, searched, stopped};
+    };
+
+    for (const EnemyArchetype archetype : {
+             EnemyArchetype::Worker, EnemyArchetype::Guard,
+             EnemyArchetype::Officer, EnemyArchetype::Engineer,
+             EnemyArchetype::IndustrialRobot}) {
+        const auto first = runFixture(archetype, 1.0F);
+        const auto relocated = runFixture(archetype, 4.0F);
+        expect(first == relocated && std::get<2>(first) && std::get<3>(first),
+            "all roles search the remembered area deterministically without tracking a hidden player");
+    }
+}
+
 void testEnemyNoisePerception()
 {
     using namespace gdp::entities;
@@ -2678,6 +2783,7 @@ int main()
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();
+    testEnemySearchWithoutHiddenPlayerTracking();
     testEnemyNoisePerception();
 
     if (failures != 0) {
