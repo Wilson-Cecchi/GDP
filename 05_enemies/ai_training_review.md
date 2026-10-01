@@ -484,3 +484,13 @@ os arquivos `.brain` ativos nem promover o candidato isolado 174. A mudança de
 combate eleva Campaign/Speedrun rules para 32/33, isolando checkpoints e
 recordes anteriores. Avaliações numéricas feitas com o binário anterior não
 devem ser comparadas diretamente a uma nova rodada.
+
+**Correção de busca após playtest (2026-09-30):** o Worker neural agora grava a
+última posição vista antes de sua decisão motora, como os outros arquétipos.
+Antes, quando a rede controlava o tick visível, um `continue` impedia a gravação
+e o Worker podia voltar à patrulha assim que o Player desaparecia. Na varredura,
+os pontos candidatos precisam ter uma rota navegável; se nenhum deles ou o
+ponto lembrado for alcançável, o inimigo observa em vez de pressionar uma
+parede até o tempo esgotar. Há regressões para perda de visão do Worker neural
+e alvo inacessível. Os arquivos `.brain` não mudam. A alteração de comportamento
+eleva Campaign/Speedrun rules para 33/34.

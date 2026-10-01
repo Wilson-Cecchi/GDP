@@ -2520,6 +2520,40 @@ void testEnemySearchWithoutHiddenPlayerTracking()
     }
 }
 
+void testEnemySearchRejectsUnreachableFlanks()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld divided{
+        {{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}},
+        {{{-5.0F, 0.0F, -0.25F}, {5.0F, 3.0F, 0.25F}}},
+    };
+    EntityManager manager;
+    Player player;
+    player.spawn({1.0F, 0.0F, -2.0F});
+    const EntityId worker = manager.createEnemy({
+        .transform = {.position = {1.0F, 0.0F, 1.5F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::Worker,
+    });
+    EnemyData* enemy = manager.findData<EnemyData>(worker);
+    enemy->lastKnownPlayerPosition = {1.0F, 0.0F, -1.0F};
+    enemy->recoverTime = 3.0F;
+    WorkerConfig config;
+    config.investigation.recoverDuration = 3.0F;
+    config.investigation.searchRadius = 1.0F;
+    const wkc::core::Vec3 start = manager.find(worker)->transform.position;
+    const EnemyUpdateSummary update = updateWorkers(
+        manager, player, 1U, divided, 0.5F, config);
+    expect(update.recovering == 1U
+            && enemy->behavior == EnemyBehaviorState::Recover
+            && manager.find(worker)->transform.position == start
+            && enemy->lastKnownPlayerPosition
+                == wkc::core::Vec3{1.0F, 0.0F, -1.0F},
+        "search scans instead of walking into a wall when no flank is reachable");
+}
+
 void testEnemyNoisePerception()
 {
     using namespace gdp::entities;
@@ -2784,6 +2818,7 @@ int main()
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();
     testEnemySearchWithoutHiddenPlayerTracking();
+    testEnemySearchRejectsUnreachableFlanks();
     testEnemyNoisePerception();
 
     if (failures != 0) {

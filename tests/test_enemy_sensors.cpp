@@ -227,6 +227,47 @@ void testExperimentalWorker()
         "attack checks visibility again after the neural turn");
 }
 
+void testNeuralWorkerRemembersVisiblePlayer()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld open{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const CollisionWorld blocked{
+        {{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}},
+        {{{0.0F, 0.0F, -1.0F}, {2.0F, 3.0F, -0.8F}}},
+    };
+    EntityManager manager;
+    Player player;
+    player.spawn({1.0F, 0.0F, 0.0F});
+    const EntityId worker = manager.createEnemy({
+        .transform = {.position = {1.0F, 0.0F, 1.5F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::Worker,
+    });
+    NeuralEnemyExperiment brain{42U, EnemyArchetype::Worker,
+        EnemyBrainContract::Tactical};
+    std::fill(brain.genome.network.parameters().begin(),
+        brain.genome.network.parameters().end(), 0.0F);
+    brain.controlAll = true;
+    brain.logSelection = false;
+    const EnemyUpdateSummary seen = updateWorkers(
+        manager, player, 1U, open, 0.1F, {}, {}, &brain);
+    const EnemyData* enemy = manager.findData<EnemyData>(worker);
+    expect(brain.controlledTicks == 1U && seen.idle == 1U
+            && enemy->lastKnownPlayerPosition == wkc::core::Vec3{1.0F, 0.0F, 0.0F}
+            && enemy->investigationTime > 0.0F,
+        "active neural Worker records a visible player before motor control returns");
+
+    (void)player.relocate({1.0F, 0.0F, -2.0F}, -90.0F);
+    const EnemyUpdateSummary hidden = updateWorkers(
+        manager, player, 1U, blocked, 0.1F, {}, {}, &brain);
+    expect(hidden.investigating == 1U && brain.controlledTicks == 1U
+            && enemy->lastKnownPlayerPosition == wkc::core::Vec3{1.0F, 0.0F, 0.0F}
+            && enemy->behavior == EnemyBehaviorState::Investigate,
+        "neural Worker navigates to its last sighting after line of sight breaks");
+}
+
 void testExperimentalArchetypes()
 {
     using namespace gdp::gameplay;
@@ -575,6 +616,7 @@ int main()
     testSensors();
     testTacticalMovement();
     testExperimentalWorker();
+    testNeuralWorkerRemembersVisiblePlayer();
     testExperimentalArchetypes();
     testNeuralLocomotionFacing();
     testNeuralRangedAim();

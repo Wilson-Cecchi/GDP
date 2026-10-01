@@ -294,6 +294,11 @@ void testInvalidAndVersionedData()
             == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
         "checkpoints from before moving enemy searches remain isolated");
 
+    writeText(path, "version = 3\nrules_version = 32\n");
+    expect(persistence::loadCampaignCheckpoint(path).status
+            == persistence::CampaignCheckpointLoadStatus::IncompatibleRules,
+        "checkpoints from before neural Worker memory remain isolated");
+
     writeText(path, "version = 1\nrules_version = 3\n");
     expect(persistence::loadCampaignCheckpoint(path).status
             == persistence::CampaignCheckpointLoadStatus::UnsupportedVersion,
