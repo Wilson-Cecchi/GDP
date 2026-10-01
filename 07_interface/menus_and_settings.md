@@ -1,5 +1,26 @@
 # Interface — Menus e configurações
 
+## Direção visual atual — aprovada em 2026-10-01
+
+**Industrial refinado**, combinado com HUD **Tático minimalista** conforme
+`visual/proposals/interface_visual_v3.html`. O título usa logo maior e claro,
+opções verticais compactas, superfícies grafite e seleção com uma única faixa
+ciano discreta à esquerda. Em telas largas o menu curto fica à esquerda;
+o título mostra à direita a descrição da opção selecionada. Submenus longos
+e telas menores usam composição centralizada e escala ajustada.
+
+Pausa, resultado, configurações e confirmação compartilham a paleta refinada,
+fonte suavizada e painéis planos sem cantos ornamentais. O fallback compacto
+inclui setas e colchetes legíveis. `ListMenuLayout` continua sendo a única fonte
+da geometria tanto para renderização quanto para cliques, incluindo `<` / `>`.
+Não muda ordem das opções, estados, remapeamento, saves nem ações de teclado/mouse.
+Todas as páginas possuem regressão de renderização nas quatro resoluções-base;
+16:10 e ultrawide também têm validação estrutural dos layouts.
+
+O atlas da fonte é incorporado ao executável: builds portáteis não dependem
+de uma fonte no computador do usuário. A licença acompanha o pacote Windows.
+O gerador offline em `tools/generate_ui_font.py` não é dependência do build.
+
 ## Fluxo atual — revisão de 2026-10-01
 
 Esta revisão substitui o fluxo histórico descrito abaixo. `MenuFlow` é o dono

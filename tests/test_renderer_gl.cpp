@@ -28,7 +28,10 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
     slots[1] = {checkpoint, true};
     for (auto dimensions : {std::array{1280, 720}, std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
         const int width = dimensions[0], height = dimensions[1];
-        for (auto page : {MenuPage::Root, MenuPage::CampaignSlots, MenuPage::Bindings}) {
+        for (auto page : {MenuPage::Root, MenuPage::CampaignSlots, MenuPage::CampaignSlot,
+                 MenuPage::Difficulty, MenuPage::Overwrite, MenuPage::Speedrun,
+                 MenuPage::Leaderboard, MenuPage::Settings, MenuPage::Display,
+                 MenuPage::Audio, MenuPage::Controls, MenuPage::Bindings, MenuPage::MoreBindings}) {
             MenuFlowState state; state.page = page;
             const auto view = makeMenuView(state, slots, {}, {}, true);
             HudRenderData hud;
@@ -60,6 +63,66 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
         }
     }
     if (!passed) std::cerr << "Frontend menu pixel render failed\n";
+    return passed;
+}
+
+bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    bool passed = true;
+    const char* capture = std::getenv("GDP_TACTICAL_CAPTURE_DIR");
+    for (auto dimensions : {std::array{1280, 720}, std::array{960, 540},
+             std::array{960, 600}, std::array{640, 360}, std::array{320, 200}}) {
+        const int width = dimensions[0], height = dimensions[1];
+        HudRenderData hud;
+        hud.visible = true;
+        hud.health = 100.0F; hud.maximumHealth = 115.0F;
+        hud.armor = 40.0F; hud.magazineAmmo = 24U; hud.reserveAmmo = 96U;
+        hud.weapon = HudWeaponRole::Carbine; hud.level = 3U;
+        hud.experience = 80U; hud.experienceForNextLevel = 175U;
+        const auto pixelsFor = [&](const HudRenderData& state) {
+            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, state);
+            std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            return pixels;
+        };
+        const auto original = pixelsFor(hud);
+        hud.health = 12.0F;
+        const auto damaged = pixelsFor(hud);
+        hud.health = 100.0F; hud.magazineAmmo = 0U;
+        const auto empty = pixelsFor(hud);
+        const auto differences = [&](const auto& other, int firstX, int lastX) {
+            std::size_t count = 0;
+            for (int y = 0; y < height; ++y) for (int x = firstX; x < lastX; ++x) {
+                const auto offset = static_cast<std::size_t>((y * width + x) * 4);
+                if (!std::equal(original.begin() + static_cast<std::ptrdiff_t>(offset),
+                        original.begin() + static_cast<std::ptrdiff_t>(offset + 3U),
+                        other.begin() + static_cast<std::ptrdiff_t>(offset))) ++count;
+            }
+            return count;
+        };
+        passed &= differences(damaged, 0, width / 2) > 0U
+            && differences(damaged, width / 2, width) == 0U;
+        passed &= differences(empty, 0, width / 2) == 0U
+            && differences(empty, width / 2, width) > 0U;
+        hud.weapon = HudWeaponRole::Knife;
+        passed &= pixelsFor(hud) != empty;
+        if (capture) {
+            std::filesystem::create_directories(capture);
+            std::vector<std::uint8_t> topDown(original.size());
+            const auto stride = static_cast<std::size_t>(width * 4);
+            for (int y = 0; y < height; ++y) std::copy_n(original.data()
+                + static_cast<std::size_t>(height - y - 1) * stride, stride,
+                topDown.data() + static_cast<std::size_t>(y) * stride);
+            const auto path = std::filesystem::path{capture} / ("tactical-hud-"
+                + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
+            auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
+                topDown.data(), width * 4);
+            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+            SDL_DestroySurface(surface);
+        }
+    }
+    if (!passed) std::cerr << "Tactical HUD resource positioning/feedback failed\n";
     return passed;
 }
 
@@ -191,8 +254,10 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
 
 int main()
 {
-    constexpr int width = 160;
-    constexpr int height = 100;
+    // Smallest supported interface fixture: enough room for map and corner resources.
+    // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
+    constexpr int width = 320;
+    constexpr int height = 200;
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
@@ -1792,11 +1857,20 @@ int main()
                           << " fovStable=" << fovFootprintsStable
                           << " firing=" << firingViewmodelChangedChannels
                           << " impactRendered=" << renderedImpacts << '\n';
+                std::cerr << "UI gates: map=" << mapHudChangedChannels
+                          << " route=" << mapRouteChangedChannels << " footprint=" << mapFootprintChangedChannels
+                          << " exploration=" << mapExplorationChangedChannels
+                          << " timer=" << runTimerChangedChannels << " campaign=" << campaignTimerChangedChannels
+                          << " record=" << speedrunRecordChangedChannels
+                          << " main=" << mainMenuChangedChannels << " settings=" << settingsMenuChangedChannels
+                          << " selection=" << settingsSelectionChangedChannels
+                          << " hud=" << functionalHudChangedChannels << '\n';
             }
             // Exercise the gameplay HUD at real drawable sizes after the small
             // fixed-scene checks; these snapshots do not change combat state.
             passed = validateBossHud(renderer) && passed;
             passed = validateFrontendMenus(renderer) && passed;
+            passed = validateTacticalHud(renderer) && passed;
         }
     }
 

@@ -1,5 +1,31 @@
 # Interface — HUD
 
+## Direção visual atual — aprovada em 2026-10-01
+
+**Tático minimalista**, aprovado explicitamente pelo usuário a partir da
+proposta `visual/proposals/interface_visual_v3.html`. Esta seção substitui a
+composição Rail/Precision histórica descrita abaixo; não altera contratos de gameplay.
+
+- Saúde em números maiores no canto inferior esquerdo, com máximo, armor,
+  barras independentes e chaves. Saúde crítica mantém vermelho.
+- Arma e munição no canto inferior direito: carregador maior, reserva menor,
+  indicação de faca/READY, Overdrive, nível e XP. Carregador vazio usa aviso.
+- Sem placas opacas, cantos metálicos ou bordas ornamentais nos recursos.
+  Objetivo, evento, prompts e minimapa recebem somente um fundo escuro translúcido
+  para contraste, sem esconder suas informações ou mudar condições de exibição.
+- Barra do boss permanece centralizada no topo, com vida proporcional e fase.
+  Não recebe moldura metálica. O mapa se recolhe se não couber acima dos recursos.
+- Fonte suavizada pré-rasterizada e incorporada ao executável. Telas compactas
+  mantêm fallback bitmap legível; números principais ainda usam a fonte suavizada.
+  Nada depende de fontes instaladas, SDL_ttf ou Pillow em execução/build.
+- Interface permanece em resolução nativa, independente do perfil gráfico do mundo.
+  Não introduz blur, nova iluminação, animações contínuas ou mudanças nas IAs.
+
+Snapshots OpenGL e testes cobrem HP crítico, munição vazia, faca, fase/vida do boss,
+mapa e separação entre os cantos. Validação visual em partida permanece com o usuário.
+
+## Histórico e contratos preservados
+
 > **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,
 > XP, objetivo, evento, resultado e prompts contextuais aparecem no viewport;
 > a Fase 18 acrescenta feedback temporário de combate e eventos e a Fase 58

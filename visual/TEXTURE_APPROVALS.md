@@ -79,6 +79,29 @@ resultado final:
 
 ## Propostas ativas
 
+### Interface/menu e HUD — v3
+
+```text
+unidade visual: menus e HUD de gameplay
+versão da proposta: v3 (combinação de duas direções)
+arquivo: visual/proposals/interface_visual_v3.html
+contrato: visual/proposals/interface_visual_proposal_v3.md
+variantes mostradas: Industrial refinado; Tático minimalista; Terminal da instalação
+decisão do usuário: HUD Tático minimalista + menus Industrial refinado
+                    "use o Tatico minimalista para a hud do jogo e o Industrial Refinado para o menu"
+data: 2026-10-01
+commit de implementação: feat: apply minimal tactical HUD and refined industrial menus
+capturas: visual/validation/interface_v3_menu_1280x720.png;
+          visual/validation/interface_v3_hud_1280x720.png;
+          visual/validation/interface_v3_bindings_320x200.png;
+          visual/validation/interface_v3_boss_320x200.png
+resultado final: IMPLEMENTADA EM VALIDAÇÃO (aceitação em partida pendente)
+```
+
+Não aprova a variante Terminal da instalação, novas texturas de ambiente,
+modelos, armas ou mudanças de gameplay. Substitui apenas a composição visual
+do HUD Rail/Precision e acabamento anterior dos menus.
+
 ### HUD/map visual language — v1 (somente HUD de gameplay)
 
 ```text

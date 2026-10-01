@@ -266,6 +266,9 @@ private:
     wkc::render::Shader shadow3Shader_{};
     wkc::render::Shader shadow6Shader_{};
     wkc::render::Shader lowSpecShader_{};
+    wkc::render::Shader uiShader_{};
+    wkc::render::Mesh uiQuad_{};
+    wkc::render::Texture uiFont_{};
     wkc::render::Mesh box_{};
     std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
         weaponRoleCount> weaponMeshes_{};

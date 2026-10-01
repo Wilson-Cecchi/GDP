@@ -1,5 +1,6 @@
 #include "game/MenuFlow.hpp"
 #include "game/visual/GdpRenderData.hpp"
+#include "game/visual/UiFontAtlas.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "persistence/SpeedrunLeaderboardStore.hpp"
@@ -74,13 +75,31 @@ void bindingsTests() {
 }
 void layoutTests() {
     using namespace gdp::game::visual;
-    for (auto dimensions : {std::array{1280, 720}, std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
+    expect(makeListMenuLayout(320, 50, 14U).rows.empty(), "impossibly small viewports do not create offscreen hit targets");
+    std::size_t decoded = 0U;
+    bool antialias = false;
+    for (std::size_t i = 0U; i < uiFontAtlasRle.size(); i += 2U) {
+        decoded += uiFontAtlasRle[i];
+        antialias |= uiFontAtlasRle[i + 1U] > 0U && uiFontAtlasRle[i + 1U] < 255U;
+    }
+    expect(decoded == static_cast<std::size_t>(uiFontAtlasWidth * uiFontAtlasHeight)
+        && antialias, "embedded font decodes to a complete antialiased atlas");
+    for (auto dimensions : {std::array{1280, 720}, std::array{960, 540}, std::array{960, 600},
+             std::array{2560, 1080}, std::array{640, 360}, std::array{320, 200}}) {
+        const auto tactical = makeTacticalHudLayout(dimensions[0], dimensions[1]);
+        expect(tactical.health.x + tactical.health.width < tactical.weapon.x,
+            "minimal HUD keeps health left, ammo right, and the center open");
+        for (const auto rect : {tactical.health, tactical.weapon}) {
+            expect(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= dimensions[0]
+                && rect.y + rect.height <= dimensions[1], "tactical HUD corner groups remain in viewport");
+        }
         for (std::size_t count = 2U; count <= 14U; ++count) {
             auto layout = makeListMenuLayout(dimensions[0], dimensions[1], count);
             expect(layout.rows.size() == count, "every menu row has a shared render/hit rectangle");
             for (std::size_t i = 0U; i < count; ++i) {
                 const auto r = layout.rows[i];
                 expect(r.x >= 0 && r.y >= 0 && r.x + r.width <= dimensions[0] && r.y + r.height <= dimensions[1], "rows remain inside viewport");
+                if (i > 0U) expect(r.y + r.height < layout.rows[i - 1U].y, "refined menu hit targets do not overlap");
                 float x = static_cast<float>(r.x + r.width / 2);
                 float y = static_cast<float>(dimensions[1] - r.y - r.height / 2);
                 expect(listMenuSelectionAt(dimensions[0], dimensions[1], count, x, y) == i, "mouse finds exactly the rendered row");

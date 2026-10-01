@@ -433,6 +433,7 @@ if(WIN32)
     endif()
 
     install(FILES README_WINDOWS.md DESTINATION .)
+    install(FILES assets/fonts/LICENSE-DejaVu.txt DESTINATION licenses)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(GDP_WINDOWS_ARCHITECTURE x64)

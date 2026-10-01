@@ -1,0 +1,182 @@
+<div id="gdp-ui-concepts">
+  <div class="viz-carousel" aria-label="Propostas de menu e HUD do GDP" data-previous-label="Anterior" data-next-label="Próxima">
+    <section data-variant="Industrial refinado" aria-label="Industrial refinado">
+      <div class="gdp-product industrial" aria-label="Menu e HUD industrial refinado"></div>
+    </section>
+    <section data-variant="Tático minimalista" aria-label="Tático minimalista" hidden>
+      <div class="gdp-product minimal" aria-label="Menu e HUD tático minimalista"></div>
+    </section>
+    <section data-variant="Terminal da instalação" aria-label="Terminal da instalação" hidden>
+      <div class="gdp-product terminal" aria-label="Menu e HUD terminal da instalação"></div>
+    </section>
+  </div>
+</div>
+<style>
+  #gdp-ui-concepts .gdp-product { --gdp-accent:#63d2d5; --gdp-text:#edf2f1; --gdp-muted:#a6b9bc; --gdp-panel:#121e23; --gdp-line:#34474e; --gdp-alert:#e9b35b; color:var(--gdp-text); font:14px/1.4 Arial,Helvetica,sans-serif; color-scheme:dark; }
+  #gdp-ui-concepts .gdp-product * { box-sizing:border-box; }
+  #gdp-ui-concepts .screen { position:relative; isolation:isolate; overflow:hidden; background:#121b20; min-height:490px; margin-bottom:14px; }
+  #gdp-ui-concepts .screen::before { content:""; position:absolute; z-index:-2; inset:0; background:linear-gradient(90deg,#080f16e8 0%,#101920b3 45%,#1021284a),repeating-linear-gradient(90deg,transparent 0 89px,#0d1c23 90px 97px),repeating-linear-gradient(0deg,#32444c 0 66px,#172b34 68px 73px); }
+  #gdp-ui-concepts .scene { position:absolute; z-index:-1; right:0; top:0; width:60%; height:100%; opacity:.5; }
+  #gdp-ui-concepts .scene::before { content:""; position:absolute; width:140%; height:46%; bottom:-9%; right:-40%; transform:skewY(-15deg); background:repeating-linear-gradient(90deg,transparent 0 55px,#64767c 56px 57px),repeating-linear-gradient(0deg,#29383d 0 31px,#617077 32px 33px); border-top:3px solid #8b8150; }
+  #gdp-ui-concepts .scene::after { content:""; position:absolute; width:32%; height:45%; right:20%; top:22%; background:linear-gradient(90deg,#0a1318,#2d424c); border:8px solid #52626a; box-shadow:inset 0 0 0 3px #14252d; }
+  #gdp-ui-concepts .screen-tag { display:inline-block; margin:18px 24px 0; color:var(--gdp-muted); font:11px/1.4 monospace; letter-spacing:.12em; }
+  #gdp-ui-concepts .menu-layout { padding:20px 36px 30px; display:grid; grid-template-columns:minmax(220px,1fr) 1fr; gap:24px; }
+  #gdp-ui-concepts .brand { margin:0; color:var(--gdp-text); font-size:64px; line-height:1; letter-spacing:-.045em; font-weight:700; }
+  #gdp-ui-concepts .subtitle { margin:6px 0 25px; color:var(--gdp-muted); font-size:11px; letter-spacing:.22em; }
+  #gdp-ui-concepts .menu-list { display:grid; max-width:292px; gap:3px; }
+  #gdp-ui-concepts .menu-choice { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; width:100%; text-align:left; padding:10px 14px; border:0; border-left:2px solid transparent; background:#10191ecf; color:var(--gdp-muted); font:14px/1.4 Arial,Helvetica,sans-serif; transition:background 120ms,color 120ms; }
+  #gdp-ui-concepts .menu-choice[aria-pressed="true"] { background:#20353ded; color:var(--gdp-text); border-left-color:var(--gdp-accent); }
+  #gdp-ui-concepts .menu-choice:hover { background:#263e46; color:var(--gdp-text); }
+  #gdp-ui-concepts .menu-choice span { font:11px/1.4 monospace; color:var(--gdp-muted); }
+  #gdp-ui-concepts .dev { color:var(--gdp-muted); margin-top:8px; }
+  #gdp-ui-concepts .mode-detail { align-self:end; padding:18px; border-top:1px solid var(--gdp-line); background:#121e23ed; }
+  #gdp-ui-concepts .mode-detail strong { display:block; font-size:18px; font-weight:500; margin-bottom:7px; }
+  #gdp-ui-concepts .mode-detail p { margin:0; font-size:12px; color:var(--gdp-muted); }
+  #gdp-ui-concepts .footer { padding:0 36px 18px; color:var(--gdp-muted); font:11px/1.4 monospace; }
+  #gdp-ui-concepts .hud-screen { min-height:350px; }
+  #gdp-ui-concepts .hud-screen::before { background:linear-gradient(0deg,#071016b3,transparent 45%,#07101699),repeating-linear-gradient(90deg,transparent 0 130px,#162b32 132px 138px),repeating-linear-gradient(0deg,#3b5259 0 70px,#253940 72px 78px); }
+  #gdp-ui-concepts .hud-screen .scene { opacity:.8; width:100%; }
+  #gdp-ui-concepts .hud-top { padding:16px 24px; display:grid; grid-template-columns:100px minmax(100px,1fr) 100px; gap:16px; align-items:start; }
+  #gdp-ui-concepts .mini-map { height:85px; background:var(--gdp-panel); padding:10px; }
+  #gdp-ui-concepts .map-rooms { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,18px); gap:3px; }
+  #gdp-ui-concepts .map-rooms i { background:#3d5359; }
+  #gdp-ui-concepts .map-rooms i:nth-child(2),#gdp-ui-concepts .map-rooms i:nth-child(4),#gdp-ui-concepts .map-rooms i:nth-child(9) { visibility:hidden; }
+  #gdp-ui-concepts .map-rooms i:nth-child(5) { background:var(--gdp-accent); display:grid; place-items:center; font:12px monospace; color:#122c32; }
+  #gdp-ui-concepts .boss { padding:10px 12px; background:var(--gdp-panel); text-align:center; }
+  #gdp-ui-concepts .boss-title { font-size:11px; letter-spacing:.13em; margin-bottom:8px; }
+  #gdp-ui-concepts .track { height:4px; background:#465359; }
+  #gdp-ui-concepts .track div { height:100%; width:64%; background:var(--gdp-alert); }
+  #gdp-ui-concepts .boss-phase { color:var(--gdp-muted); font:11px/1.4 monospace; margin-top:7px; }
+  #gdp-ui-concepts .objective { text-align:right; padding-top:4px; font-size:11px; }
+  #gdp-ui-concepts .objective strong { display:block; color:var(--gdp-text); font-weight:500; }
+  #gdp-ui-concepts .objective span { display:block; color:var(--gdp-muted); margin-top:7px; font-family:monospace; }
+  #gdp-ui-concepts .crosshair { position:absolute; left:50%; top:49%; color:#e4efed; font:22px/1 monospace; transform:translate(-50%,-50%); }
+  #gdp-ui-concepts .hud-bottom { position:absolute; left:24px; right:24px; bottom:22px; display:flex; justify-content:space-between; gap:16px; align-items:end; }
+  #gdp-ui-concepts .vitals,#gdp-ui-concepts .weapon { background:var(--gdp-panel); padding:12px 16px; border-top:2px solid var(--gdp-accent); min-width:140px; }
+  #gdp-ui-concepts .label { font-size:11px; letter-spacing:.09em; color:var(--gdp-muted); }
+  #gdp-ui-concepts .number { font:500 32px/1.3 Arial,Helvetica,sans-serif; font-variant-numeric:tabular-nums; }
+  #gdp-ui-concepts .number small { font-size:14px; color:var(--gdp-muted); }
+  #gdp-ui-concepts .substat { font:11px/1.4 monospace; color:var(--gdp-muted); margin-top:4px; }
+  #gdp-ui-concepts .weapon { text-align:right; }
+  #gdp-ui-concepts .industrial .brand::after { content:""; display:block; width:42px; height:3px; margin-top:10px; background:var(--gdp-accent); }
+  #gdp-ui-concepts .minimal { --gdp-accent:#dde9e8; --gdp-panel:#111c22ed; }
+  #gdp-ui-concepts .minimal .menu-layout { padding-top:38px; grid-template-columns:1fr; }
+  #gdp-ui-concepts .minimal .brand { font-weight:500; font-size:52px; letter-spacing:.1em; }
+  #gdp-ui-concepts .minimal .subtitle { margin-bottom:28px; }
+  #gdp-ui-concepts .minimal .menu-list { display:flex; flex-wrap:wrap; max-width:none; gap:10px; }
+  #gdp-ui-concepts .minimal .menu-choice { width:auto; padding:10px 0; min-height:48px; border-left:0; border-bottom:1px solid transparent; background:transparent; margin-right:14px; }
+  #gdp-ui-concepts .minimal .menu-choice[aria-pressed="true"] { border-bottom-color:var(--gdp-accent); color:var(--gdp-accent); }
+  #gdp-ui-concepts .minimal .menu-choice:hover { color:var(--gdp-text); }
+  #gdp-ui-concepts .minimal .mode-detail { max-width:340px; padding:0; background:transparent; border:0; margin-top:36px; }
+  #gdp-ui-concepts .minimal .vitals,#gdp-ui-concepts .minimal .weapon { border:0; background:transparent; padding:0; }
+  #gdp-ui-concepts .minimal .boss { background:transparent; padding-top:10px; }
+  #gdp-ui-concepts .minimal .mini-map { background:#132329d9; }
+  #gdp-ui-concepts .terminal { --gdp-accent:#a9c6b2; --gdp-panel:#111f1b; --gdp-muted:#afc0b5; --gdp-line:#41564b; font-family:monospace; }
+  #gdp-ui-concepts .terminal .menu-layout { grid-template-columns:minmax(200px,1fr) 1fr; margin:18px 28px; padding:20px; background:#10201aef; border:1px solid #3f544a; }
+  #gdp-ui-concepts .terminal .brand { font:500 36px/1.2 monospace; letter-spacing:.03em; }
+  #gdp-ui-concepts .terminal .subtitle { color:var(--gdp-accent); margin:6px 0 18px; }
+  #gdp-ui-concepts .terminal .menu-choice { font-family:monospace; background:transparent; border-left:0; padding-left:0; }
+  #gdp-ui-concepts .terminal .menu-choice[aria-pressed="true"] { background:#294032; padding-left:10px; }
+  #gdp-ui-concepts .terminal .mode-detail { background:transparent; border-left:1px solid var(--gdp-line); border-top:0; }
+  #gdp-ui-concepts .terminal .mode-detail strong { font-family:monospace; font-size:16px; }
+  #gdp-ui-concepts .terminal .hud-top { grid-template-columns:100px 1fr; }
+  #gdp-ui-concepts .terminal .mini-map { grid-column:1; grid-row:1/3; }
+  #gdp-ui-concepts .terminal .boss { grid-column:2; text-align:left; border-left:2px solid var(--gdp-alert); }
+  #gdp-ui-concepts .terminal .objective { grid-column:2; text-align:left; padding-left:12px; }
+  #gdp-ui-concepts .terminal .objective span { display:inline-block; margin:0 0 0 8px; }
+  #gdp-ui-concepts .terminal .number { font-family:monospace; font-size:28px; }
+  #gdp-ui-concepts .terminal .vitals,#gdp-ui-concepts .terminal .weapon { border-top:0; border-left:2px solid var(--gdp-accent); }
+  @media(max-width:560px) {
+    #gdp-ui-concepts .screen { min-height:570px; }
+    #gdp-ui-concepts .menu-layout,#gdp-ui-concepts .terminal .menu-layout { grid-template-columns:1fr; padding:18px 20px; gap:18px; }
+    #gdp-ui-concepts .terminal .menu-layout { margin:14px; }
+    #gdp-ui-concepts .brand { font-size:52px; }
+    #gdp-ui-concepts .subtitle { margin-bottom:18px; }
+    #gdp-ui-concepts .mode-detail { padding:12px; }
+    #gdp-ui-concepts .minimal .mode-detail { margin-top:15px; }
+    #gdp-ui-concepts .minimal .menu-list { flex-direction:column; gap:0; }
+    #gdp-ui-concepts .minimal .menu-choice { margin:0; padding:8px 0; min-height:44px; }
+    #gdp-ui-concepts .terminal .mode-detail { border-left:0; border-top:1px solid var(--gdp-line); padding:12px 0; }
+    #gdp-ui-concepts .footer { padding:0 20px 16px; }
+    #gdp-ui-concepts .hud-screen { min-height:360px; }
+    #gdp-ui-concepts .hud-top { padding:14px; grid-template-columns:68px 1fr; gap:10px; }
+    #gdp-ui-concepts .mini-map { height:70px; padding:7px; grid-row:1/3; }
+    #gdp-ui-concepts .map-rooms { grid-template-rows:repeat(3,16px); gap:2px; }
+    #gdp-ui-concepts .boss { grid-column:2; }
+    #gdp-ui-concepts .objective { grid-column:2; text-align:left; padding:0; }
+    #gdp-ui-concepts .objective span { display:inline-block; margin:0 0 0 8px; }
+    #gdp-ui-concepts .hud-bottom { left:14px; right:14px; gap:10px; }
+    #gdp-ui-concepts .vitals,#gdp-ui-concepts .weapon { min-width:0; padding:10px; }
+    #gdp-ui-concepts .number { font-size:28px; }
+    #gdp-ui-concepts .screen-tag { margin-left:20px; }
+  }
+  @media(prefers-reduced-motion:reduce) { #gdp-ui-concepts .menu-choice { transition:none; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('gdp-ui-concepts');
+  const options = ['Campaign / Story','Speedrun','Settings','Quit Game','Test Mode'];
+  const descriptions = {
+    'Campaign / Story':['CAMPAIGN / STORY','10 andares · 3 slots de save','Easy / Normal / Hard'],
+    'Speedrun':['SPEEDRUN','Dificuldade Hard · partida cronometrada','Iniciar partida / placar local'],
+    'Settings':['SETTINGS','Tela · Áudio · Controles','Sensibilidade e remapeamento'],
+    'Quit Game':['QUIT GAME','Sair do GDP','Confirmação antes de sair'],
+    'Test Mode':['TEST MODE','Área dedicada de testes','Disponível apenas em desenvolvimento']
+  };
+  const saved = window.openai?.widgetState?.privateContent;
+  const configs = [];
+  root.querySelectorAll('.gdp-product').forEach((product,index) => {
+    const config = { hudPanels: !product.classList.contains('minimal'), active: options.includes(saved?.active?.[index]) ? saved.active[index] : options[0] };
+    configs.push(config);
+    product.innerHTML = `
+      <div class="screen menu-screen" aria-label="Proposta de menu inicial">
+        <div class="scene" aria-hidden="true"></div>
+        <span class="screen-tag">MENU INICIAL · CONCEITO VISUAL</span>
+        <div class="menu-layout">
+          <div><h2 class="brand">GDP</h2><div class="subtitle">INDUSTRIAL COMPLEX</div>
+            <nav class="menu-list" aria-label="Opções do menu">
+              ${options.map((name,i)=>`<button type="button" class="menu-choice cursor-interaction${i===4?' dev':''}" data-option="${name}" aria-pressed="${name===config.active}">${name}${i===4?'<span>DEV</span>':''}</button>`).join('')}
+            </nav>
+          </div>
+          <div class="mode-detail" aria-live="polite"><strong></strong><p></p><p></p></div>
+        </div>
+        <div class="footer">WASD / SETAS · ENTER · MOUSE</div>
+      </div>
+      <div class="screen hud-screen" aria-label="Proposta de HUD em combate, com valores ilustrativos">
+        <div class="scene" aria-hidden="true"></div>
+        <span class="screen-tag">HUD · VALORES ILUSTRATIVOS</span>
+        <div class="hud-top">
+          <div class="mini-map" role="img" aria-label="Minimapa esquemático; seta indica o jogador"><div class="map-rooms"><i></i><i></i><i></i><i></i><i>↑</i><i></i><i></i><i></i><i></i></div></div>
+          <div class="boss"><div class="boss-title">BOSS</div><div class="track" role="meter" aria-label="Vida do boss ilustrativa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64"><div></div></div><div class="boss-phase">PURSUIT</div></div>
+          <div class="objective"><strong>DEFEAT BOSS</strong><span>04:23.18</span></div>
+        </div>
+        <div class="crosshair" aria-hidden="true">+</div>
+        <div class="hud-bottom">
+          <div class="vitals"><div class="label">HEALTH</div><div class="number">100 <small>/ 115</small></div><div class="substat">ARMOR 40 · KEYS 02</div></div>
+          <div class="weapon"><div class="label">RIFLE</div><div class="number">24 <small>/ 96</small></div><div class="substat">LV 03 · XP 80 / 175</div></div>
+        </div>
+      </div>`;
+    function render() {
+      const detail = descriptions[config.active];
+      product.querySelectorAll('.menu-choice').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.option===config.active)));
+      const panel = product.querySelector('.mode-detail');
+      panel.querySelector('strong').textContent = detail[0];
+      panel.querySelectorAll('p').forEach((p,i)=>p.textContent=detail[i+1]);
+      product.querySelectorAll('.vitals,.weapon').forEach(p=>p.style.background = config.hudPanels ? 'var(--gdp-panel)' : 'transparent');
+    }
+    function remember() {
+      if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{menuSelecionado:config.active,direcao:product.getAttribute('aria-label')},privateContent:{active:configs.map(c=>c.active)}}).catch(()=>{});
+    }
+    product.querySelectorAll('.menu-choice').forEach(button=>button.addEventListener('click',()=>{config.active=button.dataset.option;render();remember();}));
+    render();
+    if(globalThis.Tweak) {
+      const tweak = new Tweak({container:product,onChange:render});
+      tweak.addToggle(config,'hudPanels',{label:'Fundo dos blocos da HUD'});
+    }
+    window.addEventListener('openai:set_globals',event=>{
+      const active = event.detail?.globals?.widgetState?.privateContent?.active?.[index];
+      if(options.includes(active)){config.active=active;render();}
+    });
+  });
+})();
+</script>

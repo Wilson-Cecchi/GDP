@@ -13,17 +13,20 @@ namespace gdp::game::visual {
 ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count)
 {
     ListMenuLayout layout;
-    if (width < 32 || height < 48 || count == 0U || count > 24U) return layout;
+    if (width < 64 || count == 0U || count > 24U
+        || height < 68 + static_cast<int>(count) * 8) return layout;
     const int n = static_cast<int>(count);
     layout.scale = std::max(1, std::min(width / 620, height / (80 + n * 15)));
     const int scale = layout.scale;
-    const int panelWidth = std::min(width - 12, 600 * scale);
-    const int rowHeight = std::max(8, std::min(16 * scale, (height - 60 * scale) / n));
-    const int panelHeight = std::min(height - 8, 58 * scale + n * rowHeight);
-    layout.panel = {(width - panelWidth) / 2, (height - panelHeight) / 2, panelWidth, panelHeight};
+    const int margin = width >= 640 ? width / 20 : 8;
+    const int panelWidth = std::min(width - 2 * margin, (count <= 7U ? 320 : 560) * scale);
+    const int rowHeight = std::max(1, std::min(26 * scale, (height - 68 * scale) / n));
+    const int panelHeight = std::min(height - 8, 64 * scale + n * rowHeight);
+    const int panelX = width >= 800 && count <= 7U ? margin : (width - panelWidth) / 2;
+    layout.panel = {panelX, (height - panelHeight) / 2, panelWidth, panelHeight};
     for (int i = 0; i < n; ++i) {
         layout.rows.push_back({layout.panel.x + 8 * scale,
-            layout.panel.y + panelHeight - 40 * scale - (i + 1) * rowHeight,
+            layout.panel.y + panelHeight - 52 * scale - (i + 1) * rowHeight,
             panelWidth - 16 * scale, rowHeight - scale});
     }
     return layout;
@@ -717,16 +720,27 @@ UiVisualTheme industrialUiTheme() noexcept
 {
     return {
         .background = {0.004F, 0.010F, 0.014F},
-        .panel = {0.014F, 0.028F, 0.035F},
-        .panelBorder = {0.075F, 0.145F, 0.165F},
-        .selection = {0.055F, 0.205F, 0.225F},
-        .text = {0.78F, 0.88F, 0.90F},
-        .mutedText = {0.42F, 0.56F, 0.60F},
-        .accent = {0.18F, 0.88F, 0.94F},
+        .panel = {0.045F, 0.070F, 0.082F},
+        .panelBorder = {0.20F, 0.27F, 0.30F},
+        .selection = {0.12F, 0.21F, 0.24F},
+        .text = {0.92F, 0.95F, 0.94F},
+        .mutedText = {0.61F, 0.70F, 0.72F},
+        .accent = {0.39F, 0.82F, 0.84F},
         .warning = {0.98F, 0.62F, 0.14F},
         .danger = {0.96F, 0.20F, 0.10F},
         .success = {0.24F, 0.92F, 0.56F},
     };
+}
+
+TacticalHudLayout makeTacticalHudLayout(const int width, const int height) noexcept
+{
+    if (width < 32 || height < 48) return {};
+    const int scale = width >= 640 && height >= 360 ? 2 : 1;
+    const int margin = 6 * scale;
+    const int blockWidth = std::min(130 * scale, (width - 2 * margin - 4 * scale) / 2);
+    const int blockHeight = std::min(height - 2 * margin, 62 * scale);
+    return {{margin, margin, blockWidth, blockHeight},
+        {width - margin - blockWidth, margin, blockWidth, blockHeight}};
 }
 
 MainMenuLayout makeMainMenuLayout(const int width, const int height) noexcept

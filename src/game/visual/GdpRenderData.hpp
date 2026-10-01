@@ -387,6 +387,12 @@ struct UiVisualTheme {
 
 [[nodiscard]] UiVisualTheme industrialUiTheme() noexcept;
 
+struct TacticalHudLayout {
+    UiRect health{};
+    UiRect weapon{};
+};
+[[nodiscard]] TacticalHudLayout makeTacticalHudLayout(int width, int height) noexcept;
+
 struct MainMenuLayout {
     int scale{1};
     UiRect panel{};
