@@ -489,6 +489,17 @@ if(GDP_BUILD_TESTS)
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_ai_gameplay_eval.cmake)
     set_tests_properties(ai_gameplay_eval_deterministic PROPERTIES TIMEOUT 30)
 
+    find_package(Python3 3.10 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME ai_auto_promotion_policy
+            COMMAND ${Python3_EXECUTABLE} -m unittest discover
+                -s ${CMAKE_CURRENT_SOURCE_DIR}/tests
+                -p test_ai_auto_promote.py)
+        set_tests_properties(ai_auto_promotion_policy PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+    endif()
+
     add_test(NAME active_enemy_brains_headless
         COMMAND ${CMAKE_COMMAND}
             -DGDP_EXECUTABLE=$<TARGET_FILE:gdp>

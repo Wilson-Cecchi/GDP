@@ -552,3 +552,26 @@ O modo `--test-brain-dir` confirma cada geração carregada no log. Nenhum
 arquivo em `assets/ai/` foi substituído: a aprovação visual do movimento,
 cobertura e equilíbrio continua necessária antes de promover o Officer.
 Pontuação de treino/holdout sozinha não foi usada como gate.
+
+**Promoção automática para os treinos seguintes (2026-10-01):** por decisão do
+usuário, o playtest visual passa a ocorrer continuamente durante o projeto, sem
+uma aprovação pontual obrigatória antes de cada atualização neural. A ferramenta
+`tools/ai_auto_promote.py train -- build/release/gdp --ai-training ...` executa o
+treino e, somente quando ele termina com sucesso, compara os checkpoints de
+cada arquétipo com o cérebro fixo atual. Pesos iguais são avaliados uma vez.
+Um filtro rápido de três seeds elimina regressões grandes; os candidatos
+restantes competem em dez seeds de validação. Somente o vencedor passa por dez
+seeds finais distintas, não vistas na seleção nem iguais à seed de treino,
+com mapas em 360 e 720 frames e duelos em solo/Bhop. O gate barra perdas
+relevantes de combate por cenário, Bhop, deslocamento, controle neural e picos
+de letalidade do Robot.
+Exige também ganho mensurável em pressão, cobertura, navegação ou Bhop.
+
+A substituição é por arquétipo e atualiza `assets/ai/TYPE.brain` e a cópia
+`build/release/ai/TYPE.brain` para o próximo início do jogo; um headless smoke
+test e relatório JSON acompanham cada decisão. Checkpoints reprovados são
+preservados no diretório de treino. A ferramenta recusa sobrescrever uma edição
+alheia não registrada e não faz commit nem push. O gate ainda usa fixtures
+controladas e não mede toda a campanha: relatos de gameplay continuam podendo
+exigir rollback ou ajuste dos critérios. O conjunto fixo atual permanece os
+cinco cérebros de geração 200; a bateria de 2026-10-01 não promoveu nenhum.

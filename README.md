@@ -687,8 +687,9 @@ especializados das pastas numeradas.
   geração, sem substituir arquivos
   existentes. `--resume` inicia outra sequência a partir de um desses campeões
   do mesmo arquétipo (não reproduz exatamente a população anterior). Um treino
-  novo não substitui automaticamente os assets distribuídos: escolha, teste e
-  promova manualmente os novos campeões a `assets/ai/`. Arquivos
+  novo executado diretamente não substitui os assets distribuídos. Para
+  avaliação e promoção automáticas ao terminar, use o wrapper descrito abaixo.
+  Arquivos
   antigos de Worker ainda podem ser carregados no jogo. Treinos novos usam o
   contrato tático de cérebro (`GDP_ENEMY_BRAIN 3`): sensores de velocidade e
   ameaça do Player, munição e recarga, além de strafe independente e uma ação
@@ -708,7 +709,9 @@ especializados das pastas numeradas.
   anteriores. `--resume` aceita apenas um checkpoint do contrato tático novo;
   um cérebro antigo continua jogável, mas o treino novo precisa começar fresco.
   Os checkpoints gerados não substituem os ativos sem
-  avaliação comparativa e aprovação visual. Inimigos de alcance agora lançam
+  avaliação comparativa. A promoção automática usa gates conservadores; o
+  playtest visual continua ao longo do desenvolvimento e pode motivar rollback.
+  Inimigos de alcance agora lançam
   projéteis visíveis com trajetória fixa, colisão com cobertura, carregador e
   recarga; Worker continua com ataque corpo a corpo. O treino registra tiros
   disparados, acertos reais, tiros bloqueados e tiros evitados pelo Player.
@@ -736,6 +739,42 @@ especializados das pastas numeradas.
   Para continuar um único tipo, combine `--ai-training TIPO`,
   `--resume CAMINHO_DO_BRAIN`, `--generations N` e
   `--save-dir NOVO_DIRETORIO`.
+
+  **Promoção automática pós-treino:** o comando canônico é o wrapper abaixo.
+  Ele executa o treino, espera o término bem-sucedido, deduplica os pesos dos
+  checkpoints e tria todos os candidatos em três seeds. Escolhe o melhor dos
+  promissores em dez seeds de validação e testa somente esse vencedor em outras
+  dez seeds finais ainda não usadas. Cada comparação inclui mapas de 360/720
+  frames e duelos em solo/Bhop. Só troca o arquétipo que superar os dois gates
+  de combate, cobertura,
+  mobilidade, fallback e letalidade do boss. Fitness ou geração maiores, por si,
+  não aprovam a troca. O jogo em execução não muda no meio da partida; o próximo
+  início usa os arquivos promovidos. A ferramenta atualiza `assets/ai/` e
+  `build/release/ai/` atomicamente por arquivo, confere um boot headless e
+  registra a decisão em `build/ai-promotion-reports/`. Ela não faz commit/push:
+  uma nova versão Windows exige publicar os assets promovidos depois.
+
+  ```bash
+  cmake --build --preset release --target gdp gdp_ai_gameplay_eval
+  python3 tools/ai_auto_promote.py train -- \
+    build/release/gdp --ai-training all --all-scenarios \
+    --population 16 --generations 30 --seed 42 \
+    --save-dir build/ai-runs/novo-lote
+  # Para um treino que já terminou, sem rodá-lo novamente:
+  python3 tools/ai_auto_promote.py promote \
+    --run-dir build/ai-runs/lote-concluido
+  # Diagnóstico sem substituir os ativos:
+  python3 tools/ai_auto_promote.py promote \
+    --run-dir build/ai-runs/lote-concluido --dry-run
+  ```
+
+  É necessário usar `train -- ...` para o pós-treino ser automático; executar
+  apenas `gdp --ai-training` preserva o comportamento antigo. A ferramenta
+  interrompe a promoção se o treino falhar, faltar algum checkpoint, um cérebro
+  ativo tiver edição alheia ou a cópia da build estiver divergente. O avaliador
+  é controlado e não prova sozinho a qualidade de uma campanha inteira; o
+  retorno do playtest segue sendo usado para ajustar o gate e reverter uma
+  promoção ruim.
 
 - **Avaliação reproduzível de gameplay da IA:** `gdp_ai_gameplay_eval` compara a
   IA anterior (`scripted`) e os cérebros carregados (`neural`) em cinco situações:
@@ -779,7 +818,8 @@ especializados das pastas numeradas.
   da campanha. O espaço é aberto e não contém objetos/portas: a mira automática
   e esse cenário sintético não comprovam qualidade de navegação, precisão contra
   jogadores humanos ou desempenho em uma partida completa. Compare políticas
-  nas mesmas seeds e valide visualmente antes de promover qualquer cérebro.
+  nas mesmas seeds; mesmo com promoção automatizada, valide o resultado em
+  partidas reais e reverta uma regressão observada.
 
 O bootstrap atual contém CMake, SDL3, janela, contexto OpenGL 3.3 core, game loop
 com fixed update de 60 Hz, snapshots de input, logging e modo headless para
