@@ -79,6 +79,7 @@ void testMissingAndRoundTrip()
         = gdp::gameplay::WindowResolution::R1600x900;
     settings.fullscreen = true;
     settings.verticalSync = false;
+    settings.language = gdp::gameplay::Language::PortugueseBrazil;
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
     const SettingsLoadResult loaded = loadRuntimeSettings(path);
@@ -101,7 +102,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 7\n"
+        "version = 8\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -113,6 +114,7 @@ void testRecoveryAndForwardCompatibility()
         "window_height = 777\n"
         "fullscreen = maybe\n"
         "vertical_sync = maybe\n"
+        "language = unavailable\n"
         "future_option = enabled\n");
 
     const SettingsLoadResult recovered = loadRuntimeSettings(path);
@@ -130,11 +132,12 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720
             && !recovered.settings.fullscreen
-            && recovered.settings.verticalSync,
+            && recovered.settings.verticalSync
+            && recovered.settings.language == gdp::gameplay::Language::English,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 7\n"
+        "version = 8\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -146,6 +149,14 @@ void testRecoveryAndForwardCompatibility()
                 == gdp::gameplay::GraphicsQuality::High
             && forwardCompatible.settings.verticalSync,
         "unknown and missing fields remain forward compatible");
+
+    writeText(path, "version = 7\nmaster_volume = 65\nbinding_0 = I\n");
+    const auto previous = loadRuntimeSettings(path);
+    expect(previous.status == SettingsLoadStatus::Migrated
+        && previous.settings.language == gdp::gameplay::Language::English
+        && previous.settings.masterVolumePercent == 65U
+        && previous.settings.controls.values[0] == gdp::gameplay::bindingForName("I"),
+        "v7 migration preserves existing settings and bindings without forcing a new language");
 
     writeText(path,
         "version = 1\n"

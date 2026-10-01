@@ -7,6 +7,7 @@
 #include "game/visual/RoomMaterialGenerator.hpp"
 #include "game/visual/VisualAssets.hpp"
 #include "game/visual/UiFontAtlas.hpp"
+#include "game/Localization.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 
@@ -39,13 +40,14 @@ constexpr std::string_view uiFragmentShader = R"glsl(#version 330 core
 in vec2 vLocal;
 uniform sampler2D uAtlas;
 uniform vec2 uGlyphOrigin;
+uniform vec2 uGlyphSize;
 uniform int uUseFont;
 uniform vec3 uColor;
 uniform float uAlpha;
 out vec4 fragmentColor;
 void main() {
     float coverage = uUseFont == 0 ? 1.0 : textureLod(uAtlas,
-        uGlyphOrigin + vec2(vLocal.x, 1.0 - vLocal.y) * vec2(20.0/320.0, 26.0/156.0), 0.0).r;
+        uGlyphOrigin + vec2(vLocal.x, 1.0 - vLocal.y) * uGlyphSize, 0.0).r;
     fragmentColor = vec4(uColor, uAlpha * coverage);
 }
 )glsl";
@@ -337,7 +339,7 @@ constexpr std::array roomParts{
 
 using Glyph = std::array<std::uint8_t, 7U>;
 
-constexpr Glyph glyphFor(const char character) noexcept
+constexpr Glyph glyphFor(const std::uint32_t character) noexcept
 {
     switch (character) {
     case '0': return {0x0EU, 0x11U, 0x13U, 0x15U, 0x19U, 0x11U, 0x0EU};
@@ -389,13 +391,26 @@ constexpr Glyph glyphFor(const char character) noexcept
     case '=': return {0x00U, 0x00U, 0x1FU, 0x00U, 0x1FU, 0x00U, 0x00U};
     case '_': return {0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x1FU};
     case '?': return {0x0EU, 0x11U, 0x01U, 0x02U, 0x04U, 0x00U, 0x04U};
+    case U'Á': case U'á': return {0x04U, 0x08U, 0x0EU, 0x11U, 0x1FU, 0x11U, 0x11U};
+    case U'À': case U'à': return {0x08U, 0x04U, 0x0EU, 0x11U, 0x1FU, 0x11U, 0x11U};
+    case U'Â': case U'â': return {0x04U, 0x0AU, 0x0EU, 0x11U, 0x1FU, 0x11U, 0x11U};
+    case U'Ã': case U'ã': return {0x0AU, 0x14U, 0x0EU, 0x11U, 0x1FU, 0x11U, 0x11U};
+    case U'É': case U'é':
+        return {0x04U, 0x08U, 0x1FU, 0x10U, 0x1EU, 0x10U, 0x1FU};
+    case U'Ê': case U'ê': return {0x04U, 0x0AU, 0x1FU, 0x10U, 0x1EU, 0x10U, 0x1FU};
+    case U'Í': case U'í': return {0x02U, 0x04U, 0x0EU, 0x04U, 0x04U, 0x04U, 0x0EU};
+    case U'Ó': case U'ó': return {0x04U, 0x08U, 0x0EU, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case U'Ô': case U'ô': return {0x04U, 0x0AU, 0x0EU, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case U'Õ': case U'õ': return {0x0AU, 0x14U, 0x0EU, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case U'Ú': case U'ú': return {0x04U, 0x08U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    case U'Ç': case U'ç': return {0x0FU, 0x10U, 0x10U, 0x10U, 0x0FU, 0x04U, 0x08U};
     default: return {};
     }
 }
 
 int bitmapTextWidth(const std::string_view text, const int scale) noexcept
 {
-    return static_cast<int>(text.size()) * 6 * scale;
+    return static_cast<int>(uiTextLength(text)) * 6 * scale;
 }
 
 void drawSolidRect(
@@ -422,7 +437,8 @@ void drawBitmapText(
 {
     glClearColor(color.x, color.y, color.z, 1.0F);
     int cursor = x;
-    for (const char character : text) {
+    for (std::size_t offset = 0U; offset < text.size();) {
+        const auto character = nextUiCodepoint(text, offset);
         const Glyph glyph = glyphFor(character);
         for (std::size_t row = 0; row < glyph.size(); ++row) {
             for (int column = 0; column < 5; ++column) {
@@ -2308,29 +2324,39 @@ bool GdpRenderer::render(
             uiFont_.bind(gl_, textureBindings_);
             uiShader_.setInt(gl_, "uAtlas", 0);
             uiShader_.setVec2(gl_, "uGlyphOrigin", {
-                static_cast<float>((glyph % 16) * 20) / 320.0F,
-                static_cast<float>((glyph / 16) * 26) / 156.0F});
+                static_cast<float>(glyph % uiFontAtlasColumns) / static_cast<float>(uiFontAtlasColumns),
+                static_cast<float>(glyph / uiFontAtlasColumns) / static_cast<float>(uiFontAtlasRows)});
+            uiShader_.setVec2(gl_, "uGlyphSize", {1.0F / static_cast<float>(uiFontAtlasColumns),
+                1.0F / static_cast<float>(uiFontAtlasRows)});
         }
         uiQuad_.draw(gl_, meshBindings_);
         glDisable(GL_BLEND);
         glEnable(GL_SCISSOR_TEST);
     };
     const auto drawBitmapText = [&](const int x, const int y, const int scale,
-                                    const std::string_view text, const wkc::core::Vec3 color) {
+                                    const std::string_view source, const wkc::core::Vec3 color) {
+        const auto text = localize(hud.language, source);
         if (scale <= 1) {
             gdp::game::visual::drawBitmapText(x, y, scale, text, color);
             return;
         }
         int cursor = x;
-        for (const unsigned char character : text) {
-            if (character > 32U && character < 127U) {
+        for (std::size_t offset = 0U; offset < text.size();) {
+            auto character = nextUiCodepoint(text, offset);
+            if (character > static_cast<std::uint32_t>(uiFontLastCodepoint)) character = '?';
+            if (character > 32U) {
                 // Same six-unit advance as the compact fallback and all shared layouts.
-                drawUiQuad({cursor - scale, y - 2 * scale, 8 * scale,
-                    static_cast<int>(std::round(10.4F * static_cast<float>(scale)))},
-                    color, 1.0F, static_cast<int>(character) - 32);
+                const float cellScale = 0.4F * static_cast<float>(scale);
+                drawUiQuad({cursor - scale,
+                    y - static_cast<int>(std::round(static_cast<float>(uiFontCellHeight - uiFontBaseline - 1) * cellScale)),
+                    8 * scale, static_cast<int>(std::round(static_cast<float>(uiFontCellHeight) * cellScale))},
+                    color, 1.0F, static_cast<int>(character) - uiFontFirstCodepoint);
             }
             cursor += 6 * scale;
         }
+    };
+    const auto bitmapTextWidth = [&](const std::string_view text, const int scale) {
+        return gdp::game::visual::bitmapTextWidth(localize(hud.language, text), scale);
     };
     const auto drawMenuPanel = [&](const UiRect panel,
                                          const int scale,
@@ -2364,9 +2390,14 @@ bool GdpRenderer::render(
     const int bossPanelWidth = showBoss
         ? std::min(std::max(1, width - (hudMargin * 2)),
             std::max(220, std::min(240 * hudScale, width * 2 / 5))) : 0;
+    const int bossPhaseWidth = std::max({
+        bitmapTextWidth("PHASE 1/3 RANGE", hudScale),
+        bitmapTextWidth("PHASE 2/3 PRESSURE", hudScale),
+        bitmapTextWidth("PHASE 3/3 PURSUIT", hudScale),
+    });
     const bool bossTwoLines = bossPanelWidth < (hudPadding * 2)
         + bitmapTextWidth("BOSS 100%", hudScale)
-        + bitmapTextWidth("PHASE 2/3 PRESSURE", hudScale) + (6 * hudScale);
+        + bossPhaseWidth + (6 * hudScale);
     const int bossPanelHeight = showBoss
         ? (hudPadding * 2) + (hudLineHeight * (bossTwoLines ? 2 : 1))
             + (6 * hudScale) : 0;
@@ -2443,8 +2474,8 @@ bool GdpRenderer::render(
             drawMenuPanel(layout.panel, scale, textColor);
         }
         const auto fit = [&](const std::string& source, const int available, const int textScale) {
-            std::string text = source;
-            while (!text.empty() && bitmapTextWidth(text, textScale) > available) text.pop_back();
+            std::string text = localize(hud.language, source);
+            while (!text.empty() && bitmapTextWidth(text, textScale) > available) popUiCodepoint(text);
             return text;
         };
         const int titleScale = menu.titleScreen ? 3 * scale : 2 * scale;
@@ -2537,12 +2568,12 @@ bool GdpRenderer::render(
             layout.panel.y + layout.panel.height - (22 * scale),
             2 * scale, title, cyanColor);
 
-        constexpr std::array<std::string_view, 12> labels{
+        constexpr std::array<std::string_view, 13> labels{
             "MASTER", "EFFECTS", "AMBIENT", "UI VOLUME",
             "SENSITIVITY", "INVERT Y", "FOV", "QUALITY", "RESOLUTION",
-            "FULLSCREEN", "VSYNC", "BACK",
+            "FULLSCREEN", "VSYNC", "LANGUAGE", "BACK",
         };
-        const std::array<std::uint16_t, 12> numbers{
+        const std::array<std::uint16_t, 13> numbers{
             hud.masterVolumePercent,
             hud.effectsVolumePercent,
             hud.ambientVolumePercent,
@@ -2550,6 +2581,7 @@ bool GdpRenderer::render(
             hud.mouseSensitivityPercent,
             0U,
             hud.fieldOfViewDegrees,
+            0U,
             0U,
             0U,
             0U,
@@ -2571,7 +2603,9 @@ bool GdpRenderer::render(
                 continue;
             }
             std::string value;
-            if (index
+            if (index == static_cast<std::size_t>(HudSettingsSelection::Language)) {
+                value = hud.language == gameplay::Language::PortugueseBrazil ? "PORTUGUÊS (BR)" : "ENGLISH";
+            } else if (index
                 == static_cast<std::size_t>(HudSettingsSelection::InvertMouseY)) {
                 value = hud.invertMouseY ? "ON" : "OFF";
             } else if (index

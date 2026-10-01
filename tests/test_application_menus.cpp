@@ -1,4 +1,5 @@
 #include "game/Application.hpp"
+#include "game/Localization.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "persistence/SpeedrunLeaderboardStore.hpp"
@@ -35,7 +36,8 @@ struct ApplicationMenuTestAccess {
                 key(Key::Enter); return;
             }
             auto view = app.frontendMenuView();
-            for (std::size_t i = 0; i < view.rows.size(); ++i) if (view.rows[i].text.starts_with(label)) {
+            const auto translatedLabel = localize(app.runtimeSettings_.language, label);
+            for (std::size_t i = 0; i < view.rows.size(); ++i) if (view.rows[i].text.starts_with(translatedLabel)) {
                 app.menuFlow_.selection = i; key(Key::Enter); return;
             }
             expect(false, "requested row exists");
@@ -84,6 +86,16 @@ struct ApplicationMenuTestAccess {
         click(settingsRow.x + settingsRow.width / 2, settingsRow.y + settingsRow.height / 2);
         expect(app.settingsMenu_.active && app.menuFlow_.page == MenuPage::Settings,
             "compact title mouse target opens the displayed Settings row");
+        app.menuFlow_.selection = 3U; key(Key::Right);
+        expect(app.runtimeSettings_.language == gameplay::Language::PortugueseBrazil
+            && app.frontendMenuView().title == "CONFIGURAÇÕES", "keyboard switches language instantly without closing settings");
+        key(Key::Left);
+        expect(app.runtimeSettings_.language == gameplay::Language::English, "keyboard can return to English");
+        const auto languageLayout = visual::makeListMenuLayout(width, height, app.frontendMenuView().rows.size());
+        const auto languageRow = languageLayout.rows[3];
+        click(languageRow.x + languageRow.width - 10 * languageLayout.scale, languageRow.y + languageRow.height / 2);
+        expect(app.runtimeSettings_.language == gameplay::Language::PortugueseBrazil
+            && !app.fatalError_, "mouse switches to Portuguese using the rendered language arrow");
         const auto menuTime = app.menuBackdropSeconds_;
         release(); app.fixedUpdate(1.0 / 60.0);
         expect(app.menuBackdropSeconds_ > menuTime && !app.world_,
@@ -141,6 +153,8 @@ struct ApplicationMenuTestAccess {
         config.worldSeed = 999U;
         Application reopened{config};
         expect(reopened.initialize(), "second process session boots");
+        expect(reopened.runtimeSettings_.language == gameplay::Language::PortugueseBrazil
+            && reopened.frontendMenuView().rows[0].text == "MODO DE TESTE", "selected language persists into a subsequent launch");
         expect(reopened.campaignSlots_[2].checkpoint && reopened.campaignSlots_[2].checkpoint->difficulty == gameplay::Difficulty::Hard,
             "slots reload on subsequent launch");
         expect(reopened.runtimeSettings_.controls.values[0] == gameplay::bindingForName("I"), "remapped controls reload on subsequent launch");

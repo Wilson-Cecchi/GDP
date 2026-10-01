@@ -1,5 +1,6 @@
 #include "game/MenuFlow.hpp"
 #include "game/visual/GdpRenderData.hpp"
+#include "game/Localization.hpp"
 #include <algorithm>
 
 namespace gdp::game {
@@ -11,15 +12,19 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
 {
     using gameplay::SettingsMenuOption;
     MenuView view;
-    auto row = [&](std::string text, bool enabled = true) { view.rows.push_back({std::move(text), enabled, {}, {}}); };
+    auto row = [&](std::string text, bool enabled = true) { view.rows.push_back({std::move(text), enabled, {}, {}, {}, {}}); };
     auto setting = [&](const char* name, SettingsMenuOption option, std::string value) {
-        view.rows.push_back({std::string{name} + "  " + value, true, option, {}});
+        view.rows.push_back({std::string{name} + "  " + value, true, option, {}, {}, {}});
     };
     switch (s.page) {
     case MenuPage::Root:
         view.title = "GDP"; view.subtitle = "INDUSTRIAL COMPLEX";
-        if (testMode) row("TEST MODE");
-        row("CAMPAIGN / STORY"); row("SPEEDRUN"); row("SETTINGS"); row("QUIT GAME"); break;
+        if (testMode) { row("TEST MODE"); view.rows.back().command = MenuCommand::TestMode; }
+        row("CAMPAIGN / STORY"); view.rows.back().destination = MenuPage::CampaignSlots;
+        row("SPEEDRUN"); view.rows.back().destination = MenuPage::Speedrun;
+        row("SETTINGS"); view.rows.back().destination = MenuPage::Settings;
+        view.rows.back().command = MenuCommand::OpenSettings;
+        row("QUIT GAME"); view.rows.back().command = MenuCommand::ExitGame; break;
     case MenuPage::CampaignSlots:
         view.title = "CAMPAIGN / STORY"; view.subtitle = "3 SAVES  -  10 FLOORS";
         for (std::size_t i = 0; i < slots.size(); ++i) {
@@ -52,7 +57,10 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         row("BACK"); break;
     case MenuPage::Settings:
         view.title = "SETTINGS"; view.subtitle = "CHANGES ARE SAVED AUTOMATICALLY";
-        row("DISPLAY"); row("AUDIO"); row("CONTROLS"); row("BACK"); break;
+        row("DISPLAY"); row("AUDIO"); row("CONTROLS");
+        setting("LANGUAGE", SettingsMenuOption::Language,
+            settings.language == gameplay::Language::PortugueseBrazil ? "PORTUGUÊS (BR)" : "ENGLISH");
+        row("BACK"); break;
     case MenuPage::Display: {
         view.title = "DISPLAY";
         setting("FIELD OF VIEW", SettingsMenuOption::FieldOfView, std::to_string(settings.fieldOfViewDegrees));
@@ -81,12 +89,15 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         for (std::size_t i = first; i < first + 11U; ++i) {
             auto action = static_cast<gameplay::ControlAction>(i);
             const std::string value = s.capture == action ? "..." : std::string{gameplay::bindingName(settings.controls.values[i])};
-            view.rows.push_back({std::string{gameplay::controlActionName(action)} + "  [" + value + "]", true, {}, action});
+            view.rows.push_back({std::string{gameplay::controlActionName(action)} + "  [" + value + "]", true, {}, action, {}, {}});
         }
         row(s.page == MenuPage::Bindings ? "NEXT PAGE" : "PREVIOUS PAGE"); row("RESET DEFAULTS"); row("BACK"); break;
     }
     }
     if (!s.notice.empty()) view.subtitle = s.notice;
+    view.title = localize(settings.language, view.title);
+    view.subtitle = localize(settings.language, view.subtitle);
+    for (auto& item : view.rows) item.text = localize(settings.language, item.text);
     return view;
 }
 void moveMenuSelection(MenuFlowState& s, const MenuView& view, const int direction) noexcept
@@ -121,11 +132,8 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     if (row.binding) { s.capture = row.binding; return MenuCommand::None; }
     if (row.setting) return MenuCommand::None;
     if (s.page == MenuPage::Root) {
-        if (row.text == "TEST MODE") return MenuCommand::TestMode;
-        if (row.text == "CAMPAIGN / STORY") open(s, MenuPage::CampaignSlots);
-        if (row.text == "SPEEDRUN") open(s, MenuPage::Speedrun);
-        if (row.text == "SETTINGS") { open(s, MenuPage::Settings); return MenuCommand::OpenSettings; }
-        if (row.text == "QUIT GAME") return MenuCommand::ExitGame;
+        if (row.destination) open(s, *row.destination);
+        return row.command;
     } else if (s.page == MenuPage::CampaignSlots && selected < 3U) {
         s.slot = selected; open(s, MenuPage::CampaignSlot);
     } else if (s.page == MenuPage::CampaignSlot && selected == 0U) return MenuCommand::ContinueCampaign;

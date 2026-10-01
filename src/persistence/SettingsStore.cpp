@@ -89,7 +89,8 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "fullscreen = "
            << (settings.fullscreen ? "true" : "false") << '\n'
            << "vertical_sync = "
-           << (settings.verticalSync ? "true" : "false") << '\n';
+           << (settings.verticalSync ? "true" : "false") << '\n'
+           << "language = " << gameplay::languageName(settings.language) << '\n';
     for (std::size_t i = 0U; i < gameplay::controlActionCount; ++i) {
         output << "binding_" << i << " = " << gameplay::bindingName(settings.controls.values[i]) << '\n';
     }
@@ -187,6 +188,12 @@ SettingsLoadResult loadRuntimeSettings(
                 } else {
                     recovered = true;
                 }
+            } else if (key == "language") {
+                if (const auto language = gameplay::languageForName(value)) {
+                    result.settings.language = *language;
+                } else {
+                    recovered = true;
+                }
             } else if (key == "window_width") {
                 windowWidth = parseUnsigned(value);
                 recovered = !windowWidth || recovered;
@@ -260,6 +267,7 @@ SettingsLoadResult loadRuntimeSettings(
             // Preserve the exact pre-preset renderer for existing players.
             result.settings.graphicsQuality = gameplay::GraphicsQuality::Ultra;
         }
+        if (*version <= 7U) result.settings.language = gameplay::Language::English;
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {
             result.status = SettingsLoadStatus::Migrated;

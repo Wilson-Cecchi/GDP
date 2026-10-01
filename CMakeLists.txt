@@ -48,7 +48,7 @@ find_package(OpenGL REQUIRED)
 
 function(gdp_enable_warnings target_name)
     if(MSVC)
-        target_compile_options(${target_name} PRIVATE /W4 /permissive-)
+        target_compile_options(${target_name} PRIVATE /W4 /permissive- /utf-8)
     else()
         target_compile_options(
             ${target_name}
@@ -259,6 +259,7 @@ add_library(
     src/game/visual/GdpRenderData.cpp
     src/game/visual/GdpRenderer.cpp
     src/game/visual/MenuBackdrop.cpp
+    src/game/Localization.cpp
     src/game/visual/WeaponViewmodelAssets.cpp
 )
 

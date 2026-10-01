@@ -131,6 +131,13 @@ bool adjustRuntimeSetting(
         settings.verticalSync = direction > 0;
         return settings.verticalSync != previous;
     }
+    case SettingsMenuOption::Language: {
+        const auto previous = settings.language;
+        // Two choices wrap in either direction; keyboard and both mouse arrows work.
+        settings.language = previous == Language::English
+            ? Language::PortugueseBrazil : Language::English;
+        return settings.language != previous;
+    }
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
         return false;
@@ -149,6 +156,18 @@ SettingsMenuCommand activateSettingsMenuSelection(
     return origin == SettingsMenuOrigin::PauseMenu
         ? SettingsMenuCommand::BackToPauseMenu
         : SettingsMenuCommand::BackToMainMenu;
+}
+
+std::string_view languageName(const Language language) noexcept
+{
+    return language == Language::PortugueseBrazil ? "pt-BR" : "en";
+}
+
+std::optional<Language> languageForName(const std::string_view name) noexcept
+{
+    if (name == "en") return Language::English;
+    if (name == "pt-BR") return Language::PortugueseBrazil;
+    return std::nullopt;
 }
 
 float normalizedVolume(const std::uint16_t percent) noexcept
@@ -241,6 +260,7 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     if (settings.windowResolution >= WindowResolution::Count) {
         settings.windowResolution = WindowResolution::R1280x720;
     }
+    if (settings.language >= Language::Count) settings.language = Language::English;
     if (!validateControlBindings(settings.controls)) settings.controls = {};
     return settings;
 }

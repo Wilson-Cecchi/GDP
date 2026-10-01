@@ -34,6 +34,8 @@ struct MenuRow {
     bool enabled{true};
     std::optional<gameplay::SettingsMenuOption> setting;
     std::optional<gameplay::ControlAction> binding;
+    std::optional<MenuPage> destination;
+    MenuCommand command{MenuCommand::None};
 };
 struct MenuView {
     std::string title;

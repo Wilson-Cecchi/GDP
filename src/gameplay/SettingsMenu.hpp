@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gameplay/ControlBindings.hpp"
+#include "gameplay/Language.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -25,6 +26,7 @@ enum class SettingsMenuOption : std::uint8_t {
     WindowResolution,
     Fullscreen,
     VerticalSync,
+    Language,
     Back,
     Count,
 };
@@ -83,6 +85,7 @@ struct RuntimeSettings {
     WindowResolution windowResolution{WindowResolution::R1280x720};
     bool fullscreen{false};
     bool verticalSync{true};
+    Language language{Language::English};
     ControlBindings controls{};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;

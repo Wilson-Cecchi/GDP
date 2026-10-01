@@ -102,7 +102,7 @@ entram no placar. Regras de Speedrun 36 isolam os novos tempos Hard dos anterior
 
 ### Configurações e remapeamento
 
-Settings abre Display / Audio / Controls, no título ou na pausa, preservando
+Settings abre Display / Audio / Controls / Language, no título ou na pausa, preservando
 a origem ao voltar. Display conserva FOV, perfis gráficos, resolução, fullscreen
 e VSync; Audio conserva Master/Effects/Ambient/UI. Controls conserva sensibilidade
 e Invert Y e adiciona duas páginas de bindings.
@@ -124,6 +124,27 @@ Validação automatizada inclui modelos, persistência, teclas, mouse, slots,
 retorno à pausa, placar e arena em uma aplicação SDL/OpenGL real offscreen.
 Layouts/pixels também são exercitados em 1280×720, 960×540, 640×360 e 320×200.
 A aprovação de ergonomia e balanceamento continua sendo feita em gameplay.
+
+### Idioma: English / Português (BR)
+
+Em `SETTINGS → LANGUAGE` / `CONFIGURAÇÕES → IDIOMA`, A/D, setas laterais ou
+as setas clicáveis `<` / `>` alternam os dois idiomas nos dois sentidos.
+A troca é imediata, inclusive na página aberta, e fica salva em `settings.toml`
+(schema 8). Ao reabrir o jogo, a preferência é restaurada. Instalações novas
+e configurações anteriores mantêm inglês até o usuário escolher PT-BR.
+
+O catálogo em `src/game/Localization.cpp` cobre menus, controles, pausa,
+confirmação, resultados, HUD, objetivos, avisos e barra do boss. Os comandos
+dos menus são identificadores, nunca comparações com o texto traduzido.
+Números, seeds, nomes literais das teclas e identificadores persistentes não
+mudam. CLI e logs continuam em inglês; métricas de diagnóstico preservam
+suas siglas, unidades e identificadores técnicos.
+
+O atlas incorporado conserva a mesma fonte aprovada e agora inclui os acentos
+do português. Medição e truncamento usam caracteres UTF-8 completos; células
+do atlas reservam espaço para os acentos sem invadir o glifo vizinho.
+As dimensões compactas e o fundo 3D aprovado são preservados nos dois idiomas.
+Detalhes e evidências: [localization.md](localization.md).
 
 ## Histórico anterior à revisão
 

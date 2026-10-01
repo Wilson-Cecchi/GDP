@@ -15,6 +15,10 @@
   Schemas 1–6 mantêm as configurações e recebem os controles originais.
   Bindings inválidos ou duplicados recuperam o conjunto padrão, sem ações
   inacessíveis. A gameplay usa o conjunto salvo, enquanto a UI permanece fixa.
+- Settings schema 8 adiciona `language = en` ou `language = pt-BR`.
+  Schemas 1–7 migram mantendo inglês, demais preferências e remapeamentos
+  compatíveis. Idioma inválido recupera inglês; schema futuro não é reinterpretado.
+  Trocar idioma não modifica checkpoints, placar, regras de gameplay ou cérebros.
 - `speedrun_leaderboard.txt` tem cabeçalho `GDP_SPEEDRUN_BOARD 1 N` e no máximo
   10 registros de regras, ticks e seed, ordenados por ticks/seed. Somente
   vitórias Hard entram. A regra de Speedrun 36 não reaproveita tempos das regras
@@ -26,7 +30,7 @@
 - Save no meio do andar e placar online continuam fora desta revisão.
 
 O restante deste documento registra a evolução histórica; referências a um
-slot, três andares ou settings v6 não descrevem mais o fluxo atual.
+slot, três andares ou settings v6/v7 não descrevem mais o fluxo atual.
 
 > **Estado:** configurações e recorde de Speedrun persistentes; checkpoint único
 > de entrada de andar da Campaign implementado na Fase 81. Slots completos e

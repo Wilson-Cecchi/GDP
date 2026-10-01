@@ -3,6 +3,7 @@
 #include "game/audio/AudioSystem.hpp"
 #include "game/HudBoss.hpp"
 #include "game/HudMap.hpp"
+#include "game/Localization.hpp"
 #include "game/SeedDomains.hpp"
 #if GDP_ENABLE_TEST_MODE
 #include "game/TestArena.hpp"
@@ -130,6 +131,8 @@ static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Fullscreen
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Fullscreen));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::VerticalSync)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::VerticalSync));
+static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Language)
+    == static_cast<std::uint8_t>(visual::HudSettingsSelection::Language));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Back)
     == static_cast<std::uint8_t>(visual::HudSettingsSelection::Back));
 static_assert(static_cast<std::uint8_t>(gameplay::SettingsMenuOption::Count)
@@ -2966,8 +2969,9 @@ void Application::render()
     };
 
     if (controlsMenuActive_) {
-        SDL_SetWindowTitle(window_, "GDP | CONTROLS");
+        SDL_SetWindowTitle(window_, ("GDP | " + localize(runtimeSettings_.language, "CONTROLS")).c_str());
         visual::HudRenderData hud;
+        hud.language = runtimeSettings_.language;
         hud.controlsMenu = true;
         if (!renderAndPresent([&] {
                 return renderer_->render(
@@ -2982,6 +2986,7 @@ void Application::render()
         const auto view = frontendMenuView();
         SDL_SetWindowTitle(window_, ("GDP | " + view.title).c_str());
         visual::HudRenderData hud;
+        hud.language = runtimeSettings_.language;
         hud.listMenu.active = true;
         hud.listMenu.titleScreen = menuFlow_.page == MenuPage::Root;
         hud.listMenu.title = view.title;
@@ -3459,8 +3464,9 @@ void Application::render()
     if (pauseMenu_.paused) {
         title << " | PAUSED";
     }
-    SDL_SetWindowTitle(window_, title.str().c_str());
+    SDL_SetWindowTitle(window_, localize(runtimeSettings_.language, title.str()).c_str());
     visual::HudRenderData hud;
+    hud.language = runtimeSettings_.language;
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
     hud.interactBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Interact)]);

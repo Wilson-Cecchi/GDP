@@ -1,6 +1,7 @@
 #include "game/MenuFlow.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/MenuBackdrop.hpp"
+#include "game/Localization.hpp"
 #include "game/visual/UiFontAtlas.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SettingsStore.hpp"
@@ -76,6 +77,36 @@ void bindingsTests() {
     expect(controlDown(bindings, ControlAction::QuietWalk, input), "right Shift remains an alias");
 }
 void layoutTests() {
+    using namespace gdp::game;
+    using namespace gdp::gameplay;
+    expect(localize(Language::English, "CAMPAIGN / STORY") == "CAMPAIGN / STORY", "English is unchanged");
+    expect(localize(Language::PortugueseBrazil, "CAMPAIGN / STORY") == "CAMPANHA / HISTÓRIA", "Brazilian Portuguese includes accents");
+    expect(localize(Language::PortugueseBrazil, "FLOOR 7/10  HARD") == "ANDAR 7/10  DIFÍCIL", "dynamic labels retain numbers and translated difficulty");
+    expect(localize(Language::PortugueseBrazil, "JUMP  [SPACE]") == "PULAR  [SPACE]", "localized descriptions cannot translate saved key binding tokens");
+    expect(localize(Language::PortugueseBrazil, "UNLISTED_ID_42") == "UNLISTED_ID_42", "unknown technical identifiers have a stable fallback");
+    expect(uiTextLength("CONFIGURAÇÕES") == 13U && uiTextLength("PORTUGUÊS (BR)") == 14U,
+        "width counts Unicode glyphs instead of UTF-8 bytes");
+    std::string accented = "ÁÇ"; popUiCodepoint(accented);
+    expect(accented == "Á", "text fitting never splits an accented UTF-8 glyph");
+    expect(uiTextLength(std::string{"\xFF\xC3", 2}) == 2U, "malformed UTF-8 has bounded replacement glyphs");
+    RuntimeSettings settings; settings.language = Language::PortugueseBrazil;
+    MenuFlowState state;
+    std::array<CampaignSlotInfo, 3> slots{};
+    auto view = makeMenuView(state, slots, {}, settings, true);
+    expect(view.rows[0].text == "MODO DE TESTE" && view.rows[3].text == "CONFIGURAÇÕES", "all title labels use selected language");
+    expect(activateMenu(state, view, slots) == MenuCommand::TestMode, "translated Test Mode still launches typed command");
+    state.selection = 1U; (void)activateMenu(state, view, slots);
+    expect(state.page == MenuPage::CampaignSlots, "translated campaign label cannot break navigation");
+    state = {}; state.selection = 2U;
+    (void)activateMenu(state, makeMenuView(state, slots, {}, settings, false), slots);
+    expect(state.page == MenuPage::Settings, "shipping root commands remain valid without Test Mode in Portuguese");
+    view = makeMenuView(state, slots, {}, settings, true);
+    expect(view.rows[3].setting == SettingsMenuOption::Language && view.rows[3].text == "IDIOMA  PORTUGUÊS (BR)", "language row is directly available in Settings");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::Language, -1) && settings.language == Language::English,
+        "left arrow returns to English");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::Language, 1) && settings.language == Language::PortugueseBrazil,
+        "right arrow restores Portuguese immediately");
+    expect(languageForName("pt-BR") == Language::PortugueseBrazil && !languageForName("xx"), "language serialization identifiers are stable");
     using namespace gdp::game::visual;
     for (const auto dimensions : {std::array{1280, 720}, std::array{1920, 1080}, std::array{2560, 1080}}) {
         const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
@@ -169,7 +200,7 @@ void persistenceTests(const std::filesystem::path& directory) {
         "v6 settings retain graphics and sensitivity while receiving default bindings");
     {
         std::ofstream file(directory / "invalid_bindings.toml");
-        file << "version = 7\nbinding_0 = S\nbinding_1 = S\n";
+        file << "version = 8\nbinding_0 = S\nbinding_1 = S\n";
     }
     const auto invalid = loadRuntimeSettings(directory / "invalid_bindings.toml");
     expect(invalid.status == SettingsLoadStatus::LoadedWithRecovery && invalid.settings.controls == ControlBindings{},

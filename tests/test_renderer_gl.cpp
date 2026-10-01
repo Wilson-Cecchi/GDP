@@ -27,6 +27,7 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
     gdp::gameplay::CampaignCheckpoint checkpoint;
     checkpoint.floor = 7U; checkpoint.difficulty = gdp::gameplay::Difficulty::Hard;
     slots[1] = {checkpoint, true};
+    for (const auto language : {gdp::gameplay::Language::English, gdp::gameplay::Language::PortugueseBrazil}) {
     for (auto dimensions : {std::array{1280, 720}, std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
         const int width = dimensions[0], height = dimensions[1];
         for (auto page : {MenuPage::Root, MenuPage::CampaignSlots, MenuPage::CampaignSlot,
@@ -34,8 +35,10 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
                  MenuPage::Leaderboard, MenuPage::Settings, MenuPage::Display,
                  MenuPage::Audio, MenuPage::Controls, MenuPage::Bindings, MenuPage::MoreBindings}) {
             MenuFlowState state; state.page = page;
-            const auto view = makeMenuView(state, slots, {}, {}, true);
+            gdp::gameplay::RuntimeSettings settings; settings.language = language;
+            const auto view = makeMenuView(state, slots, {}, settings, true);
             HudRenderData hud;
+            hud.language = language;
             hud.listMenu.active = true; hud.listMenu.title = view.title; hud.listMenu.subtitle = view.subtitle;
             hud.listMenu.titleScreen = page == MenuPage::Root;
             for (const auto& row : view.rows) {
@@ -56,7 +59,7 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
                 for (int row = 0; row < height; ++row) std::copy_n(pixels.data() + static_cast<std::size_t>(height - row - 1) * stride,
                     stride, topDown.data() + static_cast<std::size_t>(row) * stride);
                 std::filesystem::create_directories(captureDirectory);
-                const auto path = std::filesystem::path{captureDirectory} / ("menu-" + std::to_string(static_cast<unsigned>(page))
+                const auto path = std::filesystem::path{captureDirectory} / (std::string{gdp::gameplay::languageName(language)} + "-menu-" + std::to_string(static_cast<unsigned>(page))
                     + "-" + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
                 auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
                 passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
@@ -80,6 +83,7 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
             }
         }
     }
+    }
     if (!passed) std::cerr << "Frontend menu pixel render failed\n";
     return passed;
 }
@@ -89,10 +93,12 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
     using namespace gdp::game::visual;
     bool passed = true;
     const char* capture = std::getenv("GDP_TACTICAL_CAPTURE_DIR");
+    for (const auto language : {gdp::gameplay::Language::English, gdp::gameplay::Language::PortugueseBrazil}) {
     for (auto dimensions : {std::array{1280, 720}, std::array{960, 540},
              std::array{960, 600}, std::array{640, 360}, std::array{320, 200}}) {
         const int width = dimensions[0], height = dimensions[1];
         HudRenderData hud;
+        hud.language = language;
         hud.visible = true;
         hud.health = 100.0F; hud.maximumHealth = 115.0F;
         hud.armor = 40.0F; hud.magazineAmmo = 24U; hud.reserveAmmo = 96U;
@@ -132,13 +138,14 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
             for (int y = 0; y < height; ++y) std::copy_n(original.data()
                 + static_cast<std::size_t>(height - y - 1) * stride, stride,
                 topDown.data() + static_cast<std::size_t>(y) * stride);
-            const auto path = std::filesystem::path{capture} / ("tactical-hud-"
+            const auto path = std::filesystem::path{capture} / (std::string{gdp::gameplay::languageName(language)} + "-tactical-hud-"
                 + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
             auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
                 topDown.data(), width * 4);
             passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
             SDL_DestroySurface(surface);
         }
+    }
     }
     if (!passed) std::cerr << "Tactical HUD resource positioning/feedback failed\n";
     return passed;
@@ -149,11 +156,13 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
     using namespace gdp::game::visual;
     const char* const captureDirectory = std::getenv("GDP_BOSS_HUD_CAPTURE_DIR");
     bool passed = true;
+    for (const auto language : {gdp::gameplay::Language::English, gdp::gameplay::Language::PortugueseBrazil}) {
     for (const auto dimensions : {std::array{1280, 720},
              std::array{960, 540}, std::array{640, 360}, std::array{320, 200}}) {
         const int width = dimensions[0];
         const int height = dimensions[1];
         HudRenderData hud;
+        hud.language = language;
         hud.visible = true;
         hud.objective = ObjectiveRenderState::DefeatBoss;
         hud.magazineAmmo = 8U;
@@ -243,7 +252,7 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
                 }
                 const std::filesystem::path directory{captureDirectory};
                 std::filesystem::create_directories(directory);
-                const auto path = directory / ("boss-hud-" + std::to_string(width)
+                const auto path = directory / (std::string{gdp::gameplay::languageName(language)} + "-boss-hud-" + std::to_string(width)
                     + "x" + std::to_string(height) + "-" + phase + ".bmp");
                 SDL_Surface* const surface = SDL_CreateSurfaceFrom(width, height,
                     SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
@@ -261,6 +270,7 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
         const auto victory = renderPixels(hud);
         hud.boss.visible = true;
         passed &= renderPixels(hud) == victory;
+    }
     }
     if (!passed) {
         std::cerr << "Boss HUD health/phase/visibility rendering failed\n";

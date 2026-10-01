@@ -46,6 +46,9 @@ especializados das pastas numeradas.
   com fonte incorporada, botões menores e recursos separados por canto.
   Título e seus submenus mostram uma cena 3D animada independente da partida,
   reutilizando os materiais/modelos existentes sem alterar saves ou seed.
+  **Idioma:** `Settings → Language` permite alternar imediatamente entre
+  English e Português (BR). A preferência fica salva; menus, controles,
+  pausa, resultados e HUD têm tradução e suporte aos acentos de PT-BR.
   Para distribuição final sem arena, configure `-DGDP_ENABLE_TEST_MODE=OFF`;
   o pacote de desenvolvimento atual mantém o Test Mode para validar mecânicas.
   Detalhes e contratos atuais: `07_interface/menus_and_settings.md`.

@@ -2,6 +2,7 @@
 
 #include "core/Math.hpp"
 #include "core/Seed.hpp"
+#include "gameplay/Language.hpp"
 
 #include <array>
 #include <cstddef>
@@ -351,6 +352,7 @@ enum class HudSettingsSelection : std::uint8_t {
     WindowResolution,
     Fullscreen,
     VerticalSync,
+    Language,
     Back,
     Count,
 };
@@ -674,6 +676,7 @@ struct HudRenderData {
     std::uint64_t performanceRenderedInstances{0U};
     std::uint64_t performanceAvoidedDrawCalls{0U};
     std::uint32_t performanceShadowShaderOccluderCapacity{0U};
+    gameplay::Language language{gameplay::Language::English};
 };
 
 inline constexpr std::size_t maxRenderedRoomLights = 8U;
