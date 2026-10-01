@@ -79,7 +79,33 @@ resultado final:
 
 ## Propostas ativas
 
+### Interface/menu — v4 (refinamento solicitado)
+
+```text
+unidade visual: menus (HUD Tático v3 preservado)
+versão: v4 — Tático minimalista compacto + cena de demonstração
+referência da direção: visual/proposals/interface_visual_v3.html (Tático minimalista)
+contrato: visual/proposals/interface_visual_proposal_v4.md
+decisão do usuário: "deixa o menu no modo Tatico minimanista tambem"
+                   botões menores e tela do jogo rodando de fundo
+data: 2026-10-01
+commit de implementação: feat: compact tactical menus with live game backdrop
+capturas: visual/validation/interface_v4_menu_1280x720.png;
+          visual/validation/interface_v4_menu_640x360.png;
+          visual/validation/interface_v4_bindings_320x200.png;
+          visual/validation/interface_v4_display_1280x720.png
+resultado final: título ACEITO NO JOGO via captura nativa aprovada
+                 "eu amei essa tela" (2026-10-01)
+                 submenus IMPLEMENTADOS EM VALIDAÇÃO
+```
+
+Substitui a direção Industrial refinado dos menus da v3. Reutiliza a direção
+Tático já mostrada e os materiais/modelos existentes. Não aprova novas texturas,
+armas, modelos nem mudanças na gameplay ou treinamento das IAs.
+
 ### Interface/menu e HUD — v3
+
+Direção dos menus substituída pela v4 acima; HUD Tático desta versão preservado.
 
 ```text
 unidade visual: menus e HUD de gameplay

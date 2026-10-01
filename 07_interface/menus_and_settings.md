@@ -2,17 +2,21 @@
 
 ## Direção visual atual — aprovada em 2026-10-01
 
-**Industrial refinado**, combinado com HUD **Tático minimalista** conforme
-`visual/proposals/interface_visual_v3.html`. O título usa logo maior e claro,
-opções verticais compactas, superfícies grafite e seleção com uma única faixa
-ciano discreta à esquerda. Em telas largas o menu curto fica à esquerda;
-o título mostra à direita a descrição da opção selecionada. Submenus longos
-e telas menores usam composição centralizada e escala ajustada.
+**Tático minimalista nos menus e no HUD**. A revisão v4 substitui somente a
+direção Industrial refinado dos menus da v3, por pedido explícito do usuário.
+Contrato atual: `visual/proposals/interface_visual_proposal_v4.md`;
+referência da direção Tático: `visual/proposals/interface_visual_v3.html`.
+Logo claro, texto branco/cinza, seleção por sublinhado e fundo translúcido.
+Não há molduras ornamentais nem cartão grande de descrição à direita.
+O título fica à esquerda nas telas largas; submenus ficam centralizados.
 
-Pausa, resultado, configurações e confirmação compartilham a paleta refinada,
-fonte suavizada e painéis planos sem cantos ornamentais. O fallback compacto
-inclui setas e colchetes legíveis. `ListMenuLayout` continua sendo a única fonte
-da geometria tanto para renderização quanto para cliques, incluindo `<` / `>`.
+Em 1280×720, cada linha do título mede **348×30 px**, antes 608×50 px.
+A escala da tipografia/linhas é limitada a 2× também em Full HD/ultrawide;
+páginas densas e telas pequenas adaptam a escala e altura para manter todas
+as opções visíveis. Pausa, resultado e confirmação usam painéis translúcidos.
+O fallback compacto inclui setas e colchetes legíveis. `ListMenuLayout`, com
+flag de título compartilhada, continua sendo a única fonte da geometria tanto
+para renderização quanto para cliques, incluindo `<` / `>`.
 Não muda ordem das opções, estados, remapeamento, saves nem ações de teclado/mouse.
 Todas as páginas possuem regressão de renderização nas quatro resoluções-base;
 16:10 e ultrawide também têm validação estrutural dos layouts.
@@ -20,6 +24,23 @@ Todas as páginas possuem regressão de renderização nas quatro resoluções-b
 O atlas da fonte é incorporado ao executável: builds portáteis não dependem
 de uma fonte no computador do usuário. A licença acompanha o pacote Windows.
 O gerador offline em `tools/generate_ui_font.py` não é dependência do build.
+
+### Fundo animado do título
+
+`MenuBackdrop` amostra uma cena 3D de demonstração no renderer real do jogo,
+com sala/material, props, câmera lenta e dois inimigos em patrulha visual.
+Reutiliza os modelos e materiais já existentes; não adiciona nova textura.
+Não é vídeo nem partida automática: seu relógio e trajetórias de apresentação
+são independentes de `SessionSystem`, entidades, dungeon, seed, saves e IAs.
+Portanto não treina/avalia cérebros nem gera progressão ou dano ao jogador.
+A dungeon continua sendo criada somente ao confirmar um modo de jogo.
+
+O relógio avança no título e seus submenus. Em configurações abertas a partir
+da pausa, a demonstração fica estática; a sessão real continua pausada conforme
+as regras existentes (inclusive o cronômetro específico de Speedrun).
+O fundo respeita escala interna e materiais do perfil gráfico selecionado;
+usa somente duas luzes, sem sombras. Interface e cliques ficam na resolução
+nativa. Não promete um ganho de FPS sem medição no hardware do usuário.
 
 ## Fluxo atual — revisão de 2026-10-01
 

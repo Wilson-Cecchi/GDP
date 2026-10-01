@@ -25,6 +25,7 @@
 #include "platform/SdlInput.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/GdpRenderer.hpp"
+#include "game/visual/MenuBackdrop.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldEntities.hpp"
@@ -1984,6 +1985,9 @@ void Application::fixedUpdate(const double fixedStep)
         session_.advanceRunTimer(gameplayActive);
     }
     if (!gameplayActive) {
+        if (mainMenu_.active && std::isfinite(fixedStep) && fixedStep > 0.0) {
+            menuBackdropSeconds_ = std::fmod(menuBackdropSeconds_ + fixedStep, 240.0);
+        }
         if (audio_) {
             audio_->updateUi(step);
         }
@@ -2979,6 +2983,7 @@ void Application::render()
         SDL_SetWindowTitle(window_, ("GDP | " + view.title).c_str());
         visual::HudRenderData hud;
         hud.listMenu.active = true;
+        hud.listMenu.titleScreen = menuFlow_.page == MenuPage::Root;
         hud.listMenu.title = view.title;
         hud.listMenu.subtitle = view.subtitle;
         hud.listMenu.selection = menuFlow_.selection;
@@ -2990,8 +2995,13 @@ void Application::render()
         hud.exitConfirmation = exitConfirmation_.active;
         if (exitConfirmation_.selection == gameplay::ExitConfirmationOption::ExitGame)
             hud.exitConfirmationSelection = visual::HudExitConfirmationSelection::ExitGame;
+        const auto backdrop = visual::sampleMenuBackdrop(menuBackdropSeconds_);
+        hud.worldRenderScalePercent = graphicsQuality.renderScalePercent;
+        hud.detailedMaterials = graphicsQuality.detailedMaterials;
+        hud.graphicsQuality = hudGraphicsQuality;
         (void)renderAndPresent([&] {
-            return renderer_->render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            return renderer_->render(width, height, backdrop.camera, backdrop.enemies,
+                {}, backdrop.props, backdrop.lighting, backdrop.room, {}, {}, {}, hud);
         }, "Renderer failed while drawing frontend menu");
         return;
     }

@@ -10,19 +10,21 @@
 #include <vector>
 
 namespace gdp::game::visual {
-ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count)
+ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count,
+    const bool titleScreen)
 {
     ListMenuLayout layout;
     if (width < 64 || count == 0U || count > 24U
         || height < 68 + static_cast<int>(count) * 8) return layout;
     const int n = static_cast<int>(count);
-    layout.scale = std::max(1, std::min(width / 620, height / (80 + n * 15)));
+    // Do not inflate hit targets on large/ultrawide displays. Dense pages still fit 360p.
+    layout.scale = width >= 640 && height >= std::max(360, 136 + n * 16) ? 2 : 1;
     const int scale = layout.scale;
     const int margin = width >= 640 ? width / 20 : 8;
-    const int panelWidth = std::min(width - 2 * margin, (count <= 7U ? 320 : 560) * scale);
-    const int rowHeight = std::max(1, std::min(26 * scale, (height - 68 * scale) / n));
+    const int panelWidth = std::min(width - 2 * margin, (titleScreen ? 190 : 340) * scale);
+    const int rowHeight = std::max(8, std::min(16 * scale, (height - 68 * scale) / n));
     const int panelHeight = std::min(height - 8, 64 * scale + n * rowHeight);
-    const int panelX = width >= 800 && count <= 7U ? margin : (width - panelWidth) / 2;
+    const int panelX = width >= 800 && titleScreen ? margin : (width - panelWidth) / 2;
     layout.panel = {panelX, (height - panelHeight) / 2, panelWidth, panelHeight};
     for (int i = 0; i < n; ++i) {
         layout.rows.push_back({layout.panel.x + 8 * scale,
@@ -32,10 +34,10 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     return layout;
 }
 std::optional<std::size_t> listMenuSelectionAt(const int width, const int height,
-    const std::size_t count, const float pointerX, const float pointerY)
+    const std::size_t count, const float pointerX, const float pointerY, const bool titleScreen)
 {
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
-    const auto layout = makeListMenuLayout(width, height, count);
+    const auto layout = makeListMenuLayout(width, height, count, titleScreen);
     // SDL pointers have a top-left origin; UI rectangles have a bottom-left origin.
     const float y = static_cast<float>(height) - pointerY;
     for (std::size_t i = 0; i < layout.rows.size(); ++i) {
@@ -46,11 +48,11 @@ std::optional<std::size_t> listMenuSelectionAt(const int width, const int height
     return std::nullopt;
 }
 std::optional<int> listMenuAdjustmentDirectionAt(const int width, const int height,
-    const std::size_t count, const float pointerX, const float pointerY)
+    const std::size_t count, const float pointerX, const float pointerY, const bool titleScreen)
 {
-    const auto selected = listMenuSelectionAt(width, height, count, pointerX, pointerY);
+    const auto selected = listMenuSelectionAt(width, height, count, pointerX, pointerY, titleScreen);
     if (!selected) return std::nullopt;
-    const auto layout = makeListMenuLayout(width, height, count);
+    const auto layout = makeListMenuLayout(width, height, count, titleScreen);
     const auto r = layout.rows[*selected];
     const float right = static_cast<float>(r.x + r.width);
     if (pointerX >= right - static_cast<float>(40 * layout.scale)

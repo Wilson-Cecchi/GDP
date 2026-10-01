@@ -258,6 +258,7 @@ add_library(
     STATIC
     src/game/visual/GdpRenderData.cpp
     src/game/visual/GdpRenderer.cpp
+    src/game/visual/MenuBackdrop.cpp
     src/game/visual/WeaponViewmodelAssets.cpp
 )
 
@@ -465,6 +466,10 @@ if(GDP_BUILD_TESTS)
         add_test(NAME application_menu_integration COMMAND gdp_application_menu_tests)
         set_tests_properties(application_menu_integration PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy" TIMEOUT 120)
+        if(GDP_ENABLE_SANITIZERS)
+            # This fixture rebuilds many real procedural/GPU assets, including save migration.
+            set_tests_properties(application_menu_integration PROPERTIES TIMEOUT 300)
+        endif()
     endif()
     include(CTest)
 
@@ -913,6 +918,9 @@ if(GDP_BUILD_TESTS)
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
                 TIMEOUT 20
         )
+        if(GDP_ENABLE_SANITIZERS)
+            set_tests_properties(renderer_opengl_pixels PROPERTIES TIMEOUT 60)
+        endif()
 
         add_test(
             NAME renderer_instancing_opengl

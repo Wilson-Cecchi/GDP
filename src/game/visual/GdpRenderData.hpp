@@ -424,6 +424,7 @@ struct ListMenuLayout {
 };
 struct ListMenuRenderData {
     bool active{false};
+    bool titleScreen{false};
     std::string title;
     std::string subtitle;
     std::vector<std::string> rows;
@@ -431,11 +432,12 @@ struct ListMenuRenderData {
     std::vector<bool> adjustable;
     std::size_t selection{0U};
 };
-[[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count);
+[[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count,
+    bool titleScreen = false);
 [[nodiscard]] std::optional<std::size_t> listMenuSelectionAt(int width, int height,
-    std::size_t count, float pointerX, float pointerY);
+    std::size_t count, float pointerX, float pointerY, bool titleScreen = false);
 [[nodiscard]] std::optional<int> listMenuAdjustmentDirectionAt(int width, int height,
-    std::size_t count, float pointerX, float pointerY);
+    std::size_t count, float pointerX, float pointerY, bool titleScreen = false);
 
 struct ControlsMenuLayout {
     int scale{1};

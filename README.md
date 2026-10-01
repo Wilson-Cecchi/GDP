@@ -42,8 +42,10 @@ especializados das pastas numeradas.
   no início do andar e armas adicionais aleatórias nas salas.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
-  botões do mouse e scroll. Direção visual aprovada: menus Industrial refinado
-  e HUD Tático minimalista, com fonte incorporada e recursos separados por canto.
+  botões do mouse e scroll. Direção visual atual: menus e HUD Tático minimalista,
+  com fonte incorporada, botões menores e recursos separados por canto.
+  Título e seus submenus mostram uma cena 3D animada independente da partida,
+  reutilizando os materiais/modelos existentes sem alterar saves ou seed.
   Para distribuição final sem arena, configure `-DGDP_ENABLE_TEST_MODE=OFF`;
   o pacote de desenvolvimento atual mantém o Test Mode para validar mecânicas.
   Detalhes e contratos atuais: `07_interface/menus_and_settings.md`.

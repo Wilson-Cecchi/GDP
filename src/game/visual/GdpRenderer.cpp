@@ -2288,7 +2288,6 @@ bool GdpRenderer::render(
     const int hudPadding = 4 * hudScale;
     const int hudLineHeight = 9 * hudScale;
     const UiVisualTheme uiTheme = industrialUiTheme();
-    const wkc::core::Vec3 panelColor = uiTheme.panel;
     const wkc::core::Vec3 textColor = uiTheme.text;
     const wkc::core::Vec3 cyanColor = uiTheme.accent;
     uiShader_.beginUniformFrame();
@@ -2333,10 +2332,17 @@ bool GdpRenderer::render(
             cursor += 6 * scale;
         }
     };
-    const auto drawIndustrialPanel = [&](const UiRect panel,
+    const auto drawMenuPanel = [&](const UiRect panel,
                                          const int scale,
                                          const wkc::core::Vec3 accent) {
-        drawSolidRect(panel.x, panel.y, panel.width, panel.height, panelColor);
+        drawUiQuad(panel, uiTheme.background, 0.78F, -1);
+        (void)scale;
+        (void)accent;
+    };
+    const auto drawIndustrialPanel = [&](const UiRect panel, const int scale,
+                                         const wkc::core::Vec3 accent) {
+        // Preserve the already approved gameplay information/map panels.
+        drawSolidRect(panel.x, panel.y, panel.width, panel.height, uiTheme.panel);
         drawSolidRect(panel.x + 8 * scale, panel.y + panel.height - scale,
             std::min(panel.width - 16 * scale, 32 * scale), scale, accent);
     };
@@ -2374,8 +2380,8 @@ bool GdpRenderer::render(
     const auto drawSelectedRow = [&](const UiRect row,
                                      const int scale,
                                      const wkc::core::Vec3 accent) {
-        drawSolidRect(row.x, row.y, row.width, row.height, uiTheme.selection);
-        drawSolidRect(row.x, row.y, 2 * scale, row.height, accent);
+        drawUiQuad(row, textColor, 0.10F, -1);
+        drawSolidRect(row.x + 6 * scale, row.y, row.width - 12 * scale, scale, accent);
     };
     const auto drawExitConfirmation = [&]() {
         if (!hud.exitConfirmation) {
@@ -2385,7 +2391,7 @@ bool GdpRenderer::render(
             = makeExitConfirmationLayout(width, height);
         const int scale = layout.scale;
         const wkc::core::Vec3 dangerColor = uiTheme.danger;
-        drawIndustrialPanel(layout.panel, scale, dangerColor);
+        drawMenuPanel(layout.panel, scale, dangerColor);
         constexpr std::string_view title = "EXIT GAME?";
         drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (22 * scale),
@@ -2423,16 +2429,25 @@ bool GdpRenderer::render(
 
     if (hud.listMenu.active) {
         const auto& menu = hud.listMenu;
-        const auto layout = makeListMenuLayout(width, height, menu.rows.size());
+        const auto layout = makeListMenuLayout(width, height, menu.rows.size(), menu.titleScreen);
         const int scale = layout.scale;
-        drawUiQuad({0, 0, width, height}, uiTheme.background, 0.42F, -1);
-        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        drawUiQuad({0, 0, width, height}, uiTheme.background, 0.16F, -1);
+        if (menu.titleScreen) {
+            // Quiet left-to-right scrim: the live scene remains the focus on the right.
+            const int scrimWidth = std::min(width, layout.panel.x + layout.panel.width + width / 5);
+            for (int x = 0; x < scrimWidth; x += 8) {
+                const float opacity = 0.62F * (1.0F - static_cast<float>(x) / static_cast<float>(scrimWidth));
+                drawUiQuad({x, 0, std::min(8, scrimWidth - x), height}, uiTheme.background, opacity, -1);
+            }
+        } else {
+            drawMenuPanel(layout.panel, scale, textColor);
+        }
         const auto fit = [&](const std::string& source, const int available, const int textScale) {
             std::string text = source;
             while (!text.empty() && bitmapTextWidth(text, textScale) > available) text.pop_back();
             return text;
         };
-        const int titleScale = menu.title == "GDP" ? 4 * scale : 2 * scale;
+        const int titleScale = menu.titleScreen ? 3 * scale : 2 * scale;
         const auto title = fit(menu.title, layout.panel.width - 16 * scale, titleScale);
         drawBitmapText(layout.panel.x + 8 * scale,
             layout.panel.y + layout.panel.height - 8 * scale - 7 * titleScale,
@@ -2443,38 +2458,20 @@ bool GdpRenderer::render(
         for (std::size_t i = 0; i < layout.rows.size(); ++i) {
             const auto row = layout.rows[i];
             const bool enabled = i >= menu.enabled.size() || menu.enabled[i];
-            if (i == menu.selection && enabled) drawSelectedRow(row, scale, cyanColor);
+            if (i == menu.selection && enabled) drawSelectedRow(row, scale, textColor);
             const bool adjustable = i < menu.adjustable.size() && menu.adjustable[i];
             const auto text = fit(menu.rows[i], row.width - (adjustable ? 48 : 12) * scale, scale);
             drawBitmapText(row.x + 6 * scale, row.y + std::max(0, (row.height - 7 * scale) / 2),
                 scale, text, !enabled ? uiTheme.mutedText : textColor);
             if (adjustable) {
                 const int y = row.y + std::max(0, (row.height - 7 * scale) / 2);
-                drawBitmapText(row.x + row.width - 34 * scale, y, scale, "<", cyanColor);
-                drawBitmapText(row.x + row.width - 14 * scale, y, scale, ">", cyanColor);
+                drawBitmapText(row.x + row.width - 34 * scale, y, scale, "<", textColor);
+                drawBitmapText(row.x + row.width - 14 * scale, y, scale, ">", textColor);
             }
         }
-        constexpr std::string_view controls = "WASD / ARROWS  ENTER  ESC  MOUSE";
+        constexpr std::string_view controls = "WASD/ARROWS ENTER ESC MOUSE";
         const auto footer = fit(std::string{controls}, layout.panel.width - 16 * scale, scale);
         drawBitmapText(layout.panel.x + 8 * scale, layout.panel.y + 4 * scale, scale, footer, uiTheme.mutedText);
-        if (menu.title == "GDP" && width >= 1000 && menu.selection < menu.rows.size()) {
-            const int x = layout.panel.x + layout.panel.width + 16 * scale;
-            const int available = width - x - layout.panel.x;
-            if (available > 160 * scale) {
-                const UiRect detail{x, layout.panel.y + 22 * scale, available, 58 * scale};
-                drawIndustrialPanel(detail, scale, cyanColor);
-                const auto& selected = menu.rows[menu.selection];
-                std::string_view description = selected == "TEST MODE" ? "DEDICATED MECHANICS ARENA"
-                    : selected == "CAMPAIGN / STORY" ? "10 FLOORS - 3 SAVE SLOTS"
-                    : selected == "SPEEDRUN" ? "HARD ONLY - LOCAL LEADERBOARD"
-                    : selected == "SETTINGS" ? "DISPLAY / AUDIO / CONTROLS"
-                    : "CONFIRM BEFORE EXITING";
-                drawBitmapText(x + 8 * scale, detail.y + 38 * scale, scale,
-                    fit(selected, available - 16 * scale, scale), textColor);
-                drawBitmapText(x + 8 * scale, detail.y + 20 * scale, scale,
-                    fit(std::string{description}, available - 16 * scale, scale), uiTheme.mutedText);
-            }
-        }
         drawExitConfirmation();
         glDisable(GL_SCISSOR_TEST);
         glEnable(GL_DEPTH_TEST);
@@ -2483,8 +2480,8 @@ bool GdpRenderer::render(
     if (hud.controlsMenu) {
         const ControlsMenuLayout layout = makeControlsMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(0, 0, width, height, uiTheme.background);
-        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        drawUiQuad({0, 0, width, height}, uiTheme.background, 0.35F, -1);
+        drawMenuPanel(layout.panel, scale, cyanColor);
         constexpr std::string_view title = "CONTROLS";
         drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (21 * scale),
@@ -2533,8 +2530,8 @@ bool GdpRenderer::render(
     if (hud.settingsMenu) {
         const SettingsMenuLayout layout = makeSettingsMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(0, 0, width, height, uiTheme.background);
-        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        drawUiQuad({0, 0, width, height}, uiTheme.background, 0.35F, -1);
+        drawMenuPanel(layout.panel, scale, cyanColor);
         constexpr std::string_view title = "SETTINGS";
         drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (22 * scale),
@@ -2663,13 +2660,13 @@ bool GdpRenderer::render(
     if (hud.mainMenu) {
         const MainMenuLayout layout = makeMainMenuLayout(width, height);
         const int scale = layout.scale;
-        drawSolidRect(0, 0, width, height, uiTheme.background);
+        drawUiQuad({0, 0, width, height}, uiTheme.background, 0.35F, -1);
         const int railWidth = std::max(2, 2 * scale);
         drawSolidRect(layout.panel.x - (5 * scale), layout.panel.y,
             railWidth, layout.panel.height, uiTheme.panelBorder);
         drawSolidRect(layout.panel.x + layout.panel.width + (3 * scale),
             layout.panel.y, railWidth, layout.panel.height, uiTheme.panelBorder);
-        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        drawMenuPanel(layout.panel, scale, cyanColor);
 
         constexpr std::string_view title = "GDP";
         constexpr std::string_view subtitle = "GENERATED DUNGEON PROTOCOL";
@@ -3358,7 +3355,7 @@ bool GdpRenderer::render(
         const int scale = layout.scale;
         const wkc::core::Vec3 resultColor = victory
             ? uiTheme.success : uiTheme.danger;
-        drawIndustrialPanel(layout.panel, scale, resultColor);
+        drawMenuPanel(layout.panel, scale, resultColor);
         drawBitmapText((width - bitmapTextWidth(result, 2 * scale)) / 2,
             layout.panel.y + layout.panel.height - (24 * scale),
             2 * scale, result, resultColor);
@@ -3416,12 +3413,12 @@ bool GdpRenderer::render(
     if (hud.paused) {
         const PauseMenuLayout layout = makePauseMenuLayout(width, height);
         const int scale = layout.scale;
-        drawIndustrialPanel(layout.panel, scale, cyanColor);
+        drawMenuPanel(layout.panel, scale, textColor);
         constexpr std::string_view pauseTitle = "PAUSED";
         const int titleWidth = bitmapTextWidth(pauseTitle, scale);
         drawBitmapText((width - titleWidth) / 2,
             layout.panel.y + layout.panel.height - (14 * scale), scale,
-            pauseTitle, cyanColor);
+            pauseTitle, textColor);
 
         constexpr std::array<std::string_view, 6> options{
             "RESUME", "RESTART RUN", "SETTINGS", "CONTROLS",
@@ -3448,11 +3445,11 @@ bool GdpRenderer::render(
             const UiRect button = buttons[index];
             const int optionWidth = bitmapTextWidth(options[index], scale);
             if (index == selected) {
-                drawSelectedRow(button, scale, cyanColor);
+                drawSelectedRow(button, scale, textColor);
             }
             drawBitmapText((width - optionWidth) / 2,
                 button.y + (2 * scale), scale, options[index],
-                index == selected ? cyanColor : textColor);
+                textColor);
         }
         const std::string_view controls = width >= 480
             ? "W S  ENTER  MOUSE  ESC"

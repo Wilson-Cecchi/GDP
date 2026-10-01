@@ -41,6 +41,16 @@ struct ApplicationMenuTestAccess {
             expect(false, "requested row exists");
         };
         expect(app.mainMenu_.active && !app.world_, "menu defers world generation");
+        const auto titleSeed = app.session_.state().currentSeed;
+        const auto titleTicks = app.session_.state().elapsedRunTicks;
+        for (unsigned tick = 0U; tick < 60U; ++tick) app.fixedUpdate(1.0 / 60.0);
+        app.render();
+        expect(app.menuBackdropSeconds_ > 0.99 && app.menuBackdropSeconds_ < 1.01,
+            "title animates its independent presentation clock");
+        expect(!app.world_ && app.entities_.query(entities::EntityKind::Enemy).empty()
+            && app.session_.state().currentSeed == titleSeed
+            && app.session_.state().elapsedRunTicks == titleTicks && app.fixedUpdates_ == 0U
+            && !app.fatalError_, "animated title cannot advance the session or spawn gameplay entities");
         choose("SETTINGS"); choose("CONTROLS"); choose("REMAP"); choose("FORWARD");
         expect(app.menuFlow_.capture == gameplay::ControlAction::Forward, "binding begins capture without assigning activation Enter");
         key(Key::I);
@@ -67,6 +77,18 @@ struct ApplicationMenuTestAccess {
         expect(app.runtimeSettings_.masterVolumePercent == 100U, "mouse right arrow increases existing configuration");
         key(Key::Escape); key(Key::Escape);
         expect(!app.settingsMenu_.active && app.mainMenu_.active, "settings return to title");
+        const auto root = visual::makeListMenuLayout(width, height, app.frontendMenuView().rows.size(), true);
+        const auto settingsRow = root.rows[3];
+        click(settingsRow.x + settingsRow.width + 1, settingsRow.y + settingsRow.height / 2);
+        expect(app.menuFlow_.page == MenuPage::Root, "click outside compact title does not launch an option");
+        click(settingsRow.x + settingsRow.width / 2, settingsRow.y + settingsRow.height / 2);
+        expect(app.settingsMenu_.active && app.menuFlow_.page == MenuPage::Settings,
+            "compact title mouse target opens the displayed Settings row");
+        const auto menuTime = app.menuBackdropSeconds_;
+        release(); app.fixedUpdate(1.0 / 60.0);
+        expect(app.menuBackdropSeconds_ > menuTime && !app.world_,
+            "settings from title retain the animated background without starting gameplay");
+        key(Key::Escape);
 
         for (std::size_t slot = 0U; slot < 3U; ++slot) {
             choose("CAMPAIGN"); choose("SLOT " + std::to_string(slot + 1U)); choose("NEW GAME");
@@ -80,6 +102,9 @@ struct ApplicationMenuTestAccess {
             release(); app.input_.handleKey(Key::W, true); app.processEvents();
             expect(app.playerCommand_.moveForward == 0.0F, "old W binding no longer moves player");
             key(Key::Escape); choose("SETTINGS"); key(Key::Escape);
+            const auto pausedTime = app.menuBackdropSeconds_;
+            release(); app.fixedUpdate(1.0 / 60.0);
+            expect(app.menuBackdropSeconds_ == pausedTime, "pause freezes the demonstration clock as well as gameplay");
             expect(app.pauseMenu_.paused && !app.settingsMenu_.active && app.activeCampaignSlot_ == slot,
                 "pause settings return preserves active campaign slot");
             expect(app.saveCurrentCampaignCheckpoint(), "settings cannot redirect subsequent checkpoint to another slot");

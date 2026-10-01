@@ -45,7 +45,7 @@ void Application::processFrontendMenu()
             pointerX = pointer.x * static_cast<float>(dw) / static_cast<float>(ww);
             pointerY = pointer.y * static_cast<float>(dh) / static_cast<float>(wh);
             pointed = visual::listMenuSelectionAt(dw, dh, view.rows.size(), pointerX,
-                pointerY);
+                pointerY, menuFlow_.page == MenuPage::Root);
         }
     }
     if (pointed && view.rows[*pointed].enabled && input_.mouseDelta() != wkc::core::Vec2{}) {
@@ -60,7 +60,8 @@ void Application::processFrontendMenu()
     auto& row = view.rows[menuFlow_.selection];
     const bool left = input_.wasKeyPressed(Key::Left) || input_.wasKeyPressed(Key::A);
     const bool right = input_.wasKeyPressed(Key::Right) || input_.wasKeyPressed(Key::D);
-    const auto mouseDirection = click ? visual::listMenuAdjustmentDirectionAt(dw, dh, view.rows.size(), pointerX, pointerY) : std::nullopt;
+    const auto mouseDirection = click ? visual::listMenuAdjustmentDirectionAt(dw, dh,
+        view.rows.size(), pointerX, pointerY, menuFlow_.page == MenuPage::Root) : std::nullopt;
     if (row.setting && (left != right || mouseDirection)) {
         const int direction = mouseDirection.value_or(left ? -1 : 1);
         if (gameplay::adjustRuntimeSetting(runtimeSettings_, *row.setting, direction)) {

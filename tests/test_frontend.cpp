@@ -1,5 +1,6 @@
 #include "game/MenuFlow.hpp"
 #include "game/visual/GdpRenderData.hpp"
+#include "game/visual/MenuBackdrop.hpp"
 #include "game/visual/UiFontAtlas.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SettingsStore.hpp"
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 namespace {
 int failures = 0;
@@ -75,6 +77,18 @@ void bindingsTests() {
 }
 void layoutTests() {
     using namespace gdp::game::visual;
+    for (const auto dimensions : {std::array{1280, 720}, std::array{1920, 1080}, std::array{2560, 1080}}) {
+        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
+        expect(root.rows[0].width == 348 && root.rows[0].height == 30,
+            "title buttons stay compact rather than scaling up with display size");
+        const auto r = root.rows[3];
+        expect(listMenuSelectionAt(dimensions[0], dimensions[1], 5U,
+            static_cast<float>(r.x + r.width / 2), static_cast<float>(dimensions[1] - r.y - r.height / 2), true) == 3U,
+            "left-aligned title uses exactly the same hit targets as rendering");
+        expect(!listMenuSelectionAt(dimensions[0], dimensions[1], 5U,
+            static_cast<float>(r.x + r.width + 1), static_cast<float>(dimensions[1] - r.y - r.height / 2), true),
+            "empty scene outside compact title buttons is not clickable");
+    }
     expect(makeListMenuLayout(320, 50, 14U).rows.empty(), "impossibly small viewports do not create offscreen hit targets");
     std::size_t decoded = 0U;
     bool antialias = false;
@@ -109,6 +123,30 @@ void layoutTests() {
                 x = static_cast<float>(r.x + r.width - 10 * layout.scale);
                 expect(listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count, x, y) == 1, "right arrow increases setting");
             }
+        }
+    }
+}
+void backdropTests() {
+    using namespace gdp::game::visual;
+    const auto first = sampleMenuBackdrop(0.0);
+    const auto later = sampleMenuBackdrop(8.0);
+    expect(first.camera.position != later.camera.position
+        && first.enemies[0].position != later.enemies[0].position
+        && later.enemies[0].animationTick == 480U, "menu camera and patrol animation advance independently");
+    expect(later.camera.position == sampleMenuBackdrop(8.0).camera.position,
+        "presentation snapshot is deterministic without consuming world RNG");
+    expect(first.room.materialKey != 0U && first.room.materialKey == later.room.materialKey,
+        "demo explicitly selects its cached baseline rather than the last gameplay room");
+    expect(first.camera.position == sampleMenuBackdrop(240.0).camera.position,
+        "menu animation loops without unbounded tick accumulation");
+    for (const double time : {0.0, 8.0, 23.9, 100.0, 239.9, 1e20,
+            -1.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        const auto scene = sampleMenuBackdrop(time);
+        expect(std::isfinite(scene.camera.position.x) && scene.lighting.shadowLightCount == 0U
+            && scene.lighting.lightCount == 2U, "background has bounded geometry and a small shadow-free light budget");
+        for (const auto& enemy : scene.enemies) {
+            expect(std::isfinite(enemy.yawDegrees) && scene.room.worldBounds.contains(enemy.position),
+                "presentation patrol stays inside the demo room");
         }
     }
 }
@@ -185,7 +223,7 @@ void campaignLootTests() {
 int main() {
     const auto directory = std::filesystem::temp_directory_path() / ("gdp_frontend_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(directory);
-    menuTests(); bindingsTests(); layoutTests(); persistenceTests(directory); campaignLootTests();
+    menuTests(); bindingsTests(); layoutTests(); backdropTests(); persistenceTests(directory); campaignLootTests();
     std::error_code error; std::filesystem::remove_all(directory, error);
     return failures == 0 ? 0 : 1;
 }

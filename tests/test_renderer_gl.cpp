@@ -1,5 +1,6 @@
 #include "game/visual/GdpRenderer.hpp"
 #include "game/MenuFlow.hpp"
+#include "game/visual/MenuBackdrop.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -36,11 +37,17 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
             const auto view = makeMenuView(state, slots, {}, {}, true);
             HudRenderData hud;
             hud.listMenu.active = true; hud.listMenu.title = view.title; hud.listMenu.subtitle = view.subtitle;
+            hud.listMenu.titleScreen = page == MenuPage::Root;
             for (const auto& row : view.rows) {
                 hud.listMenu.rows.push_back(row.text); hud.listMenu.enabled.push_back(row.enabled);
                 hud.listMenu.adjustable.push_back(row.setting.has_value());
             }
-            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            const auto renderBackdrop = [&](const double time) {
+                const auto scene = sampleMenuBackdrop(time);
+                return renderer.render(width, height, scene.camera, scene.enemies, {}, scene.props,
+                    scene.lighting, scene.room, {}, {}, {}, hud);
+            };
+            passed &= renderBackdrop(0.0);
             std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
             if (captureDirectory) {
@@ -56,10 +63,21 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
                 SDL_DestroySurface(surface);
             }
             hud.listMenu.selection = view.rows.size() - 1U;
-            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+            passed &= renderBackdrop(0.0);
             std::vector<std::uint8_t> changed(pixels.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, changed.data());
             passed &= pixels != changed;
+            if (page == MenuPage::Root) {
+                passed &= renderBackdrop(8.0);
+                std::vector<std::uint8_t> animated(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, animated.data());
+                std::size_t differences = 0U;
+                for (int y = 0; y < height; ++y) for (int x = width * 3 / 4; x < width; ++x) {
+                    const auto index = static_cast<std::size_t>((y * width + x) * 4);
+                    differences += animated[index] != changed[index];
+                }
+                passed &= differences > 100U;
+            }
         }
     }
     if (!passed) std::cerr << "Frontend menu pixel render failed\n";
