@@ -83,16 +83,17 @@ resultado final:
 
 ```text
 unidades visuais: Weapon/Sniper; Weapon/Shotgun (aprovações independentes)
-versão: v1 — equipamento metálico industrial, direção sugerida Used
+versão: v1 — equipamento metálico industrial, direção Used apresentada
 pranchas: visual/proposals/weapon_sniper_proposal_v1.png;
           visual/proposals/weapon_shotgun_proposal_v1.png
 variantes: Maintained / Used / Worn, vista próxima e gameplay ilustrativo
 contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
-decisão do usuário: pendente; autorização de mecânicas não aprova estes modelos
+decisão do usuário: "aprovadas a parte visual e funcional"
+escopo: pranchas v1 de sniper e escopeta apresentadas; direção Used
 data: 2026-10-02
 commit de implementação artística: nenhum
 capturas reais no jogo: pendentes de implementação aprovada
-estado: AGUARDANDO APROVAÇÃO
+estado: APROVADA PARA IMPLEMENTAÇÃO
 ```
 
 ### Weapon/SMG — v1
@@ -102,15 +103,19 @@ unidade visual: Weapon/SMG
 versão: v1 — direção metálica Used ainda sem prancha
 contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
 prancha: nenhuma; geração integrada rejeitada, sem fallback
-decisão do usuário: pendente
+decisão do usuário: funcionalidade aprovada; visual pendente de prancha
 data: 2026-10-02
 commit de implementação artística: nenhum
 estado: PROPOSTA EM PREPARAÇÃO
 ```
 
 As três mecânicas reutilizam temporariamente o modelo/material aprovado da
-carabina, incluindo o pickup no chão. Essa reutilização não é aprovação de
-modelagem/textura nova, e as pranchas ilustrativas não são capturas reais.
+carabina, incluindo o pickup no chão. Funcionalidade das três aprovada pelo
+usuário em 2026-10-02. A aprovação visual permite implementar sniper e escopeta
+v1, mas não declara esses modelos já implementados ou aceitos no runtime.
+A SMG não recebe aprovação artística sem artefato apresentado. As pranchas
+ilustrativas não são capturas reais; a implementação final ainda precisa
+de validação visual no jogo.
 
 ### Interface/menu — v4 (refinamento solicitado)
 

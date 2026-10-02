@@ -1,7 +1,8 @@
 # Proposta — variedade e distribuição de armas
 
-Estado: mecânicas implementadas após autorização do usuário; arte definitiva
-pendente de aprovação. O relato de excesso de armas motivou revisar a
+Estado: mecânicas implementadas e aprovadas pelo usuário em 2026-10-02;
+propostas visuais v1 de sniper e escopeta aprovadas para implementação,
+SMG ainda sem prancha. O relato de excesso de armas motivou revisar a
 distribuição junto com a variedade, sem aumentar o número de pickups.
 
 ## Base atual
@@ -50,14 +51,17 @@ explícita ao ler, preservando recursos, andar e seed; o loot usa o novo balanç
 O arquivo original não é regravado pela leitura. Speedrun mantém regras 36.
 
 Distribuição e invariantes foram cobertos por testes determinísticos, incluindo
-1.000 seeds. Esses valores ainda precisam de playtest humano nas três
-dificuldades; não são declarados balanceamento final.
+1.000 seeds. O usuário aprovou a funcionalidade com "aprovadas a parte visual
+e funcional". Isso não documenta uma matriz de playtests nas três dificuldades
+nem torna os valores imutáveis; podem ser refinados por novos resultados.
 
 ## Gate de implementação
 
 As três armas reutilizam temporariamente o modelo aprovado da carabina,
 inclusive no chão. Essa reutilização não representa sua aparência definitiva.
-Sniper e escopeta têm pranchas v1 em `visual/proposals/`; a prancha da SMG
-permanece em preparação após falha do gerador. Aprovar cada unidade exata antes
-de implementar modelos/texturas novos, conforme `visual/TEXTURE_APPROVALS.md`.
+Sniper e escopeta têm pranchas v1 aprovadas para implementação em
+`visual/proposals/`, com direção Used. Seus modelos definitivos ainda não foram
+implementados. A prancha da SMG permanece em preparação após falha do gerador;
+sua arte exige aprovação própria. Implementar as duas unidades aprovadas e
+validá-las em capturas reais, conforme `visual/TEXTURE_APPROVALS.md`.
 Contrato e prompts: `visual/proposals/new_firearms_proposal_v1.md`.

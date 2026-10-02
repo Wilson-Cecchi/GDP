@@ -11,12 +11,14 @@ Nenhuma prancha é uma textura pronta ou substitui a aprovação de modelo.
   desgaste moderado Used; sem luzes sci-fi, marcas ou silhuetas exageradas.
 - Pranchas: Maintained / Used / Worn, vista próxima neutra e composição
   ilustrativa em primeira pessoa, com centro livre e empunhadura correta.
-- Sniper: [prancha v1](weapon_sniper_proposal_v1.png), AGUARDANDO APROVAÇÃO.
-- Escopeta: [prancha v1](weapon_shotgun_proposal_v1.png), AGUARDANDO APROVAÇÃO.
+- Sniper: [prancha v1](weapon_sniper_proposal_v1.png), APROVADA PARA IMPLEMENTAÇÃO.
+- Escopeta: [prancha v1](weapon_shotgun_proposal_v1.png), APROVADA PARA IMPLEMENTAÇÃO.
 - SMG: PROPOSTA EM PREPARAÇÃO. A ferramenta rejeitou a geração; nenhum
   artefato foi obtido ou implementado. Não houve fallback CLI/API.
-- Cada aprovação deve especificar unidade, versão e variante. Used é apenas
-  a sugestão, não uma decisão já tomada. Dimensões/viewmodel/FOV/drops devem
+- Aprovação do usuário em 2026-10-02: "aprovadas a parte visual e funcional".
+  Abrange as duas pranchas v1 apresentadas, com direção Used, e as mecânicas
+  das três armas; não abrange uma futura prancha de SMG ainda inexistente.
+  Dimensões/viewmodel/FOV/drops devem
   ser validados em capturas reais após implementação aprovada.
 - No runtime, as três mecânicas usam o modelo/material existente da carabina.
   Artefatos aqui não são carregados pelo renderer nem pelo pacote Windows.
