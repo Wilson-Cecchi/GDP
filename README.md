@@ -48,6 +48,13 @@ especializados das pastas numeradas.
   resultado intermediária. Standard/Speedrun mantêm a conclusão na morte do boss.
   Reforços de Lockdown só aparecem quando sua onda é liberada, evitando corpos
   visíveis que não atacavam enquanto o grupo inicial ainda estava vivo.
+  **Armas:** sniper, escopeta de seis pellets e SMG estão disponíveis na
+  Campanha e no Test Mode. Pickups extras de campanha caíram de 55% para 25%.
+  `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
+  As três novas armas usam provisoriamente o modelo aprovado da carabina;
+  sua arte definitiva depende de aprovação visual. Para ensaiá-las:
+  `build/release/gdp --test-mode`. Saves anteriores de regras 34 têm migração
+  explícita preservando recursos; Standard/Speedrun mantêm seu loot anterior.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
   botões do mouse e scroll. Direção visual atual: menus e HUD Tático minimalista,

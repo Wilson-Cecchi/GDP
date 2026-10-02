@@ -40,6 +40,14 @@ world::InitialEntitySet populateTestArena(world::World& arena, entities::EntityM
         room.entities.push_back(manager.createItem({.transform = {.position = {-6.0F + static_cast<float>(i) * 4.0F, 0.0F, 7.0F}},
             .roomId = 1U, .type = i == 0U ? ItemType::Health : ItemType::Ammo, .quantity = 100U}));
     }
+    for (unsigned i = 0U; i < 3U; ++i) {
+        const auto id = manager.createItem({
+            .transform = {.position = {-4.0F + static_cast<float>(i) * 4.0F, 0.0F, 0.0F}},
+            .roomId = room.id, .type = ItemType::Weapon, .quantity = 1U});
+        manager.findData<ItemData>(id)->spawnedWeaponArchetype
+            = static_cast<std::uint32_t>(gameplay::WeaponArchetype::Sniper) + i;
+        room.entities.push_back(id);
+    }
     return result;
 }
 }

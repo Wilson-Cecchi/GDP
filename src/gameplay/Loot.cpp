@@ -69,10 +69,11 @@ LootCollectionSummary collectNearbyLoot(
             }
             break;
         }
-        case ItemType::Weapon:
+        case ItemType::Weapon: {
+            bool ammunitionPickup = false;
             if (item->recoveredWeapon) {
                 applied = item->recoveredWeapon->archetype
-                        <= static_cast<std::uint32_t>(WeaponArchetype::Carbine)
+                        < static_cast<std::uint32_t>(WeaponArchetype::Count)
                     && weapon.equipRecovered(
                         static_cast<WeaponArchetype>(
                             item->recoveredWeapon->archetype),
@@ -82,11 +83,19 @@ LootCollectionSummary collectNearbyLoot(
             } else {
                 const auto archetype = item->spawnedWeaponArchetype.value_or(
                     static_cast<std::uint32_t>(WeaponArchetype::Carbine));
-                if (archetype <= static_cast<std::uint32_t>(WeaponArchetype::Carbine))
-                    applied = weapon.equip(static_cast<WeaponArchetype>(archetype));
+                if (archetype < static_cast<std::uint32_t>(WeaponArchetype::Count)) {
+                    const auto type = static_cast<WeaponArchetype>(archetype);
+                    if (weapon.ownsWeapon(type) && isFirearmArchetype(type)) {
+                        ammunitionPickup = true;
+                        const auto added = weapon.addReserveAmmoFor(type, baseWeaponDefinition(type).magazineSize);
+                        summary.ammoAdded += added;
+                        applied = added > 0U;
+                    } else applied = weapon.equip(type);
+                }
             }
-            summary.weaponsEquipped += applied ? 1U : 0U;
+            summary.weaponsEquipped += applied && !ammunitionPickup ? 1U : 0U;
             break;
+        }
         case ItemType::Special:
             applied = weapon.activateOverdrive();
             summary.specialsActivated += applied ? 1U : 0U;

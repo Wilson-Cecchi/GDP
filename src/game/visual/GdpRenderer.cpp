@@ -2191,7 +2191,8 @@ bool GdpRenderer::render(
                 - (forward * 0.44F)));
         const WeaponViewmodelPose pose
             = sampleWeaponViewmodelPose(weaponViewmodel);
-        const bool carbine = weaponViewmodel.role == HudWeaponRole::Carbine;
+        const bool carbine = weaponViewmodel.role != HudWeaponRole::Pistol
+            && weaponViewmodel.role != HudWeaponRole::Knife;
         const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
         const wkc::core::Vec3 baseOffset{
             carbine ? 0.47F : knife ? 0.38F : 0.27F,
@@ -2232,7 +2233,7 @@ bool GdpRenderer::render(
         shader.setMat4(gl_, "uModel", root);
         shader.setInt(gl_, "uDetailedMaterial", 1);
         const std::size_t weaponIndex = static_cast<std::size_t>(
-            weaponViewmodel.role);
+            carbine ? HudWeaponRole::Carbine : weaponViewmodel.role);
         for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
             const wkc::render::Mesh& mesh = weaponMeshes_[weaponIndex][material];
             if (!mesh.isValid()) {
@@ -2832,8 +2833,11 @@ bool GdpRenderer::render(
             static_cast<int>(std::round(static_cast<float>(healthBarWidth) * armorRatio)),
             hudScale, uiTheme.mutedText);
 
-        const std::string weaponLabel = std::string{hud.weapon == HudWeaponRole::Knife
-            ? "KNIFE" : hud.weapon == HudWeaponRole::Carbine ? "CARBINE" : "PISTOL"}
+        const std::string weaponLabel = std::string{hud.weapon == HudWeaponRole::Knife ? "KNIFE"
+            : hud.weapon == HudWeaponRole::Sniper ? "SNIPER"
+            : hud.weapon == HudWeaponRole::Shotgun ? "SHOTGUN"
+            : hud.weapon == HudWeaponRole::SubmachineGun ? "SMG"
+            : hud.weapon == HudWeaponRole::Carbine ? "CARBINE" : "PISTOL"}
             + (hud.weaponOverdrive ? " OD" : "");
         drawBitmapText(rightEdge - bitmapTextWidth(weaponLabel, hudScale),
             resourceY + 54 * hudScale, hudScale, weaponLabel, uiTheme.mutedText);

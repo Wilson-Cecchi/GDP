@@ -606,6 +606,37 @@ ativo permanece inerte. Stores isolam as regras Campaign/Speedrun 26/25.
 
 ## Sanitizers
 
+### Revisão de armas — 2026-10-02
+
+Gates adicionais: sniper/escopeta/SMG com cadência, reload, aim, consumo,
+troca/Q/scroll, drop/recovery exato, uma primária + pistola + faca e reserva
+compatível de duplicatas. O teste impede zerar o intervalo da sniper por troca
+rápida e protege upgrades normalizados no total de pellets da escopeta.
+Hitscan cobre seis rays/uma cartucha, padrão determinístico, queda de dano,
+paredes/portas/salas adjacentes, uma morte por vítima e lotes limitados a 13
+sinais mesmo com contagem de contatos malformada.
+
+Loot usa 1.000 seeds para faixa de pickups extras, variedade e raridade da
+sniper. Frontend valida a tabela de campanha e Standard/Speedrun conservam
+seus golden hashes. Saves fazem round trip dos três tipos e migração explícita
+34→35 sem regravar o arquivo de entrada. Integração da aplicação recolhe cada
+arma no Test Mode, seleciona slots e renderiza. O gate OpenGL testa os três
+nomes no HUD e o fallback seguro ao modelo aprovado da carabina.
+
+Esses gates não substituem aprovação artística, balanceamento humano em
+Easy/Normal/Hard ou execução nativa do pacote Windows.
+
+Resultado local desta revisão: Release 63/63 (67,70 s); ASan/UBSan 10/10
+afetados (242,27 s), incluindo integração da aplicação e pixels OpenGL.
+A primeira execução instrumentada detectou objetos de inventário compilados
+com layouts diferentes durante builds sobrepostos; reconstrução limpa de
+sanitizers e repetição dos dez gates não reproduziram o erro. Evitar compilar
+o mesmo preset em paralelo ou editar layouts enquanto ele compila.
+A validação ocorreu no worktree com o fluxo paralelo de treinamento; essas
+alterações de IA foram preservadas e excluídas do commit desta etapa.
+
+### Instrumentação
+
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
 
 O preset CMake `sanitizers` ativa ambos em GCC/Clang e executa a mesma suíte de

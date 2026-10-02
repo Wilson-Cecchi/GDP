@@ -378,11 +378,53 @@ void testLastFirearmPickup()
         "Knife-only player can recover the last gun without bonus XP");
 }
 
+void testCampaignWeaponVarietyAndReducedFrequency()
+{
+    using namespace gdp::world;
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    constexpr std::array zones{SpawnZone{{{-3.0F, 0.0F, -3.0F}, {-2.0F, 0.0F, -2.0F}}}};
+    std::array<unsigned, 6> counts{};
+    unsigned extra = 0U;
+    for (wkc::core::Seed seed = 0U; seed < 1000U; ++seed) {
+        const auto layout = generateLootLayout(seed, RoomRole::Normal, RoomTheme::Industrial, 3U, zones, 1.0F, true);
+        expect(validateLootLayout(layout, zones).isValid(), "new Campaign loot stays within placement/budget contracts");
+        const auto repeat = generateLootLayout(seed, RoomRole::Normal, RoomTheme::Industrial, 3U, zones, 1.0F, true);
+        expect(layout.drops == repeat.drops && layout.layoutHash == repeat.layoutHash, "new weapon loot repeats exactly");
+        for (const auto& drop : layout.drops) if (drop.weaponArchetype) {
+            ++counts[*drop.weaponArchetype]; ++extra;
+        }
+        const auto secret = generateLootLayout(seed, RoomRole::Secret, RoomTheme::Industrial, 3U, zones, 1.0F, true);
+        expect(std::any_of(secret.drops.begin(), secret.drops.end(), [](const auto& drop) {
+            return drop.weaponArchetype && isPrimaryWeapon(static_cast<WeaponArchetype>(*drop.weaponArchetype));
+        }), "Secret guarantees a primary rather than another starter pistol");
+    }
+    expect(extra > 180U && extra < 320U && counts[2] == 0U
+        && counts[0] > 0U && counts[1] > 0U && counts[3] > 0U && counts[4] > 0U && counts[5] > 0U
+        && counts[3] < counts[1], "1,000 rooms have about 25% extra pickups, all five firearms, and rare sniper");
+    EntityManager manager;
+    Player player; player.spawn({});
+    Weapon weapon;
+    (void)weapon.equip(WeaponArchetype::Sniper); weapon.fixedUpdate(1.0F);
+    (void)weapon.tryFire(); (void)weapon.reload(); weapon.fixedUpdate(2.0F);
+    (void)weapon.switchTo(WeaponArchetype::Pistol); weapon.fixedUpdate(1.0F);
+    const auto pickup = manager.createItem({.roomId = 1U, .type = ItemType::Weapon, .quantity = 1U});
+    manager.findData<ItemData>(pickup)->spawnedWeaponArchetype = static_cast<std::uint32_t>(WeaponArchetype::Sniper);
+    const auto before = weapon.campaignProgress();
+    const auto collected = collectNearbyLoot(manager, player, weapon, 1U);
+    expect(collected.collected == 1U && collected.ammoAdded == 1U && collected.weaponsEquipped == 0U
+        && weapon.definition().archetype == WeaponArchetype::Pistol
+        && weapon.reserveAmmo() == before.reserveAmmo
+        && weapon.campaignProgress().stowed->reserveAmmo == before.stowed->reserveAmmo + 1U,
+        "duplicate primary supplies only its own reserve without switching/refilling another gun");
+}
+
 } // namespace
 
 int main()
 {
     testDeterministicLootLayout();
+    testCampaignWeaponVarietyAndReducedFrequency();
     testRoleBudgetsAndBatch();
     testAutomaticLootCollection();
     testDroppedWeaponPickup();

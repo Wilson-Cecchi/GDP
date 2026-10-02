@@ -58,11 +58,20 @@ struct ImpactResult {
     ImpactMaterial material{ImpactMaterial::Metal};
 };
 
+struct ShotContact {
+    ShotOutcome outcome{ShotOutcome::Miss};
+    std::optional<HitResult> hit;
+    gdp::entities::EntityId spawnedItem{};
+    std::optional<ImpactResult> impact;
+};
+
 struct ShotResult {
     ShotOutcome outcome{ShotOutcome::Miss};
     std::optional<HitResult> hit;
     gdp::entities::EntityId spawnedItem{};
     std::optional<ImpactResult> impact;
+    std::array<ShotContact, 5> extraContacts{};
+    std::uint8_t extraContactCount{0U};
 };
 
 enum class CombatSignalKind : std::uint8_t {
@@ -80,11 +89,12 @@ struct CombatSignal {
     HitZone zone{HitZone::Standard};
     wkc::core::Vec3 point{};
     std::optional<ImpactResult> impact;
+    gdp::entities::EntityId spawnedItem{};
 };
 
-// A single accepted shot emits at most fire, contact, and damage/death, in that order.
+// One firing event, followed by contact/damage for at most six shotgun pellets.
 struct CombatSignalBatch {
-    std::array<CombatSignal, 3> signals{};
+    std::array<CombatSignal, 13> signals{};
     std::uint8_t count{0};
 };
 

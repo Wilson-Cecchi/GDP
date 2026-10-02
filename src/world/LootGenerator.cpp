@@ -262,7 +262,7 @@ LootLayout generateLootLayout(
     wkc::core::RandomStream selection{wkc::core::deriveSeed(
         layout.seed, gdp::game::SeedDomain::Loot, 1)};
     if (campaignWeapons && role != RoomRole::Start && role != RoomRole::Boss
-        && role != RoomRole::Secret && selection.chance(0.55F)) {
+        && role != RoomRole::Secret && selection.chance(0.25F)) {
         // Reserve space in the existing loot budget; positions still use the validated zones.
         layout.budget += itemCost(gdp::entities::ItemType::Weapon);
         addDrop(layout, gdp::entities::ItemType::Weapon, lootZones);
@@ -280,8 +280,13 @@ LootLayout generateLootLayout(
         addDrop(layout, type, lootZones);
     }
     if (campaignWeapons) {
-        for (auto& drop : layout.drops) if (drop.type == gdp::entities::ItemType::Weapon)
-            drop.weaponArchetype = selection.chance(0.7F) ? 1U : 0U;
+        for (auto& drop : layout.drops) if (drop.type == gdp::entities::ItemType::Weapon) {
+            // Pistol 15%, Carbine 40%, SMG 20%, Shotgun 17%, Sniper 8%.
+            // Secret always supplies a primary, never a duplicate starter pistol.
+            const int roll = selection.rangeInt(role == RoomRole::Secret ? 15 : 0, 99);
+            drop.weaponArchetype = roll < 15 ? 0U : roll < 55 ? 1U
+                : roll < 75 ? 5U : roll < 92 ? 4U : 3U;
+        }
     }
     layout.layoutHash = lootLayoutHash(layout);
     return layout;
@@ -308,7 +313,8 @@ LootValidationResult validateLootLayout(
     for (std::size_t index = 0; index < layout.drops.size(); ++index) {
         const LootDrop& drop = layout.drops[index];
         if (drop.quantity == 0U || drop.type > gdp::entities::ItemType::Special
-            || (drop.weaponArchetype && (drop.type != gdp::entities::ItemType::Weapon || *drop.weaponArchetype > 1U))) {
+            || (drop.weaponArchetype && (drop.type != gdp::entities::ItemType::Weapon
+                || *drop.weaponArchetype > 5U || *drop.weaponArchetype == 2U))) {
             result.errors.push_back(LootValidationError::InvalidDrop);
         }
         keyCount += drop.type == gdp::entities::ItemType::Key ? 1U : 0U;

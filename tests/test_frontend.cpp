@@ -251,14 +251,17 @@ void persistenceTests(const std::filesystem::path& directory) {
 void campaignLootTests() {
     using namespace gdp::world;
     const std::array zones{SpawnZone{{{-10.0F, 0.0F, -10.0F}, {10.0F, 1.0F, 10.0F}}}};
-    unsigned withWeapon = 0U, pistol = 0U, carbine = 0U;
+    unsigned withWeapon = 0U;
+    std::array<unsigned, 6> types{};
     for (unsigned seed = 1U; seed <= 100U; ++seed) {
         const auto layout = generateLootLayout(seed, RoomRole::Normal, RoomTheme::Industrial, 2U, zones, 1.0F, true);
         expect(validateLootLayout(layout, zones).isValid(), "campaign random weapons respect loot zones, separation and budget");
         expect(layout.drops == generateLootLayout(seed, RoomRole::Normal, RoomTheme::Industrial, 2U, zones, 1.0F, true).drops, "campaign weapon randomization remains deterministic");
-        for (const auto& drop : layout.drops) if (drop.weaponArchetype) { ++withWeapon; *drop.weaponArchetype == 0U ? ++pistol : ++carbine; }
+        for (const auto& drop : layout.drops) if (drop.weaponArchetype) { ++withWeapon; ++types[*drop.weaponArchetype]; }
     }
-    expect(withWeapon > 20U && pistol > 0U && carbine > 0U, "campaign includes random pistols and carbines outside secret rooms");
+    expect(withWeapon > 15U && withWeapon < 40U && types[0] > 0U && types[1] > 0U
+        && types[3] > 0U && types[4] > 0U && types[5] > 0U && types[2] == 0U,
+        "campaign includes all five firearms with reduced extra-pickup frequency");
 }
 }
 int main() {

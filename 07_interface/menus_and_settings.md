@@ -64,7 +64,10 @@ As teclas dos menus são fixas, independentemente dos bindings da gameplay.
 ### Test Mode
 
 Arena única dedicada, de 32 × 40 m, com os cinco tipos de inimigo, coberturas
-altas, plataformas baixas, munição, saúde, pistola, carabina e faca. Não gera
+altas, plataformas baixas, munição, saúde, pistola, carabina, faca, sniper,
+escopeta e SMG. As três novas armas estão dispostas na arena; use G para
+liberar a primária antes de recolher outra. Seus modelos provisórios reutilizam
+a carabina aprovada; o nome no HUD e a mecânica identificam o tipo. Não gera
 eventos de campanha nem termina a run quando o robô morre. A pausa permite
 reiniciar a área ou voltar ao título. A arena usa as IAs ativas do mesmo jogo.
 `--test-mode` abre diretamente a área, também aceitando seed e limite de frames.
@@ -102,10 +105,15 @@ Dificuldade inicial: Easy 0,75×, Normal 1×, Hard 1,25×. Cada andar acrescenta
 0,08 ao multiplicador; no andar 10 resulta em 1,47× / 1,72× / 1,97×.
 O multiplicador alimenta população, comportamento, eventos e orçamento de loot.
 Esses valores são uma base para playtest, não balanceamento final.
-Salas elegíveis não iniciais/finais/secretas têm 55% de chance de um pickup
-extra de arma; os pickups de campanha escolhem carabina (70%) ou pistola (30%).
+Salas elegíveis não iniciais/finais/secretas têm 25% de chance de um pickup
+extra de arma; os pickups de campanha escolhem pistola (15%), carabina (40%),
+SMG (20%), escopeta (17%) ou sniper (8%). Secret garante uma primária,
+normalizando os pesos sem pistola. Duplicatas procedurais oferecem munição
+à reserva da arma compatível, sem trocar seleção ou encher o carregador.
 As armas usam as zonas e a separação de loot existentes, e a mesma seed reproduz
-o conteúdo. Atualmente existem esses dois tipos de arma de fogo, mais a faca.
+o conteúdo. Slot 1 seleciona a primária possuída, 2 a pistola e 3 a faca;
+4/5 continuam reservados. O inventário aceita uma primária e uma pistola:
+G permite trocar de primária sem apagar silenciosamente arma ou munição.
 Campanha/História ainda reutiliza a progressão jogável: esta revisão não adiciona
 roteiro, diálogos ou cenas narrativas.
 

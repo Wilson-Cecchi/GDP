@@ -8,7 +8,7 @@
 
 namespace gdp::persistence {
 
-inline constexpr std::uint32_t currentCampaignCheckpointFileVersion = 5U;
+inline constexpr std::uint32_t currentCampaignCheckpointFileVersion = 6U;
 
 enum class CampaignCheckpointLoadStatus : std::uint8_t {
     Loaded,
@@ -22,6 +22,7 @@ enum class CampaignCheckpointLoadStatus : std::uint8_t {
 struct CampaignCheckpointLoadResult {
     std::optional<gameplay::CampaignCheckpoint> checkpoint;
     CampaignCheckpointLoadStatus status{CampaignCheckpointLoadStatus::Missing};
+    bool migratedRules{false};
 };
 
 [[nodiscard]] CampaignCheckpointLoadResult loadCampaignCheckpoint(

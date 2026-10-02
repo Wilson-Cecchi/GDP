@@ -562,7 +562,11 @@ std::array<MeshData, weaponMaterialCount> makeWeaponViewmodelMeshes(
     WeaponMeshBuilder builder;
     switch (role) {
     case HudWeaponRole::Pistol: makePistol(builder); break;
-    case HudWeaponRole::Carbine: makeCarbine(builder); break;
+    // Mechanics-only additions reuse the approved model pending their own art gate.
+    case HudWeaponRole::Carbine:
+    case HudWeaponRole::Sniper:
+    case HudWeaponRole::Shotgun:
+    case HudWeaponRole::SubmachineGun: makeCarbine(builder); break;
     case HudWeaponRole::Knife: makeKnife(builder); break;
     }
     return builder.finish();

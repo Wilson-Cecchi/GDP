@@ -318,6 +318,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         }
         if (*fields.version != 3U
             && *fields.version != 4U
+            && *fields.version != 5U
             && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::UnsupportedVersion;
             return result;
@@ -327,7 +328,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;
         }
-        if (*rulesVersion != gameplay::currentCampaignRulesVersion) {
+        const bool migratePreviousRules = *rulesVersion == 34U && *fields.version <= 5U;
+        if (*rulesVersion != gameplay::currentCampaignRulesVersion && !migratePreviousRules) {
             result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
             return result;
         }
@@ -354,9 +356,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         if (!fields.initialSeed || !fields.currentSeed || !runIndex || !seedIndex
             || !floor || !fields.health || !fields.maximumHealth || !fields.armor
             || !fields.maximumArmor || !keys || !weaponArchetype
-            || *weaponArchetype
-                > static_cast<std::uint32_t>(
-                    gameplay::WeaponArchetype::Carbine)
+            || *weaponArchetype > (*fields.version >= 6U ? 5U : 1U)
+            || *weaponArchetype == static_cast<std::uint32_t>(gameplay::WeaponArchetype::Knife)
             || (*fields.version >= 4U
                 && (!firearmOwned || *firearmOwned > 1U))
             || !fields.weaponDamage
@@ -385,9 +386,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
                 || !fields.stowedFireInterval || !fields.stowedRange
                 || !stowedMagazineSize || !stowedReserveMaximum
                 || !stowedMagazineAmmo || !stowedReserveAmmo
-                || *stowedArchetype
-                    > static_cast<std::uint32_t>(
-                        gameplay::WeaponArchetype::Carbine)) {
+                || *stowedArchetype > (*fields.version >= 6U ? 5U : 1U)
+                || *stowedArchetype == static_cast<std::uint32_t>(gameplay::WeaponArchetype::Knife)) {
                 result.status = CampaignCheckpointLoadStatus::Invalid;
                 return result;
             }
@@ -401,7 +401,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             };
         }
         gameplay::CampaignCheckpoint checkpoint{
-            *rulesVersion,
+            gameplay::currentCampaignRulesVersion,
             *fields.initialSeed,
             *fields.currentSeed,
             *runIndex,
@@ -433,6 +433,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         }
         result.checkpoint = std::move(checkpoint);
         result.status = CampaignCheckpointLoadStatus::Loaded;
+        result.migratedRules = migratePreviousRules;
         return result;
     } catch (...) {
         result.status = CampaignCheckpointLoadStatus::IoError;

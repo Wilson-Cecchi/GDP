@@ -263,67 +263,56 @@ CombatSignalBatch combatSignalsForShot(const ShotResult& shot) noexcept
 
     batch.signals[batch.count++] = {.kind = CombatSignalKind::WeaponFired,
         .outcome = shot.outcome, .impact = std::nullopt};
-    if (shot.hit) {
-        batch.signals[batch.count++] = {
-            .kind = CombatSignalKind::EntityHit,
-            .outcome = shot.outcome,
-            .target = shot.hit->target,
-            .zone = shot.hit->zone,
-            .point = shot.hit->point,
-            .impact = shot.impact,
-        };
-        if (shot.outcome == ShotOutcome::Hit
-            || shot.outcome == ShotOutcome::Killed
-            || shot.outcome == ShotOutcome::Destroyed) {
+    const auto appendContact = [&](const ShotContact& contact) {
+        if (contact.hit) {
             batch.signals[batch.count++] = {
-                .kind = shot.outcome == ShotOutcome::Hit
-                    ? CombatSignalKind::EntityDamaged
-                    : CombatSignalKind::EntityKilled,
-                .outcome = shot.outcome,
-                .target = shot.hit->target,
-                .zone = shot.hit->zone,
-                .point = shot.hit->point,
-                .impact = std::nullopt,
+                .kind = CombatSignalKind::EntityHit,
+                .outcome = contact.outcome,
+                .target = contact.hit->target,
+                .zone = contact.hit->zone,
+                .point = contact.hit->point,
+                .impact = contact.impact,
+            };
+            if (contact.outcome == ShotOutcome::Hit
+                || contact.outcome == ShotOutcome::Killed
+                || contact.outcome == ShotOutcome::Destroyed) {
+                batch.signals[batch.count++] = {
+                    .kind = contact.outcome == ShotOutcome::Hit
+                        ? CombatSignalKind::EntityDamaged
+                        : CombatSignalKind::EntityKilled,
+                    .outcome = contact.outcome,
+                    .target = contact.hit->target,
+                    .zone = contact.hit->zone,
+                    .point = contact.hit->point,
+                    .impact = std::nullopt,
+                    .spawnedItem = contact.spawnedItem,
+                };
+            }
+        } else if (contact.outcome == ShotOutcome::ImpactWorld) {
+            batch.signals[batch.count++] = {
+                .kind = CombatSignalKind::ImpactWorld,
+                .outcome = contact.outcome,
+                .point = contact.impact ? contact.impact->point : wkc::core::Vec3{},
+                .impact = contact.impact,
             };
         }
-    } else if (shot.outcome == ShotOutcome::ImpactWorld) {
-        batch.signals[batch.count++] = {
-            .kind = CombatSignalKind::ImpactWorld,
-            .outcome = shot.outcome,
-            .point = shot.impact ? shot.impact->point : wkc::core::Vec3{},
-            .impact = shot.impact,
-        };
-    }
+    };
+    appendContact({shot.outcome, shot.hit, shot.spawnedItem, shot.impact});
+    for (std::size_t i = 0; i < std::min<std::size_t>(shot.extraContactCount, shot.extraContacts.size()); ++i)
+        appendContact(shot.extraContacts[i]);
     return batch;
 }
 
-ShotResult fireHitscan(
-    Weapon& weapon,
+static ShotContact traceHitscan(
+    const Weapon& weapon,
     const wkc::core::Vec3 origin,
     wkc::core::Vec3 direction,
     const std::uint32_t roomId,
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager,
-    const float spreadScale,
     const std::span<const std::uint32_t> additionalRoomIds) noexcept
 {
-    const FireReadiness readiness = weapon.tryFire();
-    if (readiness == FireReadiness::Cooldown) {
-        return {ShotOutcome::Cooldown, std::nullopt, {}, std::nullopt};
-    }
-    if (readiness == FireReadiness::Reloading) {
-        return {ShotOutcome::Reloading, std::nullopt, {}, std::nullopt};
-    }
-    if (readiness == FireReadiness::Switching) {
-        return {ShotOutcome::Switching, std::nullopt, {}, std::nullopt};
-    }
-    if (readiness == FireReadiness::Empty) {
-        return {ShotOutcome::Empty, std::nullopt, {}, std::nullopt};
-    }
-
-    direction = applyDeterministicWeaponSpread(
-        direction, weapon.definition().archetype, weapon.spreadShotIndex(),
-        spreadScale);
+    direction = wkc::core::normalized(direction);
     const float range = weapon.definition().range;
     if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
         return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
@@ -410,9 +399,12 @@ ShotResult fireHitscan(
             direction * -1.0F,
             material,
         };
+        const float damageAmount = weapon.damage()
+            * (weapon.definition().archetype == WeaponArchetype::Shotgun
+                ? std::clamp(1.0F - nearestHit->distance / 20.0F, 0.25F, 1.0F) : 1.0F);
         if (targetIsProp) {
             const PropDamageResult damage
-                = damageProp(manager, nearestHit->target, weapon.damage());
+                = damageProp(manager, nearestHit->target, damageAmount);
             const ShotOutcome outcome = damage.outcome == PropDamageOutcome::Destroyed
                 ? ShotOutcome::Destroyed
                 : damage.outcome == PropDamageOutcome::Damaged ? ShotOutcome::Hit
@@ -421,7 +413,7 @@ ShotResult fireHitscan(
         }
         const DamageOutcome damage = applyDamage(
             manager, nearestHit->target,
-            weapon.damage()
+            damageAmount
                 * (nearestHit->zone == HitZone::WeakPoint
                         ? weakPointDamageMultiplier : 1.0F));
         return {
@@ -444,6 +436,36 @@ ShotResult fireHitscan(
         };
     }
     return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
+}
+
+ShotResult fireHitscan(
+    Weapon& weapon, const wkc::core::Vec3 origin, const wkc::core::Vec3 direction,
+    const std::uint32_t roomId, const CollisionWorld& collisionWorld,
+    gdp::entities::EntityManager& manager, const float spreadScale,
+    const std::span<const std::uint32_t> additionalRoomIds) noexcept
+{
+    const auto readiness = weapon.tryFire();
+    if (readiness != FireReadiness::Fired) {
+        const auto outcome = readiness == FireReadiness::Cooldown ? ShotOutcome::Cooldown
+            : readiness == FireReadiness::Reloading ? ShotOutcome::Reloading
+            : readiness == FireReadiness::Switching ? ShotOutcome::Switching : ShotOutcome::Empty;
+        return {outcome, std::nullopt, {}, std::nullopt};
+    }
+    std::array<ShotContact, 6> contacts{};
+    const auto count = weaponProjectileCount(weapon.definition().archetype);
+    std::size_t representative = 0U;
+    for (std::uint8_t i = 0U; i < count; ++i) {
+        const auto index = count > 1U ? static_cast<std::uint32_t>(i + 1U) : weapon.spreadShotIndex();
+        const auto ray = applyDeterministicWeaponSpread(direction, weapon.definition().archetype, index, spreadScale);
+        contacts[i] = traceHitscan(weapon, origin, ray, roomId, collisionWorld, manager, additionalRoomIds);
+        // Keep the most significant contact in the legacy summary fields.
+        if (contacts[i].outcome > contacts[representative].outcome) representative = i;
+    }
+    const auto& primary = contacts[representative];
+    ShotResult result{primary.outcome, primary.hit, primary.spawnedItem, primary.impact};
+    for (std::uint8_t i = 0U; i < count; ++i) if (i != representative)
+        result.extraContacts[result.extraContactCount++] = contacts[i];
+    return result;
 }
 
 bool hasLineOfSight(

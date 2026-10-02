@@ -2933,11 +2933,134 @@ void testEnemyNoisePerception()
         "interrupted Recover resumes investigation immediately");
 }
 
+void testExpandedWeaponProfilesAndInventory()
+{
+    using namespace gdp::gameplay;
+    for (const auto type : {WeaponArchetype::Sniper, WeaponArchetype::Shotgun, WeaponArchetype::SubmachineGun}) {
+        Weapon weapon;
+        expect(weapon.equip(type), "new primary equips beside starter pistol");
+        weapon.fixedUpdate(1.0F);
+        expect(weapon.archetypeForSlot(1U) == type && weapon.ownsWeapon(WeaponArchetype::Pistol)
+            && !weapon.equip(WeaponArchetype::Carbine), "slot one selects owned primary and cannot silently replace it");
+        expect(weapon.tryFire() == FireReadiness::Fired && weapon.tryFire() == FireReadiness::Cooldown,
+            "new weapons consume ammo once and enforce their fire interval");
+        const auto progress = weapon.campaignProgress();
+        expect(weapon.switchTo(WeaponArchetype::Pistol) && weapon.switchTo(WeaponArchetype::Knife)
+            && weapon.previousWeaponArchetype() == WeaponArchetype::Pistol
+            && weapon.nextWeaponArchetype() == type && weapon.switchTo(type),
+            "new primary participates in rapid scroll/knife/last-weapon navigation");
+        weapon.fixedUpdate(1.0F);
+        expect(weapon.magazineAmmo() == progress.magazineAmmo && weapon.reload(),
+            "switching does not refill the primary and timed reload begins");
+        weapon.fixedUpdate(weaponReloadDurationSeconds(type));
+        const auto saved = weapon.campaignProgress();
+        Weapon restored;
+        expect(restored.restoreCampaignProgress(saved) && restored.campaignProgress() == saved,
+            "new primary ammo and pistol survive campaign restore exactly");
+        expect(restored.dropSelectedFirearm().has_value() && restored.ownsWeapon(WeaponArchetype::Pistol)
+            && !restored.ownsWeapon(type), "dropping a new primary preserves secondary");
+        restored.fixedUpdate(1.0F);
+        expect(restored.equipRecovered(type, saved.magazineAmmo, saved.reserveAmmo),
+            "new primary can be recovered without regenerating its ammunition");
+        expect(weaponUsesAutomaticFire(type) == (type == WeaponArchetype::SubmachineGun),
+            "only SMG supports held-trigger fire among the new weapons");
+    }
+    Weapon shotgun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    expect(shotgun.increaseDamage(12.0F)
+        && near((shotgun.damage() - baseWeaponDefinition(WeaponArchetype::Shotgun).damage) * 6.0F, 12.0F),
+        "shotgun damage upgrade is shared across pellets, not multiplied six times");
+    const auto dropped = shotgun.dropSelectedFirearm();
+    shotgun.fixedUpdate(1.0F);
+    expect(dropped && shotgun.equip(WeaponArchetype::Sniper)
+        && near(shotgun.damage() - baseWeaponDefinition(WeaponArchetype::Sniper).damage, 12.0F),
+        "damage bonus transfers between shotgun and single-projectile primary without amplification");
+    expect(weaponAimFovScale(WeaponArchetype::Sniper) < weaponAimFovScale(WeaponArchetype::Carbine)
+        && weaponAimDurationSeconds(WeaponArchetype::Sniper) > weaponAimDurationSeconds(WeaponArchetype::Carbine),
+        "sniper has stronger optical zoom and a slower aim transition");
+    expect(!isFirearmArchetype(WeaponArchetype::Knife)
+        && !isFirearmArchetype(static_cast<WeaponArchetype>(255U)), "invalid weapon IDs never become guns");
+    Weapon slow;
+    (void)slow.equip(WeaponArchetype::Sniper); slow.fixedUpdate(1.0F);
+    expect(slow.tryFire() == FireReadiness::Fired, "sniper accepts first shot");
+    (void)slow.switchTo(WeaponArchetype::Pistol);
+    slow.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Pistol));
+    (void)slow.switchTo(WeaponArchetype::Sniper);
+    slow.fixedUpdate(weaponSwitchDurationSeconds(WeaponArchetype::Sniper));
+    expect(slow.tryFire() == FireReadiness::Cooldown,
+        "rapid secondary/primary switching cannot bypass sniper bolt cooldown");
+}
+
+void testShotgunPelletsAndOcclusion()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld open{{{-30.0F, 0.0F, -100.0F}, {30.0F, 5.0F, 100.0F}}};
+    const auto fireAt = [&](float distance) {
+        EntityManager manager;
+        const auto enemy = manager.createEnemy({.transform = {.position = {0.0F, 0.0F, distance}},
+            .roomId = 1U, .health = 1000.0F});
+        Weapon weapon(baseWeaponDefinition(WeaponArchetype::Shotgun));
+        const auto shot = fireHitscan(weapon, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, 1.0F}, 1U, open, manager);
+        const auto signals = combatSignalsForShot(shot);
+        expect(weapon.magazineAmmo() == 5U && shot.extraContactCount == 5U
+            && std::count_if(signals.signals.begin(), signals.signals.begin() + signals.count,
+                [](const auto& signal) { return signal.kind == CombatSignalKind::WeaponFired; }) == 1,
+            "six pellets consume one shell and emit one firing event");
+        return 1000.0F - manager.findData<EnemyData>(enemy)->health;
+    };
+    const float nearDamage = fireAt(2.0F);
+    const float farDamage = fireAt(12.0F);
+    expect(nearDamage > farDamage && farDamage >= 0.0F && nearDamage <= 84.0F,
+        "shotgun dispersion and damage falloff favor close range");
+    expect(near(nearDamage, fireAt(2.0F)), "shotgun pattern and damage repeat deterministically");
+    EntityManager manager;
+    const auto enemy = manager.createEnemy({.transform = {.position = {0.0F, 0.0F, 3.0F}},
+        .roomId = 1U, .health = 1.0F});
+    Weapon weapon(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    const auto lethal = combatSignalsForShot(fireHitscan(weapon,
+        {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, 1.0F}, 1U, open, manager));
+    expect(manager.findData<EnemyData>(enemy)->health == 0.0F
+        && std::count_if(lethal.signals.begin(), lethal.signals.begin() + lethal.count,
+            [](const auto& signal) { return signal.kind == CombatSignalKind::EntityKilled; }) == 1,
+        "several pellets cannot credit the same death multiple times");
+    EntityManager group;
+    std::array<EntityId, 3> victims{};
+    for (std::size_t i = 0; i < victims.size(); ++i) {
+        victims[i] = group.createEnemy({.transform = {.position = {0.0F, 0.0F, 2.0F + float(i)}},
+            .roomId = 1U, .health = 1.0F});
+    }
+    Weapon groupGun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    const auto groupSignals = combatSignalsForShot(fireHitscan(groupGun,
+        {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, 1.0F}, 1U, open, group, 0.0F));
+    for (const auto victim : victims) {
+        expect(std::count_if(groupSignals.signals.begin(), groupSignals.signals.begin() + groupSignals.count,
+            [victim](const auto& signal) {
+                return signal.kind == CombatSignalKind::EntityKilled && signal.target == victim;
+            }) == 1, "each pellet victim receives exactly one death signal");
+    }
+    ShotResult bounded{ShotOutcome::Hit, HitResult{enemy}, {}, std::nullopt};
+    bounded.extraContacts.fill({ShotOutcome::Hit, HitResult{enemy}, {}, std::nullopt});
+    bounded.extraContactCount = 255U;
+    expect(combatSignalsForShot(bounded).count == 13U,
+        "signal batching clamps malformed contact counts to its six-contact capacity");
+    EntityManager blockedManager;
+    const auto blocked = blockedManager.createEnemy({.transform = {.position = {0.0F, 0.0F, 3.0F}},
+        .roomId = 2U, .health = 1000.0F});
+    const CollisionWorld wall{open.roomBounds(), {{{-30.0F, 0.0F, 1.0F}, {30.0F, 5.0F, 1.2F}}}};
+    Weapon blockedGun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    const std::array<std::uint32_t, 1> neighbors{2U};
+    (void)fireHitscan(blockedGun, {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, 1.0F}, 1U, wall, blockedManager, 1.0F, neighbors);
+    expect(blockedManager.findData<EnemyData>(blocked)->health == 1000.0F,
+        "each shotgun pellet respects cover/closed-door solids even for neighboring rooms");
+}
+
 } // namespace
 
 int main()
 {
     testCombatSignalBatch();
+    testExpandedWeaponProfilesAndInventory();
+    testShotgunPelletsAndOcclusion();
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
     testDeterministicWeaponSpread();

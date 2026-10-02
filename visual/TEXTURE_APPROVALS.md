@@ -79,6 +79,39 @@ resultado final:
 
 ## Propostas ativas
 
+### Weapon/Sniper e Weapon/Shotgun — v1
+
+```text
+unidades visuais: Weapon/Sniper; Weapon/Shotgun (aprovações independentes)
+versão: v1 — equipamento metálico industrial, direção sugerida Used
+pranchas: visual/proposals/weapon_sniper_proposal_v1.png;
+          visual/proposals/weapon_shotgun_proposal_v1.png
+variantes: Maintained / Used / Worn, vista próxima e gameplay ilustrativo
+contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
+decisão do usuário: pendente; autorização de mecânicas não aprova estes modelos
+data: 2026-10-02
+commit de implementação artística: nenhum
+capturas reais no jogo: pendentes de implementação aprovada
+estado: AGUARDANDO APROVAÇÃO
+```
+
+### Weapon/SMG — v1
+
+```text
+unidade visual: Weapon/SMG
+versão: v1 — direção metálica Used ainda sem prancha
+contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
+prancha: nenhuma; geração integrada rejeitada, sem fallback
+decisão do usuário: pendente
+data: 2026-10-02
+commit de implementação artística: nenhum
+estado: PROPOSTA EM PREPARAÇÃO
+```
+
+As três mecânicas reutilizam temporariamente o modelo/material aprovado da
+carabina, incluindo o pickup no chão. Essa reutilização não é aprovação de
+modelagem/textura nova, e as pranchas ilustrativas não são capturas reais.
+
 ### Interface/menu — v4 (refinamento solicitado)
 
 ```text

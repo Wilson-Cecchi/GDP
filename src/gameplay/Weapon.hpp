@@ -9,6 +9,10 @@ enum class WeaponArchetype : std::uint8_t {
     Pistol,
     Carbine,
     Knife,
+    Sniper,
+    Shotgun,
+    SubmachineGun,
+    Count,
 };
 
 struct WeaponDefinition {
@@ -62,6 +66,8 @@ public:
     [[nodiscard]] FireReadiness tryFire() noexcept;
     [[nodiscard]] bool reload() noexcept;
     [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
+    [[nodiscard]] std::uint32_t addReserveAmmoFor(WeaponArchetype archetype, std::uint32_t amount) noexcept;
+    [[nodiscard]] std::optional<WeaponArchetype> archetypeForSlot(std::uint32_t slot) const noexcept;
     [[nodiscard]] bool increaseDamage(float amount) noexcept;
     [[nodiscard]] bool increaseReserveCapacity(
         std::uint32_t amount,
@@ -116,6 +122,7 @@ private:
     std::uint32_t magazineAmmo_{0};
     std::uint32_t reserveAmmo_{0};
     float cooldownRemaining_{0.0F};
+    float stowedCooldownRemaining_{0.0F};
     float knifeCooldownRemaining_{0.0F};
     float reloadRemaining_{0.0F};
     float switchRemaining_{0.0F};
@@ -129,6 +136,11 @@ private:
 
 [[nodiscard]] WeaponDefinition baseWeaponDefinition(
     WeaponArchetype archetype) noexcept;
+[[nodiscard]] bool isFirearmArchetype(WeaponArchetype archetype) noexcept;
+[[nodiscard]] bool isPrimaryWeapon(WeaponArchetype archetype) noexcept;
+[[nodiscard]] std::uint8_t weaponProjectileCount(WeaponArchetype archetype) noexcept;
+[[nodiscard]] float weaponAimDurationSeconds(WeaponArchetype archetype) noexcept;
+[[nodiscard]] float weaponAimFovScale(WeaponArchetype archetype) noexcept;
 [[nodiscard]] const char* weaponArchetypeName(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(

@@ -392,6 +392,42 @@ void testKnifeOnlyAndLegacyRoundTrip()
     }
 }
 
+void testNewPrimaryRoundTripsAndPreviousRulesMigration()
+{
+    using namespace gdp;
+    using namespace gameplay;
+    TemporaryDirectory directory;
+    const auto path = directory.path() / "new-primary.toml";
+    for (const auto type : {WeaponArchetype::Sniper, WeaponArchetype::Shotgun, WeaponArchetype::SubmachineGun}) {
+        auto checkpoint = makeCheckpoint();
+        Weapon weapon;
+        (void)weapon.equip(type); weapon.fixedUpdate(1.0F);
+        (void)weapon.tryFire(); (void)weapon.increaseDamage(12.0F);
+        checkpoint.floorEntry.weapon = weapon.campaignProgress();
+        expect(persistence::saveCampaignCheckpoint(path, checkpoint)
+            && persistence::loadCampaignCheckpoint(path).checkpoint == checkpoint,
+            "schema six round-trips each new primary, partial ammo, upgrades and pistol");
+        (void)weapon.switchTo(WeaponArchetype::Pistol);
+        checkpoint.floorEntry.weapon = weapon.campaignProgress();
+        expect(persistence::saveCampaignCheckpoint(path, checkpoint)
+            && persistence::loadCampaignCheckpoint(path).checkpoint == checkpoint,
+            "schema six also preserves each new primary when stowed");
+    }
+    const auto old = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, old), "previous-rule fixture is serializable");
+    std::ifstream input(path, std::ios::binary);
+    std::string serialized{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    serialized.replace(serialized.find("version = 6"), std::string{"version = 6"}.size(), "version = 5");
+    serialized.replace(serialized.find("rules_version = 35"), std::string{"rules_version = 35"}.size(), "rules_version = 34");
+    writeText(path, serialized);
+    const auto migrated = persistence::loadCampaignCheckpoint(path);
+    expect(migrated.migratedRules && migrated.checkpoint == old,
+        "rules 34 migrate explicitly to 35 preserving the complete floor-entry snapshot");
+    std::ifstream unchanged(path, std::ios::binary);
+    const std::string after{std::istreambuf_iterator<char>{unchanged}, std::istreambuf_iterator<char>{}};
+    expect(after == serialized, "reading a migratable checkpoint does not overwrite its original file");
+}
+
 } // namespace
 
 int main()
@@ -400,6 +436,7 @@ int main()
     testInvalidAndVersionedData();
     testCommentsAndFutureFields();
     testKnifeOnlyAndLegacyRoundTrip();
+    testNewPrimaryRoundTripsAndPreviousRulesMigration();
     if (failures != 0) {
         std::cerr << failures << " Campaign checkpoint persistence test(s) failed\n";
         return 1;

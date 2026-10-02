@@ -63,6 +63,7 @@ constexpr auto catalog = std::to_array<Translation>({
     {"REPLAY FLOOR", "REPETIR ANDAR"}, {"REPLAY SEED", "REPETIR SEED"},
     {"HEALTH", "VIDA"}, {"ARMOR", "COLETE"}, {"KEYS", "CHAVES"},
     {"KNIFE", "FACA"}, {"CARBINE", "CARABINA"}, {"PISTOL", "PISTOLA"},
+    {"SNIPER", "PRECISÃO"}, {"SHOTGUN", "ESCOPETA"}, {"SMG", "SUBMETRALHADORA"},
     {"READY", "PRONTA"}, {"LV", "NV"}, {"LIGHT ON", "LANTERNA LIGADA"},
     {"LOCKDOWN", "CONFINAMENTO"}, {"EVENT STANDBY", "EVENTO EM ESPERA"},
     {"EVENT ACTIVE", "EVENTO ATIVO"}, {"EVENT CLEAR", "EVENTO CONCLUÍDO"},

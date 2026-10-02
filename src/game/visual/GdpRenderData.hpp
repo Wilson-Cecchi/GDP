@@ -42,6 +42,9 @@ enum class HudWeaponRole : std::uint8_t {
     Pistol,
     Carbine,
     Knife,
+    Sniper,
+    Shotgun,
+    SubmachineGun,
 };
 
 enum class PropVisualRole : std::uint8_t {

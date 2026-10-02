@@ -5,6 +5,7 @@
 #include "persistence/SpeedrunLeaderboardStore.hpp"
 #include "platform/SdlInput.hpp"
 #include "gameplay/Props.hpp"
+#include "gameplay/Loot.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -233,6 +234,26 @@ struct ApplicationMenuTestAccess {
         expect(app.session_.state().mode == gameplay::RunMode::TestMode && app.world_ && app.world_->rooms.size() == 1U
             && app.entities_.query(entities::EntityKind::Enemy).size() == 5U, "Test Mode creates dedicated arena with all enemy types");
         expect(app.weapon_.ownsWeapon(gameplay::WeaponArchetype::Carbine), "arena starts with firearms and knife available");
+        for (const auto type : {gameplay::WeaponArchetype::Sniper, gameplay::WeaponArchetype::Shotgun, gameplay::WeaponArchetype::SubmachineGun}) {
+            const auto items = app.entities_.query(entities::EntityKind::Item);
+            const auto item = std::find_if(items.begin(), items.end(), [&](const auto id) {
+                return app.entities_.findData<entities::ItemData>(id)->spawnedWeaponArchetype
+                    == static_cast<std::uint32_t>(type);
+            });
+            expect(item != items.end(), "arena exposes a pickup for each new primary");
+            if (item == items.end()) continue;
+            app.weapon_ = gameplay::Weapon{};
+            const auto* pickup = app.entities_.find(*item);
+            app.player_.spawn(pickup->transform.position);
+            const auto collected = gameplay::collectNearbyLoot(app.entities_, app.player_, app.weapon_, 1U);
+            expect(collected.weaponsEquipped == 1U && app.weapon_.archetypeForSlot(1U) == type,
+                "arena pickup equips new primary beside pistol");
+            app.weapon_.fixedUpdate(1.0F);
+            key(Key::Digit3); release(); app.fixedUpdate(1.0 / 60.0);
+            key(Key::Digit1); release(); app.fixedUpdate(1.0 / 60.0); app.render();
+            expect(app.weapon_.definition().archetype == type && !app.fatalError_,
+                "live primary key and rendering support each new firearm after selecting Knife");
+        }
         release(); app.fixedUpdate(1.0 / 60.0); app.render();
         expect(!app.fatalError_, "arena supports simulation and rendering");
         (void)app.returnToMainMenu();

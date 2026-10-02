@@ -23,6 +23,32 @@
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
+## Revisão de armas — 2026-10-02
+
+Sniper, escopeta e SMG integram Campanha/Test Mode. Valores e distribuição
+atuais: [balanceamento de armas](weapon_balance_proposal_2026-10-02.md).
+A primária possuída ocupa `1`, pistola `2` e faca `3`; G libera a primária
+para recolher uma diferente. Q/scroll e munição independente continuam válidos.
+Duplicatas procedurais abastecem somente a reserva compatível; drops do jogador
+mantêm a quantidade exata. Trocar de arma não apaga seu cooldown de disparo.
+
+A escopeta emite seis rays determinísticos por uma única cartucha e aplica
+queda de dano `clamp(1 - distância/20, 0,25, 1)`. Cada pellet respeita colisão,
+cobertura, porta e weak point. O lote local suporta 13 sinais: um disparo mais
+até dois eventos por contato. Cada vítima gera uma única morte/XP, mesmo com
+vários acertos; todos os drops de props destruídos são registrados em sua sala.
+Bônus de dano são normalizados pelo número de pellets na equip/progressão,
+sem multiplicação involuntária de upgrades. Não há nova fila global.
+
+Sniper e escopeta são semiautomáticas; SMG é automática. A sniper tem mira
+mais lenta e zoom proporcional ao FOV configurado. Nenhum atributo do boss
+foi alterado. Modelos novos ainda dependem de aprovação; as três mecânicas
+reutilizam provisoriamente a carabina aprovada.
+
+As seções de fases abaixo preservam seu contexto histórico; por exemplo,
+o antigo slot 1 fixo da Carbine agora representa qualquer primária possuída,
+e a antiga rejeição de duplicata agora permite munição de pickup procedural.
+
 ## Pipeline
 
 ```text

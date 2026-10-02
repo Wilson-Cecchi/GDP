@@ -3,8 +3,9 @@
 ## Contrato atual — revisão de 2026-10-02
 
 - Três slots: `campaign_slot_1.toml` a `campaign_slot_3.toml`, no diretório
-  de preferências SDL de WKC/GDP. Schema 5 adiciona a dificuldade base;
-  schemas 3/4 compatíveis continuam legíveis e assumem Normal.
+  de preferências SDL de WKC/GDP. Schema 6 acrescenta sniper/escopeta/SMG;
+  schema 5 acrescentou a dificuldade base. Schemas 3/4 compatíveis continuam
+  legíveis e assumem Normal. IDs 0/1/2 anteriores não são renumerados.
   Checkpoint válido aceita andares 1–10; recursos e seed continuam validados.
 - O arquivo único legado `campaign_checkpoint.toml` é importado somente para
   slot 1 vazio e válido. Após salvar/verificar o novo arquivo, o legado é
@@ -33,8 +34,15 @@
   dos andares 1–9 captura os recursos atuais; somente a inicialização válida
   do próximo andar grava sua nova entrada. No andar 10, a interação conclui
   a campanha e remove somente o slot ativo. Sair antes dela conserva o save
-  de entrada. Schema 5 e regras de entrada existentes continuam compatíveis;
-  nenhuma entidade ou estado intermediário de terminal passa a ser serializado.
+  de entrada. Nenhuma entidade ou estado intermediário de terminal é serializado.
+- Regras de Campanha 35 correspondem ao novo loot de armas. Schemas 3–5 com
+  regras 34 são migrados explicitamente na leitura, com aviso no log e
+  `migratedRules`, mantendo andar, dificuldade, seed e recursos exatos. O loot
+  da tentativa é regenerado com o balanço novo; ler não regrava o arquivo.
+  Próxima gravação válida usa schema 6/regras 35. Demais regras incompatíveis
+  e schemas futuros são rejeitados sem apagar arquivos. Speedrun continua 36.
+  A validação aceita somente uma primária e uma pistola, ou apenas faca;
+  duplicatas, duas primárias e IDs inválidos não restauram inventários.
 
 O restante deste documento registra a evolução histórica; referências a um
 slot, três andares ou settings v6/v7 não descrevem mais o fluxo atual.

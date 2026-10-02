@@ -1534,7 +1534,7 @@ void Application::processEvents()
         flashlightOn_ = !flashlightOn_;
         log(LogLevel::Info, flashlightOn_ ? "Flashlight enabled" : "Flashlight disabled");
     }
-    if (pressed(ControlAction::Primary)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(1U);
+    if (pressed(ControlAction::Primary)) weaponSwitchPending_ = weapon_.archetypeForSlot(1U);
     else if (pressed(ControlAction::Secondary)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
     else if (pressed(ControlAction::Melee)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
     else if (pressed(ControlAction::LastWeapon)) weaponSwitchPending_ = weapon_.lastWeaponArchetype();
@@ -1904,6 +1904,9 @@ void Application::loadPersistedCampaignCheckpoint()
     for (std::size_t i = 0; i < campaignSlots_.size(); ++i) {
         campaignSlotPaths_[i] = directory / ("campaign_slot_" + std::to_string(i + 1U) + ".toml");
         const auto loaded = persistence::loadCampaignCheckpoint(*campaignSlotPaths_[i]);
+        if (loaded.migratedRules)
+            log(LogLevel::Info, "Campaign slot " + std::to_string(i + 1U)
+                + " migrated from rules 34 to 35; floor-entry resources preserved, loot uses new balance");
         campaignSlots_[i] = {loaded.checkpoint, loaded.status != persistence::CampaignCheckpointLoadStatus::Missing};
         if (loaded.status != persistence::CampaignCheckpointLoadStatus::Loaded
             && loaded.status != persistence::CampaignCheckpointLoadStatus::Missing)
@@ -2023,7 +2026,8 @@ void Application::fixedUpdate(const double fixedStep)
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
         && gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Aim, input_);
     aimBlend_ = std::clamp(aimBlend_
-            + (aimRequested ? 1.0F : -1.0F) * step * 8.0F,
+            + (aimRequested ? 1.0F : -1.0F) * step
+                / gameplay::weaponAimDurationSeconds(weapon_.definition().archetype),
         0.0F, 1.0F);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
@@ -2051,6 +2055,7 @@ void Application::fixedUpdate(const double fixedStep)
     weapon_.fixedUpdate(step);
     if (weaponSwitchPending_ && player_.state().alive
         && weapon_.switchTo(*weaponSwitchPending_)) {
+        aimBlend_ = 0.0F;
         reloadPending_ = false;
         firePending_ = false;
         fireHeld_ = false;
@@ -2285,6 +2290,7 @@ void Application::fixedUpdate(const double fixedStep)
                 const auto dropped = gameplay::dropSelectedWeapon(
                     entities_, player_, weapon_, collisionWorld_, playerRoom);
                 if (dropped) {
+                    aimBlend_ = 0.0F;
                     room->entities.push_back(*dropped);
                     if (entities::ItemData* item
                         = entities_.findData<entities::ItemData>(*dropped)) {
@@ -2343,6 +2349,7 @@ void Application::fixedUpdate(const double fixedStep)
                 << " | ammo +" << loot.ammoAdded
                 << " | keys +" << loot.keysAdded;
         if (loot.weaponsEquipped > 0U) {
+            aimBlend_ = 0.0F;
             message << " | equipped "
                     << gameplay::weaponArchetypeName(
                         weapon_.definition().archetype);
@@ -2459,17 +2466,22 @@ void Application::fixedUpdate(const double fixedStep)
                 player_.cameraPosition(), player_.cameraPosition(),
                 player_.forwardDirection());
         }
-        if (shot.spawnedItem.isValid() && world_) {
+        for (std::uint8_t index = 0U; index < signals.count; ++index) {
+            const auto& signal = signals.signals[index];
+            if (!signal.spawnedItem.isValid() || !world_) continue;
+            const entities::Entity* item = entities_.find(signal.spawnedItem);
+            if (item == nullptr) continue;
             const auto room = std::find_if(
                 world_->rooms.begin(), world_->rooms.end(),
-                [playerRoom](const world::RoomInstance& candidate) {
-                    return candidate.id == playerRoom;
+                [item](const world::RoomInstance& candidate) {
+                    return candidate.id == item->roomId;
                 });
             if (room != world_->rooms.end()) {
-                room->entities.push_back(shot.spawnedItem);
+                room->entities.push_back(signal.spawnedItem);
             }
         }
-        if (shot.outcome == gameplay::ShotOutcome::Destroyed) {
+        if (std::any_of(signals.signals.begin(), signals.signals.begin() + signals.count,
+                [](const auto& signal) { return signal.outcome == gameplay::ShotOutcome::Destroyed; })) {
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
         }
@@ -2511,15 +2523,16 @@ void Application::fixedUpdate(const double fixedStep)
                     player_.cameraPosition(), player_.forwardDirection());
             }
         }
-        if (shot.outcome == gameplay::ShotOutcome::Killed && shot.hit) {
-            const entities::EnemyData* killed
-                = entities_.findData<entities::EnemyData>(shot.hit->target);
-            if (killed != nullptr) {
+        for (std::uint8_t index = 0U; index < signals.count; ++index) {
+            const auto& signal = signals.signals[index];
+            if (signal.kind != gameplay::CombatSignalKind::EntityKilled) continue;
+            const auto* killed = entities_.findData<entities::EnemyData>(signal.target);
+            if (killed && signal.outcome == gameplay::ShotOutcome::Killed)
                 awardProgress(progressionEventFor(killed->archetype), 1U);
-            }
-        } else if (shot.outcome == gameplay::ShotOutcome::Destroyed
-            && !hitCeilingFixture) {
-            awardProgress(gameplay::ProgressionEvent::PropDestroyed, 1U);
+            const auto* prop = entities_.findData<entities::PropData>(signal.target);
+            if (signal.outcome == gameplay::ShotOutcome::Destroyed && prop
+                && prop->type != entities::PropType::CeilingFixture)
+                awardProgress(gameplay::ProgressionEvent::PropDestroyed, 1U);
         }
         std::ostringstream message;
         if (shot.outcome == gameplay::ShotOutcome::Hit
@@ -3060,7 +3073,8 @@ void Application::render()
         renderCameraPosition,
         player_.forwardDirection(),
         static_cast<float>(runtimeSettings_.fieldOfViewDegrees)
-            * (1.0F - aimBlend_ * 0.22F),
+            * (1.0F - aimBlend_ * (1.0F
+                - gameplay::weaponAimFovScale(weapon_.definition().archetype))),
     };
     const float cameraAspect = height > 0
         ? static_cast<float>(width) / static_cast<float>(height)
@@ -3601,6 +3615,17 @@ void Application::render()
     case gameplay::WeaponArchetype::Pistol:
         hud.weapon = visual::HudWeaponRole::Pistol;
         break;
+    case gameplay::WeaponArchetype::Sniper:
+        hud.weapon = visual::HudWeaponRole::Sniper;
+        break;
+    case gameplay::WeaponArchetype::Shotgun:
+        hud.weapon = visual::HudWeaponRole::Shotgun;
+        break;
+    case gameplay::WeaponArchetype::SubmachineGun:
+        hud.weapon = visual::HudWeaponRole::SubmachineGun;
+        break;
+    case gameplay::WeaponArchetype::Count:
+        break;
     }
     hud.weaponOverdrive = weapon_.overdriveActive();
     hud.weaponSpread = weapon_.spreadStrength();
@@ -3777,7 +3802,11 @@ void Application::render()
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
-        .role = hud.weapon,
+        // New weapon mechanics use the approved Carbine model until visual approval.
+        .role = hud.weapon == visual::HudWeaponRole::Sniper
+                || hud.weapon == visual::HudWeaponRole::Shotgun
+                || hud.weapon == visual::HudWeaponRole::SubmachineGun
+            ? visual::HudWeaponRole::Carbine : hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
         .reloadProgress = weapon_.reloadProgress(),
         .equipStrength = std::max(

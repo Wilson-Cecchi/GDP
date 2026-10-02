@@ -131,6 +131,14 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
             && differences(empty, width / 2, width) > 0U;
         hud.weapon = HudWeaponRole::Knife;
         passed &= pixelsFor(hud) != empty;
+        for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun, HudWeaponRole::SubmachineGun}) {
+            hud.weapon = role;
+            passed &= pixelsFor(hud) != empty;
+            // New roles must reuse approved baseline safely, without indexing past GPU meshes.
+            WeaponViewmodelRenderData model;
+            model.visible = true; model.role = role;
+            passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud, {}, model);
+        }
         if (capture) {
             std::filesystem::create_directories(capture);
             std::vector<std::uint8_t> topDown(original.size());
