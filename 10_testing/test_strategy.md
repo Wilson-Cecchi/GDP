@@ -621,12 +621,17 @@ sniper. Frontend valida a tabela de campanha e Standard/Speedrun conservam
 seus golden hashes. Saves fazem round trip dos três tipos e migração explícita
 34→35 sem regravar o arquivo de entrada. Integração da aplicação recolhe cada
 arma no Test Mode, seleciona slots e renderiza. O gate OpenGL testa os três
-nomes no HUD e o fallback seguro ao modelo aprovado da carabina.
+nomes no HUD. A revisão visual subsequente testa modelos próprios de sniper e
+escopeta visíveis/distintos da carabina em MEDIUM/POTATO, drops e footprint
+estável em FOV 60/100; somente a SMG mantém o fallback aprovado.
+CPU protege bounds, empunhadura, orçamento e contato com chão nas duas laterais.
+Capturas offscreen opcionais usam `GDP_NEW_WEAPON_CAPTURE_DIR`; não equivalem
+a uma sessão manual ou aceitação visual final.
 
 Esses gates não substituem aprovação artística, balanceamento humano em
 Easy/Normal/Hard ou execução nativa do pacote Windows.
 
-Resultado local desta revisão: Release 63/63 (67,70 s); ASan/UBSan 10/10
+Resultado local da revisão mecânica anterior: Release 63/63 (67,70 s); ASan/UBSan 10/10
 afetados (242,27 s), incluindo integração da aplicação e pixels OpenGL.
 A primeira execução instrumentada detectou objetos de inventário compilados
 com layouts diferentes durante builds sobrepostos; reconstrução limpa de
@@ -634,6 +639,12 @@ sanitizers e repetição dos dez gates não reproduziram o erro. Evitar compilar
 o mesmo preset em paralelo ou editar layouts enquanto ele compila.
 A validação ocorreu no worktree com o fluxo paralelo de treinamento; essas
 alterações de IA foram preservadas e excluídas do commit desta etapa.
+
+A comparação entre draw comum e instanciado admite somente diferenças RGB
+esparsas delimitadas, após reprodução da falha llvmpipe da CI; alpha e os
+outros gates determinísticos continuam exatos. Limites, casos negativos,
+drivers e resultados da revisão visual/CI:
+[registro de 2026-10-02](ci_opengl_instancing_2026-10-02.md).
 
 ### Instrumentação
 

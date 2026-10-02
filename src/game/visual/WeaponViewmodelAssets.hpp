@@ -21,7 +21,8 @@ enum class WeaponMaterial : std::size_t {
 
 inline constexpr std::size_t weaponMaterialCount
     = static_cast<std::size_t>(WeaponMaterial::Count);
-inline constexpr std::size_t weaponRoleCount = 3U;
+// Pistol, Carbine, Knife plus the two approved v1 models. SMG uses Carbine.
+inline constexpr std::size_t weaponRoleCount = 5U;
 inline constexpr std::uint32_t weaponGripSemanticRegion = 1U;
 
 struct WeaponMaterialImages {

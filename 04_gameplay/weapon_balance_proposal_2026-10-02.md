@@ -1,7 +1,7 @@
 # Proposta — variedade e distribuição de armas
 
 Estado: mecânicas implementadas e aprovadas pelo usuário em 2026-10-02;
-propostas visuais v1 de sniper e escopeta aprovadas para implementação,
+modelos visuais v1 de sniper e escopeta implementados em validação,
 SMG ainda sem prancha. O relato de excesso de armas motivou revisar a
 distribuição junto com a variedade, sem aumentar o número de pickups.
 
@@ -57,11 +57,11 @@ nem torna os valores imutáveis; podem ser refinados por novos resultados.
 
 ## Gate de implementação
 
-As três armas reutilizam temporariamente o modelo aprovado da carabina,
-inclusive no chão. Essa reutilização não representa sua aparência definitiva.
-Sniper e escopeta têm pranchas v1 aprovadas para implementação em
-`visual/proposals/`, com direção Used. Seus modelos definitivos ainda não foram
-implementados. A prancha da SMG permanece em preparação após falha do gerador;
-sua arte exige aprovação própria. Implementar as duas unidades aprovadas e
-validá-las em capturas reais, conforme `visual/TEXTURE_APPROVALS.md`.
+Sniper e escopeta têm modelos próprios Used v1, incluindo pickup caído,
+implementados após aprovação das duas pranchas. As capturas nativas estão em
+`visual/validation/`; validação técnica não equivale a aceitação artística final.
+Somente a SMG reutiliza temporariamente a carabina: sua prancha permanece em
+preparação após falha do gerador e exige aprovação própria. Não houve alteração
+de dano, munição, cadência ou distribuição nesta implementação visual.
+Gate final: `visual/TEXTURE_APPROVALS.md`.
 Contrato e prompts: `visual/proposals/new_firearms_proposal_v1.md`.

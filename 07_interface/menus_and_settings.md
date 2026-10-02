@@ -66,8 +66,9 @@ As teclas dos menus são fixas, independentemente dos bindings da gameplay.
 Arena única dedicada, de 32 × 40 m, com os cinco tipos de inimigo, coberturas
 altas, plataformas baixas, munição, saúde, pistola, carabina, faca, sniper,
 escopeta e SMG. As três novas armas estão dispostas na arena; use G para
-liberar a primária antes de recolher outra. Seus modelos provisórios reutilizam
-a carabina aprovada; o nome no HUD e a mecânica identificam o tipo. Não gera
+liberar a primária antes de recolher outra. Sniper e escopeta têm modelos próprios
+Used v1 na mão e no chão, em validação visual; SMG ainda reutiliza a carabina
+aprovada até sua proposta. O HUD identifica cada tipo. Não gera
 eventos de campanha nem termina a run quando o robô morre. A pausa permite
 reiniciar a área ou voltar ao título. A arena usa as IAs ativas do mesmo jogo.
 `--test-mode` abre diretamente a área, também aceitando seed e limite de frames.

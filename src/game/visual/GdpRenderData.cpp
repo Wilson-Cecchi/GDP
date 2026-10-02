@@ -1315,8 +1315,9 @@ DroppedWeaponPose sampleDroppedWeaponPose(
     const float yawVariation = static_cast<float>(variation % 51U) - 25.0F;
     const float side = (variation & 0x80U) == 0U ? 1.0F : -1.0F;
     const float settle = t * t * (3.0F - 2.0F * t);
-    const float floorHeight = role == PickupVisualRole::DroppedPistol
-        ? 0.11F : 0.14F;
+    const float floorHeight = role == PickupVisualRole::DroppedPistol ? 0.11F
+        : role == PickupVisualRole::DroppedSniper ? (side > 0.0F ? 0.113F : 0.24F)
+        : role == PickupVisualRole::DroppedShotgun ? 0.115F : 0.14F;
     return {
         .yawDegrees = yawVariation + (1.0F - settle) * side * 16.0F,
         .rollDegrees = side * (18.0F + 72.0F * settle),
@@ -1341,7 +1342,8 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
     const float meleeArc = melee > 0.0F
         ? std::sin((1.0F - melee) * 3.14159265358979323846F)
         : 0.0F;
-    const float mass = weapon.role == HudWeaponRole::Carbine ? 0.72F : 1.0F;
+    const float mass = weapon.role != HudWeaponRole::Pistol
+        && weapon.role != HudWeaponRole::Knife ? 0.72F : 1.0F;
     return {
         .offset = {
             (-0.09F * reloadArc) - (0.18F * meleeArc),

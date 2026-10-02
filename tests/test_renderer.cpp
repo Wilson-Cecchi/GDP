@@ -1357,6 +1357,10 @@ void testDroppedWeaponPose()
     for (const auto& [role, visualRole, seed] : std::array{
              std::tuple{HudWeaponRole::Pistol, PickupVisualRole::DroppedPistol, 123U},
              std::tuple{HudWeaponRole::Carbine, PickupVisualRole::Weapon, 456U},
+             std::tuple{HudWeaponRole::Sniper, PickupVisualRole::DroppedSniper, 123U},
+             std::tuple{HudWeaponRole::Sniper, PickupVisualRole::DroppedSniper, 128U},
+             std::tuple{HudWeaponRole::Shotgun, PickupVisualRole::DroppedShotgun, 123U},
+             std::tuple{HudWeaponRole::Shotgun, PickupVisualRole::DroppedShotgun, 128U},
          }) {
         const DroppedWeaponPose contact
             = sampleDroppedWeaponPose(seed, visualRole, 1.0F);
@@ -1456,7 +1460,8 @@ void testWeaponViewmodelAssets()
 {
     using namespace gdp::game::visual;
     constexpr std::array roles{
-        HudWeaponRole::Pistol, HudWeaponRole::Carbine, HudWeaponRole::Knife};
+        HudWeaponRole::Pistol, HudWeaponRole::Carbine, HudWeaponRole::Knife,
+        HudWeaponRole::Sniper, HudWeaponRole::Shotgun};
     for (const HudWeaponRole role : roles) {
         const auto meshes = makeWeaponViewmodelMeshes(role);
         std::size_t triangles = 0U;
@@ -1512,6 +1517,14 @@ void testWeaponViewmodelAssets()
                 "firearm grip base rakes toward the rear, not the muzzle");
         }
     }
+    const auto sniper = makeWeaponViewmodelMeshes(HudWeaponRole::Sniper);
+    const auto shotgun = makeWeaponViewmodelMeshes(HudWeaponRole::Shotgun);
+    const auto carbine = makeWeaponViewmodelMeshes(HudWeaponRole::Carbine);
+    const auto steel = static_cast<std::size_t>(WeaponMaterial::CoatedSteel);
+    expect(sniper[steel].bounds.maximum.y > shotgun[steel].bounds.maximum.y + 0.1F
+            && sniper[steel].vertices.size() != carbine[steel].vertices.size()
+            && shotgun[steel].vertices.size() != carbine[steel].vertices.size(),
+        "approved sniper has its optic and shotgun has a distinct non-carbine silhouette");
     for (std::size_t material = 0U; material < weaponMaterialCount; ++material) {
         const auto images = makeUsedWeaponMaterialImages(
             static_cast<WeaponMaterial>(material));

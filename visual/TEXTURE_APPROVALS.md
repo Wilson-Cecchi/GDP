@@ -91,9 +91,14 @@ contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
 decisão do usuário: "aprovadas a parte visual e funcional"
 escopo: pranchas v1 de sniper e escopeta apresentadas; direção Used
 data: 2026-10-02
-commit de implementação artística: nenhum
-capturas reais no jogo: pendentes de implementação aprovada
-estado: APROVADA PARA IMPLEMENTAÇÃO
+commit de implementação artística: feat: approved sniper and shotgun Used v1 models
+capturas nativas: visual/validation/weapon_sniper_v1_used_gameplay.png;
+                 visual/validation/weapon_sniper_v1_used_ground.png;
+                 visual/validation/weapon_sniper_v1_used_potato.png;
+                 visual/validation/weapon_shotgun_v1_used_gameplay.png;
+                 visual/validation/weapon_shotgun_v1_used_ground.png;
+                 visual/validation/weapon_shotgun_v1_used_potato.png
+estado: IMPLEMENTADA EM VALIDAÇÃO; aceitação visual final pendente
 ```
 
 ### Weapon/SMG — v1
@@ -109,13 +114,14 @@ commit de implementação artística: nenhum
 estado: PROPOSTA EM PREPARAÇÃO
 ```
 
-As três mecânicas reutilizam temporariamente o modelo/material aprovado da
-carabina, incluindo o pickup no chão. Funcionalidade das três aprovada pelo
-usuário em 2026-10-02. A aprovação visual permite implementar sniper e escopeta
-v1, mas não declara esses modelos já implementados ou aceitos no runtime.
-A SMG não recebe aprovação artística sem artefato apresentado. As pranchas
-ilustrativas não são capturas reais; a implementação final ainda precisa
-de validação visual no jogo.
+Funcionalidade das três aprovada pelo usuário em 2026-10-02. Sniper e escopeta
+v1 têm geometrias próprias reutilizadas na mão e no chão, com materiais Used
+metálicos existentes, sem alterar seus mapas ou as armas anteriores. As seis
+capturas vêm do renderer nativo em uma fixture offscreen, não de um playtest
+manual nem da prancha ilustrativa. FOV 60/100, contato com chão e visibilidade
+em MEDIUM/POTATO têm gates técnicos; aceitação visual final cabe ao usuário.
+Somente a SMG reutiliza temporariamente a carabina: não recebe aprovação
+artística sem artefato apresentado.
 
 ### Interface/menu — v4 (refinamento solicitado)
 

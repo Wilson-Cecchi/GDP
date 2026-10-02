@@ -2034,11 +2034,16 @@ bool GdpRenderer::render(
     fallbackTexture_.bind(gl_, textureBindings_);
     for (const PickupRenderData& pickup : pickups) {
         if (pickup.role == PickupVisualRole::Weapon
-            || pickup.role == PickupVisualRole::DroppedPistol) {
+            || pickup.role == PickupVisualRole::DroppedPistol
+            || pickup.role == PickupVisualRole::DroppedSniper
+            || pickup.role == PickupVisualRole::DroppedShotgun) {
             constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
             const HudWeaponRole weaponRole
                 = pickup.role == PickupVisualRole::DroppedPistol
-                ? HudWeaponRole::Pistol : HudWeaponRole::Carbine;
+                ? HudWeaponRole::Pistol
+                : pickup.role == PickupVisualRole::DroppedSniper ? HudWeaponRole::Sniper
+                : pickup.role == PickupVisualRole::DroppedShotgun ? HudWeaponRole::Shotgun
+                : HudWeaponRole::Carbine;
             const DroppedWeaponPose pose = sampleDroppedWeaponPose(
                 pickup.visualSeed, pickup.role, pickup.fallProgress);
             const float yaw = (pickup.baseYawDegrees + pose.yawDegrees)
@@ -2161,8 +2166,10 @@ bool GdpRenderer::render(
         drawMesh(box_);
     }
 
+    const HudWeaponRole viewmodelRole = weaponViewmodel.role == HudWeaponRole::SubmachineGun
+        ? HudWeaponRole::Carbine : weaponViewmodel.role;
     if (weaponViewmodel.visible
-        && static_cast<std::size_t>(weaponViewmodel.role) < weaponRoleCount) {
+        && static_cast<std::size_t>(viewmodelRole) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
         // The world FOV belongs to the player's camera, not to the weapon.
         // A fixed viewmodel projection keeps its screen footprint stable
@@ -2232,8 +2239,7 @@ bool GdpRenderer::render(
         };
         shader.setMat4(gl_, "uModel", root);
         shader.setInt(gl_, "uDetailedMaterial", 1);
-        const std::size_t weaponIndex = static_cast<std::size_t>(
-            carbine ? HudWeaponRole::Carbine : weaponViewmodel.role);
+        const std::size_t weaponIndex = static_cast<std::size_t>(viewmodelRole);
         for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
             const wkc::render::Mesh& mesh = weaponMeshes_[weaponIndex][material];
             if (!mesh.isValid()) {
@@ -2271,7 +2277,11 @@ bool GdpRenderer::render(
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
-        const float muzzlePosition = carbine ? 1.08F : knife ? 0.0F : 0.33F;
+        const float muzzlePosition = viewmodelRole == HudWeaponRole::Sniper ? 1.25F
+            : viewmodelRole == HudWeaponRole::Shotgun ? 1.14F
+            : carbine ? 1.08F : knife ? 0.0F : 0.33F;
+        const float muzzleHeight = viewmodelRole == HudWeaponRole::Sniper ? 0.014F
+            : viewmodelRole == HudWeaponRole::Shotgun ? 0.046F : 0.0F;
 
         const float flash = std::clamp(
             std::isfinite(weaponViewmodel.muzzleFlashStrength)
@@ -2279,13 +2289,13 @@ bool GdpRenderer::render(
             0.0F, 1.0F);
         if (flash > 0.0F && weaponViewmodel.role != HudWeaponRole::Knife) {
             const wkc::core::Vec3 flashColor{1.0F, 0.56F, 0.10F};
-            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + (0.07F * flash)},
+            drawWeaponPiece({0.0F, muzzleHeight, muzzlePosition + (0.07F * flash)},
                 {0.07F + (0.08F * flash), 0.07F + (0.08F * flash),
                     0.18F + (0.12F * flash)}, {}, flashColor, 1.8F);
-            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + 0.04F},
+            drawWeaponPiece({0.0F, muzzleHeight, muzzlePosition + 0.04F},
                 {0.20F * flash, 0.025F, 0.055F},
                 {0.0F, 0.0F, 45.0F}, flashColor, 1.5F);
-            drawWeaponPiece({0.0F, 0.0F, muzzlePosition + 0.04F},
+            drawWeaponPiece({0.0F, muzzleHeight, muzzlePosition + 0.04F},
                 {0.20F * flash, 0.025F, 0.055F},
                 {0.0F, 0.0F, -45.0F}, flashColor, 1.5F);
         }

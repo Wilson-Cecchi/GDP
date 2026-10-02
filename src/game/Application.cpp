@@ -3175,11 +3175,14 @@ void Application::render()
         } else if (item->type == entities::ItemType::Armor) {
             role = visual::PickupVisualRole::Armor;
         } else if (item->type == entities::ItemType::Weapon) {
-            role = (item->recoveredWeapon ? std::optional{item->recoveredWeapon->archetype}
-                    : item->spawnedWeaponArchetype)
-                    == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Pistol)}
+            const auto type = item->recoveredWeapon
+                ? std::optional{item->recoveredWeapon->archetype} : item->spawnedWeaponArchetype;
+            role = type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Pistol)}
                 ? visual::PickupVisualRole::DroppedPistol
-                : visual::PickupVisualRole::Weapon;
+                : type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Sniper)}
+                    ? visual::PickupVisualRole::DroppedSniper
+                    : type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Shotgun)}
+                        ? visual::PickupVisualRole::DroppedShotgun : visual::PickupVisualRole::Weapon;
         } else if (item->type == entities::ItemType::Special) {
             role = visual::PickupVisualRole::Special;
         }
@@ -3802,10 +3805,8 @@ void Application::render()
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
-        // New weapon mechanics use the approved Carbine model until visual approval.
-        .role = hud.weapon == visual::HudWeaponRole::Sniper
-                || hud.weapon == visual::HudWeaponRole::Shotgun
-                || hud.weapon == visual::HudWeaponRole::SubmachineGun
+        // Only SMG still awaits its own visual proposal.
+        .role = hud.weapon == visual::HudWeaponRole::SubmachineGun
             ? visual::HudWeaponRole::Carbine : hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
         .reloadProgress = weapon_.reloadProgress(),

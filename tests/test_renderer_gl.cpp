@@ -17,6 +17,54 @@
 
 namespace {
 
+struct InstancingPixelComparison {
+    unsigned maximumDelta{0U};
+    std::size_t changedChannels{0U};
+    bool alphaMatches{true};
+    bool equivalent{false};
+};
+
+InstancingPixelComparison compareInstancingPixels(
+    const std::vector<std::uint8_t>& actual, const std::vector<std::uint8_t>& reference)
+{
+    InstancingPixelComparison result;
+    if (actual.empty() || actual.size() != reference.size() || actual.size() % 4U != 0U)
+        return result;
+    for (std::size_t i = 0U; i < actual.size(); ++i) {
+        const auto delta = static_cast<unsigned>(std::abs(int(actual[i]) - int(reference[i])));
+        if (i % 4U == 3U) result.alphaMatches &= delta == 0U;
+        else {
+            result.maximumDelta = std::max(result.maximumDelta, delta);
+            result.changedChannels += delta != 0U;
+        }
+    }
+    // llvmpipe: 11/192,000 RGB channels differ, maximum 7/255. NVIDIA is exact.
+    // Permit <=8/255 only in <=1/8192 RGB channels; alpha remains exact.
+    result.equivalent = result.alphaMatches && result.maximumDelta <= 8U
+        && result.changedChannels <= (actual.size() / 4U * 3U) / 8192U + 1U;
+    return result;
+}
+
+bool validateInstancingTolerance()
+{
+    std::vector<std::uint8_t> reference(320U * 200U * 4U, 100U);
+    auto actual = reference;
+    bool passed = compareInstancingPixels(actual, reference).equivalent;
+    actual[0] += 7U;
+    passed &= compareInstancingPixels(actual, reference).equivalent;
+    actual[0] = 109U;
+    passed &= !compareInstancingPixels(actual, reference).equivalent;
+    actual = reference; actual[3] = 101U;
+    passed &= !compareInstancingPixels(actual, reference).equivalent;
+    actual = reference;
+    for (std::size_t i = 0U; i < 400U; i += 4U) ++actual[i];
+    passed &= !compareInstancingPixels(actual, reference).equivalent;
+    actual.pop_back();
+    passed &= !compareInstancingPixels(actual, reference).equivalent;
+    if (!passed) std::cerr << "Instancing tolerance accepts a meaningful pixel regression\n";
+    return passed;
+}
+
 bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
 {
     using namespace gdp::game;
@@ -134,7 +182,7 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
         for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun, HudWeaponRole::SubmachineGun}) {
             hud.weapon = role;
             passed &= pixelsFor(hud) != empty;
-            // New roles must reuse approved baseline safely, without indexing past GPU meshes.
+            // Approved roles have their own mesh; SMG safely retains the baseline.
             WeaponViewmodelRenderData model;
             model.visible = true; model.role = role;
             passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud, {}, model);
@@ -340,6 +388,69 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
         }
     }
     if (!passed) std::cerr << "Campaign exit HUD rendering failed\n";
+    return passed;
+}
+
+bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* capture = std::getenv("GDP_NEW_WEAPON_CAPTURE_DIR");
+    const int width = capture ? 1280 : 320;
+    const int height = capture ? 720 : 200;
+    bool passed = true;
+    const auto readFrame = [&] {
+        std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        return pixels;
+    };
+    const auto save = [&](const std::vector<std::uint8_t>& pixels, const std::string& name) {
+        if (!capture) return true;
+        std::filesystem::create_directories(capture);
+        std::vector<std::uint8_t> topDown(pixels.size());
+        const auto stride = static_cast<std::size_t>(width * 4);
+        for (int y = 0; y < height; ++y) std::copy_n(
+            pixels.data() + static_cast<std::size_t>(height - y - 1) * stride,
+            stride, topDown.data() + static_cast<std::size_t>(y) * stride);
+        auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
+            topDown.data(), width * 4);
+        const auto path = std::filesystem::path{capture} / (name + ".bmp");
+        const bool saved = surface && SDL_SaveBMP(surface, path.string().c_str());
+        SDL_DestroySurface(surface);
+        return saved;
+    };
+    for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun}) {
+        const std::string name = role == HudWeaponRole::Sniper ? "sniper" : "shotgun";
+        CameraData camera;
+        WeaponViewmodelRenderData model{.visible = true, .role = role, .visualSeed = 1717U};
+        for (const bool potato : {false, true}) {
+            HudRenderData quality;
+            quality.detailedMaterials = !potato;
+            quality.worldRenderScalePercent = potato ? 50U : 100U;
+            quality.graphicsQuality = potato ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+            passed &= renderer.render(width, height, camera, {}, {}, {}, {}, {}, {}, {}, {}, quality);
+            const auto background = readFrame();
+            passed &= renderer.render(width, height, camera, {}, {}, {}, {}, {}, {}, {}, {}, quality, {}, model);
+            const auto actual = readFrame();
+            const auto stats = renderer.lastFrameStats();
+            passed &= actual != background && stats.drawCalls > 0U && stats.lowSpecShader == potato;
+            passed &= save(actual, name + (potato ? "-potato" : "-gameplay"));
+            model.role = HudWeaponRole::Carbine;
+            passed &= renderer.render(width, height, camera, {}, {}, {}, {}, {}, {}, {}, {}, quality, {}, model);
+            passed &= actual != readFrame();
+            model.role = role;
+        }
+        const std::array pickup{PickupRenderData{{0.0F, 0.0F, 0.0F},
+            role == HudWeaponRole::Sniper ? PickupVisualRole::DroppedSniper : PickupVisualRole::DroppedShotgun,
+            123U, 1.0F, 30.0F}};
+        camera.position = {1.2F, 1.0F, 1.8F};
+        camera.forward = wkc::core::normalized(wkc::core::Vec3{-1.2F, -0.9F, -1.8F});
+        passed &= renderer.render(width, height, camera);
+        const auto floor = readFrame();
+        passed &= renderer.render(width, height, camera, {}, pickup);
+        const auto drop = readFrame();
+        passed &= floor != drop && save(drop, name + "-ground");
+    }
+    if (!passed) std::cerr << "Approved new weapon silhouettes failed pixel validation\n";
     return passed;
 }
 
@@ -836,8 +947,8 @@ int main()
             std::vector<std::uint8_t> corridorPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 corridorPixels.data());
-            const bool corridorInstancingPreservedPixels
-                = corridorPixels == corridorReferencePixels;
+            const auto instancingComparison = compareInstancingPixels(corridorPixels, corridorReferencePixels);
+            const bool corridorInstancingPreservedPixels = instancingComparison.equivalent;
             const bool corridorInstancingReducedDraws
                 = corridorInstancedStats.drawCalls < corridorReferenceStats.drawCalls
                 && corridorInstancedStats.triangles
@@ -1438,7 +1549,9 @@ int main()
             bool fovFootprintsStable = true;
             for (const auto role : {gdp::game::visual::HudWeaponRole::Pistol,
                     gdp::game::visual::HudWeaponRole::Carbine,
-                    gdp::game::visual::HudWeaponRole::Knife}) {
+                    gdp::game::visual::HudWeaponRole::Knife,
+                    gdp::game::visual::HudWeaponRole::Sniper,
+                    gdp::game::visual::HudWeaponRole::Shotgun}) {
                 WeaponFootprint narrow;
                 WeaponFootprint wide;
                 renderedFovViewmodels &= weaponFootprint(60.0F, role, narrow)
@@ -1958,6 +2071,19 @@ int main()
                           << " main=" << mainMenuChangedChannels << " settings=" << settingsMenuChangedChannels
                           << " selection=" << settingsSelectionChangedChannels
                           << " hud=" << functionalHudChangedChannels << '\n';
+                std::cerr << "Renderer invariants: roomExact=" << (roomPixels == repeatedRoomPixels)
+                          << " potatoExact=" << (potatoReferencePixels == potatoQualityPixels)
+                          << " shadowClampExact=" << (clampedShadowPixels == shadowedPixels)
+                          << " instancingEquivalent=" << corridorInstancingPreservedPixels
+                          << " instancingReduced=" << corridorInstancingReducedDraws
+                          << " instancingDelta=" << instancingComparison.maximumDelta
+                          << " instancingChanged=" << instancingComparison.changedChannels
+                          << " gpuTiming=" << measuredGpuFrame
+                          << " gpuSamples=" << performanceFrameStats.gpuTimingAvailable
+                          << " uniformSkips=" << performanceFrameStats.uniformSkips
+                          << " textureSkips=" << performanceFrameStats.textureBindSkips
+                          << " meshSkips=" << performanceFrameStats.meshBindSkips
+                          << " darkBeam=" << darkBeamPixels << '\n';
             }
             // Exercise the gameplay HUD at real drawable sizes after the small
             // fixed-scene checks; these snapshots do not change combat state.
@@ -1965,6 +2091,8 @@ int main()
             passed = validateCampaignExitHud(renderer) && passed;
             passed = validateFrontendMenus(renderer) && passed;
             passed = validateTacticalHud(renderer) && passed;
+            passed = validateNewWeaponVisuals(renderer) && passed;
+            passed = validateInstancingTolerance() && passed;
         }
     }
 

@@ -51,8 +51,9 @@ especializados das pastas numeradas.
   **Armas:** sniper, escopeta de seis pellets e SMG estão disponíveis na
   Campanha e no Test Mode. Pickups extras de campanha caíram de 55% para 25%.
   `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
-  As três novas armas usam provisoriamente o modelo aprovado da carabina;
-  sua arte definitiva depende de aprovação visual. Para ensaiá-las:
+  Sniper e escopeta têm modelos próprios metálicos Used v1, na mão e no chão,
+  implementados após aprovação das pranchas e aguardando aceitação no jogo.
+  A SMG ainda usa provisoriamente a carabina até sua proposta visual. Para ensaiá-las:
   `build/release/gdp --test-mode`. Saves anteriores de regras 34 têm migração
   explícita preservando recursos; Standard/Speedrun mantêm seu loot anterior.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
@@ -1694,7 +1695,10 @@ mantém a ordem e os draws anteriores para a regressão comparar os dois caminho
 Na seed `12345`, os perfis `POTATO/LOW` evitam 13 submissões e passam de 80/96
 para 67/83 draws. `MEDIUM/HIGH/ULTRA` evitam 80 e passam de 265/281/281 para
 185/201/201, sem alterar a contagem de 3.360/3.552 triângulos. O teste OpenGL
-exige pixels byte a byte idênticos entre referência e instancing. O F3 mostra
+exigia pixels byte a byte idênticos entre referência e instancing. A revisão de
+2026-10-02 aceita apenas diferenças RGB esparsas de até 8/255 para compatibilidade
+com llvmpipe, mantendo alpha exato, triângulos e redução de draws estritos;
+[limites e reprodução](10_testing/ci_opengl_instancing_2026-10-02.md). O F3 mostra
 `INSTANCE DRAW`, `COUNT` e `SAVE`; a linha `BENCHMARK` publica os mesmos campos
 como `instanced_draws`, `instances` e `saved_draws`. Gameplay, visibilidade,
 materiais, RNG e conteúdo permanecem inalterados.

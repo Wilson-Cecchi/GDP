@@ -11,8 +11,8 @@ Nenhuma prancha é uma textura pronta ou substitui a aprovação de modelo.
   desgaste moderado Used; sem luzes sci-fi, marcas ou silhuetas exageradas.
 - Pranchas: Maintained / Used / Worn, vista próxima neutra e composição
   ilustrativa em primeira pessoa, com centro livre e empunhadura correta.
-- Sniper: [prancha v1](weapon_sniper_proposal_v1.png), APROVADA PARA IMPLEMENTAÇÃO.
-- Escopeta: [prancha v1](weapon_shotgun_proposal_v1.png), APROVADA PARA IMPLEMENTAÇÃO.
+- Sniper: [prancha v1](weapon_sniper_proposal_v1.png), IMPLEMENTADA EM VALIDAÇÃO.
+- Escopeta: [prancha v1](weapon_shotgun_proposal_v1.png), IMPLEMENTADA EM VALIDAÇÃO.
 - SMG: PROPOSTA EM PREPARAÇÃO. A ferramenta rejeitou a geração; nenhum
   artefato foi obtido ou implementado. Não houve fallback CLI/API.
 - Aprovação do usuário em 2026-10-02: "aprovadas a parte visual e funcional".
@@ -20,8 +20,39 @@ Nenhuma prancha é uma textura pronta ou substitui a aprovação de modelo.
   das três armas; não abrange uma futura prancha de SMG ainda inexistente.
   Dimensões/viewmodel/FOV/drops devem
   ser validados em capturas reais após implementação aprovada.
-- No runtime, as três mecânicas usam o modelo/material existente da carabina.
-  Artefatos aqui não são carregados pelo renderer nem pelo pacote Windows.
+- No runtime, sniper e escopeta usam geometrias próprias, compartilhadas entre
+  viewmodel e pickup caído. Somente a SMG mantém a carabina provisória.
+  As pranchas ilustrativas não são carregadas pelo renderer nem pelo pacote Windows.
+
+## Implementação nativa Used v1 — em validação
+
+A sniper tem luneta fixa discreta, alavanca do ferrolho, carregador curto e
+coronha ajustável; a escopeta tem pump estriado, tubo sob o cano, coronha
+convencional e miras abertas. Ambas usam aço revestido, aço exposto, polímero
+escuro e recessos dos mapas Used já existentes, sem glow ou textura adicional.
+São modelos procedurais de orçamento baixo/médio, não reproduções fotográficas
+das pranchas. Mantêm projeção do viewmodel fixa em 68°, centro livre e posição
+inferior direita. Flash acompanha o cano próprio; hitscan, dano e loot não mudam.
+Ferrolho/pump ainda não têm animação mecânica independente.
+
+Capturas reais do renderer offscreen, fixture de regressão 1280×720, seed visual
+1717 (mão) e 123 (chão), não sessão manual de gameplay:
+
+| Unidade | Primeira pessoa | Caída no chão | POTATO |
+| --- | --- | --- | --- |
+| Sniper | [captura](../validation/weapon_sniper_v1_used_gameplay.png) | [captura](../validation/weapon_sniper_v1_used_ground.png) | [captura](../validation/weapon_sniper_v1_used_potato.png) |
+| Escopeta | [captura](../validation/weapon_shotgun_v1_used_gameplay.png) | [captura](../validation/weapon_shotgun_v1_used_ground.png) | [captura](../validation/weapon_shotgun_v1_used_potato.png) |
+
+Gates CPU verificam geometria finita, empunhadura, silhuetas distintas da
+carabina, orçamento inferior a 1.600 triângulos por arma e contato com o chão
+nas duas orientações. OpenGL verifica modelos visíveis/distintos em MEDIUM e
+POTATO, drops e footprint estável ao alterar FOV 60/100. A aceitação artística
+final das implementações continua pendente em `visual/TEXTURE_APPROVALS.md`.
+
+Para recapturar, definir `GDP_NEW_WEAPON_CAPTURE_DIR` ao executar
+`gdp_renderer_gl_tests` com `SDL_VIDEODRIVER=offscreen`; BMPs ficam no diretório
+indicado. Para playtest interativo: `build/release/gdp --test-mode`, G para liberar
+a primária antes de recolher outra, 1 para equipá-la.
 
 ## Prompt comum enviado (verbatim)
 
