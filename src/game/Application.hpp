@@ -104,6 +104,7 @@ private:
     void loadPersistedCampaignCheckpoint();
     [[nodiscard]] bool saveCurrentCampaignCheckpoint();
     [[nodiscard]] bool clearPersistedCampaignCheckpoint();
+    [[nodiscard]] bool isCampaignExitTargeted() const;
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
@@ -145,6 +146,7 @@ private:
     std::array<std::optional<gameplay::NeuralEnemyExperiment>,
         ai::activeEnemyBrainCount> activeEnemyBrains_;
     entities::EntityId terminalEntity_{};
+    entities::EntityId exitTerminalEntity_{};
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};
     bool jumpPending_{false};

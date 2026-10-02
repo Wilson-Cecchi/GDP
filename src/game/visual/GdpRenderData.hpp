@@ -272,6 +272,7 @@ enum class ObjectiveRenderState : std::uint8_t {
     Victory,
     Defeat,
     TestArena,
+    ActivateExit,
 };
 
 enum class HudEventState : std::uint8_t {
@@ -287,6 +288,9 @@ enum class HudPrompt : std::uint8_t {
     DoorLocked,
     UseTerminal,
     Reload,
+    ExitTerminalLocked,
+    NextFloorTerminal,
+    FinishCampaignTerminal,
 };
 
 enum class HudHitFeedback : std::uint8_t {

@@ -1,5 +1,36 @@
 # Testing — Estratégia
 
+## Terminal da Campanha e ondas — revisão de 2026-10-02
+
+- `session_systems`: boss vivo bloqueia o terminal, interação antecipada não
+  fica em fila, morte pelo corredor libera saída sem vitória automática,
+  morte do jogador tem prioridade, restart limpa liberação e os dez andares
+  só concluem após interação. Standard/Speedrun/Test Mode conservam seus fluxos.
+- `application_menu_integration`: aplicação SDL/OpenGL real testa bloqueio,
+  liberação sem menu de resultado, alcance/cobertura, captura exata de recursos,
+  ciclo normal shutdown/restart/initialize no próximo andar, novo checkpoint
+  e vitória final removendo somente o slot ativo.
+- `world_module_systems` e `room_traversal_systems`: 64 seeds de Campanha
+  validam console protegido na sala Boss, bounds correspondentes ao modelo
+  existente, as quatro rotações, posição livre e superfície alcançável por
+  interação sem atravessar sólidos. Não substitui playtest de navegação completa.
+- `room_event_systems`: reforços futuros de Lockdown não são corpos visíveis
+  inativos; só nascem ativos após a limpeza, inclusive se um inimigo inicial
+  saiu da sala. Primeira onda por entrada mantém staging e não duplica handles.
+- `renderer_opengl_pixels`: objetivo e três prompts do terminal em EN/PT-BR,
+  em 1280×720, 960×540, 640×360 e 320×200. Capturas opcionais usam
+  `GDP_CAMPAIGN_EXIT_CAPTURE_DIR` e permanecem artefatos locais de validação.
+
+Rodar suíte Release e gates afetados em sanitizers. Verificação gráfica local
+usa SDL offscreen; ergonomia, dificuldade e percepção do spawn precisam de
+playtest. A proposta de novas armas/menos pickups permanece não implementada.
+
+Validação local de 2026-10-02: suíte Release 63/63; os sete gates acima passaram
+em sanitizers (ASan/UBSan). A verificação extra de acesso em 64 seeds também
+passou nos dois presets. Capturas PT-BR do terminal em 1280×720 e 320×200
+foram inspecionadas; não houve teste manual completo nem execução Windows
+nesta etapa.
+
 > **Estado:** especificação técnica inicial do novo GDP.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.

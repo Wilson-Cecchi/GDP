@@ -412,6 +412,7 @@ void testInitialEntityPopulation()
     const PropData* terminal = manager.findData<PropData>(initial.terminal);
     expect(terminal != nullptr && terminal->type == PropType::Terminal && terminal->solid,
         "START room receives the solid interaction terminal");
+    expect(!initial.exitTerminal.isValid(), "non-Campaign population has no exit terminal");
 
     bool arenaCompositionValid = true;
     std::size_t arenaEnemyCount = 0U;
@@ -878,6 +879,45 @@ void testWorldSeedBatch()
         "seed batch keeps a weapon and exercises all bounded enemy and boss variants");
 }
 
+void testCampaignExitTerminalPopulation()
+{
+    using namespace gdp::world;
+    using namespace gdp::entities;
+    using namespace wkc::core;
+    std::array<bool, 4> rotations{};
+    for (Seed seed = 0U; seed < 64U; ++seed) {
+        auto generated = generateWorld(seed);
+        expect(generated.succeeded(), "Campaign exit seed generates");
+        if (!generated.world) continue;
+        EntityManager manager;
+        const auto initial = populateInitialEntities(*generated.world, manager,
+            {.transform = {.position = {0.0F, 0.0F, 4.0F}}}, 1.0F, true);
+        const auto* terminal = manager.find(initial.exitTerminal);
+        const auto* prop = manager.findData<PropData>(initial.exitTerminal);
+        expect(initial.isValid() && terminal && prop,
+            "every Campaign seed creates an exit interaction entity");
+        if (!terminal || !prop) continue;
+        const auto boss = std::find_if(generated.world->rooms.begin(), generated.world->rooms.end(),
+            [](const auto& room) { return room.role == RoomRole::Boss; });
+        expect(boss != generated.world->rooms.end(), "Campaign exit has a Boss room owner");
+        if (boss == generated.world->rooms.end()) continue;
+        rotations[static_cast<std::size_t>(boss->rotation)] = true;
+        const Vec3 position = boss->transform.position
+            + rotateQuarterTurns({0.0F, 0.0F, 2.2F}, boss->rotation);
+        const bool sideways = boss->rotation == QuarterTurn::Degrees90
+            || boss->rotation == QuarterTurn::Degrees270;
+        expect(terminal->roomId == boss->id && prop->type == PropType::Terminal
+            && prop->solid && prop->maximumHealth == 0.0F
+            && nearlyEqual(terminal->transform.position, position)
+            && nearlyEqual(terminal->transform.scale,
+                sideways ? Vec3{0.3F, 2.0F, 0.8F} : Vec3{0.8F, 2.0F, 0.3F})
+            && std::count(boss->entities.begin(), boss->entities.end(), initial.exitTerminal) == 1,
+            "protected exit bounds match the authored console in the owning rotated Boss room");
+    }
+    expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
+        "Campaign exit seed batch exercises all four console rotations");
+}
+
 } // namespace
 
 int main()
@@ -891,6 +931,7 @@ int main()
     testWorldGeneration();
     testCorridorRouting();
     testInitialEntityPopulation();
+    testCampaignExitTerminalPopulation();
     testWorldSeedBatch();
 
     if (failures != 0) {

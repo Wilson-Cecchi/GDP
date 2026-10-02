@@ -74,12 +74,14 @@ std::vector<gdp::entities::EntityId> stageRoomEventFirstWave(
 {
     using gdp::world::RoomEventTrigger;
     std::vector<gdp::entities::EntityId> staged;
+    // Lockdown reinforcements wait for the baseline encounter. Do not expose
+    // their inactive bodies before that wave can fight.
     if (runtime.phase != RoomEventPhase::Dormant
+        || runtime.plan.type == gdp::world::RoomEventType::Lockdown
         || runtime.plan.trigger != RoomEventTrigger::RoomEntry
         || runtime.plan.waveCount == 0U || !runtime.stagedEnemies.empty()) {
         return staged;
     }
-
     for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
         if (spawn.wave != 0U) {
             continue;

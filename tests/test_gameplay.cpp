@@ -463,6 +463,13 @@ void testInteractionAndLife()
         "interaction ray selects the visible in-range target");
     expect(!player.findInteraction(targets, 1.0F),
         "interaction ray rejects targets beyond its range");
+    constexpr std::array ownSolid{targets[0].bounds};
+    expect(player.findInteraction(targets, 2.25F, ownSolid) == targets[0].id,
+        "interaction allows the target's own solid surface");
+    constexpr std::array blockingCover{
+        wkc::core::Aabb{{-0.5F, 0.0F, 2.8F}, {0.5F, 2.0F, 3.0F}}};
+    expect(!player.findInteraction(targets, 2.25F, blockingCover),
+        "a covered exit terminal cannot be activated through a wall or prop");
 
     player.applyDamage(35.0F);
     expect(wkc::core::nearlyEqual(player.state().health, 65.0F),

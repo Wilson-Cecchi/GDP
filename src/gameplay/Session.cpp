@@ -17,20 +17,25 @@ SessionUpdate SessionSystem::update(
     const gdp::world::RoomRole currentRoomRole,
     const bool bossExists,
     const bool bossAlive,
-    const bool bossAccessible) noexcept
+    const bool bossAccessible,
+    const bool exitTerminalUsed) noexcept
 {
     SessionUpdate update{state_.phase, state_.phase, false};
     if (state_.phase != SessionPhase::Playing) {
         return update;
     }
     if (!playerAlive) {
+        state_.campaignExitReady = false;
         state_.phase = SessionPhase::Defeat;
     } else if (state_.mode != RunMode::TestMode && bossExists && (currentRoomRole == gdp::world::RoomRole::Boss
                    || bossAccessible || state_.bossEngaged)) {
         state_.bossEngaged = true;
-        if (!bossAlive) {
+        state_.campaignExitReady = state_.mode == RunMode::Campaign && !bossAlive;
+        if (!bossAlive && (state_.mode != RunMode::Campaign || exitTerminalUsed)) {
             state_.phase = SessionPhase::Victory;
         }
+    } else {
+        state_.campaignExitReady = false;
     }
     update.phase = state_.phase;
     update.changed = update.phase != update.previousPhase;
@@ -60,6 +65,7 @@ std::optional<wkc::core::Seed> SessionSystem::restart(
     }
     state_.phase = SessionPhase::Playing;
     state_.bossEngaged = false;
+    state_.campaignExitReady = false;
     state_.elapsedRunTicks = 0U;
     return state_.currentSeed;
 }

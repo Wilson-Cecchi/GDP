@@ -49,7 +49,7 @@ O fundo respeita escala interna e materiais do perfil gráfico selecionado;
 usa somente duas luzes, sem sombras. Interface e cliques ficam na resolução
 nativa. Não promete um ganho de FPS sem medição no hardware do usuário.
 
-## Fluxo atual — revisão de 2026-10-01
+## Fluxo atual — revisão de 2026-10-02
 
 Esta revisão substitui o fluxo histórico descrito abaixo. `MenuFlow` é o dono
 das páginas e comandos; `Application` aplica as ações ao jogo. O renderer recebe
@@ -82,10 +82,21 @@ inicial; nenhum arquivo é apagado durante a seleção.
 
 São 10 andares com carry-over de HP, armor, munição, nível e progressão.
 O save representa **a entrada do andar**, não o ponto exato de saída. Repetir
-ou continuar restaura essa entrada; vencer os nove primeiros andares oferece
-Next Floor, e o décimo conclui a campanha. Concluir apaga somente o checkpoint
+ou continuar restaura essa entrada. Matar o boss libera o terminal da sala Boss,
+mas não encerra a partida nem troca de andar. O objetivo passa a `ACTIVATE EXIT`
+(`ATIVE A SAÍDA`). Aproximar-se do console existente e usar Interagir (E por
+padrão, respeitando remapeamentos) sobe diretamente nos nove primeiros andares,
+com os recursos atuais e sem menu de resultado intermediário. No décimo, usar
+o terminal mostra a vitória. Concluir apaga somente o checkpoint
 do slot ativo. Abrir configurações, mudar de modo ou voltar ao título não troca
 nem apaga os outros saves.
+
+O terminal fica bloqueado enquanto o boss estiver vivo. A interação exige
+estar na mesma sala, mirar o console, distância máxima de 2,25 m e ausência
+de parede/cobertura entre o jogador e ele. O HUD informa bloqueio, subida ou
+conclusão, em EN/PT-BR. Matar o boss pelo corredor também libera esse terminal;
+o jogador ainda precisa alcançá-lo. Standard/Speedrun continuam concluindo na
+morte do boss; Test Mode permanece uma área sem vitória automática.
 
 Dificuldade inicial: Easy 0,75×, Normal 1×, Hard 1,25×. Cada andar acrescenta
 0,08 ao multiplicador; no andar 10 resulta em 1,47× / 1,72× / 1,97×.

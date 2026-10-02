@@ -235,7 +235,7 @@ void testLockdownAndSupplyRuntime()
         "Hub supply event activates and completes atomically on room entry");
 }
 
-void testAdjacentEventWaveIsStagedDormant()
+void testLockdownWaveIsNotVisibleBeforeRelease()
 {
     using namespace gdp::entities;
     using namespace gdp::gameplay;
@@ -250,16 +250,12 @@ void testAdjacentEventWaveIsStagedDormant()
         777, RoomRole::Arena, RoomTheme::Security, 4, eventZones), 8);
 
     const std::vector<EntityId> staged = stageRoomEventFirstWave(runtime, manager);
-    expect(staged.size() == 1U && runtime.stagedEnemies == staged,
-        "room-entry event materializes its first wave before room activation");
-    const EnemyData* stagedEnemy = staged.empty()
-        ? nullptr : manager.findData<EnemyData>(staged.front());
-    expect(stagedEnemy != nullptr && !stagedEnemy->active
+    expect(staged.empty() && runtime.stagedEnemies.empty()
             && runtime.nextWave == 0U && runtime.phase == RoomEventPhase::Dormant,
-        "materialized event enemy remains dormant without advancing the event");
+        "future lockdown wave has no visible inactive bodies before release");
     expect(stageRoomEventFirstWave(runtime, manager).empty()
-            && manager.queryRoom(8).size() == 2U,
-        "staging is idempotent and cannot duplicate the previewed wave");
+            && manager.queryRoom(8).size() == 1U,
+        "repeated preview preparation cannot expose future lockdown enemies");
 
     manager.find(baseline)->roomId = 9U;
     expect(manager.findData<EnemyData>(baseline)->originRoomId == 8U,
@@ -275,11 +271,13 @@ void testAdjacentEventWaveIsStagedDormant()
     (void)applyDamage(manager, baseline, 1'000.0F);
     const RoomEventUpdateSummary released
         = updateRoomEvent(runtime, manager, true, false, 1.0F);
-    stagedEnemy = manager.findData<EnemyData>(staged.front());
-    expect(released.spawnedEnemies == staged && released.createdEntities.empty()
-            && stagedEnemy != nullptr && stagedEnemy->active
+    const EnemyData* releasedEnemy = released.spawnedEnemies.empty()
+        ? nullptr : manager.findData<EnemyData>(released.spawnedEnemies.front());
+    expect(released.spawnedEnemies.size() == 1U
+            && released.createdEntities == released.spawnedEnemies
+            && releasedEnemy != nullptr && releasedEnemy->active
             && runtime.nextWave == 1U,
-        "event releases the already visible enemy instead of creating a pop-in duplicate");
+        "reinforcement appears already active exactly when its wave is released");
     expect(shouldSealRoomDoors(runtime, manager),
         "lockdown can seal again once the escaped enemy is defeated");
 
@@ -309,9 +307,15 @@ void testTwoWaveReinforcementRuntime()
 
     gdp::entities::EntityManager manager;
     RoomEventRuntime runtime = makeRoomEventRuntime(plan, 12);
+    const auto staged = stageRoomEventFirstWave(runtime, manager);
+    expect(staged.size() == 1U
+        && !manager.findData<gdp::entities::EnemyData>(staged.front())->active,
+        "immediate-entry reinforcement keeps its adjacent-room preview");
     const RoomEventUpdateSummary first
         = updateRoomEvent(runtime, manager, true, false, 0.0F);
-    expect(first.enemiesSpawned == 1U && runtime.nextWave == 1U,
+    expect(first.enemiesSpawned == 1U && runtime.nextWave == 1U
+        && first.spawnedEnemies == staged && first.createdEntities.empty()
+        && manager.findData<gdp::entities::EnemyData>(staged.front())->active,
         "reinforcement event spawns only its first wave on activation");
     killAllEnemies(manager, 12);
     const RoomEventUpdateSummary second
@@ -333,7 +337,7 @@ int main()
     testEventPlanBatchAndWorlds();
     testTerminalAmbushRuntime();
     testLockdownAndSupplyRuntime();
-    testAdjacentEventWaveIsStagedDormant();
+    testLockdownWaveIsNotVisibleBeforeRelease();
     testTwoWaveReinforcementRuntime();
     if (failures != 0) {
         std::cerr << failures << " event test(s) failed\n";

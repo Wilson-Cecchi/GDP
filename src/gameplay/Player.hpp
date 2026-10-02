@@ -69,7 +69,8 @@ public:
 
     [[nodiscard]] std::optional<gdp::entities::EntityId> findInteraction(
         std::span<const InteractionTarget> targets,
-        float maximumDistance = 2.25F) const noexcept;
+        float maximumDistance = 2.25F,
+        std::span<const wkc::core::Aabb> blockers = {}) const noexcept;
 
     void applyDamage(float amount) noexcept;
     void heal(float amount) noexcept;

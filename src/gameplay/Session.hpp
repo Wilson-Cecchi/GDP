@@ -47,6 +47,7 @@ struct SessionState {
     bool bossEngaged{false};
     std::uint64_t elapsedRunTicks{0U};
     Difficulty difficulty{Difficulty::Normal};
+    bool campaignExitReady{false};
 };
 
 struct SessionUpdate {
@@ -71,7 +72,8 @@ public:
         gdp::world::RoomRole currentRoomRole,
         bool bossExists,
         bool bossAlive,
-        bool bossAccessible = false) noexcept;
+        bool bossAccessible = false,
+        bool exitTerminalUsed = false) noexcept;
     [[nodiscard]] std::optional<wkc::core::Seed> restart(
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;

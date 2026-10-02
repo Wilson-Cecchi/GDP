@@ -4,7 +4,11 @@
 #include "persistence/SettingsStore.hpp"
 #include "persistence/SpeedrunLeaderboardStore.hpp"
 #include "platform/SdlInput.hpp"
+#include "gameplay/Props.hpp"
+#include "gameplay/RoomTraversal.hpp"
 #include <SDL3/SDL.h>
+#include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <iostream>
 
@@ -126,6 +130,93 @@ struct ApplicationMenuTestAccess {
         expect(app.menuFlow_.page == MenuPage::Overwrite && app.menuFlow_.selection == 0U, "occupied slot requires safe overwrite confirmation");
         key(Key::Escape); choose("CONTINUE");
         expect(app.session_.state().difficulty == gameplay::Difficulty::Hard && app.activeCampaignSlot_ == 2U, "cancelled overwrite preserves Hard save and continue restores it");
+
+        // Exercise real interaction/update/render rather than calling the session
+        // victory method directly. The original slot remains isolated.
+        const auto testExit = [&](const bool finalFloor) {
+            const auto* terminal = app.entities_.find(app.exitTerminalEntity_);
+            expect(terminal != nullptr, "campaign populates one Boss exit terminal");
+            if (!terminal) return;
+            const auto bossRoom = std::find_if(app.world_->rooms.begin(), app.world_->rooms.end(),
+                [terminal](const auto& room) { return room.id == terminal->roomId; });
+            expect(bossRoom != app.world_->rooms.end(), "exit console belongs to Boss room");
+            if (bossRoom == app.world_->rooms.end()) return;
+            const auto position = bossRoom->transform.position
+                + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 1.0F}, bossRoom->rotation);
+            const auto direction = wkc::core::rotateQuarterTurns({0.0F, 0.0F, 1.0F}, bossRoom->rotation);
+            constexpr float radiansToDegrees = 57.295779513F;
+            app.player_.spawn(position, std::atan2(direction.z, direction.x) * radiansToDegrees);
+            auto* playerEntity = app.entities_.find(app.player_.entity());
+            playerEntity->roomId = bossRoom->id;
+            playerEntity->transform.position = position;
+            app.baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(*app.world_, bossRoom->id);
+            app.collisionWorld_ = gameplay::collisionWorldWithProps(app.baseCollisionWorld_, app.entities_, bossRoom->id);
+            expect(app.isCampaignExitTargeted(), "rotated console is accessible at its visible surface");
+            app.playerCommand_ = {.interact = true}; release(); app.fixedUpdate(1.0 / 60.0);
+            expect(!app.session_.state().campaignExitReady && !app.restartRequested_
+                && app.session_.state().phase == gameplay::SessionPhase::Playing,
+                "terminal interaction before Boss death neither advances nor queues exit");
+            for (const auto id : app.entities_.query(entities::EntityKind::Enemy)) {
+                auto* enemy = app.entities_.findData<entities::EnemyData>(id);
+                enemy->health = 0.0F; enemy->behavior = entities::EnemyBehaviorState::Dead;
+            }
+            app.playerCommand_ = {}; app.fixedUpdate(1.0 / 60.0); app.render();
+            expect(app.session_.state().campaignExitReady && !app.restartRequested_
+                && !app.resultMenu_.active && app.session_.state().phase == gameplay::SessionPhase::Playing,
+                "Boss death unlocks exit but leaves travel playable without results screen");
+            expect(app.saveCurrentCampaignCheckpoint(), "unlocked exit keeps the recoverable floor-entry save");
+            const auto storedBefore = app.campaignSlots_[app.activeCampaignSlot_].checkpoint;
+            expect(storedBefore.has_value(), "campaign checkpoint survives Boss death until terminal use");
+            const auto blocker = app.entities_.createProp({
+                .transform = {.position = position + direction * 0.4F, .scale = {0.5F, 2.0F, 0.5F}},
+                .roomId = bossRoom->id, .type = entities::PropType::Barricade,
+                .solid = true, .health = 60.0F, .maximumHealth = 60.0F});
+            app.collisionWorld_ = gameplay::collisionWorldWithProps(app.baseCollisionWorld_, app.entities_, bossRoom->id);
+            expect(!app.isCampaignExitTargeted(), "solid cover blocks exit activation through objects");
+            (void)app.entities_.destroy(blocker); (void)app.entities_.flushDestroyed();
+            app.player_.spawn(position - direction * 4.0F, std::atan2(direction.z, direction.x) * radiansToDegrees);
+            expect(!app.isCampaignExitTargeted(), "exit cannot be activated remotely");
+            app.player_.spawn(position, std::atan2(direction.z, direction.x) * radiansToDegrees);
+            app.player_.applyDamage(17.0F);
+            const auto carryover = gameplay::captureCampaignCarryover(app.player_, app.weapon_, app.progression_);
+            app.playerCommand_ = {.interact = true}; app.fixedUpdate(1.0 / 60.0); app.render();
+            expect(app.session_.state().phase == gameplay::SessionPhase::Victory && !app.fatalError_,
+                "validated terminal use completes the floor");
+            if (finalFloor) {
+                expect(app.resultMenu_.active && !app.restartRequested_
+                    && !app.campaignSlots_[app.activeCampaignSlot_].checkpoint,
+                    "final terminal displays campaign victory and clears only its slot");
+            } else {
+                expect(app.restartRequested_ && !app.resultMenu_.active
+                    && app.restartMode_ == gameplay::RunRestartMode::NextCampaignFloor
+                    && app.campaignCarryover_ == carryover,
+                    "intermediate terminal requests next floor with exact resources, without results menu");
+                const auto restartMode = app.restartMode_;
+                app.shutdown();
+                const auto nextSeed = app.session_.restart(restartMode);
+                expect(nextSeed.has_value(), "terminal advances deterministic floor sequence");
+                if (nextSeed) app.config_.worldSeed = *nextSeed;
+                app.restartRequested_ = false; app.running_ = true;
+                expect(app.initialize() && app.initializeRun(), "next floor is generated through the normal gameplay initialization");
+                expect(app.session_.state().campaignFloor == 2U && !app.session_.state().campaignExitReady
+                    && gameplay::captureCampaignCarryover(app.player_, app.weapon_, app.progression_) == carryover
+                    && app.campaignSlots_[app.activeCampaignSlot_].checkpoint->floor == 2U,
+                    "next floor relocks its console, restores resources and persists floor two");
+            }
+        };
+        testExit(false);
+        (void)app.returnToMainMenu(); choose("CAMPAIGN"); choose("SLOT 3"); choose("CONTINUE");
+        // Keep the fixture's existing seed/checkpoint format and move only its floor.
+        app.shutdown();
+        app.session_ = gameplay::SessionSystem{12345U};
+        app.config_.worldSeed = 12345U;
+        expect(app.session_.restoreCampaignCheckpoint(12345U, 12345U, 0U, 0U,
+            gameplay::campaignFloorCount, gameplay::Difficulty::Hard), "final-floor fixture restores a valid campaign session");
+        expect(app.initialize() && app.initializeRun(), "final campaign floor initializes normally");
+        app.running_ = true;
+        testExit(true);
+        // Recreate the cleared fixture slot for the original persistence checks below.
+        (void)app.returnToMainMenu(); choose("CAMPAIGN"); choose("SLOT 3"); choose("NEW GAME"); choose("HARD");
         (void)app.returnToMainMenu(); choose("SPEEDRUN"); choose("START RUN");
         expect(app.session_.state().mode == gameplay::RunMode::Speedrun && app.session_.state().difficulty == gameplay::Difficulty::Hard && app.runDifficulty_ == 1.25F,
             "Speedrun generates and populates world at Hard");

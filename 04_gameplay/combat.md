@@ -55,8 +55,11 @@ porta transitável. Visão, ataque e perseguição usam a colisão contínua des
 salas e a cobertura de ambas; uma porta fechada não dá visão nem passagem. A
 ocupação por um inimigo no meio do corredor impede seu fechamento, e sua sala
 lógica só muda quando o collider entra inteiro no próximo cômodo. O boss pode
-ser enfrentado na passagem aberta: uma morte antes de entrar na sala conclui a
-partida, sem exigir uma segunda entrada artificial.
+ser enfrentado na passagem aberta: em Standard/Speedrun, sua morte conclui a
+partida sem exigir uma segunda entrada artificial. Na Campanha, sua morte
+libera o terminal da sala Boss; o jogador continua móvel e só avança o andar
+ao interagir com esse console. No décimo andar, essa interação mostra a vitória.
+Vida, dano, fases, mira e pontos fracos do boss não mudam nesta revisão.
 
 Na Fase 134, `HitResult` também identifica `Standard` ou `WeakPoint`. Inimigos
 orgânicos usam um volume menor sobre a cabeça; o IndustrialRobot usa o sensor

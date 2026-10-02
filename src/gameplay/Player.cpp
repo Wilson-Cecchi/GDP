@@ -226,7 +226,8 @@ void Player::fixedUpdate(
 
 std::optional<gdp::entities::EntityId> Player::findInteraction(
     const std::span<const InteractionTarget> targets,
-    const float maximumDistance) const noexcept
+    const float maximumDistance,
+    const std::span<const wkc::core::Aabb> blockers) const noexcept
 {
     if (!state_.alive || maximumDistance <= 0.0F) {
         return std::nullopt;
@@ -243,6 +244,14 @@ std::optional<gdp::entities::EntityId> Player::findInteraction(
         if (distance && *distance < nearestDistance) {
             nearestDistance = *distance;
             nearestId = target.id;
+        }
+    }
+    if (nearestId) {
+        for (const auto& blocker : blockers) {
+            const auto distance = rayAabbDistance(cameraPosition(), forwardDirection(),
+                blocker, maximumDistance);
+            // The console's own static solid is allowed at the same surface.
+            if (distance && *distance + 1.0e-4F < nearestDistance) return std::nullopt;
         }
     }
     return nearestId;

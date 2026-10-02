@@ -33,6 +33,15 @@ registra os novos handles no `RoomInstance`. Lockdown permanece ativo até a
 condição de limpeza; a conclusão cria uma única recompensa. Eventos completos
 não reativam nem duplicam entidades.
 
+Revisão de 2026-10-02: a onda extra de `Lockdown` da Arena não é pré-criada
+como corpos visíveis e inativos. Ela só nasce, já ativa, quando o encontro
+inicial termina. Isso corrige os inimigos aparentando esperar a morte dos
+outros para poder atacar. A primeira onda de `Reinforcements` por entrada
+continua usando o staging existente e é ativada ao entrar, sem duplicação;
+emboscadas de terminal continuam ocultas até a interação. Não mudam planos,
+contagem de ondas, HP, recompensas ou RNG. A regressão cobre espera, inimigo
+que saiu da sala, liberação única e ativação dos handles pré-criados.
+
 A limpeza considera a sala de origem de cada inimigo, preservada ao nascer,
 e também intrusos ainda vivos dentro da sala. Perseguir o Player por um
 corredor e assumir outro `roomId` não conta como morte nem libera prematuramente

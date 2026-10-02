@@ -242,6 +242,22 @@ InitialEntitySet populateInitialEntities(
             addEnemy(EnemyArchetype::IndustrialRobot, {},
                 360.0F + 30.0F * static_cast<float>(encounter.rangeInt(0, 2)));
             addFixedProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
+            if (campaignWeapons) {
+                // Reuse the authored teal console and its existing static solid.
+                const bool sideways = room.rotation == wkc::core::QuarterTurn::Degrees90
+                    || room.rotation == wkc::core::QuarterTurn::Degrees270;
+                result.exitTerminal = manager.createProp({
+                    .transform = {
+                        .position = positionInRoom(room, {0.0F, 0.0F, 2.2F}),
+                        .scale = sideways ? wkc::core::Vec3{0.3F, 2.0F, 0.8F}
+                                          : wkc::core::Vec3{0.8F, 2.0F, 0.3F},
+                    },
+                    .roomId = room.id,
+                    .type = PropType::Terminal,
+                    .solid = true,
+                });
+                addToRoom(result.exitTerminal);
+            }
             break;
         case RoomRole::Start:
         case RoomRole::Count:

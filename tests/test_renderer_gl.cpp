@@ -278,6 +278,63 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
     return passed;
 }
 
+bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    bool passed = true;
+    const char* capture = std::getenv("GDP_CAMPAIGN_EXIT_CAPTURE_DIR");
+    for (const auto language : {gdp::gameplay::Language::English, gdp::gameplay::Language::PortugueseBrazil}) {
+        for (const auto dimensions : {std::array{1280, 720}, std::array{960, 540},
+                 std::array{640, 360}, std::array{320, 200}}) {
+            const int width = dimensions[0], height = dimensions[1];
+            HudRenderData hud;
+            hud.language = language;
+            hud.visible = true;
+            hud.campaignMode = true;
+            hud.campaignFloor = 1U;
+            hud.campaignFloorCount = 10U;
+            hud.runTimerVisible = true;
+            hud.objective = ObjectiveRenderState::DefeatBoss;
+            hud.prompt = HudPrompt::ExitTerminalLocked;
+            const auto pixelsFor = [&] {
+                passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
+                std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+                return pixels;
+            };
+            const auto locked = pixelsFor();
+            hud.objective = ObjectiveRenderState::ActivateExit;
+            hud.prompt = HudPrompt::NextFloorTerminal;
+            const auto ready = pixelsFor();
+            hud.campaignFloor = 10U;
+            hud.prompt = HudPrompt::FinishCampaignTerminal;
+            const auto final = pixelsFor();
+            passed &= locked != ready && ready != final;
+            if (capture) {
+                const auto save = [&](const auto& pixels, const std::string& state) {
+                    std::vector<std::uint8_t> topDown(pixels.size());
+                    const auto stride = static_cast<std::size_t>(width * 4);
+                    for (int row = 0; row < height; ++row) std::copy_n(pixels.data()
+                        + static_cast<std::size_t>(height - row - 1) * stride, stride,
+                        topDown.data() + static_cast<std::size_t>(row) * stride);
+                    std::filesystem::create_directories(capture);
+                    const auto path = std::filesystem::path{capture}
+                        / (std::string{gdp::gameplay::languageName(language)} + "-exit-" + state
+                            + "-" + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
+                    auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
+                        topDown.data(), width * 4);
+                    const bool saved = surface && SDL_SaveBMP(surface, path.string().c_str());
+                    SDL_DestroySurface(surface);
+                    return saved;
+                };
+                passed &= save(locked, "locked") && save(ready, "ready") && save(final, "final");
+            }
+        }
+    }
+    if (!passed) std::cerr << "Campaign exit HUD rendering failed\n";
+    return passed;
+}
+
 } // namespace
 
 int main()
@@ -1897,6 +1954,7 @@ int main()
             // Exercise the gameplay HUD at real drawable sizes after the small
             // fixed-scene checks; these snapshots do not change combat state.
             passed = validateBossHud(renderer) && passed;
+            passed = validateCampaignExitHud(renderer) && passed;
             passed = validateFrontendMenus(renderer) && passed;
             passed = validateTacticalHud(renderer) && passed;
         }

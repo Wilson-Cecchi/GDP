@@ -8,6 +8,7 @@ namespace gdp::world {
 struct InitialEntitySet {
     gdp::entities::EntityId player{};
     gdp::entities::EntityId terminal{};
+    gdp::entities::EntityId exitTerminal{};
 
     [[nodiscard]] bool isValid() const noexcept;
 };

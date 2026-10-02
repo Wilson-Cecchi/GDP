@@ -946,6 +946,12 @@ bool Application::initializeRun()
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
+    exitTerminalEntity_ = initialEntities.exitTerminal;
+    if (session_.state().mode == gameplay::RunMode::Campaign
+        && !exitTerminalEntity_.isValid()) {
+        log(LogLevel::Error, "Campaign Boss room is missing its exit terminal");
+        return false;
+    }
 
     std::vector<world::EdgeId> initiallyBlockedEdges;
     initiallyBlockedEdges.reserve(world_->corridors.size());
@@ -1640,6 +1646,7 @@ bool Application::returnToMainMenu()
     uiAudioEventCounter_ = 0U;
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
+    exitTerminalEntity_ = {};
     world_.reset();
     visitedRooms_.clear();
     clock_.reset();
@@ -1976,6 +1983,21 @@ bool Application::clearPersistedCampaignCheckpoint()
     log(LogLevel::Info, "Completed Campaign checkpoint removed from disk");
     campaignSlots_[activeCampaignSlot_] = {};
     return true;
+}
+
+bool Application::isCampaignExitTargeted() const
+{
+    if (session_.state().mode != gameplay::RunMode::Campaign
+        || session_.state().phase != gameplay::SessionPhase::Playing) return false;
+    const entities::Entity* terminal = entities_.find(exitTerminalEntity_);
+    const entities::Entity* player = entities_.find(player_.entity());
+    const entities::PropData* prop = entities_.findData<entities::PropData>(exitTerminalEntity_);
+    if (!terminal || !player || !prop || terminal->roomId != player->roomId
+        || prop->type != entities::PropType::Terminal) return false;
+    const std::array targets{gameplay::InteractionTarget{
+        exitTerminalEntity_, gameplay::propCollisionBounds(*terminal, *prop)}};
+    return player_.findInteraction(targets, 2.25F, collisionWorld_.solids())
+        == exitTerminalEntity_;
 }
 
 void Application::fixedUpdate(const double fixedStep)
@@ -2644,6 +2666,7 @@ void Application::fixedUpdate(const double fixedStep)
             data->keys = player_.state().keys;
         }
     }
+    const bool exitTerminalUsed = playerCommand_.interact && isCampaignExitTargeted();
     bool terminalUsed = false;
     if (playerCommand_.interact) {
         const entities::Entity* terminal = entities_.find(terminalEntity_);
@@ -2772,9 +2795,13 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
     }
+    const bool exitWasReady = session_.state().campaignExitReady;
     const gameplay::SessionUpdate sessionUpdate = session_.update(
         player_.state().alive, currentRoomRole, boss.exists, boss.alive,
-        bossAccessible);
+        bossAccessible, exitTerminalUsed);
+    if (!exitWasReady && session_.state().campaignExitReady) {
+        log(LogLevel::Info, "Campaign exit terminal unlocked after boss defeat");
+    }
     if (sessionUpdate.changed) {
         interactionPending_ = false;
         jumpPending_ = false;
@@ -2815,6 +2842,22 @@ void Application::fixedUpdate(const double fixedStep)
         if (audio_ && sessionUpdate.phase == gameplay::SessionPhase::Victory) {
             audio_->play(gdp::audio::AudioEventKind::EventComplete,
                 session_.state().currentSeed, audioEventCounter_++);
+        }
+        if (gameplay::canAdvanceCampaign(session_.state())) {
+            gameplay::CampaignCarryover carryover = gameplay::captureCampaignCarryover(
+                player_, weapon_, progression_);
+            if (!gameplay::validateCampaignCarryover(carryover)) {
+                log(LogLevel::Error, "Campaign exit produced invalid carry-over state");
+                fatalError_ = true;
+                running_ = false;
+                return;
+            }
+            campaignCarryover_ = std::move(carryover);
+            restartMode_ = gameplay::RunRestartMode::NextCampaignFloor;
+            restartRequested_ = true;
+            running_ = false;
+            log(LogLevel::Info, "Exit terminal requested the next Campaign floor");
+            return;
         }
         gameplay::openResultMenu(resultMenu_);
         if (!config_.headless && window_ != nullptr
@@ -3648,6 +3691,8 @@ void Application::render()
         hud.objective = visual::ObjectiveRenderState::Defeat;
     } else if (session_.state().mode == gameplay::RunMode::TestMode) {
         hud.objective = visual::ObjectiveRenderState::TestArena;
+    } else if (session_.state().campaignExitReady) {
+        hud.objective = visual::ObjectiveRenderState::ActivateExit;
     } else if (session_.state().bossEngaged
         || renderedRoomRole == world::RoomRole::Boss) {
         hud.objective = visual::ObjectiveRenderState::DefeatBoss;
@@ -3666,11 +3711,18 @@ void Application::render()
         hud.eventLocked = gameplay::shouldSealRoomDoors(*activeEvent, entities_);
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing && world_) {
+        if (isCampaignExitTargeted()) {
+            hud.prompt = !session_.state().campaignExitReady
+                ? visual::HudPrompt::ExitTerminalLocked
+                : session_.state().campaignFloor < gameplay::campaignFloorCount
+                    ? visual::HudPrompt::NextFloorTerminal
+                    : visual::HudPrompt::FinishCampaignTerminal;
+        }
         const std::optional<gameplay::RoomTransition> transition
             = gameplay::findRoomTransition(
                 *world_, playerRoom, player_.state().position,
                 player_.planarForwardDirection());
-        if (transition) {
+        if (transition && hud.prompt == visual::HudPrompt::None) {
             const auto door = doorRuntimes_.find(transition->edge);
             if (hud.eventLocked) {
                 hud.prompt = visual::HudPrompt::DoorLocked;
@@ -3816,6 +3868,7 @@ void Application::shutdown()
     uiAudioEventCounter_ = 0U;
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
+    exitTerminalEntity_ = {};
     world_.reset();
     visitedRooms_.clear();
 

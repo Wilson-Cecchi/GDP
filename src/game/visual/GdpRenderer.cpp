@@ -2380,7 +2380,8 @@ bool GdpRenderer::render(
     };
     const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
         || hud.objective == ObjectiveRenderState::DefeatBoss
-        || hud.objective == ObjectiveRenderState::TestArena;
+        || hud.objective == ObjectiveRenderState::TestArena
+        || hud.objective == ObjectiveRenderState::ActivateExit;
     const bool showBoss = hud.visible && hud.boss.visible
         && hud.objective == ObjectiveRenderState::DefeatBoss
         && std::isfinite(hud.boss.health) && hud.boss.health > 0.0F
@@ -2913,6 +2914,13 @@ bool GdpRenderer::render(
         } else if (hud.prompt == HudPrompt::Reload) {
             promptText = hud.reloadBinding + " RELOAD";
             promptColor = {0.98F, 0.62F, 0.14F};
+        } else if (hud.prompt == HudPrompt::ExitTerminalLocked) {
+            promptText = "DEFEAT BOSS TO UNLOCK";
+            promptColor = uiTheme.warning;
+        } else if (hud.prompt == HudPrompt::NextFloorTerminal) {
+            promptText = hud.interactBinding + " ASCEND FLOOR";
+        } else if (hud.prompt == HudPrompt::FinishCampaignTerminal) {
+            promptText = hud.interactBinding + " FINISH CAMPAIGN";
         }
         if (!hud.paused && !promptText.empty()) {
             const int promptWidth = bitmapTextWidth(promptText, hudScale)
@@ -3289,6 +3297,8 @@ bool GdpRenderer::render(
     wkc::core::Vec3 objectiveColor = textColor;
     if (hud.objective == ObjectiveRenderState::ReachBoss) {
         objectiveText = "REACH BOSS";
+    } else if (hud.objective == ObjectiveRenderState::ActivateExit) {
+        objectiveText = "ACTIVATE EXIT";
     } else if (hud.objective == ObjectiveRenderState::TestArena) {
         objectiveText = "TEST ARENA";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {

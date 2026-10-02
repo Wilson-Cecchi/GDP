@@ -42,6 +42,12 @@ especializados das pastas numeradas.
   os caminhos de saves continuam com os identificadores técnicos GDP.
   Campanha: 10 andares, três slots independentes, Easy/Normal/Hard, checkpoint
   no início do andar e armas adicionais aleatórias nas salas.
+  Matar o boss libera o console existente na sala Boss: Interagir (E por padrão)
+  sobe para o próximo andar; no décimo, mostra a vitória. Antes disso o terminal
+  fica bloqueado. HP, munição e progressão acompanham a subida, sem tela de
+  resultado intermediária. Standard/Speedrun mantêm a conclusão na morte do boss.
+  Reforços de Lockdown só aparecem quando sua onda é liberada, evitando corpos
+  visíveis que não atacavam enquanto o grupo inicial ainda estava vivo.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
   botões do mouse e scroll. Direção visual atual: menus e HUD Tático minimalista,

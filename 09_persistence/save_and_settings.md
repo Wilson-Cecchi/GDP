@@ -1,6 +1,6 @@
 # Persistence — Saves e configurações
 
-## Contrato atual — revisão de 2026-10-01
+## Contrato atual — revisão de 2026-10-02
 
 - Três slots: `campaign_slot_1.toml` a `campaign_slot_3.toml`, no diretório
   de preferências SDL de WKC/GDP. Schema 5 adiciona a dificuldade base;
@@ -28,6 +28,13 @@
   falha não remove o save anterior. Campanhas concluídas removem somente o
   slot ativo. Execuções headless não acessam preferências do jogador.
 - Save no meio do andar e placar online continuam fora desta revisão.
+- Na Campanha, a morte do boss apenas libera o terminal de saída. Esse estado
+  é transitório e não altera o checkpoint de entrada. Interagir com o terminal
+  dos andares 1–9 captura os recursos atuais; somente a inicialização válida
+  do próximo andar grava sua nova entrada. No andar 10, a interação conclui
+  a campanha e remove somente o slot ativo. Sair antes dela conserva o save
+  de entrada. Schema 5 e regras de entrada existentes continuam compatíveis;
+  nenhuma entidade ou estado intermediário de terminal passa a ser serializado.
 
 O restante deste documento registra a evolução histórica; referências a um
 slot, três andares ou settings v6/v7 não descrevem mais o fluxo atual.

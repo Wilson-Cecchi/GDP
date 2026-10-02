@@ -4,10 +4,12 @@
 #include "gameplay/Door.hpp"
 #include "gameplay/Enemy.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/Props.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "gameplay/Session.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldGenerator.hpp"
+#include "world/WorldEntities.hpp"
 
 #include <algorithm>
 #include <array>
@@ -904,6 +906,38 @@ void testGeneratedCorridorsSupportContinuousWalkingAndLockdown()
     }
 }
 
+void testCampaignExitConsoleAccessAcrossSeeds()
+{
+    using namespace gdp;
+    using namespace wkc::core;
+    for (Seed seed = 0U; seed < 64U; ++seed) {
+        auto generated = world::generateWorld(seed);
+        expect(generated.succeeded(), "exit access seed generates");
+        if (!generated.world) continue;
+        entities::EntityManager manager;
+        const auto initial = world::populateInitialEntities(*generated.world, manager,
+            {.transform = {.position = {0.0F, 0.0F, 4.0F}}}, 1.0F, true);
+        const auto* terminal = manager.find(initial.exitTerminal);
+        const auto* prop = manager.findData<entities::PropData>(initial.exitTerminal);
+        expect(terminal && prop, "exit access fixture has the Campaign console");
+        if (!terminal || !prop) continue;
+        const auto* room = findRoom(*generated.world, terminal->roomId);
+        if (!room) { expect(false, "exit console room exists"); continue; }
+        const auto collision = gameplay::collisionWorldWithProps(
+            gameplay::makeRoomNavigationCollision(*generated.world, room->id), manager, room->id);
+        const Vec3 position = room->transform.position
+            + rotateQuarterTurns({0.0F, 0.0F, 1.0F}, room->rotation);
+        const Vec3 direction = rotateQuarterTurns({0.0F, 0.0F, 1.0F}, room->rotation);
+        gameplay::Player player;
+        player.spawn(position, std::atan2(direction.z, direction.x) * 57.295779513F);
+        const std::array targets{gameplay::InteractionTarget{
+            initial.exitTerminal, gameplay::propCollisionBounds(*terminal, *prop)}};
+        expect(collision.canOccupy(position)
+            && player.findInteraction(targets, 2.25F, collision.solids()) == initial.exitTerminal,
+            "generated rotated Boss console has a free interaction point and unblocked visible surface");
+    }
+}
+
 } // namespace
 
 int main()
@@ -922,6 +956,7 @@ int main()
     testGeneratedDoorsFitTheLargestEnemyCollider();
     testLockdownEntryKeepsPlayerMobile();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
+    testCampaignExitConsoleAccessAcrossSeeds();
 
     if (failures != 0) {
         std::cerr << failures << " room traversal test(s) failed\n";
