@@ -538,7 +538,7 @@ void makeCarbine(WeaponMeshBuilder& mesh)
 void makeSniper(WeaponMeshBuilder& mesh)
 {
     using enum WeaponMaterial;
-    // Approved Used v1: slender receiver, short magazine, bolt and modest optic.
+    // Approved rifle Used v1, optic Used v2: receiver/stock/bolt stay unchanged.
     mesh.beveledLoft(CoatedSteel, std::array{
         WeaponMeshBuilder::LoftSection{-0.24F, 0.096F, 0.015F, 0.069F, 0.016F},
         WeaponMeshBuilder::LoftSection{0.21F, 0.096F, 0.015F, 0.069F, 0.016F},
@@ -567,16 +567,23 @@ void makeSniper(WeaponMeshBuilder& mesh)
     mesh.cylinder(CoatedSteel, {0.0F, 0.014F, 0.0F}, 0.052F, 0.052F, 1.15F, 1.25F);
     mesh.cylinder(Recess, {0.0F, 0.014F, 0.0F}, 0.027F, 0.027F, 1.25F, 1.252F);
     mesh.box(CoatedSteel, {0.0F, 0.105F, 0.02F}, {0.105F, 0.028F, 0.46F});
-    for (const float z : {-0.10F, 0.17F}) {
-        mesh.box(CoatedSteel, {0.0F, 0.15F, z}, {0.10F, 0.082F, 0.035F});
-        mesh.cylinder(CoatedSteel, {0.0F, 0.237F, 0.0F}, 0.067F, 0.067F, z - 0.02F, z + 0.02F);
+    constexpr Vec3 opticCenter{0.0F, 0.265F, 0.0F};
+    for (const float z : {-0.09F, 0.12F}) {
+        mesh.box(CoatedSteel, {0.0F, 0.17F, z}, {0.11F, 0.106F, 0.044F});
+        mesh.cylinder(CoatedSteel, opticCenter, 0.075F, 0.075F, z - 0.026F, z + 0.026F);
+        mesh.sideDisc(BareSteel, 0.076F, 0.265F, z, 0.012F);
+        mesh.sideDisc(Recess, 0.077F, 0.265F, z, 0.005F);
     }
-    mesh.cylinder(CoatedSteel, {0.0F, 0.237F, 0.0F}, 0.048F, 0.048F, -0.18F, 0.29F);
-    mesh.cylinder(CoatedSteel, {0.0F, 0.237F, 0.0F}, 0.074F, 0.074F, 0.24F, 0.39F);
-    mesh.cylinder(CoatedSteel, {0.0F, 0.237F, 0.0F}, 0.064F, 0.064F, -0.27F, -0.14F);
-    mesh.cylinder(Recess, {0.0F, 0.237F, 0.0F}, 0.054F, 0.054F, -0.271F, -0.268F);
-    mesh.cylinder(Recess, {0.0F, 0.237F, 0.0F}, 0.064F, 0.064F, 0.39F, 0.392F);
-    mesh.box(CoatedSteel, {0.0F, 0.314F, 0.04F}, {0.068F, 0.044F, 0.068F});
+    mesh.cylinder(CoatedSteel, opticCenter, 0.056F, 0.056F, -0.20F, 0.19F);
+    mesh.cylinder(CoatedSteel, opticCenter, 0.056F, 0.098F, 0.18F, 0.35F);
+    mesh.cylinder(CoatedSteel, opticCenter, 0.098F, 0.098F, 0.35F, 0.415F);
+    mesh.cylinder(BareSteel, opticCenter, 0.099F, 0.099F, 0.406F, 0.413F);
+    mesh.cylinder(Recess, opticCenter, 0.085F, 0.085F, 0.416F, 0.418F);
+    mesh.cylinder(CoatedSteel, opticCenter, 0.078F, 0.071F, -0.34F, -0.19F);
+    mesh.cylinder(BareSteel, opticCenter, 0.079F, 0.079F, -0.328F, -0.322F);
+    mesh.cylinder(Recess, opticCenter, 0.065F, 0.065F, -0.342F, -0.339F);
+    mesh.box(CoatedSteel, {0.0F, 0.348F, 0.015F}, {0.070F, 0.060F, 0.070F});
+    mesh.sideDisc(CoatedSteel, 0.072F, 0.265F, 0.015F, 0.037F);
     mesh.part(WeaponPart::Mechanism, [&] {
         mesh.box(BareSteel, {0.148F, -0.012F, -0.08F}, {0.136F, 0.027F, 0.025F}, 25.0F);
         mesh.cylinder(BareSteel, {0.215F, -0.07F, 0.0F}, 0.025F, 0.025F, -0.10F, -0.06F);

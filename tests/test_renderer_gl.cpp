@@ -456,11 +456,148 @@ bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
     return passed;
 }
 
+bool validateSniperScope(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* capture = std::getenv("GDP_SNIPER_SCOPE_CAPTURE_DIR");
+    bool passed = true;
+    const std::vector<std::array<int, 2>> sizes = capture
+        ? std::vector<std::array<int, 2>>{{1280, 720}, {960, 600}, {320, 200}}
+        : std::vector<std::array<int, 2>>{{320, 200}, {384, 240}, {480, 200}, {200, 320}};
+    for (const auto dimensions : sizes) for (const bool potato : {false, true})
+    for (const float fov : {60.0F, 100.0F}) {
+        const int width = dimensions[0], height = dimensions[1];
+        const int cx = width / 2, cy = height / 2;
+        const float radius = 0.44F * static_cast<float>(std::min(width, height));
+        HudRenderData hud;
+        hud.worldRenderScalePercent = potato ? 50U : 100U;
+        hud.detailedMaterials = !potato;
+        hud.graphicsQuality = potato ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+        CameraData camera;
+        camera.verticalFieldOfViewDegrees = fov * 0.35F;
+        camera.position = {1.8F, 1.62F, 4.0F};
+        camera.forward = wkc::core::normalized(wkc::core::Vec3{0.0F, -0.05F, -1.0F});
+        WeaponViewmodelRenderData model{.visible = true, .role = HudWeaponRole::Sniper,
+            .visualSeed = 1717U, .aimStrength = 1.0F};
+        const auto read = [&] {
+            std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            return pixels;
+        };
+        const auto frame = [&](const WeaponViewmodelRenderData& weapon, const HudRenderData& ui) {
+            passed &= renderer.render(width, height, camera, {}, {}, {}, {}, {}, {}, {}, {}, ui, {}, weapon);
+            return read();
+        };
+        const auto reference = frame({}, hud);
+        const auto worldStats = renderer.lastFrameStats();
+        const auto scope = frame(model, hud);
+        const auto scopedStats = renderer.lastFrameStats();
+        // No additional world rendering; viewmodel is absent at complete aim.
+        passed &= scopedStats.drawCalls == worldStats.drawCalls
+            && scopedStats.triangles == worldStats.triangles;
+        const auto offset = [&](int x, int y) { return static_cast<std::size_t>((y * width + x) * 4); };
+        const auto isDark = [&](int x, int y) {
+            const auto i = offset(x, y);
+            return scope[i] <= 3U && scope[i + 1U] <= 3U && scope[i + 2U] <= 3U;
+        };
+        passed &= isDark(2, 2) && isDark(width - 3, height - 3);
+        // Equal radius along both axes, including portrait and ultrawide fixtures.
+        const int inner = static_cast<int>(radius) - 10;
+        const int outer = static_cast<int>(radius) + 5;
+        for (const auto xy : {std::array{cx + inner, cy + 8}, std::array{cx + 8, cy + inner},
+                 std::array{cx - inner, cy - 8}, std::array{cx - 8, cy - inner}}) {
+            const auto i = offset(xy[0], xy[1]);
+            passed &= std::equal(scope.begin() + static_cast<std::ptrdiff_t>(i),
+                scope.begin() + static_cast<std::ptrdiff_t>(i + 3U),
+                reference.begin() + static_cast<std::ptrdiff_t>(i));
+        }
+        passed &= isDark(cx + outer, cy + 4) && isDark(cx + 4, cy + outer);
+        // White standard crosshair is not also painted over the optical reticle.
+        passed &= isDark(cx + 8, cy) && isDark(cx, cy + 8);
+        const auto center = offset(cx, cy);
+        passed &= scope[center] > 160U && scope[center + 1U] > 160U;
+
+        model.aimStrength = 0.5F;
+        const auto partial = frame(model, hud);
+        passed &= partial != scope && partial != reference;
+        model.aimStrength = 0.0F;
+        const auto hip = frame(model, hud);
+        model.aimStrength = 1.0F;
+        model.reloadProgress = 0.4F;
+        const auto reload = frame(model, hud);
+        model.aimStrength = 0.0F;
+        passed &= reload == frame(model, hud);
+        model.reloadProgress = 0.0F;
+        model.aimStrength = 1.0F;
+        model.equipStrength = 0.4F;
+        const auto equip = frame(model, hud);
+        model.aimStrength = 0.0F;
+        passed &= equip == frame(model, hud);
+        model.equipStrength = 0.0F;
+        model.aimStrength = 1.0F;
+        for (int menu = 0; menu < 7; ++menu) {
+            auto ui = hud;
+            if (menu == 0) ui.paused = true;
+            if (menu == 1) ui.mainMenu = true;
+            if (menu == 2) ui.settingsMenu = true;
+            if (menu == 3) ui.controlsMenu = true;
+            if (menu == 4) ui.listMenu.active = true;
+            if (menu == 5) ui.objective = ObjectiveRenderState::Victory;
+            if (menu == 6) ui.objective = ObjectiveRenderState::Defeat;
+            const auto disabled = frame(model, ui);
+            model.aimStrength = 0.0F;
+            passed &= disabled == frame(model, ui);
+            model.aimStrength = 1.0F;
+        }
+        model.role = HudWeaponRole::Pistol;
+        const auto pistol = frame(model, hud);
+        model.aimStrength = 0.0F;
+        passed &= pistol == frame(model, hud);
+        model.role = HudWeaponRole::Sniper;
+        // Return to aim, then release: no stale shader mode left on UI or next frame.
+        model.aimStrength = 1.0F;
+        passed &= scope == frame(model, hud);
+        model.aimStrength = 0.0F;
+        passed &= hip == frame(model, hud);
+        if (capture) {
+            std::filesystem::create_directories(capture);
+            const auto save = [&](const std::vector<std::uint8_t>& pixels, const std::string& suffix) {
+                std::vector<std::uint8_t> topDown(pixels.size());
+                const auto stride = static_cast<std::size_t>(width * 4);
+                for (int y = 0; y < height; ++y) std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride, stride,
+                    topDown.data() + static_cast<std::size_t>(y) * stride);
+                auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
+                    topDown.data(), width * 4);
+                const auto path = std::filesystem::path{capture}
+                    / ("sniper-scope-v2-" + std::to_string(width) + "x" + std::to_string(height)
+                        + (potato ? "-potato" : "-medium") + "-fov" + std::to_string(int(fov))
+                        + "-" + suffix + ".bmp");
+                const bool saved = surface && SDL_SaveBMP(surface, path.string().c_str());
+                SDL_DestroySurface(surface);
+                return saved;
+            };
+            passed &= save(scope, "aim") && save(hip, "hip");
+            hud.visible = true; hud.weapon = HudWeaponRole::Sniper;
+            hud.magazineAmmo = 5U; hud.reserveAmmo = 3U;
+            model.aimStrength = 1.0F;
+            passed &= save(frame(model, hud), "hud");
+        }
+        if (!passed) {
+            std::cerr << "Sniper scope failed: " << width << 'x' << height
+                << " potato=" << potato << " fov=" << fov << '\n';
+            return false;
+        }
+    }
+    return passed;
+}
+
 } // namespace
 
 int main(const int argc, char** argv)
 {
     const bool reloadOnly = argc == 2 && std::string{argv[1]} == "--reload-only";
+    const bool scopeOnly = argc == 2 && std::string{argv[1]} == "--scope-only";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -625,6 +762,8 @@ int main(const int argc, char** argv)
             std::cerr << "Renderer failed to produce a frame\n";
         } else if (reloadOnly) {
             passed = validateWeaponReloads(renderer);
+        } else if (scopeOnly) {
+            passed = validateSniperScope(renderer) && validateNewWeaponVisuals(renderer);
         } else {
             std::vector<std::uint8_t> baseline(
                 static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U);
@@ -2097,6 +2236,7 @@ int main(const int argc, char** argv)
             passed = validateFrontendMenus(renderer) && passed;
             passed = validateTacticalHud(renderer) && passed;
             passed = validateNewWeaponVisuals(renderer) && passed;
+            passed = validateSniperScope(renderer) && passed;
             passed = validateInstancingTolerance() && passed;
         }
     }

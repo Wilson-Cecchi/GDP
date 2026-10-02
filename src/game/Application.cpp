@@ -1545,6 +1545,8 @@ void Application::processEvents()
 
 void Application::setPaused(const bool paused)
 {
+    if (paused && weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
+        aimBlend_ = 0.0F;
     if (paused) {
         gameplay::openPauseMenu(pauseMenu_);
     } else {
@@ -2025,10 +2027,12 @@ void Application::fixedUpdate(const double fixedStep)
     const bool aimRequested = player_.state().alive
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
         && gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Aim, input_);
-    aimBlend_ = std::clamp(aimBlend_
-            + (aimRequested ? 1.0F : -1.0F) * step
-                / gameplay::weaponAimDurationSeconds(weapon_.definition().archetype),
-        0.0F, 1.0F);
+    const bool scopeBlocked = weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper
+        && (weapon_.reloading() || weapon_.switching() || weaponEquipRemaining_ > 0.0F);
+    aimBlend_ = gameplay::advanceWeaponAimBlend(aimBlend_, step,
+        weapon_.definition().archetype, aimRequested,
+        scopeBlocked || !player_.state().alive
+            || session_.state().phase != gameplay::SessionPhase::Playing);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
     weaponMeleeRemaining_
@@ -2368,6 +2372,8 @@ void Application::fixedUpdate(const double fixedStep)
     }
     if (reloadPending_ && player_.state().alive) {
         if (weapon_.reload()) {
+            if (weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
+                aimBlend_ = 0.0F;
             std::ostringstream message;
             message << "Weapon reload started: " << weapon_.magazineAmmo() << '/'
                     << weapon_.reserveAmmo();
@@ -3828,6 +3834,9 @@ void Application::render()
                 : hud.weapon == visual::HudWeaponRole::Knife
                     ? 0x4b4e494645ULL : 0x504953544f4cULL),
         .reloadRoundCount = weapon_.reloadRoundCount(),
+        .aimStrength = !pauseMenu_.paused && !controlsMenuActive_
+                && !weapon_.reloading() && !weapon_.switching()
+            ? aimBlend_ : 0.0F,
     };
     currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
         visibleEnemies.size());

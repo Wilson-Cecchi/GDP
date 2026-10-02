@@ -42,10 +42,25 @@ uniform sampler2D uAtlas;
 uniform vec2 uGlyphOrigin;
 uniform vec2 uGlyphSize;
 uniform int uUseFont;
+uniform vec2 uViewport;
 uniform vec3 uColor;
 uniform float uAlpha;
+uniform float uScopeRadius;
 out vec4 fragmentColor;
 void main() {
+    if (uUseFont == 2) {
+        // Pixel-space circle, independent of world scale/FOV and aspect ratio.
+        vec2 p = gl_FragCoord.xy - uViewport * 0.5;
+        float radius = length(p);
+        float outside = smoothstep(uScopeRadius - 1.0, uScopeRadius + 1.0, radius);
+        float rim = smoothstep(uScopeRadius - 6.0, uScopeRadius - 1.0, radius);
+        float crosshair = 1.0 - smoothstep(0.45, 1.05, min(abs(p.x), abs(p.y)));
+        float center = 1.0 - smoothstep(1.0, 1.8, radius);
+        float coverage = max(max(outside, rim * 0.85), crosshair);
+        fragmentColor = vec4(mix(uColor, vec3(0.83, 0.86, 0.85), center),
+            uAlpha * max(coverage, center));
+        return;
+    }
     float coverage = uUseFont == 0 ? 1.0 : textureLod(uAtlas,
         uGlyphOrigin + vec2(vLocal.x, 1.0 - vLocal.y) * uGlyphSize, 0.0).r;
     fragmentColor = vec4(uColor, uAlpha * coverage);
@@ -1183,6 +1198,11 @@ bool GdpRenderer::render(
     if (!initialized_ || width <= 0 || height <= 0) {
         return false;
     }
+    const bool scopeAllowed = !hud.paused && !hud.mainMenu && !hud.settingsMenu
+        && !hud.controlsMenu && !hud.listMenu.active && !hud.exitConfirmation
+        && hud.objective != ObjectiveRenderState::Victory
+        && hud.objective != ObjectiveRenderState::Defeat;
+    const float scopeStrength = scopeAllowed ? sniperScopeStrength(weaponViewmodel) : 0.0F;
     const int renderScalePercent = std::clamp(
         static_cast<int>(hud.worldRenderScalePercent), 50, 100);
     const int renderWidth = std::max(1, (width * renderScalePercent) / 100);
@@ -2176,7 +2196,7 @@ bool GdpRenderer::render(
 
     const HudWeaponRole viewmodelRole = weaponViewmodel.role == HudWeaponRole::SubmachineGun
         ? HudWeaponRole::Carbine : weaponViewmodel.role;
-    if (weaponViewmodel.visible
+    if (weaponViewmodel.visible && scopeStrength < 0.95F
         && static_cast<std::size_t>(viewmodelRole) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
         // The world FOV belongs to the player's camera, not to the weapon.
@@ -2216,7 +2236,8 @@ bool GdpRenderer::render(
             carbine ? -0.48F : knife ? -0.38F : -0.31F,
             carbine ? 1.18F : knife ? 0.83F : 0.94F,
         };
-        const wkc::core::Vec3 localOffset = baseOffset + pose.offset;
+        const wkc::core::Vec3 localOffset = baseOffset + pose.offset
+            + wkc::core::Vec3{0.0F, -0.65F * scopeStrength, 0.0F};
         const wkc::core::Vec3 anchor = camera.position
             + (right * localOffset.x) + (up * localOffset.y)
             + (forward * localOffset.z);
@@ -2364,7 +2385,10 @@ bool GdpRenderer::render(
         uiShader_.setVec2(gl_, "uSize", {static_cast<float>(rect.width), static_cast<float>(rect.height)});
         uiShader_.setVec3(gl_, "uColor", color);
         uiShader_.setFloat(gl_, "uAlpha", alpha);
-        uiShader_.setInt(gl_, "uUseFont", glyph >= 0 ? 1 : 0);
+        uiShader_.setInt(gl_, "uUseFont", glyph == -2 ? 2 : glyph >= 0 ? 1 : 0);
+        if (glyph == -2) {
+            uiShader_.setFloat(gl_, "uScopeRadius", 0.44F * static_cast<float>(std::min(width, height)));
+        }
         if (glyph >= 0) {
             uiFont_.bind(gl_, textureBindings_);
             uiShader_.setInt(gl_, "uAtlas", 0);
@@ -2378,6 +2402,10 @@ bool GdpRenderer::render(
         glDisable(GL_BLEND);
         glEnable(GL_SCISSOR_TEST);
     };
+    // Native overlay before resource/map/menu HUD: no second world pass.
+    if (scopeStrength > 0.0F) {
+        drawUiQuad({0, 0, width, height}, {0.005F, 0.007F, 0.008F}, scopeStrength, -2);
+    }
     const auto drawBitmapText = [&](const int x, const int y, const int scale,
                                     const std::string_view source, const wkc::core::Vec3 color) {
         const auto text = localize(hud.language, source);
@@ -3553,7 +3581,7 @@ bool GdpRenderer::render(
         drawBitmapText((width - controlsWidth) / 2,
             layout.panel.y + (6 * scale),
             1, controls, uiTheme.mutedText);
-    } else {
+    } else if (scopeStrength == 0.0F) {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
         const int centerX = width / 2;
         const int centerY = height / 2;

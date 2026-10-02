@@ -79,6 +79,60 @@ resultado final:
 
 ## Propostas ativas
 
+### Sniper — luneta v2 e visão de mira v1
+
+```text
+unidades visuais: Weapon/Sniper optic v2; HUD/Sniper scoped view v1
+data: 2026-10-02
+prancha: visual/proposals/sniper_scope_proposal_v2.png
+contrato/prompt: visual/proposals/sniper_scope_proposal_v2.md
+variantes da luneta: Mantido / Usado / Gasto (Usado recomendada)
+vistas: close da luneta; SEM MIRA e MOUSE2 ilustrativos
+seeds: não aplicável à prancha conceitual
+pedido: luneta mais visível e retículo na visão de mira
+resposta funcional: "As duas coisas"
+decisão visual desta prancha: "aprovado pode implementar" — Usado v2 / mira v1
+commit de implementação: feat: implement approved sniper optic and scoped aim
+capturas nativas: visual/validation/sniper_optic_v2_gameplay.png;
+                 visual/validation/sniper_optic_v2_ground.png;
+                 visual/validation/sniper_scope_v2_medium_1280x720.png;
+                 visual/validation/sniper_scope_v2_medium_960x600.png;
+                 visual/validation/sniper_scope_v2_medium_320x200.png;
+                 visual/validation/sniper_scope_v2_potato_1280x720.png
+estado: IMPLEMENTADA EM VALIDAÇÃO — aceitação no jogo pendente
+```
+
+Preserva a identidade da sniper v1 fora da luneta e o HUD Tático fora da visão
+de mira. Aprovações da sniper v1 e do player Usado não se estendem a esta prancha.
+Zoom e balanceamento preservados. A abertura é inteira na build, diferente do
+corte do painel ilustrativo explicitado ao aprovar. Capturas da fixture OpenGL
+offscreen não equivalem a playtest manual. Evidências e roteiro de teste estão
+em `04_gameplay/sniper_scope_2026-10-02.md`. O player segue aprovado, ainda
+sem implementação nesta etapa.
+
+### Player presentation — v1
+
+```text
+unidade visual: Player presentation — corpo e mãos em primeira pessoa
+versão: v1 — uniforme industrial grafite
+data: 2026-10-02
+prancha: visual/proposals/player_body_proposal_v1.png
+contrato/prompt: visual/proposals/player_body_proposal_v1.md
+variantes: Mantido / Usado / Gasto (Usado recomendada)
+referência: captura nativa da carabina Used, somente contexto de estilo
+seeds: não aplicável à prancha conceitual; não é saída do gerador do jogo
+pedido: pernas visíveis e animadas ao andar/pular/agachar; mãos nas recargas
+decisão do usuário: "visual aprovado" — Usado APROVADA PARA IMPLEMENTAÇÃO
+commit de implementação: nenhum
+capturas no jogo: nenhuma; prancha gerada não é screenshot da build
+estado: APROVADA PARA IMPLEMENTAÇÃO — Usado
+```
+
+Não aprova redesenho das armas, inimigos, HUD ou ambientes. Corpo proposto
+é humano, com tecido/couro/borracha foscos, não metálico ou robótico.
+Animações deverão acompanhar simulação e contatos reais; nenhum teste técnico
+ou benchmark dessa implementação existe ainda.
+
 ### Weapon/reload — descarte e carregador novo v2
 
 Pedido confirmado: "faça isso no jogo por favor" após proposta de descartar
@@ -444,7 +498,9 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
-| Player presentation | Não revisada |
+| Player presentation | V1 Usado aprovada para implementação |
+| Weapon/Sniper optic | V2 Usado implementada em validação |
+| HUD/Sniper scoped view | V1 implementada em validação |
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |
 | Weapon/ground pickup | V2 modelos Used caídos implementada em validação; V1 substituída |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |

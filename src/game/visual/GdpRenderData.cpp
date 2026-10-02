@@ -1415,6 +1415,18 @@ WeaponReloadPose sampleWeaponReloadPose(
     return pose;
 }
 
+float sniperScopeStrength(const WeaponViewmodelRenderData& weapon) noexcept
+{
+    if (!weapon.visible || weapon.role != HudWeaponRole::Sniper
+        || !std::isfinite(weapon.aimStrength)
+        || !std::isfinite(weapon.reloadProgress) || weapon.reloadProgress != 0.0F
+        || !std::isfinite(weapon.equipStrength) || weapon.equipStrength != 0.0F) {
+        return 0.0F;
+    }
+    const float blend = std::clamp(weapon.aimStrength, 0.0F, 1.0F);
+    return blend * blend * (3.0F - 2.0F * blend);
+}
+
 WeaponViewmodelPose sampleWeaponViewmodelPose(
     const WeaponViewmodelRenderData& weapon) noexcept
 {

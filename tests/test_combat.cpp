@@ -3040,6 +3040,20 @@ void testEnemyNoisePerception()
 void testExpandedWeaponProfilesAndInventory()
 {
     using namespace gdp::gameplay;
+    const auto sniperType = WeaponArchetype::Sniper;
+    expect(near(advanceWeaponAimBlend(0.0F, 0.175F, sniperType, true), 0.5F)
+        && near(advanceWeaponAimBlend(0.5F, 0.175F, sniperType, true), 1.0F)
+        && near(advanceWeaponAimBlend(1.0F, 0.175F, sniperType, false), 0.5F),
+        "sniper aim preserves its 0.35 second entry and release transition");
+    expect(advanceWeaponAimBlend(1.0F, 0.01F, sniperType, true, true) == 0.0F
+        && advanceWeaponAimBlend(1.0F, 0.01F, WeaponArchetype::Knife, true) == 0.0F,
+        "blocked aim or knife immediately removes stale zoom");
+    expect(advanceWeaponAimBlend(0.5F, -1.0F, sniperType, true) == 0.5F
+        && advanceWeaponAimBlend(0.5F, std::numeric_limits<float>::infinity(), sniperType, true) == 0.5F
+        && advanceWeaponAimBlend(std::numeric_limits<float>::quiet_NaN(), 0.0F, sniperType, true) == 0.0F,
+        "aim transition sanitizes invalid clocks and stale non-finite state");
+    expect(near(weaponAimFovScale(sniperType), 0.35F)
+        && near(weaponAimDurationSeconds(sniperType), 0.35F), "scope adds no extra zoom");
     for (const auto type : {WeaponArchetype::Sniper, WeaponArchetype::Shotgun, WeaponArchetype::SubmachineGun}) {
         Weapon weapon;
         expect(weapon.equip(type), "new primary equips beside starter pistol");

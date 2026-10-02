@@ -253,6 +253,53 @@ struct ApplicationMenuTestAccess {
             key(Key::Digit1); release(); app.fixedUpdate(1.0 / 60.0); app.render();
             expect(app.weapon_.definition().archetype == type && !app.fatalError_,
                 "live primary key and rendering support each new firearm after selecting Knife");
+            if (type == gameplay::WeaponArchetype::Sniper) {
+                // Isolate presentation transitions from combat and physical input.
+                for (const auto id : app.entities_.query(entities::EntityKind::Enemy)) {
+                    auto* enemy = app.entities_.findData<entities::EnemyData>(id);
+                    enemy->health = 0.0F;
+                    enemy->behavior = entities::EnemyBehaviorState::Dead;
+                }
+                app.weapon_.fixedUpdate(1.0F);
+                app.weaponEquipRemaining_ = 0.0F;
+                release(); app.input_.handleMouseButton(MouseButton::Secondary, true, {});
+                for (int tick = 0; tick < 22; ++tick) app.fixedUpdate(1.0 / 60.0);
+                expect(app.aimBlend_ > 0.999F, "Mouse2 fully aims the live sniper");
+                app.render();
+                release(); app.fixedUpdate(0.175);
+                expect(std::abs(app.aimBlend_ - 0.5F) < 0.001F,
+                    "Mouse2 release preserves the existing smooth zoom-out");
+                const auto aimIndex = static_cast<std::size_t>(gameplay::ControlAction::Aim);
+                const auto originalAim = app.runtimeSettings_.controls.values[aimIndex];
+                app.runtimeSettings_.controls.values[aimIndex] = gameplay::bindingForName("T").value();
+                release(); app.input_.handleKey(Key::T, true); app.fixedUpdate(0.175);
+                expect(app.aimBlend_ > 0.999F, "aim uses remapped action, not hard-coded Mouse2");
+                app.runtimeSettings_.controls.values[aimIndex] = originalAim;
+                release(); app.input_.handleMouseButton(MouseButton::Secondary, true, {});
+                app.reloadPending_ = true; app.fixedUpdate(1.0 / 60.0);
+                expect(!app.weapon_.reloading() && app.aimBlend_ > 0.999F,
+                    "rejected reload with a full magazine does not blink the scope");
+                (void)app.weapon_.tryFire();
+                app.reloadPending_ = true; app.fixedUpdate(1.0 / 60.0);
+                expect(app.weapon_.reloading() && app.aimBlend_ == 0.0F,
+                    "starting reload clears scope immediately");
+                app.weapon_.fixedUpdate(3.0F);
+                app.aimBlend_ = 1.0F;
+                app.setPaused(true);
+                expect(app.aimBlend_ == 0.0F, "opening pause clears sniper zoom");
+                app.setPaused(false);
+                app.aimBlend_ = 1.0F;
+                app.weaponSwitchPending_ = gameplay::WeaponArchetype::Pistol;
+                release(); app.fixedUpdate(1.0 / 60.0);
+                expect(app.aimBlend_ == 0.0F
+                    && app.weapon_.definition().archetype == gameplay::WeaponArchetype::Pistol,
+                    "switching away cannot carry scope to the pistol");
+                (void)app.weapon_.switchTo(type); app.weapon_.fixedUpdate(1.0F);
+                app.aimBlend_ = 1.0F; app.dropPending_ = true;
+                app.fixedUpdate(1.0 / 60.0);
+                expect(app.aimBlend_ == 0.0F && !app.weapon_.ownsWeapon(type),
+                    "dropping sniper removes its optical state");
+            }
         }
         release(); app.fixedUpdate(1.0 / 60.0); app.render();
         expect(!app.fatalError_, "arena supports simulation and rendering");

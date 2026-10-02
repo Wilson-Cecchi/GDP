@@ -54,6 +54,10 @@ especializados das pastas numeradas.
   Sniper e escopeta têm modelos próprios metálicos Used v1, na mão e no chão,
   implementados após aprovação das pranchas e aguardando aceitação no jogo.
   A SMG ainda usa provisoriamente a carabina até sua proposta visual.
+  A sniper ganhou luneta Used v2 e visão circular com retículo ao segurar
+  a ação Mira (`Mouse2` por padrão, remapeável). O zoom e o balanceamento
+  permanecem iguais; recarga, troca, drop e menu retiram a visão de mira.
+  [Contrato e validação](04_gameplay/sniper_scope_2026-10-02.md).
   As cinco armas de fogo têm recargas visuais próprias, com peças móveis;
   pistola, rifle, SMG e sniper descartam o pente usado e suas balas restantes,
   consumindo outro cheio. O HUD conta reservas em pentes; escopeta usa cartuchos.

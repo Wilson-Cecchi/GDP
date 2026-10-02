@@ -1329,6 +1329,39 @@ void testWeaponViewmodelPose()
         "weapon pose sanitizes non-finite and out-of-range animation input");
 }
 
+void testSniperScopePresentation()
+{
+    using namespace gdp::game::visual;
+    WeaponViewmodelRenderData model{.visible = true, .role = HudWeaponRole::Sniper};
+    expect(sniperScopeStrength(model) == 0.0F, "hip fire has no scope overlay");
+    model.aimStrength = 0.5F;
+    expect(sniperScopeStrength(model) == 0.5F, "scope blends deterministically at half aim");
+    model.aimStrength = 1.0F;
+    expect(sniperScopeStrength(model) == 1.0F, "full sniper aim activates optical view");
+    for (const auto role : {HudWeaponRole::Pistol, HudWeaponRole::Carbine,
+             HudWeaponRole::Knife, HudWeaponRole::Shotgun, HudWeaponRole::SubmachineGun}) {
+        model.role = role;
+        expect(sniperScopeStrength(model) == 0.0F, "other weapons never inherit sniper scope");
+    }
+    model.role = HudWeaponRole::Sniper;
+    model.reloadProgress = 0.2F;
+    expect(sniperScopeStrength(model) == 0.0F, "reload suppresses the optical view");
+    model.reloadProgress = 0.0F;
+    model.equipStrength = 0.2F;
+    expect(sniperScopeStrength(model) == 0.0F, "equip suppresses the optical view");
+    model.equipStrength = 0.0F;
+    model.visible = false;
+    expect(sniperScopeStrength(model) == 0.0F, "hidden or dead player cannot leave scope active");
+    model.visible = true;
+    for (const float strength : {-1.0F, std::numeric_limits<float>::quiet_NaN(),
+             std::numeric_limits<float>::infinity()}) {
+        model.aimStrength = strength;
+        expect(sniperScopeStrength(model) == 0.0F, "invalid aim input does not create an overlay");
+    }
+    model.aimStrength = 2.0F;
+    expect(sniperScopeStrength(model) == 1.0F, "finite aim clamps to full scope");
+}
+
 void testDroppedWeaponPose()
 {
     using namespace gdp::game::visual;
@@ -1633,6 +1666,7 @@ int main()
     testEnemyRootAnimation();
     testImpactVisualData();
     testWeaponViewmodelPose();
+    testSniperScopePresentation();
     testWeaponReloadProfiles();
     testDroppedWeaponPose();
     testOptimizedShadowBudget();

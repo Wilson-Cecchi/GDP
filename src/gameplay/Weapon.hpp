@@ -154,6 +154,8 @@ inline constexpr float shotgunReadySeconds = 0.30F;
 [[nodiscard]] std::uint8_t weaponProjectileCount(WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponAimDurationSeconds(WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponAimFovScale(WeaponArchetype archetype) noexcept;
+[[nodiscard]] float advanceWeaponAimBlend(float current, float seconds,
+    WeaponArchetype archetype, bool requested, bool blocked = false) noexcept;
 [[nodiscard]] const char* weaponArchetypeName(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(

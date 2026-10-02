@@ -76,6 +76,16 @@ float weaponAimFovScale(const WeaponArchetype archetype) noexcept
     return archetype == WeaponArchetype::Sniper ? 0.35F : 0.78F;
 }
 
+float advanceWeaponAimBlend(const float current, const float seconds,
+    const WeaponArchetype archetype, const bool requested, const bool blocked) noexcept
+{
+    if (blocked || !isFirearmArchetype(archetype)) return 0.0F;
+    const float blend = std::isfinite(current) ? std::clamp(current, 0.0F, 1.0F) : 0.0F;
+    if (!std::isfinite(seconds) || seconds <= 0.0F) return blend;
+    return std::clamp(blend + (requested ? 1.0F : -1.0F)
+        * seconds / weaponAimDurationSeconds(archetype), 0.0F, 1.0F);
+}
+
 WeaponDefinition baseWeaponDefinition(const WeaponArchetype archetype) noexcept
 {
     if (archetype == WeaponArchetype::Sniper) return {65.0F, 1.20F, 90.0F, 5U, 3U, archetype};

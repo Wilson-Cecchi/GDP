@@ -221,7 +221,11 @@ struct WeaponViewmodelRenderData {
     bool overdrive{false};
     wkc::core::Seed visualSeed{0U};
     std::uint32_t reloadRoundCount{6U};
+    float aimStrength{0.0F};
 };
+
+// Presentation only: no camera, input, damage or ammo ownership.
+[[nodiscard]] float sniperScopeStrength(const WeaponViewmodelRenderData& weapon) noexcept;
 
 struct WeaponViewmodelPose {
     wkc::core::Vec3 offset{};
