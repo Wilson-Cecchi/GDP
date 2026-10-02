@@ -79,6 +79,28 @@ resultado final:
 
 ## Propostas ativas
 
+### Weapon/reload — animações rígidas v1
+
+```text
+unidade visual: animação de recarga por arma; sem revisão de texturas
+pedido do usuário: "podemos colocar animação de recando as armas para cada arma diferente?"
+data: 2026-10-02
+contrato: 04_gameplay/weapon_reload_animation_2026-10-02.md
+escopo: pistola, carabina, sniper, escopeta e SMG provisória; faca sem recarga
+implementação: perfis próprios e peças rígidas móveis; sem mãos/IK
+capturas: visual/validation/weapon_reload_v1_pistol.gif;
+          visual/validation/weapon_reload_v1_carbine.gif;
+          visual/validation/weapon_reload_v1_smg.gif;
+          visual/validation/weapon_reload_v1_sniper.gif;
+          visual/validation/weapon_reload_v1_shotgun.gif
+estado: IMPLEMENTADA EM VALIDAÇÃO; aceitação visual final pendente
+```
+
+As sequências são da fixture nativa offscreen, seed 1717, 31 poses/arma,
+640×360. As cores/texturas e as silhuetas externas não foram redesenhadas;
+somente particionadas para articulação. A SMG não ganhou arte própria nem
+aprovação de modelo por receber um perfil de animação.
+
 ### Weapon/Sniper e Weapon/Shotgun — v1
 
 ```text

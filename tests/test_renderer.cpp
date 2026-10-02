@@ -1280,9 +1280,9 @@ void testWeaponViewmodelPose()
         .visible = true,
         .reloadProgress = 1.0F,
     });
-    expect(reloadPeak.offset.x < 0.0F && reloadPeak.offset.y < 0.0F
+    expect(reloadPeak.offset.x < 0.0F && reloadPeak.offset.y > 0.0F
             && reloadPeak.rotationDegrees.z > 30.0F,
-        "reload follows a readable lowered side arc");
+        "reload raises the magazine into view and follows a readable side arc");
     expect(nearlyEqual(reloadEnd.offset.x, idle.offset.x, 1.0e-5F)
             && nearlyEqual(reloadEnd.offset.y, idle.offset.y, 1.0e-5F)
             && nearlyEqual(reloadEnd.rotationDegrees.z,
@@ -1379,6 +1379,63 @@ void testDroppedWeaponPose()
         expect(lowestPoint >= -0.002F && lowestPoint < 0.025F,
             "settled weapon mesh touches floor without clipping");
     }
+}
+
+void testWeaponReloadProfiles()
+{
+    using namespace gdp::game::visual;
+    constexpr std::array roles{HudWeaponRole::Pistol, HudWeaponRole::Carbine,
+        HudWeaponRole::SubmachineGun, HudWeaponRole::Sniper, HudWeaponRole::Shotgun};
+    for (const auto role : roles) {
+        const auto idle = sampleWeaponReloadPose(role, 0.0F);
+        expect(sampleWeaponReloadPose(role, 1.0F) == idle,
+            "reload parts and body return exactly to their idle pose");
+        expect(sampleWeaponReloadPose(role, -1.0F) == idle
+                && sampleWeaponReloadPose(role, 3.0F) == idle
+                && sampleWeaponReloadPose(role, std::numeric_limits<float>::quiet_NaN()) == idle,
+            "reload progress is safely clamped and sanitizes NaN");
+        for (int i = 0; i <= 100; ++i) {
+            const auto pose = sampleWeaponReloadPose(role, float(i) / 100.0F);
+            expect(wkc::core::length(pose.weapon.offset) < 0.25F
+                    && wkc::core::length(pose.magazineOffset) < 0.5F
+                    && wkc::core::length(pose.mechanismOffset) < 0.2F,
+                "rigid reload transforms stay within a restrained finite budget");
+        }
+        for (const auto other : roles) if (role != other)
+            expect(sampleWeaponReloadPose(role, 0.45F) != sampleWeaponReloadPose(other, 0.45F),
+                "each firearm has a distinct reload profile, including the placeholder SMG");
+        const auto full = makeWeaponViewmodelMeshes(role);
+        const auto parts = makeWeaponViewmodelParts(role);
+        std::size_t completeIndices = 0, splitIndices = 0;
+        for (std::size_t m = 0; m < weaponMaterialCount; ++m) {
+            completeIndices += full[m].indices.size();
+            for (std::size_t p = 0; p < weaponPartCount; ++p) {
+                const auto& mesh = parts[p][m];
+                if (!mesh.vertices.empty())
+                    expect(wkc::render::validateMeshData(mesh), "reload part mesh is valid");
+                if (role == HudWeaponRole::Shotgun
+                    && p == static_cast<std::size_t>(WeaponPart::Magazine)) continue;
+                splitIndices += mesh.indices.size();
+                for (const auto& vertex : mesh.vertices)
+                    expect((p == 1U && vertex.semanticRegion == 2U)
+                            || (p == 2U && vertex.semanticRegion == 3U)
+                            || (p == 0U && vertex.semanticRegion < 2U),
+                        "rigid parts only contain their own authored semantic regions");
+            }
+        }
+        expect(completeIndices == splitIndices, "rigid partition neither loses nor duplicates triangles");
+        for (const auto part : {WeaponPart::Magazine, WeaponPart::Mechanism}) {
+            std::size_t indices = 0;
+            for (const auto& mesh : parts[static_cast<std::size_t>(part)]) indices += mesh.indices.size();
+            expect(indices > 0, "firearms provide an actual magazine/cartridge and moving mechanism");
+        }
+    }
+    const auto knife = sampleWeaponReloadPose(HudWeaponRole::Knife, 0.5F);
+    expect(knife.weapon == WeaponViewmodelPose{} && !knife.magazineVisible,
+        "knife never plays a fictitious reload");
+    expect(sampleWeaponReloadPose(HudWeaponRole::Shotgun, 0.31F, 1U).magazineOffset
+            != sampleWeaponReloadPose(HudWeaponRole::Shotgun, 0.31F, 6U).magazineOffset,
+        "shotgun insertion cadence follows the actual number of rounds being loaded");
 }
 
 void testOptimizedShadowBudget()
@@ -1565,6 +1622,7 @@ int main()
     testEnemyRootAnimation();
     testImpactVisualData();
     testWeaponViewmodelPose();
+    testWeaponReloadProfiles();
     testDroppedWeaponPose();
     testOptimizedShadowBudget();
     testIndustrialUiTheme();

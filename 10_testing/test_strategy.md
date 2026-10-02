@@ -648,6 +648,12 @@ drivers e resultados da revisão visual/CI:
 
 ### Instrumentação
 
+A revisão de recarga por arma adiciona `weapon_reload_opengl` (CLI
+`gdp_renderer_gl_tests --reload-only`) separado do gate de pixels anterior.
+CPU valida perfis, peças, limites e retorno ao repouso; OpenGL valida recargas
+distintas, cartuchos, retorno exato e MEDIUM/POTATO. Contrato/recaptura:
+`04_gameplay/weapon_reload_animation_2026-10-02.md`.
+
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
 
 O preset CMake `sanitizers` ativa ambos em GCC/Clang e executa a mesma suíte de

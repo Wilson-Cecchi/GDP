@@ -272,6 +272,8 @@ private:
     wkc::render::Mesh box_{};
     std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
         weaponRoleCount> weaponMeshes_{};
+    std::array<std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
+        weaponPartCount>, weaponRoleCount> weaponPartMeshes_{};
     std::array<WeaponGpuMaterial, weaponMaterialCount> weaponMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};

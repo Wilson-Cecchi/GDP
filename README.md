@@ -53,8 +53,10 @@ especializados das pastas numeradas.
   `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
   Sniper e escopeta têm modelos próprios metálicos Used v1, na mão e no chão,
   implementados após aprovação das pranchas e aguardando aceitação no jogo.
-  A SMG ainda usa provisoriamente a carabina até sua proposta visual. Para ensaiá-las:
-  `build/release/gdp --test-mode`. Saves anteriores de regras 34 têm migração
+  A SMG ainda usa provisoriamente a carabina até sua proposta visual.
+  As cinco armas de fogo têm recargas visuais próprias, com peças móveis;
+  [contrato e teste manual](04_gameplay/weapon_reload_animation_2026-10-02.md).
+  Para ensaiá-las: `build/release/gdp --test-mode`. Saves anteriores de regras 34 têm migração
   explícita preservando recursos; Standard/Speedrun mantêm seu loot anterior.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,

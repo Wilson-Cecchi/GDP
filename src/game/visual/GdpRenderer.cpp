@@ -554,6 +554,14 @@ bool GdpRenderer::initialize(const int width, const int height)
             }
         }
     }
+    for (std::size_t role = 0; role < weaponRoleCount; ++role) {
+        const auto parts = makeWeaponViewmodelParts(static_cast<HudWeaponRole>(role));
+        for (std::size_t part = 0; part < weaponPartCount; ++part)
+            for (std::size_t material = 0; material < weaponMaterialCount; ++material)
+                if (!parts[part][material].vertices.empty()
+                    && !weaponPartMeshes_[role][part][material].upload(gl_, parts[part][material]))
+                    return false;
+    }
     for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
         const WeaponMaterialImages images = makeUsedWeaponMaterialImages(
             static_cast<WeaponMaterial>(material));
@@ -2198,6 +2206,8 @@ bool GdpRenderer::render(
                 - (forward * 0.44F)));
         const WeaponViewmodelPose pose
             = sampleWeaponViewmodelPose(weaponViewmodel);
+        const WeaponReloadPose reloadPose = sampleWeaponReloadPose(
+            weaponViewmodel.role, weaponViewmodel.reloadProgress, weaponViewmodel.reloadRoundCount);
         const bool carbine = weaponViewmodel.role != HudWeaponRole::Pistol
             && weaponViewmodel.role != HudWeaponRole::Knife;
         const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
@@ -2240,24 +2250,39 @@ bool GdpRenderer::render(
         shader.setMat4(gl_, "uModel", root);
         shader.setInt(gl_, "uDetailedMaterial", 1);
         const std::size_t weaponIndex = static_cast<std::size_t>(viewmodelRole);
-        for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
-            const wkc::render::Mesh& mesh = weaponMeshes_[weaponIndex][material];
-            if (!mesh.isValid()) {
-                continue;
+        for (std::size_t part = 0; part < weaponPartCount; ++part) {
+            if (part == static_cast<std::size_t>(WeaponPart::Magazine)
+                && !reloadPose.magazineVisible) continue;
+            const bool magazine = part == static_cast<std::size_t>(WeaponPart::Magazine);
+            const bool mechanism = part == static_cast<std::size_t>(WeaponPart::Mechanism);
+            const wkc::core::Vec3 offset = magazine ? reloadPose.magazineOffset
+                : mechanism ? reloadPose.mechanismOffset : wkc::core::Vec3{};
+            const wkc::core::Vec3 pivot = viewmodelRole == HudWeaponRole::Sniper
+                ? wkc::core::Vec3{0.096F, 0.015F, -0.08F} : wkc::core::Vec3{};
+            const float rotation = mechanism ? reloadPose.mechanismRotationDegrees.z : 0.0F;
+            shader.setMat4(gl_, "uModel", root * wkc::core::translationMatrix(offset)
+                * wkc::core::translationMatrix(pivot)
+                * wkc::core::rotationZMatrix(rotation * degreesToRadians)
+                * wkc::core::translationMatrix(pivot * -1.0F));
+            for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
+                const wkc::render::Mesh& mesh = weaponPartMeshes_[weaponIndex][part][material];
+                if (!mesh.isValid()) {
+                    continue;
+                }
+                const WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
+                gpuMaterial.albedo.bind(gl_, textureBindings_, 0U);
+                gpuMaterial.normal.bind(gl_, textureBindings_, 1U);
+                gpuMaterial.properties.bind(gl_, textureBindings_, 2U);
+                shader.setVec3(gl_, "uTint", materialColors[material]);
+                shader.setFloat(gl_, "uEmissiveStrength",
+                    material == static_cast<std::size_t>(WeaponMaterial::Sight)
+                        ? 0.22F : 0.0F);
+                drawMesh(mesh);
             }
-            const WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
-            gpuMaterial.albedo.bind(gl_, textureBindings_, 0U);
-            gpuMaterial.normal.bind(gl_, textureBindings_, 1U);
-            gpuMaterial.properties.bind(gl_, textureBindings_, 2U);
-            shader.setVec3(gl_, "uTint", materialColors[material]);
-            shader.setFloat(gl_, "uEmissiveStrength",
-                material == static_cast<std::size_t>(WeaponMaterial::Sight)
-                    ? 0.22F : 0.0F);
-            drawMesh(mesh);
         }
 
         // The flash is transient and remains independent of the approved
-        // weapon material. All three weapon bodies above are static GPU meshes.
+        // weapon material. Rigid reload parts reuse their uploaded GPU meshes.
         fallbackTexture_.bind(gl_, textureBindings_);
         shader.setInt(gl_, "uDetailedMaterial", 0);
         shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});

@@ -913,6 +913,12 @@ if(GDP_BUILD_TESTS)
         gdp_enable_sanitizers(wkc_forge_instancing_gl_tests)
 
         add_test(NAME renderer_opengl_pixels COMMAND gdp_renderer_gl_tests)
+        add_test(NAME weapon_reload_opengl COMMAND gdp_renderer_gl_tests --reload-only)
+        set_tests_properties(weapon_reload_opengl PROPERTIES
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen" TIMEOUT 30)
+        if(GDP_ENABLE_SANITIZERS)
+            set_tests_properties(weapon_reload_opengl PROPERTIES TIMEOUT 60)
+        endif()
         set_tests_properties(
             renderer_opengl_pixels
             PROPERTIES

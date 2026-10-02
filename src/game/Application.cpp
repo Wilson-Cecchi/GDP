@@ -3805,9 +3805,8 @@ void Application::render()
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
-        // Only SMG still awaits its own visual proposal.
-        .role = hud.weapon == visual::HudWeaponRole::SubmachineGun
-            ? visual::HudWeaponRole::Carbine : hud.weapon,
+        // SMG retains its animation identity even while sharing Carbine geometry.
+        .role = hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
         .reloadProgress = weapon_.reloadProgress(),
         .equipStrength = std::max(
@@ -3828,6 +3827,8 @@ void Application::render()
                 ? 0x43415242494e45ULL
                 : hud.weapon == visual::HudWeaponRole::Knife
                     ? 0x4b4e494645ULL : 0x504953544f4cULL),
+        .reloadRoundCount = std::min(weapon_.reserveAmmo(),
+            weapon_.definition().magazineSize - weapon_.magazineAmmo()),
     };
     currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
         visibleEnemies.size());

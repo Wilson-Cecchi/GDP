@@ -32,6 +32,10 @@ para recolher uma diferente. Q/scroll e munição independente continuam válido
 Duplicatas procedurais abastecem somente a reserva compatível; drops do jogador
 mantêm a quantidade exata. Trocar de arma não apaga seu cooldown de disparo.
 
+As cinco armas de fogo têm [recargas visuais específicas](weapon_reload_animation_2026-10-02.md),
+com carregadores/mecanismos rígidos articulados. Tempo e transferência de munição
+continuam autoritativos em `Weapon`; a animação não muda o balanceamento.
+
 A escopeta emite seis rays determinísticos por uma única cartucha e aplica
 queda de dano `clamp(1 - distância/20, 0,25, 1)`. Cada pellet respeita colisão,
 cobertura, porta e weak point. O lote local suporta 13 sinais: um disparo mais

@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "WeaponReloadValidation.hpp"
+
 namespace {
 
 struct InstancingPixelComparison {
@@ -456,8 +458,9 @@ bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
 
 } // namespace
 
-int main()
+int main(const int argc, char** argv)
 {
+    const bool reloadOnly = argc == 2 && std::string{argv[1]} == "--reload-only";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -620,6 +623,8 @@ int main()
             {0.0F, 3.82F, -7.0F}, {0.48F, 0.66F, 0.92F}, 0.88F, 5.4F};
         if (!renderer.initialize(width, height) || !renderer.render(width, height)) {
             std::cerr << "Renderer failed to produce a frame\n";
+        } else if (reloadOnly) {
+            passed = validateWeaponReloads(renderer);
         } else {
             std::vector<std::uint8_t> baseline(
                 static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U);

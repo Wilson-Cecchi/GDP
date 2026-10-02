@@ -24,6 +24,17 @@ constexpr std::size_t indexOf(const WeaponMaterial material) noexcept
 
 class WeaponMeshBuilder {
 public:
+    template <typename Build>
+    void part(const WeaponPart part, Build&& build)
+    {
+        std::array<std::size_t, weaponMaterialCount> starts{};
+        for (std::size_t i = 0; i < weaponMaterialCount; ++i) starts[i] = meshes_[i].vertices.size();
+        build();
+        for (std::size_t i = 0; i < weaponMaterialCount; ++i)
+            for (std::size_t j = starts[i]; j < meshes_[i].vertices.size(); ++j)
+                meshes_[i].vertices[j].semanticRegion = static_cast<std::uint32_t>(part) + 1U;
+    }
+
     struct LoftSection {
         float z;
         float halfWidth;
@@ -336,19 +347,24 @@ void makePistol(WeaponMeshBuilder& mesh)
         {0.17F, 0.086F, 0.20F}, 0.015F);
     mesh.box(Polymer, {0.0F, -0.205F, -0.115F},
         {0.125F, 0.29F, 0.15F}, 22.0F, weaponGripSemanticRegion);
-    mesh.box(Recess, {0.0F, -0.355F, -0.072F}, {0.13F, 0.025F, 0.17F});
-    mesh.beveledLoft(CoatedSteel,
-        std::array{WeaponMeshBuilder::LoftSection{-0.26F, 0.095F, 0.054F,
-                       0.057F, 0.023F},
-            WeaponMeshBuilder::LoftSection{-0.205F, 0.1025F, 0.055F,
-                0.0625F, 0.022F},
-            WeaponMeshBuilder::LoftSection{0.17F, 0.1025F, 0.055F,
-                0.0625F, 0.022F},
-            WeaponMeshBuilder::LoftSection{0.29F, 0.085F, 0.048F,
-                0.053F, 0.019F}});
-    mesh.box(BareSteel, {0.0F, 0.115F, 0.018F}, {0.153F, 0.008F, 0.44F});
-    mesh.box(Recess, {0.0F, 0.122F, 0.045F}, {0.094F, 0.004F, 0.112F});
-    mesh.box(BareSteel, {0.0F, 0.124F, 0.055F}, {0.065F, 0.004F, 0.077F});
+    mesh.part(WeaponPart::Magazine, [&] {
+        mesh.box(Recess, {0.0F, -0.355F, -0.072F}, {0.13F, 0.025F, 0.17F});
+        mesh.box(CoatedSteel, {0.0F, -0.245F, -0.115F}, {0.105F, 0.22F, 0.11F}, 22.0F);
+    });
+    mesh.part(WeaponPart::Mechanism, [&] {
+        mesh.beveledLoft(CoatedSteel,
+            std::array{WeaponMeshBuilder::LoftSection{-0.26F, 0.095F, 0.054F,
+                           0.057F, 0.023F},
+                WeaponMeshBuilder::LoftSection{-0.205F, 0.1025F, 0.055F,
+                    0.0625F, 0.022F},
+                WeaponMeshBuilder::LoftSection{0.17F, 0.1025F, 0.055F,
+                    0.0625F, 0.022F},
+                WeaponMeshBuilder::LoftSection{0.29F, 0.085F, 0.048F,
+                    0.053F, 0.019F}});
+        mesh.box(BareSteel, {0.0F, 0.115F, 0.018F}, {0.153F, 0.008F, 0.44F});
+        mesh.box(Recess, {0.0F, 0.122F, 0.045F}, {0.094F, 0.004F, 0.112F});
+        mesh.box(BareSteel, {0.0F, 0.124F, 0.055F}, {0.065F, 0.004F, 0.077F});
+    });
     mesh.cylinder(Recess, {0.0F, 0.055F, 0.0F}, 0.046F, 0.046F, 0.288F, 0.323F);
     mesh.cylinder(BareSteel, {0.0F, 0.055F, 0.0F}, 0.035F, 0.035F, 0.246F, 0.296F);
     mesh.box(Polymer, {0.0F, -0.145F, 0.04F}, {0.025F, 0.026F, 0.17F});
@@ -358,18 +374,20 @@ void makePistol(WeaponMeshBuilder& mesh)
     for (const float facing : {-1.0F, 1.0F}) {
         // Both faces are authored: either can become camera-facing with sway.
         const float slideX = facing * 0.104F;
-        mesh.box(BareSteel, {slideX, 0.014F, -0.012F},
-            {0.004F, 0.004F, 0.41F});
-        mesh.box(Recess, {slideX, 0.105F, -0.03F},
-            {0.004F, 0.004F, 0.31F});
-        for (int groove = 0; groove < 6; ++groove) {
-            mesh.box(Recess, {slideX, 0.069F,
-                    -0.216F + 0.013F * static_cast<float>(groove)},
-                {0.005F, 0.065F, 0.005F}, 14.0F);
-            mesh.box(Recess, {slideX, 0.069F,
-                    0.172F + 0.013F * static_cast<float>(groove)},
-                {0.005F, 0.065F, 0.005F}, 14.0F);
-        }
+        mesh.part(WeaponPart::Mechanism, [&] {
+            mesh.box(BareSteel, {slideX, 0.014F, -0.012F},
+                {0.004F, 0.004F, 0.41F});
+            mesh.box(Recess, {slideX, 0.105F, -0.03F},
+                {0.004F, 0.004F, 0.31F});
+            for (int groove = 0; groove < 6; ++groove) {
+                mesh.box(Recess, {slideX, 0.069F,
+                        -0.216F + 0.013F * static_cast<float>(groove)},
+                    {0.005F, 0.065F, 0.005F}, 14.0F);
+                mesh.box(Recess, {slideX, 0.069F,
+                        0.172F + 0.013F * static_cast<float>(groove)},
+                    {0.005F, 0.065F, 0.005F}, 14.0F);
+            }
+        });
         mesh.box(Recess, {facing * 0.093F, -0.071F, -0.04F},
             {0.006F, 0.017F, 0.31F});
         mesh.box(BareSteel, {facing * 0.096F, -0.081F, 0.012F},
@@ -388,14 +406,16 @@ void makePistol(WeaponMeshBuilder& mesh)
         mesh.sideDisc(BareSteel, facing * 0.075F, -0.177F, -0.098F, 0.006F);
         mesh.sideDisc(BareSteel, facing * 0.075F, -0.302F, -0.098F, 0.006F);
     }
-    mesh.box(Recess, {0.0F, 0.13F, -0.215F}, {0.085F, 0.014F, 0.038F});
-    mesh.box(Recess, {-0.034F, 0.155F, -0.215F},
-        {0.017F, 0.045F, 0.032F});
-    mesh.box(Recess, {0.034F, 0.155F, -0.215F},
-        {0.017F, 0.045F, 0.032F});
-    mesh.box(Recess, {0.0F, 0.134F, 0.247F}, {0.043F, 0.014F, 0.023F});
-    mesh.box(Recess, {0.0F, 0.152F, 0.247F}, {0.016F, 0.032F, 0.018F});
-    mesh.box(Sight, {0.0F, 0.171F, 0.247F}, {0.014F, 0.006F, 0.007F});
+    mesh.part(WeaponPart::Mechanism, [&] {
+        mesh.box(Recess, {0.0F, 0.13F, -0.215F}, {0.085F, 0.014F, 0.038F});
+        mesh.box(Recess, {-0.034F, 0.155F, -0.215F},
+            {0.017F, 0.045F, 0.032F});
+        mesh.box(Recess, {0.034F, 0.155F, -0.215F},
+            {0.017F, 0.045F, 0.032F});
+        mesh.box(Recess, {0.0F, 0.134F, 0.247F}, {0.043F, 0.014F, 0.023F});
+        mesh.box(Recess, {0.0F, 0.152F, 0.247F}, {0.016F, 0.032F, 0.018F});
+        mesh.box(Sight, {0.0F, 0.171F, 0.247F}, {0.014F, 0.006F, 0.007F});
+    });
 }
 
 void makeCarbine(WeaponMeshBuilder& mesh)
@@ -448,9 +468,11 @@ void makeCarbine(WeaponMeshBuilder& mesh)
     mesh.box(Recess, {0.0F, -0.16F, 0.015F}, {0.025F, 0.025F, 0.185F});
     mesh.box(Recess, {0.0F, -0.222F, 0.093F}, {0.025F, 0.105F, 0.026F});
     mesh.box(Recess, {0.0F, -0.27F, 0.025F}, {0.025F, 0.021F, 0.14F});
-    mesh.box(CoatedSteel, {0.0F, -0.185F, 0.225F},
-        {0.14F, 0.34F, 0.115F}, -8.0F);
-    mesh.box(Polymer, {0.0F, -0.34F, 0.268F}, {0.153F, 0.055F, 0.13F});
+    mesh.part(WeaponPart::Magazine, [&] {
+        mesh.box(CoatedSteel, {0.0F, -0.185F, 0.225F},
+            {0.14F, 0.34F, 0.115F}, -8.0F);
+        mesh.box(Polymer, {0.0F, -0.34F, 0.268F}, {0.153F, 0.055F, 0.13F});
+    });
     for (const float facing : {-1.0F, 1.0F}) {
         mesh.box(Recess, {facing * 0.124F, 0.048F, -0.04F},
             {0.007F, 0.063F, 0.135F});
@@ -458,8 +480,10 @@ void makeCarbine(WeaponMeshBuilder& mesh)
             {0.005F, 0.037F, 0.102F});
         mesh.box(CoatedSteel, {facing * 0.132F, 0.043F, -0.041F},
             {0.005F, 0.007F, 0.085F});
-        mesh.box(BareSteel, {facing * 0.126F, -0.017F, -0.17F},
-            {0.007F, 0.013F, 0.088F});
+        mesh.part(WeaponPart::Mechanism, [&] {
+            mesh.box(BareSteel, {facing * 0.126F, -0.017F, -0.17F},
+                {0.007F, 0.013F, 0.088F});
+        });
         mesh.sideDisc(BareSteel, facing * 0.129F, -0.033F, 0.092F, 0.025F);
         mesh.sideDisc(Recess, facing * 0.131F, -0.033F, 0.092F, 0.008F);
         for (const float screwZ : {-0.205F, 0.193F}) {
@@ -470,13 +494,15 @@ void makeCarbine(WeaponMeshBuilder& mesh)
             {0.006F, 0.014F, 0.46F});
         mesh.box(BareSteel, {facing * 0.113F, 0.084F, 0.52F},
             {0.005F, 0.005F, 0.40F});
-        mesh.box(Recess, {facing * 0.073F, -0.2F, 0.225F},
-            {0.005F, 0.25F, 0.086F}, -8.0F);
-        for (int rib = 0; rib < 5; ++rib) {
-            mesh.box(BareSteel, {facing * 0.078F,
-                    -0.075F - static_cast<float>(rib) * 0.048F, 0.24F},
-                {0.004F, 0.004F, 0.066F}, -8.0F);
-        }
+        mesh.part(WeaponPart::Magazine, [&] {
+            mesh.box(Recess, {facing * 0.073F, -0.2F, 0.225F},
+                {0.005F, 0.25F, 0.086F}, -8.0F);
+            for (int rib = 0; rib < 5; ++rib) {
+                mesh.box(BareSteel, {facing * 0.078F,
+                        -0.075F - static_cast<float>(rib) * 0.048F, 0.24F},
+                    {0.004F, 0.004F, 0.066F}, -8.0F);
+            }
+        });
         for (int row = 0; row < 5; ++row) {
             mesh.box(Recess, {facing * 0.067F,
                     -0.18F - static_cast<float>(row) * 0.029F, -0.091F},
@@ -526,8 +552,10 @@ void makeSniper(WeaponMeshBuilder& mesh)
     mesh.box(Polymer, {0.0F, -0.178F, -0.13F},
         {0.12F, 0.26F, 0.135F}, 18.0F, weaponGripSemanticRegion);
     mesh.box(Recess, {0.0F, -0.275F, -0.11F}, {0.13F, 0.025F, 0.15F});
-    mesh.box(CoatedSteel, {0.0F, -0.17F, 0.095F}, {0.115F, 0.19F, 0.16F});
-    mesh.box(Recess, {0.0F, -0.272F, 0.095F}, {0.12F, 0.02F, 0.165F});
+    mesh.part(WeaponPart::Magazine, [&] {
+        mesh.box(CoatedSteel, {0.0F, -0.17F, 0.095F}, {0.115F, 0.19F, 0.16F});
+        mesh.box(Recess, {0.0F, -0.272F, 0.095F}, {0.12F, 0.02F, 0.165F});
+    });
     mesh.box(Recess, {0.0F, -0.126F, -0.01F}, {0.024F, 0.022F, 0.15F});
     mesh.box(Recess, {0.0F, -0.204F, 0.035F}, {0.024F, 0.13F, 0.024F});
     mesh.box(Recess, {0.0F, -0.264F, -0.02F}, {0.024F, 0.022F, 0.12F});
@@ -549,8 +577,10 @@ void makeSniper(WeaponMeshBuilder& mesh)
     mesh.cylinder(Recess, {0.0F, 0.237F, 0.0F}, 0.054F, 0.054F, -0.271F, -0.268F);
     mesh.cylinder(Recess, {0.0F, 0.237F, 0.0F}, 0.064F, 0.064F, 0.39F, 0.392F);
     mesh.box(CoatedSteel, {0.0F, 0.314F, 0.04F}, {0.068F, 0.044F, 0.068F});
-    mesh.box(BareSteel, {0.148F, -0.012F, -0.08F}, {0.136F, 0.027F, 0.025F}, 25.0F);
-    mesh.cylinder(BareSteel, {0.215F, -0.07F, 0.0F}, 0.025F, 0.025F, -0.10F, -0.06F);
+    mesh.part(WeaponPart::Mechanism, [&] {
+        mesh.box(BareSteel, {0.148F, -0.012F, -0.08F}, {0.136F, 0.027F, 0.025F}, 25.0F);
+        mesh.cylinder(BareSteel, {0.215F, -0.07F, 0.0F}, 0.025F, 0.025F, -0.10F, -0.06F);
+    });
     for (const float side : {-1.0F, 1.0F}) {
         mesh.box(Recess, {side * 0.097F, 0.045F, 0.025F}, {0.003F, 0.035F, 0.23F});
         mesh.box(BareSteel, {side * 0.10F, 0.04F, 0.025F}, {0.002F, 0.015F, 0.17F});
@@ -586,11 +616,13 @@ void makeShotgun(WeaponMeshBuilder& mesh)
     mesh.cylinder(Recess, {0.0F, 0.046F, 0.0F}, 0.035F, 0.035F, 1.14F, 1.142F);
     mesh.cylinder(CoatedSteel, {0.0F, -0.063F, 0.0F}, 0.046F, 0.046F, 0.21F, 1.03F);
     mesh.cylinder(CoatedSteel, {0.0F, -0.063F, 0.0F}, 0.053F, 0.053F, 0.97F, 1.035F);
-    mesh.cylinder(Polymer, {0.0F, -0.035F, 0.0F}, 0.083F, 0.079F, 0.33F, 0.66F);
-    for (int rib = 0; rib < 8; ++rib) {
-        const float z = 0.35F + float(rib) * 0.039F;
-        mesh.cylinder(Recess, {0.0F, -0.035F, 0.0F}, 0.087F, 0.082F, z, z + 0.009F);
-    }
+    mesh.part(WeaponPart::Mechanism, [&] {
+        mesh.cylinder(Polymer, {0.0F, -0.035F, 0.0F}, 0.083F, 0.079F, 0.33F, 0.66F);
+        for (int rib = 0; rib < 8; ++rib) {
+            const float z = 0.35F + float(rib) * 0.039F;
+            mesh.cylinder(Recess, {0.0F, -0.035F, 0.0F}, 0.087F, 0.082F, z, z + 0.009F);
+        }
+    });
     mesh.box(CoatedSteel, {0.0F, 0.105F, -0.19F}, {0.068F, 0.05F, 0.04F});
     mesh.box(Recess, {0.0F, 0.112F, -0.188F}, {0.023F, 0.038F, 0.042F});
     mesh.box(CoatedSteel, {0.0F, 0.10F, 1.04F}, {0.043F, 0.055F, 0.038F});
@@ -662,6 +694,56 @@ std::array<MeshData, weaponMaterialCount> makeWeaponViewmodelMeshes(
     case HudWeaponRole::Knife: makeKnife(builder); break;
     }
     return builder.finish();
+}
+
+WeaponPartMeshes makeWeaponViewmodelParts(const HudWeaponRole role)
+{
+    const auto complete = makeWeaponViewmodelMeshes(role);
+    WeaponPartMeshes parts;
+    for (std::size_t m = 0; m < weaponMaterialCount; ++m) {
+        const auto& source = complete[m];
+        std::array<std::vector<std::uint32_t>, weaponPartCount> remaps;
+        for (auto& map : remaps) map.assign(source.vertices.size(), UINT32_MAX);
+        for (const auto index : source.indices) {
+            const auto region = source.vertices[index].semanticRegion;
+            const auto part = region == 2U ? WeaponPart::Magazine
+                : region == 3U ? WeaponPart::Mechanism : WeaponPart::Body;
+            const auto p = static_cast<std::size_t>(part);
+            auto& output = parts[p][m];
+            auto& mapped = remaps[p][index];
+            if (mapped == UINT32_MAX) {
+                mapped = static_cast<std::uint32_t>(output.vertices.size());
+                output.vertices.push_back(source.vertices[index]);
+            }
+            output.indices.push_back(mapped);
+        }
+    }
+    if (role == HudWeaponRole::Shotgun) {
+        // A transient cartridge, never present in the idle or floor mesh.
+        WeaponMeshBuilder shell;
+        shell.cylinder(WeaponMaterial::CoatedSteel, {0.0F, -0.10F, 0.0F},
+            0.025F, 0.025F, 0.025F, 0.12F);
+        shell.cylinder(WeaponMaterial::BareSteel, {0.0F, -0.10F, 0.0F},
+            0.028F, 0.028F, 0.01F, 0.025F);
+        parts[static_cast<std::size_t>(WeaponPart::Magazine)] = shell.finish();
+    }
+    for (auto& part : parts) for (auto& mesh : part) {
+        if (mesh.vertices.empty()) continue;
+        Vec3 minimum{std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max()};
+        Vec3 maximum{-minimum.x, -minimum.y, -minimum.z};
+        for (const auto& vertex : mesh.vertices) {
+            minimum.x = std::min(minimum.x, vertex.position.x);
+            minimum.y = std::min(minimum.y, vertex.position.y);
+            minimum.z = std::min(minimum.z, vertex.position.z);
+            maximum.x = std::max(maximum.x, vertex.position.x);
+            maximum.y = std::max(maximum.y, vertex.position.y);
+            maximum.z = std::max(maximum.z, vertex.position.z);
+        }
+        mesh.bounds = {minimum, maximum};
+        mesh.backfaceCullingSafe = false;
+    }
+    return parts;
 }
 
 WeaponMaterialImages makeUsedWeaponMaterialImages(

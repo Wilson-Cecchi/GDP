@@ -220,6 +220,7 @@ struct WeaponViewmodelRenderData {
     float muzzleFlashStrength{0.0F};
     bool overdrive{false};
     wkc::core::Seed visualSeed{0U};
+    std::uint32_t reloadRoundCount{6U};
 };
 
 struct WeaponViewmodelPose {
@@ -228,6 +229,19 @@ struct WeaponViewmodelPose {
 
     constexpr bool operator==(const WeaponViewmodelPose&) const noexcept = default;
 };
+
+struct WeaponReloadPose {
+    WeaponViewmodelPose weapon{};
+    wkc::core::Vec3 magazineOffset{};
+    wkc::core::Vec3 mechanismOffset{};
+    wkc::core::Vec3 mechanismRotationDegrees{};
+    bool magazineVisible{true};
+
+    constexpr bool operator==(const WeaponReloadPose&) const noexcept = default;
+};
+
+[[nodiscard]] WeaponReloadPose sampleWeaponReloadPose(
+    HudWeaponRole role, float progress, std::uint32_t roundCount = 6U) noexcept;
 
 [[nodiscard]] WeaponViewmodelPose sampleWeaponViewmodelPose(
     const WeaponViewmodelRenderData& weapon) noexcept;

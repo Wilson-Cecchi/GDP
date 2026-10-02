@@ -33,7 +33,8 @@ escuro e recessos dos mapas Used já existentes, sem glow ou textura adicional.
 São modelos procedurais de orçamento baixo/médio, não reproduções fotográficas
 das pranchas. Mantêm projeção do viewmodel fixa em 68°, centro livre e posição
 inferior direita. Flash acompanha o cano próprio; hitscan, dano e loot não mudam.
-Ferrolho/pump ainda não têm animação mecânica independente.
+Ferrolho/pump têm movimento independente na recarga v1, sem braços/mãos;
+contrato: `04_gameplay/weapon_reload_animation_2026-10-02.md`.
 
 Capturas reais do renderer offscreen, fixture de regressão 1280×720, seed visual
 1717 (mão) e 123 (chão), não sessão manual de gameplay:
