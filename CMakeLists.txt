@@ -261,6 +261,7 @@ add_library(
     src/game/visual/MenuBackdrop.cpp
     src/game/Localization.cpp
     src/game/visual/WeaponViewmodelAssets.cpp
+    src/game/visual/PlayerBodyAssets.cpp
 )
 
 target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)

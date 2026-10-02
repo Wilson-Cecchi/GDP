@@ -303,7 +303,24 @@ struct ApplicationMenuTestAccess {
         }
         release(); app.fixedUpdate(1.0 / 60.0); app.render();
         expect(!app.fatalError_, "arena supports simulation and rendering");
+        // Isolate actual locomotion in an unobstructed part of the test arena.
+        app.player_.spawn({0,0,3}); app.playerBodyMotion_ = {};
+        release(); app.input_.handleKey(Key::I,true);
+        app.processEvents();
+        const auto bodyStart = app.player_.state().position;
+        for (int tick = 0; tick < 8; ++tick) app.fixedUpdate(1.0/60.0);
+        expect(app.player_.state().position != bodyStart && app.playerBodyMotion_.phaseRadians > 0,
+            "live application advances body gait after actual collision-resolved movement");
+        const auto bodyMoving = app.playerBodyMotion_;
+        app.setPaused(true);
+        app.fixedUpdate(1.0/60.0); app.render();
+        expect(app.playerBodyMotion_ == bodyMoving,"pause/render sampling freeze the body pose");
+        app.setPaused(false); release();
+        app.processEvents();
+        for (int tick = 0; tick < 40; ++tick) app.fixedUpdate(1.0/60.0);
+        expect(app.playerBodyMotion_.weight == 0,"stopping in live game blends legs to rest");
         (void)app.returnToMainMenu();
+        expect(app.playerBodyMotion_ == visual::PlayerBodyMotion{},"return/restart clears lower-body pose history");
         app.shutdown();
         for (unsigned slot = 1U; slot <= 3U; ++slot) {
             auto cp = persistence::loadCampaignCheckpoint(directory / "WKC" / "GDP" / ("campaign_slot_" + std::to_string(slot) + ".toml"));

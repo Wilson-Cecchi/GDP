@@ -123,15 +123,17 @@ referência: captura nativa da carabina Used, somente contexto de estilo
 seeds: não aplicável à prancha conceitual; não é saída do gerador do jogo
 pedido: pernas visíveis e animadas ao andar/pular/agachar; mãos nas recargas
 decisão do usuário: "visual aprovado" — Usado APROVADA PARA IMPLEMENTAÇÃO
-commit de implementação: nenhum
-capturas no jogo: nenhuma; prancha gerada não é screenshot da build
-estado: APROVADA PARA IMPLEMENTAÇÃO — Usado
+commit de implementação: entrega corpo inferior v1 (histórico Git)
+capturas no jogo: visual/validation/player_body_v1_* (fixture OpenGL offscreen)
+estado: PARCIALMENTE IMPLEMENTADA EM VALIDAÇÃO — Usado; braços/mãos pendentes
 ```
 
 Não aprova redesenho das armas, inimigos, HUD ou ambientes. Corpo proposto
 é humano, com tecido/couro/borracha foscos, não metálico ou robótico.
-Animações deverão acompanhar simulação e contatos reais; nenhum teste técnico
-ou benchmark dessa implementação existe ainda.
+Corpo inferior acompanha simulação e distância real, com skinning e oclusão.
+Testes/capturas e orçamento estão em `04_gameplay/player_body_2026-10-02.md`;
+não equivalem a playtest humano nem benchmark de FPS. Braços, mãos e contatos
+nas recargas permanecem aprovados para a próxima entrega, não implementados.
 
 ### Weapon/reload — descarte e carregador novo v2
 
@@ -498,7 +500,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
-| Player presentation | V1 Usado aprovada para implementação |
+| Player presentation | V1 Usado corpo inferior em validação; braços/mãos aprovados e pendentes |
 | Weapon/Sniper optic | V2 Usado implementada em validação |
 | HUD/Sniper scoped view | V1 implementada em validação |
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |

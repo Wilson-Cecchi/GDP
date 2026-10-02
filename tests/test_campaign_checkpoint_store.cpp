@@ -62,6 +62,13 @@ void writeText(const std::filesystem::path& path, const std::string_view text)
     output << text;
 }
 
+std::string readText(const std::filesystem::path& path)
+{
+    // End the handle's lifetime before replacing the save (Windows sharing rules).
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+}
+
 gdp::gameplay::CampaignCheckpoint makeCheckpoint()
 {
     using namespace gdp::gameplay;
@@ -429,16 +436,14 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
     }
     const auto old = makeCheckpoint();
     expect(persistence::saveCampaignCheckpoint(path, legacyRoundReserves(old)), "previous-rule fixture is serializable");
-    std::ifstream input(path, std::ios::binary);
-    std::string serialized{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    std::string serialized = readText(path);
     serialized.replace(serialized.find("version = 7"), std::string{"version = 7"}.size(), "version = 5");
     serialized.replace(serialized.find("rules_version = 37"), std::string{"rules_version = 37"}.size(), "rules_version = 34");
     writeText(path, serialized);
     const auto migrated = persistence::loadCampaignCheckpoint(path);
     expect(migrated.migratedRules && migrated.checkpoint == old,
         "rules 34 round reserves migrate to complete magazines preserving floor-entry progress");
-    std::ifstream unchanged(path, std::ios::binary);
-    const std::string after{std::istreambuf_iterator<char>{unchanged}, std::istreambuf_iterator<char>{}};
+    const std::string after = readText(path);
     expect(after == serialized, "reading a migratable checkpoint does not overwrite its original file");
     for (const auto type : {WeaponArchetype::Sniper, WeaponArchetype::Shotgun, WeaponArchetype::SubmachineGun}) {
         auto expected = makeCheckpoint();
@@ -449,9 +454,10 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
         auto rounds = legacyRoundReserves(expected);
         // A partially stocked old reserve rounds up once to one full magazine.
         if (weaponUsesSpareMagazines(type)) --rounds.floorEntry.weapon.stowed->reserveAmmo;
-        expect(persistence::saveCampaignCheckpoint(path, rounds), "schema six legacy fixture saves");
-        std::ifstream legacyInput(path, std::ios::binary);
-        std::string text{std::istreambuf_iterator<char>{legacyInput}, std::istreambuf_iterator<char>{}};
+        const bool saved = persistence::saveCampaignCheckpoint(path, rounds);
+        expect(saved, "schema six legacy fixture saves");
+        if (!saved) continue; // Report the failure, not an out_of_range from missing text.
+        std::string text = readText(path);
         text.replace(text.find("version = 7"), 11U, "version = 6");
         text.replace(text.find("rules_version = 37"), 18U, "rules_version = 35");
         writeText(path, text);

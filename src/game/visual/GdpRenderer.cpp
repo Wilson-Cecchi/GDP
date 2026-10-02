@@ -75,6 +75,8 @@ layout(location = 4) in mat4 aInstanceModel;
 
 uniform mat4 uModel;
 uniform int uInstanced;
+uniform int uPlayerSkinning;
+uniform mat4 uPlayerBones[7];
 uniform mat4 uView;
 uniform mat4 uProjection;
 
@@ -85,10 +87,21 @@ out vec2 vUv;
 void main()
 {
     mat4 model = uInstanced != 0 ? aInstanceModel : uModel;
-    vec4 worldPosition = model * vec4(aPosition, 1.0);
-    vWorldPosition = worldPosition.xyz;
-    vNormal = normalize(mat3(model) * aNormal);
+    vec4 position = vec4(aPosition, 1.0);
+    vec3 normal = aNormal;
     vUv = aUv;
+    if (uPlayerSkinning != 0) {
+        int joint = int(floor(aUv.x * 0.5));
+        float weight = aUv.x - float(joint) * 2.0;
+        mat4 skin = uPlayerBones[joint] * weight
+            + uPlayerBones[int(aUv.y)] * (1.0 - weight);
+        position = skin * position;
+        normal = mat3(skin) * normal;
+        vUv = vec2(aPosition.x * 2.0 + aPosition.z * 3.0, aPosition.y * 2.0);
+    }
+    vec4 worldPosition = model * position;
+    vWorldPosition = worldPosition.xyz;
+    vNormal = normalize(mat3(model) * normal);
     gl_Position = uProjection * uView * worldPosition;
 }
 )glsl";
@@ -589,6 +602,15 @@ bool GdpRenderer::initialize(const int width, const int height)
                 gl_, images.properties, wkc::render::TextureSampling::Trilinear)) {
             return false;
         }
+    }
+    const auto playerMeshes = makePlayerBodyMeshes();
+    for (std::size_t material = 0; material < playerBodyMaterialCount; ++material) {
+        const auto images = makeUsedPlayerBodyMaterialImages(static_cast<PlayerBodyMaterial>(material));
+        auto& gpu = playerBodyMaterials_[material];
+        if (!playerBodyMeshes_[material].upload(gl_, playerMeshes[material])
+            || !gpu.albedo.upload(gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
+            || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
+            || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
     }
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
         return false;
@@ -1192,7 +1214,8 @@ bool GdpRenderer::render(
     const HudRenderData hud,
     const std::span<const ImpactRenderData> impacts,
     const WeaponViewmodelRenderData weaponViewmodel,
-    const std::span<const EnemyProjectileRenderData> enemyProjectiles)
+    const std::span<const EnemyProjectileRenderData> enemyProjectiles,
+    const PlayerBodyRenderData playerBody)
 {
     lastFrameStats_ = {};
     if (!initialized_ || width <= 0 || height <= 0) {
@@ -1262,6 +1285,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uViewmodel", 0);
     shader.setFloat(gl_, "uOpacity", 1.0F);
     shader.setInt(gl_, "uInstanced", 0);
+    shader.setInt(gl_, "uPlayerSkinning", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
     shader.setVec3(gl_, "uCameraPosition", camera.position);
@@ -2192,6 +2216,33 @@ bool GdpRenderer::render(
         shader.setVec2(gl_, "uUvOffset", {});
         shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
         drawMesh(box_);
+    }
+
+    if (playerBody.visible && !hud.mainMenu
+        && hud.objective != ObjectiveRenderState::Victory
+        && hud.objective != ObjectiveRenderState::Defeat) {
+        const auto pose = samplePlayerBodyPose(playerBody);
+        constexpr std::array<const char*, playerBodyBoneCount> boneUniforms{
+            "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]", "uPlayerBones[3]",
+            "uPlayerBones[4]", "uPlayerBones[5]", "uPlayerBones[6]"};
+        shader.setInt(gl_, "uPlayerSkinning", 1);
+        shader.setMat4(gl_, "uModel", pose.root);
+        for (std::size_t i = 0; i < playerBodyBoneCount; ++i)
+            shader.setMat4(gl_, boneUniforms[i], pose.skin[i]);
+        shader.setVec3(gl_, "uTint", {1,1,1});
+        shader.setVec2(gl_, "uUvScale", {1,1});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setInt(gl_, "uUseEmissionMap", 0);
+        shader.setInt(gl_, "uDetailedMaterial", 1);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        for (std::size_t material = 0; material < playerBodyMaterialCount; ++material) {
+            const auto& gpu = playerBodyMaterials_[material];
+            gpu.albedo.bind(gl_, textureBindings_, 0U);
+            gpu.normal.bind(gl_, textureBindings_, 1U);
+            gpu.properties.bind(gl_, textureBindings_, 2U);
+            drawMesh(playerBodyMeshes_[material]);
+        }
+        shader.setInt(gl_, "uPlayerSkinning", 0);
     }
 
     const HudWeaponRole viewmodelRole = weaponViewmodel.role == HudWeaponRole::SubmachineGun

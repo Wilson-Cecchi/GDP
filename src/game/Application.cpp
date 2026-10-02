@@ -899,6 +899,7 @@ bool Application::initializeRun()
     const wkc::core::Vec3 startPosition = startRoom->transform.position
         + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
     player_.spawn(startPosition, yawForDirection(startForward));
+    playerBodyMotion_ = {};
     if (campaignCarryover_) {
         if (!gameplay::restoreCampaignCarryover(
                 *campaignCarryover_, player_, weapon_, progression_)) {
@@ -1621,6 +1622,7 @@ bool Application::returnToMainMenu()
     gameplay::clearFeedback(feedback_);
     gameplay::resetFootsteps(footsteps_);
     gameplay::resetViewMotion(viewMotion_);
+    playerBodyMotion_ = {};
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     menuFlow_ = {};
@@ -2205,6 +2207,9 @@ void Application::fixedUpdate(const double fixedStep)
     }
     gameplay::updateViewMotion(
         viewMotion_, previousPlayerPosition, player_.state().position,
+        player_.state().grounded, player_.state().alive, step);
+    visual::updatePlayerBodyMotion(playerBodyMotion_, previousPlayerPosition,
+        player_.state().position, player_.state().yawDegrees,
         player_.state().grounded, player_.state().alive, step);
 
     const auto adoptRoom = [this, &playerEntity, &playerRoom](
@@ -3851,7 +3856,16 @@ void Application::render()
             return renderer_->render(
                 width, height, camera, visibleEnemies, visiblePickups, visibleProps,
                 lighting, roomRender, visibleDoors, visibleCorridors, connectedRooms,
-                hud, visibleImpacts, weaponViewmodel, visibleEnemyProjectiles);
+                hud, visibleImpacts, weaponViewmodel, visibleEnemyProjectiles,
+                {.visible = player_.state().alive && session_.state().phase == gameplay::SessionPhase::Playing,
+                    .feetPosition = player_.state().position,
+                    .yawDegrees = player_.state().yawDegrees,
+                    .crouchAmount = player_.state().crouchAmount,
+                    .gaitPhase = playerBodyMotion_.phaseRadians,
+                    .gaitWeight = playerBodyMotion_.weight,
+                    .forwardMovement = playerBodyMotion_.forward,
+                    .rightMovement = playerBodyMotion_.right,
+                    .airborneStrength = playerBodyMotion_.airborne});
         }, "Renderer failed while drawing the frame")) {
         return;
     }
@@ -3882,6 +3896,7 @@ void Application::shutdown()
     gameplay::clearFeedback(feedback_);
     gameplay::resetFootsteps(footsteps_);
     gameplay::resetViewMotion(viewMotion_);
+    playerBodyMotion_ = {};
     gameplay::openMainMenu(mainMenu_);
     gameplay::closePauseMenu(pauseMenu_);
     controlsMenuActive_ = false;

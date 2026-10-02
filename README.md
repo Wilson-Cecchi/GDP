@@ -58,6 +58,10 @@ especializados das pastas numeradas.
   a ação Mira (`Mouse2` por padrão, remapeável). O zoom e o balanceamento
   permanecem iguais; recarga, troca, drop e menu retiram a visão de mira.
   [Contrato e validação](04_gameplay/sniper_scope_2026-10-02.md).
+  **Player Usado:** pernas e botas agora aparecem ao olhar para baixo,
+  animadas por movimento real, agachamento e salto, com oclusão pelo mundo.
+  Corpo inferior implementado em validação; braços/mãos nas recargas ainda
+  são a próxima entrega. [Contrato e capturas](04_gameplay/player_body_2026-10-02.md).
   As cinco armas de fogo têm recargas visuais próprias, com peças móveis;
   pistola, rifle, SMG e sniper descartam o pente usado e suas balas restantes,
   consumindo outro cheio. O HUD conta reservas em pentes; escopeta usa cartuchos.

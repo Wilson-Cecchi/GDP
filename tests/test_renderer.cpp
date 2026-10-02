@@ -1641,6 +1641,86 @@ void testWeaponViewmodelAssets()
     }
 }
 
+void testPlayerBody()
+{
+    using namespace gdp::game::visual;
+    using namespace wkc::core;
+    PlayerBodyMotion motion;
+    updatePlayerBodyMotion(motion,{0,0,0},{0,0,-.1F},-90,true,true,1.0F/60);
+    expect(motion.phaseRadians > 0 && motion.forward > .1F,
+        "body gait advances by actual forward distance");
+    const auto phase = motion.phaseRadians;
+    for (int i = 0; i < 30; ++i)
+        updatePlayerBodyMotion(motion,{0,0,0},{0,0,0},-90,true,true,1.0F/60);
+    expect(motion.phaseRadians == phase && motion.weight == 0,
+        "blocked movement stops body gait without advancing phase");
+    for (int i = 0; i < 10; ++i)
+        updatePlayerBodyMotion(motion,{0,0,0},{0,0,.1F},-90,true,true,1.0F/60);
+    expect(motion.forward < -.99F,"backward gait uses actual signed direction");
+    for (int i = 0; i < 10; ++i)
+        updatePlayerBodyMotion(motion,{0,0,0},{.1F,0,0},-90,true,true,1.0F/60);
+    expect(motion.right > .99F,"strafe gait uses yaw-local direction");
+    const auto beforeAir = motion.phaseRadians;
+    for (int i = 0; i < 20; ++i)
+        updatePlayerBodyMotion(motion,{0,0,0},{.02F,.02F,0},-90,false,true,1.0F/60);
+    expect(motion.phaseRadians == beforeAir && motion.weight == 0 && motion.airborne == 1,
+        "airborne body flexes without fake walking or movement changes");
+    const auto beforeInvalid = motion;
+    updatePlayerBodyMotion(motion,{},{},-90,true,true,std::numeric_limits<float>::quiet_NaN());
+    expect(motion == beforeInvalid,"invalid clock cannot corrupt body state");
+    updatePlayerBodyMotion(motion,{},{10,0,0},-90,true,true,1.0F/60);
+    expect(motion == PlayerBodyMotion{},"relocation resets transient body history");
+
+    const auto meshes = makePlayerBodyMeshes();
+    std::size_t triangles = 0;
+    for (const auto& mesh : meshes) {
+        expect(wkc::render::validateMeshData(mesh),"skinned lower-body mesh validates");
+        triangles += mesh.indices.size()/3U;
+        for (const auto& v : mesh.vertices) {
+            const auto joint = std::floor(v.uv.x*.5F);
+            const auto weight = v.uv.x-2*joint;
+            expect(joint >= 0 && joint < 7 && v.uv.y >= 0 && v.uv.y < 7
+                && weight >= 0 && weight <= 1,"GDP skin indices/weights stay within palette");
+        }
+    }
+    expect(triangles <= 2200U,"body stays within the four-draw 2200-triangle budget");
+    std::cout << "Player body triangles=" << triangles << " materials=4 bones=7\n";
+    for (float crouch : {0.0F,.5F,1.0F}) for (float air : {0.0F,1.0F})
+    for (float direction : {-1.0F,0.0F,1.0F}) for (float gait : {0.0F,1.1F,3.3F}) {
+        const PlayerBodyRenderData body{.visible=true,.crouchAmount=crouch,
+            .gaitPhase=gait,.gaitWeight=1,.forwardMovement=direction,.airborneStrength=air};
+        const auto pose = samplePlayerBodyPose(body);
+        const auto repeated = samplePlayerBodyPose(body);
+        expect(pose.skin[1].elements == repeated.skin[1].elements,
+            "player pose is deterministic and render sampling does not mutate it");
+        for (std::size_t leg = 0; leg < 2; ++leg) {
+            expect(nearlyEqual(length(pose.knees[leg]-pose.hips[leg]),.44F,.0001F)
+                && nearlyEqual(length(pose.ankles[leg]-pose.knees[leg]),.43F,.0001F),
+                "IK preserves human thigh/calf lengths in gait/crouch/air");
+            expect(pose.knees[leg].z < pose.hips[leg].z+.04F,
+                "knees flex forward, not inside out");
+        }
+        for (const auto& mesh : meshes) for (const auto& v : mesh.vertices) {
+            const auto p = deformPlayerBodyVertex(v,pose);
+            expect(std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z)
+                && p.y > -.06F && p.y < 1.50F,"deformed body stays finite and above floor");
+        }
+    }
+    PlayerBodyRenderData invalid;
+    invalid.crouchAmount = invalid.gaitPhase = invalid.yawDegrees = std::numeric_limits<float>::quiet_NaN();
+    const auto pose = samplePlayerBodyPose(invalid);
+    for (const auto& matrix : pose.skin) for (const auto n : matrix.elements)
+        expect(std::isfinite(n),"invalid body DTO produces a finite safe pose");
+    for (std::size_t i = 0; i < playerBodyMaterialCount; ++i) {
+        const auto images = makeUsedPlayerBodyMaterialImages(static_cast<PlayerBodyMaterial>(i));
+        expect(wkc::render::validateImageData(images.albedo)
+            && wkc::render::validateImageData(images.normal)
+            && wkc::render::validateImageData(images.properties),"body maps validate");
+        for (std::size_t offset = 1U; offset < images.properties.rgba.size(); offset+=4U)
+            expect(images.properties.rgba[offset] == 0U,"cloth/leather/rubber are nonmetallic");
+    }
+}
+
 } // namespace
 
 int main()
@@ -1673,6 +1753,7 @@ int main()
     testIndustrialUiTheme();
     testWeaponViewmodelAssets();
     testSettingsMenuLayout();
+    testPlayerBody();
 
     if (failures != 0) {
         std::cerr << failures << " renderer test(s) failed\n";

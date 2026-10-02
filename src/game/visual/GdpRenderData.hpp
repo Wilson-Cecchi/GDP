@@ -208,6 +208,18 @@ struct EnemyProjectileRenderData {
     float strength = 1.0F) noexcept;
 [[nodiscard]] float impactVisualSize(float strength) noexcept;
 
+struct PlayerBodyRenderData {
+    bool visible{false};
+    wkc::core::Vec3 feetPosition{};
+    float yawDegrees{-90.0F};
+    float crouchAmount{0.0F};
+    float gaitPhase{0.0F};
+    float gaitWeight{0.0F};
+    float forwardMovement{0.0F};
+    float rightMovement{0.0F};
+    float airborneStrength{0.0F};
+};
+
 struct WeaponViewmodelRenderData {
     bool visible{false};
     HudWeaponRole role{HudWeaponRole::Pistol};

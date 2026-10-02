@@ -4,6 +4,7 @@
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/RoomMaterialGenerator.hpp"
 #include "game/visual/WeaponViewmodelAssets.hpp"
+#include "game/visual/PlayerBodyAssets.hpp"
 #include "resources/AssetCache.hpp"
 #include "render/Camera.hpp"
 #include "render/Framebuffer.hpp"
@@ -156,7 +157,8 @@ public:
         HudRenderData hud = {},
         std::span<const ImpactRenderData> impacts = {},
         WeaponViewmodelRenderData weaponViewmodel = {},
-        std::span<const EnemyProjectileRenderData> enemyProjectiles = {});
+        std::span<const EnemyProjectileRenderData> enemyProjectiles = {},
+        PlayerBodyRenderData playerBody = {});
     [[nodiscard]] RendererFrameStats lastFrameStats() const noexcept
     {
         RendererFrameStats stats = lastFrameStats_;
@@ -275,6 +277,8 @@ private:
     std::array<std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
         weaponPartCount>, weaponRoleCount> weaponPartMeshes_{};
     std::array<WeaponGpuMaterial, weaponMaterialCount> weaponMaterials_{};
+    std::array<wkc::render::Mesh, playerBodyMaterialCount> playerBodyMeshes_{};
+    std::array<WeaponGpuMaterial, playerBodyMaterialCount> playerBodyMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};

@@ -1,9 +1,10 @@
 # Player em primeira pessoa — proposta visual v1
 
-Estado: **APROVADA PARA IMPLEMENTAÇÃO — Usado**. Data: 2026-10-02.
+Estado: **PARCIALMENTE IMPLEMENTADA EM VALIDAÇÃO — Usado**. Data: 2026-10-02.
 Decisão do usuário: "visual aprovado", em resposta à prancha v1 e à
 recomendação da variante Usado. Não aprova uma revisão da sniper, que é outra
-unidade visual. Ainda não há implementação ou capturas nativas do player.
+unidade visual. Corpo inferior v1 implementado; braços/mãos ainda pendentes.
+Contrato, capturas nativas e testes: `04_gameplay/player_body_2026-10-02.md`.
 Unidade: `Player presentation` — corpo, braços, mãos, uniforme e animações
 de primeira pessoa. Prancha: [player_body_proposal_v1.png](player_body_proposal_v1.png).
 Gerada com o skill `imagegen`, ferramenta integrada, usando uma captura nativa
@@ -36,7 +37,8 @@ Não aprova remodelagem das armas nem texturas novas de ambiente.
 - `PlayerState` já publica posição dos pés, velocidade, yaw/pitch, grounded,
   crouchAmount e alive. A câmera lógica fica a 1,62 m em pé e 1,02 m agachada.
 - `ViewMotionState` usa distância real pós-colisão; há integração de passos
-  e proteção contra relocação. O corpo ainda não é enviado ao renderer.
+  e proteção contra relocação. `PlayerBodyRenderData` agora leva o snapshot
+  do corpo inferior ao renderer, com histórico visual separado de gameplay.
 - Armas usam projeção própria de 68 graus para manter proporções em FOV 60–100.
   `WeaponViewmodelRenderData` já recebe recuo, recarga, equip, faca e postura,
   mas não contém braços/mãos ou pontos de contato das mãos.
@@ -92,10 +94,11 @@ Pausar congela a pose; reiniciar/relocar descarta seu histórico transitório.
   Capturas dos passos/salto/agachamento e das cinco recargas em jogo.
 - Playtest humano decide naturalidade, conforto e aceitação artística.
 
-Nada disso foi implementado ou validado nesta etapa: houve inspeção do código
-e criação/revisão da proposta visual. O gate `visual/TEXTURE_APPROVALS.md`
-exige aprovação explícita da prancha/variante antes da implementação; essa
-aprovação foi recebida para Usado em 2026-10-02.
+Os itens 1/2 e os gates do corpo inferior foram implementados após aprovação;
+itens 3/4 e gates de mãos/recargas seguem pendentes. O gate
+`visual/TEXTURE_APPROVALS.md` exige aprovação explícita da prancha/variante
+antes da implementação; essa aprovação foi recebida para Usado em 2026-10-02.
+Aceitação visual final no jogo permanece com o usuário.
 
 ## Prompt final utilizado
 

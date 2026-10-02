@@ -7,6 +7,7 @@
 #include "game/MenuFlow.hpp"
 #include "game/ai/ActiveEnemyBrains.hpp"
 #include "game/visual/GdpRenderData.hpp"
+#include "game/visual/PlayerBodyAssets.hpp"
 #include "gameplay/Collision.hpp"
 #include "gameplay/Campaign.hpp"
 #include "gameplay/Door.hpp"
@@ -129,6 +130,7 @@ private:
     gameplay::FeedbackState feedback_;
     gameplay::FootstepState footsteps_;
     gameplay::ViewMotionState viewMotion_;
+    visual::PlayerBodyMotion playerBodyMotion_{};
     gameplay::MainMenuState mainMenu_;
     gameplay::PauseMenuState pauseMenu_;
     gameplay::ResultMenuState resultMenu_;
