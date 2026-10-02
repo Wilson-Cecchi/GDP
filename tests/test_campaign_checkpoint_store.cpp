@@ -86,6 +86,19 @@ gdp::gameplay::CampaignCheckpoint makeCheckpoint()
     };
 }
 
+gdp::gameplay::CampaignCheckpoint legacyRoundReserves(gdp::gameplay::CampaignCheckpoint checkpoint)
+{
+    const auto convert = [](auto& slot) {
+        if (gdp::gameplay::weaponUsesSpareMagazines(slot.definition.archetype)) {
+            slot.reserveAmmo *= slot.definition.magazineSize;
+            slot.definition.reserveMaximum *= slot.definition.magazineSize;
+        }
+    };
+    convert(checkpoint.floorEntry.weapon);
+    if (checkpoint.floorEntry.weapon.stowed) convert(*checkpoint.floorEntry.weapon.stowed);
+    return checkpoint;
+}
+
 void testMissingRoundTripReplacementAndRemoval()
 {
     using namespace gdp;
@@ -371,7 +384,7 @@ void testKnifeOnlyAndLegacyRoundTrip()
         "schema 4 preserves a checkpoint with no firearm");
 
     const gameplay::CampaignCheckpoint legacy = makeCheckpoint();
-    expect(persistence::saveCampaignCheckpoint(path, legacy),
+    expect(persistence::saveCampaignCheckpoint(path, legacyRoundReserves(legacy)),
         "legacy migration fixture saves a valid armed checkpoint");
     std::ifstream input(path, std::ios::binary);
     std::string serialized{
@@ -385,7 +398,8 @@ void testKnifeOnlyAndLegacyRoundTrip()
         expect(persistence::loadCampaignCheckpoint(path).status
                 == persistence::CampaignCheckpointLoadStatus::Invalid,
             "schema 4 rejects missing ownership instead of inventing a gun");
-        serialized.replace(0U, std::string{"version = 4"}.size(), "version = 3");
+        serialized.replace(0U, std::string{"version = 7"}.size(), "version = 3");
+        serialized.replace(serialized.find("rules_version = 37"), std::string{"rules_version = 37"}.size(), "rules_version = 34");
         writeText(path, serialized);
         expect(persistence::loadCampaignCheckpoint(path).checkpoint == legacy,
             "schema 3 checkpoints migrate as an armed loadout");
@@ -414,18 +428,41 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
             "schema six also preserves each new primary when stowed");
     }
     const auto old = makeCheckpoint();
-    expect(persistence::saveCampaignCheckpoint(path, old), "previous-rule fixture is serializable");
+    expect(persistence::saveCampaignCheckpoint(path, legacyRoundReserves(old)), "previous-rule fixture is serializable");
     std::ifstream input(path, std::ios::binary);
     std::string serialized{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
-    serialized.replace(serialized.find("version = 6"), std::string{"version = 6"}.size(), "version = 5");
-    serialized.replace(serialized.find("rules_version = 35"), std::string{"rules_version = 35"}.size(), "rules_version = 34");
+    serialized.replace(serialized.find("version = 7"), std::string{"version = 7"}.size(), "version = 5");
+    serialized.replace(serialized.find("rules_version = 37"), std::string{"rules_version = 37"}.size(), "rules_version = 34");
     writeText(path, serialized);
     const auto migrated = persistence::loadCampaignCheckpoint(path);
     expect(migrated.migratedRules && migrated.checkpoint == old,
-        "rules 34 migrate explicitly to 35 preserving the complete floor-entry snapshot");
+        "rules 34 round reserves migrate to complete magazines preserving floor-entry progress");
     std::ifstream unchanged(path, std::ios::binary);
     const std::string after{std::istreambuf_iterator<char>{unchanged}, std::istreambuf_iterator<char>{}};
     expect(after == serialized, "reading a migratable checkpoint does not overwrite its original file");
+    for (const auto type : {WeaponArchetype::Sniper, WeaponArchetype::Shotgun, WeaponArchetype::SubmachineGun}) {
+        auto expected = makeCheckpoint();
+        Weapon weapon(baseWeaponDefinition(type));
+        (void)weapon.equip(WeaponArchetype::Pistol);
+        weapon.fixedUpdate(1.0F);
+        expected.floorEntry.weapon = weapon.campaignProgress();
+        auto rounds = legacyRoundReserves(expected);
+        // A partially stocked old reserve rounds up once to one full magazine.
+        if (weaponUsesSpareMagazines(type)) --rounds.floorEntry.weapon.stowed->reserveAmmo;
+        expect(persistence::saveCampaignCheckpoint(path, rounds), "schema six legacy fixture saves");
+        std::ifstream legacyInput(path, std::ios::binary);
+        std::string text{std::istreambuf_iterator<char>{legacyInput}, std::istreambuf_iterator<char>{}};
+        text.replace(text.find("version = 7"), 11U, "version = 6");
+        text.replace(text.find("rules_version = 37"), 18U, "rules_version = 35");
+        writeText(path, text);
+        const auto loaded = persistence::loadCampaignCheckpoint(path);
+        expect(loaded.migratedRules && loaded.checkpoint == expected,
+            "schema six migrates active pistol and stowed new primary, preserving shotgun shells");
+        expect(loaded.checkpoint && persistence::saveCampaignCheckpoint(path, *loaded.checkpoint)
+            && !persistence::loadCampaignCheckpoint(path).migratedRules
+            && persistence::loadCampaignCheckpoint(path).checkpoint == expected,
+            "saving migrated schema seven does not convert reserves a second time");
+    }
 }
 
 } // namespace

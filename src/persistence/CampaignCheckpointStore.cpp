@@ -319,6 +319,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         if (*fields.version != 3U
             && *fields.version != 4U
             && *fields.version != 5U
+            && *fields.version != 6U
             && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::UnsupportedVersion;
             return result;
@@ -328,7 +329,13 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;
         }
-        const bool migratePreviousRules = *rulesVersion == 34U && *fields.version <= 5U;
+        const bool migratePreviousRules = (*rulesVersion == 34U && *fields.version <= 5U)
+            || (*rulesVersion == 35U && *fields.version <= 6U);
+        // A current-rules file must not pretend to use the legacy round schema.
+        if (!migratePreviousRules && *fields.version != currentCampaignCheckpointFileVersion) {
+            result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
+            return result;
+        }
         if (*rulesVersion != gameplay::currentCampaignRulesVersion && !migratePreviousRules) {
             result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
             return result;
@@ -430,6 +437,15 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         if (!gameplay::validateCampaignCheckpoint(checkpoint)) {
             result.status = CampaignCheckpointLoadStatus::Invalid;
             return result;
+        }
+        if (migratePreviousRules) {
+            const auto migrateSlot = [](auto& slot) {
+                slot.reserveAmmo = gameplay::reserveUnitsFromRounds(slot.definition, slot.reserveAmmo);
+                slot.definition.reserveMaximum = gameplay::reserveUnitsFromRounds(
+                    slot.definition, slot.definition.reserveMaximum);
+            };
+            migrateSlot(checkpoint.floorEntry.weapon);
+            if (checkpoint.floorEntry.weapon.stowed) migrateSlot(*checkpoint.floorEntry.weapon.stowed);
         }
         result.checkpoint = std::move(checkpoint);
         result.status = CampaignCheckpointLoadStatus::Loaded;

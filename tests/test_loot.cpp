@@ -167,7 +167,7 @@ void testAutomaticLootCollection()
     expect(weapon.reload(),
         "pickup test starts a timed reload before collection");
     weapon.fixedUpdate(weaponReloadDurationSeconds(WeaponArchetype::Pistol));
-    expect(weapon.reserveAmmo() == 8U,
+    expect(weapon.reserveAmmo() == 9U,
         "pickup test creates finite ammo capacity before collection");
 
     EntityManager manager;
@@ -222,12 +222,12 @@ void testAutomaticLootCollection()
     const LootCollectionSummary collected
         = collectNearbyLoot(manager, player, weapon, 2, 0.85F);
     expect(collected.itemsInRange == 6U && collected.collected == 6U
-            && collected.healthRestored == 25.0F && collected.ammoAdded == 2U
+            && collected.healthRestored == 25.0F && collected.ammoAdded == 1U
             && collected.keysAdded == 1U && collected.armorAdded == 15.0F
             && collected.weaponsEquipped == 1U
             && collected.specialsActivated == 1U,
         "nearby loot applies resources, objective key, Carbine and Overdrive");
-    expect(player.state().health == 85.0F && weapon.reserveAmmo() == 48U
+    expect(player.state().health == 85.0F && weapon.reserveAmmo() == 10U
             && weapon.definition().archetype == WeaponArchetype::Carbine
             && weapon.overdriveActive()
             && player.state().keys == 1U && player.state().armor == 15.0F,

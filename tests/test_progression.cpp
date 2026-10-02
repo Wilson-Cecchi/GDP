@@ -72,7 +72,7 @@ void testFunctionalProgression()
     expect(thirdRobot.levelsGained == 1U
             && progression.state().level == 4U
             && progression.state().experienceIntoLevel == 175U
-            && weapon.reserveCapacity() == 36U && weapon.reserveAmmo() == 36U,
+            && weapon.reserveCapacity() == 5U && weapon.reserveAmmo() == 5U,
         "next threshold grants reserve capacity and bonus ammo");
     expect(validateProgressionState(progression.state()),
         "functional progression state validates after multiple reward types");
@@ -103,7 +103,7 @@ void testCapCountersAndInvalidEvents()
             && std::abs(player.state().maximumArmor - 80.0F) < 1.0e-5F
             && std::abs(player.state().armor - 30.0F) < 1.0e-5F
             && std::abs(weapon.definition().damage - 46.0F) < 1.0e-5F
-            && weapon.reserveCapacity() == 44U,
+            && weapon.reserveCapacity() == 7U,
         "all nine level rewards are applied to real player and weapon stats");
     expect(validateProgressionState(progression.state()),
         "capped progression state validates");

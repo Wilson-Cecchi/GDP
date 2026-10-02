@@ -382,7 +382,7 @@ const char* progressionRewardName(const gameplay::ProgressionReward reward) noex
     case gameplay::ProgressionReward::Firepower:
         return "Firepower +4 damage";
     case gameplay::ProgressionReward::Capacity:
-        return "Capacity +4 reserve";
+        return "Capacity +1 magazine / +4 shells";
     }
     return "Unknown";
 }
@@ -3827,8 +3827,7 @@ void Application::render()
                 ? 0x43415242494e45ULL
                 : hud.weapon == visual::HudWeaponRole::Knife
                     ? 0x4b4e494645ULL : 0x504953544f4cULL),
-        .reloadRoundCount = std::min(weapon_.reserveAmmo(),
-            weapon_.definition().magazineSize - weapon_.magazineAmmo()),
+        .reloadRoundCount = weapon_.reloadRoundCount(),
     };
     currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
         visibleEnemies.size());

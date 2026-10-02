@@ -34,9 +34,9 @@ essa conversão. É preciso usar G para liberar a primária antes de pegar outra
 
 | Arma | Dano-base | Intervalo | Alcance | Carregador/reserva | Recarga |
 | --- | --- | --- | --- | --- | --- |
-| Sniper | 65 | 1,20 s | 90 m | 5/15 | 2,0 s |
-| Escopeta | 14 por pellet, seis rays | 0,85 s | 18 m | 6/24 | 2,4 s |
-| SMG | 16 | 0,085 s | 28 m | 24/96 | 1,4 s |
+| Sniper | 65 | 1,20 s | 90 m | 5 balas / 3 pentes | 2,0 s |
+| Escopeta | 14 por pellet, seis rays | 0,85 s | 18 m | 6/24 cartuchos | 0,35 s/cartucho + 0,30 s pump |
+| SMG | 16 | 0,085 s | 28 m | 24 balas / 4 pentes | 1,4 s |
 
 A escopeta consome uma cartucha por disparo e tem queda de dano com distância.
 A sniper tem mira de 0,35 s e FOV de mira a 35% do FOV configurado; a SMG aceita
@@ -46,9 +46,11 @@ Vida, fases e atributos do boss permanecem inalterados.
 
 O Test Mode oferece as três armas para ensaio imediato. Slot 1 é a primária
 possuída, 2 a pistola, 3 a faca; 4/5 continuam reservados. A Campanha usa regras
-35/schema 6. Checkpoints antigos de regras 34/schema 3–5 recebem migração
-explícita ao ler, preservando recursos, andar e seed; o loot usa o novo balanço.
-O arquivo original não é regravado pela leitura. Speedrun mantém regras 36.
+37/schema 7. Checkpoints antigos de regras 34/schema 3–5 e 35/schema 3–6
+recebem migração explícita de balas reservadas para pentes ao ler, preservando
+andar, seed e munição carregada. O arquivo original não é regravado pela
+leitura. Speedrun usa regras 38 devido ao novo descarte de munição na recarga.
+Detalhes: [recarga v2](weapon_reload_animation_2026-10-02.md).
 
 Distribuição e invariantes foram cobertos por testes determinísticos, incluindo
 1.000 seeds. O usuário aprovou a funcionalidade com "aprovadas a parte visual

@@ -24,6 +24,16 @@ composição Rail/Precision histórica descrita abaixo; não altera contratos de
 Snapshots OpenGL e testes cobrem HP crítico, munição vazia, faca, fase/vida do boss,
 mapa e separação entre os cantos. Validação visual em partida permanece com o usuário.
 
+### Reserva e recarga — revisão de 2026-10-02
+
+O número grande mostra balas carregadas. A reserva menor mostra pentes inteiros
+com sufixo `MAGS`/`PENTES`, exceto a escopeta (`SHELLS`/`CART`, cartuchos).
+Nas armas de pente, balas restantes desaparecem na ejeção e o novo pente cheio
+entra ao concluir. Na escopeta, o número aumenta a cada cartucho inserido;
+duração = 0,35 s por cartucho + 0,30 s de finalização. O snapshot mantém a
+quantidade planejada constante para não acelerar gestos enquanto a reserva cai.
+Detalhes e limites: [recarga v2](../04_gameplay/weapon_reload_animation_2026-10-02.md).
+
 ## Histórico e contratos preservados
 
 > **Estado:** HUD funcional implementado na Fase 17. HP, munição, chaves, nível,

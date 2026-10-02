@@ -654,6 +654,17 @@ CPU valida perfis, peças, limites e retorno ao repouso; OpenGL valida recargas
 distintas, cartuchos, retorno exato e MEDIUM/POTATO. Contrato/recaptura:
 `04_gameplay/weapon_reload_animation_2026-10-02.md`.
 
+Revisão v2: gates de combate verificam perda das balas restantes na ejeção,
+consumo de um pente cheio, falta de reserva, dt longo, cancelamento antes/depois
+da ejeção, drop/recuperação e reinício sem duplicação. Escopeta preserva cartuchos;
+loot e upgrades convertem seus orçamentos por tipo. Persistência cobre migração
+das duas armas, reserva parcial arredondada uma vez, schema 7 sem reconversão
+e leitura sem sobrescrita. CPU/OpenGL verificam o pente caindo independente do
+novo e o retorno exato ao repouso nos perfis MEDIUM/POTATO.
+Escopeta: testes de 1–6 cartuchos verificam duração proporcional, inserção
+autoritativa por cartucho, reserva curta, interrupção, reinício, dt longo e
+quantidade visual planejada constante enquanto o carregamento avança.
+
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
 
 O preset CMake `sanitizers` ativa ambos em GCC/Clang e executa a mesma suíte de

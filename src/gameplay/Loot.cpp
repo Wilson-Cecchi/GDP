@@ -47,7 +47,8 @@ LootCollectionSummary collectNearbyLoot(
             break;
         }
         case ItemType::Ammo: {
-            const std::uint32_t added = weapon.addReserveAmmo(item->quantity);
+            const std::uint32_t added = weapon.addReserveAmmo(
+                reserveUnitsFromRounds(weapon.campaignProgress().definition, item->quantity));
             if (added > 0U) {
                 summary.ammoAdded += added;
                 applied = true;
@@ -87,7 +88,8 @@ LootCollectionSummary collectNearbyLoot(
                     const auto type = static_cast<WeaponArchetype>(archetype);
                     if (weapon.ownsWeapon(type) && isFirearmArchetype(type)) {
                         ammunitionPickup = true;
-                        const auto added = weapon.addReserveAmmoFor(type, baseWeaponDefinition(type).magazineSize);
+                        const auto added = weapon.addReserveAmmoFor(type,
+                            weaponUsesSpareMagazines(type) ? 1U : baseWeaponDefinition(type).magazineSize);
                         summary.ammoAdded += added;
                         applied = added > 0U;
                     } else applied = weapon.equip(type);

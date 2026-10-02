@@ -55,9 +55,14 @@ especializados das pastas numeradas.
   implementados após aprovação das pranchas e aguardando aceitação no jogo.
   A SMG ainda usa provisoriamente a carabina até sua proposta visual.
   As cinco armas de fogo têm recargas visuais próprias, com peças móveis;
+  pistola, rifle, SMG e sniper descartam o pente usado e suas balas restantes,
+  consumindo outro cheio. O HUD conta reservas em pentes; escopeta usa cartuchos.
+  A escopeta recarrega por cartucho (0,35 s cada + 0,30 s para finalizar) e
+  conserva os já inseridos se você trocar ou largar a arma.
   [contrato e teste manual](04_gameplay/weapon_reload_animation_2026-10-02.md).
-  Para ensaiá-las: `build/release/gdp --test-mode`. Saves anteriores de regras 34 têm migração
-  explícita preservando recursos; Standard/Speedrun mantêm seu loot anterior.
+  Para ensaiá-las: `build/release/gdp --test-mode`. Saves de regras 34/35 têm
+  migração explícita da reserva para pentes; andar, seed e balas carregadas são
+  preservados. Standard/Speedrun mantêm seu loot anterior.
   Speedrun: Hard obrigatório e top 10 local. Configurações separadas em
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
   botões do mouse e scroll. Direção visual atual: menus e HUD Tático minimalista,

@@ -1404,6 +1404,17 @@ void testWeaponReloadProfiles()
         for (const auto other : roles) if (role != other)
             expect(sampleWeaponReloadPose(role, 0.45F) != sampleWeaponReloadPose(other, 0.45F),
                 "each firearm has a distinct reload profile, including the placeholder SMG");
+        if (role != HudWeaponRole::Shotgun) {
+            const auto outgoing = sampleWeaponReloadPose(role, 0.40F);
+            const auto falling = sampleWeaponReloadPose(role, 0.60F);
+            expect(outgoing.discardedMagazineVisible && !outgoing.magazineVisible
+                && falling.discardedMagazineVisible && falling.magazineVisible
+                && falling.discardedMagazineOffset.y < outgoing.discardedMagazineOffset.y
+                && falling.discardedMagazineOffset != falling.magazineOffset,
+                "old magazine falls away independently of the incoming full magazine");
+            expect(!sampleWeaponReloadPose(role, 0.80F).discardedMagazineVisible,
+                "discarded magazine never returns to the weapon");
+        }
         const auto full = makeWeaponViewmodelMeshes(role);
         const auto parts = makeWeaponViewmodelParts(role);
         std::size_t completeIndices = 0, splitIndices = 0;

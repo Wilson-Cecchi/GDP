@@ -79,7 +79,17 @@ resultado final:
 
 ## Propostas ativas
 
-### Weapon/reload — animações rígidas v1
+### Weapon/reload — descarte e carregador novo v2
+
+Pedido confirmado: "faça isso no jogo por favor" após proposta de descartar
+balas restantes e contar pentes completos. Estado: IMPLEMENTADA EM VALIDAÇÃO.
+O pente velho cai sem retornar e outro entra; escopeta mantém cartuchos.
+Meshes e materiais aprovados são reutilizados, sem novas texturas ou mãos.
+Contrato: `04_gameplay/weapon_reload_animation_2026-10-02.md` (seção v2).
+O playtest ainda decide aceitação visual; testes técnicos não substituem essa
+aprovação. O registro v1 seguinte permanece como histórico.
+
+### Weapon/reload — animações rígidas v1 (histórico)
 
 ```text
 unidade visual: animação de recarga por arma; sem revisão de texturas

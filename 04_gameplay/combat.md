@@ -33,8 +33,14 @@ Duplicatas procedurais abastecem somente a reserva compatível; drops do jogador
 mantêm a quantidade exata. Trocar de arma não apaga seu cooldown de disparo.
 
 As cinco armas de fogo têm [recargas visuais específicas](weapon_reload_animation_2026-10-02.md),
-com carregadores/mecanismos rígidos articulados. Tempo e transferência de munição
-continuam autoritativos em `Weapon`; a animação não muda o balanceamento.
+com carregadores/mecanismos rígidos articulados. Na revisão v2, recarregar
+pistola/carbine/SMG/sniper descarta as balas restantes e gasta um pente cheio.
+Reservas contam pentes; a escopeta mantém cartuchos individuais. Ejeção aos
+32% é irreversível em trocas/drops; o novo pente é consumido apenas ao concluir.
+`Weapon` é autoritativo; a animação não concede munição.
+Na escopeta, cada cartucho entra e consome reserva após 0,35 s, com 0,30 s
+de finalização do pump. A duração escala com a quantidade faltante/disponível;
+interromper não remove os cartuchos já inseridos.
 
 A escopeta emite seis rays determinísticos por uma única cartucha e aplica
 queda de dano `clamp(1 - distância/20, 0,25, 1)`. Cada pellet respeita colisão,

@@ -236,6 +236,9 @@ struct WeaponReloadPose {
     wkc::core::Vec3 mechanismOffset{};
     wkc::core::Vec3 mechanismRotationDegrees{};
     bool magazineVisible{true};
+    wkc::core::Vec3 discardedMagazineOffset{};
+    wkc::core::Vec3 discardedMagazineRotationDegrees{};
+    bool discardedMagazineVisible{false};
 
     constexpr bool operator==(const WeaponReloadPose&) const noexcept = default;
 };

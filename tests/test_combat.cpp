@@ -153,14 +153,118 @@ void testWeaponLifecycle()
         "reload advances deterministically without an early ammo grant");
     weapon.fixedUpdate(reloadDuration * 0.5F);
     expect(!weapon.reloading() && near(weapon.reloadProgress(), 0.0F)
-            && weapon.magazineAmmo() == 2 && weapon.reserveAmmo() == 1,
-        "reload completion transfers only the ammunition needed by the magazine");
+            && weapon.magazineAmmo() == 2 && weapon.reserveAmmo() == 2,
+        "reload completion consumes exactly one complete spare magazine");
     expect(!weapon.reload(), "full magazine rejects a redundant reload");
 
     Weapon empty({.fireInterval = 0.0F, .magazineSize = 1, .reserveMaximum = 0});
     expect(empty.tryFire() == FireReadiness::Fired, "last cartridge can fire");
     expect(empty.tryFire() == FireReadiness::Empty,
         "empty weapon rejects fire deterministically");
+}
+
+void testDiscardedMagazineReloads()
+{
+    using namespace gdp::gameplay;
+    for (const auto type : {WeaponArchetype::Pistol, WeaponArchetype::Carbine,
+             WeaponArchetype::SubmachineGun, WeaponArchetype::Sniper}) {
+        Weapon gun(baseWeaponDefinition(type));
+        const auto size = gun.definition().magazineSize;
+        const auto reserve = gun.reserveAmmo();
+        const auto duration = weaponReloadDurationSeconds(type);
+        expect(gun.tryFire() == FireReadiness::Fired && gun.reload(), "partial magazine starts replacement");
+        gun.fixedUpdate(duration * 0.20F);
+        expect(gun.magazineAmmo() == size - 1U && gun.switchTo(WeaponArchetype::Knife),
+            "switch before ejection retains the old magazine");
+        (void)gun.switchTo(type); gun.fixedUpdate(1.0F);
+        expect(gun.reload(), "interrupted reload can restart");
+        gun.fixedUpdate(duration * 0.40F);
+        expect(gun.magazineAmmo() == 0U && gun.reserveAmmo() == reserve,
+            "ejection discards all remaining rounds without spending an uninserted spare");
+        const auto dropped = gun.dropSelectedFirearm();
+        expect(dropped && dropped->magazineAmmo == 0U && dropped->reserveAmmo == reserve,
+            "dropping after ejection cannot recover discarded bullets");
+        gun.fixedUpdate(1.0F);
+        expect(dropped && gun.equipRecovered(type, dropped->magazineAmmo, dropped->reserveAmmo),
+            "recovered weapon preserves interrupted ammo state");
+        gun.fixedUpdate(1.0F);
+        expect(gun.reload(), "empty recovered magazine reloads");
+        gun.fixedUpdate(duration + 1.0F);
+        expect(gun.magazineAmmo() == size && gun.reserveAmmo() == reserve - 1U,
+            "large fixed step consumes precisely one full magazine");
+        gun.fixedUpdate(duration);
+        expect(gun.reserveAmmo() == reserve - 1U && !gun.reload(), "completion and full-mag reload never duplicate ammo");
+        while (gun.reserveAmmo() > 0U) {
+            (void)gun.tryFire(); (void)gun.reload(); gun.fixedUpdate(duration + 1.0F);
+        }
+        (void)gun.tryFire();
+        expect(!gun.reload() && gun.magazineAmmo() == size - 1U,
+            "zero spare magazines reject reload without discarding the loaded magazine");
+    }
+    Weapon shotgun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    (void)shotgun.tryFire(); (void)shotgun.reload(); shotgun.fixedUpdate(3.0F);
+    expect(shotgun.magazineAmmo() == 6U && shotgun.reserveAmmo() == 23U,
+        "shotgun reload retains loaded shells and uses only the missing shell");
+    expect(reserveUnitsFromRounds(baseWeaponDefinition(WeaponArchetype::Pistol), 9U) == 2U
+        && reserveUnitsFromRounds(baseWeaponDefinition(WeaponArchetype::Shotgun), 9U) == 9U,
+        "round budgets become complete magazines but stay individual shotgun shells");
+    Weapon switched;
+    (void)switched.tryFire(); (void)switched.reload(); switched.fixedUpdate(0.40F);
+    (void)switched.switchTo(WeaponArchetype::Knife);
+    (void)switched.switchTo(WeaponArchetype::Pistol); switched.fixedUpdate(1.0F);
+    expect(switched.magazineAmmo() == 0U && switched.reserveAmmo() == 4U,
+        "switch after ejection cannot restore discarded rounds or spend a spare");
+    (void)switched.reload(); switched.fixedUpdate(1.0F);
+    expect(switched.magazineAmmo() == 8U && switched.reserveAmmo() == 3U,
+        "restart after switch commits only one spare magazine");
+    Weapon upgraded;
+    expect(upgraded.increaseReserveCapacity(4U, 4U)
+        && upgraded.equip(WeaponArchetype::Shotgun), "capacity rank follows weapon type");
+    upgraded.fixedUpdate(1.0F);
+    expect(upgraded.reserveCapacity() == 28U && upgraded.campaignProgress().stowed->definition.reserveMaximum == 5U,
+        "one extra magazine upgrade becomes four shells, not four magazines");
+}
+
+void testPerShellShotgunReload()
+{
+    using namespace gdp::gameplay;
+    for (std::uint32_t missing = 1U; missing <= 6U; ++missing) {
+        Weapon gun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+        auto state = gun.campaignProgress();
+        state.magazineAmmo = 6U - missing;
+        (void)gun.restoreCampaignProgress(state);
+        expect(gun.reload() && gun.reloadRoundCount() == missing
+            && near(gun.reloadRemaining(), static_cast<float>(missing) * shotgunShellReloadSeconds + shotgunReadySeconds)
+            && near(gun.reloadProgress(), 0.0F), "shotgun duration scales with missing shells");
+        gun.fixedUpdate(shotgunShellReloadSeconds - 0.01F);
+        expect(gun.magazineAmmo() == 6U - missing && gun.reserveAmmo() == 24U,
+            "no shell is granted before its individual insertion time");
+        gun.fixedUpdate(0.01F);
+        expect(gun.magazineAmmo() == 7U - missing && gun.reserveAmmo() == 23U
+            && gun.reloadRoundCount() == missing && gun.tryFire() == FireReadiness::Reloading,
+            "first shell consumes one reserve and visual count stays stable");
+        (void)gun.switchTo(WeaponArchetype::Knife); (void)gun.switchTo(WeaponArchetype::Shotgun);
+        gun.fixedUpdate(1.0F);
+        expect(gun.magazineAmmo() == 7U - missing && gun.reserveAmmo() == 23U,
+            "interrupting shell reload preserves only inserted shells");
+        if (missing > 1U) {
+            expect(gun.reload(), "partially loaded shotgun resumes");
+            gun.fixedUpdate(10.0F);
+            expect(gun.magazineAmmo() == 6U && gun.reserveAmmo() == 24U - missing,
+                "large update inserts all remaining shells without duplication");
+        }
+    }
+    Weapon limited(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    auto state = limited.campaignProgress(); state.magazineAmmo = 0U; state.reserveAmmo = 2U;
+    (void)limited.restoreCampaignProgress(state);
+    expect(limited.reload() && near(limited.reloadRemaining(), 1.0F),
+        "shotgun reload duration also respects available reserve shells");
+    limited.fixedUpdate(0.70F);
+    expect(limited.magazineAmmo() == 2U && limited.reserveAmmo() == 0U && limited.reloading(),
+        "two shells inserted before final pump ready time");
+    limited.fixedUpdate(0.31F);
+    expect(!limited.reloading() && limited.magazineAmmo() == 2U && !limited.reload(),
+        "shotgun finishes with available shells, no invented cartridges");
 }
 
 void testDeterministicWeaponSpread()
@@ -309,9 +413,9 @@ void testWeaponPickupEquipment()
             && near(weapon.definition().damage, 30.0F)
             && near(weapon.definition().fireInterval, 0.13F)
             && weapon.definition().magazineSize == 12U
-            && weapon.reserveCapacity() == 52U
+            && weapon.reserveCapacity() == 5U
             && weapon.magazineAmmo() == 12U
-            && weapon.reserveAmmo() == 52U
+            && weapon.reserveAmmo() == 5U
             && near(weapon.cooldownRemaining(), 0.0F)
             && weapon.switching()
             && near(weapon.switchStrength(), 1.0F),
@@ -362,12 +466,12 @@ void testWeaponPickupEquipment()
         "cycling reaches the permanent Knife with loadout-wide damage upgrades");
     expect(weapon.switchTo(WeaponArchetype::Carbine)
             && near(weapon.definition().damage, 34.0F)
-            && weapon.reserveCapacity() == 56U
+            && weapon.reserveCapacity() == 6U
             && weapon.magazineAmmo() == 11U
-            && weapon.reserveAmmo() == 56U
+            && weapon.reserveAmmo() == 6U
             && weapon.switchTo(WeaponArchetype::Pistol)
             && near(weapon.definition().damage, 42.0F)
-            && weapon.reserveCapacity() == 40U
+            && weapon.reserveCapacity() == 6U
             && weapon.switching()
             && !weapon.switchTo(WeaponArchetype::Pistol),
         "an interrupting direct selection restores Pistol and rejects redundancy");
@@ -542,7 +646,7 @@ void testKnifeOnlyLoadout()
             && restored.hasFirearm()
             && restored.magazineAmmo() == 7U
             && near(restored.definition().damage, 38.0F)
-            && restored.reserveCapacity() == 36U
+            && restored.reserveCapacity() == 5U
             && restored.ownsWeapon(WeaponArchetype::Pistol)
             && !restored.ownsWeapon(WeaponArchetype::Carbine),
         "recovering from Knife-only restores exact ammo and only one gun");
@@ -3063,6 +3167,8 @@ int main()
     testShotgunPelletsAndOcclusion();
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
+    testDiscardedMagazineReloads();
+    testPerShellShotgunReload();
     testDeterministicWeaponSpread();
     testWeaponPickupEquipment();
     testKnifeFallback();

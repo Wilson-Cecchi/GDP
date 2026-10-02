@@ -43,6 +43,11 @@ bool validateWeaponReloads(gdp::game::visual::GdpRenderer& renderer)
             const auto mid = frame(0.45F);
             passed &= idle != mid && frame(1.0F) == idle && frame(0.0F) == idle;
             passed &= frame(0.85F) != idle;
+            if (roles[r] != HudWeaponRole::Shotgun) {
+                const auto outgoing = frame(0.40F);
+                const auto incoming = frame(0.60F);
+                passed &= outgoing != incoming && outgoing != idle && incoming != idle;
+            }
             if (roles[r] == HudWeaponRole::Shotgun) {
                 const auto loading = frame(0.45F);
                 const auto draws = renderer.lastFrameStats().drawCalls;

@@ -8,6 +8,19 @@
 namespace gdp::gameplay {
 namespace {
 
+bool inheritReserveCapacity(const WeaponDefinition& source, WeaponDefinition& target) noexcept
+{
+    const auto base = baseWeaponDefinition(source.archetype).reserveMaximum;
+    const auto bonus = source.reserveMaximum > base ? source.reserveMaximum - base : 0U;
+    const auto sourceStep = source.archetype == WeaponArchetype::Shotgun ? 4U : 1U;
+    const auto targetStep = target.archetype == WeaponArchetype::Shotgun ? 4U : 1U;
+    const std::uint64_t ranks = bonus / sourceStep + (bonus % sourceStep != 0U ? 1U : 0U);
+    const auto capacity = static_cast<std::uint64_t>(target.reserveMaximum) + ranks * targetStep;
+    if (capacity > std::numeric_limits<std::uint32_t>::max()) return false;
+    target.reserveMaximum = static_cast<std::uint32_t>(capacity);
+    return true;
+}
+
 bool validateWeaponSlot(
     const WeaponDefinition& definition,
     const std::uint32_t magazineAmmo,
@@ -35,6 +48,19 @@ bool isPrimaryWeapon(const WeaponArchetype archetype) noexcept
     return isFirearmArchetype(archetype) && archetype != WeaponArchetype::Pistol;
 }
 
+bool weaponUsesSpareMagazines(const WeaponArchetype archetype) noexcept
+{
+    return isFirearmArchetype(archetype) && archetype != WeaponArchetype::Shotgun;
+}
+
+std::uint32_t reserveUnitsFromRounds(
+    const WeaponDefinition& definition, const std::uint32_t rounds) noexcept
+{
+    if (!weaponUsesSpareMagazines(definition.archetype)) return rounds;
+    const auto size = std::max(definition.magazineSize, 1U);
+    return rounds / size + (rounds % size != 0U ? 1U : 0U);
+}
+
 std::uint8_t weaponProjectileCount(const WeaponArchetype archetype) noexcept
 {
     return archetype == WeaponArchetype::Shotgun ? 6U : 1U;
@@ -52,10 +78,10 @@ float weaponAimFovScale(const WeaponArchetype archetype) noexcept
 
 WeaponDefinition baseWeaponDefinition(const WeaponArchetype archetype) noexcept
 {
-    if (archetype == WeaponArchetype::Sniper) return {65.0F, 1.20F, 90.0F, 5U, 15U, archetype};
+    if (archetype == WeaponArchetype::Sniper) return {65.0F, 1.20F, 90.0F, 5U, 3U, archetype};
     // Shotgun damage is per pellet; one shell emits six rays.
     if (archetype == WeaponArchetype::Shotgun) return {14.0F, 0.85F, 18.0F, 6U, 24U, archetype};
-    if (archetype == WeaponArchetype::SubmachineGun) return {16.0F, 0.085F, 28.0F, 24U, 96U, archetype};
+    if (archetype == WeaponArchetype::SubmachineGun) return {16.0F, 0.085F, 28.0F, 24U, 4U, archetype};
     if (archetype == WeaponArchetype::Knife) {
         return {
             .damage = 48.0F,
@@ -72,7 +98,7 @@ WeaponDefinition baseWeaponDefinition(const WeaponArchetype archetype) noexcept
             .fireInterval = 0.13F,
             .range = 34.0F,
             .magazineSize = 12U,
-            .reserveMaximum = 48U,
+            .reserveMaximum = 4U,
             .archetype = WeaponArchetype::Carbine,
         };
     }
@@ -108,7 +134,7 @@ float weaponReloadDurationSeconds(
     const WeaponArchetype archetype) noexcept
 {
     if (archetype == WeaponArchetype::Sniper) return 2.0F;
-    if (archetype == WeaponArchetype::Shotgun) return 2.4F;
+    if (archetype == WeaponArchetype::Shotgun) return 6.0F * shotgunShellReloadSeconds + shotgunReadySeconds;
     if (archetype == WeaponArchetype::SubmachineGun) return 1.4F;
     if (archetype == WeaponArchetype::Knife) {
         return 0.0F;
@@ -197,15 +223,33 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
     overdriveRemaining_ = std::max(0.0F, overdriveRemaining_ - step);
     spreadRecoveryRemaining_ = std::max(
         0.0F, spreadRecoveryRemaining_ - step);
-    const bool reloadCompleted = reloadRemaining_ > 0.0F
+    const bool wasReloading = reloadRemaining_ > 0.0F;
+    const bool reloadCompleted = wasReloading
         && step >= reloadRemaining_;
     reloadRemaining_ = std::max(0.0F, reloadRemaining_ - step);
-    if (reloadCompleted) {
-        const std::uint32_t requested
-            = definition_.magazineSize - magazineAmmo_;
-        const std::uint32_t transferred = std::min(requested, reserveAmmo_);
-        magazineAmmo_ += transferred;
-        reserveAmmo_ -= transferred;
+    if (wasReloading && definition_.archetype == WeaponArchetype::Shotgun) {
+        const double elapsed = static_cast<double>(reloadDuration_ - reloadRemaining_);
+        const auto inserted = reloadCompleted ? reloadRoundCount_
+            : static_cast<std::uint32_t>(std::clamp(
+                std::floor((elapsed + 0.000001) / shotgunShellReloadSeconds),
+                0.0, static_cast<double>(reloadRoundCount_)));
+        if (inserted > reloadInsertedRounds_) {
+            const auto transferred = std::min(inserted - reloadInsertedRounds_, reserveAmmo_);
+            magazineAmmo_ += transferred;
+            reserveAmmo_ -= transferred;
+            reloadInsertedRounds_ += transferred;
+        }
+    }
+    // Ejection is irreversible, even if a switch/drop interrupts insertion.
+    if (wasReloading && weaponUsesSpareMagazines(definition_.archetype)
+        && reloadRemaining_ <= weaponReloadDurationSeconds(definition_.archetype)
+            * (1.0F - magazineReleaseProgress)) {
+        magazineAmmo_ = 0U;
+    }
+    if (reloadCompleted && weaponUsesSpareMagazines(definition_.archetype)
+        && reserveAmmo_ > 0U) {
+        --reserveAmmo_;
+        magazineAmmo_ = definition_.magazineSize;
     }
     if (spreadRecoveryRemaining_ <= 0.0F) {
         spreadShotCount_ = 0U;
@@ -257,7 +301,13 @@ bool Weapon::reload() noexcept
         || reserveAmmo_ == 0U) {
         return false;
     }
-    reloadRemaining_ = weaponReloadDurationSeconds(definition_.archetype);
+    reloadInsertedRounds_ = 0U;
+    reloadRoundCount_ = definition_.archetype == WeaponArchetype::Shotgun
+        ? std::min(definition_.magazineSize - magazineAmmo_, reserveAmmo_) : 1U;
+    reloadDuration_ = definition_.archetype == WeaponArchetype::Shotgun
+        ? static_cast<float>(reloadRoundCount_) * shotgunShellReloadSeconds + shotgunReadySeconds
+        : weaponReloadDurationSeconds(definition_.archetype);
+    reloadRemaining_ = reloadDuration_;
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
@@ -312,22 +362,26 @@ bool Weapon::increaseReserveCapacity(
     const std::uint32_t amount,
     const std::uint32_t bonusAmmo) noexcept
 {
+    const auto activeAmount = reserveUnitsFromRounds(definition_, amount);
+    const auto stowedAmount = stowedWeapon_
+        ? reserveUnitsFromRounds(stowedWeapon_->definition, amount) : 0U;
     if (amount == 0U
-        || amount > std::numeric_limits<std::uint32_t>::max()
+        || activeAmount > std::numeric_limits<std::uint32_t>::max()
             - definition_.reserveMaximum
         || (stowedWeapon_
-            && amount > std::numeric_limits<std::uint32_t>::max()
+            && stowedAmount > std::numeric_limits<std::uint32_t>::max()
                 - stowedWeapon_->definition.reserveMaximum)) {
         return false;
     }
-    definition_.reserveMaximum += amount;
-    (void)addReserveAmmo(bonusAmmo);
+    definition_.reserveMaximum += activeAmount;
+    (void)addReserveAmmo(reserveUnitsFromRounds(definition_, bonusAmmo));
     if (stowedWeapon_) {
-        stowedWeapon_->definition.reserveMaximum += amount;
+        stowedWeapon_->definition.reserveMaximum += stowedAmount;
         const std::uint32_t capacity
             = stowedWeapon_->definition.reserveMaximum
             - stowedWeapon_->reserveAmmo;
-        stowedWeapon_->reserveAmmo += std::min(bonusAmmo, capacity);
+        stowedWeapon_->reserveAmmo += std::min(
+            reserveUnitsFromRounds(stowedWeapon_->definition, bonusAmmo), capacity);
     }
     return true;
 }
@@ -341,13 +395,12 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     }
     const WeaponCampaignProgress::StowedWeapon previous{
         definition_, magazineAmmo_, reserveAmmo_};
-    stowedCooldownRemaining_ = hasFirearm_ ? cooldownRemaining_ : 0.0F;
     const WeaponDefinition currentBase = baseWeaponDefinition(definition_.archetype);
     WeaponDefinition replacement = baseWeaponDefinition(archetype);
     replacement.damage += std::max(definition_.damage - currentBase.damage, 0.0F)
         * weaponProjectileCount(definition_.archetype) / weaponProjectileCount(archetype);
-    replacement.reserveMaximum += definition_.reserveMaximum > currentBase.reserveMaximum
-        ? definition_.reserveMaximum - currentBase.reserveMaximum : 0U;
+    if (!inheritReserveCapacity(definition_, replacement)) return false;
+    stowedCooldownRemaining_ = hasFirearm_ ? cooldownRemaining_ : 0.0F;
     definition_ = replacement;
     magazineAmmo_ = definition_.magazineSize;
     reserveAmmo_ = definition_.reserveMaximum;
@@ -381,9 +434,7 @@ bool Weapon::equipRecovered(
     recovered.damage += std::max(
         definition_.damage - currentBase.damage, 0.0F)
         * weaponProjectileCount(definition_.archetype) / weaponProjectileCount(archetype);
-    recovered.reserveMaximum += definition_.reserveMaximum
-            > currentBase.reserveMaximum
-        ? definition_.reserveMaximum - currentBase.reserveMaximum : 0U;
+    if (!inheritReserveCapacity(definition_, recovered)) return false;
     if (!validateWeaponSlot(recovered, magazineAmmo, reserveAmmo)
         || !equip(archetype)) {
         return false;
@@ -609,9 +660,13 @@ float Weapon::reloadProgress() const noexcept
         return 0.0F;
     }
     return std::clamp(
-        1.0F - (reloadRemaining_
-            / weaponReloadDurationSeconds(definition_.archetype)),
+        1.0F - (reloadRemaining_ / reloadDuration_),
         0.0F, 1.0F);
+}
+
+std::uint32_t Weapon::reloadRoundCount() const noexcept
+{
+    return reloading() ? reloadRoundCount_ : 0U;
 }
 
 bool Weapon::reloading() const noexcept

@@ -1,4 +1,82 @@
-# Recarga visual por arma — v1
+# Recarga por arma — v2: descarte e carregadores completos
+
+Atualização solicitada e autorizada pelo usuário: descartar o pente usado e
+suas balas restantes, inserir outro cheio e contar reservas em carregadores.
+O registro v1 abaixo é histórico e não descreve mais a reserva das armas.
+
+## Regras atuais
+
+- Pistola: 8 balas / 4 carregadores; carabina: 12 / 4; SMG: 24 / 4;
+  sniper: 5 / 3. Dano e cadência não mudaram; tempos das armas de pente também não.
+- A escopeta continua com 6 cartuchos carregados / 24 de reserva. Completa
+  somente os espaços vazios, sem jogar fora os cartuchos já carregados.
+  Cada cartucho leva 0,35 s, seguido de 0,30 s para finalizar o pump:
+  um cartucho leva 0,65 s; seis levam 2,40 s. A duração considera também a
+  reserva disponível. Cada inserção consome um cartucho e aumenta a munição
+  carregada durante a recarga. Trocar ou largar preserva os já inseridos.
+- R não recarrega arma cheia nem arma sem reserva. Aos 32% da recarga,
+  o carregador antigo é ejetado e todas as balas que sobraram são perdidas.
+  No término, gasta exatamente um carregador da reserva e enche a arma.
+- Trocar ou largar antes da ejeção preserva o carregador antigo. Depois da
+  ejeção, a arma continua vazia; o pente novo ainda não concluído permanece
+  na reserva. Reiniciar não duplica munição. Não há munição recuperável no
+  pente descartado nem entidade de loot gerada por essa animação.
+- Drops do jogador preservam carregador e reserva exatos. Duplicatas de arma
+  dão até um pente compatível (escopeta: até seis cartuchos). Caixas de munição
+  conservam seu orçamento em balas, convertido por arma para pentes inteiros
+  com arredondamento para cima, limitado pela capacidade disponível.
+- Cada recompensa usual de capacidade (+4 no orçamento antigo) dá +1 pente
+  às armas de carregador, ou +4 cartuchos à escopeta, incluindo a arma guardada.
+  A troca de tipo de arma mantém o número equivalente de melhorias.
+- HUD mostra balas ativas e reserva identificada como MAGS/PENTES ou
+  SHELLS/CART. IA inimiga e treinamento não tiveram suas reservas alteradas.
+
+## Persistência e compatibilidade
+
+Campanha usa regras 37 e schema 7. Saves de regras 34/schema 3–5 e
+35/schema 3–6 são validados antes da conversão; balas reservadas e capacidade
+das armas de carregador tornam-se pentes completos, arredondando para cima
+uma única vez. Munição carregada, cartuchos da escopeta, upgrades, andar, seed
+e dificuldade permanecem. Ler não sobrescreve o arquivo; o próximo checkpoint
+salvo usa schema 7, que não reconverte os valores. Speedrun usa regras 38,
+separando recordes do balanceamento antigo.
+
+## Visual v2
+
+O pente antigo desce e gira, saindo do enquadramento, sem retornar à arma.
+Um segundo exemplar entra por baixo e se encaixa; slide/ferrolho continuam
+com seu gesto próprio. A escopeta publica uma quantidade planejada estável
+durante a recarga; seu cartucho visual acompanha cada intervalo de inserção,
+sem acelerar a animação conforme a reserva diminui. Reutiliza os meshes e materiais Used aprovados, com
+uma passagem adicional temporária para o pente que cai. Não cria texturas,
+assets de mãos ou simulação física persistente. A aceitação visual final
+continua dependente do playtest do usuário.
+
+Capturas nativas v2: [pistola](../visual/validation/weapon_reload_v2_pistol.gif),
+[carabina](../visual/validation/weapon_reload_v2_carbine.gif),
+[SMG](../visual/validation/weapon_reload_v2_smg.gif),
+[sniper](../visual/validation/weapon_reload_v2_sniper.gif),
+[escopeta](../visual/validation/weapon_reload_v2_shotgun.gif).
+São fixtures offscreen de 31 poses por arma, não uma sessão manual completa.
+Recaptura atual:
+
+```sh
+GDP_RELOAD_CAPTURE_DIR=build/visual-validation/weapon-reloads-v2 \
+SDL_VIDEODRIVER=offscreen build/release/gdp_renderer_gl_tests --reload-only
+```
+
+Validação local v2: Release 64/64 testes em 59,50 s, já incluindo a recarga
+proporcional da escopeta e integração da Application. Capturas inspecionadas
+na Quadro K2100M/NVIDIA 470.256.02; repetição dos três gates OpenGL no
+Mesa llvmpipe 26.2.3 passou em 12,52 s. Sem alteração de timeouts ou tolerâncias.
+ASan/UBSan: nove gates de CPU, combate, loot, progressão, campanha, persistência,
+Speedrun e OpenGL passaram em 45,28 s, sem erros reportados.
+A integração completa da Application com ASan/UBSan passou em 213,26 s;
+total de dez gates afetados instrumentados aprovados. Não houve novo teste
+nativo Windows local; o pacote desta revisão depende da execução da CI após
+o push. Mudanças do fluxo paralelo de IA ficaram preservadas e fora do commit.
+
+## Registro histórico v1
 
 Pedido: "podemos colocar animação de recando as armas para cada arma diferente?"
 Data: 2026-10-02. Implementação em validação visual, sem mudar texturas,

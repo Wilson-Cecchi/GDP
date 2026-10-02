@@ -1,6 +1,7 @@
 #include "game/visual/GdpRenderData.hpp"
 
 #include "core/Hash.hpp"
+#include "gameplay/Weapon.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1337,55 +1338,77 @@ WeaponReloadPose sampleWeaponReloadPose(
     WeaponReloadPose pose;
     if (role == HudWeaponRole::Knife) { pose.magazineVisible = false; return pose; }
     const float hold = ease(0.0F, 0.16F) * (1.0F - ease(0.84F, 1.0F));
-    float magazine = 0.0F;
     float cycle = 0.0F;
     switch (role) {
     case HudWeaponRole::Pistol:
         pose.weapon = {{-0.09F, 0.18F, -0.025F}, {12.0F, -8.0F, 34.0F}};
-        magazine = ease(0.14F, 0.34F) * (1.0F - ease(0.54F, 0.76F));
-        pose.magazineOffset = {0.0F, -0.27F * magazine, -0.10F * magazine};
         cycle = ease(0.78F, 0.86F) * (1.0F - ease(0.89F, 0.98F));
         pose.mechanismOffset.z = -0.085F * cycle;
         break;
     case HudWeaponRole::Carbine:
         pose.weapon = {{-0.08F, 0.22F, -0.04F}, {7.0F, 10.0F, -22.0F}};
-        magazine = ease(0.12F, 0.35F) * (1.0F - ease(0.56F, 0.78F));
-        pose.magazineOffset = {-0.055F * magazine, -0.24F * magazine, 0.05F * magazine};
         cycle = ease(0.80F, 0.87F) * (1.0F - ease(0.91F, 0.98F));
         pose.mechanismOffset.z = -0.12F * cycle;
         break;
     case HudWeaponRole::SubmachineGun:
         pose.weapon = {{-0.045F, 0.18F, 0.02F}, {4.0F, -6.0F, 20.0F}};
-        magazine = ease(0.08F, 0.27F) * (1.0F - ease(0.48F, 0.68F));
-        pose.magazineOffset = {0.035F * magazine, -0.23F * magazine, 0.025F * magazine};
         cycle = ease(0.73F, 0.81F) * (1.0F - ease(0.85F, 0.94F));
         pose.mechanismOffset.z = -0.095F * cycle;
         break;
     case HudWeaponRole::Sniper:
         pose.weapon = {{-0.06F, 0.18F, -0.03F}, {3.0F, 12.0F, -16.0F}};
-        magazine = ease(0.22F, 0.43F) * (1.0F - ease(0.59F, 0.78F));
-        pose.magazineOffset = {0.0F, -0.24F * magazine, -0.035F * magazine};
         cycle = ease(0.06F, 0.17F) * (1.0F - ease(0.79F, 0.93F));
         pose.mechanismRotationDegrees.z = 50.0F * ease(0.02F, 0.10F)
             * (1.0F - ease(0.91F, 0.98F));
         pose.mechanismOffset.z = -0.13F * cycle;
         break;
-    case HudWeaponRole::Shotgun:
+    case HudWeaponRole::Shotgun: {
         pose.weapon = {{-0.06F, 0.20F, 0.015F}, {6.0F, -8.0F, -38.0F}};
-        pose.magazineVisible = p >= 0.14F && p < 0.76F;
+        const float rounds = static_cast<float>(std::clamp(roundCount, 1U, 32U));
+        const float duration = rounds * gameplay::shotgunShellReloadSeconds + gameplay::shotgunReadySeconds;
+        const float loadingEnd = (duration - gameplay::shotgunReadySeconds) / duration;
+        pose.magazineVisible = p >= 0.04F && p < loadingEnd;
         if (pose.magazineVisible) {
-            const float rounds = static_cast<float>(std::clamp(roundCount, 1U, 32U));
-            const float phase = std::fmod((p - 0.14F) / 0.62F * rounds, 1.0F);
+            const float phase = std::fmod(p * duration / gameplay::shotgunShellReloadSeconds, 1.0F);
             const float t = std::clamp(phase / 0.86F, 0.0F, 1.0F);
             const float insert = t * t * (3.0F - 2.0F * t);
             pose.magazineOffset = {-0.13F * (1.0F - insert),
                 -0.22F * (1.0F - insert), -0.10F * (1.0F - insert)};
         }
-        cycle = ease(0.79F, 0.87F) * (1.0F - ease(0.90F, 0.98F));
+        cycle = ease(loadingEnd, loadingEnd + (1.0F - loadingEnd) * 0.45F)
+            * (1.0F - ease(loadingEnd + (1.0F - loadingEnd) * 0.55F, 0.99F));
         pose.mechanismOffset.z = -0.18F * cycle;
         break;
+    }
     case HudWeaponRole::Knife: break;
     default: return {};
+    }
+    if (role != HudWeaponRole::Shotgun) {
+        // The old magazine leaves permanently. A different full magazine enters
+        // from outside the view; both instances reuse the same immutable mesh.
+        constexpr float release = gameplay::magazineReleaseProgress;
+        const float sideways = role == HudWeaponRole::Carbine ? -0.055F
+            : role == HudWeaponRole::SubmachineGun ? 0.035F : 0.0F;
+        const float depth = role == HudWeaponRole::Pistol ? -0.10F : -0.035F;
+        if (p < release) {
+            const float extract = ease(0.14F, release);
+            pose.magazineOffset = {sideways * extract, -0.24F * extract, depth * extract};
+        } else {
+            pose.magazineVisible = p >= 0.53F;
+            const float insert = 1.0F - ease(0.53F, 0.78F);
+            pose.magazineOffset = {sideways * insert, -0.42F * insert, depth * insert};
+            pose.discardedMagazineVisible = p < 0.70F;
+            if (pose.discardedMagazineVisible) {
+                const float t = (p - release) / (0.70F - release);
+                const float side = role == HudWeaponRole::Pistol
+                    || role == HudWeaponRole::SubmachineGun ? 1.0F : -1.0F;
+                pose.discardedMagazineOffset = {sideways + side * 0.20F * t,
+                    -0.24F - 0.28F * t - 0.65F * t * t, depth - 0.08F * t};
+                pose.discardedMagazineRotationDegrees = {70.0F * t, 0.0F, side * 105.0F * t};
+            }
+        }
+        // Canonical endpoint poses must be identical to idle, including hidden data.
+        if (p >= 1.0F) pose.magazineOffset = {};
     }
     pose.weapon.offset = pose.weapon.offset * hold;
     pose.weapon.rotationDegrees = pose.weapon.rotationDegrees * hold;

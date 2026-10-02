@@ -20,7 +20,8 @@ struct WeaponDefinition {
     float fireInterval{0.22F};
     float range{30.0F};
     std::uint32_t magazineSize{8};
-    std::uint32_t reserveMaximum{32};
+    // Full spare magazines, or individual shells for the tube-fed shotgun.
+    std::uint32_t reserveMaximum{4};
     WeaponArchetype archetype{WeaponArchetype::Pistol};
 
     constexpr bool operator==(const WeaponDefinition&) const noexcept = default;
@@ -65,10 +66,12 @@ public:
     void fixedUpdate(float fixedStepSeconds) noexcept;
     [[nodiscard]] FireReadiness tryFire() noexcept;
     [[nodiscard]] bool reload() noexcept;
+    // Reserve units: complete magazines, except shotgun shells.
     [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
     [[nodiscard]] std::uint32_t addReserveAmmoFor(WeaponArchetype archetype, std::uint32_t amount) noexcept;
     [[nodiscard]] std::optional<WeaponArchetype> archetypeForSlot(std::uint32_t slot) const noexcept;
     [[nodiscard]] bool increaseDamage(float amount) noexcept;
+    // Loot/progression budgets remain expressed in rounds; converted per gun.
     [[nodiscard]] bool increaseReserveCapacity(
         std::uint32_t amount,
         std::uint32_t bonusAmmo = 0U) noexcept;
@@ -101,6 +104,7 @@ public:
     [[nodiscard]] float cooldownRemaining() const noexcept;
     [[nodiscard]] float reloadRemaining() const noexcept;
     [[nodiscard]] float reloadProgress() const noexcept;
+    [[nodiscard]] std::uint32_t reloadRoundCount() const noexcept;
     [[nodiscard]] bool reloading() const noexcept;
     [[nodiscard]] float switchRemaining() const noexcept;
     [[nodiscard]] float switchStrength() const noexcept;
@@ -125,6 +129,9 @@ private:
     float stowedCooldownRemaining_{0.0F};
     float knifeCooldownRemaining_{0.0F};
     float reloadRemaining_{0.0F};
+    float reloadDuration_{0.0F};
+    std::uint32_t reloadRoundCount_{0U};
+    std::uint32_t reloadInsertedRounds_{0U};
     float switchRemaining_{0.0F};
     float overdriveRemaining_{0.0F};
     std::uint32_t spreadShotCount_{0U};
@@ -138,6 +145,12 @@ private:
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] bool isFirearmArchetype(WeaponArchetype archetype) noexcept;
 [[nodiscard]] bool isPrimaryWeapon(WeaponArchetype archetype) noexcept;
+[[nodiscard]] bool weaponUsesSpareMagazines(WeaponArchetype archetype) noexcept;
+[[nodiscard]] std::uint32_t reserveUnitsFromRounds(
+    const WeaponDefinition& definition, std::uint32_t rounds) noexcept;
+inline constexpr float magazineReleaseProgress = 0.32F;
+inline constexpr float shotgunShellReloadSeconds = 0.35F;
+inline constexpr float shotgunReadySeconds = 0.30F;
 [[nodiscard]] std::uint8_t weaponProjectileCount(WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponAimDurationSeconds(WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponAimFovScale(WeaponArchetype archetype) noexcept;

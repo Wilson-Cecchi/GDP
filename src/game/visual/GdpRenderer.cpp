@@ -2250,19 +2250,28 @@ bool GdpRenderer::render(
         shader.setMat4(gl_, "uModel", root);
         shader.setInt(gl_, "uDetailedMaterial", 1);
         const std::size_t weaponIndex = static_cast<std::size_t>(viewmodelRole);
-        for (std::size_t part = 0; part < weaponPartCount; ++part) {
+        // One extra magazine pass exists only while the discarded instance falls.
+        for (std::size_t pass = 0; pass < weaponPartCount + 1U; ++pass) {
+            const bool discarded = pass == weaponPartCount;
+            const std::size_t part = discarded
+                ? static_cast<std::size_t>(WeaponPart::Magazine) : pass;
+            if (discarded && !reloadPose.discardedMagazineVisible) continue;
             if (part == static_cast<std::size_t>(WeaponPart::Magazine)
-                && !reloadPose.magazineVisible) continue;
+                && !discarded && !reloadPose.magazineVisible) continue;
             const bool magazine = part == static_cast<std::size_t>(WeaponPart::Magazine);
             const bool mechanism = part == static_cast<std::size_t>(WeaponPart::Mechanism);
-            const wkc::core::Vec3 offset = magazine ? reloadPose.magazineOffset
+            const wkc::core::Vec3 offset = discarded ? reloadPose.discardedMagazineOffset
+                : magazine ? reloadPose.magazineOffset
                 : mechanism ? reloadPose.mechanismOffset : wkc::core::Vec3{};
-            const wkc::core::Vec3 pivot = viewmodelRole == HudWeaponRole::Sniper
+            const wkc::core::Vec3 pivot = mechanism && viewmodelRole == HudWeaponRole::Sniper
                 ? wkc::core::Vec3{0.096F, 0.015F, -0.08F} : wkc::core::Vec3{};
-            const float rotation = mechanism ? reloadPose.mechanismRotationDegrees.z : 0.0F;
+            const float rotation = discarded ? reloadPose.discardedMagazineRotationDegrees.z
+                : mechanism ? reloadPose.mechanismRotationDegrees.z : 0.0F;
             shader.setMat4(gl_, "uModel", root * wkc::core::translationMatrix(offset)
                 * wkc::core::translationMatrix(pivot)
                 * wkc::core::rotationZMatrix(rotation * degreesToRadians)
+                * wkc::core::rotationXMatrix(discarded
+                    ? reloadPose.discardedMagazineRotationDegrees.x * degreesToRadians : 0.0F)
                 * wkc::core::translationMatrix(pivot * -1.0F));
             for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
                 const wkc::render::Mesh& mesh = weaponPartMeshes_[weaponIndex][part][material];
@@ -2882,7 +2891,10 @@ bool GdpRenderer::render(
                 resourceY + 34 * hudScale, largeScale, ready, textColor);
         } else {
             const std::string ammo = std::to_string(hud.magazineAmmo);
-            const std::string reserve = "/ " + std::to_string(hud.reserveAmmo);
+            const std::string reserve = "/ " + std::to_string(hud.reserveAmmo)
+                + (hud.weapon == HudWeaponRole::Shotgun
+                    ? (hud.language == gameplay::Language::PortugueseBrazil ? " CART" : " SHELLS")
+                    : (hud.language == gameplay::Language::PortugueseBrazil ? " PENTES" : " MAGS"));
             const int reserveWidth = bitmapTextWidth(reserve, hudScale);
             drawBitmapText(rightEdge - reserveWidth - 3 * hudScale - bitmapTextWidth(ammo, largeScale),
                 resourceY + 34 * hudScale, largeScale, ammo,
