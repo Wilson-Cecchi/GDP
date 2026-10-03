@@ -1,9 +1,14 @@
 # Player em primeira pessoa — proposta visual v1
 
 Estado: **PARCIALMENTE IMPLEMENTADA EM VALIDAÇÃO — Usado**. Data: 2026-10-02.
+Feedback de playtest: **REVISÃO SOLICITADA** da postura parada/cintura;
+[v2 torso/cinto](player_body_proposal_v2.md) aguardando aprovação. Não aceita a v1
+como arte final nem revoga a aprovação anterior de braços/mãos.
 Decisão do usuário: "visual aprovado", em resposta à prancha v1 e à
 recomendação da variante Usado. Não aprova uma revisão da sniper, que é outra
-unidade visual. Corpo inferior v1 implementado; braços/mãos ainda pendentes.
+unidade visual. Corpo inferior v1 implementado; braços/mãos revisados na
+[unidade Usado v2](player_hands_proposal_v2.md), aprovada para implementação
+em 2026-10-03 e em validação visual no jogo.
 Contrato, capturas nativas e testes: `04_gameplay/player_body_2026-10-02.md`.
 Unidade: `Player presentation` — corpo, braços, mãos, uniforme e animações
 de primeira pessoa. Prancha: [player_body_proposal_v1.png](player_body_proposal_v1.png).
@@ -41,7 +46,7 @@ Não aprova remodelagem das armas nem texturas novas de ambiente.
   do corpo inferior ao renderer, com histórico visual separado de gameplay.
 - Armas usam projeção própria de 68 graus para manter proporções em FOV 60–100.
   `WeaponViewmodelRenderData` já recebe recuo, recarga, equip, faca e postura,
-  mas não contém braços/mãos ou pontos de contato das mãos.
+  e agora alimenta o rig local de braços/mãos com contatos próprios por arma.
 - A recarga é autoritativa em `Weapon`: pente ejetado aos 32%, pente novo
   consumido ao concluir; escopeta insere cartuchos a cada 0,35 s e finaliza
   em mais 0,30 s. `reloadRoundCount()` fixa a quantidade visual planejada.
@@ -95,7 +100,8 @@ Pausar congela a pose; reiniciar/relocar descarta seu histórico transitório.
 - Playtest humano decide naturalidade, conforto e aceitação artística.
 
 Os itens 1/2 e os gates do corpo inferior foram implementados após aprovação;
-itens 3/4 e gates de mãos/recargas seguem pendentes. O gate
+itens 3/4 foram revisados após aprovação própria de mãos Usado v2,
+documentada em `04_gameplay/player_hands_2026-10-03.md`. O gate
 `visual/TEXTURE_APPROVALS.md` exige aprovação explícita da prancha/variante
 antes da implementação; essa aprovação foi recebida para Usado em 2026-10-02.
 Aceitação visual final no jogo permanece com o usuário.

@@ -1357,9 +1357,11 @@ WeaponReloadPose sampleWeaponReloadPose(
         break;
     case HudWeaponRole::Sniper:
         pose.weapon = {{-0.06F, 0.18F, -0.03F}, {3.0F, 12.0F, -16.0F}};
-        cycle = ease(0.06F, 0.17F) * (1.0F - ease(0.79F, 0.93F));
-        pose.mechanismRotationDegrees.z = 50.0F * ease(0.02F, 0.10F)
-            * (1.0F - ease(0.91F, 0.98F));
+        // Dominant hand reaches the right-side bolt before it moves; the
+        // support hand is back on the fore-end before the closing stroke.
+        cycle = ease(0.11F, 0.20F) * (1.0F - ease(0.85F, 0.93F));
+        pose.mechanismRotationDegrees.z = 50.0F * ease(0.07F, 0.12F)
+            * (1.0F - ease(0.93F, 0.97F));
         pose.mechanismOffset.z = -0.13F * cycle;
         break;
     case HudWeaponRole::Shotgun: {
@@ -1391,11 +1393,12 @@ WeaponReloadPose sampleWeaponReloadPose(
             : role == HudWeaponRole::SubmachineGun ? 0.035F : 0.0F;
         const float depth = role == HudWeaponRole::Pistol ? -0.10F : -0.035F;
         if (p < release) {
-            const float extract = ease(0.14F, release);
+            const float extract = ease(role == HudWeaponRole::Sniper ? 0.28F : 0.14F, release);
             pose.magazineOffset = {sideways * extract, -0.24F * extract, depth * extract};
         } else {
             pose.magazineVisible = p >= 0.53F;
-            const float insert = 1.0F - ease(0.53F, 0.78F);
+            const float insert = 1.0F - ease(0.53F,
+                role == HudWeaponRole::SubmachineGun ? 0.71F : 0.78F);
             pose.magazineOffset = {sideways * insert, -0.42F * insert, depth * insert};
             pose.discardedMagazineVisible = p < 0.70F;
             if (pose.discardedMagazineVisible) {
@@ -1462,6 +1465,27 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
             reloadPose.weapon.rotationDegrees.z - (58.0F * meleeArc),
         },
     };
+}
+
+wkc::core::Mat4 sampleWeaponPresentationTransform(const WeaponViewmodelRenderData& weapon) noexcept
+{
+    using namespace wkc::core;
+    const auto pose=sampleWeaponViewmodelPose(weapon);
+    const bool knife=weapon.role==HudWeaponRole::Knife;
+    const bool primary=!knife && weapon.role!=HudWeaponRole::Pistol;
+    const Vec3 base{primary ? .47F : knife ? .38F : .27F,
+        primary ? -.30F : knife ? -.31F : -.22F,
+        primary ? 1.18F : knife ? .83F : .94F};
+    // Perspective-equivalent near space: halve BOTH translation and scale.
+    // Screen framing is unchanged, while arms can use human-scale reach.
+    constexpr float nearScale=.5F;
+    constexpr float radians=std::numbers::pi_v<float>/180;
+    const float scale=(knife ? .80F : primary ? .78F : .80F)*nearScale;
+    return translationMatrix((base+pose.offset+Vec3{0,-.65F*sniperScopeStrength(weapon),0})*nearScale)
+        *rotationZMatrix(pose.rotationDegrees.z*radians)
+        *rotationYMatrix((pose.rotationDegrees.y+(knife ? -35.0F : primary ? -23.0F : -28.0F))*radians)
+        *rotationXMatrix((pose.rotationDegrees.x+(knife ? -28.0F : -7.0F))*radians)
+        *scaleMatrix({scale,scale,scale});
 }
 
 ShadowBudgetResult optimizeShadowBudget(

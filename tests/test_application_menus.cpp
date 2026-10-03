@@ -253,6 +253,24 @@ struct ApplicationMenuTestAccess {
             key(Key::Digit1); release(); app.fixedUpdate(1.0 / 60.0); app.render();
             expect(app.weapon_.definition().archetype == type && !app.fatalError_,
                 "live primary key and rendering support each new firearm after selecting Knife");
+            // Live reload state feeds the new hands, without a second visual clock.
+            app.weapon_.fixedUpdate(1.0F);
+            expect(app.weapon_.tryFire()==gameplay::FireReadiness::Fired, "primary can fire before hands reload fixture");
+            app.reloadPending_=true; release(); app.fixedUpdate(1.0/60.0); app.render();
+            expect(app.weapon_.reloading() && !app.fatalError_,
+                "live application renders hands while the authoritative weapon is reloading");
+            const float progressBeforePause=app.weapon_.reloadProgress();
+            const auto magsBeforePause=app.weapon_.reserveAmmo();
+            app.setPaused(true); app.fixedUpdate(.20); app.render();
+            expect(app.weapon_.reloadProgress()==progressBeforePause
+                && app.weapon_.reserveAmmo()==magsBeforePause && !app.fatalError_,
+                "pause/render cannot advance a hand reload or spend ammunition");
+            app.setPaused(false);
+            release();
+            for(unsigned int tick=0;tick<160U;++tick) app.fixedUpdate(1.0/60.0);
+            app.render();
+            expect(!app.weapon_.reloading() && !app.fatalError_,
+                "completed magazine or per-shell reload returns the live hands to rest");
             if (type == gameplay::WeaponArchetype::Sniper) {
                 // Isolate presentation transitions from combat and physical input.
                 for (const auto id : app.entities_.query(entities::EntityKind::Enemy)) {

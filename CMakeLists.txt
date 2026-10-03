@@ -262,6 +262,7 @@ add_library(
     src/game/Localization.cpp
     src/game/visual/WeaponViewmodelAssets.cpp
     src/game/visual/PlayerBodyAssets.cpp
+    src/game/visual/PlayerHandsAssets.cpp
 )
 
 target_compile_features(gdp_visual_renderer PUBLIC cxx_std_20)
@@ -915,10 +916,14 @@ if(GDP_BUILD_TESTS)
 
         add_test(NAME renderer_opengl_pixels COMMAND gdp_renderer_gl_tests)
         add_test(NAME weapon_reload_opengl COMMAND gdp_renderer_gl_tests --reload-only)
+        add_test(NAME player_hands_opengl COMMAND gdp_renderer_gl_tests --player-hands-only)
+        set_tests_properties(player_hands_opengl PROPERTIES
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen" TIMEOUT 30)
         set_tests_properties(weapon_reload_opengl PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=offscreen" TIMEOUT 30)
         if(GDP_ENABLE_SANITIZERS)
             set_tests_properties(weapon_reload_opengl PROPERTIES TIMEOUT 60)
+            set_tests_properties(player_hands_opengl PROPERTIES TIMEOUT 60)
         endif()
         set_tests_properties(
             renderer_opengl_pixels

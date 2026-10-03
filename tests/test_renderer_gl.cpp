@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "WeaponReloadValidation.hpp"
+#include "PlayerHandsValidation.hpp"
 #include "PlayerBodyValidation.hpp"
 
 namespace {
@@ -600,6 +601,7 @@ int main(const int argc, char** argv)
     const bool reloadOnly = argc == 2 && std::string{argv[1]} == "--reload-only";
     const bool scopeOnly = argc == 2 && std::string{argv[1]} == "--scope-only";
     const bool bodyOnly = argc == 2 && std::string{argv[1]} == "--player-body-only";
+    const bool handsOnly = argc == 2 && std::string{argv[1]} == "--player-hands-only";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -764,6 +766,8 @@ int main(const int argc, char** argv)
             std::cerr << "Renderer failed to produce a frame\n";
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
+        } else if (handsOnly) {
+            passed = validatePlayerHands(renderer);
         } else if (reloadOnly) {
             passed = validateWeaponReloads(renderer);
         } else if (scopeOnly) {

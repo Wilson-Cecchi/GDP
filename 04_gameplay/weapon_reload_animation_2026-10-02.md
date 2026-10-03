@@ -4,6 +4,12 @@ Atualização solicitada e autorizada pelo usuário: descartar o pente usado e
 suas balas restantes, inserir outro cheio e contar reservas em carregadores.
 O registro v1 abaixo é histórico e não descreve mais a reserva das armas.
 
+Atualização de apresentação em 2026-10-03: [mãos Usado v2](player_hands_2026-10-03.md)
+adicionam rig/contatos sobre estas peças, após aprovação própria. Curvas
+cosméticas do ferrolho/sniper e da entrada/SMG foram sincronizadas com as mãos;
+tempos e regras de munição abaixo não mudaram. Capturas/testes desta página
+registram a etapa anterior, não validam automaticamente as mãos atuais.
+
 ## Regras atuais
 
 - Pistola: 8 balas / 4 carregadores; carabina: 12 / 4; SMG: 24 / 4;
@@ -48,8 +54,9 @@ Um segundo exemplar entra por baixo e se encaixa; slide/ferrolho continuam
 com seu gesto próprio. A escopeta publica uma quantidade planejada estável
 durante a recarga; seu cartucho visual acompanha cada intervalo de inserção,
 sem acelerar a animação conforme a reserva diminui. Reutiliza os meshes e materiais Used aprovados, com
-uma passagem adicional temporária para o pente que cai. Não cria texturas,
-assets de mãos ou simulação física persistente. A aceitação visual final
+uma passagem adicional temporária para o pente que cai. Nesta etapa não foram
+criadas texturas, assets de mãos ou simulação física persistente; mãos foram
+implementadas depois na unidade própria ligada acima. A aceitação visual final
 continua dependente do playtest do usuário.
 
 Capturas nativas v2: [pistola](../visual/validation/weapon_reload_v2_pistol.gif),

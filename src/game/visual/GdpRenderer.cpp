@@ -76,7 +76,7 @@ layout(location = 4) in mat4 aInstanceModel;
 uniform mat4 uModel;
 uniform int uInstanced;
 uniform int uPlayerSkinning;
-uniform mat4 uPlayerBones[7];
+uniform mat4 uPlayerBones[36];
 uniform mat4 uView;
 uniform mat4 uProjection;
 
@@ -97,7 +97,28 @@ void main()
             + uPlayerBones[int(aUv.y)] * (1.0 - weight);
         position = skin * position;
         normal = mat3(skin) * normal;
-        vUv = vec2(aPosition.x * 2.0 + aPosition.z * 3.0, aPosition.y * 2.0);
+        if (uPlayerSkinning == 2) {
+            int localJoint = joint % 18;
+            if (localJoint < 2) {
+                // Sleeves: circumference plus length, not a tiny repeated
+                // planar checker that mipmaps into a smooth plastic cylinder.
+                vUv = vec2(atan(aPosition.z, aPosition.x + 0.000001) / 6.283185 + 0.5,
+                    -aPosition.y / 1.8);
+            } else if (localJoint >= 3) {
+                const float rootsX[5] = float[5](0.032, 0.0105, -0.0105, -0.030, 0.036);
+                const float rootsY[5] = float[5](0.085, 0.090, 0.087, 0.077, 0.025);
+                const float lengths[5] = float[5](0.091, 0.098, 0.091, 0.075, 0.077);
+                int digit = (localJoint - 3) / 3;
+                float mirror = joint < 18 ? 1.0 : -1.0;
+                vec3 bind = aPosition - vec3(rootsX[digit] * mirror, rootsY[digit], 0.0) * 2.2;
+                vUv = vec2(atan(bind.z, bind.x + 0.000001) / 6.283185 + 0.5,
+                    bind.y / (lengths[digit] * 2.2));
+            } else {
+                vUv = vec2(aPosition.x / 0.22 + 0.5, aPosition.y / 0.44);
+            }
+        } else {
+            vUv = vec2(aPosition.x * 2.0 + aPosition.z * 3.0, aPosition.y * 2.0);
+        }
     }
     vec4 worldPosition = model * position;
     vWorldPosition = worldPosition.xyz;
@@ -608,6 +629,15 @@ bool GdpRenderer::initialize(const int width, const int height)
         const auto images = makeUsedPlayerBodyMaterialImages(static_cast<PlayerBodyMaterial>(material));
         auto& gpu = playerBodyMaterials_[material];
         if (!playerBodyMeshes_[material].upload(gl_, playerMeshes[material])
+            || !gpu.albedo.upload(gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
+            || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
+            || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
+    }
+    const auto handsMeshes = makePlayerHandsMeshes();
+    for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
+        const auto images = makeUsedPlayerHandsMaterialImages(static_cast<PlayerHandsMaterial>(i));
+        auto& gpu = playerHandsMaterials_[i];
+        if (!playerHandsMeshes_[i].upload(gl_, handsMeshes[i])
             || !gpu.albedo.upload(gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
             || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
             || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
@@ -2275,39 +2305,21 @@ bool GdpRenderer::render(
         shader.setVec3(gl_, "uViewmodelLightDirection",
             wkc::core::normalized((up * 0.82F) - (right * 0.34F)
                 - (forward * 0.44F)));
-        const WeaponViewmodelPose pose
-            = sampleWeaponViewmodelPose(weaponViewmodel);
         const WeaponReloadPose reloadPose = sampleWeaponReloadPose(
             weaponViewmodel.role, weaponViewmodel.reloadProgress, weaponViewmodel.reloadRoundCount);
         const bool carbine = weaponViewmodel.role != HudWeaponRole::Pistol
             && weaponViewmodel.role != HudWeaponRole::Knife;
         const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
-        const wkc::core::Vec3 baseOffset{
-            carbine ? 0.47F : knife ? 0.38F : 0.27F,
-            carbine ? -0.48F : knife ? -0.38F : -0.31F,
-            carbine ? 1.18F : knife ? 0.83F : 0.94F,
-        };
-        const wkc::core::Vec3 localOffset = baseOffset + pose.offset
-            + wkc::core::Vec3{0.0F, -0.65F * scopeStrength, 0.0F};
-        const wkc::core::Vec3 anchor = camera.position
-            + (right * localOffset.x) + (up * localOffset.y)
-            + (forward * localOffset.z);
+        auto presentationWeapon = weaponViewmodel;
+        // Modal UI gates scope separately from the raw DTO. The shared hand
+        // frame must use that same gate, not retain a hidden zoom-lowered root.
+        if (scopeStrength == 0.0F) presentationWeapon.aimStrength = 0.0F;
         // Keep the weapon in the lower-right periphery. Geometry and flash
         // scale together; the camera-space firing ray remains unchanged.
-        const float presentationScale = knife ? 0.80F : carbine ? 0.78F : 0.80F;
         const wkc::core::Mat4 root
-            = wkc::core::translationMatrix(anchor)
+            = wkc::core::translationMatrix(camera.position)
             * basisMatrix(right, up, forward)
-            * wkc::core::rotationZMatrix(
-                pose.rotationDegrees.z * degreesToRadians)
-            * wkc::core::rotationYMatrix(
-                (pose.rotationDegrees.y + (knife ? -35.0F : carbine ? -23.0F : -28.0F))
-                    * degreesToRadians)
-            * wkc::core::rotationXMatrix(
-                (pose.rotationDegrees.x + (knife ? -28.0F : -7.0F))
-                    * degreesToRadians)
-            * wkc::core::scaleMatrix({presentationScale,
-                presentationScale, presentationScale});
+            * sampleWeaponPresentationTransform(presentationWeapon);
         const float seedTone = static_cast<float>(
             (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
         const std::array materialColors{
@@ -2360,6 +2372,37 @@ bool GdpRenderer::render(
                         ? 0.22F : 0.0F);
                 drawMesh(mesh);
             }
+        }
+
+        if (weaponViewmodel.handsVisible && !hud.mainMenu
+            && hud.objective != ObjectiveRenderState::Victory
+            && hud.objective != ObjectiveRenderState::Defeat) {
+            const auto hands = samplePlayerHandsPose(presentationWeapon);
+            shader.setInt(gl_, "uPlayerSkinning", 2);
+            shader.setMat4(gl_, "uModel", root);
+            constexpr std::array<const char*, playerHandsBoneCount> uniforms{
+                "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]", "uPlayerBones[3]",
+                "uPlayerBones[4]", "uPlayerBones[5]", "uPlayerBones[6]", "uPlayerBones[7]",
+                "uPlayerBones[8]", "uPlayerBones[9]", "uPlayerBones[10]", "uPlayerBones[11]",
+                "uPlayerBones[12]", "uPlayerBones[13]", "uPlayerBones[14]", "uPlayerBones[15]",
+                "uPlayerBones[16]", "uPlayerBones[17]", "uPlayerBones[18]", "uPlayerBones[19]",
+                "uPlayerBones[20]", "uPlayerBones[21]", "uPlayerBones[22]", "uPlayerBones[23]",
+                "uPlayerBones[24]", "uPlayerBones[25]", "uPlayerBones[26]", "uPlayerBones[27]",
+                "uPlayerBones[28]", "uPlayerBones[29]", "uPlayerBones[30]", "uPlayerBones[31]",
+                "uPlayerBones[32]", "uPlayerBones[33]", "uPlayerBones[34]", "uPlayerBones[35]"};
+            for (std::size_t i = 0; i < playerHandsBoneCount; ++i)
+                shader.setMat4(gl_, uniforms[i], hands.skin[i]);
+            shader.setVec3(gl_, "uTint", {1,1,1});
+            shader.setFloat(gl_, "uEmissiveStrength", 0);
+            for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
+                const auto& gpu = playerHandsMaterials_[i];
+                shader.setVec3(gl_, "uTint", {1.0F,1.0F,1.0F});
+                gpu.albedo.bind(gl_, textureBindings_, 0U);
+                gpu.normal.bind(gl_, textureBindings_, 1U);
+                gpu.properties.bind(gl_, textureBindings_, 2U);
+                drawMesh(playerHandsMeshes_[i]);
+            }
+            shader.setInt(gl_, "uPlayerSkinning", 0);
         }
 
         // The flash is transient and remains independent of the approved

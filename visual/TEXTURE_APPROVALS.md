@@ -107,8 +107,59 @@ de mira. Aprovações da sniper v1 e do player Usado não se estendem a esta pra
 Zoom e balanceamento preservados. A abertura é inteira na build, diferente do
 corte do painel ilustrativo explicitado ao aprovar. Capturas da fixture OpenGL
 offscreen não equivalem a playtest manual. Evidências e roteiro de teste estão
-em `04_gameplay/sniper_scope_2026-10-02.md`. O player segue aprovado, ainda
-sem implementação nesta etapa.
+em `04_gameplay/sniper_scope_2026-10-02.md`. Na etapa da luneta, o player ainda
+não estava implementado; seu estado atual está nas unidades seguintes.
+
+### Player presentation/Hands + Reload contacts — v2
+
+```text
+unidade visual: mãos, luvas/punhos e contatos nas recargas do player
+versão: v2 — anatomia e material refinados; poses próprias por fase/arma
+data: 2026-10-03
+prancha: visual/proposals/player_hands_proposal_v2.png
+contrato/prompts: visual/proposals/player_hands_proposal_v2.md
+variantes: Mantido / Usado / Gasto; Usado recomendada
+pedido: "prepara um visual melhor para as mãos e ajuste as mãos para
+         quando tiver que recarregar as armas"
+decisão do usuário: "visual simulado aprovado para implementação" — Usado v2
+commit de implementação v2: entrega mãos Usado v2 (histórico Git)
+capturas nativas: visual/validation/player_hands_v2_* (fixture OpenGL offscreen)
+implementação/testes: 04_gameplay/player_hands_2026-10-03.md
+estado: IMPLEMENTADA EM VALIDAÇÃO — Usado v2; aceitação final no jogo pendente
+```
+
+Prancha entregue: detalhe palma/dorso, três desgastes, empunhadura da pistola
+e entrada do pente da carabina. Storyboard extra das recargas não foi gerado
+(ferramenta rejeitou); o contrato documenta as poses propostas para todas as
+armas, sem apresentá-las como animações executadas na etapa de proposta.
+Implementação agora possui capturas/GIFs nativos das cinco recargas, contatos
+com orientação/flexão por dedo e mão direita no ferrolho da sniper. Custo:
+três draws, 4016 triângulos, 36 juntas e aproximadamente 9 MiB de mapas com
+mipmaps; sem benchmark comparativo de FPS. Preserva FOV próximo de
+68°, identidade das armas e regras de munição/tempo. Torso/cinto é unidade
+separada e continua pendente. Aceitação visual final desta v2 depende do jogo.
+
+### Player presentation/Torso + Belt — v2
+
+```text
+unidade visual: torso/abdômen/cintura e cinto com coldre/bainha do player
+versão: v2 — uniforme grafite preservado; definição anatômica e equipamentos
+data: 2026-10-02
+prancha: visual/proposals/player_body_proposal_v2.png
+contrato/prompts: visual/proposals/player_body_proposal_v2.md
+variantes: Mantido / Usado / Gasto; Usado recomendada
+pedido: corpo parado estranho; acrescentar torso e cinto para pistola/faca
+decisão do usuário sobre a prancha v2: nenhuma ainda
+commit de implementação: nenhum; renderer permanece na v1
+capturas nativas da v2: nenhuma; prancha é conceito, não screenshot
+estado: AGUARDANDO APROVAÇÃO — Usado v2 recomendada
+```
+
+Não amplia o inventário nem redesenha pistola/faca. Equipamento no cinto
+segue propriedade e arma ativa: arma em uso ou largada não reaparece guardada.
+V1 não aprova automaticamente a geometria/materiais novos da v2. Braços/mãos
+têm aprovação própria e implementação v2 em validação; torso/cinto aguardam
+aprovação explícita desta nova prancha antes de qualquer alteração na build.
 
 ### Player presentation — v1
 
@@ -125,7 +176,7 @@ pedido: pernas visíveis e animadas ao andar/pular/agachar; mãos nas recargas
 decisão do usuário: "visual aprovado" — Usado APROVADA PARA IMPLEMENTAÇÃO
 commit de implementação: entrega corpo inferior v1 (histórico Git)
 capturas no jogo: visual/validation/player_body_v1_* (fixture OpenGL offscreen)
-estado: PARCIALMENTE IMPLEMENTADA EM VALIDAÇÃO — Usado; braços/mãos pendentes
+estado: PARCIALMENTE IMPLEMENTADA; REVISÃO SOLICITADA da postura parada/cintura
 ```
 
 Não aprova redesenho das armas, inimigos, HUD ou ambientes. Corpo proposto
@@ -133,14 +184,25 @@ Não aprova redesenho das armas, inimigos, HUD ou ambientes. Corpo proposto
 Corpo inferior acompanha simulação e distância real, com skinning e oclusão.
 Testes/capturas e orçamento estão em `04_gameplay/player_body_2026-10-02.md`;
 não equivalem a playtest humano nem benchmark de FPS. Braços, mãos e contatos
-nas recargas permanecem aprovados para a próxima entrega, não implementados.
+nas recargas tiveram candidato v1 local, com revisão de proporções solicitada
+("essas mãos estão fora de proporção"). Esse histórico permanece em
+`04_gameplay/player_hands_2026-10-02.md`. Novo refinamento em 2026-10-03
+originou Hands + Reload contacts v2 acima, aprovado para implementação e agora
+em validação. Isso não aceita automaticamente o resultado no jogo nem aprova
+torso/cinto v2.
+
+Feedback após teste do corpo: "notei que o corpo parado fica meio estranho
+talvez seja melhor colocar um torso, talvez até um cinto para segurar a
+pistola e faca enquanto não estiverem em uso". V1 não recebeu aceitação
+visual final; revisão v2 registrada acima, sem alteração do código atual.
 
 ### Weapon/reload — descarte e carregador novo v2
 
 Pedido confirmado: "faça isso no jogo por favor" após proposta de descartar
 balas restantes e contar pentes completos. Estado: IMPLEMENTADA EM VALIDAÇÃO.
 O pente velho cai sem retornar e outro entra; escopeta mantém cartuchos.
-Meshes e materiais aprovados são reutilizados, sem novas texturas ou mãos.
+Nesta etapa, meshes e materiais aprovados foram reutilizados, sem novas
+texturas ou mãos. Mãos implementadas posteriormente em unidade própria acima.
 Contrato: `04_gameplay/weapon_reload_animation_2026-10-02.md` (seção v2).
 O playtest ainda decide aceitação visual; testes técnicos não substituem essa
 aprovação. O registro v1 seguinte permanece como histórico.
@@ -500,7 +562,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
-| Player presentation | V1 Usado corpo inferior em validação; braços/mãos aprovados e pendentes |
+| Player presentation | V1 corpo/cintura em revisão; V2 torso/cinto aguardando aprovação; V2 mãos/contatos Usado implementada em validação |
 | Weapon/Sniper optic | V2 Usado implementada em validação |
 | HUD/Sniper scoped view | V1 implementada em validação |
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |

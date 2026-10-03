@@ -4,6 +4,7 @@
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/RoomMaterialGenerator.hpp"
 #include "game/visual/WeaponViewmodelAssets.hpp"
+#include "game/visual/PlayerHandsAssets.hpp"
 #include "game/visual/PlayerBodyAssets.hpp"
 #include "resources/AssetCache.hpp"
 #include "render/Camera.hpp"
@@ -279,6 +280,8 @@ private:
     std::array<WeaponGpuMaterial, weaponMaterialCount> weaponMaterials_{};
     std::array<wkc::render::Mesh, playerBodyMaterialCount> playerBodyMeshes_{};
     std::array<WeaponGpuMaterial, playerBodyMaterialCount> playerBodyMaterials_{};
+    std::array<wkc::render::Mesh, playerHandsMaterialCount> playerHandsMeshes_{};
+    std::array<WeaponGpuMaterial, playerHandsMaterialCount> playerHandsMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};

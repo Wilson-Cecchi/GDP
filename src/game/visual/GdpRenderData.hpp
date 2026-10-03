@@ -234,6 +234,8 @@ struct WeaponViewmodelRenderData {
     wkc::core::Seed visualSeed{0U};
     std::uint32_t reloadRoundCount{6U};
     float aimStrength{0.0F};
+    // Fixture/diagnostic switch; gameplay always supplies the approved hands.
+    bool handsVisible{true};
 };
 
 // Presentation only: no camera, input, damage or ammo ownership.
@@ -263,6 +265,9 @@ struct WeaponReloadPose {
     HudWeaponRole role, float progress, std::uint32_t roundCount = 6U) noexcept;
 
 [[nodiscard]] WeaponViewmodelPose sampleWeaponViewmodelPose(
+    const WeaponViewmodelRenderData& weapon) noexcept;
+// Coordinates are camera right/up/forward. Shared by weapon and arm anchors.
+[[nodiscard]] wkc::core::Mat4 sampleWeaponPresentationTransform(
     const WeaponViewmodelRenderData& weapon) noexcept;
 
 struct RoomRenderData {

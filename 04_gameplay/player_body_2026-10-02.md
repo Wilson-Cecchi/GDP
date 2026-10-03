@@ -2,10 +2,17 @@
 
 Data: 2026-10-02. Estado: **IMPLEMENTAÇÃO PARCIAL EM VALIDAÇÃO**.
 
+Atualização de playtest: usuário considerou o corpo parado estranho e pediu
+torso/cinto para pistola/faca guardadas. **Revisão visual solicitada**;
+[proposta v2](../visual/proposals/player_body_proposal_v2.md) aguardando aprovação,
+sem alterar esta implementação antes da aprovação da nova prancha.
+
 Primeira entrega do [player aprovado](../visual/proposals/player_body_proposal_v1.md):
 quadril, calça industrial grafite, reforços discretos nos joelhos e botas.
-Braços, luvas, dedos e mãos executando as recargas continuam aprovados,
-mas **não estão implementados nesta entrega**. Não há cabeça nem terceira pessoa.
+Braços, luvas, dedos e mãos executando as recargas não faziam parte desta
+primeira entrega. Agora há [mãos Usado v2](player_hands_2026-10-03.md),
+implementadas após aprovação da nova prancha e aguardando aceitação visual
+no jogo. Não há cabeça nem terceira pessoa.
 Tecido, couro e borracha são foscos e não metálicos; apenas Usado foi aplicado.
 
 ## Contrato e ownership
@@ -115,7 +122,7 @@ de lado. Pare contra uma caixa: não deve continuar marchando. Teste Ctrl,
 Space, aterrissagem, FOV 60/100 e POTATO/MEDIUM. Pause andando e retome;
 reinicie a arena. Olhando para frente, o corpo não deve ocupar a mira.
 Confira também a sniper ao segurar Mouse2. Validação humana de conforto e
-naturalidade permanece pendente; mãos nas recargas serão a entrega seguinte.
+naturalidade permanece pendente; as mãos v2 estão documentadas à parte.
 
 Fixture isolada: `SDL_VIDEODRIVER=offscreen build/release/gdp_renderer_gl_tests --player-body-only`.
 Capturas: definir `GDP_PLAYER_BODY_CAPTURE_DIR` para uma pasta local em `build/`.

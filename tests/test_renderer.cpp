@@ -1482,6 +1482,195 @@ void testWeaponReloadProfiles()
         "shotgun insertion cadence follows the actual number of rounds being loaded");
 }
 
+void testPlayerHands()
+{
+    using namespace gdp::game::visual;
+    using namespace wkc::core;
+    const auto meshes=makePlayerHandsMeshes();
+    const auto repeated=makePlayerHandsMeshes();
+    std::size_t triangles=0;
+    for(std::size_t m=0;m<meshes.size();++m) {
+        const auto& mesh=meshes[m];
+        expect(wkc::render::validateMeshData(mesh),"rounded hands/sleeve mesh validates");
+        triangles+=mesh.indices.size()/3U;
+        expect(mesh.indices==repeated[m].indices && mesh.vertices.size()==repeated[m].vertices.size(),
+            "hands topology is deterministic");
+        for(std::size_t v=0;v<mesh.vertices.size();++v) {
+            const auto a=mesh.vertices[v],b=repeated[m].vertices[v];
+            expect(a.position==b.position && a.normal==b.normal && a.uv==b.uv,
+                "hands vertices are deterministic");
+            const float joint=std::floor(a.uv.x*.5F),weight=a.uv.x-2*joint;
+            expect(joint>=0 && joint<float(playerHandsBoneCount) && a.uv.y>=0
+                && a.uv.y<float(playerHandsBoneCount) && weight>=0 && weight<=1,
+                "hands use valid two-joint skin weights");
+        }
+    }
+    expect(triangles==4016U,"approved refined hands retain a bounded 4016-triangle budget");
+    std::cout<<"Player hands triangles="<<triangles<<" materials=3 bones=36\n";
+    std::size_t textureBytes=0;
+    for(const auto material:{PlayerHandsMaterial::Cloth,PlayerHandsMaterial::Leather,PlayerHandsMaterial::Reinforcement}) {
+        const auto images=makeUsedPlayerHandsMaterialImages(material);
+        const auto repeatedImages=makeUsedPlayerHandsMaterialImages(material);
+        const int resolution=material==PlayerHandsMaterial::Reinforcement ? 256 : 512;
+        expect(images.albedo.width==resolution && images.albedo.height==resolution
+            && images.albedo.rgba==repeatedImages.albedo.rgba
+            && images.normal.rgba==repeatedImages.normal.rgba
+            && images.properties.rgba==repeatedImages.properties.rgba,
+            "dedicated approved glove maps have stable dimensions and deterministic pixels");
+        textureBytes+=images.albedo.rgba.size()+images.normal.rgba.size()+images.properties.rgba.size();
+        for(std::size_t i=0;i<images.properties.rgba.size();i+=4U)
+            expect(images.properties.rgba[i]>=200U && images.properties.rgba[i+1U]==0U
+                && images.albedo.rgba[i+3U]==255U && images.normal.rgba[i+3U]==255U
+                && images.properties.rgba[i+3U]==255U,"gloves are opaque matte nonmetal materials");
+    }
+    expect(textureBytes==7077888U,"glove textures use a measured bounded 6.75 MiB before mipmaps");
+    constexpr std::array roles{HudWeaponRole::Pistol,HudWeaponRole::Carbine,HudWeaponRole::Knife,
+        HudWeaponRole::Sniper,HudWeaponRole::Shotgun,HudWeaponRole::SubmachineGun};
+    for(const auto role:roles) {
+        WeaponViewmodelRenderData model{.visible=true,.role=role};
+        const auto idle=samplePlayerHandsPose(model);
+        for(int i=0;i<=100;++i) {
+            model.reloadProgress=float(i)/100;
+            const auto pose=samplePlayerHandsPose(model);
+            const auto duplicate=samplePlayerHandsPose(model);
+            for(std::size_t b=0;b<playerHandsBoneCount;++b)
+                expect(isFinite(pose.skin[b]) && pose.skin[b].elements==duplicate.skin[b].elements,
+                    "hands pose is finite and deterministic across every reload phase");
+            for(std::size_t side=0;side<2;++side) {
+                expect(nearlyEqual(length(pose.shoulders[side]-pose.elbows[side]),.90F,.0001F)
+                    && nearlyEqual(length(pose.elbows[side]-pose.wrists[side]),.90F,.0001F),
+                    "elbow IK preserves arm lengths and contact wrist");
+                const auto frame=sampleWeaponPresentationTransform(model);
+                const auto& a=frame.elements;
+                const auto p=pose.shoulders[side];
+                const float y=a[1]*p.x+a[5]*p.y+a[9]*p.z+a[13];
+                const float z=a[2]*p.x+a[6]*p.y+a[10]*p.z+a[14];
+                expect(y+z*.675F<-.12F,"shoulder sleeve endpoints stay outside the bottom frame through reload");
+            }
+            if(role!=HudWeaponRole::Sniper || (i>=26 && i<=80) || i==0 || i==100)
+                expect(pose.wrists[0]==idle.wrists[0],"dominant grip remains fixed except explicit sniper bolt windows");
+            else if(i==12 || i==90)
+                expect(pose.rightContact==HandContact::Mechanism && pose.leftContact==HandContact::Support
+                    && pose.wrists[0]!=idle.wrists[0] && pose.wrists[1]==idle.wrists[1],
+                    "sniper uses right hand on bolt while left hand supports fore-end");
+            for(std::size_t side=0;side<2U;++side) {
+                const auto& a=pose.skin[side*playerHandBonesPerSide+2U].elements;
+                const Vec3 x{a[0],a[1],a[2]},y{a[4],a[5],a[6]},z{a[8],a[9],a[10]};
+                expect(nearlyEqual(length(x),1) && nearlyEqual(length(y),1) && nearlyEqual(length(z),1)
+                    && nearlyEqual(dot(cross(x,y),z),1),"palm contact orientation stays rigid and right handed");
+                for(const auto flex:pose.fingerFlexion[side])
+                    expect(std::isfinite(flex) && flex>=0 && flex<=1.05F,"individual finger profiles stay bounded");
+            }
+            for(const auto& mesh:meshes) for(const auto& vertex:mesh.vertices) {
+                const auto p=deformPlayerHandsVertex(vertex,pose);
+                expect(std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) && length(p)<4.0F,
+                    "skinned fingers and sleeve remain finite within local bounds");
+            }
+            if(i==0 || i==100) for(std::size_t b=0;b<playerHandsBoneCount;++b)
+                expect(pose.skin[b].elements==idle.skin[b].elements,"reload completion returns hands exactly to grip");
+        }
+        model.reloadProgress=std::numeric_limits<float>::quiet_NaN();
+        const auto invalid=samplePlayerHandsPose(model);
+        for(std::size_t b=0;b<playerHandsBoneCount;++b)
+            expect(invalid.skin[b].elements==idle.skin[b].elements,"invalid reload gives safe idle hands");
+        model.reloadProgress=.4F;
+        if(role!=HudWeaponRole::Knife && role!=HudWeaponRole::Shotgun)
+            expect(samplePlayerHandsPose(model).leftContact==HandContact::Fetch,
+                "left hand releases old magazine rather than following falling instance");
+        model.reloadProgress=.6F;
+        if(role!=HudWeaponRole::Knife && role!=HudWeaponRole::Shotgun)
+            expect(samplePlayerHandsPose(model).leftContact==HandContact::Magazine,
+                "left hand holds the incoming fresh magazine");
+        if(role!=HudWeaponRole::Knife && role!=HudWeaponRole::Shotgun) {
+            const auto magazine=samplePlayerHandsPose(model);
+            // Probe the inner palm against the actual incoming part bounds, not
+            // just a semantic label saying that the hand is "on the magazine".
+            const wkc::render::Vertex probe{{0,.132F,-.0396F},{},{41,20},0};
+            const Vec3 palm=deformPlayerHandsVertex(probe,magazine);
+            Vec3 minimum{100,100,100},maximum{-100,-100,-100};
+            const auto parts=makeWeaponViewmodelParts(role==HudWeaponRole::SubmachineGun ? HudWeaponRole::Carbine : role);
+            const auto offset=sampleWeaponReloadPose(role,.6F).magazineOffset;
+            for(const auto& mesh:parts[static_cast<std::size_t>(WeaponPart::Magazine)])
+                for(const auto& vertex:mesh.vertices) {
+                    const auto p=vertex.position+offset;
+                    minimum={std::min(minimum.x,p.x),std::min(minimum.y,p.y),std::min(minimum.z,p.z)};
+                    maximum={std::max(maximum.x,p.x),std::max(maximum.y,p.y),std::max(maximum.z,p.z)};
+                }
+            const Vec3 nearest{std::clamp(palm.x,minimum.x,maximum.x),
+                std::clamp(palm.y,minimum.y,maximum.y),std::clamp(palm.z,minimum.z,maximum.z)};
+            expect(length(palm-nearest)<.04F,"incoming magazine touches the inner palm in actual weapon-part space");
+            model.reloadProgress=.46F;
+            const auto open=samplePlayerHandsPose(model);
+            expect(open.fingerFlexion[1][0]<magazine.fingerFlexion[1][0]
+                && open.fingerFlexion[1][4]<magazine.fingerFlexion[1][4],
+                "discard/fetch opens fingers and incoming magazine closes them again");
+            if(role!=HudWeaponRole::Sniper) {
+                model.reloadProgress=.84F;
+                const auto mechanism=samplePlayerHandsPose(model);
+                expect(mechanism.skin[playerHandBonesPerSide+2U].elements[0]
+                    !=magazine.skin[playerHandBonesPerSide+2U].elements[0]
+                    || mechanism.skin[playerHandBonesPerSide+2U].elements[8]
+                    !=magazine.skin[playerHandBonesPerSide+2U].elements[8],
+                    "mechanism has its own orientation rather than a translated magazine pose");
+            }
+        }
+        if(role==HudWeaponRole::Sniper) {
+            const auto transformPoint=[](const Mat4& matrix,const Vec3 p) {
+                const auto& a=matrix.elements;
+                return Vec3{a[0]*p.x+a[4]*p.y+a[8]*p.z+a[12],
+                    a[1]*p.x+a[5]*p.y+a[9]*p.z+a[13],a[2]*p.x+a[6]*p.y+a[10]*p.z+a[14]};
+            };
+            for(const float progress:{.12F,.18F,.87F,.94F}) {
+                model.reloadProgress=progress;
+                const auto pose=samplePlayerHandsPose(model);
+                const auto part=sampleWeaponReloadPose(role,progress);
+                const Vec3 pivot{.096F,.015F,-.08F};
+                const Mat4 bolt=translationMatrix(part.mechanismOffset)*translationMatrix(pivot)
+                    *rotationZMatrix(part.mechanismRotationDegrees.z*std::numbers::pi_v<float>/180)
+                    *translationMatrix(pivot*-1);
+                const Vec3 knob=transformPoint(bolt,{.215F,-.07F,-.08F});
+                const wkc::render::Vertex probe{{0,.132F,-.0396F},{},{5,2},0};
+                expect(length(deformPlayerHandsVertex(probe,pose)-knob)<.05F,
+                    "dominant palm follows the actual rotating/translating sniper bolt knob");
+            }
+        }
+        if(role==HudWeaponRole::Shotgun) {
+            model.reloadProgress=.6F;
+            model.reloadRoundCount=1;
+            const auto one=samplePlayerHandsPose(model);
+            model.reloadRoundCount=6;
+            expect(samplePlayerHandsPose(model).wrists[1]!=one.wrists[1],
+                "shotgun hand cadence follows planned shell count rather than magazine clock");
+            model.reloadProgress=.20F;
+            const auto shell=samplePlayerHandsPose(model);
+            expect(shell.leftContact==HandContact::Shell && shell.fingerFlexion[1][0]<shell.fingerFlexion[1][2]
+                && shell.fingerFlexion[1][4]<shell.fingerFlexion[1][3],
+                "shotgun uses separate thumb/index shell pinch rather than a closed magazine fist");
+        }
+        model.reloadProgress=0;
+        auto previous=samplePlayerHandsPose(model);
+        for(unsigned int i=1;i<=1000U;++i) {
+            model.reloadProgress=float(i)/1000;
+            const auto next=samplePlayerHandsPose(model);
+            for(std::size_t side=0;side<2U;++side) {
+                expect(length(next.wrists[side]-previous.wrists[side])<.08F,
+                    "both reload hands have continuous contact trajectories");
+                const auto& a=next.skin[side*playerHandBonesPerSide+2U].elements;
+                const auto& b=previous.skin[side*playerHandBonesPerSide+2U].elements;
+                expect(dot({a[0],a[1],a[2]},{b[0],b[1],b[2]})>.99F
+                    && dot({a[8],a[9],a[10]},{b[8],b[9],b[10]})>.99F,
+                    "palm contact rotations interpolate without orientation snaps");
+            }
+            previous=next;
+        }
+        model.reloadProgress=0;
+        model.recoilStrength=1; model.meleeStrength=1; model.crouchStrength=1;
+        model.equipStrength=1; model.airborneStrength=1;
+        const auto attached=samplePlayerHandsPose(model);
+        expect(attached.wrists==idle.wrists,"root recoil/equip/posture transforms cannot detach hand contacts");
+    }
+}
+
 void testOptimizedShadowBudget()
 {
     using namespace gdp::game::visual;
@@ -1752,6 +1941,7 @@ int main()
     testOptimizedShadowBudget();
     testIndustrialUiTheme();
     testWeaponViewmodelAssets();
+    testPlayerHands();
     testSettingsMenuLayout();
     testPlayerBody();
 
