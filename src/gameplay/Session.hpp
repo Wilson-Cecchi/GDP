@@ -73,7 +73,8 @@ public:
         bool bossExists,
         bool bossAlive,
         bool bossAccessible = false,
-        bool exitTerminalUsed = false) noexcept;
+        bool exitTerminalUsed = false,
+        bool campaignMissionComplete = false) noexcept;
     [[nodiscard]] std::optional<wkc::core::Seed> restart(
         RunRestartMode mode = RunRestartMode::NextSeed) noexcept;
     [[nodiscard]] bool selectRunMode(RunMode mode) noexcept;

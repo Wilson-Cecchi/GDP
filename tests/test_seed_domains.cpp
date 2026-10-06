@@ -40,6 +40,10 @@ void testStableDomainIds()
         std::pair{SeedDomain::Events, std::uint64_t{15}},
         std::pair{SeedDomain::Audio, std::uint64_t{16}},
         std::pair{SeedDomain::RoomMaterial, std::uint64_t{17}},
+        std::pair{SeedDomain::NeuralWorker, std::uint64_t{18}},
+        std::pair{SeedDomain::MapPlacement, std::uint64_t{19}},
+        std::pair{SeedDomain::CampaignLayout, std::uint64_t{20}},
+        std::pair{SeedDomain::CampaignMission, std::uint64_t{21}},
     };
 
     for (const auto& [domain, value] : expected) {

@@ -85,9 +85,15 @@ inclusive quando seu arquivo está inválido ou incompatível. Cancel é a opç�
 inicial; nenhum arquivo é apagado durante a seleção.
 
 São 10 andares com carry-over de HP, armor, munição, nível e progressão.
+Cada andar gera de 7 a 10 salas e zero ou uma rota alternativa, conforme sua
+seed; o mesmo slot/seed reproduz o mesmo layout. A missão do andar pede limpar
+o evento da Arena, recuperar a chave da sala Secret ou ativar o terminal da START
+e eliminar sua emboscada. O primeiro andar sempre
+usa a Arena como introdução; nos seguintes, a escolha é determinística.
 O save representa **a entrada do andar**, não o ponto exato de saída. Repetir
-ou continuar restaura essa entrada. Matar o boss libera o terminal da sala Boss,
-mas não encerra a partida nem troca de andar. O objetivo passa a `ACTIVATE EXIT`
+ou continuar restaura essa entrada. Matar o boss e cumprir a missão libera o
+terminal da sala Boss, mas nenhuma das ações isolada encerra a partida nem
+troca de andar. O objetivo passa a `ACTIVATE EXIT`
 (`ATIVE A SAÍDA`). Aproximar-se do console existente e usar Interagir (E por
 padrão, respeitando remapeamentos) sobe diretamente nos nove primeiros andares,
 com os recursos atuais e sem menu de resultado intermediário. No décimo, usar
@@ -95,11 +101,14 @@ o terminal mostra a vitória. Concluir apaga somente o checkpoint
 do slot ativo. Abrir configurações, mudar de modo ou voltar ao título não troca
 nem apaga os outros saves.
 
-O terminal fica bloqueado enquanto o boss estiver vivo. A interação exige
+O terminal fica bloqueado enquanto o boss estiver vivo ou a missão não estiver
+concluída. O HUD apresenta a tarefa pendente em EN/PT-BR e, se o boss já morreu,
+mostra `COMPLETE MISSION`/`CONCLUA A MISSÃO` ao mirar o console. A interação exige
 estar na mesma sala, mirar o console, distância máxima de 2,25 m e ausência
 de parede/cobertura entre o jogador e ele. O HUD informa bloqueio, subida ou
-conclusão, em EN/PT-BR. Matar o boss pelo corredor também libera esse terminal;
-o jogador ainda precisa alcançá-lo. Standard/Speedrun continuam concluindo na
+conclusão, em EN/PT-BR. Matar o boss pelo corredor conta para liberar esse terminal
+se a missão também estiver concluída; o jogador ainda precisa alcançá-lo.
+Standard/Speedrun continuam concluindo na
 morte do boss; Test Mode permanece uma área sem vitória automática.
 
 Dificuldade inicial: Easy 0,75×, Normal 1×, Hard 1,25×. Cada andar acrescenta

@@ -33,10 +33,16 @@ Cada rota é validada antes de aceitar.
 `RoomTraversal` usa `edge` e os dois `RoomId` do `CorridorPath` como contrato de
 destino. Assim, nenhuma porta pode enviar o jogador a uma sala não ligada, e o
 mesmo corredor funciona nos dois sentidos. Cada par de pontos vira um volume
-ortogonal navegável, com sobreposição longitudinal de `0,65 m` para acomodar o
-raio do jogador nas transições de volume e nas curvas. A sala atual, seus
+ortogonal navegável. Nas soleiras, a sobreposição de `1,12 m` preserva passagem
+do maior inimigo; nas curvas, ela se limita à metade da largura do corredor,
+evitando bolsões caminháveis atrás da parede desenhada. A sala atual, seus
 corredores e as salas diretamente adjacentes formam a união navegável; lockdown
 reduz essa união à sala atual.
+
+A colisão vertical usa o teto do volume local, não o maior teto da união de
+salas: pular no corredor interrompe a subida antes de atravessar o teto. O
+deslocamento horizontal é dividido em passos menores que o raio do personagem
+para que movimento rápido não atravesse uma lacuna entre volumes navegáveis.
 
 ## Stub
 
@@ -70,5 +76,6 @@ Todas as rotas falharam → rejeitar placement/candidate. Nunca atravessar geome
 ## Testes
 
 Straight, L, Z, obstáculos, salas próximas, connectors opostos e mapa impossível.
-A regressão funcional percorre todos os corredores de uma seed representativa
-nos dois sentidos, sem teleporte, e verifica o bloqueio físico de lockdown.
+A regressão funcional percorre 500 seeds de corredores nos dois sentidos,
+incluindo o collider do boss, e verifica o bloqueio físico de lockdown. Testes
+adicionais cobrem teto, curvas e travessia rápida de lacunas não caminháveis.

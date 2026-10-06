@@ -42,9 +42,13 @@ especializados das pastas numeradas.
   os caminhos de saves continuam com os identificadores técnicos GDP.
   Campanha: 10 andares, três slots independentes, Easy/Normal/Hard, checkpoint
   no início do andar e armas adicionais aleatórias nas salas.
-  Matar o boss libera o console existente na sala Boss: Interagir (E por padrão)
-  sobe para o próximo andar; no décimo, mostra a vitória. Antes disso o terminal
-  fica bloqueado. HP, munição e progressão acompanham a subida, sem tela de
+  Cada andar varia deterministicamente entre 7 e 10 salas e pode ter uma rota
+  alternativa. A missão do andar exige limpar o evento da Arena, recuperar a
+  chave da sala Secret ou ativar o terminal da START e eliminar sua emboscada.
+  O minimapa marca missão, Boss e saída após descobrir a
+  sala correspondente. Matar o boss **e** cumprir a missão libera o console da
+  sala Boss: Interagir (E por padrão) sobe para o próximo andar; no décimo,
+  mostra a vitória. HP, munição e progressão acompanham a subida, sem tela de
   resultado intermediária. Standard/Speedrun mantêm a conclusão na morte do boss.
   Reforços de Lockdown só aparecem quando sua onda é liberada, evitando corpos
   visíveis que não atacavam enquanto o grupo inicial ainda estava vivo.

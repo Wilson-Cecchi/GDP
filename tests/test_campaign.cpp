@@ -1,6 +1,11 @@
 #include "gameplay/Campaign.hpp"
 #include "gameplay/Session.hpp"
+#include "gameplay/RoomEvents.hpp"
+#include "world/EventGenerator.hpp"
+#include "world/WorldEntities.hpp"
+#include "world/WorldGenerator.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -236,6 +241,133 @@ void testCampaignDifficultyProgression()
         "Campaign threat clamps invalid floor numbers safely");
 }
 
+void testCampaignFloorVarietyAndMissions()
+{
+    using namespace gdp;
+    bool sawSeven = false, sawTen = false, sawLoop = false, sawNoLoop = false;
+    bool sawKey = false, sawArena = false, sawTerminal = false;
+    for (wkc::core::Seed initialSeed = 1U; initialSeed <= 24U; ++initialSeed) {
+        for (std::uint32_t floor = 1U; floor <= gameplay::campaignFloorCount; ++floor) {
+            const auto floorSeed = gameplay::seedForRun(initialSeed, floor - 1U);
+            const auto layout = gameplay::campaignFloorLayout(floorSeed, floor);
+            expect(layout == gameplay::campaignFloorLayout(floorSeed, floor)
+                    && layout.roomCount >= 7U && layout.roomCount <= 10U
+                    && layout.loopBudget <= 1U,
+                "floor profile is deterministic and bounded");
+            sawSeven |= layout.roomCount == 7U;
+            sawTen |= layout.roomCount == 10U;
+            sawLoop |= layout.loopBudget == 1U;
+            sawNoLoop |= layout.loopBudget == 0U;
+            auto generated = world::generateWorld(floorSeed,
+                {.roomCount = layout.roomCount, .loopBudget = layout.loopBudget,
+                    .maximumAttempts = 64U});
+            if (!generated.world) {
+                std::cerr << "Campaign map failed seed=" << initialSeed
+                    << " floor=" << floor << " rooms=" << layout.roomCount
+                    << " loops=" << layout.loopBudget << '\n';
+                expect(false, "every sampled campaign floor generates a valid map");
+                continue;
+            }
+            expect(generated.world->rooms.size() == layout.roomCount
+                    && world::validateWorld(*generated.world).isValid(),
+                "campaign floor geometry and corridors validate");
+            const auto kind = gameplay::campaignMissionKind(floorSeed, floor);
+            sawKey |= kind == gameplay::CampaignMissionKind::RecoverKey;
+            sawArena |= kind == gameplay::CampaignMissionKind::SecureArena;
+            sawTerminal |= kind == gameplay::CampaignMissionKind::SecureTerminal;
+            const auto role = kind == gameplay::CampaignMissionKind::RecoverKey
+                ? world::RoomRole::Secret
+                : kind == gameplay::CampaignMissionKind::SecureTerminal
+                    ? world::RoomRole::Start : world::RoomRole::Arena;
+            const auto target = std::find_if(generated.world->rooms.begin(),
+                generated.world->rooms.end(), [role](const auto& room) {
+                    return room.role == role;
+                });
+            expect(target != generated.world->rooms.end(),
+                "mission target always exists on a generated floor");
+            if (target == generated.world->rooms.end()) continue;
+            auto mission = gameplay::CampaignMissionState{kind, target->id};
+            expect(!gameplay::advanceCampaignMission(mission, target->id + 99U,
+                        {.keysCollected = 1U, .arenaCleared = true,
+                            .terminalActivated = true, .terminalAmbushCleared = true})
+                    && !gameplay::advanceCampaignMission(mission, target->id, {}),
+                "another room and prior-floor keys cannot satisfy the mission");
+            if (kind == gameplay::CampaignMissionKind::RecoverKey) {
+                entities::EntityManager entities;
+                auto populated = world::populateInitialEntities(*generated.world, entities,
+                    {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
+                    1.0F, true);
+                bool hasKey = false;
+                for (const auto id : target->entities) {
+                    const auto* item = entities.findData<entities::ItemData>(id);
+                    hasKey |= item && item->type == entities::ItemType::Key;
+                }
+                expect(populated.isValid() && hasKey,
+                    "key objective has a real collectible in the reachable Secret room");
+                expect(gameplay::advanceCampaignMission(mission, target->id,
+                            {.keysCollected = 1U})
+                    && !gameplay::advanceCampaignMission(mission, target->id,
+                            {.keysCollected = 1U}),
+                    "only a current-floor key pickup completes the key mission once");
+            } else if (kind == gameplay::CampaignMissionKind::SecureArena) {
+                expect(gameplay::advanceCampaignMission(mission, target->id,
+                            {.arenaCleared = true})
+                    && !gameplay::advanceCampaignMission(mission, target->id,
+                            {.arenaCleared = true}),
+                    "Arena lockdown completion satisfies its mission exactly once");
+            } else {
+                entities::EntityManager entities;
+                const auto populated = world::populateInitialEntities(
+                    *generated.world, entities,
+                    {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
+                    1.0F, true);
+                const auto node = std::find_if(generated.world->graph.nodes.begin(),
+                    generated.world->graph.nodes.end(), [target](const auto& candidate) {
+                        return candidate.id == target->id;
+                    });
+                expect(populated.isValid() && entities.find(populated.terminal)
+                        && node != generated.world->graph.nodes.end(),
+                    "terminal objective has a real interactable in Start");
+                if (node == generated.world->graph.nodes.end()) continue;
+                const auto plan = world::generateRoomEventPlan(target->seed,
+                    target->role, target->theme, node->depth, target->enemyZones, 1.0F);
+                expect(plan.type == world::RoomEventType::TerminalAmbush
+                        && plan.trigger == world::RoomEventTrigger::TerminalUse
+                        && world::validateRoomEventPlan(plan, target->enemyZones).isValid(),
+                    "terminal objective has a valid ambush event gated by interaction");
+                auto runtime = gameplay::makeRoomEventRuntime(plan, target->id);
+                expect(!gameplay::updateRoomEvent(runtime, entities, true, false,
+                        1.0F / 60.0F).activated,
+                    "entering Start alone cannot complete the terminal mission");
+                expect(!gameplay::advanceCampaignMission(mission, target->id,
+                        {.terminalAmbushCleared = true}) && !mission.activated,
+                    "ambush completion without terminal activation cannot satisfy the mission");
+                const auto activated = gameplay::updateRoomEvent(runtime, entities,
+                    true, true, 1.0F / 60.0F);
+                expect(activated.activated && !gameplay::advanceCampaignMission(
+                        mission, target->id, {.terminalActivated = activated.activated})
+                        && mission.activated && !mission.completed,
+                    "using the Start terminal activates but does not finish the mission");
+                for (const auto id : entities.query(entities::EntityKind::Enemy)) {
+                    if (auto* enemy = entities.findData<entities::EnemyData>(id)) {
+                        enemy->active = false;
+                        enemy->behavior = entities::EnemyBehaviorState::Dead;
+                    }
+                }
+                const auto completed = gameplay::updateRoomEvent(runtime, entities,
+                    true, false, 1.0F / 60.0F);
+                expect(completed.completed && gameplay::advanceCampaignMission(
+                        mission, target->id,
+                        {.terminalAmbushCleared = completed.completed}),
+                    "clearing the activated ambush completes the terminal mission");
+            }
+        }
+    }
+    expect(sawSeven && sawTen && sawLoop && sawNoLoop && sawKey && sawArena
+            && sawTerminal,
+        "campaign seeds cover multiple floor sizes, graph cycles and mission types");
+}
+
 } // namespace
 
 int main()
@@ -244,6 +376,7 @@ int main()
     testCampaignCarryoverRejectsInvalidStateAtomically();
     testCampaignCheckpointValidation();
     testCampaignDifficultyProgression();
+    testCampaignFloorVarietyAndMissions();
     if (failures != 0) {
         std::cerr << failures << " campaign test(s) failed\n";
         return 1;

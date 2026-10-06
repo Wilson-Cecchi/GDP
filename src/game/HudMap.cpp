@@ -9,7 +9,8 @@ visual::HudMapData buildHudMap(
     const std::span<const world::RoomId> visitedRooms,
     const world::RoomId currentRoom,
     const wkc::core::Vec3 playerPosition,
-    const wkc::core::Vec3 playerForward) noexcept
+    const wkc::core::Vec3 playerForward,
+    const HudMapTarget target) noexcept
 {
     visual::HudMapData map;
     if (currentRoom == 0U || world.rooms.empty()
@@ -70,6 +71,12 @@ visual::HudMapData buildHudMap(
         if (known) {
             map.rooms[first].known = true;
             map.rooms[second].known = true;
+        }
+    }
+    if (target.roomId != 0U && target.marker != visual::HudMapMarker::None) {
+        const std::size_t targetIndex = roomIndex(target.roomId);
+        if (targetIndex != map.roomCount && map.rooms[targetIndex].known) {
+            map.rooms[targetIndex].marker = target.marker;
         }
     }
     map.visible = roomIndex(currentRoom) != map.roomCount;

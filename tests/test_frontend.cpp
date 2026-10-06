@@ -81,6 +81,12 @@ void layoutTests() {
     using namespace gdp::gameplay;
     expect(localize(Language::English, "CAMPAIGN / STORY") == "CAMPAIGN / STORY", "English is unchanged");
     expect(localize(Language::PortugueseBrazil, "CAMPAIGN / STORY") == "CAMPANHA / HISTÓRIA", "Brazilian Portuguese includes accents");
+    expect(localize(Language::PortugueseBrazil, "RECOVER KEY") == "RECUPERE A CHAVE"
+            && localize(Language::PortugueseBrazil, "SECURE ARENA") == "CONTROLE A ARENA"
+            && localize(Language::PortugueseBrazil, "ACTIVATE TERMINAL") == "ATIVE O TERMINAL"
+            && localize(Language::PortugueseBrazil, "CLEAR AMBUSH") == "ELIMINE A EMBOSCADA"
+            && localize(Language::PortugueseBrazil, "COMPLETE MISSION") == "CONCLUA A MISSÃO",
+        "Campaign mission objective and exit gate are localized");
     expect(localize(Language::PortugueseBrazil, "FLOOR 7/10  HARD") == "ANDAR 7/10  DIFÍCIL", "dynamic labels retain numbers and translated difficulty");
     expect(localize(Language::PortugueseBrazil, "JUMP  [SPACE]") == "PULAR  [SPACE]", "localized descriptions cannot translate saved key binding tokens");
     expect(localize(Language::PortugueseBrazil, "UNLISTED_ID_42") == "UNLISTED_ID_42", "unknown technical identifiers have a stable fallback");

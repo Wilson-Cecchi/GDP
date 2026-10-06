@@ -9,7 +9,43 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 37U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 39U;
+
+struct CampaignFloorLayout {
+    std::uint32_t roomCount{8U};
+    std::uint32_t loopBudget{1U};
+
+    constexpr bool operator==(const CampaignFloorLayout&) const noexcept = default;
+};
+
+enum class CampaignMissionKind : std::uint8_t {
+    SecureArena,
+    RecoverKey,
+    SecureTerminal,
+};
+
+struct CampaignMissionState {
+    CampaignMissionKind kind{CampaignMissionKind::SecureArena};
+    std::uint32_t targetRoomId{0U};
+    bool activated{false};
+    bool completed{false};
+};
+
+struct CampaignMissionProgress {
+    std::uint32_t keysCollected{0U};
+    bool arenaCleared{false};
+    bool terminalActivated{false};
+    bool terminalAmbushCleared{false};
+};
+
+[[nodiscard]] CampaignFloorLayout campaignFloorLayout(
+    wkc::core::Seed floorSeed, std::uint32_t floor) noexcept;
+[[nodiscard]] CampaignMissionKind campaignMissionKind(
+    wkc::core::Seed floorSeed, std::uint32_t floor) noexcept;
+[[nodiscard]] bool advanceCampaignMission(
+    CampaignMissionState& mission, std::uint32_t roomId,
+    CampaignMissionProgress progress) noexcept;
+[[nodiscard]] const char* campaignMissionName(CampaignMissionKind kind) noexcept;
 
 struct CampaignCarryover {
     PlayerCampaignProgress player{};

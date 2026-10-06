@@ -20,6 +20,9 @@ composição Rail/Precision histórica descrita abaixo; não altera contratos de
   Nada depende de fontes instaladas, SDL_ttf ou Pillow em execução/build.
 - Interface permanece em resolução nativa, independente do perfil gráfico do mundo.
   Não introduz blur, nova iluminação, animações contínuas ou mudanças nas IAs.
+- Na Campanha, o minimapa marca a sala da missão em âmbar, o Boss pendente em
+  vermelho e a saída liberada em verde. O marcador aparece somente quando a
+  sala já é conhecida pelo mapa; não revela cômodos através da névoa.
 
 Snapshots OpenGL e testes cobrem HP crítico, munição vazia, faca, fase/vida do boss,
 mapa e separação entre os cantos. Validação visual em partida permanece com o usuário.

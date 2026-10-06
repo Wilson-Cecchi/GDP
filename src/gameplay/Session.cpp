@@ -18,7 +18,8 @@ SessionUpdate SessionSystem::update(
     const bool bossExists,
     const bool bossAlive,
     const bool bossAccessible,
-    const bool exitTerminalUsed) noexcept
+    const bool exitTerminalUsed,
+    const bool campaignMissionComplete) noexcept
 {
     SessionUpdate update{state_.phase, state_.phase, false};
     if (state_.phase != SessionPhase::Playing) {
@@ -30,8 +31,10 @@ SessionUpdate SessionSystem::update(
     } else if (state_.mode != RunMode::TestMode && bossExists && (currentRoomRole == gdp::world::RoomRole::Boss
                    || bossAccessible || state_.bossEngaged)) {
         state_.bossEngaged = true;
-        state_.campaignExitReady = state_.mode == RunMode::Campaign && !bossAlive;
-        if (!bossAlive && (state_.mode != RunMode::Campaign || exitTerminalUsed)) {
+        state_.campaignExitReady = state_.mode == RunMode::Campaign
+            && !bossAlive && campaignMissionComplete;
+        if (!bossAlive && (state_.mode != RunMode::Campaign
+                || (campaignMissionComplete && exitTerminalUsed))) {
             state_.phase = SessionPhase::Victory;
         }
     } else {

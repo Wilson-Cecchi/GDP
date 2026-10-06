@@ -1,11 +1,68 @@
 #include "gameplay/Campaign.hpp"
 
 #include "gameplay/Session.hpp"
+#include "game/SeedDomains.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 namespace gdp::gameplay {
+
+CampaignFloorLayout campaignFloorLayout(
+    const wkc::core::Seed floorSeed, const std::uint32_t floor) noexcept
+{
+    const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
+    const wkc::core::Seed layout = wkc::core::deriveSeed(
+        floorSeed, gdp::game::SeedDomain::CampaignLayout, safeFloor);
+    const std::uint32_t base = 7U + (safeFloor - 1U) / 4U;
+    return {std::min(10U, base + static_cast<std::uint32_t>(layout % 3U)),
+        static_cast<std::uint32_t>((layout >> 8U) & 1U)};
+}
+
+CampaignMissionKind campaignMissionKind(
+    const wkc::core::Seed floorSeed, const std::uint32_t floor) noexcept
+{
+    const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
+    if (safeFloor == 1U) return CampaignMissionKind::SecureArena;
+    const wkc::core::Seed selection = wkc::core::deriveSeed(
+        floorSeed, gdp::game::SeedDomain::CampaignMission, safeFloor);
+    switch (selection % 3U) {
+    case 0U: return CampaignMissionKind::SecureArena;
+    case 1U: return CampaignMissionKind::RecoverKey;
+    default: return CampaignMissionKind::SecureTerminal;
+    }
+}
+
+bool advanceCampaignMission(
+    CampaignMissionState& mission, const std::uint32_t roomId,
+    const CampaignMissionProgress progress) noexcept
+{
+    if (mission.completed || mission.targetRoomId == 0U
+        || roomId != mission.targetRoomId) return false;
+    switch (mission.kind) {
+    case CampaignMissionKind::SecureArena:
+        mission.completed = progress.arenaCleared;
+        break;
+    case CampaignMissionKind::RecoverKey:
+        mission.completed = progress.keysCollected > 0U;
+        break;
+    case CampaignMissionKind::SecureTerminal:
+        mission.activated |= progress.terminalActivated;
+        mission.completed = mission.activated && progress.terminalAmbushCleared;
+        break;
+    }
+    return mission.completed;
+}
+
+const char* campaignMissionName(const CampaignMissionKind kind) noexcept
+{
+    switch (kind) {
+    case CampaignMissionKind::SecureArena: return "SecureArena";
+    case CampaignMissionKind::RecoverKey: return "RecoverKey";
+    case CampaignMissionKind::SecureTerminal: return "SecureTerminal";
+    }
+    return "Invalid";
+}
 
 CampaignCarryover captureCampaignCarryover(
     const Player& player,

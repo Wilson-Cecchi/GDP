@@ -938,6 +938,82 @@ void testCampaignExitConsoleAccessAcrossSeeds()
     }
 }
 
+void testCorridorRoofAndCornerWalls()
+{
+    using namespace gdp;
+    constexpr gameplay::CharacterCollider collider{0.3F, 1.8F};
+    bool checkedRoof = false;
+    bool checkedBend = false;
+    for (wkc::core::Seed seed = 1U; seed <= 48U; ++seed) {
+        const auto generated = world::generateWorld(seed);
+        if (!generated.world) continue;
+        for (const world::CorridorPath& corridor : generated.world->corridors) {
+            const auto navigation = gameplay::makeRoomNavigationCollision(
+                *generated.world, corridor.firstRoom);
+            for (std::size_t index = 0U; index + 1U < corridor.points.size(); ++index) {
+                const auto first = corridor.points[index];
+                const auto second = corridor.points[index + 1U];
+                if (wkc::core::length(second - first) < 2.0F) continue;
+                const auto midpoint = (first + second) * 0.5F;
+                const bool insideRoom = std::any_of(generated.world->rooms.begin(),
+                    generated.world->rooms.end(), [midpoint](const auto& room) {
+                        return room.worldBounds.contains(midpoint);
+                    });
+                if (insideRoom || !navigation.canOccupy(midpoint, collider)) continue;
+                const auto jump = navigation.moveCharacter(midpoint,
+                    {0.0F, 8.0F, 0.0F}, 0.15F, collider);
+                expect(jump.position.y + collider.height
+                        <= midpoint.y + corridor.height + 1.0e-4F
+                        && jump.velocity.y == 0.0F && jump.collided,
+                    "jumping inside a corridor hits its local ceiling");
+                checkedRoof = true;
+            }
+            for (std::size_t index = 1U; index + 1U < corridor.points.size(); ++index) {
+                const auto incoming = wkc::core::normalized(
+                    corridor.points[index] - corridor.points[index - 1U]);
+                const auto outgoing = wkc::core::normalized(
+                    corridor.points[index + 1U] - corridor.points[index]);
+                if (std::abs(wkc::core::dot(incoming, outgoing)) > 0.5F) continue;
+                for (const auto beyondWall : {
+                         corridor.points[index]
+                             + incoming * (corridor.width * 0.5F + 0.15F),
+                         corridor.points[index]
+                             - outgoing * (corridor.width * 0.5F + 0.15F),
+                     }) {
+                    const bool insideRoom = std::any_of(generated.world->rooms.begin(),
+                        generated.world->rooms.end(), [beyondWall](const auto& room) {
+                            return room.worldBounds.contains(beyondWall);
+                        });
+                    if (insideRoom) continue;
+                    expect(!navigation.canOccupy(beyondWall, collider),
+                        "both corridor corner walls block pockets beyond their visible edges");
+                    checkedBend = true;
+                }
+            }
+        }
+    }
+    expect(checkedRoof && checkedBend,
+        "generated corridors exercise local roof and bent wall collision");
+}
+
+void testDisconnectedWalkableVolumesCannotBeCrossedInOneStep()
+{
+    using namespace gdp;
+    const auto collision = gameplay::CollisionWorld::fromWalkableVolumes({
+        {{-2.0F, 0.0F, -0.6F}, {2.0F, 2.2F, 0.6F}},
+        {{-2.0F, 0.0F, 1.4F}, {2.0F, 2.2F, 2.6F}},
+    });
+    constexpr gameplay::CharacterCollider collider{0.3F, 1.8F};
+    expect(collision.canOccupy({0.0F, 0.0F, 0.0F}, collider)
+            && collision.canOccupy({0.0F, 0.0F, 2.0F}, collider),
+        "wall-sweep fixture has two valid but disconnected passages");
+    const auto motion = collision.moveCharacter({0.0F, 0.0F, 0.0F},
+        {0.0F, 0.0F, 20.0F}, 0.1F, collider);
+    expect(motion.position.z <= 0.301F && motion.velocity.z == 0.0F
+            && motion.collided,
+        "a fast fixed step cannot tunnel through a corridor wall into another passage");
+}
+
 } // namespace
 
 int main()
@@ -957,6 +1033,8 @@ int main()
     testLockdownEntryKeepsPlayerMobile();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
     testCampaignExitConsoleAccessAcrossSeeds();
+    testCorridorRoofAndCornerWalls();
+    testDisconnectedWalkableVolumesCannotBeCrossedInOneStep();
 
     if (failures != 0) {
         std::cerr << failures << " room traversal test(s) failed\n";

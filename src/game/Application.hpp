@@ -117,6 +117,7 @@ private:
     gameplay::ProgressionSystem progression_;
     std::optional<gameplay::CampaignCarryover> campaignCarryover_;
     std::optional<gameplay::CampaignCarryover> campaignFloorEntry_;
+    gameplay::CampaignMissionState campaignMission_{};
     std::optional<gameplay::CampaignCheckpoint> campaignCheckpoint_;
     std::optional<std::filesystem::path> campaignCheckpointPath_;
     std::array<CampaignSlotInfo, 3> campaignSlots_{};

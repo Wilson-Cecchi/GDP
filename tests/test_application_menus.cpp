@@ -162,9 +162,30 @@ struct ApplicationMenuTestAccess {
                 enemy->health = 0.0F; enemy->behavior = entities::EnemyBehaviorState::Dead;
             }
             app.playerCommand_ = {}; app.fixedUpdate(1.0 / 60.0); app.render();
-            expect(app.session_.state().campaignExitReady && !app.restartRequested_
+            expect(!app.session_.state().campaignExitReady && !app.restartRequested_
                 && !app.resultMenu_.active && app.session_.state().phase == gameplay::SessionPhase::Playing,
-                "Boss death unlocks exit but leaves travel playable without results screen");
+                "Boss death alone does not bypass the current floor mission");
+            app.playerCommand_ = {.interact = true}; app.fixedUpdate(1.0 / 60.0);
+            expect(!app.restartRequested_ && app.session_.state().phase == gameplay::SessionPhase::Playing,
+                "real terminal interaction remains blocked while the mission is incomplete");
+            if (app.campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal) {
+                expect(!gameplay::advanceCampaignMission(app.campaignMission_,
+                        app.campaignMission_.targetRoomId, {.terminalActivated = true}),
+                    "terminal mission activation alone does not release the Boss exit");
+            }
+            expect(gameplay::advanceCampaignMission(app.campaignMission_,
+                    app.campaignMission_.targetRoomId, {
+                        .keysCollected = app.campaignMission_.kind
+                            == gameplay::CampaignMissionKind::RecoverKey ? 1U : 0U,
+                        .arenaCleared = app.campaignMission_.kind
+                            == gameplay::CampaignMissionKind::SecureArena,
+                        .terminalAmbushCleared = app.campaignMission_.kind
+                            == gameplay::CampaignMissionKind::SecureTerminal,
+                    }),
+                "fixture completes the seeded mission at its assigned room");
+            app.playerCommand_ = {}; app.fixedUpdate(1.0 / 60.0); app.render();
+            expect(app.session_.state().campaignExitReady && !app.restartRequested_,
+                "mission completion after Boss death unlocks the return trip to the console");
             expect(app.saveCurrentCampaignCheckpoint(), "unlocked exit keeps the recoverable floor-entry save");
             const auto storedBefore = app.campaignSlots_[app.activeCampaignSlot_].checkpoint;
             expect(storedBefore.has_value(), "campaign checkpoint survives Boss death until terminal use");

@@ -59,33 +59,38 @@ wkc::core::Aabb corridorSegmentVolume(
     const wkc::core::Vec3 first,
     const wkc::core::Vec3 second,
     const float width,
-    const float height) noexcept
+    const float height,
+    const float firstOverlap,
+    const float secondOverlap) noexcept
 {
-    // The longitudinal overlap lets a circular character pass continuously
-    // between volumes after each AABB is inset by its collision radius.
-    // The robot has the largest collider (radius 0.52). The inset room and
-    // corridor volumes must still overlap after both have lost that radius.
-    constexpr float endpointOverlap = 1.12F;
     const float halfWidth = width * 0.5F;
     const float floor = std::min(first.y, second.y);
     const float ceiling = std::max(first.y, second.y) + height;
     if (wkc::core::nearlyEqual(first.z, second.z)) {
+        const float minimumOverlap = first.x < second.x
+            ? firstOverlap : secondOverlap;
+        const float maximumOverlap = first.x < second.x
+            ? secondOverlap : firstOverlap;
         return {
-            {std::min(first.x, second.x) - endpointOverlap,
+            {std::min(first.x, second.x) - minimumOverlap,
                 floor,
                 first.z - halfWidth},
-            {std::max(first.x, second.x) + endpointOverlap,
+            {std::max(first.x, second.x) + maximumOverlap,
                 ceiling,
                 first.z + halfWidth},
         };
     }
+    const float minimumOverlap = first.z < second.z
+        ? firstOverlap : secondOverlap;
+    const float maximumOverlap = first.z < second.z
+        ? secondOverlap : firstOverlap;
     return {
         {first.x - halfWidth,
             floor,
-            std::min(first.z, second.z) - endpointOverlap},
+            std::min(first.z, second.z) - minimumOverlap},
         {first.x + halfWidth,
             ceiling,
-            std::max(first.z, second.z) + endpointOverlap},
+            std::max(first.z, second.z) + maximumOverlap},
     };
 }
 
@@ -231,9 +236,17 @@ CollisionWorld makeRoomNavigationCollision(
         volumes.push_back(destination->worldBounds);
         appendFixedRoomSolids(*destination, solids);
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
+            // Door thresholds need extra overlap with each room for the
+            // largest enemy. At bends, restrict the extension to the visible
+            // corner tile so it cannot continue behind a perpendicular wall.
+            constexpr float doorwayOverlap = 1.12F;
+            const float bendOverlap = corridor.width * 0.5F;
             volumes.push_back(corridorSegmentVolume(
                 corridor.points[index], corridor.points[index + 1U],
-                corridor.width, corridor.height));
+                corridor.width, corridor.height,
+                index == 0U ? doorwayOverlap : bendOverlap,
+                index + 2U == corridor.points.size()
+                    ? doorwayOverlap : bendOverlap));
         }
     }
     return CollisionWorld::fromWalkableVolumes(

@@ -73,6 +73,14 @@ int main()
         "room footprint follows the physical room rather than a fixed icon size");
     expect(secretMarker != nullptr && !secretMarker->known,
         "secret room is not revealed from the starting room");
+    const auto hiddenMission = gdp::game::buildHudMap(world, visited, start->id,
+        start->transform.position, {0.0F, 0.0F, -1.0F},
+        {secret->id, gdp::game::visual::HudMapMarker::Mission});
+    expect(findRoom(hiddenMission, secret->id) != nullptr
+            && !findRoom(hiddenMission, secret->id)->known
+            && findRoom(hiddenMission, secret->id)->marker
+                == gdp::game::visual::HudMapMarker::None,
+        "mission marker does not reveal a room hidden by the map fog");
 
     bool fogValid = true;
     RoomId nextRoom = 0U;
@@ -126,6 +134,20 @@ int main()
     expect(moved.playerPosition == wkc::core::Vec2{2.0F, -3.0F}
             && moved.playerForward == wkc::core::Vec2{1.0F, 0.0F},
         "player marker updates without regenerating the world");
+    const auto mission = gdp::game::buildHudMap(world, visitedNext, nextRoom,
+        {2.0F, 0.0F, -3.0F}, {1.0F, 0.0F, 0.0F},
+        {nextRoom, gdp::game::visual::HudMapMarker::Mission});
+    const auto exit = gdp::game::buildHudMap(world, visitedNext, nextRoom,
+        {2.0F, 0.0F, -3.0F}, {1.0F, 0.0F, 0.0F},
+        {nextRoom, gdp::game::visual::HudMapMarker::Exit});
+    expect(findRoom(mission, nextRoom) != nullptr
+            && findRoom(mission, nextRoom)->marker
+                == gdp::game::visual::HudMapMarker::Mission
+            && findRoom(exit, nextRoom)->marker
+                == gdp::game::visual::HudMapMarker::Exit
+            && findRoom(moved, nextRoom)->marker
+                == gdp::game::visual::HudMapMarker::None,
+        "the same discovered room can change from mission to exit without persisting a stale marker");
 
     const wkc::core::Vec3 nearWall{
         start->worldBounds.maximum.x - 0.4F,

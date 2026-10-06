@@ -2548,7 +2548,11 @@ bool GdpRenderer::render(
     const bool topRightObjective = hud.objective == ObjectiveRenderState::ReachBoss
         || hud.objective == ObjectiveRenderState::DefeatBoss
         || hud.objective == ObjectiveRenderState::TestArena
-        || hud.objective == ObjectiveRenderState::ActivateExit;
+        || hud.objective == ObjectiveRenderState::ActivateExit
+        || hud.objective == ObjectiveRenderState::SecureArena
+        || hud.objective == ObjectiveRenderState::RecoverKey
+        || hud.objective == ObjectiveRenderState::ActivateTerminal
+        || hud.objective == ObjectiveRenderState::ClearAmbush;
     const bool showBoss = hud.visible && hud.boss.visible
         && hud.objective == ObjectiveRenderState::DefeatBoss
         && std::isfinite(hud.boss.health) && hud.boss.health > 0.0F
@@ -3090,6 +3094,9 @@ bool GdpRenderer::render(
         } else if (hud.prompt == HudPrompt::ExitTerminalLocked) {
             promptText = "DEFEAT BOSS TO UNLOCK";
             promptColor = uiTheme.warning;
+        } else if (hud.prompt == HudPrompt::CampaignMissionRequired) {
+            promptText = "COMPLETE MISSION";
+            promptColor = uiTheme.warning;
         } else if (hud.prompt == HudPrompt::NextFloorTerminal) {
             promptText = hud.interactBinding + " ASCEND FLOOR";
         } else if (hud.prompt == HudPrompt::FinishCampaignTerminal) {
@@ -3453,6 +3460,26 @@ bool GdpRenderer::render(
                 drawSolidRect(std::min(left, right), std::min(top, bottom),
                     std::max(1, std::abs(right - left) + 1),
                     std::max(1, std::abs(bottom - top) + 1), roomColor);
+                if (mapRoom.marker != HudMapMarker::None) {
+                    const auto [markerX, markerY] = mapPoint(mapRoom.center);
+                    const int half = 2 * hudScale;
+                    if (mapRoom.marker == HudMapMarker::Mission) {
+                        drawSolidRect(markerX - half, markerY - half,
+                            2 * half + 1, 2 * half + 1, uiTheme.warning);
+                    } else if (mapRoom.marker == HudMapMarker::Boss) {
+                        drawSolidRect(markerX - half, markerY - hudScale / 2,
+                            2 * half + 1, hudScale, uiTheme.danger);
+                        drawSolidRect(markerX - hudScale / 2, markerY - half,
+                            hudScale, 2 * half + 1, uiTheme.danger);
+                    } else if (mapRoom.marker == HudMapMarker::Exit) {
+                        drawSolidRect(markerX - half, markerY - half,
+                            2 * half + 1, 2 * half + 1, uiTheme.success);
+                        drawSolidRect(markerX - half + hudScale,
+                            markerY - half + hudScale,
+                            2 * half + 1 - 2 * hudScale,
+                            2 * half + 1 - 2 * hudScale, roomColor);
+                    }
+                }
             }
             const auto [playerX, playerY] = mapPoint(hud.map.playerPosition);
             drawSolidRect(playerX - hudScale, playerY - hudScale,
@@ -3472,6 +3499,14 @@ bool GdpRenderer::render(
         objectiveText = "REACH BOSS";
     } else if (hud.objective == ObjectiveRenderState::ActivateExit) {
         objectiveText = "ACTIVATE EXIT";
+    } else if (hud.objective == ObjectiveRenderState::SecureArena) {
+        objectiveText = "SECURE ARENA";
+    } else if (hud.objective == ObjectiveRenderState::RecoverKey) {
+        objectiveText = "RECOVER KEY";
+    } else if (hud.objective == ObjectiveRenderState::ActivateTerminal) {
+        objectiveText = "ACTIVATE TERMINAL";
+    } else if (hud.objective == ObjectiveRenderState::ClearAmbush) {
+        objectiveText = "CLEAR AMBUSH";
     } else if (hud.objective == ObjectiveRenderState::TestArena) {
         objectiveText = "TEST ARENA";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {

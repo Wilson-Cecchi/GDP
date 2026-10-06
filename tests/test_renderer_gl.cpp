@@ -356,6 +356,17 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
             hud.runTimerVisible = true;
             hud.objective = ObjectiveRenderState::DefeatBoss;
             hud.prompt = HudPrompt::ExitTerminalLocked;
+            hud.map.visible = true;
+            hud.map.roomCount = 2U;
+            hud.map.rooms[0] = {1U, {0.0F, 0.0F}, true, true, true,
+                {-4.0F, -4.0F}, {4.0F, 4.0F}};
+            hud.map.rooms[1] = {2U, {0.0F, -12.0F}, true, false, false,
+                {-4.0F, -16.0F}, {4.0F, -8.0F}};
+            hud.map.linkCount = 1U;
+            hud.map.links[0] = {0U, 1U, true};
+            hud.map.links[0].pointCount = 2U;
+            hud.map.links[0].points[0] = {0.0F, -4.0F};
+            hud.map.links[0].points[1] = {0.0F, -8.0F};
             const auto pixelsFor = [&] {
                 passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud);
                 std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
@@ -363,13 +374,27 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                 return pixels;
             };
             const auto locked = pixelsFor();
+            hud.objective = ObjectiveRenderState::SecureArena;
+            hud.prompt = HudPrompt::CampaignMissionRequired;
+            hud.map.rooms[1].marker = HudMapMarker::Mission;
+            const auto arenaMission = pixelsFor();
+            hud.objective = ObjectiveRenderState::RecoverKey;
+            const auto keyMission = pixelsFor();
+            hud.objective = ObjectiveRenderState::ActivateTerminal;
+            const auto terminalActivation = pixelsFor();
+            hud.objective = ObjectiveRenderState::ClearAmbush;
+            const auto terminalClear = pixelsFor();
             hud.objective = ObjectiveRenderState::ActivateExit;
             hud.prompt = HudPrompt::NextFloorTerminal;
+            hud.map.rooms[1].marker = HudMapMarker::Exit;
             const auto ready = pixelsFor();
             hud.campaignFloor = 10U;
             hud.prompt = HudPrompt::FinishCampaignTerminal;
             const auto final = pixelsFor();
-            passed &= locked != ready && ready != final;
+            passed &= locked != arenaMission && arenaMission != keyMission
+                && keyMission != terminalActivation
+                && terminalActivation != terminalClear
+                && terminalClear != ready && ready != final;
             if (capture) {
                 const auto save = [&](const auto& pixels, const std::string& state) {
                     std::vector<std::uint8_t> topDown(pixels.size());
@@ -387,7 +412,11 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                     SDL_DestroySurface(surface);
                     return saved;
                 };
-                passed &= save(locked, "locked") && save(ready, "ready") && save(final, "final");
+                passed &= save(locked, "locked") && save(arenaMission, "arena-mission")
+                    && save(keyMission, "key-mission")
+                    && save(terminalActivation, "terminal-activation")
+                    && save(terminalClear, "terminal-clear") && save(ready, "ready")
+                    && save(final, "final");
             }
         }
     }
@@ -1263,6 +1292,32 @@ int main(const int argc, char** argv)
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 mapHudPixels.data());
 
+            const auto renderMapMarker = [&](const std::size_t roomIndex,
+                                             const gdp::game::visual::HudMapMarker marker) {
+                auto marked = mapHud;
+                marked.map.rooms[roomIndex].marker = marker;
+                const bool rendered = renderer.render(width, height, {}, {}, {},
+                    {}, {}, {}, {}, {}, {}, marked);
+                std::vector<std::uint8_t> pixels(baseline.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    pixels.data());
+                return std::pair{rendered, std::move(pixels)};
+            };
+            const auto [renderedMissionMap, missionMapPixels]
+                = renderMapMarker(1U, gdp::game::visual::HudMapMarker::Mission);
+            const auto [renderedBossMap, bossMapPixels]
+                = renderMapMarker(1U, gdp::game::visual::HudMapMarker::Boss);
+            const auto [renderedExitMap, exitMapPixels]
+                = renderMapMarker(1U, gdp::game::visual::HudMapMarker::Exit);
+            const auto [renderedHiddenMarkerMap, hiddenMarkerMapPixels]
+                = renderMapMarker(2U, gdp::game::visual::HudMapMarker::Mission);
+            const bool mapMarkersDistinct = renderedMissionMap && renderedBossMap
+                && renderedExitMap && renderedHiddenMarkerMap
+                && missionMapPixels != mapHudPixels
+                && bossMapPixels != missionMapPixels
+                && exitMapPixels != bossMapPixels
+                && hiddenMarkerMapPixels == mapHudPixels;
+
             gdp::game::visual::HudRenderData narrowRoomMapHud = mapHud;
             narrowRoomMapHud.map.rooms[0].minimum.x = -2.0F;
             narrowRoomMapHud.map.rooms[0].maximum.x = 2.0F;
@@ -2118,6 +2173,7 @@ int main(const int argc, char** argv)
                 && renderedResultExit && resultSelectionChangedChannels > 100U
                 && renderedFunctionalHud && functionalHudChangedChannels > 500U
                 && renderedMapReference && renderedMapHud
+                && mapMarkersDistinct
                 && renderedBentMapHud && mapRouteChangedChannels > 5U
                 && renderedNarrowRoomMapHud && mapFootprintChangedChannels > 5U
                 && renderedExploredMapHud && mapHudChangedChannels > 100U

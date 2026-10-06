@@ -24,6 +24,8 @@ enum class SeedDomain : std::uint64_t {
     RoomMaterial = 17,
     NeuralWorker = 18,
     MapPlacement = 19,
+    CampaignLayout = 20,
+    CampaignMission = 21,
 };
 
 } // namespace gdp::game

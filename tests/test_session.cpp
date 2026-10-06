@@ -192,13 +192,13 @@ void testCampaignAdvancesThreeDeterministicFloors()
         "replaying a Campaign floor keeps its floor and seed");
 
     const wkc::core::Seed firstSeed = session.state().currentSeed;
-    (void)session.update(true, world::RoomRole::Boss, true, true);
-    (void)session.update(true, world::RoomRole::Boss, true, false);
+    (void)session.update(true, world::RoomRole::Boss, true, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, false, true);
     expect(session.state().campaignExitReady
             && session.state().phase == gameplay::SessionPhase::Playing
             && !gameplay::canAdvanceCampaign(session.state()),
         "boss defeat only unlocks the exit terminal and keeps the player mobile");
-    (void)session.update(true, world::RoomRole::Boss, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, true, true);
     expect(gameplay::canAdvanceCampaign(session.state()),
         "exit terminal activation unlocks the second Campaign floor");
     const auto secondSeed
@@ -208,8 +208,8 @@ void testCampaignAdvancesThreeDeterministicFloors()
             && session.state().seedIndex == 1U,
         "second floor advances through the deterministic world sequence");
 
-    (void)session.update(true, world::RoomRole::Boss, true, true);
-    (void)session.update(true, world::RoomRole::Boss, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, true, true);
     const auto thirdSeed
         = session.restart(gameplay::RunRestartMode::NextCampaignFloor);
     expect(thirdSeed && *thirdSeed == gameplay::seedForRun(firstSeed, 2U)
@@ -217,19 +217,19 @@ void testCampaignAdvancesThreeDeterministicFloors()
         "third floor is derived deterministically without ending the ten-floor campaign");
 
     for (std::uint32_t floor = 4U; floor <= gameplay::campaignFloorCount; ++floor) {
-        (void)session.update(true, world::RoomRole::Boss, true, false, false, true);
+        (void)session.update(true, world::RoomRole::Boss, true, false, false, true, true);
         expect(gameplay::canAdvanceCampaign(session.state()), "intermediate victory advances campaign");
         expect(session.restart(gameplay::RunRestartMode::NextCampaignFloor).has_value()
                 && session.state().campaignFloor == floor,
             "campaign progresses to every floor through ten");
     }
 
-    (void)session.update(true, world::RoomRole::Boss, true, true);
-    (void)session.update(true, world::RoomRole::Boss, true, false);
+    (void)session.update(true, world::RoomRole::Boss, true, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, false, true);
     expect(session.state().phase == gameplay::SessionPhase::Playing
             && session.state().campaignExitReady,
         "final boss death cannot display victory before the terminal is activated");
-    (void)session.update(true, world::RoomRole::Boss, true, false, false, true);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, true, true);
     expect(!gameplay::canAdvanceCampaign(session.state())
             && !session.restart(gameplay::RunRestartMode::NextCampaignFloor),
         "final Campaign victory cannot advance beyond the floor cap");
@@ -247,7 +247,7 @@ void testCampaignTerminalLocksAndRecovery()
     expect(!session.state().campaignExitReady
             && session.state().phase == gameplay::SessionPhase::Playing,
         "using a terminal while boss is alive cannot win or queue advancement");
-    (void)session.update(true, world::RoomRole::Normal, true, false, true);
+    (void)session.update(true, world::RoomRole::Normal, true, false, true, false, true);
     expect(session.state().campaignExitReady
             && session.state().phase == gameplay::SessionPhase::Playing,
         "corridor boss kill unlocks exit without consuming an earlier interaction");
@@ -256,10 +256,10 @@ void testCampaignTerminalLocksAndRecovery()
     expect(session.state().elapsedRunTicks == ticks + 1U
             && !session.restart(gameplay::RunRestartMode::NextCampaignFloor),
         "post-boss travel remains playable and cannot advance without the terminal");
-    (void)session.update(true, world::RoomRole::Boss, true, true);
+    (void)session.update(true, world::RoomRole::Boss, true, true, false, false, true);
     expect(!session.state().campaignExitReady,
         "a living boss always relocks the terminal even after a ready state");
-    (void)session.update(true, world::RoomRole::Boss, true, false);
+    (void)session.update(true, world::RoomRole::Boss, true, false, false, false, true);
     (void)session.update(false, world::RoomRole::Boss, true, false, false, true);
     expect(session.state().phase == gameplay::SessionPhase::Defeat
             && !session.state().campaignExitReady,
@@ -267,6 +267,29 @@ void testCampaignTerminalLocksAndRecovery()
     (void)session.restart(gameplay::RunRestartMode::SameSeed);
     expect(!session.state().campaignExitReady && !session.state().bossEngaged,
         "restart clears unlocked terminal state");
+}
+
+void testCampaignMissionMustPrecedeExit()
+{
+    using namespace gdp;
+    gameplay::SessionSystem session{1042U};
+    expect(session.selectRunMode(gameplay::RunMode::Campaign),
+        "mission gate fixture starts a Campaign run");
+    (void)session.update(true, world::RoomRole::Boss, true, true,
+        false, false, false);
+    const auto premature = session.update(true, world::RoomRole::Boss,
+        true, false, false, true);
+    expect(!premature.changed && !session.state().campaignExitReady,
+        "killing the boss and using the terminal cannot skip the mission");
+    (void)session.update(true, world::RoomRole::Secret,
+        true, false, false, false, true);
+    expect(session.state().campaignExitReady
+            && session.state().phase == gameplay::SessionPhase::Playing,
+        "a mission completed after the boss death unlocks a return trip to the terminal");
+    const auto victory = session.update(true, world::RoomRole::Boss,
+        true, false, false, true, true);
+    expect(victory.changed && victory.phase == gameplay::SessionPhase::Victory,
+        "the exit terminal completes a Campaign floor only after both gates");
 }
 
 void testCampaignCheckpointRestoresOnlyPristineSessions()
@@ -368,6 +391,7 @@ int main()
     testSameSeedReplayPreservesDeterministicSequence();
     testCampaignAdvancesThreeDeterministicFloors();
     testCampaignTerminalLocksAndRecovery();
+    testCampaignMissionMustPrecedeExit();
     testCampaignCheckpointRestoresOnlyPristineSessions();
     testBossStatusUsesArchetypeAndRoomOwnership();
     testRestartSeedRegeneratesAReproducibleWorld();

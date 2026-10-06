@@ -316,6 +316,10 @@ enum class ObjectiveRenderState : std::uint8_t {
     Defeat,
     TestArena,
     ActivateExit,
+    SecureArena,
+    RecoverKey,
+    ActivateTerminal,
+    ClearAmbush,
 };
 
 enum class HudEventState : std::uint8_t {
@@ -334,6 +338,7 @@ enum class HudPrompt : std::uint8_t {
     ExitTerminalLocked,
     NextFloorTerminal,
     FinishCampaignTerminal,
+    CampaignMissionRequired,
 };
 
 enum class HudHitFeedback : std::uint8_t {
@@ -569,6 +574,13 @@ inline constexpr std::size_t maximumHudMapRooms = 32U;
 inline constexpr std::size_t maximumHudMapLinks = 64U;
 inline constexpr std::size_t maximumHudMapCorridorPoints = 8U;
 
+enum class HudMapMarker : std::uint8_t {
+    None,
+    Mission,
+    Boss,
+    Exit,
+};
+
 struct HudMapRoom {
     std::uint32_t id{0U};
     wkc::core::Vec2 center{};
@@ -577,6 +589,7 @@ struct HudMapRoom {
     bool current{false};
     wkc::core::Vec2 minimum{};
     wkc::core::Vec2 maximum{};
+    HudMapMarker marker{HudMapMarker::None};
 };
 
 struct HudMapLink {

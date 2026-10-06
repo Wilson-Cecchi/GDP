@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <utility>
 
 namespace gdp::gameplay {
@@ -69,6 +70,17 @@ bool overlapsHorizontally(
     const float differenceZ = feetPosition.z - closestZ;
     return (differenceX * differenceX) + (differenceZ * differenceZ)
         < collider.radius * collider.radius;
+}
+
+bool fitsHorizontally(
+    const wkc::core::Vec3 feetPosition,
+    const CharacterCollider collider,
+    const wkc::core::Aabb volume) noexcept
+{
+    return feetPosition.x >= volume.minimum.x + collider.radius
+        && feetPosition.x <= volume.maximum.x - collider.radius
+        && feetPosition.z >= volume.minimum.z + collider.radius
+        && feetPosition.z <= volume.maximum.z - collider.radius;
 }
 
 } // namespace
@@ -153,8 +165,18 @@ CharacterMotionResult CollisionWorld::moveCharacter(
         }
     } else {
         float ceilingHeight = roomBounds_.maximum.y;
+        bool localCeilingFound = false;
         const float originalTop = originalY + collider.height;
         const float requestedTop = requestedY + collider.height;
+        for (const wkc::core::Aabb volume : walkableVolumes_) {
+            if (fitsHorizontally(result.position, collider, volume)
+                && originalY >= volume.minimum.y - 1.0e-4F) {
+                ceilingHeight = localCeilingFound
+                    ? std::max(ceilingHeight, volume.maximum.y)
+                    : volume.maximum.y;
+                localCeilingFound = true;
+            }
+        }
         for (const wkc::core::Aabb solid : solids_) {
             if (overlapsHorizontally(result.position, collider, solid)
                 && originalTop <= solid.minimum.y + 1.0e-4F
@@ -171,28 +193,36 @@ CharacterMotionResult CollisionWorld::moveCharacter(
         }
     }
 
+    const float displacementX = result.velocity.x * step;
+    const float displacementZ = result.velocity.z * step;
+    const float maximumSubstep = std::max(0.05F, collider.radius * 0.5F);
+    const float requiredSteps = std::max(std::abs(displacementX),
+        std::abs(displacementZ)) / maximumSubstep;
+    const int substeps = std::clamp(
+        static_cast<int>(std::ceil(std::min(requiredSteps, 256.0F))), 1, 256);
     const float originalX = result.position.x;
-    result.position.x += result.velocity.x * step;
-    if (!canOccupy(result.position, collider)) {
-        result.position.x = originalX;
-    }
-    if (!wkc::core::nearlyEqual(
-            result.position.x,
-            originalX + (result.velocity.x * step))) {
-        result.velocity.x = 0.0F;
-        result.collided = true;
-    }
-
     const float originalZ = result.position.z;
-    result.position.z += result.velocity.z * step;
-    if (!canOccupy(result.position, collider)) {
-        result.position.z = originalZ;
-    }
-    if (!wkc::core::nearlyEqual(
-            result.position.z,
-            originalZ + (result.velocity.z * step))) {
-        result.velocity.z = 0.0F;
-        result.collided = true;
+    for (int index = 0; index < substeps; ++index) {
+        const float fraction = static_cast<float>(index + 1)
+            / static_cast<float>(substeps);
+        if (result.velocity.x != 0.0F) {
+            const float previousX = result.position.x;
+            result.position.x = originalX + displacementX * fraction;
+            if (!canOccupy(result.position, collider)) {
+                result.position.x = previousX;
+                result.velocity.x = 0.0F;
+                result.collided = true;
+            }
+        }
+        if (result.velocity.z != 0.0F) {
+            const float previousZ = result.position.z;
+            result.position.z = originalZ + displacementZ * fraction;
+            if (!canOccupy(result.position, collider)) {
+                result.position.z = previousZ;
+                result.velocity.z = 0.0F;
+                result.collided = true;
+            }
+        }
     }
 
     return result;
@@ -227,10 +257,7 @@ bool CollisionWorld::insideWalkable(
 {
     const float top = feetPosition.y + collider.height;
     for (const wkc::core::Aabb volume : walkableVolumes_) {
-        if (feetPosition.x >= volume.minimum.x + collider.radius
-            && feetPosition.x <= volume.maximum.x - collider.radius
-            && feetPosition.z >= volume.minimum.z + collider.radius
-            && feetPosition.z <= volume.maximum.z - collider.radius
+        if (fitsHorizontally(feetPosition, collider, volume)
             && feetPosition.y >= volume.minimum.y - 1.0e-4F
             && top <= volume.maximum.y + 1.0e-4F) {
             return true;

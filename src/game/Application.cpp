@@ -782,6 +782,7 @@ bool Application::initializeRun()
 {
     using Clock = std::chrono::steady_clock;
     performanceMonitor_.reset();
+    campaignMission_ = {};
     for (auto& brain : activeEnemyBrains_) {
         brain.reset();
     }
@@ -873,7 +874,16 @@ bool Application::initializeRun()
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor, session_.state().difficulty)
         : gameplay::baseDifficultyMultiplier(session_.state().difficulty);
     const auto worldGenerationStart = Clock::now();
-    world::WorldGenerationResult generation = world::generateWorld(config_.worldSeed);
+    world::WorldGenerationConfig worldConfig;
+    if (session_.state().mode == gameplay::RunMode::Campaign) {
+        const auto layout = gameplay::campaignFloorLayout(
+            config_.worldSeed, session_.state().campaignFloor);
+        worldConfig.roomCount = layout.roomCount;
+        worldConfig.loopBudget = layout.loopBudget;
+        worldConfig.maximumAttempts = 64U;
+    }
+    world::WorldGenerationResult generation = world::generateWorld(
+        config_.worldSeed, worldConfig);
 #if GDP_ENABLE_TEST_MODE
     if (session_.state().mode == gameplay::RunMode::TestMode) generation.world = makeTestArena(config_.worldSeed);
 #endif
@@ -952,6 +962,45 @@ bool Application::initializeRun()
         && !exitTerminalEntity_.isValid()) {
         log(LogLevel::Error, "Campaign Boss room is missing its exit terminal");
         return false;
+    }
+    if (session_.state().mode == gameplay::RunMode::Campaign) {
+        campaignMission_.kind = gameplay::campaignMissionKind(
+            config_.worldSeed, session_.state().campaignFloor);
+        const world::RoomRole targetRole = campaignMission_.kind
+                == gameplay::CampaignMissionKind::RecoverKey
+            ? world::RoomRole::Secret
+            : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
+                ? world::RoomRole::Start : world::RoomRole::Arena;
+        const auto target = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+            [targetRole](const world::RoomInstance& room) {
+                return room.role == targetRole;
+            });
+        if (target == world_->rooms.end()) {
+            log(LogLevel::Error, "Campaign mission target room is missing");
+            return false;
+        }
+        campaignMission_.targetRoomId = target->id;
+        if (campaignMission_.kind == gameplay::CampaignMissionKind::RecoverKey) {
+            const bool keyPresent = std::any_of(target->entities.begin(),
+                target->entities.end(), [this](const entities::EntityId id) {
+                    const auto* item = entities_.findData<entities::ItemData>(id);
+                    return item && item->type == entities::ItemType::Key;
+                });
+            if (!keyPresent) {
+                log(LogLevel::Error, "Campaign key mission has no collectible key");
+                return false;
+            }
+        } else if (campaignMission_.kind
+                == gameplay::CampaignMissionKind::SecureTerminal
+            && !entities_.find(terminalEntity_)) {
+            log(LogLevel::Error, "Campaign terminal mission has no usable terminal");
+            return false;
+        }
+        log(LogLevel::Info, "Campaign floor "
+            + std::to_string(session_.state().campaignFloor)
+            + " layout rooms=" + std::to_string(worldConfig.roomCount)
+            + " loops=" + std::to_string(worldConfig.loopBudget)
+            + " mission=" + gameplay::campaignMissionName(campaignMission_.kind));
     }
 
     std::vector<world::EdgeId> initiallyBlockedEdges;
@@ -1588,6 +1637,7 @@ bool Application::returnToMainMenu()
 {
     campaignCarryover_.reset();
     campaignFloorEntry_.reset();
+    campaignMission_ = {};
     runDifficulty_ = 1.0F;
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
         (void)session_.update(
@@ -2334,6 +2384,11 @@ void Application::fixedUpdate(const double fixedStep)
     const gameplay::LootCollectionSummary loot = gameplay::collectNearbyLoot(
         entities_, player_, weapon_, playerRoom);
     if (loot.collected > 0U) {
+        if (gameplay::advanceCampaignMission(campaignMission_, playerRoom,
+                {.keysCollected = loot.keysAdded})) {
+            log(LogLevel::Info, "Campaign mission completed: "
+                + std::string{gameplay::campaignMissionName(campaignMission_.kind)});
+        }
         if (world_) {
             const auto room = std::find_if(
                 world_->rooms.begin(), world_->rooms.end(),
@@ -2690,7 +2745,8 @@ void Application::fixedUpdate(const double fixedStep)
             data->keys = player_.state().keys;
         }
     }
-    const bool exitTerminalUsed = playerCommand_.interact && isCampaignExitTargeted();
+    const bool exitTerminalUsed = playerCommand_.interact
+        && campaignMission_.completed && isCampaignExitTargeted();
     bool terminalUsed = false;
     if (playerCommand_.interact) {
         const entities::Entity* terminal = entities_.find(terminalEntity_);
@@ -2746,6 +2802,11 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
         if (event.activated) {
+            (void)gameplay::advanceCampaignMission(campaignMission_,
+                activeEvent->roomId, {
+                    .terminalActivated = activeEvent->plan.role == world::RoomRole::Start
+                        && activeEvent->plan.type == world::RoomEventType::TerminalAmbush,
+                });
             std::ostringstream message;
             message << "Room event activated: "
                     << gameplay::roomEventTypeName(activeEvent->plan.type);
@@ -2769,6 +2830,17 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
         if (event.completed) {
+            const gameplay::CampaignMissionProgress missionProgress{
+                .arenaCleared = activeEvent->plan.role == world::RoomRole::Arena
+                    && activeEvent->plan.type == world::RoomEventType::Lockdown,
+                .terminalAmbushCleared = activeEvent->plan.role == world::RoomRole::Start
+                    && activeEvent->plan.type == world::RoomEventType::TerminalAmbush,
+            };
+            if (gameplay::advanceCampaignMission(campaignMission_,
+                    activeEvent->roomId, missionProgress)) {
+                log(LogLevel::Info, "Campaign mission completed: "
+                    + std::string{gameplay::campaignMissionName(campaignMission_.kind)});
+            }
             std::ostringstream message;
             message << "Room event completed: "
                     << gameplay::roomEventTypeName(activeEvent->plan.type)
@@ -2822,7 +2894,7 @@ void Application::fixedUpdate(const double fixedStep)
     const bool exitWasReady = session_.state().campaignExitReady;
     const gameplay::SessionUpdate sessionUpdate = session_.update(
         player_.state().alive, currentRoomRole, boss.exists, boss.alive,
-        bossAccessible, exitTerminalUsed);
+        bossAccessible, exitTerminalUsed, campaignMission_.completed);
     if (!exitWasReady && session_.state().campaignExitReady) {
         log(LogLevel::Info, "Campaign exit terminal unlocked after boss defeat");
     }
@@ -3545,8 +3617,21 @@ void Application::render()
     hud.flashlightBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Flashlight)]);
     hud.infoOverlay = gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Information, input_);
     if (world_) {
+        HudMapTarget mapTarget;
+        if (session_.state().mode == gameplay::RunMode::Campaign
+            && session_.state().phase == gameplay::SessionPhase::Playing) {
+            if (!campaignMission_.completed) {
+                mapTarget = {campaignMission_.targetRoomId,
+                    visual::HudMapMarker::Mission};
+            } else if (const auto* exitTerminal = entities_.find(exitTerminalEntity_)) {
+                mapTarget = {exitTerminal->roomId,
+                    session_.state().campaignExitReady
+                        ? visual::HudMapMarker::Exit
+                        : visual::HudMapMarker::Boss};
+            }
+        }
         hud.map = buildHudMap(*world_, visitedRooms_, playerRoom,
-            player_.state().position, player_.planarForwardDirection());
+            player_.state().position, player_.planarForwardDirection(), mapTarget);
     }
     hud.runSeed = session_.state().currentSeed;
     hud.score = progress.score;
@@ -3732,6 +3817,19 @@ void Application::render()
         hud.objective = visual::ObjectiveRenderState::TestArena;
     } else if (session_.state().campaignExitReady) {
         hud.objective = visual::ObjectiveRenderState::ActivateExit;
+    } else if (session_.state().mode == gameplay::RunMode::Campaign
+        && !campaignMission_.completed
+        && (!gameplay::bossStatus(entities_, 0U).alive
+            || (!session_.state().bossEngaged
+                && renderedRoomRole != world::RoomRole::Boss))) {
+        hud.objective = campaignMission_.kind
+                == gameplay::CampaignMissionKind::RecoverKey
+            ? visual::ObjectiveRenderState::RecoverKey
+            : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
+                ? campaignMission_.activated
+                    ? visual::ObjectiveRenderState::ClearAmbush
+                    : visual::ObjectiveRenderState::ActivateTerminal
+                : visual::ObjectiveRenderState::SecureArena;
     } else if (session_.state().bossEngaged
         || renderedRoomRole == world::RoomRole::Boss) {
         hud.objective = visual::ObjectiveRenderState::DefeatBoss;
@@ -3751,8 +3849,11 @@ void Application::render()
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing && world_) {
         if (isCampaignExitTargeted()) {
-            hud.prompt = !session_.state().campaignExitReady
-                ? visual::HudPrompt::ExitTerminalLocked
+            hud.prompt = !gameplay::bossStatus(entities_, 0U).alive
+                    && !campaignMission_.completed
+                ? visual::HudPrompt::CampaignMissionRequired
+                : !session_.state().campaignExitReady
+                    ? visual::HudPrompt::ExitTerminalLocked
                 : session_.state().campaignFloor < gameplay::campaignFloorCount
                     ? visual::HudPrompt::NextFloorTerminal
                     : visual::HudPrompt::FinishCampaignTerminal;
