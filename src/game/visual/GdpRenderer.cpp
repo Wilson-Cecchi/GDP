@@ -103,16 +103,16 @@ void main()
                 // Sleeves: circumference plus length, not a tiny repeated
                 // planar checker that mipmaps into a smooth plastic cylinder.
                 vUv = vec2(atan(aPosition.z, aPosition.x + 0.000001) / 6.283185 + 0.5,
-                    -aPosition.y / 1.8);
+                    -aPosition.y / 1.02);
             } else if (localJoint >= 3) {
-                const float rootsX[5] = float[5](0.032, 0.0105, -0.0105, -0.030, 0.036);
-                const float rootsY[5] = float[5](0.085, 0.090, 0.087, 0.077, 0.025);
-                const float lengths[5] = float[5](0.091, 0.098, 0.091, 0.075, 0.077);
+                const float rootsX[5] = float[5](0.0385, 0.013, -0.013, -0.0365, 0.039);
+                const float rootsY[5] = float[5](0.073, 0.078, 0.075, 0.065, 0.021);
+                const float lengths[5] = float[5](0.064, 0.071, 0.066, 0.054, 0.056);
                 int digit = (localJoint - 3) / 3;
                 float mirror = joint < 18 ? 1.0 : -1.0;
-                vec3 bind = aPosition - vec3(rootsX[digit] * mirror, rootsY[digit], 0.0) * 2.2;
+                vec3 bind = aPosition - vec3(rootsX[digit] * mirror, rootsY[digit], 0.0) * 2.4;
                 vUv = vec2(atan(bind.z, bind.x + 0.000001) / 6.283185 + 0.5,
-                    bind.y / (lengths[digit] * 2.2));
+                    bind.y / (lengths[digit] * 2.4));
             } else {
                 vUv = vec2(aPosition.x / 0.22 + 0.5, aPosition.y / 0.44);
             }
@@ -634,10 +634,12 @@ bool GdpRenderer::initialize(const int width, const int height)
             || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
     }
     const auto handsMeshes = makePlayerHandsMeshes();
+    const auto singleHandMeshes = makePlayerHandsMeshes(false);
     for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
         const auto images = makeUsedPlayerHandsMaterialImages(static_cast<PlayerHandsMaterial>(i));
         auto& gpu = playerHandsMaterials_[i];
         if (!playerHandsMeshes_[i].upload(gl_, handsMeshes[i])
+            || !playerSingleHandMeshes_[i].upload(gl_, singleHandMeshes[i])
             || !gpu.albedo.upload(gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
             || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
             || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
@@ -2400,7 +2402,7 @@ bool GdpRenderer::render(
                 gpu.albedo.bind(gl_, textureBindings_, 0U);
                 gpu.normal.bind(gl_, textureBindings_, 1U);
                 gpu.properties.bind(gl_, textureBindings_, 2U);
-                drawMesh(playerHandsMeshes_[i]);
+                drawMesh(knife ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
             }
             shader.setInt(gl_, "uPlayerSkinning", 0);
         }
@@ -3710,7 +3712,8 @@ bool GdpRenderer::render(
         drawBitmapText((width - controlsWidth) / 2,
             layout.panel.y + (6 * scale),
             1, controls, uiTheme.mutedText);
-    } else if (scopeStrength == 0.0F) {
+    } else if (scopeStrength == 0.0F
+        && (weaponViewmodel.visible ? weaponViewmodel.role : hud.weapon) != HudWeaponRole::Sniper) {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
         const int centerX = width / 2;
         const int centerY = height / 2;

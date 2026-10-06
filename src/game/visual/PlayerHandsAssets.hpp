@@ -14,13 +14,15 @@ enum class HandContact { Grip, Support, Magazine, Fetch, Mechanism, Shell, Ready
 struct PlayerHandsPose {
     std::array<wkc::core::Mat4, playerHandsBoneCount> skin{};
     std::array<wkc::core::Vec3, 2U> shoulders{}, elbows{}, wrists{};
+    // Authored piece surfaces: inner palm, or articulated index pad for shells.
+    std::array<wkc::core::Vec3, 2U> contactPoints{};
     std::array<std::array<float, 5U>, 2U> fingerFlexion{};
     HandContact rightContact{HandContact::Grip};
     HandContact leftContact{HandContact::Support};
 };
 
 [[nodiscard]] std::array<wkc::render::MeshData, playerHandsMaterialCount>
-makePlayerHandsMeshes();
+makePlayerHandsMeshes(bool includeSupportHand = true);
 [[nodiscard]] WeaponMaterialImages makeUsedPlayerHandsMaterialImages(PlayerHandsMaterial material);
 // Weapon-local coordinates; the weapon's camera-relative root moves both.
 [[nodiscard]] PlayerHandsPose samplePlayerHandsPose(

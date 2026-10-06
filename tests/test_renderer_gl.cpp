@@ -553,6 +553,22 @@ bool validateSniperScope(gdp::game::visual::GdpRenderer& renderer)
         passed &= partial != scope && partial != reference;
         model.aimStrength = 0.0F;
         const auto hip = frame(model, hud);
+        // Hip-fire sniper has no standard crosshair. Compare the center to
+        // the same world with no viewmodel and an explicitly selected sniper.
+        auto sniperHud = hud;
+        sniperHud.weapon = HudWeaponRole::Sniper;
+        const auto noHipReticle = frame({}, sniperHud);
+        const auto sameCenter = [&](const std::vector<std::uint8_t>& a,
+                                    const std::vector<std::uint8_t>& b) {
+            for (int y = cy - 8; y < cy + 8; ++y) for (int x = cx - 8; x < cx + 8; ++x) {
+                const auto i = offset(x, y);
+                if (!std::equal(a.begin() + static_cast<std::ptrdiff_t>(i),
+                        a.begin() + static_cast<std::ptrdiff_t>(i + 3U),
+                        b.begin() + static_cast<std::ptrdiff_t>(i))) return false;
+            }
+            return true;
+        };
+        passed &= sameCenter(hip, noHipReticle) && !sameCenter(hip, reference);
         model.aimStrength = 1.0F;
         model.reloadProgress = 0.4F;
         const auto reload = frame(model, hud);
@@ -580,10 +596,14 @@ bool validateSniperScope(gdp::game::visual::GdpRenderer& renderer)
             passed &= disabled == frame(model, ui);
             model.aimStrength = 1.0F;
         }
-        model.role = HudWeaponRole::Pistol;
-        const auto pistol = frame(model, hud);
-        model.aimStrength = 0.0F;
-        passed &= pistol == frame(model, hud);
+        for (const auto role : {HudWeaponRole::Pistol, HudWeaponRole::Carbine,
+                 HudWeaponRole::SubmachineGun, HudWeaponRole::Shotgun, HudWeaponRole::Knife}) {
+            model.role = role;
+            model.aimStrength = 1.0F;
+            const auto other = frame(model, hud);
+            model.aimStrength = 0.0F;
+            passed &= other == frame(model, hud) && sameCenter(other, reference);
+        }
         model.role = HudWeaponRole::Sniper;
         // Return to aim, then release: no stale shader mode left on UI or next frame.
         model.aimStrength = 1.0F;

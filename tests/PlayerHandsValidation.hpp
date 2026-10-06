@@ -56,7 +56,9 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             weapon.handsVisible=true;
             const auto idle=frame(); const auto withHands=renderer.lastFrameStats();
             passed &= baseline!=idle && frame()==idle;
-            passed &= withHands.drawCalls==stats.drawCalls+3U && withHands.triangles==stats.triangles+4016U;
+            if(capture && width==1280 && !potato) save(std::string(names[r])+"_idle_fov60",idle);
+            const unsigned int handTriangles=roles[r]==HudWeaponRole::Knife ? 2008U : 4016U;
+            passed &= withHands.drawCalls==stats.drawCalls+3U && withHands.triangles==stats.triangles+handTriangles;
             // Contacts stay peripheral: no new silhouette covering aim at rest.
             for(int y=height/2-8;y<height/2+8;++y) for(int x=width/2-8;x<width/2+8;++x)
                 for(int channel=0;channel<4;++channel) {
@@ -79,7 +81,7 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             passed &= mismatches<static_cast<std::size_t>(width*height)/100U;
             save(std::string(names[r])+"_idle",wide);
             camera.verticalFieldOfViewDegrees=68;
-            for(const float progress:{.16F,.31F,.40F,.60F,.84F,.96F}) {
+            for(const float progress:{.16F,.31F,.40F,.60F,.84F,.88F,.96F}) {
                 weapon.reloadProgress=progress;
                 const auto reloading=frame();
                 weapon.handsVisible=false;
@@ -91,19 +93,30 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             }
             weapon.reloadProgress=0;
             const auto original=frame();
+            const auto savePose=[&](const std::string& pose,const std::vector<std::uint8_t>& pixels) {
+                if(capture && width==1280 && !potato) save(std::string(names[r])+"_"+pose,pixels);
+            };
             weapon.reloadProgress=1;
             passed &= frame()==original;
             weapon.reloadProgress=0;
             weapon.recoilStrength=1; const auto recoil=frame(); passed &= recoil!=original;
+            savePose("recoil",recoil);
             weapon.recoilStrength=0;
-            weapon.crouchStrength=1; passed &= frame()!=original;
-            weapon.crouchStrength=0; weapon.airborneStrength=1; passed &= frame()!=original;
-            weapon.airborneStrength=0; weapon.equipStrength=1; passed &= frame()!=original;
+            weapon.crouchStrength=1; const auto crouch=frame(); passed &= crouch!=original; savePose("crouch",crouch);
+            weapon.crouchStrength=0; weapon.airborneStrength=1;
+            const auto airborne=frame(); passed &= airborne!=original; savePose("airborne",airborne);
+            weapon.airborneStrength=0; weapon.equipStrength=1;
+            const auto equip=frame(); passed &= equip!=original; savePose("equip",equip);
             weapon.equipStrength=0;
             if(roles[r]==HudWeaponRole::Knife) {
-                weapon.meleeStrength=.5F; const auto melee=frame(); passed &= melee!=original;
-                save("knife_attack",melee); weapon.meleeStrength=0;
+                for(const float phase:{.25F,.50F,.75F,1.0F}) {
+                    weapon.meleeStrength=phase; const auto melee=frame();
+                    passed &= phase<1.0F ? melee!=original : melee==original;
+                    savePose("attack_"+std::to_string(int(phase*100)),melee);
+                }
+                weapon.meleeStrength=0;
             }
+            weapon.aimStrength=.5F; savePose("aim_half",frame()); weapon.aimStrength=0;
             if(roles[r]==HudWeaponRole::Sniper) {
                 weapon.aimStrength=1; const auto scope=frame();
                 weapon.handsVisible=false; passed &= frame()==scope;
@@ -122,7 +135,7 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
         }
     }
     if(!passed) std::cerr<<"Player hands failed contact/FOV/reset/low-spec pixel checks\n";
-    else std::cout<<"Player hands v2: three draws, 4016 triangles, six roles and reload poses checked\n";
+    else std::cout<<"Player hands correction: three draws, 4016/2008 triangles, six roles and reload poses checked\n";
     return passed;
 }
 } // namespace

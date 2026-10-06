@@ -1342,17 +1342,20 @@ WeaponReloadPose sampleWeaponReloadPose(
     switch (role) {
     case HudWeaponRole::Pistol:
         pose.weapon = {{-0.09F, 0.18F, -0.025F}, {12.0F, -8.0F, 34.0F}};
-        cycle = ease(0.78F, 0.86F) * (1.0F - ease(0.89F, 0.98F));
+        // The support hand clears the seated magazine and reaches the slide
+        // before pulling; gameplay's reload duration is unchanged.
+        cycle = ease(0.85F, 0.89F) * (1.0F - ease(0.89F, 0.92F));
         pose.mechanismOffset.z = -0.085F * cycle;
         break;
     case HudWeaponRole::Carbine:
         pose.weapon = {{-0.08F, 0.22F, -0.04F}, {7.0F, 10.0F, -22.0F}};
-        cycle = ease(0.80F, 0.87F) * (1.0F - ease(0.91F, 0.98F));
+        // The support hand must settle on the handle before it starts moving.
+        cycle = ease(0.86F, 0.91F) * (1.0F - ease(0.91F, 0.98F));
         pose.mechanismOffset.z = -0.12F * cycle;
         break;
     case HudWeaponRole::SubmachineGun:
         pose.weapon = {{-0.045F, 0.18F, 0.02F}, {4.0F, -6.0F, 20.0F}};
-        cycle = ease(0.73F, 0.81F) * (1.0F - ease(0.85F, 0.94F));
+        cycle = ease(0.78F, 0.85F) * (1.0F - ease(0.85F, 0.94F));
         pose.mechanismOffset.z = -0.095F * cycle;
         break;
     case HudWeaponRole::Sniper:
@@ -1369,16 +1372,22 @@ WeaponReloadPose sampleWeaponReloadPose(
         const float rounds = static_cast<float>(std::clamp(roundCount, 1U, 32U));
         const float duration = rounds * gameplay::shotgunShellReloadSeconds + gameplay::shotgunReadySeconds;
         const float loadingEnd = (duration - gameplay::shotgunReadySeconds) / duration;
-        pose.magazineVisible = p >= 0.04F && p < loadingEnd;
+        pose.magazineVisible = p >= 0.096F / duration && p < loadingEnd;
         if (pose.magazineVisible) {
             const float phase = std::fmod(p * duration / gameplay::shotgunShellReloadSeconds, 1.0F);
+            // Once inserted, this cartridge belongs inside the tube, not in
+            // the hand that is reaching for the next one.
+            pose.magazineVisible = phase < 0.87F;
             const float t = std::clamp(phase / 0.86F, 0.0F, 1.0F);
             const float insert = t * t * (3.0F - 2.0F * t);
             pose.magazineOffset = {-0.13F * (1.0F - insert),
                 -0.22F * (1.0F - insert), -0.10F * (1.0F - insert)};
         }
-        cycle = ease(loadingEnd, loadingEnd + (1.0F - loadingEnd) * 0.45F)
-            * (1.0F - ease(loadingEnd + (1.0F - loadingEnd) * 0.55F, 0.99F));
+        // The final shell is seated first. Give the hand 72 ms to leave the
+        // loading port and grasp the fore-end before moving the pump.
+        cycle = ease(loadingEnd + 0.072F / duration,
+            loadingEnd + (1.0F - loadingEnd) * 0.55F)
+            * (1.0F - ease(loadingEnd + (1.0F - loadingEnd) * 0.60F, 0.99F));
         pose.mechanismOffset.z = -0.18F * cycle;
         break;
     }

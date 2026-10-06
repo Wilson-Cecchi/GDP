@@ -1,6 +1,6 @@
 # Mãos e contatos de recarga — proposta v2
 
-Estado: **IMPLEMENTADA EM VALIDAÇÃO — Usado; aceitação visual final pendente**.
+Estado: **DIREÇÃO USADO APROVADA; REVISÃO POSTERIOR APROVADA PROVISORIAMENTE**.
 Data: 2026-10-03.
 Unidade: `Player presentation/Hands + Reload contacts`.
 Variante recomendada: **Usado**.
@@ -22,8 +22,16 @@ Torso/cinto v2 é outra unidade, continua pendente e não faz parte desta revis�
 A prancha é **conceito ilustrativo**, não screenshot, textura aplicável, mesh,
 rig ou animação pronta. Não é promessa de fidelidade cinematográfica no jogo.
 
-Implementação, orçamento, capturas nativas das cinco recargas e resultados
-atuais: [mãos v2](../../04_gameplay/player_hands_2026-10-03.md).
+Implementação publicada e rejeitada no playtest, orçamento e capturas:
+[mãos v2](../../04_gameplay/player_hands_2026-10-03.md).
+Feedback: mãos muito finas/longas, sem proporção com armas; faca com duas
+mãos; punhos parecem quebrar nas animações. Correção local para a mesma
+referência: [revisão](../../04_gameplay/player_hands_2026-10-04.md).
+Revisão posterior das seis armas e braços mais curtos:
+[candidato atual](../../04_gameplay/player_weapon_contacts_2026-10-04.md).
+A movimentação e os visuais dessa revisão foram aprovados por enquanto no jogo
+em 2026-10-05; isso não aprova retroativamente a implementação rejeitada.
+Nenhuma captura ou teste anterior comprova fidelidade à prancha.
 As seções abaixo preservam o diagnóstico e o contrato da etapa de proposta;
 seus números da v1 e gates previstos não são resultados medidos da v2.
 

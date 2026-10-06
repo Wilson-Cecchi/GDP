@@ -281,6 +281,7 @@ private:
     std::array<wkc::render::Mesh, playerBodyMaterialCount> playerBodyMeshes_{};
     std::array<WeaponGpuMaterial, playerBodyMaterialCount> playerBodyMaterials_{};
     std::array<wkc::render::Mesh, playerHandsMaterialCount> playerHandsMeshes_{};
+    std::array<wkc::render::Mesh, playerHandsMaterialCount> playerSingleHandMeshes_{};
     std::array<WeaponGpuMaterial, playerHandsMaterialCount> playerHandsMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};

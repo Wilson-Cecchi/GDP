@@ -6,6 +6,7 @@
 #include "render/RasterState.hpp"
 #include "game/visual/GdpRenderer.hpp"
 #include "game/visual/WeaponViewmodelAssets.hpp"
+#include "gameplay/Weapon.hpp"
 #include "render/Texture.hpp"
 
 #include <algorithm>
@@ -1480,6 +1481,21 @@ void testWeaponReloadProfiles()
     expect(sampleWeaponReloadPose(HudWeaponRole::Shotgun, 0.31F, 1U).magazineOffset
             != sampleWeaponReloadPose(HudWeaponRole::Shotgun, 0.31F, 6U).magazineOffset,
         "shotgun insertion cadence follows the actual number of rounds being loaded");
+    expect(sampleWeaponReloadPose(HudWeaponRole::Pistol,.84F).mechanismOffset==wkc::core::Vec3{}
+        && sampleWeaponReloadPose(HudWeaponRole::Pistol,.88F).mechanismOffset.z<-.05F,
+        "pistol slide waits for the support hand to finish reaching it");
+    for(const unsigned int rounds:{1U,6U,32U}) {
+        const float duration=float(rounds)*gdp::gameplay::shotgunShellReloadSeconds+gdp::gameplay::shotgunReadySeconds;
+        const float inserted=.90F*gdp::gameplay::shotgunShellReloadSeconds/duration;
+        const float held=.50F*gdp::gameplay::shotgunShellReloadSeconds/duration;
+        expect(sampleWeaponReloadPose(HudWeaponRole::Shotgun,held,rounds).magazineVisible
+            && !sampleWeaponReloadPose(HudWeaponRole::Shotgun,inserted,rounds).magazineVisible,
+            "loaded cartridge disappears into tube before fingers fetch another shell");
+        const float loadingEnd=float(rounds)*gdp::gameplay::shotgunShellReloadSeconds/duration;
+        expect(sampleWeaponReloadPose(HudWeaponRole::Shotgun,
+            loadingEnd+.036F/duration,rounds).mechanismOffset==wkc::core::Vec3{},
+            "shotgun pump waits for the hand to leave the loading port for any shell count");
+    }
 }
 
 void testPlayerHands()
@@ -1506,6 +1522,25 @@ void testPlayerHands()
         }
     }
     expect(triangles==4016U,"approved refined hands retain a bounded 4016-triangle budget");
+    const auto singleHand=makePlayerHandsMeshes(false);
+    std::size_t singleTriangles=0;
+    float palmMinX=100, palmMaxX=-100, palmMaxY=0;
+    for(const auto& mesh:singleHand) {
+        expect(wkc::render::validateMeshData(mesh),"knife's right-only hand mesh validates");
+        singleTriangles+=mesh.indices.size()/3U;
+        for(const auto& vertex:mesh.vertices) {
+            const auto joint=static_cast<unsigned int>(std::floor(vertex.uv.x*.5F));
+            expect(joint<playerHandBonesPerSide,"knife mesh contains no support-hand vertices");
+            if(joint==2U) {
+                palmMinX=std::min(palmMinX,vertex.position.x);
+                palmMaxX=std::max(palmMaxX,vertex.position.x);
+                palmMaxY=std::max(palmMaxY,vertex.position.y);
+            }
+        }
+    }
+    expect(singleTriangles==2008U,"knife renders exactly one hand, not an idle second hand");
+    expect(palmMaxX-palmMinX>.225F && palmMaxX-palmMinX<.26F
+        && palmMaxY<.21F,"palm is broader than the pistol grip without an elongated mitten silhouette");
     std::cout<<"Player hands triangles="<<triangles<<" materials=3 bones=36\n";
     std::size_t textureBytes=0;
     for(const auto material:{PlayerHandsMaterial::Cloth,PlayerHandsMaterial::Leather,PlayerHandsMaterial::Reinforcement}) {
@@ -1526,9 +1561,85 @@ void testPlayerHands()
     expect(textureBytes==7077888U,"glove textures use a measured bounded 6.75 MiB before mipmaps");
     constexpr std::array roles{HudWeaponRole::Pistol,HudWeaponRole::Carbine,HudWeaponRole::Knife,
         HudWeaponRole::Sniper,HudWeaponRole::Shotgun,HudWeaponRole::SubmachineGun};
+    // Distance to actual triangles, not just an AABB that also accepts a
+    // floating hand inside the empty space between unrelated parts.
+    const auto surfaceDistance=[](const auto& part,const Vec3 probe,const Vec3 offset,
+        const bool gripOnly=false) {
+        float distance=100.0F;
+        const auto segmentDistance=[&](const Vec3 a,const Vec3 b) {
+            const Vec3 edge=b-a;
+            return length(probe-(a+edge*std::clamp(dot(probe-a,edge)/dot(edge,edge),0.0F,1.0F)));
+        };
+        for(const auto& mesh:part) for(std::size_t i=0;i<mesh.indices.size();i+=3U) {
+            const auto& va=mesh.vertices[mesh.indices[i]];
+            const auto& vb=mesh.vertices[mesh.indices[i+1U]];
+            const auto& vc=mesh.vertices[mesh.indices[i+2U]];
+            if(gripOnly && (va.semanticRegion!=weaponGripSemanticRegion
+                || vb.semanticRegion!=weaponGripSemanticRegion || vc.semanticRegion!=weaponGripSemanticRegion)) continue;
+            const Vec3 a=va.position+offset,b=vb.position+offset,c=vc.position+offset;
+            distance=std::min({distance,segmentDistance(a,b),segmentDistance(b,c),segmentDistance(c,a)});
+            const Vec3 normal=normalized(cross(b-a,c-a));
+            const Vec3 projected=probe-normal*dot(probe-a,normal);
+            if(dot(cross(b-a,projected-a),normal)>=-.000001F
+                && dot(cross(c-b,projected-b),normal)>=-.000001F
+                && dot(cross(a-c,projected-c),normal)>=-.000001F)
+                distance=std::min(distance,std::abs(dot(probe-a,normal)));
+        }
+        return distance;
+    };
     for(const auto role:roles) {
         WeaponViewmodelRenderData model{.visible=true,.role=role};
         const auto idle=samplePlayerHandsPose(model);
+        const auto weaponParts=makeWeaponViewmodelParts(role);
+        const auto& body=weaponParts[static_cast<std::size_t>(WeaponPart::Body)];
+        expect(surfaceDistance(body,idle.contactPoints[0],{},role!=HudWeaponRole::Knife)<.022F,
+            "dominant palm touches the authored grip or knife handle surface, not receiver/blade/empty space");
+        if(role!=HudWeaponRole::Knife) {
+            const auto& support=weaponParts[static_cast<std::size_t>(role==HudWeaponRole::Shotgun
+                ? WeaponPart::Mechanism : WeaponPart::Body)];
+            expect(surfaceDistance(support,idle.contactPoints[1],{},role==HudWeaponRole::Pistol)<.025F,
+                "support palm touches the pistol grip, fore-end or shotgun pump surface");
+            if(role!=HudWeaponRole::Pistol)
+                expect(idle.contactPoints[1].y<-.065F && idle.contactPoints[1].z>.30F,
+                    "long-gun support is underneath the fore-end rather than on the receiver or barrel");
+        } else {
+            const auto& hand=idle.skin[2].elements;
+            expect(hand[2]>.85F && idle.contactPoints[0].z>-.275F && idle.contactPoints[0].z<.02F,
+                "knife knuckles run along its handle with the palm away from the blade");
+        }
+        if(role==HudWeaponRole::Pistol) {
+            model.reloadProgress=.02F;
+            const auto leaving=samplePlayerHandsPose(model);
+            model.reloadProgress=.08F;
+            const auto travelling=samplePlayerHandsPose(model);
+            model.reloadProgress=.14F;
+            const auto grasping=samplePlayerHandsPose(model);
+            expect(travelling.contactPoints[1].z
+                <(leaving.contactPoints[1].z+grasping.contactPoints[1].z)*.5F-.05F,
+                "support hand clears the pistol on an arc instead of crossing the receiver in a straight line");
+            expect(travelling.fingerFlexion[1][0]<leaving.fingerFlexion[1][0]
+                && travelling.fingerFlexion[1][0]<grasping.fingerFlexion[1][0]
+                && travelling.fingerFlexion[1][3]<grasping.fingerFlexion[1][3],
+                "fingers release before travelling and close only after finding the magazine");
+        }
+        if(role==HudWeaponRole::Sniper) {
+            model.reloadProgress=.22F;
+            const auto preparing=samplePlayerHandsPose(model);
+            expect(preparing.contactPoints[0]!=idle.contactPoints[0]
+                && preparing.contactPoints[1]!=idle.contactPoints[1],
+                "support hand starts for the magazine while the dominant hand is finishing the bolt stroke");
+        }
+        if(role==HudWeaponRole::Carbine || role==HudWeaponRole::SubmachineGun) {
+            const float approaching=role==HudWeaponRole::Carbine ? .84F : .75F;
+            const float seated=role==HudWeaponRole::Carbine ? .78F : .71F;
+            model.reloadProgress=seated;
+            const auto atMagazine=samplePlayerHandsPose(model);
+            model.reloadProgress=approaching;
+            const auto reachingHandle=samplePlayerHandsPose(model);
+            expect(sampleWeaponReloadPose(role,approaching).mechanismOffset==Vec3{}
+                && length(reachingHandle.contactPoints[1]-atMagazine.contactPoints[1])>.10F,
+                "charging handle waits until the hand has approached it");
+        }
         for(int i=0;i<=100;++i) {
             model.reloadProgress=float(i)/100;
             const auto pose=samplePlayerHandsPose(model);
@@ -1537,8 +1648,8 @@ void testPlayerHands()
                 expect(isFinite(pose.skin[b]) && pose.skin[b].elements==duplicate.skin[b].elements,
                     "hands pose is finite and deterministic across every reload phase");
             for(std::size_t side=0;side<2;++side) {
-                expect(nearlyEqual(length(pose.shoulders[side]-pose.elbows[side]),.90F,.0001F)
-                    && nearlyEqual(length(pose.elbows[side]-pose.wrists[side]),.90F,.0001F),
+                expect(nearlyEqual(length(pose.shoulders[side]-pose.elbows[side]),.56F,.0001F)
+                    && nearlyEqual(length(pose.elbows[side]-pose.wrists[side]),.46F,.0001F),
                     "elbow IK preserves arm lengths and contact wrist");
                 const auto frame=sampleWeaponPresentationTransform(model);
                 const auto& a=frame.elements;
@@ -1548,16 +1659,22 @@ void testPlayerHands()
                 expect(y+z*.675F<-.12F,"shoulder sleeve endpoints stay outside the bottom frame through reload");
             }
             if(role!=HudWeaponRole::Sniper || (i>=26 && i<=80) || i==0 || i==100)
-                expect(pose.wrists[0]==idle.wrists[0],"dominant grip remains fixed except explicit sniper bolt windows");
+                expect(pose.contactPoints[0]==idle.contactPoints[0],"dominant palm contact remains fixed except explicit sniper bolt windows");
             else if(i==12 || i==90)
                 expect(pose.rightContact==HandContact::Mechanism && pose.leftContact==HandContact::Support
-                    && pose.wrists[0]!=idle.wrists[0] && pose.wrists[1]==idle.wrists[1],
+                    && pose.contactPoints[0]!=idle.contactPoints[0] && pose.contactPoints[1]==idle.contactPoints[1],
                     "sniper uses right hand on bolt while left hand supports fore-end");
             for(std::size_t side=0;side<2U;++side) {
                 const auto& a=pose.skin[side*playerHandBonesPerSide+2U].elements;
                 const Vec3 x{a[0],a[1],a[2]},y{a[4],a[5],a[6]},z{a[8],a[9],a[10]};
                 expect(nearlyEqual(length(x),1) && nearlyEqual(length(y),1) && nearlyEqual(length(z),1)
                     && nearlyEqual(dot(cross(x,y),z),1),"palm contact orientation stays rigid and right handed");
+                const auto fore=normalized(pose.wrists[side]-pose.elbows[side]);
+                const auto& sleeve=pose.skin[side*playerHandBonesPerSide+1U].elements;
+                const auto roll=normalized(x-fore*dot(x,fore));
+                expect(dot(fore,y)>std::cos(31.0F*std::numbers::pi_v<float>/180)
+                    && dot(roll,{sleeve[0],sleeve[1],sleeve[2]})>.9999F,
+                    "wrist bend is bounded and forearm roll follows the palm without corkscrew twists");
                 for(const auto flex:pose.fingerFlexion[side])
                     expect(std::isfinite(flex) && flex>=0 && flex<=1.05F,"individual finger profiles stay bounded");
             }
@@ -1585,7 +1702,7 @@ void testPlayerHands()
             const auto magazine=samplePlayerHandsPose(model);
             // Probe the inner palm against the actual incoming part bounds, not
             // just a semantic label saying that the hand is "on the magazine".
-            const wkc::render::Vertex probe{{0,.132F,-.0396F},{},{41,20},0};
+            const wkc::render::Vertex probe{{0,.132F,-.0624F},{},{41,20},0};
             const Vec3 palm=deformPlayerHandsVertex(probe,magazine);
             Vec3 minimum{100,100,100},maximum{-100,-100,-100};
             const auto parts=makeWeaponViewmodelParts(role==HudWeaponRole::SubmachineGun ? HudWeaponRole::Carbine : role);
@@ -1599,6 +1716,8 @@ void testPlayerHands()
             const Vec3 nearest{std::clamp(palm.x,minimum.x,maximum.x),
                 std::clamp(palm.y,minimum.y,maximum.y),std::clamp(palm.z,minimum.z,maximum.z)};
             expect(length(palm-nearest)<.04F,"incoming magazine touches the inner palm in actual weapon-part space");
+            expect(surfaceDistance(parts[static_cast<std::size_t>(WeaponPart::Magazine)],palm,offset)<.015F,
+                "incoming magazine palm contacts its actual skin, not just its enclosing bounds");
             model.reloadProgress=.46F;
             const auto open=samplePlayerHandsPose(model);
             expect(open.fingerFlexion[1][0]<magazine.fingerFlexion[1][0]
@@ -1629,7 +1748,7 @@ void testPlayerHands()
                     *rotationZMatrix(part.mechanismRotationDegrees.z*std::numbers::pi_v<float>/180)
                     *translationMatrix(pivot*-1);
                 const Vec3 knob=transformPoint(bolt,{.215F,-.07F,-.08F});
-                const wkc::render::Vertex probe{{0,.132F,-.0396F},{},{5,2},0};
+                const wkc::render::Vertex probe{{0,.132F,-.0624F},{},{5,2},0};
                 expect(length(deformPlayerHandsVertex(probe,pose)-knob)<.05F,
                     "dominant palm follows the actual rotating/translating sniper bolt knob");
             }
@@ -1646,6 +1765,53 @@ void testPlayerHands()
             expect(shell.leftContact==HandContact::Shell && shell.fingerFlexion[1][0]<shell.fingerFlexion[1][2]
                 && shell.fingerFlexion[1][4]<shell.fingerFlexion[1][3],
                 "shotgun uses separate thumb/index shell pinch rather than a closed magazine fist");
+            const auto cartridge=sampleWeaponReloadPose(role,.20F,6U);
+            expect(surfaceDistance(weaponParts[static_cast<std::size_t>(WeaponPart::Magazine)],
+                shell.contactPoints[1],cartridge.magazineOffset)<.012F,
+                "shell pinch contacts the actual cartridge rather than a magazine-well target");
+            const wkc::render::Vertex indexPad{{-.0924F,.3217344F,-.0288F},{},{47,23},0};
+            const auto indexContact=deformPlayerHandsVertex(indexPad,shell);
+            expect(length(indexContact-shell.contactPoints[1])<.0001F,
+                "cartridge is anchored at the articulated index pad rather than hidden inside the palm");
+            float thumbGap=100;
+            const auto& shellMesh=weaponParts[static_cast<std::size_t>(WeaponPart::Magazine)];
+            Vec3 shellMin{100,100,100},shellMax{-100,-100,-100};
+            for(const auto& mesh:shellMesh) for(const auto& vertex:mesh.vertices) {
+                const auto p=vertex.position+cartridge.magazineOffset;
+                shellMin={std::min(shellMin.x,p.x),std::min(shellMin.y,p.y),std::min(shellMin.z,p.z)};
+                shellMax={std::max(shellMax.x,p.x),std::max(shellMax.y,p.y),std::max(shellMax.z,p.z)};
+            }
+            for(const auto& mesh:meshes) {
+                if(thumbGap<.012F) break;
+                for(const auto& vertex:mesh.vertices) {
+                    const auto joint=static_cast<unsigned int>(std::floor(vertex.uv.x*.5F));
+                    if(joint<33U || joint>35U) continue;
+                    const Vec3 p=deformPlayerHandsVertex(vertex,shell);
+                    const Vec3 nearest{std::clamp(p.x,shellMin.x,shellMax.x),
+                        std::clamp(p.y,shellMin.y,shellMax.y),std::clamp(p.z,shellMin.z,shellMax.z)};
+                    // Exact same triangle gate: broad-phase only rejects
+                    // points that cannot possibly meet the distance limit.
+                    if(dot(p-nearest,p-nearest)>=.012F*.012F) continue;
+                    thumbGap=std::min(thumbGap,surfaceDistance(shellMesh,p,cartridge.magazineOffset));
+                    if(thumbGap<.012F) break;
+                }
+            }
+            if(thumbGap>=.012F) std::cerr<<"Shell thumb surface gap="<<thumbGap<<'\n';
+            expect(thumbGap<.012F,"shell sits between the index pad and the articulated thumb surface");
+            for(const float progress:{.91F,.96F,.98F,.995F}) {
+                model.reloadProgress=progress;
+                const auto pump=sampleWeaponReloadPose(role,progress,6U);
+                const auto hands=samplePlayerHandsPose(model);
+                expect(length(hands.contactPoints[1]-idle.contactPoints[1]-pump.mechanismOffset)<.0001F,
+                    "support stays attached to the pump through the full manual return stroke");
+            }
+        } else if(role!=HudWeaponRole::Knife && role!=HudWeaponRole::Sniper) {
+            model.reloadProgress=role==HudWeaponRole::Pistol ? .87F : role==HudWeaponRole::SubmachineGun ? .80F : .87F;
+            const auto operating=samplePlayerHandsPose(model);
+            const auto part=sampleWeaponReloadPose(role,model.reloadProgress);
+            expect(surfaceDistance(weaponParts[static_cast<std::size_t>(WeaponPart::Mechanism)],
+                operating.contactPoints[1],part.mechanismOffset)<.020F,
+                "operating palm holds the actual moving slide or charging handle surface");
         }
         model.reloadProgress=0;
         auto previous=samplePlayerHandsPose(model);
@@ -1657,17 +1823,41 @@ void testPlayerHands()
                     "both reload hands have continuous contact trajectories");
                 const auto& a=next.skin[side*playerHandBonesPerSide+2U].elements;
                 const auto& b=previous.skin[side*playerHandBonesPerSide+2U].elements;
-                expect(dot({a[0],a[1],a[2]},{b[0],b[1],b[2]})>.99F
-                    && dot({a[8],a[9],a[10]},{b[8],b[9],b[10]})>.99F,
+                const auto fore=normalized(next.wrists[side]-next.elbows[side]);
+                expect(dot(fore,{a[4],a[5],a[6]})>std::cos(31.0F*std::numbers::pi_v<float>/180),
+                    "wrist stays inside the anatomical bend limit between coarse reload samples");
+                const bool continuous=dot({a[0],a[1],a[2]},{b[0],b[1],b[2]})>.99F
+                    && dot({a[8],a[9],a[10]},{b[8],b[9],b[10]})>.99F;
+                if(!continuous) std::cerr<<"Hand continuity role="<<static_cast<int>(role)
+                    <<" side="<<side<<" reload="<<model.reloadProgress<<'\n';
+                expect(continuous,
                     "palm contact rotations interpolate without orientation snaps");
             }
             previous=next;
+        }
+        for(unsigned int motion=0;motion<6U;++motion) for(unsigned int phase=0;phase<=20U;++phase) {
+            WeaponViewmodelRenderData moving{.visible=true,.role=role,.reloadProgress=.60F};
+            const float strength=float(phase)/20;
+            if(motion==0U) moving.recoilStrength=strength;
+            else if(motion==1U) moving.equipStrength=strength;
+            else if(motion==2U) moving.crouchStrength=strength;
+            else if(motion==3U) moving.airborneStrength=strength;
+            else if(motion==4U) moving.meleeStrength=strength;
+            else {moving.reloadProgress=0; moving.aimStrength=strength;}
+            const auto pose=samplePlayerHandsPose(moving);
+            for(std::size_t side=0;side<2U;++side) {
+                const auto& a=pose.skin[side*playerHandBonesPerSide+2U].elements;
+                expect(dot(normalized(pose.wrists[side]-pose.elbows[side]),{a[4],a[5],a[6]})
+                    >std::cos(31.0F*std::numbers::pi_v<float>/180),
+                    "recoil/equip/posture/melee cannot bypass the wrist bend limit");
+                for(const auto& skin:pose.skin) expect(isFinite(skin),"motion/contact solver keeps every joint finite");
+            }
         }
         model.reloadProgress=0;
         model.recoilStrength=1; model.meleeStrength=1; model.crouchStrength=1;
         model.equipStrength=1; model.airborneStrength=1;
         const auto attached=samplePlayerHandsPose(model);
-        expect(attached.wrists==idle.wrists,"root recoil/equip/posture transforms cannot detach hand contacts");
+        expect(attached.contactPoints==idle.contactPoints,"root recoil/equip/posture transforms cannot detach palm contacts");
     }
 }
 

@@ -47,7 +47,8 @@ renderer bloqueia adicionalmente todos os menus e os estados Victory/Defeat.
   círculo cabe inteiro em retrato, ultrawide, 16:9 e 16:10 e não vira elipse.
 - Fora quase preto, borda suave, cruz fina escura e ponto central claro para
   contraste. O centro corresponde ao da retícula/disparo existentes.
-- Retícula comum é suprimida enquanto há overlay, sem apagar HP/munição/mapa.
+- Na sniper, a retícula comum não é desenhada, com ou sem overlay. O retículo
+  óptico aparece durante a mira com Mouse2, sem apagar HP/munição/mapa.
 - Overlay permanece na resolução de saída mesmo com mundo a 50% no POTATO.
 
 Tudo permanece no GDP; nenhum conceito Sniper foi adicionado à WKC Forge.
@@ -120,3 +121,25 @@ no commit desta etapa. A CI do commit publicado é uma verificação separada.
 4. Comparar FOV 60/100 e POTATO/MEDIUM. Julgar legibilidade e tamanho da luneta.
 
 Aceitação visual no jogo cabe ao usuário, não aos testes automatizados.
+
+## Ajuste solicitado — 2026-10-04
+
+Pedido: remover a mira central da sniper quando não estiver usando Mouse2.
+O renderer agora suprime a retícula comum para a sniper selecionada; usa o
+papel do viewmodel visível e, na ausência dele, o snapshot do HUD. A luneta 3D
+e o retículo óptico ao mirar permanecem. Não altera zoom/blend, input
+remapeável Aim, spread, dano ou comportamento das outras armas.
+
+Regressão GL compara os 16×16 pixels centrais do hip fire com o mesmo mundo
+sem retícula e confirma que pistola, carabina, SMG, shotgun e faca mantêm a
+retícula anterior. Os gates de entrada/saída da mira, menus, reload/equip,
+FOV 60/100 e MEDIUM/POTATO continuam passando.
+
+- Release: cinco gates afetados (GL completo, mãos, recarga, integração da
+  Application e fronteiras arquiteturais), **5/5**, 18,33 s.
+- ASan/UBSan: GL completo **1/1**, 18,43 s, sem diagnósticos; preset com
+  `detect_leaks=0` pela restrição de ptrace. Não é uma nova suíte completa.
+- Fixture `--scope-only`: passou na NVIDIA Quadro K2100M/470.256.02 e no
+  Mesa llvmpipe/LLVM 21.1.8/Mesa 26.2.3.
+- `git diff --check` passou. Ajuste local, junto ao candidato de apresentação
+  das mãos; sem novo commit/push ou pacote Windows nesta revisão.

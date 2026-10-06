@@ -1,11 +1,14 @@
 # Player Usado — mãos v2 e contatos de recarga
 
-Data: 2026-10-03. Estado: **IMPLEMENTADA EM VALIDAÇÃO**.
+Data: 2026-10-03. Estado: **REJEITADA NO PLAYTEST — REVISÃO SOLICITADA**.
 Unidade: `Player presentation/Hands + Reload contacts`.
 Usuário aprovou a [proposta Usado v2](../visual/proposals/player_hands_proposal_v2.md)
 com "visual simulado aprovado para implementação". A aprovação do conceito
 autoriza esta implementação; **aceitação visual final no jogo permanece pendente**.
-O [candidato v1](player_hands_2026-10-02.md) é histórico, não a implementação atual.
+Usuário rejeitou proporção/fidelidade das mãos, mão extra na faca e dobras dos
+punhos. Os testes abaixo são evidência técnica, **não aprovação visual**.
+Correção local: [revisão de 2026-10-04](player_hands_2026-10-04.md).
+O [candidato v1](player_hands_2026-10-02.md) é histórico.
 Torso/cinto v2 continua sendo outra unidade, aguardando aprovação e não implementada.
 
 ## Anatomia e materiais

@@ -125,7 +125,7 @@ decisão do usuário: "visual simulado aprovado para implementação" — Usado 
 commit de implementação v2: entrega mãos Usado v2 (histórico Git)
 capturas nativas: visual/validation/player_hands_v2_* (fixture OpenGL offscreen)
 implementação/testes: 04_gameplay/player_hands_2026-10-03.md
-estado: IMPLEMENTADA EM VALIDAÇÃO — Usado v2; aceitação final no jogo pendente
+estado: REVISÃO SOLICITADA — implementação v2 rejeitada no playtest
 ```
 
 Prancha entregue: detalhe palma/dorso, três desgastes, empunhadura da pistola
@@ -138,6 +138,18 @@ três draws, 4016 triângulos, 36 juntas e aproximadamente 9 MiB de mapas com
 mipmaps; sem benchmark comparativo de FPS. Preserva FOV próximo de
 68°, identidade das armas e regras de munição/tempo. Torso/cinto é unidade
 separada e continua pendente. Aceitação visual final desta v2 depende do jogo.
+
+Feedback de playtest: mãos/mangas finas e longas, proporção diferente da
+prancha, faca com duas mãos e punhos dobrando excessivamente nas recargas.
+O commit `88c5f87` não recebeu aceitação visual. A referência Usado v2
+permanece aprovada como direção; correção local da implementação em revisão,
+com evidências nativas e contrato em `04_gameplay/player_hands_2026-10-04.md`.
+Revisão posterior dos contatos das seis armas e encurtamento dos braços:
+`04_gameplay/player_weapon_contacts_2026-10-04.md`. O usuário aprovou
+movimentação e visuais **por enquanto** em 2026-10-05, após testar o jogo:
+aceitação provisória da revisão posterior, não da implementação rejeitada em
+`88c5f87`. Texturas e identidade das armas não mudaram; torso/cinto seguem
+fora desta aprovação. Testes técnicos isolados não constituem aprovação visual.
 
 ### Player presentation/Torso + Belt — v2
 
@@ -562,7 +574,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | Engineer/material families | Não revisada |
 | IndustrialRobot/material families | Não revisada |
 | Weapon/first-person presentation | V1 Used implementada em validação |
-| Player presentation | V1 corpo/cintura em revisão; V2 torso/cinto aguardando aprovação; V2 mãos/contatos Usado implementada em validação |
+| Player presentation | V1 corpo/cintura em revisão; V2 torso/cinto aguardando aprovação; mãos v2 publicadas rejeitadas, revisão posterior de mãos/contatos aprovada provisoriamente |
 | Weapon/Sniper optic | V2 Usado implementada em validação |
 | HUD/Sniper scoped view | V1 implementada em validação |
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |
