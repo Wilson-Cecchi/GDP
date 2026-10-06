@@ -3735,6 +3735,20 @@ void Application::render()
     hud.campaignMode = session_.state().mode == gameplay::RunMode::Campaign;
     hud.campaignFloor = session_.state().campaignFloor;
     hud.campaignFloorCount = gameplay::campaignFloorCount;
+    if (hud.campaignMode) {
+        hud.campaignMission = campaignMission_.kind
+                == gameplay::CampaignMissionKind::RecoverKey
+            ? visual::ObjectiveRenderState::RecoverKey
+            : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
+                ? campaignMission_.activated
+                    ? visual::ObjectiveRenderState::ClearAmbush
+                    : visual::ObjectiveRenderState::ActivateTerminal
+                : visual::ObjectiveRenderState::SecureArena;
+        hud.campaignMissionCompleted = campaignMission_.completed;
+        const auto boss = gameplay::bossStatus(entities_, 0U);
+        hud.campaignBossDefeated = boss.exists && !boss.alive;
+        hud.campaignExitReady = session_.state().campaignExitReady;
+    }
     hud.campaignThreatPercent = static_cast<std::uint16_t>(
         std::lround(runDifficulty_ * 100.0F));
     hud.campaignAdvanceAvailable

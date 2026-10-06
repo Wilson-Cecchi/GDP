@@ -391,10 +391,34 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
             hud.campaignFloor = 10U;
             hud.prompt = HudPrompt::FinishCampaignTerminal;
             const auto final = pixelsFor();
+            hud.infoOverlay = true;
+            hud.campaignFloor = 2U;
+            hud.campaignMission = ObjectiveRenderState::ActivateTerminal;
+            hud.objective = ObjectiveRenderState::ActivateTerminal;
+            hud.prompt = HudPrompt::CampaignMissionRequired;
+            hud.map.rooms[1].marker = HudMapMarker::Mission;
+            const auto missionPending = pixelsFor();
+            hud.campaignMission = ObjectiveRenderState::ClearAmbush;
+            hud.objective = ObjectiveRenderState::ClearAmbush;
+            const auto ambushPending = pixelsFor();
+            hud.campaignBossDefeated = true;
+            const auto bossFirst = pixelsFor();
+            hud.campaignBossDefeated = false;
+            hud.campaignMissionCompleted = true;
+            const auto missionFirst = pixelsFor();
+            hud.campaignBossDefeated = true;
+            hud.campaignExitReady = true;
+            hud.objective = ObjectiveRenderState::ActivateExit;
+            hud.prompt = HudPrompt::NextFloorTerminal;
+            hud.map.rooms[1].marker = HudMapMarker::Exit;
+            const auto exitChecklist = pixelsFor();
             passed &= locked != arenaMission && arenaMission != keyMission
                 && keyMission != terminalActivation
                 && terminalActivation != terminalClear
-                && terminalClear != ready && ready != final;
+                && terminalClear != ready && ready != final
+                && final != missionPending && missionPending != ambushPending
+                && ambushPending != bossFirst && bossFirst != missionFirst
+                && missionFirst != exitChecklist;
             if (capture) {
                 const auto save = [&](const auto& pixels, const std::string& state) {
                     std::vector<std::uint8_t> topDown(pixels.size());
@@ -416,7 +440,12 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                     && save(keyMission, "key-mission")
                     && save(terminalActivation, "terminal-activation")
                     && save(terminalClear, "terminal-clear") && save(ready, "ready")
-                    && save(final, "final");
+                    && save(final, "final")
+                    && save(missionPending, "mission-pending-tab")
+                    && save(ambushPending, "ambush-pending-tab")
+                    && save(bossFirst, "boss-first-tab")
+                    && save(missionFirst, "mission-first-tab")
+                    && save(exitChecklist, "exit-ready-tab");
             }
         }
     }

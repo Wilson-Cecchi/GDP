@@ -88,6 +88,15 @@ void layoutTests() {
             && localize(Language::PortugueseBrazil, "COMPLETE MISSION") == "CONCLUA A MISSÃO",
         "Campaign mission objective and exit gate are localized");
     expect(localize(Language::PortugueseBrazil, "FLOOR 7/10  HARD") == "ANDAR 7/10  DIFÍCIL", "dynamic labels retain numbers and translated difficulty");
+    expect(localize(Language::PortugueseBrazil, "MISSION: CLEAR AMBUSH")
+            == "MISSÃO: ELIMINE A EMBOSCADA"
+            && localize(Language::PortugueseBrazil, "MISSION COMPLETE")
+                == "MISSÃO CONCLUÍDA"
+            && localize(Language::PortugueseBrazil, "BOSS ALIVE") == "CHEFE VIVO"
+            && localize(Language::PortugueseBrazil, "BOSS DOWN") == "CHEFE DERROTADO"
+            && localize(Language::PortugueseBrazil, "EXIT LOCKED") == "SAÍDA BLOQUEADA"
+            && localize(Language::PortugueseBrazil, "EXIT READY") == "SAÍDA LIBERADA",
+        "Campaign run-status checklist is localized");
     expect(localize(Language::PortugueseBrazil, "JUMP  [SPACE]") == "PULAR  [SPACE]", "localized descriptions cannot translate saved key binding tokens");
     expect(localize(Language::PortugueseBrazil, "UNLISTED_ID_42") == "UNLISTED_ID_42", "unknown technical identifiers have a stable fallback");
     expect(uiTextLength("CONFIGURAÇÕES") == 13U && uiTextLength("PORTUGUÊS (BR)") == 14U,

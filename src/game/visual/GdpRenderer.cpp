@@ -3199,41 +3199,75 @@ bool GdpRenderer::render(
         }
     }
 
-    if (hud.infoOverlay && hud.visible && !hud.mainMenu && !hud.paused
-        && !hud.settingsMenu) {
-        const std::array<std::string, 7> lines{
-            "RUN STATUS",
-            "SEED " + std::to_string(hud.runSeed),
-            "SCORE " + std::to_string(hud.score),
-            "KILLS " + std::to_string(hud.enemiesKilled),
-            "EVENTS " + std::to_string(hud.eventsCompleted),
-            "LOOT " + std::to_string(hud.lootCollected),
-            "TIME " + runTimeText(hud.elapsedRunTicks),
-        };
-        const int panelScale = hudScale;
-        const int lineHeight = 10 * panelScale;
-        int textWidth = 0;
-        for (const std::string& line : lines) {
-            textWidth = std::max(textWidth,
-                bitmapTextWidth(line, panelScale));
+    UiRect mapPanelRect{};
+    bool mapPanelVisible = false;
+    const auto drawInfoOverlay = [&] {
+        if (hud.infoOverlay && hud.visible && !hud.mainMenu && !hud.paused
+            && !hud.settingsMenu) {
+            std::array<std::string, 11> lines{
+                "RUN STATUS",
+                "SEED " + std::to_string(hud.runSeed),
+                "SCORE " + std::to_string(hud.score),
+                "KILLS " + std::to_string(hud.enemiesKilled),
+                "EVENTS " + std::to_string(hud.eventsCompleted),
+                "LOOT " + std::to_string(hud.lootCollected),
+                "TIME " + runTimeText(hud.elapsedRunTicks),
+            };
+            std::size_t lineCount = 7U;
+            if (hud.campaignMode) {
+                std::string mission = "MISSION UNKNOWN";
+                if (hud.campaignMissionCompleted) {
+                    mission = "MISSION COMPLETE";
+                } else {
+                    switch (hud.campaignMission) {
+                    case ObjectiveRenderState::SecureArena:
+                        mission = "MISSION: SECURE ARENA"; break;
+                    case ObjectiveRenderState::RecoverKey:
+                        mission = "MISSION: RECOVER KEY"; break;
+                    case ObjectiveRenderState::ActivateTerminal:
+                        mission = "MISSION: ACTIVATE TERMINAL"; break;
+                    case ObjectiveRenderState::ClearAmbush:
+                        mission = "MISSION: CLEAR AMBUSH"; break;
+                    default: break;
+                    }
+                }
+                lines[lineCount++] = "FLOOR " + std::to_string(hud.campaignFloor)
+                    + "/" + std::to_string(hud.campaignFloorCount);
+                lines[lineCount++] = std::move(mission);
+                lines[lineCount++] = hud.campaignBossDefeated ? "BOSS DOWN" : "BOSS ALIVE";
+                lines[lineCount++] = hud.campaignExitReady ? "EXIT READY" : "EXIT LOCKED";
+            }
+            const int panelScale = height >= 480 ? hudScale : 1;
+            const int lineHeight = 8 * panelScale;
+            int textWidth = 0;
+            for (std::size_t index = 0U; index < lineCount; ++index) {
+                textWidth = std::max(textWidth,
+                    bitmapTextWidth(lines[index], panelScale));
+            }
+            const int panelWidth = std::min(width - (hudMargin * 2),
+                textWidth + (hudPadding * 4));
+            const int panelHeight = static_cast<int>(lineCount) * lineHeight
+                + (hudPadding * 2);
+            const int mapGap = 3 * hudScale;
+            const int belowMapY = mapPanelRect.y - mapGap - panelHeight;
+            const bool fitsBelowMap = mapPanelVisible
+                && belowMapY >= hudMargin + (65 * hudScale);
+            const int panelX = fitsBelowMap ? mapPanelRect.x
+                : (width - panelWidth) / 2;
+            const int panelY = fitsBelowMap ? belowMapY
+                : (height - panelHeight) / 2;
+            drawIndustrialPanel({panelX, panelY, panelWidth, panelHeight},
+                panelScale, cyanColor);
+            int lineY = panelY + panelHeight - hudPadding
+                - (7 * panelScale);
+            for (std::size_t index = 0; index < lineCount; ++index) {
+                drawBitmapText(panelX + (hudPadding * 2), lineY,
+                    panelScale, lines[index],
+                    index == 0U ? cyanColor : textColor);
+                lineY -= lineHeight;
+            }
         }
-        const int panelWidth = std::min(width - (hudMargin * 2),
-            textWidth + (hudPadding * 4));
-        const int panelHeight = static_cast<int>(lines.size()) * lineHeight
-            + (hudPadding * 3);
-        const int panelX = (width - panelWidth) / 2;
-        const int panelY = (height - panelHeight) / 2;
-        drawIndustrialPanel({panelX, panelY, panelWidth, panelHeight},
-            panelScale, cyanColor);
-        int lineY = panelY + panelHeight - (hudPadding * 2)
-            - (7 * panelScale);
-        for (std::size_t index = 0; index < lines.size(); ++index) {
-            drawBitmapText(panelX + (hudPadding * 2), lineY,
-                panelScale, lines[index],
-                index == 0U ? cyanColor : textColor);
-            lineY -= lineHeight;
-        }
-    }
+    };
 
     int performancePanelHeight = 0;
     if (hud.performanceOverlay) {
@@ -3356,6 +3390,8 @@ bool GdpRenderer::render(
             - mapHeight - performanceHeight;
         const int minimumMapY = hudMargin + (65 * hudScale);
         if (mapY >= minimumMapY && mapWidth + (hudMargin * 2) <= width) {
+            mapPanelRect = {mapX, mapY, mapWidth, mapHeight};
+            mapPanelVisible = true;
             drawTacticalBackdrop({mapX, mapY, mapWidth, mapHeight},
                 hudScale, cyanColor);
             drawBitmapText(mapX + hudPadding,
@@ -3494,6 +3530,8 @@ bool GdpRenderer::render(
                 hudScale, hudScale, uiTheme.warning);
         }
     }
+
+    drawInfoOverlay();
 
     std::string_view objectiveText;
     wkc::core::Vec3 objectiveColor = textColor;

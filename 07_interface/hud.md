@@ -185,6 +185,14 @@ alteram o inventário; a simulação decide se houve descarte.
 Segurar `Tab` mostra placar, abates, eventos, loot e tempo da run. Os números
 vêm do snapshot de progressão; abrir o painel não pausa nem altera o jogador.
 Ele é separado do diagnóstico `F3` e não aparece sobre menus.
+Na Campanha, o mesmo painel também mostra andar, missão atual ou concluída,
+estado do boss e liberação da saída. A missão continua visível ali durante o
+confronto com o boss, mesmo quando o objetivo breve da HUD muda para combate.
+As quatro linhas extras são localizadas em EN/PT-BR e não aparecem nos outros
+modos; esse painel apenas lê o estado da simulação e não revela salas novas.
+O painel fica abaixo do minimapa quando há espaço livre acima dos indicadores
+de vida; em resoluções compactas, volta ao centro para não cortar linhas nem
+encobrir os indicadores inferiores.
 Com a lanterna ligada, uma pequena indicação `F LIGHT ON` fica na borda
 inferior em resoluções normais, sem ocupar o centro da mira.
 

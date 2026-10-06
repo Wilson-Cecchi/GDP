@@ -45,6 +45,11 @@ primeiro, a missão continua marcada até ser concluída. Esses marcadores não
 revelam salas desconhecidas, não alteram o grafo nem afetam Standard, Speedrun
 ou Test Mode. O mapa mantém os traçados reais dos corredores.
 
+Segurar `Tab` abre a lista de situação do andar: missão atual (inclusive a
+transição de ativar terminal para eliminar emboscada), boss vivo/derrotado e
+saída bloqueada/liberada. Essa leitura continua disponível no confronto com
+o boss; não altera objetivos, não descobre salas e não aparece nos demais modos.
+
 ## Persistência e falhas
 
 O checkpoint continua representando a entrada do andar. Replay/Continue
