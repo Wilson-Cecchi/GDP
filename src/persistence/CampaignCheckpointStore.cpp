@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -39,14 +40,15 @@ std::optional<std::uint64_t> parseUnsigned(std::string_view value) noexcept
     return parsedValue;
 }
 
-std::optional<float> parseFloat(std::string_view value) noexcept
+std::optional<float> parseFloat(std::string_view value)
 {
     value = trim(value);
+    if (value.empty() || value.front() == '+') return std::nullopt;
     float parsedValue = 0.0F;
-    const char* const begin = value.data();
-    const char* const end = begin + value.size();
-    const auto parsed = std::from_chars(begin, end, parsedValue);
-    if (value.empty() || parsed.ec != std::errc{} || parsed.ptr != end
+    std::istringstream input{std::string{value}};
+    input.imbue(std::locale::classic());
+    input >> std::noskipws >> parsedValue;
+    if (!input || input.rdbuf()->sgetc() != std::char_traits<char>::eof()
         || !std::isfinite(parsedValue)) {
         return std::nullopt;
     }
@@ -110,7 +112,7 @@ struct Fields {
 bool assignField(
     Fields& fields,
     const std::string_view key,
-    const std::string_view value) noexcept
+    const std::string_view value)
 {
     std::optional<float>* floatTarget = nullptr;
     if (key == "player_health") {
@@ -216,6 +218,7 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
 {
     const gameplay::CampaignCarryover& state = checkpoint.floorEntry;
     std::ostringstream output;
+    output.imbue(std::locale::classic());
     output << std::setprecision(std::numeric_limits<float>::max_digits10)
            << "version = " << currentCampaignCheckpointFileVersion << '\n'
            << "rules_version = " << checkpoint.rulesVersion << '\n'

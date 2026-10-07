@@ -142,6 +142,32 @@ void testMissingRoundTripReplacementAndRemoval()
         "checkpoint removal is idempotent and returns to the empty state");
 }
 
+void testMalformedDecimalFields()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const auto path = directory.path() / "campaign_checkpoint.toml";
+    expect(persistence::saveCampaignCheckpoint(path, makeCheckpoint()),
+        "a valid checkpoint supplies the malformed decimal fixture");
+    const std::string validFile = readText(path);
+    const std::string field = "player_health = ";
+    const auto valueStart = validFile.find(field);
+    expect(valueStart != std::string::npos,
+        "the checkpoint fixture contains player health");
+    if (valueStart == std::string::npos) return;
+    const auto valueEnd = validFile.find('\n', valueStart);
+    for (const std::string_view invalidValue : {
+             "12.5junk", "nan", "+12.5", "12,5"}) {
+        std::string malformed = validFile;
+        malformed.replace(valueStart, valueEnd - valueStart,
+            field + std::string{invalidValue});
+        writeText(path, malformed);
+        expect(persistence::loadCampaignCheckpoint(path).status
+                == persistence::CampaignCheckpointLoadStatus::Invalid,
+            "malformed or locale-dependent decimal fields are rejected");
+    }
+}
+
 void testInvalidAndVersionedData()
 {
     using namespace gdp;
@@ -504,6 +530,7 @@ void testPreviousCampaignFloorMigration()
 int main()
 {
     testMissingRoundTripReplacementAndRemoval();
+    testMalformedDecimalFields();
     testInvalidAndVersionedData();
     testCommentsAndFutureFields();
     testKnifeOnlyAndLegacyRoundTrip();
