@@ -1,0 +1,113 @@
+name: Portable downloads
+
+# Linux/macOS distribution is opt-in: macOS runners consume more Actions minutes.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 2
+
+jobs:
+  linux-x64:
+    name: Linux x64 package
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install native build dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes
+          cmake ninja-build g++ pkg-config
+          libgl1-mesa-dev libegl1-mesa-dev
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev
+          libxfixes-dev libxss-dev libxtst-dev
+          libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
+          libasound2-dev libpulse-dev libudev-dev
+      - name: Configure portable build
+        run: >-
+          cmake -S . -B build/linux-package -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DGDP_BUILD_TESTS=OFF
+          -DGDP_PORTABLE_PACKAGE=ON
+      - name: Build game
+        run: cmake --build build/linux-package --target gdp --parallel 2
+      - name: Package
+        run: >-
+          cpack --config build/linux-package/CPackConfig.cmake
+          -B build/distribution
+      - name: Verify extracted package
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=build/distribution/IronSeed-Linux-x64.tar.gz
+          test -s "$archive"
+          mkdir -p build/distribution/check
+          tar -xzf "$archive" -C build/distribution/check
+          package=build/distribution/check/IronSeed-Linux-x64
+          test -x "$package/gdp"
+          for type in worker guard officer engineer robot; do
+            test -s "$package/ai/$type.brain"
+          done
+          if ldd "$package/gdp" | grep -q libSDL3; then
+            echo "SDL3 must be linked into the portable binary" >&2
+            exit 1
+          fi
+          "$package/gdp" --headless --frames 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IronSeed-Linux-x64
+          path: build/distribution/IronSeed-Linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    name: macOS ${{ matrix.label }} package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x86_64
+            label: Intel
+          - runner: macos-15
+            arch: arm64
+            label: AppleSilicon
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure portable bundle
+        run: >-
+          cmake -S . -B build/macos-package -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DGDP_BUILD_TESTS=OFF
+          -DGDP_PORTABLE_PACKAGE=ON
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+      - name: Build game
+        run: cmake --build build/macos-package --target gdp --parallel 2
+      - name: Install and verify bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="IronSeed-macOS-${{ matrix.label }}"
+          stage="$PWD/build/distribution/$package"
+          cmake --install build/macos-package --prefix "$stage"
+          app="$stage/IronSeed.app"
+          test -x "$app/Contents/MacOS/IronSeed"
+          for type in worker guard officer engineer robot; do
+            test -s "$app/Contents/Resources/ai/$type.brain"
+          done
+          test "$(lipo -archs "$app/Contents/MacOS/IronSeed")" = "${{ matrix.arch }}"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/IronSeed" --headless --frames 3
+          ditto -c -k --sequesterRsrc --keepParent "$stage" \
+            "$PWD/build/distribution/$package.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IronSeed-macOS-${{ matrix.label }}
+          path: build/distribution/IronSeed-macOS-${{ matrix.label }}.zip
+          if-no-files-found: error
+          retention-days: 30

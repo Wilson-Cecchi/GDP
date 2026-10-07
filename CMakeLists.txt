@@ -21,16 +21,28 @@ option(GDP_FETCH_SDL3 "Download SDL3 when no system package is available" ON)
 option(GDP_BUILD_TESTS "Build and register GDP tests" ON)
 option(GDP_ENABLE_TEST_MODE "Include the dedicated development test arena (disable for shipping)" ON)
 option(GDP_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(GDP_PORTABLE_PACKAGE "Build a self-contained Linux or macOS download" OFF)
 
-find_package(SDL3 3.4 CONFIG QUIET)
+if(GDP_PORTABLE_PACKAGE AND WIN32)
+    message(FATAL_ERROR "GDP_PORTABLE_PACKAGE is for Linux and macOS; use windows-release on Windows")
+endif()
 
-if(NOT SDL3_FOUND)
+if(NOT GDP_PORTABLE_PACKAGE)
+    find_package(SDL3 3.4 CONFIG QUIET)
+endif()
+
+if(GDP_PORTABLE_PACKAGE OR NOT SDL3_FOUND)
     if(NOT GDP_FETCH_SDL3)
         message(FATAL_ERROR "SDL3 was not found and GDP_FETCH_SDL3 is OFF")
     endif()
 
-    set(SDL_SHARED ON CACHE BOOL "Build SDL3 as a shared library" FORCE)
-    set(SDL_STATIC OFF CACHE BOOL "Do not build SDL3 as a static library" FORCE)
+    if(GDP_PORTABLE_PACKAGE)
+        set(SDL_SHARED OFF CACHE BOOL "Do not need a separate SDL3 runtime" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "Link SDL3 into the portable executable" FORCE)
+    else()
+        set(SDL_SHARED ON CACHE BOOL "Build SDL3 as a shared library" FORCE)
+        set(SDL_STATIC OFF CACHE BOOL "Do not build SDL3 as a static library" FORCE)
+    endif()
     set(SDL_TESTS OFF CACHE BOOL "Do not build SDL3 tests" FORCE)
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "Do not build SDL3 test library" FORCE)
     set(SDL_EXAMPLES OFF CACHE BOOL "Do not build SDL3 examples" FORCE)
@@ -42,6 +54,9 @@ if(NOT SDL3_FOUND)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(SDL3)
+    if(GDP_PORTABLE_PACKAGE)
+        FetchContent_GetProperties(SDL3 SOURCE_DIR GDP_SDL_SOURCE_DIR)
+    endif()
 endif()
 
 find_package(OpenGL REQUIRED)
@@ -366,6 +381,15 @@ target_link_libraries(
 )
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
+if(APPLE)
+    set_target_properties(gdp PROPERTIES
+        MACOSX_BUNDLE TRUE
+        OUTPUT_NAME IronSeed
+        MACOSX_BUNDLE_BUNDLE_NAME "Iron Seed"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "dev.wkc.ironseed"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    )
+endif()
 
 add_executable(gdp_ai_gameplay_eval tools/ai_gameplay_eval.cpp)
 target_link_libraries(gdp_ai_gameplay_eval PRIVATE gdp_training gdp_world)
@@ -379,10 +403,16 @@ set(GDP_ACTIVE_BRAIN_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/engineer.brain"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/ai/robot.brain"
 )
+if(APPLE)
+    # SDL_GetBasePath() resolves to Contents/Resources for a macOS .app.
+    set(GDP_BRAIN_OUTPUT_DIRECTORY "$<TARGET_BUNDLE_CONTENT_DIR:gdp>/Resources/ai")
+else()
+    set(GDP_BRAIN_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:gdp>/ai")
+endif()
 add_custom_target(gdp_brain_assets
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:gdp>/ai"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${GDP_BRAIN_OUTPUT_DIRECTORY}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${GDP_ACTIVE_BRAIN_FILES} "$<TARGET_FILE_DIR:gdp>/ai"
+        ${GDP_ACTIVE_BRAIN_FILES} "${GDP_BRAIN_OUTPUT_DIRECTORY}"
     DEPENDS ${GDP_ACTIVE_BRAIN_FILES}
     VERBATIM
 )
@@ -448,6 +478,32 @@ if(WIN32)
     set(CPACK_PACKAGE_FILE_NAME "GDP-Windows-${GDP_WINDOWS_ARCHITECTURE}")
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
     include(CPack)
+endif()
+
+if(UNIX AND NOT APPLE AND GDP_PORTABLE_PACKAGE)
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        message(FATAL_ERROR "The Linux download workflow currently supports x64 only")
+    endif()
+    install(TARGETS gdp RUNTIME DESTINATION .)
+    install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
+    install(FILES README_LINUX.md DESTINATION .)
+    install(FILES assets/fonts/LICENSE-DejaVu.txt DESTINATION licenses)
+    install(FILES "${GDP_SDL_SOURCE_DIR}/LICENSE.txt"
+        DESTINATION licenses RENAME LICENSE-SDL3.txt)
+    set(CPACK_GENERATOR TGZ)
+    set(CPACK_PACKAGE_FILE_NAME "IronSeed-Linux-x64")
+    set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
+    include(CPack)
+endif()
+
+if(APPLE AND GDP_PORTABLE_PACKAGE)
+    install(TARGETS gdp BUNDLE DESTINATION .)
+    install(FILES README_MACOS.md DESTINATION .)
+    install(FILES assets/fonts/LICENSE-DejaVu.txt
+        DESTINATION IronSeed.app/Contents/Resources/licenses)
+    install(FILES "${GDP_SDL_SOURCE_DIR}/LICENSE.txt"
+        DESTINATION IronSeed.app/Contents/Resources/licenses
+        RENAME LICENSE-SDL3.txt)
 endif()
 
 if(GDP_BUILD_TESTS)
