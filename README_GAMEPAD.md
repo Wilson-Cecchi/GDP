@@ -23,9 +23,14 @@ procura outro controle disponível. Teclado e mouse continuam funcionando juntos
 | Menu / Options | Pausar ou retomar |
 
 No menu, o direcional ou o analógico esquerdo navega. Esquerda/direita ajusta
-opções; A/✕ confirma e B/○ volta. O remapeamento atual em `Settings > Controls`
-continua reservado a teclado/mouse; os comandos do controle são um preset fixo.
-Os atalhos de equipamento e item especial seguem reservados, sem função no jogo.
+opções; A/✕ confirma e B/○ volta. Em `Settings > Controls`, escolha
+`Keyboard / Mouse` ou `Controller`. Cada dispositivo tem remapeamento e reset
+independentes. Se um botão já estiver associado a outra ação, as duas ações
+trocam seus comandos. Durante a captura do controle, `Options` ou `Esc`
+cancela e `Delete` remove a associação. `Options` fica reservado ao menu; os
+dois analógicos mantêm movimento/visão, embora também seja possível atribuir
+botões às quatro ações de movimento. Os atalhos de equipamento e item especial
+seguem reservados, sem função no jogo.
 
 Para testar um DualSense por Bluetooth no Linux: emparelhe-o nas configurações do
 sistema, inicie `build/release/gdp --test-mode` e confira a linha
@@ -33,6 +38,8 @@ sistema, inicie `build/release/gdp --test-mode` e confira a linha
 gatilhos e a desconexão/reconexão. O teste automatizado usa um gamepad virtual;
 ele não substitui a validação com seu DualSense real.
 
-Vibração/háptica ainda não foi habilitada. O SDL3 oferece vibração comum quando
-o controle/driver a suporta; efeitos específicos dos gatilhos adaptativos do
-DualSense serão avaliados em uma etapa separada.
+`Controller` também permite ligar/desligar a vibração e regular sua intensidade
+de 0% a 100%. Disparos e dano recebido produzem pulsos de vibração comum
+quando o controle e o driver oferecem suporte. A intensidade 0% não vibra,
+mesmo com a opção ligada. Efeitos específicos dos gatilhos adaptativos do
+DualSense continuam fora desta etapa.

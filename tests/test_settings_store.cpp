@@ -80,6 +80,11 @@ void testMissingAndRoundTrip()
     settings.fullscreen = true;
     settings.verticalSync = false;
     settings.language = gdp::gameplay::Language::PortugueseBrazil;
+    settings.gamepadVibration = false;
+    settings.gamepadVibrationPercent = 80U;
+    expect(gdp::gameplay::assignGamepadBinding(settings.gamepadControls,
+            gdp::gameplay::ControlAction::Fire, wkc::platform::GamepadButton::West),
+        "custom controller binding is accepted before persistence");
     expect(saveRuntimeSettings(path, settings),
         "settings are written through the validated temporary file");
     const SettingsLoadResult loaded = loadRuntimeSettings(path);
@@ -102,7 +107,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 8\n"
+        "version = 9\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -137,7 +142,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 8\n"
+        "version = 9\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -149,6 +154,22 @@ void testRecoveryAndForwardCompatibility()
                 == gdp::gameplay::GraphicsQuality::High
             && forwardCompatible.settings.verticalSync,
         "unknown and missing fields remain forward compatible");
+
+    writeText(path, "version = 8\nmouse_sensitivity = 140\nbinding_0 = I\n");
+    const auto previousV8 = loadRuntimeSettings(path);
+    expect(previousV8.status == SettingsLoadStatus::Migrated
+            && previousV8.settings.mouseSensitivityPercent == 140U
+            && previousV8.settings.controls.values[0] == gdp::gameplay::bindingForName("I")
+            && previousV8.settings.gamepadControls == gdp::gameplay::GamepadBindings{},
+        "v8 migration preserves keyboard bindings and adds controller defaults");
+
+    writeText(path, "version = 9\ngamepad_binding_7 = X / SQUARE\n"
+        "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
+    const auto brokenGamepad = loadRuntimeSettings(path);
+    expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery
+            && brokenGamepad.settings.gamepadControls == gdp::gameplay::GamepadBindings{}
+            && brokenGamepad.settings.gamepadVibrationPercent == 100U,
+        "duplicate controller bindings and excessive vibration recover safely");
 
     writeText(path, "version = 7\nmaster_volume = 65\nbinding_0 = I\n");
     const auto previous = loadRuntimeSettings(path);

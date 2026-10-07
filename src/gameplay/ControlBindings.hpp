@@ -23,6 +23,12 @@ struct ControlBindings {
     std::array<ControlBinding, controlActionCount> values{defaultControlBindings()};
     constexpr bool operator==(const ControlBindings&) const noexcept = default;
 };
+[[nodiscard]] std::array<wkc::platform::GamepadButton, controlActionCount>
+defaultGamepadBindings() noexcept;
+struct GamepadBindings {
+    std::array<wkc::platform::GamepadButton, controlActionCount> values{defaultGamepadBindings()};
+    constexpr bool operator==(const GamepadBindings&) const noexcept = default;
+};
 [[nodiscard]] std::string_view controlActionName(ControlAction action) noexcept;
 [[nodiscard]] std::string_view bindingName(ControlBinding binding) noexcept;
 [[nodiscard]] std::optional<ControlBinding> bindingForName(std::string_view name) noexcept;
@@ -31,6 +37,12 @@ struct ControlBindings {
 // Reusing a binding swaps the two actions instead of silently breaking one.
 [[nodiscard]] bool assignControlBinding(ControlBindings& bindings, ControlAction action, ControlBinding binding) noexcept;
 [[nodiscard]] std::optional<ControlBinding> pressedControlBinding(const wkc::platform::Input& input) noexcept;
-[[nodiscard]] bool controlDown(const ControlBindings&, ControlAction, const wkc::platform::Input&) noexcept;
-[[nodiscard]] bool controlPressed(const ControlBindings&, ControlAction, const wkc::platform::Input&) noexcept;
+[[nodiscard]] std::string_view gamepadBindingName(wkc::platform::GamepadButton button) noexcept;
+[[nodiscard]] std::optional<wkc::platform::GamepadButton> gamepadBindingForName(std::string_view name) noexcept;
+[[nodiscard]] bool validGamepadBinding(wkc::platform::GamepadButton button) noexcept;
+[[nodiscard]] bool validateGamepadBindings(const GamepadBindings& bindings) noexcept;
+[[nodiscard]] bool assignGamepadBinding(GamepadBindings&, ControlAction, wkc::platform::GamepadButton) noexcept;
+[[nodiscard]] std::optional<wkc::platform::GamepadButton> pressedGamepadBinding(const wkc::platform::Input&) noexcept;
+[[nodiscard]] bool controlDown(const ControlBindings&, const GamepadBindings&, ControlAction, const wkc::platform::Input&) noexcept;
+[[nodiscard]] bool controlPressed(const ControlBindings&, const GamepadBindings&, ControlAction, const wkc::platform::Input&) noexcept;
 } // namespace gdp::gameplay

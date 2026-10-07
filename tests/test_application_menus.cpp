@@ -73,13 +73,40 @@ struct ApplicationMenuTestAccess {
         pad(GamepadButton::East);
         expect(app.menuFlow_.page == MenuPage::Root,
             "gamepad east face button returns to the previous menu");
-        choose("SETTINGS"); choose("CONTROLS"); choose("REMAP"); choose("FORWARD");
+        choose("SETTINGS"); choose("CONTROLS"); choose("KEYBOARD / MOUSE");
+        choose("REMAP"); choose("FORWARD");
         expect(app.menuFlow_.capture == gameplay::ControlAction::Forward, "binding begins capture without assigning activation Enter");
         key(Key::I);
         expect(app.runtimeSettings_.controls.values[0] == gameplay::bindingForName("I"), "captured key is persisted as Forward");
         choose("CROUCH"); key(Key::Escape);
         expect(!app.menuFlow_.capture && app.menuFlow_.page == MenuPage::Bindings, "Esc cancels capture without leaving page");
-        key(Key::Escape); key(Key::Escape); choose("AUDIO");
+        key(Key::Escape); key(Key::Escape);
+        choose("CONTROLLER");
+        expect(app.menuFlow_.page == MenuPage::GamepadControls,
+            "controller settings are separate from keyboard and mouse");
+        app.menuFlow_.selection = 0U; key(Key::Left);
+        expect(!app.runtimeSettings_.gamepadVibration, "vibration can be disabled");
+        key(Key::Right);
+        expect(app.runtimeSettings_.gamepadVibration, "vibration can be enabled again");
+        app.menuFlow_.selection = 1U; key(Key::Left);
+        expect(app.runtimeSettings_.gamepadVibrationPercent == 40U,
+            "controller vibration intensity adjusts in ten-percent steps");
+        choose("REMAP BUTTONS"); choose("FIRE");
+        pad(GamepadButton::West);
+        expect(app.runtimeSettings_.gamepadControls.values[static_cast<std::size_t>(gameplay::ControlAction::Fire)]
+                == GamepadButton::West
+            && app.runtimeSettings_.gamepadControls.values[static_cast<std::size_t>(gameplay::ControlAction::Reload)]
+                == GamepadButton::RightTrigger,
+            "controller capture swaps duplicate buttons without affecting keyboard bindings");
+        choose("JUMP"); pad(GamepadButton::Start);
+        expect(!app.menuFlow_.capture && app.menuFlow_.page == MenuPage::GamepadBindings,
+            "Options cancels gamepad capture without remapping pause");
+        choose("RESET DEFAULTS");
+        expect(app.runtimeSettings_.gamepadControls == gameplay::GamepadBindings{}
+                && app.runtimeSettings_.controls.values[0] == gameplay::bindingForName("I"),
+            "controller reset restores only controller bindings");
+        choose("FIRE"); pad(GamepadButton::West);
+        key(Key::Escape); key(Key::Escape); key(Key::Escape); choose("AUDIO");
         auto view = app.frontendMenuView();
         int width = 0, height = 0, ww = 0, wh = 0;
         (void)SDL_GetWindowSizeInPixels(app.window_, &width, &height);
@@ -135,12 +162,12 @@ struct ApplicationMenuTestAccess {
             expect(app.playerCommand_.moveForward == 0.0F, "old W binding no longer moves player");
             release();
             app.input_.handleGamepadSticks({0.75F, -0.65F}, {});
-            app.input_.handleGamepadButton(GamepadButton::RightTrigger, true);
+            app.input_.handleGamepadButton(GamepadButton::West, true);
             app.processEvents();
             expect(app.playerCommand_.moveForward > 0.0F
                     && app.playerCommand_.moveRight > 0.0F
                     && app.fireHeld_,
-                "analog stick movement and trigger fire drive live gameplay");
+                "analog movement and remapped controller fire drive live gameplay");
             key(Key::Escape); choose("SETTINGS"); key(Key::Escape);
             const auto pausedTime = app.menuBackdropSeconds_;
             release(); app.fixedUpdate(1.0 / 60.0);

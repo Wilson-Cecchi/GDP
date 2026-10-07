@@ -46,22 +46,44 @@ void menuTests() {
     expect(state.selection == 1U && view().rows[1].enabled, "leaderboard navigation skips inactive rows");
     state.page = MenuPage::Settings; state.selection = 2U;
     (void)activateMenu(state, view(), slots);
-    expect(state.page == MenuPage::Controls && view().rows[2].text == "REMAP KEYS / MOUSE", "settings are categorized");
+    expect(state.page == MenuPage::Controls && view().rows[0].text == "KEYBOARD / MOUSE"
+        && view().rows[1].text == "CONTROLLER", "settings separate input devices");
+    state.selection = 0U; (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::KeyboardControls && view().rows[2].text == "REMAP KEYS / MOUSE",
+        "keyboard controls keep existing settings");
     state.selection = 2U; (void)activateMenu(state, view(), slots);
     expect(view().rows.size() == 14U, "bindings fit two short pages rather than an overflowing list");
     state.selection = 0U; (void)activateMenu(state, view(), slots);
     expect(state.capture == ControlAction::Forward, "binding row starts input capture");
     (void)backMenu(state);
     expect(!state.capture && state.page == MenuPage::Bindings, "Esc cancels capture before leaving page");
-    (void)backMenu(state); (void)backMenu(state);
+    (void)backMenu(state); (void)backMenu(state); (void)backMenu(state);
     expect(backMenu(state) == MenuCommand::CloseSettings, "back from categories returns to settings origin");
+    state.page = MenuPage::Controls; state.selection = 1U;
+    (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::GamepadControls && view().rows[0].setting == SettingsMenuOption::GamepadVibration
+        && view().rows[1].setting == SettingsMenuOption::GamepadVibrationStrength,
+        "controller page exposes independent vibration controls");
+    state.selection = 2U; (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::GamepadBindings && view().rows.size() == 14U,
+        "controller remapping has paged action bindings");
+    state.selection = 0U; (void)activateMenu(state, view(), slots);
+    expect(state.capture == ControlAction::Forward && state.captureGamepad,
+        "controller capture targets controller bindings only");
 }
 void bindingsTests() {
     using namespace gdp::gameplay;
     using wkc::platform::Key;
     using wkc::platform::GamepadButton;
     ControlBindings bindings;
+    GamepadBindings gamepad;
     expect(validateControlBindings(bindings), "default bindings are valid and unique");
+    expect(validateGamepadBindings(gamepad), "default gamepad bindings are valid and unique");
+    for (auto button : gamepad.values)
+        expect(gamepadBindingForName(gamepadBindingName(button)) == button,
+            "gamepad binding names round trip");
+    expect(!gamepadBindingForName("MENU / OPTIONS") && !validGamepadBinding(GamepadButton::Start),
+        "pause button remains reserved while remapping");
     for (auto binding : bindings.values) expect(bindingForName(bindingName(binding)) == binding, "binding names round trip");
     expect(!bindingForName("ESC") && !bindingForName("F3") && !bindingForName("NOT A KEY"), "reserved and unknown bindings rejected");
     auto oldForward = bindings.values[0];
@@ -70,26 +92,38 @@ void bindingsTests() {
     expect(assignControlBinding(bindings, ControlAction::Crouch, {BindingKind::Key, static_cast<std::uint8_t>(Key::C)}), "C is supported as an optional custom key");
     wkc::platform::Input input;
     input.handleKey(Key::C, true);
-    expect(controlDown(bindings, ControlAction::Crouch, input) && controlPressed(bindings, ControlAction::Crouch, input), "remapped key controls gameplay");
-    expect(!controlDown(bindings, ControlAction::Forward, input), "unrelated key does not activate another action");
+    expect(controlDown(bindings, gamepad, ControlAction::Crouch, input) && controlPressed(bindings, gamepad, ControlAction::Crouch, input), "remapped key controls gameplay");
+    expect(!controlDown(bindings, gamepad, ControlAction::Forward, input), "unrelated key does not activate another action");
     input.beginFrame(); input.handleMouseWheel(-1.0F);
-    expect(controlPressed(bindings, ControlAction::PreviousWeapon, input), "scroll bindings keep weapon cycling");
+    expect(controlPressed(bindings, gamepad, ControlAction::PreviousWeapon, input), "scroll bindings keep weapon cycling");
     input.beginFrame(); input.handleKey(Key::RightShift, true);
-    expect(controlDown(bindings, ControlAction::QuietWalk, input), "right Shift remains an alias");
+    expect(controlDown(bindings, gamepad, ControlAction::QuietWalk, input), "right Shift remains an alias");
     input.beginFrame();
     input.handleGamepadButton(GamepadButton::RightTrigger, true);
     input.handleGamepadButton(GamepadButton::LeftTrigger, true);
     input.handleGamepadButton(GamepadButton::South, true);
-    expect(controlDown(bindings, ControlAction::Fire, input)
-            && controlPressed(bindings, ControlAction::Fire, input)
-            && controlDown(bindings, ControlAction::Aim, input)
-            && controlPressed(bindings, ControlAction::Jump, input),
+    expect(controlDown(bindings, gamepad, ControlAction::Fire, input)
+            && controlPressed(bindings, gamepad, ControlAction::Fire, input)
+            && controlDown(bindings, gamepad, ControlAction::Aim, input)
+            && controlPressed(bindings, gamepad, ControlAction::Jump, input),
         "gamepad triggers and face buttons work alongside keyboard bindings");
     input.beginFrame();
     input.handleGamepadButton(GamepadButton::RightTrigger, true);
-    expect(controlDown(bindings, ControlAction::Fire, input)
-            && !controlPressed(bindings, ControlAction::Fire, input),
+    expect(controlDown(bindings, gamepad, ControlAction::Fire, input)
+            && !controlPressed(bindings, gamepad, ControlAction::Fire, input),
         "held gamepad trigger fires without repeated press events");
+    expect(assignGamepadBinding(gamepad, ControlAction::Fire, GamepadButton::West)
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Reload)] == GamepadButton::RightTrigger,
+        "duplicate gamepad button swaps Fire and Reload");
+    input.beginFrame(); input.handleGamepadButton(GamepadButton::West, true);
+    expect(controlPressed(bindings, gamepad, ControlAction::Fire, input)
+            && !controlPressed(bindings, gamepad, ControlAction::Reload, input),
+        "remapped gamepad button drives only its new action");
+    expect(assignGamepadBinding(gamepad, ControlAction::LastWeapon, GamepadButton::Back)
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Information)] == GamepadButton::Count,
+        "assigning an unbound action releases the old owner");
+    expect(assignGamepadBinding(gamepad, ControlAction::LastWeapon, GamepadButton::Count)
+            && validateGamepadBindings(gamepad), "gamepad action can be explicitly unbound");
 }
 void layoutTests() {
     using namespace gdp::game;
@@ -240,7 +274,7 @@ void persistenceTests(const std::filesystem::path& directory) {
         "v6 settings retain graphics and sensitivity while receiving default bindings");
     {
         std::ofstream file(directory / "invalid_bindings.toml");
-        file << "version = 8\nbinding_0 = S\nbinding_1 = S\n";
+        file << "version = 9\nbinding_0 = S\nbinding_1 = S\n";
     }
     const auto invalid = loadRuntimeSettings(directory / "invalid_bindings.toml");
     expect(invalid.status == SettingsLoadStatus::LoadedWithRecovery && invalid.settings.controls == ControlBindings{},

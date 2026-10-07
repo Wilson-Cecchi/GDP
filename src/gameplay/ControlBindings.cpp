@@ -42,28 +42,11 @@ bool read(const ControlBinding b, const wkc::platform::Input& input, const bool 
         || (key == Key::LeftControl && check(Key::RightControl))
         || (key == Key::LeftAlt && check(Key::RightAlt));
 }
-// The gamepad preset is additive: keyboard/mouse rebinding and its save format
-// remain unchanged, and a controller never steals a user's custom binding.
-std::optional<GamepadButton> gamepadButtonFor(const ControlAction action) noexcept {
-    switch (action) {
-    case ControlAction::QuietWalk: return GamepadButton::LeftStick;
-    case ControlAction::Crouch: return GamepadButton::East;
-    case ControlAction::Jump: return GamepadButton::South;
-    case ControlAction::Fire: return GamepadButton::RightTrigger;
-    case ControlAction::Aim: return GamepadButton::LeftTrigger;
-    case ControlAction::Reload: return GamepadButton::West;
-    case ControlAction::Interact: return GamepadButton::North;
-    case ControlAction::Flashlight: return GamepadButton::RightStick;
-    case ControlAction::Drop: return GamepadButton::DpadLeft;
-    case ControlAction::Primary: return GamepadButton::DpadUp;
-    case ControlAction::Secondary: return GamepadButton::DpadRight;
-    case ControlAction::Melee: return GamepadButton::DpadDown;
-    case ControlAction::Information: return GamepadButton::Back;
-    case ControlAction::NextWeapon: return GamepadButton::RightShoulder;
-    case ControlAction::PreviousWeapon: return GamepadButton::LeftShoulder;
-    default: return std::nullopt;
-    }
-}
+constexpr std::array<std::string_view, 16> gamepadNames{
+    "A / CROSS", "B / CIRCLE", "X / SQUARE", "Y / TRIANGLE", "VIEW / CREATE",
+    "MENU / OPTIONS", "L3", "R3", "LB / L1", "RB / R1", "DPAD UP",
+    "DPAD DOWN", "DPAD LEFT", "DPAD RIGHT", "LT / L2", "RT / R2",
+};
 }
 std::array<ControlBinding, controlActionCount> defaultControlBindings() noexcept {
     auto key = [](Key k) { return ControlBinding{BindingKind::Key, static_cast<std::uint8_t>(k)}; };
@@ -71,6 +54,14 @@ std::array<ControlBinding, controlActionCount> defaultControlBindings() noexcept
         key(Key::Space), {BindingKind::Mouse, 0U}, {BindingKind::Mouse, 2U}, key(Key::R), key(Key::E),
         key(Key::F), key(Key::G), key(Key::Digit1), key(Key::Digit2), key(Key::Digit3), key(Key::Digit4),
         key(Key::Digit5), key(Key::Q), key(Key::Tab), {BindingKind::WheelUp, 0U}, {BindingKind::WheelDown, 0U}};
+}
+std::array<GamepadButton, controlActionCount> defaultGamepadBindings() noexcept {
+    using B = GamepadButton;
+    return {B::Count, B::Count, B::Count, B::Count, B::LeftStick,
+        B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
+        B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
+        B::DpadDown, B::Count, B::Count, B::Count, B::Back,
+        B::RightShoulder, B::LeftShoulder};
 }
 std::string_view controlActionName(ControlAction action) noexcept {
     const auto i = static_cast<std::size_t>(action); return i < actionNames.size() ? actionNames[i] : "UNKNOWN";
@@ -124,18 +115,63 @@ std::optional<ControlBinding> pressedControlBinding(const wkc::platform::Input& 
     if (input.mouseWheelDelta() < 0.0F) return ControlBinding{BindingKind::WheelDown, 0U};
     return std::nullopt;
 }
-bool controlDown(const ControlBindings& b, ControlAction a, const wkc::platform::Input& i) noexcept {
-    const auto n = static_cast<std::size_t>(a);
-    if (n >= controlActionCount) return false;
-    const auto pad = gamepadButtonFor(a);
-    return read(b.values[n], i, false)
-        || (pad && i.isGamepadButtonDown(*pad));
+std::string_view gamepadBindingName(const GamepadButton button) noexcept {
+    const auto index = static_cast<std::size_t>(button);
+    return index < gamepadNames.size() ? gamepadNames[index] : "UNBOUND";
 }
-bool controlPressed(const ControlBindings& b, ControlAction a, const wkc::platform::Input& i) noexcept {
+std::optional<GamepadButton> gamepadBindingForName(const std::string_view name) noexcept {
+    if (name == "UNBOUND") return GamepadButton::Count;
+    for (std::size_t index = 0; index < gamepadNames.size(); ++index)
+        if (name == gamepadNames[index] && index != static_cast<std::size_t>(GamepadButton::Start))
+            return static_cast<GamepadButton>(index);
+    return std::nullopt;
+}
+bool validGamepadBinding(const GamepadButton button) noexcept {
+    return button == GamepadButton::Count
+        || (static_cast<std::size_t>(button) < gamepadNames.size()
+            && button != GamepadButton::Start);
+}
+bool validateGamepadBindings(const GamepadBindings& bindings) noexcept {
+    for (std::size_t i = 0; i < bindings.values.size(); ++i) {
+        const auto button = bindings.values[i];
+        if (!validGamepadBinding(button)) return false;
+        if (button == GamepadButton::Count) continue;
+        for (std::size_t j = 0; j < i; ++j)
+            if (bindings.values[j] == button) return false;
+    }
+    return true;
+}
+bool assignGamepadBinding(GamepadBindings& bindings, const ControlAction action,
+    const GamepadButton button) noexcept {
+    const auto index = static_cast<std::size_t>(action);
+    if (index >= controlActionCount || !validGamepadBinding(button)
+        || !validateGamepadBindings(bindings) || bindings.values[index] == button) return false;
+    if (button != GamepadButton::Count) {
+        for (std::size_t other = 0; other < controlActionCount; ++other)
+            if (bindings.values[other] == button) bindings.values[other] = bindings.values[index];
+    }
+    bindings.values[index] = button;
+    return true;
+}
+std::optional<GamepadButton> pressedGamepadBinding(const wkc::platform::Input& input) noexcept {
+    for (std::size_t index = 0; index < gamepadNames.size(); ++index) {
+        const auto button = static_cast<GamepadButton>(index);
+        if (validGamepadBinding(button) && input.wasGamepadButtonPressed(button)) return button;
+    }
+    return std::nullopt;
+}
+bool controlDown(const ControlBindings& b, const GamepadBindings& pad, ControlAction a, const wkc::platform::Input& i) noexcept {
     const auto n = static_cast<std::size_t>(a);
     if (n >= controlActionCount) return false;
-    const auto pad = gamepadButtonFor(a);
+    const auto button = pad.values[n];
+    return read(b.values[n], i, false)
+        || (button != GamepadButton::Count && i.isGamepadButtonDown(button));
+}
+bool controlPressed(const ControlBindings& b, const GamepadBindings& pad, ControlAction a, const wkc::platform::Input& i) noexcept {
+    const auto n = static_cast<std::size_t>(a);
+    if (n >= controlActionCount) return false;
+    const auto button = pad.values[n];
     return read(b.values[n], i, true)
-        || (pad && i.wasGamepadButtonPressed(*pad));
+        || (button != GamepadButton::Count && i.wasGamepadButtonPressed(button));
 }
 }

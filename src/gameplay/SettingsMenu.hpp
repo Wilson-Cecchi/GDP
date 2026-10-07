@@ -29,6 +29,10 @@ enum class SettingsMenuOption : std::uint8_t {
     Language,
     Back,
     Count,
+    // Frontend-only controller rows follow Count so the legacy HUD enum keeps
+    // its established numeric mapping through Back.
+    GamepadVibration,
+    GamepadVibrationStrength,
 };
 
 enum class GraphicsQuality : std::uint8_t {
@@ -87,6 +91,9 @@ struct RuntimeSettings {
     bool verticalSync{true};
     Language language{Language::English};
     ControlBindings controls{};
+    GamepadBindings gamepadControls{};
+    bool gamepadVibration{true};
+    std::uint16_t gamepadVibrationPercent{50U};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
 };

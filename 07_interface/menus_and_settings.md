@@ -143,6 +143,13 @@ a origem ao voltar. Display conserva FOV, perfis gráficos, resolução, fullscr
 e VSync; Audio conserva Master/Effects/Ambient/UI. Controls conserva sensibilidade
 e Invert Y e adiciona duas páginas de bindings.
 
+Controls agora separa Keyboard / Mouse de Controller. O primeiro conserva
+sensibilidade, inversão de Y e as duas páginas de teclas; o segundo oferece
+duas páginas de botões remapeáveis com troca ao reutilizar um botão, reset
+independente, toggle de vibração e intensidade de 0% a 100%. Options permanece
+reservado para pausa/cancelamento da captura; os analógicos de movimento/visão
+permanecem fixos. As duas famílias de bindings são persistidas separadamente.
+
 Teclado, cinco botões do mouse e os dois sentidos do scroll são aceitos.
 Uma tecla já usada troca as duas ações, evitando bindings duplicados ou ações
 sem comando. Shift/Ctrl/Alt direitos são aliases dos esquerdos. Esc cancela
@@ -166,7 +173,7 @@ A aprovação de ergonomia e balanceamento continua sendo feita em gameplay.
 Em `SETTINGS → LANGUAGE` / `CONFIGURAÇÕES → IDIOMA`, A/D, setas laterais ou
 as setas clicáveis `<` / `>` alternam os dois idiomas nos dois sentidos.
 A troca é imediata, inclusive na página aberta, e fica salva em `settings.toml`
-(schema 8). Ao reabrir o jogo, a preferência é restaurada. Instalações novas
+(schema 9; introduzida no schema 8). Ao reabrir o jogo, a preferência é restaurada. Instalações novas
 e configurações anteriores mantêm inglês até o usuário escolher PT-BR.
 
 O catálogo em `src/game/Localization.cpp` cobre menus, controles, pausa,

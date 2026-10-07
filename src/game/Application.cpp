@@ -1615,8 +1615,8 @@ void Application::processEvents()
     }
 
     using gameplay::ControlAction;
-    const auto down = [&](ControlAction action) { return gameplay::controlDown(runtimeSettings_.controls, action, input_); };
-    const auto pressed = [&](ControlAction action) { return gameplay::controlPressed(runtimeSettings_.controls, action, input_); };
+    const auto down = [&](ControlAction action) { return gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, action, input_); };
+    const auto pressed = [&](ControlAction action) { return gameplay::controlPressed(runtimeSettings_.controls, runtimeSettings_.gamepadControls, action, input_); };
     const Vec2 gamepadMove = input_.gamepadMove();
     playerCommand_.moveForward = std::clamp(
         (down(ControlAction::Forward) ? 1.0F : 0.0F)
@@ -2133,7 +2133,7 @@ void Application::fixedUpdate(const double fixedStep)
     gameplay::updateFeedback(feedback_, step);
     const bool aimRequested = player_.state().alive
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
-        && gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Aim, input_);
+        && gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, gameplay::ControlAction::Aim, input_);
     const bool scopeBlocked = weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper
         && (weapon_.reloading() || weapon_.switching() || weaponEquipRemaining_ > 0.0F);
     aimBlend_ = gameplay::advanceWeaponAimBlend(aimBlend_, step,
@@ -2557,6 +2557,12 @@ void Application::fixedUpdate(const double fixedStep)
             if (signal.kind != gameplay::CombatSignalKind::WeaponFired) {
                 continue;
             }
+            if (config_.enableGamepad && runtimeSettings_.gamepadVibration
+                && runtimeSettings_.gamepadVibrationPercent > 0U) {
+                const float strength = static_cast<float>(runtimeSettings_.gamepadVibrationPercent) / 100.0F;
+                (void)gamepad_.rumble((meleeAttack ? 0.12F : 0.28F) * strength,
+                    (meleeAttack ? 0.18F : 0.36F) * strength, meleeAttack ? 70U : 100U);
+            }
             if (meleeAttack) {
                 weaponMeleeRemaining_ = weaponMeleeDuration;
             } else {
@@ -2785,6 +2791,11 @@ void Application::fixedUpdate(const double fixedStep)
     }
     if (attacksLanded > 0U) {
         gameplay::signalPlayerDamage(feedback_);
+        if (config_.enableGamepad && runtimeSettings_.gamepadVibration
+            && runtimeSettings_.gamepadVibrationPercent > 0U) {
+            const float strength = static_cast<float>(runtimeSettings_.gamepadVibrationPercent) / 100.0F;
+            (void)gamepad_.rumble(0.8F * strength, 0.45F * strength, 220U);
+        }
     }
     if (playerWasAlive && !player_.state().alive) {
         log(LogLevel::Info, "Player died");
@@ -3670,7 +3681,7 @@ void Application::render()
     hud.interactBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Interact)]);
     hud.reloadBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Reload)]);
     hud.flashlightBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Flashlight)]);
-    hud.infoOverlay = gameplay::controlDown(runtimeSettings_.controls, gameplay::ControlAction::Information, input_);
+    hud.infoOverlay = gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, gameplay::ControlAction::Information, input_);
     if (world_) {
         HudMapTarget mapTarget;
         if (session_.state().mode == gameplay::RunMode::Campaign

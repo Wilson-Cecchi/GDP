@@ -22,6 +22,12 @@
   Schemas 1–7 migram mantendo inglês, demais preferências e remapeamentos
   compatíveis. Idioma inválido recupera inglês; schema futuro não é reinterpretado.
   Trocar idioma não modifica checkpoints, placar, regras de gameplay ou cérebros.
+- Settings schema 9 adiciona `gamepad_binding_0` a `gamepad_binding_21`,
+  `gamepad_vibration` e `gamepad_vibration_strength` (0–100). Schemas 1–8
+  migram preservando os bindings de teclado/mouse e recebem o preset de controle
+  (vibração ligada em 50%). Botões duplicados ou inválidos recuperam somente
+  o preset de controle; `MENU / OPTIONS` não pode ser remapeado. Desligar a
+  vibração ou ajustar 0% interrompe o efeito imediatamente.
 - `speedrun_leaderboard.txt` tem cabeçalho `GDP_SPEEDRUN_BOARD 1 N` e no máximo
   10 registros de regras, ticks e seed, ordenados por ticks/seed. Somente
   vitórias Hard entram. A regra de Speedrun 38 não reaproveita tempos das regras

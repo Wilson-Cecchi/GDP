@@ -5,7 +5,7 @@
 
 namespace gdp::game {
 namespace {
-void open(MenuFlowState& s, MenuPage p) { s.page = p; s.selection = 0U; s.capture.reset(); s.notice.clear(); }
+void open(MenuFlowState& s, MenuPage p) { s.page = p; s.selection = 0U; s.capture.reset(); s.captureGamepad = false; s.notice.clear(); }
 }
 MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo, 3>& slots,
     const std::vector<gameplay::SpeedrunRecord>& board, const gameplay::RuntimeSettings& settings, const bool testMode)
@@ -77,21 +77,39 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         setting("AMBIENT", SettingsMenuOption::AmbientVolume, std::to_string(settings.ambientVolumePercent) + "%");
         setting("UI", SettingsMenuOption::UiVolume, std::to_string(settings.uiVolumePercent) + "%"); row("BACK"); break;
     case MenuPage::Controls:
-        view.title = "CONTROLS"; view.subtitle = "ESC / F3 RESERVED - MENU KEYS STAY FIXED";
+        view.title = "CONTROLS"; view.subtitle = "CHOOSE INPUT DEVICE";
+        row("KEYBOARD / MOUSE"); row("CONTROLLER"); row("BACK"); break;
+    case MenuPage::KeyboardControls:
+        view.title = "KEYBOARD / MOUSE"; view.subtitle = "ESC / F3 RESERVED - MENU KEYS STAY FIXED";
         setting("SENSITIVITY", SettingsMenuOption::MouseSensitivity, std::to_string(settings.mouseSensitivityPercent) + "%");
         setting("INVERT MOUSE Y", SettingsMenuOption::InvertMouseY, settings.invertMouseY ? "ON" : "OFF");
         row("REMAP KEYS / MOUSE"); row("BACK"); break;
+    case MenuPage::GamepadControls:
+        view.title = "CONTROLLER"; view.subtitle = "MENU BUTTONS STAY FIXED";
+        setting("VIBRATION", SettingsMenuOption::GamepadVibration, settings.gamepadVibration ? "ON" : "OFF");
+        setting("VIBRATION STRENGTH", SettingsMenuOption::GamepadVibrationStrength,
+            std::to_string(settings.gamepadVibrationPercent) + "%");
+        row("REMAP BUTTONS"); row("BACK"); break;
     case MenuPage::Bindings:
-    case MenuPage::MoreBindings: {
-        view.title = s.page == MenuPage::Bindings ? "KEY BINDINGS 1/2" : "KEY BINDINGS 2/2";
-        view.subtitle = s.capture ? "KEY / MOUSE / WHEEL - ESC CANCEL" : "SELECT TO REMAP - DUPLICATES SWAP";
-        const std::size_t first = s.page == MenuPage::Bindings ? 0U : 11U;
+    case MenuPage::MoreBindings:
+    case MenuPage::GamepadBindings:
+    case MenuPage::MoreGamepadBindings: {
+        const bool gamepad = s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings;
+        const bool firstPage = s.page == MenuPage::Bindings || s.page == MenuPage::GamepadBindings;
+        view.title = gamepad ? (firstPage ? "PAD BINDINGS 1/2" : "PAD BINDINGS 2/2")
+            : (firstPage ? "KEY BINDINGS 1/2" : "KEY BINDINGS 2/2");
+        view.subtitle = s.capture
+            ? (gamepad ? "PRESS BUTTON - OPTIONS / ESC CANCEL" : "KEY / MOUSE / WHEEL - ESC CANCEL")
+            : (gamepad ? "STICKS STAY FIXED - DUPLICATES SWAP" : "SELECT TO REMAP - DUPLICATES SWAP");
+        const std::size_t first = firstPage ? 0U : 11U;
         for (std::size_t i = first; i < first + 11U; ++i) {
             auto action = static_cast<gameplay::ControlAction>(i);
-            const std::string value = s.capture == action ? "..." : std::string{gameplay::bindingName(settings.controls.values[i])};
+            const std::string value = s.capture == action ? "..." : std::string{gamepad
+                ? gameplay::gamepadBindingName(settings.gamepadControls.values[i])
+                : gameplay::bindingName(settings.controls.values[i])};
             view.rows.push_back({std::string{gameplay::controlActionName(action)} + "  [" + value + "]", true, {}, action, {}, {}});
         }
-        row(s.page == MenuPage::Bindings ? "NEXT PAGE" : "PREVIOUS PAGE"); row("RESET DEFAULTS"); row("BACK"); break;
+        row(firstPage ? "NEXT PAGE" : "PREVIOUS PAGE"); row("RESET DEFAULTS"); row("BACK"); break;
     }
     }
     if (!s.notice.empty()) view.subtitle = s.notice;
@@ -120,7 +138,9 @@ MenuCommand backMenu(MenuFlowState& s) noexcept
     case MenuPage::Leaderboard: open(s, MenuPage::Speedrun); break;
     case MenuPage::Settings: open(s, MenuPage::Root); return MenuCommand::CloseSettings;
     case MenuPage::Display: case MenuPage::Audio: case MenuPage::Controls: open(s, MenuPage::Settings); break;
-    case MenuPage::Bindings: case MenuPage::MoreBindings: open(s, MenuPage::Controls); break;
+    case MenuPage::KeyboardControls: case MenuPage::GamepadControls: open(s, MenuPage::Controls); break;
+    case MenuPage::Bindings: case MenuPage::MoreBindings: open(s, MenuPage::KeyboardControls); break;
+    case MenuPage::GamepadBindings: case MenuPage::MoreGamepadBindings: open(s, MenuPage::GamepadControls); break;
     }
     return MenuCommand::None;
 }
@@ -129,7 +149,11 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     if (s.selection >= view.rows.size() || !view.rows[s.selection].enabled || s.capture) return MenuCommand::None;
     const auto selected = s.selection;
     const auto& row = view.rows[selected];
-    if (row.binding) { s.capture = row.binding; return MenuCommand::None; }
+    if (row.binding) {
+        s.capture = row.binding;
+        s.captureGamepad = s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings;
+        return MenuCommand::None;
+    }
     if (row.setting) return MenuCommand::None;
     if (s.page == MenuPage::Root) {
         if (row.destination) open(s, *row.destination);
@@ -146,10 +170,17 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     else if (s.page == MenuPage::Speedrun && selected == 1U) { open(s, MenuPage::Leaderboard); }
     else if (s.page == MenuPage::Speedrun && selected == 2U) return MenuCommand::BestSeed;
     else if (s.page == MenuPage::Settings && selected < 3U) open(s, selected == 0U ? MenuPage::Display : selected == 1U ? MenuPage::Audio : MenuPage::Controls);
-    else if (s.page == MenuPage::Controls && selected == 2U) open(s, MenuPage::Bindings);
+    else if (s.page == MenuPage::Controls && selected < 2U)
+        open(s, selected == 0U ? MenuPage::KeyboardControls : MenuPage::GamepadControls);
+    else if (s.page == MenuPage::KeyboardControls && selected == 2U) open(s, MenuPage::Bindings);
+    else if (s.page == MenuPage::GamepadControls && selected == 2U) open(s, MenuPage::GamepadBindings);
     else if ((s.page == MenuPage::Bindings || s.page == MenuPage::MoreBindings) && selected == 11U)
         open(s, s.page == MenuPage::Bindings ? MenuPage::MoreBindings : MenuPage::Bindings);
-    else if ((s.page == MenuPage::Bindings || s.page == MenuPage::MoreBindings) && selected == 12U) return MenuCommand::None;
+    else if ((s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings) && selected == 11U)
+        open(s, s.page == MenuPage::GamepadBindings ? MenuPage::MoreGamepadBindings : MenuPage::GamepadBindings);
+    else if ((s.page == MenuPage::Bindings || s.page == MenuPage::MoreBindings
+        || s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings)
+        && selected == 12U) return MenuCommand::None;
     else return backMenu(s);
     return MenuCommand::None;
 }

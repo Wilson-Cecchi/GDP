@@ -154,11 +154,27 @@ void testRuntimeSettingsClamps()
     expect(std::abs(normalizedVolume(250U) - 1.0F) < 0.0001F,
         "volume normalization clamps invalid percentages");
 
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibration, -1)
+            && !settings.gamepadVibration,
+        "controller vibration toggle can be disabled");
+    for (int index = 0; index < 20; ++index)
+        (void)adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, -1);
+    expect(settings.gamepadVibrationPercent == 0U
+            && !adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, -1),
+        "controller vibration strength clamps at zero");
+    for (int index = 0; index < 20; ++index)
+        (void)adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, 1);
+    expect(settings.gamepadVibrationPercent == 100U
+            && !adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, 1),
+        "controller vibration strength clamps at one hundred percent");
+
     settings.windowResolution = static_cast<WindowResolution>(99U);
     settings.graphicsQuality = static_cast<GraphicsQuality>(99U);
+    settings.gamepadVibrationPercent = 200U;
     const RuntimeSettings sanitized = sanitizeRuntimeSettings(settings);
     expect(sanitized.windowResolution == WindowResolution::R1280x720
-            && sanitized.graphicsQuality == GraphicsQuality::Medium,
+            && sanitized.graphicsQuality == GraphicsQuality::Medium
+            && sanitized.gamepadVibrationPercent == 100U,
         "invalid video enums recover to their default presets");
 }
 

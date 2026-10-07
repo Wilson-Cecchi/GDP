@@ -21,10 +21,24 @@ void Application::processFrontendMenu()
     };
     if (menuFlow_.capture) {
         if (input_.wasKeyPressed(Key::Escape)
-            || input_.wasGamepadButtonPressed(GamepadButton::East)) {
-            menuFlow_.capture.reset(); play(gdp::audio::AudioEventKind::UiBack);
+            || input_.wasGamepadButtonPressed(
+                menuFlow_.captureGamepad ? GamepadButton::Start : GamepadButton::East)) {
+            menuFlow_.capture.reset(); menuFlow_.captureGamepad = false;
+            play(gdp::audio::AudioEventKind::UiBack);
         }
-        else if (auto binding = gameplay::pressedControlBinding(input_)) {
+        else if (menuFlow_.captureGamepad) {
+            const auto button = input_.wasKeyPressed(Key::Delete)
+                ? std::optional{GamepadButton::Count}
+                : gameplay::pressedGamepadBinding(input_);
+            if (button) {
+                if (gameplay::assignGamepadBinding(runtimeSettings_.gamepadControls,
+                    *menuFlow_.capture, *button)) {
+                    settingsDirty_ = true; (void)savePersistedSettings();
+                }
+                menuFlow_.capture.reset(); menuFlow_.captureGamepad = false;
+                play(gdp::audio::AudioEventKind::UiConfirm);
+            }
+        } else if (auto binding = gameplay::pressedControlBinding(input_)) {
             if (gameplay::assignControlBinding(runtimeSettings_.controls, *menuFlow_.capture, *binding)) {
                 settingsDirty_ = true; (void)savePersistedSettings();
             }
@@ -77,6 +91,10 @@ void Application::processFrontendMenu()
     if (row.setting && (left != right || mouseDirection)) {
         const int direction = mouseDirection.value_or(left ? -1 : 1);
         if (gameplay::adjustRuntimeSetting(runtimeSettings_, *row.setting, direction)) {
+            if ((!runtimeSettings_.gamepadVibration || runtimeSettings_.gamepadVibrationPercent == 0U)
+                && (*row.setting == gameplay::SettingsMenuOption::GamepadVibration
+                    || *row.setting == gameplay::SettingsMenuOption::GamepadVibrationStrength))
+                gamepad_.stopRumble();
             settingsDirty_ = true; applyRuntimeSettings();
             (void)savePersistedSettings(); play(gdp::audio::AudioEventKind::UiNavigate);
         }
@@ -88,8 +106,13 @@ void Application::processFrontendMenu()
     } else if ((input_.wasKeyPressed(Key::Enter)
         || input_.wasGamepadButtonPressed(GamepadButton::South) || click)
         && !row.setting) {
-        if ((menuFlow_.page == MenuPage::Bindings || menuFlow_.page == MenuPage::MoreBindings) && menuFlow_.selection == 12U) {
-            runtimeSettings_.controls = {}; settingsDirty_ = true; (void)savePersistedSettings();
+        if ((menuFlow_.page == MenuPage::Bindings || menuFlow_.page == MenuPage::MoreBindings
+            || menuFlow_.page == MenuPage::GamepadBindings || menuFlow_.page == MenuPage::MoreGamepadBindings)
+            && menuFlow_.selection == 12U) {
+            if (menuFlow_.page == MenuPage::GamepadBindings || menuFlow_.page == MenuPage::MoreGamepadBindings)
+                runtimeSettings_.gamepadControls = {};
+            else runtimeSettings_.controls = {};
+            settingsDirty_ = true; (void)savePersistedSettings();
             menuFlow_.notice = "DEFAULT BINDINGS RESTORED";
         } else command = activateMenu(menuFlow_, view, campaignSlots_);
         play(gdp::audio::AudioEventKind::UiConfirm);

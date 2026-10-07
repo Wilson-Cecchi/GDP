@@ -11,7 +11,8 @@
 namespace gdp::game {
 enum class MenuPage : std::uint8_t {
     Root, CampaignSlots, CampaignSlot, Difficulty, Overwrite, Speedrun, Leaderboard,
-    Settings, Display, Audio, Controls, Bindings, MoreBindings,
+    Settings, Display, Audio, Controls, KeyboardControls, GamepadControls,
+    Bindings, MoreBindings, GamepadBindings, MoreGamepadBindings,
 };
 enum class MenuCommand : std::uint8_t {
     None, TestMode, ContinueCampaign, NewCampaign, StartSpeedrun, BestSeed,
@@ -27,6 +28,7 @@ struct MenuFlowState {
     std::size_t slot{0U};
     gameplay::Difficulty difficulty{gameplay::Difficulty::Normal};
     std::optional<gameplay::ControlAction> capture;
+    bool captureGamepad{false};
     std::string notice;
 };
 struct MenuRow {

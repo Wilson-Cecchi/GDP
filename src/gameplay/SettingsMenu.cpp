@@ -138,6 +138,13 @@ bool adjustRuntimeSetting(
             ? Language::PortugueseBrazil : Language::English;
         return settings.language != previous;
     }
+    case SettingsMenuOption::GamepadVibration: {
+        const bool previous = settings.gamepadVibration;
+        settings.gamepadVibration = direction > 0;
+        return settings.gamepadVibration != previous;
+    }
+    case SettingsMenuOption::GamepadVibrationStrength:
+        return adjustPercent(settings.gamepadVibrationPercent, direction, 0U, 100U, 10U);
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
         return false;
@@ -262,6 +269,8 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     }
     if (settings.language >= Language::Count) settings.language = Language::English;
     if (!validateControlBindings(settings.controls)) settings.controls = {};
+    if (!validateGamepadBindings(settings.gamepadControls)) settings.gamepadControls = {};
+    settings.gamepadVibrationPercent = std::min<std::uint16_t>(settings.gamepadVibrationPercent, 100U);
     return settings;
 }
 

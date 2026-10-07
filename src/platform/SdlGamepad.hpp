@@ -23,6 +23,8 @@ public:
     void close(Input& input) noexcept;
     [[nodiscard]] bool connected() const noexcept;
     [[nodiscard]] const char* name() const noexcept;
+    [[nodiscard]] bool rumble(float low, float high, std::uint32_t durationMs) noexcept;
+    void stopRumble() noexcept;
 
 private:
     SDL_Gamepad* device_{nullptr};

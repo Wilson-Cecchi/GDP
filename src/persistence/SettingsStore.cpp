@@ -90,9 +90,13 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << (settings.fullscreen ? "true" : "false") << '\n'
            << "vertical_sync = "
            << (settings.verticalSync ? "true" : "false") << '\n'
-           << "language = " << gameplay::languageName(settings.language) << '\n';
+           << "language = " << gameplay::languageName(settings.language) << '\n'
+           << "gamepad_vibration = " << (settings.gamepadVibration ? "true" : "false") << '\n'
+           << "gamepad_vibration_strength = " << settings.gamepadVibrationPercent << '\n';
     for (std::size_t i = 0U; i < gameplay::controlActionCount; ++i) {
         output << "binding_" << i << " = " << gameplay::bindingName(settings.controls.values[i]) << '\n';
+        output << "gamepad_binding_" << i << " = "
+               << gameplay::gamepadBindingName(settings.gamepadControls.values[i]) << '\n';
     }
     return output.str();
 }
@@ -149,6 +153,20 @@ SettingsLoadResult loadRuntimeSettings(
                 } else {
                     recovered = true;
                 }
+            } else if (key.starts_with("gamepad_binding_")) {
+                const auto index = parseUnsigned(key.substr(16U));
+                const auto binding = gameplay::gamepadBindingForName(value);
+                if (index && *index < gameplay::controlActionCount && binding) {
+                    result.settings.gamepadControls.values[static_cast<std::size_t>(*index)] = *binding;
+                } else {
+                    recovered = true;
+                }
+            } else if (key == "gamepad_vibration") {
+                if (const auto enabled = parseBoolean(value)) result.settings.gamepadVibration = *enabled;
+                else recovered = true;
+            } else if (key == "gamepad_vibration_strength") {
+                recovered = !assignClamped(result.settings.gamepadVibrationPercent, value, 0U, 100U)
+                    || recovered;
             } else if (key == "master_volume") {
                 recovered = !assignClamped(
                     result.settings.masterVolumePercent, value, 0U, 100U)
@@ -228,6 +246,10 @@ SettingsLoadResult loadRuntimeSettings(
         }
         if (!gameplay::validateControlBindings(result.settings.controls)) {
             result.settings.controls = {};
+            recovered = true;
+        }
+        if (!gameplay::validateGamepadBindings(result.settings.gamepadControls)) {
+            result.settings.gamepadControls = {};
             recovered = true;
         }
         constexpr std::uint64_t oldestSupportedVersion = 1U;

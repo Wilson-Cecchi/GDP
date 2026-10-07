@@ -4,6 +4,7 @@
 #include <SDL3/SDL_stdinc.h>
 
 #include <array>
+#include <algorithm>
 #include <utility>
 
 namespace wkc::platform {
@@ -111,7 +112,10 @@ void SdlGamepad::poll(Input& input) noexcept
 
 void SdlGamepad::close(Input& input) noexcept
 {
-    if (device_ != nullptr) SDL_CloseGamepad(device_);
+    if (device_ != nullptr) {
+        stopRumble();
+        SDL_CloseGamepad(device_);
+    }
     device_ = nullptr;
     input.resetGamepad();
 }
@@ -124,6 +128,21 @@ bool SdlGamepad::connected() const noexcept
 const char* SdlGamepad::name() const noexcept
 {
     return connected() ? SDL_GetGamepadName(device_) : nullptr;
+}
+
+bool SdlGamepad::rumble(const float low, const float high,
+    const std::uint32_t durationMs) noexcept
+{
+    if (!connected()) return false;
+    const auto motor = [](const float strength) -> Uint16 {
+        return static_cast<Uint16>(std::clamp(strength, 0.0F, 1.0F) * 65535.0F);
+    };
+    return SDL_RumbleGamepad(device_, motor(low), motor(high), durationMs);
+}
+
+void SdlGamepad::stopRumble() noexcept
+{
+    if (connected()) (void)SDL_RumbleGamepad(device_, 0U, 0U, 0U);
 }
 
 } // namespace wkc::platform
