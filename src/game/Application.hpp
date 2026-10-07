@@ -27,6 +27,7 @@
 #include "gameplay/Progression.hpp"
 #include "gameplay/ResultMenu.hpp"
 #include "platform/Input.hpp"
+#include "platform/SdlGamepad.hpp"
 #include "world/LightingGenerator.hpp"
 #include "world/WorldGenerator.hpp"
 
@@ -55,6 +56,7 @@ struct ApplicationConfig {
     bool headless{false};
     bool scriptedEnemies{false};
     bool testMode{false};
+    bool enableGamepad{true};
     std::optional<entities::EnemyArchetype> experimentalNeuralEnemy;
     std::optional<std::filesystem::path> neuralBrainPath;
     std::optional<std::filesystem::path> testBrainDirectory;
@@ -109,6 +111,8 @@ private:
 
     ApplicationConfig config_;
     wkc::platform::Input input_;
+    wkc::platform::SdlGamepad gamepad_;
+    bool gamepadConnected_{false};
     wkc::core::FixedStepClock clock_;
     gameplay::CollisionWorld baseCollisionWorld_;
     gameplay::CollisionWorld collisionWorld_;

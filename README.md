@@ -79,6 +79,8 @@ especializados das pastas numeradas.
   Display, Audio e Controls, incluindo sensibilidade e remapeamento de teclado,
   botões do mouse e scroll. Direção visual atual: menus e HUD Tático minimalista,
   com fonte incorporada, botões menores e recursos separados por canto.
+  Controles Xbox e PlayStation reconhecidos pelo SDL3 também navegam nos menus e
+  comandam a partida por USB ou Bluetooth; [mapeamento e teste](README_GAMEPAD.md).
   Título e seus submenus mostram uma cena 3D animada independente da partida,
   reutilizando os materiais/modelos existentes sem alterar saves ou seed.
   **Idioma:** `Settings → Language` permite alternar imediatamente entre

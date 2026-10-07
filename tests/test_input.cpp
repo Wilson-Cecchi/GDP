@@ -20,6 +20,7 @@ void testInputState()
 {
     using wkc::platform::Key;
     using wkc::platform::MouseButton;
+    using wkc::platform::GamepadButton;
 
     wkc::platform::Input input;
     input.beginFrame();
@@ -75,6 +76,29 @@ void testInputState()
     input.beginFrame();
     expect(input.mouseWheelDelta() == 0.0F,
         "beginFrame clears mouse wheel movement");
+
+    input.handleGamepadButton(GamepadButton::South, true);
+    expect(input.isGamepadButtonDown(GamepadButton::South)
+            && input.wasGamepadButtonPressed(GamepadButton::South),
+        "gamepad button press has a one-frame transition");
+    input.beginFrame();
+    input.handleGamepadButton(GamepadButton::South, true);
+    expect(input.isGamepadButtonDown(GamepadButton::South)
+            && !input.wasGamepadButtonPressed(GamepadButton::South),
+        "held gamepad button does not retrigger each frame");
+    input.handleGamepadSticks({0.05F, 0.04F}, {0.0F, 0.0F});
+    expect(input.gamepadMove() == wkc::core::Vec2{},
+        "radial deadzone ignores stick drift");
+    input.handleGamepadSticks({0.9F, 0.0F}, {0.0F, -1.0F});
+    expect(input.gamepadMove().x > 0.8F
+            && input.gamepadLook().y == -1.0F
+            && input.wasGamepadButtonPressed(GamepadButton::StickRight),
+        "analog sticks retain strength and drive menu navigation");
+    input.resetGamepad();
+    expect(!input.isGamepadButtonDown(GamepadButton::South)
+            && input.gamepadMove() == wkc::core::Vec2{}
+            && input.gamepadLook() == wkc::core::Vec2{},
+        "disconnect clears held buttons and axes");
 }
 
 } // namespace

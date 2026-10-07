@@ -1,6 +1,10 @@
 #include "platform/SdlInput.hpp"
+#include "platform/SdlGamepad.hpp"
 
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_joystick.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_scancode.h>
 
@@ -184,11 +188,93 @@ void testSdlTranslation()
         "SDL flipped mouse wheel is normalized before accumulation");
 }
 
+void testVirtualGamepad()
+{
+    using wkc::platform::GamepadButton;
+    if (!SDL_Init(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS)) {
+        expect(false, "SDL gamepad subsystem initializes without a window");
+        return;
+    }
+    SDL_VirtualJoystickDesc description;
+    SDL_INIT_INTERFACE(&description);
+    description.type = SDL_JOYSTICK_TYPE_GAMEPAD;
+    description.naxes = SDL_GAMEPAD_AXIS_COUNT;
+    description.nbuttons = SDL_GAMEPAD_BUTTON_DPAD_RIGHT + 1;
+    description.name = "GDP virtual gamepad test";
+    const SDL_JoystickID id = SDL_AttachVirtualJoystick(&description);
+    expect(id != 0 && SDL_IsGamepad(id),
+        "SDL recognizes a connected virtual gamepad");
+    if (id == 0) {
+        SDL_Quit();
+        return;
+    }
+    SDL_Joystick* const joystick = SDL_OpenJoystick(id);
+    expect(joystick != nullptr, "virtual gamepad can receive simulated input");
+    if (joystick != nullptr) {
+        wkc::platform::Input input;
+        wkc::platform::SdlGamepad gamepad;
+        gamepad.refresh(id);
+        expect(gamepad.connected(), "gamepad connected before launch is detected");
+        input.beginFrame();
+        expect(SDL_SetJoystickVirtualButton(
+                joystick, SDL_GAMEPAD_BUTTON_SOUTH, true)
+                && SDL_SetJoystickVirtualAxis(
+                    joystick, SDL_GAMEPAD_AXIS_LEFTY, -32768)
+                && SDL_SetJoystickVirtualAxis(
+                    joystick, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, 32767),
+            "virtual gamepad accepts button, stick and trigger updates");
+        SDL_PumpEvents();
+        gamepad.poll(input);
+        expect(input.wasGamepadButtonPressed(GamepadButton::South)
+                && input.wasGamepadButtonPressed(GamepadButton::RightTrigger)
+                && input.gamepadMove().y < -0.9F,
+            "SDL adapter translates gameplay controls from a virtual device");
+        input.beginFrame();
+        gamepad.poll(input);
+        expect(input.isGamepadButtonDown(GamepadButton::South)
+                && !input.wasGamepadButtonPressed(GamepadButton::South),
+            "polling preserves held gamepad state without repeat presses");
+        expect(SDL_SetJoystickVirtualButton(
+                joystick, SDL_GAMEPAD_BUTTON_SOUTH, false),
+            "virtual gamepad button can be released");
+        SDL_PumpEvents();
+        input.beginFrame();
+        gamepad.poll(input);
+        input.beginFrame();
+        SDL_Event tap{};
+        tap.type = SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+        tap.gbutton.which = id;
+        tap.gbutton.button = SDL_GAMEPAD_BUTTON_SOUTH;
+        gamepad.handleEvent(input, tap);
+        tap.type = SDL_EVENT_GAMEPAD_BUTTON_UP;
+        gamepad.handleEvent(input, tap);
+        expect(input.wasGamepadButtonPressed(GamepadButton::South)
+                && !input.isGamepadButtonDown(GamepadButton::South),
+            "a short button tap survives even when released before the next poll");
+        expect(SDL_DetachVirtualJoystick(id),
+            "virtual gamepad can be disconnected during play");
+        SDL_PumpEvents();
+        SDL_Event disconnected{};
+        disconnected.type = SDL_EVENT_GAMEPAD_REMOVED;
+        disconnected.gdevice.which = id;
+        gamepad.handleEvent(input, disconnected);
+        expect(!input.isGamepadButtonDown(GamepadButton::South)
+                && input.gamepadMove() == wkc::core::Vec2{},
+            "hot unplug clears controls so the player cannot keep moving");
+        gamepad.close(input);
+        SDL_CloseJoystick(joystick);
+    } else {
+        (void)SDL_DetachVirtualJoystick(id);
+    }
+    SDL_Quit();
+}
+
 } // namespace
 
 int main()
 {
     testSdlTranslation();
+    testVirtualGamepad();
 
     if (failures != 0) {
         std::cerr << failures << " SDL input adapter test(s) failed\n";

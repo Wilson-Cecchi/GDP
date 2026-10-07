@@ -4,6 +4,7 @@ namespace gdp::gameplay {
 namespace {
 using wkc::platform::Key;
 using wkc::platform::MouseButton;
+using wkc::platform::GamepadButton;
 constexpr std::array<std::string_view, static_cast<std::size_t>(Key::Count)> keyNames{
     "W", "A", "S", "D", "Q", "E", "F", "G", "R", "SHIFT", "RSHIFT", "CTRL", "RCTRL",
     "SPACE", "1", "2", "3", "4", "5", "TAB", "F3", "ESC", "ENTER", "UP", "DOWN", "LEFT", "RIGHT",
@@ -40,6 +41,28 @@ bool read(const ControlBinding b, const wkc::platform::Input& input, const bool 
     return check(key) || (key == Key::LeftShift && check(Key::RightShift))
         || (key == Key::LeftControl && check(Key::RightControl))
         || (key == Key::LeftAlt && check(Key::RightAlt));
+}
+// The gamepad preset is additive: keyboard/mouse rebinding and its save format
+// remain unchanged, and a controller never steals a user's custom binding.
+std::optional<GamepadButton> gamepadButtonFor(const ControlAction action) noexcept {
+    switch (action) {
+    case ControlAction::QuietWalk: return GamepadButton::LeftStick;
+    case ControlAction::Crouch: return GamepadButton::East;
+    case ControlAction::Jump: return GamepadButton::South;
+    case ControlAction::Fire: return GamepadButton::RightTrigger;
+    case ControlAction::Aim: return GamepadButton::LeftTrigger;
+    case ControlAction::Reload: return GamepadButton::West;
+    case ControlAction::Interact: return GamepadButton::North;
+    case ControlAction::Flashlight: return GamepadButton::RightStick;
+    case ControlAction::Drop: return GamepadButton::DpadLeft;
+    case ControlAction::Primary: return GamepadButton::DpadUp;
+    case ControlAction::Secondary: return GamepadButton::DpadRight;
+    case ControlAction::Melee: return GamepadButton::DpadDown;
+    case ControlAction::Information: return GamepadButton::Back;
+    case ControlAction::NextWeapon: return GamepadButton::RightShoulder;
+    case ControlAction::PreviousWeapon: return GamepadButton::LeftShoulder;
+    default: return std::nullopt;
+    }
 }
 }
 std::array<ControlBinding, controlActionCount> defaultControlBindings() noexcept {
@@ -102,9 +125,17 @@ std::optional<ControlBinding> pressedControlBinding(const wkc::platform::Input& 
     return std::nullopt;
 }
 bool controlDown(const ControlBindings& b, ControlAction a, const wkc::platform::Input& i) noexcept {
-    auto n = static_cast<std::size_t>(a); return n < controlActionCount && read(b.values[n], i, false);
+    const auto n = static_cast<std::size_t>(a);
+    if (n >= controlActionCount) return false;
+    const auto pad = gamepadButtonFor(a);
+    return read(b.values[n], i, false)
+        || (pad && i.isGamepadButtonDown(*pad));
 }
 bool controlPressed(const ControlBindings& b, ControlAction a, const wkc::platform::Input& i) noexcept {
-    auto n = static_cast<std::size_t>(a); return n < controlActionCount && read(b.values[n], i, true);
+    const auto n = static_cast<std::size_t>(a);
+    if (n >= controlActionCount) return false;
+    const auto pad = gamepadButtonFor(a);
+    return read(b.values[n], i, true)
+        || (pad && i.wasGamepadButtonPressed(*pad));
 }
 }

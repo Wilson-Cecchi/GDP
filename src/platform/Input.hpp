@@ -52,6 +52,15 @@ enum class MouseButton : std::uint8_t {
     Count,
 };
 
+enum class GamepadButton : std::uint8_t {
+    South, East, West, North, Back, Start,
+    LeftStick, RightStick, LeftShoulder, RightShoulder,
+    DpadUp, DpadDown, DpadLeft, DpadRight,
+    LeftTrigger, RightTrigger,
+    StickUp, StickDown, StickLeft, StickRight,
+    Count,
+};
+
 class Input {
 public:
     void beginFrame() noexcept;
@@ -64,6 +73,9 @@ public:
         wkc::core::Vec2 position,
         wkc::core::Vec2 delta) noexcept;
     void handleMouseWheel(float delta) noexcept;
+    void handleGamepadButton(GamepadButton button, bool down) noexcept;
+    void handleGamepadSticks(wkc::core::Vec2 move, wkc::core::Vec2 look) noexcept;
+    void resetGamepad() noexcept;
 
     [[nodiscard]] bool isKeyDown(Key key) const noexcept;
     [[nodiscard]] bool wasKeyPressed(Key key) const noexcept;
@@ -74,14 +86,21 @@ public:
     [[nodiscard]] wkc::core::Vec2 mouseDelta() const noexcept;
     [[nodiscard]] wkc::core::Vec2 mousePosition() const noexcept;
     [[nodiscard]] float mouseWheelDelta() const noexcept;
+    [[nodiscard]] bool isGamepadButtonDown(GamepadButton button) const noexcept;
+    [[nodiscard]] bool wasGamepadButtonPressed(GamepadButton button) const noexcept;
+    [[nodiscard]] wkc::core::Vec2 gamepadMove() const noexcept;
+    [[nodiscard]] wkc::core::Vec2 gamepadLook() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(Key::Count);
     static constexpr std::size_t mouseButtonCount
         = static_cast<std::size_t>(MouseButton::Count);
+    static constexpr std::size_t gamepadButtonCount
+        = static_cast<std::size_t>(GamepadButton::Count);
 
     [[nodiscard]] static bool isValidKey(Key key) noexcept;
     [[nodiscard]] static bool isValidMouseButton(MouseButton button) noexcept;
+    [[nodiscard]] static bool isValidGamepadButton(GamepadButton button) noexcept;
 
     std::array<bool, keyCount> keysDown_{};
     std::array<bool, keyCount> keysPressed_{};
@@ -89,6 +108,10 @@ private:
     std::array<bool, mouseButtonCount> mouseButtonsDown_{};
     std::array<bool, mouseButtonCount> mouseButtonsPressed_{};
     std::array<bool, mouseButtonCount> mouseButtonsReleased_{};
+    std::array<bool, gamepadButtonCount> gamepadButtonsDown_{};
+    std::array<bool, gamepadButtonCount> gamepadButtonsPressed_{};
+    wkc::core::Vec2 gamepadMove_{};
+    wkc::core::Vec2 gamepadLook_{};
     wkc::core::Vec2 mouseDelta_{};
     wkc::core::Vec2 mousePosition_{};
     float mouseWheelDelta_{0.0F};

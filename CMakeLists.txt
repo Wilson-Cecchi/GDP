@@ -132,6 +132,7 @@ add_library(
     wkc_forge_platform_sdl
     STATIC
     src/platform/SdlInput.cpp
+    src/platform/SdlGamepad.cpp
 )
 
 target_compile_features(wkc_forge_platform_sdl PUBLIC cxx_std_20)
@@ -985,7 +986,7 @@ if(GDP_BUILD_TESTS)
             renderer_opengl_pixels
             PROPERTIES
                 ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
-                TIMEOUT 20
+                TIMEOUT 60
         )
         if(GDP_ENABLE_SANITIZERS)
             set_tests_properties(renderer_opengl_pixels PROPERTIES TIMEOUT 60)

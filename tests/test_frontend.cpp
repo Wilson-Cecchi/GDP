@@ -59,6 +59,7 @@ void menuTests() {
 void bindingsTests() {
     using namespace gdp::gameplay;
     using wkc::platform::Key;
+    using wkc::platform::GamepadButton;
     ControlBindings bindings;
     expect(validateControlBindings(bindings), "default bindings are valid and unique");
     for (auto binding : bindings.values) expect(bindingForName(bindingName(binding)) == binding, "binding names round trip");
@@ -75,6 +76,20 @@ void bindingsTests() {
     expect(controlPressed(bindings, ControlAction::PreviousWeapon, input), "scroll bindings keep weapon cycling");
     input.beginFrame(); input.handleKey(Key::RightShift, true);
     expect(controlDown(bindings, ControlAction::QuietWalk, input), "right Shift remains an alias");
+    input.beginFrame();
+    input.handleGamepadButton(GamepadButton::RightTrigger, true);
+    input.handleGamepadButton(GamepadButton::LeftTrigger, true);
+    input.handleGamepadButton(GamepadButton::South, true);
+    expect(controlDown(bindings, ControlAction::Fire, input)
+            && controlPressed(bindings, ControlAction::Fire, input)
+            && controlDown(bindings, ControlAction::Aim, input)
+            && controlPressed(bindings, ControlAction::Jump, input),
+        "gamepad triggers and face buttons work alongside keyboard bindings");
+    input.beginFrame();
+    input.handleGamepadButton(GamepadButton::RightTrigger, true);
+    expect(controlDown(bindings, ControlAction::Fire, input)
+            && !controlPressed(bindings, ControlAction::Fire, input),
+        "held gamepad trigger fires without repeated press events");
 }
 void layoutTests() {
     using namespace gdp::game;

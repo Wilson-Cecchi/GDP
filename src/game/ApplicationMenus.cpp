@@ -12,6 +12,7 @@ void Application::processFrontendMenu()
 {
     using wkc::platform::Key;
     using wkc::platform::MouseButton;
+    using wkc::platform::GamepadButton;
     playerCommand_ = {}; interactionPending_ = false; jumpPending_ = false;
     firePending_ = false; fireHeld_ = false; reloadPending_ = false;
     weaponSwitchPending_.reset(); dropPending_ = false;
@@ -19,7 +20,10 @@ void Application::processFrontendMenu()
         if (audio_) audio_->playUi(kind, session_.state().currentSeed, uiAudioEventCounter_++);
     };
     if (menuFlow_.capture) {
-        if (input_.wasKeyPressed(Key::Escape)) { menuFlow_.capture.reset(); play(gdp::audio::AudioEventKind::UiBack); }
+        if (input_.wasKeyPressed(Key::Escape)
+            || input_.wasGamepadButtonPressed(GamepadButton::East)) {
+            menuFlow_.capture.reset(); play(gdp::audio::AudioEventKind::UiBack);
+        }
         else if (auto binding = gameplay::pressedControlBinding(input_)) {
             if (gameplay::assignControlBinding(runtimeSettings_.controls, *menuFlow_.capture, *binding)) {
                 settingsDirty_ = true; (void)savePersistedSettings();
@@ -52,14 +56,22 @@ void Application::processFrontendMenu()
         if (menuFlow_.selection != *pointed) play(gdp::audio::AudioEventKind::UiNavigate);
         menuFlow_.selection = *pointed;
     }
-    const bool up = input_.wasKeyPressed(Key::Up) || input_.wasKeyPressed(Key::W);
-    const bool down = input_.wasKeyPressed(Key::Down) || input_.wasKeyPressed(Key::S);
+    const bool up = input_.wasKeyPressed(Key::Up) || input_.wasKeyPressed(Key::W)
+        || input_.wasGamepadButtonPressed(GamepadButton::DpadUp)
+        || input_.wasGamepadButtonPressed(GamepadButton::StickUp);
+    const bool down = input_.wasKeyPressed(Key::Down) || input_.wasKeyPressed(Key::S)
+        || input_.wasGamepadButtonPressed(GamepadButton::DpadDown)
+        || input_.wasGamepadButtonPressed(GamepadButton::StickDown);
     if (up != down) { moveMenuSelection(menuFlow_, view, up ? -1 : 1); play(gdp::audio::AudioEventKind::UiNavigate); }
     const bool click = pointed && view.rows[*pointed].enabled && input_.wasMouseButtonPressed(MouseButton::Primary);
     if (click) menuFlow_.selection = *pointed;
     auto& row = view.rows[menuFlow_.selection];
-    const bool left = input_.wasKeyPressed(Key::Left) || input_.wasKeyPressed(Key::A);
-    const bool right = input_.wasKeyPressed(Key::Right) || input_.wasKeyPressed(Key::D);
+    const bool left = input_.wasKeyPressed(Key::Left) || input_.wasKeyPressed(Key::A)
+        || input_.wasGamepadButtonPressed(GamepadButton::DpadLeft)
+        || input_.wasGamepadButtonPressed(GamepadButton::StickLeft);
+    const bool right = input_.wasKeyPressed(Key::Right) || input_.wasKeyPressed(Key::D)
+        || input_.wasGamepadButtonPressed(GamepadButton::DpadRight)
+        || input_.wasGamepadButtonPressed(GamepadButton::StickRight);
     const auto mouseDirection = click ? visual::listMenuAdjustmentDirectionAt(dw, dh,
         view.rows.size(), pointerX, pointerY, menuFlow_.page == MenuPage::Root) : std::nullopt;
     if (row.setting && (left != right || mouseDirection)) {
@@ -70,9 +82,12 @@ void Application::processFrontendMenu()
         }
     }
     MenuCommand command = MenuCommand::None;
-    if (input_.wasKeyPressed(Key::Escape)) {
+    if (input_.wasKeyPressed(Key::Escape)
+        || input_.wasGamepadButtonPressed(GamepadButton::East)) {
         command = backMenu(menuFlow_); play(gdp::audio::AudioEventKind::UiBack);
-    } else if ((input_.wasKeyPressed(Key::Enter) || click) && !row.setting) {
+    } else if ((input_.wasKeyPressed(Key::Enter)
+        || input_.wasGamepadButtonPressed(GamepadButton::South) || click)
+        && !row.setting) {
         if ((menuFlow_.page == MenuPage::Bindings || menuFlow_.page == MenuPage::MoreBindings) && menuFlow_.selection == 12U) {
             runtimeSettings_.controls = {}; settingsDirty_ = true; (void)savePersistedSettings();
             menuFlow_.notice = "DEFAULT BINDINGS RESTORED";

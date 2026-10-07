@@ -551,7 +551,13 @@ int Application::run()
             if (session_.state().phase == gameplay::SessionPhase::Playing
                 && !mainMenu_.active && !pauseMenu_.paused
                 && !settingsMenu_.active) {
-                player_.applyLook(input_.mouseDelta());
+                constexpr float gamepadLookPixelsPerSecond = 1250.0F;
+                const float lookSeconds = std::clamp(
+                    static_cast<float>(frameDelta), 0.0F, 0.05F);
+                const Vec2 gamepadLook = input_.gamepadLook();
+                const float lookScale = gamepadLookPixelsPerSecond * lookSeconds;
+                player_.applyLook(input_.mouseDelta()
+                    + Vec2{gamepadLook.x * lookScale, gamepadLook.y * lookScale});
             }
 
             std::uint32_t fixedStepsThisFrame = 0U;
@@ -676,12 +682,21 @@ bool Application::initialize()
 {
     SDL_SetAppMetadata("GDP", "0.1.0", "dev.wkc.gdp");
 
-    const SDL_InitFlags flags = config_.headless ? SDL_INIT_EVENTS : SDL_INIT_VIDEO;
+    const SDL_InitFlags flags = config_.headless ? SDL_INIT_EVENTS
+        : SDL_INIT_VIDEO;
     if (!SDL_Init(flags)) {
         log(LogLevel::Error, sdlError("SDL_Init failed"));
         return false;
     }
     sdlInitialized_ = true;
+    if (!config_.headless && config_.enableGamepad) {
+        if (SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
+            gamepad_.refresh();
+        } else {
+            log(LogLevel::Warning,
+                sdlError("Gamepad unavailable; keyboard and mouse remain active"));
+        }
+    }
 
     loadPersistedSettings();
     loadPersistedSpeedrunRecord();
@@ -1158,14 +1173,39 @@ void Application::processEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         (void)wkc::platform::handleSdlInputEvent(input_, event);
+        if (config_.enableGamepad) gamepad_.handleEvent(input_, event);
         if (event.type == SDL_EVENT_QUIT) {
             running_ = false;
+        }
+    }
+    if (config_.enableGamepad) gamepad_.poll(input_);
+    if (gamepad_.connected() != gamepadConnected_) {
+        gamepadConnected_ = gamepad_.connected();
+        if (gamepadConnected_) {
+            const char* const name = gamepad_.name();
+            log(LogLevel::Info, std::string{"Gamepad connected: "}
+                + (name != nullptr ? name : "unknown"));
+        } else {
+            log(LogLevel::Info, "Gamepad disconnected");
         }
     }
 
     if (!running_) {
         return;
     }
+
+    using wkc::platform::GamepadButton;
+    const auto padPressed = [this](const GamepadButton button) {
+        return input_.wasGamepadButtonPressed(button);
+    };
+    const bool padUp = padPressed(GamepadButton::DpadUp)
+        || padPressed(GamepadButton::StickUp);
+    const bool padDown = padPressed(GamepadButton::DpadDown)
+        || padPressed(GamepadButton::StickDown);
+    const bool padLeft = padPressed(GamepadButton::DpadLeft)
+        || padPressed(GamepadButton::StickLeft);
+    const bool padRight = padPressed(GamepadButton::DpadRight)
+        || padPressed(GamepadButton::StickRight);
 
     if (input_.wasKeyPressed(Key::F3)) {
         performanceOverlayVisible_ = !performanceOverlayVisible_;
@@ -1191,7 +1231,8 @@ void Application::processEvents()
         weaponSwitchPending_.reset();
         dropPending_ = false;
 
-        if (input_.wasKeyPressed(Key::Escape)) {
+        if (input_.wasKeyPressed(Key::Escape)
+            || padPressed(GamepadButton::East)) {
             gameplay::closeExitConfirmation(exitConfirmation_);
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
             return;
@@ -1236,11 +1277,11 @@ void Application::processEvents()
         const bool movePrevious = input_.wasKeyPressed(Key::Up)
             || input_.wasKeyPressed(Key::Left)
             || input_.wasKeyPressed(Key::W)
-            || input_.wasKeyPressed(Key::A);
+            || input_.wasKeyPressed(Key::A) || padUp || padLeft;
         const bool moveNext = input_.wasKeyPressed(Key::Down)
             || input_.wasKeyPressed(Key::Right)
             || input_.wasKeyPressed(Key::S)
-            || input_.wasKeyPressed(Key::D);
+            || input_.wasKeyPressed(Key::D) || padDown || padRight;
         if (movePrevious != moveNext) {
             gameplay::moveExitConfirmationSelection(
                 exitConfirmation_, movePrevious ? -1 : 1);
@@ -1249,7 +1290,8 @@ void Application::processEvents()
 
         gameplay::ExitConfirmationCommand command
             = gameplay::ExitConfirmationCommand::None;
-        if (input_.wasKeyPressed(Key::Enter)) {
+        if (input_.wasKeyPressed(Key::Enter)
+            || padPressed(GamepadButton::South)) {
             command = gameplay::activateExitConfirmationSelection(
                 exitConfirmation_);
         } else if (pointedSelection
@@ -1300,7 +1342,9 @@ void Application::processEvents()
             }
         }
         if (input_.wasKeyPressed(Key::Escape)
-            || input_.wasKeyPressed(Key::Enter) || backClicked) {
+            || input_.wasKeyPressed(Key::Enter)
+            || padPressed(GamepadButton::East)
+            || padPressed(GamepadButton::South) || backClicked) {
             controlsMenuActive_ = false;
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
         }
@@ -1321,7 +1365,8 @@ void Application::processEvents()
         reloadPending_ = false;
         weaponSwitchPending_.reset();
         dropPending_ = false;
-        if (input_.wasKeyPressed(Key::Escape)) {
+        if (input_.wasKeyPressed(Key::Escape)
+            || padPressed(GamepadButton::East)) {
             gameplay::openExitConfirmation(exitConfirmation_);
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
             return;
@@ -1368,9 +1413,9 @@ void Application::processEvents()
         }
 
         const bool moveUp = input_.wasKeyPressed(Key::Up)
-            || input_.wasKeyPressed(Key::W);
+            || input_.wasKeyPressed(Key::W) || padUp;
         const bool moveDown = input_.wasKeyPressed(Key::Down)
-            || input_.wasKeyPressed(Key::S);
+            || input_.wasKeyPressed(Key::S) || padDown;
         if (moveUp != moveDown) {
             const gameplay::ResultMenuOption previousSelection
                 = resultMenu_.selection;
@@ -1382,7 +1427,8 @@ void Application::processEvents()
         }
 
         gameplay::ResultMenuCommand command = gameplay::ResultMenuCommand::None;
-        if (input_.wasKeyPressed(Key::Enter)) {
+        if (input_.wasKeyPressed(Key::Enter)
+            || padPressed(GamepadButton::South)) {
             command = gameplay::activateResultMenuSelection(resultMenu_);
         } else if (pointedSelection
             && input_.wasMouseButtonPressed(MouseButton::Primary)) {
@@ -1442,7 +1488,8 @@ void Application::processEvents()
         return;
     }
 
-    if (input_.wasKeyPressed(Key::Escape)) {
+    if (input_.wasKeyPressed(Key::Escape)
+        || padPressed(GamepadButton::Start)) {
         playUiAudio(pauseMenu_.paused
                 ? gdp::audio::AudioEventKind::UiBack
                 : gdp::audio::AudioEventKind::UiConfirm);
@@ -1506,9 +1553,9 @@ void Application::processEvents()
         }
 
         const bool moveUp = input_.wasKeyPressed(Key::Up)
-            || input_.wasKeyPressed(Key::W);
+            || input_.wasKeyPressed(Key::W) || padUp;
         const bool moveDown = input_.wasKeyPressed(Key::Down)
-            || input_.wasKeyPressed(Key::S);
+            || input_.wasKeyPressed(Key::S) || padDown;
         if (moveUp != moveDown) {
             const gameplay::PauseMenuOption previousSelection
                 = pauseMenu_.selection;
@@ -1519,7 +1566,8 @@ void Application::processEvents()
         }
 
         gameplay::PauseMenuCommand command = gameplay::PauseMenuCommand::None;
-        if (input_.wasKeyPressed(Key::Enter)) {
+        if (input_.wasKeyPressed(Key::Enter)
+            || padPressed(GamepadButton::South)) {
             command = gameplay::activatePauseSelection(pauseMenu_);
         } else if (pointedSelection
             && input_.wasMouseButtonPressed(MouseButton::Primary)) {
@@ -1569,8 +1617,15 @@ void Application::processEvents()
     using gameplay::ControlAction;
     const auto down = [&](ControlAction action) { return gameplay::controlDown(runtimeSettings_.controls, action, input_); };
     const auto pressed = [&](ControlAction action) { return gameplay::controlPressed(runtimeSettings_.controls, action, input_); };
-    playerCommand_.moveForward = (down(ControlAction::Forward) ? 1.0F : 0.0F) - (down(ControlAction::Backward) ? 1.0F : 0.0F);
-    playerCommand_.moveRight = (down(ControlAction::Right) ? 1.0F : 0.0F) - (down(ControlAction::Left) ? 1.0F : 0.0F);
+    const Vec2 gamepadMove = input_.gamepadMove();
+    playerCommand_.moveForward = std::clamp(
+        (down(ControlAction::Forward) ? 1.0F : 0.0F)
+            - (down(ControlAction::Backward) ? 1.0F : 0.0F)
+            - gamepadMove.y, -1.0F, 1.0F);
+    playerCommand_.moveRight = std::clamp(
+        (down(ControlAction::Right) ? 1.0F : 0.0F)
+            - (down(ControlAction::Left) ? 1.0F : 0.0F)
+            + gamepadMove.x, -1.0F, 1.0F);
     playerCommand_.crouch = down(ControlAction::Crouch);
     playerCommand_.quietWalk = down(ControlAction::QuietWalk);
     jumpPending_ = jumpPending_ || pressed(ControlAction::Jump);
@@ -4004,6 +4059,8 @@ void Application::shutdown()
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
     enemyProjectiles_.clear();
+    gamepad_.close(input_);
+    gamepadConnected_ = false;
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};

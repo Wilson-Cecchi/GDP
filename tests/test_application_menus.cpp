@@ -18,12 +18,14 @@ struct ApplicationMenuTestAccess {
     static int run(const std::filesystem::path& directory) {
         using wkc::platform::Key;
         using wkc::platform::MouseButton;
+        using wkc::platform::GamepadButton;
         int failures = 0;
         auto expect = [&](bool condition, const char* message) {
             if (!condition) { std::cerr << "FAIL: " << message << '\n'; ++failures; }
         };
         ApplicationConfig config;
         config.worldSeed = 12345U;
+        config.enableGamepad = false;
         Application app{config};
         expect(app.initialize(), "graphical application boots before a world exists");
         if (!app.window_) return 1;
@@ -31,6 +33,10 @@ struct ApplicationMenuTestAccess {
         auto release = [&] { app.input_ = wkc::platform::Input{}; };
         auto key = [&](Key value) {
             release(); app.input_.handleKey(value, true); app.processEvents(); app.render();
+        };
+        auto pad = [&](GamepadButton value) {
+            release(); app.input_.handleGamepadButton(value, true);
+            app.processEvents(); app.render();
         };
         auto choose = [&](std::string_view label) {
             if (app.pauseMenu_.paused && !app.settingsMenu_.active) {
@@ -58,6 +64,15 @@ struct ApplicationMenuTestAccess {
             && app.session_.state().currentSeed == titleSeed
             && app.session_.state().elapsedRunTicks == titleTicks && app.fixedUpdates_ == 0U
             && !app.fatalError_, "animated title cannot advance the session or spawn gameplay entities");
+        pad(GamepadButton::DpadDown);
+        expect(app.menuFlow_.selection == 1U,
+            "gamepad D-pad navigates the title menu");
+        pad(GamepadButton::South);
+        expect(app.menuFlow_.page == MenuPage::CampaignSlots,
+            "gamepad south face button confirms a menu choice");
+        pad(GamepadButton::East);
+        expect(app.menuFlow_.page == MenuPage::Root,
+            "gamepad east face button returns to the previous menu");
         choose("SETTINGS"); choose("CONTROLS"); choose("REMAP"); choose("FORWARD");
         expect(app.menuFlow_.capture == gameplay::ControlAction::Forward, "binding begins capture without assigning activation Enter");
         key(Key::I);
@@ -118,6 +133,14 @@ struct ApplicationMenuTestAccess {
             expect(app.playerCommand_.moveForward == 1.0F, "custom Forward key drives live gameplay");
             release(); app.input_.handleKey(Key::W, true); app.processEvents();
             expect(app.playerCommand_.moveForward == 0.0F, "old W binding no longer moves player");
+            release();
+            app.input_.handleGamepadSticks({0.75F, -0.65F}, {});
+            app.input_.handleGamepadButton(GamepadButton::RightTrigger, true);
+            app.processEvents();
+            expect(app.playerCommand_.moveForward > 0.0F
+                    && app.playerCommand_.moveRight > 0.0F
+                    && app.fireHeld_,
+                "analog stick movement and trigger fire drive live gameplay");
             key(Key::Escape); choose("SETTINGS"); key(Key::Escape);
             const auto pausedTime = app.menuBackdropSeconds_;
             release(); app.fixedUpdate(1.0 / 60.0);
