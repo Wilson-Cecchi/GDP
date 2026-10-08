@@ -81,6 +81,11 @@ void bindingsTests() {
     GamepadBindings gamepad;
     expect(validateControlBindings(bindings), "default bindings are valid and unique");
     expect(validateGamepadBindings(gamepad), "default gamepad bindings are valid and unique");
+    expect(gamepad.values[static_cast<std::size_t>(ControlAction::LastWeapon)] == GamepadButton::North
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Melee)] == GamepadButton::RightStick
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Interact)] == GamepadButton::DpadUp
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Reload)] == GamepadButton::West,
+        "FPS-style default gamepad layout assigns weapon switching, knife and interaction");
     for (auto button : gamepad.values)
         expect(gamepadBindingForName(gamepadBindingName(button)) == button,
             "gamepad binding names round trip");
@@ -122,8 +127,8 @@ void bindingsTests() {
             && !controlPressed(bindings, gamepad, ControlAction::Reload, input),
         "remapped gamepad button drives only its new action");
     expect(assignGamepadBinding(gamepad, ControlAction::LastWeapon, GamepadButton::Back)
-            && gamepad.values[static_cast<std::size_t>(ControlAction::Information)] == GamepadButton::Count,
-        "assigning an unbound action releases the old owner");
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Information)] == GamepadButton::North,
+        "reassigning an occupied gamepad button swaps the old owner");
     expect(assignGamepadBinding(gamepad, ControlAction::LastWeapon, GamepadButton::Count)
             && validateGamepadBindings(gamepad), "gamepad action can be explicitly unbound");
 }
@@ -279,7 +284,7 @@ void persistenceTests(const std::filesystem::path& directory) {
         "v6 settings retain graphics and sensitivity while receiving default bindings");
     {
         std::ofstream file(directory / "invalid_bindings.toml");
-        file << "version = 10\nbinding_0 = S\nbinding_1 = S\n";
+        file << "version = 11\nbinding_0 = S\nbinding_1 = S\n";
     }
     const auto invalid = loadRuntimeSettings(directory / "invalid_bindings.toml");
     expect(invalid.status == SettingsLoadStatus::LoadedWithRecovery && invalid.settings.controls == ControlBindings{},

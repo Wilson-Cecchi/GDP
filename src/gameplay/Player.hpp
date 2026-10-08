@@ -19,6 +19,10 @@ struct PlayerCommand {
     bool interact{false};
 };
 
+[[nodiscard]] wkc::core::Vec2 gamepadLookDegrees(
+    wkc::core::Vec2 stick, float elapsedSeconds,
+    float horizontalScale, float verticalScale) noexcept;
+
 struct InteractionTarget {
     gdp::entities::EntityId id{};
     wkc::core::Aabb bounds{};

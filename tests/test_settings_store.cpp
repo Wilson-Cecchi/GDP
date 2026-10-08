@@ -114,7 +114,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 10\n"
+        "version = 11\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -155,7 +155,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 10\n"
+        "version = 11\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -185,7 +185,36 @@ void testRecoveryAndForwardCompatibility()
             && previousV9.settings.gamepadMoveDeadzonePercent == 18U,
         "v9 migration preserves controller preferences and adds default camera controls");
 
-    writeText(path, "version = 10\ngamepad_binding_7 = X / SQUARE\n"
+    using B = wkc::platform::GamepadButton;
+    gdp::gameplay::GamepadBindings oldPreset;
+    oldPreset.values = {B::Count, B::Count, B::Count, B::Count, B::LeftStick,
+        B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
+        B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
+        B::DpadDown, B::Count, B::Count, B::Count, B::Back,
+        B::RightShoulder, B::LeftShoulder};
+    const auto legacySettings = [](const gdp::gameplay::GamepadBindings& bindings) {
+        std::string text{"version = 10\n"};
+        for (std::size_t index = 0; index < bindings.values.size(); ++index) {
+            text += "gamepad_binding_" + std::to_string(index) + " = "
+                + std::string{gdp::gameplay::gamepadBindingName(bindings.values[index])} + "\n";
+        }
+        return text;
+    };
+    const std::string legacyDefault = legacySettings(oldPreset);
+    writeText(path, legacyDefault);
+    const auto upgradedPreset = loadRuntimeSettings(path);
+    expect(upgradedPreset.status == SettingsLoadStatus::Migrated
+            && upgradedPreset.settings.gamepadControls == gdp::gameplay::GamepadBindings{},
+        "untouched v10 controller preset upgrades to the new layout");
+    oldPreset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::QuietWalk)] = B::Count;
+    const std::string legacyCustom = legacySettings(oldPreset);
+    writeText(path, legacyCustom);
+    const auto preservedPreset = loadRuntimeSettings(path);
+    expect(preservedPreset.status == SettingsLoadStatus::Migrated
+            && preservedPreset.settings.gamepadControls == oldPreset,
+        "custom v10 controller bindings remain unchanged during migration");
+
+    writeText(path, "version = 11\ngamepad_binding_7 = X / SQUARE\n"
         "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
     const auto brokenGamepad = loadRuntimeSettings(path);
     expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery

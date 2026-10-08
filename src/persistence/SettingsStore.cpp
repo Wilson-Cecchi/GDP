@@ -13,6 +13,18 @@
 namespace gdp::persistence {
 namespace {
 
+gameplay::GamepadBindings oldDefaultGamepadBindings() noexcept
+{
+    using B = wkc::platform::GamepadButton;
+    gameplay::GamepadBindings bindings;
+    bindings.values = {B::Count, B::Count, B::Count, B::Count, B::LeftStick,
+        B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
+        B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
+        B::DpadDown, B::Count, B::Count, B::Count, B::Back,
+        B::RightShoulder, B::LeftShoulder};
+    return bindings;
+}
+
 std::string_view trim(std::string_view value) noexcept
 {
     constexpr std::string_view whitespace{" \t\r\n"};
@@ -313,6 +325,12 @@ SettingsLoadResult loadRuntimeSettings(
             result.settings.graphicsQuality = gameplay::GraphicsQuality::Ultra;
         }
         if (*version <= 7U) result.settings.language = gameplay::Language::English;
+        // Upgrade only the untouched old preset. Any customized gamepad
+        // mapping remains exactly as the player saved it.
+        if (*version <= 10U
+            && result.settings.gamepadControls == oldDefaultGamepadBindings()) {
+            result.settings.gamepadControls = {};
+        }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {
             result.status = SettingsLoadStatus::Migrated;

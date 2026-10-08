@@ -59,8 +59,8 @@ std::array<GamepadButton, controlActionCount> defaultGamepadBindings() noexcept 
     using B = GamepadButton;
     return {B::Count, B::Count, B::Count, B::Count, B::LeftStick,
         B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
-        B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
-        B::DpadDown, B::Count, B::Count, B::Count, B::Back,
+        B::DpadUp, B::DpadDown, B::DpadLeft, B::DpadRight, B::Count,
+        B::RightStick, B::Count, B::Count, B::North, B::Back,
         B::RightShoulder, B::LeftShoulder};
 }
 std::string_view controlActionName(ControlAction action) noexcept {

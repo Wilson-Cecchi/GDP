@@ -74,6 +74,19 @@ std::optional<float> rayAabbDistance(
 
 } // namespace
 
+wkc::core::Vec2 gamepadLookDegrees(
+    const wkc::core::Vec2 stick, const float elapsedSeconds,
+    const float horizontalScale, const float verticalScale) noexcept
+{
+    if (!std::isfinite(stick.x) || !std::isfinite(stick.y)
+        || !std::isfinite(elapsedSeconds) || !std::isfinite(horizontalScale)
+        || !std::isfinite(verticalScale)) return {};
+    constexpr float degreesPerSecond = 300.0F;
+    const float seconds = std::clamp(elapsedSeconds, 0.0F, 0.05F);
+    return {stick.x * degreesPerSecond * seconds * horizontalScale,
+        stick.y * degreesPerSecond * seconds * verticalScale};
+}
+
 void Player::spawn(const wkc::core::Vec3 feetPosition, const float yawDegrees) noexcept
 {
     state_ = {};

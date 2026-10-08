@@ -551,9 +551,6 @@ int Application::run()
             if (session_.state().phase == gameplay::SessionPhase::Playing
                 && !mainMenu_.active && !pauseMenu_.paused
                 && !settingsMenu_.active) {
-                constexpr float gamepadLookDegreesPerSecond = 150.0F;
-                const float lookSeconds = std::clamp(
-                    static_cast<float>(frameDelta), 0.0F, 0.05F);
                 const Vec2 rawLook = runtimeSettings_.gamepadSouthpaw
                     ? input_.gamepadLeftStick() : input_.gamepadRightStick();
                 const Vec2 gamepadLook = wkc::platform::gamepadDeadzone(rawLook,
@@ -563,12 +560,11 @@ int Application::run()
                 const float aimScale = aiming
                     ? static_cast<float>(runtimeSettings_.gamepadAimSensitivityPercent) / 100.0F : 1.0F;
                 player_.applyLook(input_.mouseDelta());
-                player_.applyGamepadLook({
-                    gamepadLook.x * gamepadLookDegreesPerSecond * lookSeconds * aimScale
-                        * static_cast<float>(runtimeSettings_.gamepadLookHorizontalPercent) / 100.0F,
-                    gamepadLook.y * gamepadLookDegreesPerSecond * lookSeconds * aimScale
-                        * static_cast<float>(runtimeSettings_.gamepadLookVerticalPercent) / 100.0F,
-                }, runtimeSettings_.invertGamepadY);
+                player_.applyGamepadLook(gameplay::gamepadLookDegrees(gamepadLook,
+                    static_cast<float>(frameDelta),
+                    aimScale * static_cast<float>(runtimeSettings_.gamepadLookHorizontalPercent) / 100.0F,
+                    aimScale * static_cast<float>(runtimeSettings_.gamepadLookVerticalPercent) / 100.0F),
+                    runtimeSettings_.invertGamepadY);
             }
 
             std::uint32_t fixedStepsThisFrame = 0U;

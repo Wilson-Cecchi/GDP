@@ -79,6 +79,22 @@ void testMovement()
         "quiet walk reduces grounded movement without changing direction");
 }
 
+void testGamepadLook()
+{
+    using gdp::gameplay::gamepadLookDegrees;
+    const auto normal = gamepadLookDegrees({1.0F, -1.0F}, 1.0F / 60.0F, 1.0F, 1.0F);
+    expect(wkc::core::nearlyEqual(normal.x, 5.0F, 1.0e-4F)
+            && wkc::core::nearlyEqual(normal.y, -5.0F, 1.0e-4F),
+        "full gamepad stick turns at 300 degrees per second by default");
+    const auto aimed = gamepadLookDegrees({1.0F, 0.5F}, 1.0F / 60.0F, 0.7F, 1.4F);
+    expect(wkc::core::nearlyEqual(aimed.x, 3.5F, 1.0e-4F)
+            && wkc::core::nearlyEqual(aimed.y, 3.5F, 1.0e-4F),
+        "aim and independent axis sensitivity scale the turn");
+    const auto capped = gamepadLookDegrees({1.0F, 0.0F}, 1.0F, 1.0F, 1.0F);
+    expect(wkc::core::nearlyEqual(capped.x, 15.0F, 1.0e-4F),
+        "a long frame cannot cause a sudden camera spin");
+}
+
 void testBunnyHopMovement()
 {
     using namespace gdp::gameplay;
@@ -522,6 +538,7 @@ void testInteractionAndLife()
 int main()
 {
     testMovement();
+    testGamepadLook();
     testBunnyHopMovement();
     testFootstepCadence();
     testCosmeticViewMotion();
