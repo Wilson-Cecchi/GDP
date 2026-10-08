@@ -1,7 +1,9 @@
 name: Portable downloads
 
-# Linux/macOS distribution is opt-in: macOS runners consume more Actions minutes.
+# Full distribution only runs for an approved tag or an explicit manual package test.
 on:
+  push:
+    tags: ['public-v*']
   workflow_dispatch:
 
 permissions:
@@ -11,12 +13,101 @@ env:
   CMAKE_BUILD_PARALLEL_LEVEL: 2
 
 jobs:
+  release-gate:
+    name: Verify approved release revision
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Validate tag and tested source revision
+        id: validate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOWNLOADS_TOKEN: ${{ secrets.IRON_SEED_DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != push ]]; then
+            echo "version=0.1.0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ ! "$tag" =~ ^public-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected public-vMAJOR.MINOR.PATCH tag" >&2
+            exit 1
+          fi
+          test -n "$DOWNLOADS_TOKEN" || {
+            echo "Configure IRON_SEED_DOWNLOADS_TOKEN before tagging a release" >&2
+            exit 1
+          }
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          if [[ "$GITHUB_SHA" != "$main_sha" ]]; then
+            echo "Release tag must point to the current main commit" >&2
+            exit 1
+          fi
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f head_sha="$GITHUB_SHA" -f per_page=100 \
+            | jq -e --arg sha "$GITHUB_SHA" \
+              'any(.workflow_runs[]; .head_sha == $sha and .event == "push" and .conclusion == "success")' \
+            >/dev/null || {
+              echo "No successful main CI run found for this exact commit" >&2
+              exit 1
+            }
+          echo "version=${tag#public-v}" >> "$GITHUB_OUTPUT"
+
+  windows-x64:
+    name: Windows x64 package
+    needs: release-gate
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-release -DGDP_RELEASE_VERSION=${{ needs.release-gate.outputs.version }}
+      - name: Build
+        run: cmake --build --preset windows-release --parallel 2
+      - name: Test portable systems
+        run: ctest --preset windows-release --output-on-failure
+      - name: Package
+        run: cpack --config build/windows-release/CPackConfig.cmake -C Release -B dist
+      - name: Verify extracted package
+        shell: pwsh
+        run: |
+          $archive = "dist/GDP-Windows-x64.zip"
+          if (-not (Test-Path $archive)) { throw "Missing package: $archive" }
+          Expand-Archive -Path $archive -DestinationPath dist/check
+          $executable = Get-ChildItem dist/check -Recurse -Filter gdp.exe | Select-Object -First 1
+          $runtime = Get-ChildItem dist/check -Recurse -Filter SDL3.dll | Select-Object -First 1
+          if ($null -eq $executable -or $null -eq $runtime) { throw "Missing game or SDL3" }
+          foreach ($type in @("worker", "guard", "officer", "engineer", "robot")) {
+            $brain = Join-Path $executable.DirectoryName "ai/$type.brain"
+            if (-not (Test-Path $brain)) { throw "Missing brain: $brain" }
+          }
+          & $executable.FullName --headless --frames 3
+          if ($LASTEXITCODE -ne 0) { throw "Windows smoke test failed" }
+          $version = & $executable.FullName --version
+          if ($version -ne "Iron Seed ${{ needs.release-gate.outputs.version }}") {
+            throw "Wrong package version: $version"
+          }
+          Copy-Item $archive dist/IronSeed-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IronSeed-Windows-x64
+          path: dist/IronSeed-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
   linux-x64:
     name: Linux x64 package
+    needs: release-gate
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
       - name: Install native build dependencies
+        timeout-minutes: 12
         run: >-
           sudo apt-get update && sudo apt-get install --yes
           cmake ninja-build g++ pkg-config
@@ -31,6 +122,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DGDP_BUILD_TESTS=OFF
           -DGDP_PORTABLE_PACKAGE=ON
+          -DGDP_RELEASE_VERSION=${{ needs.release-gate.outputs.version }}
       - name: Build game
         run: cmake --build build/linux-package --target gdp --parallel 2
       - name: Package
@@ -55,6 +147,7 @@ jobs:
             exit 1
           fi
           "$package/gdp" --headless --frames 3
+          test "$("$package/gdp" --version)" = "Iron Seed ${{ needs.release-gate.outputs.version }}"
       - uses: actions/upload-artifact@v4
         with:
           name: IronSeed-Linux-x64
@@ -64,6 +157,7 @@ jobs:
 
   macos:
     name: macOS ${{ matrix.label }} package
+    needs: release-gate
     strategy:
       fail-fast: false
       matrix:
@@ -83,6 +177,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DGDP_BUILD_TESTS=OFF
           -DGDP_PORTABLE_PACKAGE=ON
+          -DGDP_RELEASE_VERSION=${{ needs.release-gate.outputs.version }}
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
           -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
       - name: Build game
@@ -103,6 +198,7 @@ jobs:
           codesign --force --deep --sign - "$app"
           codesign --verify --deep --strict "$app"
           "$app/Contents/MacOS/IronSeed" --headless --frames 3
+          test "$("$app/Contents/MacOS/IronSeed" --version)" = "Iron Seed ${{ needs.release-gate.outputs.version }}"
           ditto -c -k --sequesterRsrc --keepParent "$stage" \
             "$PWD/build/distribution/$package.zip"
       - uses: actions/upload-artifact@v4
@@ -111,3 +207,50 @@ jobs:
           path: build/distribution/IronSeed-macOS-${{ matrix.label }}.zip
           if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: Publish tested packages
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/public-v')
+    needs: [release-gate, windows-x64, linux-x64, macos]
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: iron-seed-public-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: IronSeed-*
+          path: build/release-assets
+          merge-multiple: true
+      - name: Verify assets and create immutable manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/make_release_manifest.py \
+            --tag "${GITHUB_REF#refs/tags/}" \
+            --source-sha "$GITHUB_SHA" \
+            --directory build/release-assets \
+            --output build/update.json
+      - name: Publish release in the public downloads repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.IRON_SEED_DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo=Wilson-Cecchi/Iron-Seed-Downloads
+          tag="${GITHUB_REF#refs/tags/}"
+          if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite it" >&2
+            exit 1
+          fi
+          notes="Iron Seed ${tag#public-v} — Windows x64, Linux x64, macOS Intel e Apple Silicon.
+
+          Código-fonte privado: ${GITHUB_SHA}.
+          Confira os arquivos e hashes em update.json. Builds macOS ainda não são notarizados pela Apple."
+          gh release create "$tag" build/release-assets/* build/update.json \
+            --repo "$repo" --target main --title "Iron Seed ${tag#public-v}" \
+            --notes "$notes" --draft
+          test "$(gh release view "$tag" --repo "$repo" --json assets \
+            --jq '.assets | length')" = 5
+          gh release edit "$tag" --repo "$repo" --draft=false --latest

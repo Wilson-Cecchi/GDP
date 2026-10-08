@@ -20,7 +20,7 @@ void printUsage(const std::string_view executable)
     std::cout << "Usage: " << executable
               << " [--headless] [--benchmark PROFILE] [--frames N] [--seed N]"
                  " [--scripted-enemies] [--experimental-neural-enemy TYPE]"
-                 " [--neural-brain FILE] [--test-brain-dir DIR] [--help]\n"
+                 " [--neural-brain FILE] [--test-brain-dir DIR] [--help] [--version]\n"
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
@@ -50,7 +50,8 @@ void printUsage(const std::string_view executable)
               << "  --diverse-maps      Train varied cover, peek, height and boss-phase encounters.\n"
               << "  --cooperative-brain  Train a versioned brain with ally and firing-lane inputs.\n"
               << "  --curriculum-generations N  Initial curriculum length, preserved on full resume.\n"
-              << "  --help               Show this message.\n";
+              << "  --help               Show this message.\n"
+              << "  --version            Show the packaged game version.\n";
 }
 
 std::optional<gdp::entities::EnemyArchetype> parseEnemyArchetype(
@@ -138,6 +139,11 @@ int main(const int argc, char* argv[])
 
         if (argument == "--help") {
             printUsage(argv[0]);
+            return 0;
+        }
+
+        if (argument == "--version") {
+            std::cout << "Iron Seed " << GDP_VERSION_STRING << '\n';
             return 0;
         }
 

@@ -22,6 +22,10 @@ option(GDP_BUILD_TESTS "Build and register GDP tests" ON)
 option(GDP_ENABLE_TEST_MODE "Include the dedicated development test arena (disable for shipping)" ON)
 option(GDP_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(GDP_PORTABLE_PACKAGE "Build a self-contained Linux or macOS download" OFF)
+set(GDP_RELEASE_VERSION "${PROJECT_VERSION}" CACHE STRING "Version shown by the packaged game")
+if(NOT GDP_RELEASE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "GDP_RELEASE_VERSION must be MAJOR.MINOR.PATCH")
+endif()
 
 if(GDP_PORTABLE_PACKAGE AND WIN32)
     message(FATAL_ERROR "GDP_PORTABLE_PACKAGE is for Linux and macOS; use windows-release on Windows")
@@ -362,7 +366,10 @@ add_executable(
     src/game/LaunchSeed.cpp
     src/game/PerformanceMonitor.cpp
 )
-target_compile_definitions(gdp PRIVATE GDP_ENABLE_TEST_MODE=$<BOOL:${GDP_ENABLE_TEST_MODE}>)
+target_compile_definitions(gdp PRIVATE
+    GDP_ENABLE_TEST_MODE=$<BOOL:${GDP_ENABLE_TEST_MODE}>
+    GDP_VERSION_STRING="${GDP_RELEASE_VERSION}"
+)
 if(GDP_ENABLE_TEST_MODE)
     target_sources(gdp PRIVATE src/game/TestArena.cpp)
 endif()
@@ -390,7 +397,7 @@ if(APPLE)
         OUTPUT_NAME IronSeed
         MACOSX_BUNDLE_BUNDLE_NAME "Iron Seed"
         MACOSX_BUNDLE_GUI_IDENTIFIER "dev.wkc.ironseed"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${GDP_RELEASE_VERSION}"
     )
 endif()
 
@@ -478,6 +485,7 @@ if(WIN32)
         set(GDP_WINDOWS_ARCHITECTURE x86)
     endif()
     set(CPACK_GENERATOR ZIP)
+    set(CPACK_PACKAGE_VERSION "${GDP_RELEASE_VERSION}")
     set(CPACK_PACKAGE_FILE_NAME "GDP-Windows-${GDP_WINDOWS_ARCHITECTURE}")
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
     include(CPack)
@@ -494,6 +502,7 @@ if(UNIX AND NOT APPLE AND GDP_PORTABLE_PACKAGE)
     install(FILES "${GDP_SDL_SOURCE_DIR}/LICENSE.txt"
         DESTINATION licenses RENAME LICENSE-SDL3.txt)
     set(CPACK_GENERATOR TGZ)
+    set(CPACK_PACKAGE_VERSION "${GDP_RELEASE_VERSION}")
     set(CPACK_PACKAGE_FILE_NAME "IronSeed-Linux-x64")
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
     include(CPack)
@@ -952,6 +961,11 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME command_line_help COMMAND gdp --help)
     set_tests_properties(command_line_help PROPERTIES TIMEOUT 10)
+
+    add_test(NAME command_line_version COMMAND gdp --version)
+    set_tests_properties(command_line_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "Iron Seed ${GDP_RELEASE_VERSION}"
+        TIMEOUT 10)
 
     if(UNIX AND NOT APPLE)
         add_executable(gdp_capture_industrial_wall tests/capture_industrial_wall.cpp)

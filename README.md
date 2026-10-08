@@ -2071,9 +2071,12 @@ guia de compilação em [`README_WINDOWS.md`](README_WINDOWS.md). O ZIP contém
 `gdp.exe`, `SDL3.dll` e o próprio guia, sem exigir CMake ou Visual Studio no
 computador que apenas executará o jogo.
 
-Os downloads experimentais para Linux x64 e macOS (Intel e Apple Silicon) são
-gerados somente quando o workflow manual `Portable downloads` é executado,
-evitando consumir minutos de macOS a cada push. Consulte
+Os downloads experimentais para Windows x64, Linux x64 e macOS (Intel e Apple
+Silicon) são gerados juntos quando uma tag de publicação aprovada
+`public-vMAJOR.MINOR.PATCH` é enviada. O workflow `Portable downloads` também
+pode ser executado manualmente para testar os pacotes sem publicá-los. Os
+builds macOS não rodam a cada push. O procedimento e os pré-requisitos da
+publicação estão em [`README_RELEASES.md`](README_RELEASES.md). Consulte
 [`README_LINUX.md`](README_LINUX.md) e [`README_MACOS.md`](README_MACOS.md)
 para requisitos e instruções de extração. O macOS recebe um `.app` com SDL3
 incorporado, mas ainda sem assinatura Developer ID/notarização; o usuário pode

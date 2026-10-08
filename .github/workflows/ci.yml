@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -41,6 +42,10 @@ jobs:
       - name: Test
         run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
+      - name: Test release manifest
+        if: matrix.preset == 'release'
+        run: python3 -m unittest discover -s tools -p 'test_release_manifest.py'
+
   sanitizers:
     name: ASan + UBSan
     runs-on: ubuntu-24.04
@@ -64,6 +69,8 @@ jobs:
 
   windows-package:
     name: Windows x64 package
+    # Windows is built on approved release tags; retain this for manual CI checks.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-2022
 
     steps:
