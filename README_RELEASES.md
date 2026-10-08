@@ -31,9 +31,9 @@ O `GITHUB_TOKEN` padrão do repositório privado não publica em outro repositó
    ```
 
 3. O workflow `Portable downloads` verifica que a tag aponta para a `main`
-   atual e que a CI **do mesmo SHA** passou. Depois compila e testa Windows,
-   Linux, macOS Intel e macOS Apple Silicon. Se qualquer pacote falhar, nada
-   fica público. Não recicle uma tag de versão.
+   atual e que a CI **do mesmo SHA** passou. Compila e testa Windows primeiro;
+   somente se ele passar, inicia Linux, macOS Intel e macOS Apple Silicon.
+   Se qualquer pacote falhar, nada fica público. Não recicle uma tag de versão.
 4. Todos os pacotes precisam existir e ser não vazios. O workflow publica uma
    release primeiro como rascunho e só então a marca como `Latest`. Uma falha
    após a criação do rascunho exige inspeção manual antes de nova tentativa.
