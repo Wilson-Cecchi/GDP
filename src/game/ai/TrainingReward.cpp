@@ -187,4 +187,24 @@ float scoreTrainingStage(const WorkerFitnessMetrics& metrics,
     return 0.0F;
 }
 
+float scoreCooperativeTrainingStage(const WorkerFitnessMetrics& metrics,
+    const gdp::entities::EnemyArchetype archetype,
+    const TrainingStage stage) noexcept
+{
+    const float base = scoreTrainingStage(metrics, archetype, stage);
+    if (stage < TrainingStage::FireControl) {
+        return base;
+    }
+    // A blocked firing lane is normal briefly. Repeated holds without
+    // repositioning and actual allied damage reduce the candidate's score.
+    const float holdPenalty = std::min(
+        static_cast<float>(metrics.friendlyFireHolds) / 60.0F, 2.0F) * 0.6F;
+    const float hitPenalty = static_cast<float>(
+        std::min(metrics.friendlyHits, 3U)) * 0.8F;
+    const float damagePenalty = std::min(metrics.friendlyDamage, 50.0F)
+        / 25.0F * 0.6F;
+    return base - std::min(4.0F,
+        holdPenalty + hitPenalty + damagePenalty);
+}
+
 } // namespace gdp::game::ai

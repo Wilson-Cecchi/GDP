@@ -2,6 +2,7 @@
 
 #include "ai/Genome.hpp"
 #include "entities/EntityManager.hpp"
+#include "gameplay/EnemyBrainContract.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -59,6 +60,9 @@ struct WorkerFitnessMetrics {
     std::uint32_t distanceSamples{0};
     std::uint32_t realMapEpisodes{0};
     std::uint32_t corridorSpawns{0};
+    std::uint32_t coverMapEpisodes{0};
+    std::uint32_t peekMapEpisodes{0};
+    std::uint32_t heightMapEpisodes{0};
     std::uint32_t fallbackAttacksLanded{0};
     std::uint32_t fallbackShotsFired{0};
     std::uint32_t playerEliminations{0};
@@ -69,6 +73,10 @@ struct WorkerFitnessMetrics {
     std::uint32_t neuralTicks{0};
     std::uint32_t fallbackTicks{0};
     std::uint32_t playerJumps{0};
+    std::uint32_t groupEpisodes{0};
+    std::uint32_t friendlyHits{0};
+    std::uint32_t friendlyFireHolds{0};
+    float friendlyDamage{0.0F};
 };
 
 struct DirectionalCredit {
@@ -85,6 +93,10 @@ struct DirectionalCredit {
     const WorkerFitnessMetrics& metrics,
     gdp::entities::EnemyArchetype archetype,
     TrainingStage stage) noexcept;
+[[nodiscard]] float scoreCooperativeTrainingStage(
+    const WorkerFitnessMetrics& metrics,
+    gdp::entities::EnemyArchetype archetype,
+    TrainingStage stage) noexcept;
 [[nodiscard]] float creditedTacticalProgress(
     float neuralProgress, float totalProgress) noexcept;
 [[nodiscard]] DirectionalCredit directionalMovementCredit(
@@ -98,11 +110,16 @@ struct WorkerTrainingOptions {
     wkc::core::Seed seed{12'345U};
     bool seedExplicit{false};
     bool trainAllScenarios{false};
+    bool diverseMaps{false};
+    gameplay::EnemyBrainContract brainContract{
+        gameplay::EnemyBrainContract::Tactical};
+    std::uint32_t curriculumGenerations{0U}; // Zero uses first run length.
     std::uint32_t population{16U};
     std::uint32_t generations{10U}; // Additional generations when resuming.
     std::uint32_t cooldownMilliseconds{0U};
     std::optional<std::filesystem::path> saveDirectory;
     std::optional<std::filesystem::path> resumeBrain;
+    std::optional<std::filesystem::path> resumePopulation;
 };
 
 struct WorkerTrainingResult {
@@ -115,6 +132,7 @@ struct WorkerTrainingResult {
     std::uint32_t completedStages{0U};
     std::optional<std::filesystem::path> lastCheckpoint;
     std::uint32_t lastGeneration{0U};
+    std::optional<std::filesystem::path> lastPopulation;
 };
 
 [[nodiscard]] WorkerTrainingResult runWorkerTraining(

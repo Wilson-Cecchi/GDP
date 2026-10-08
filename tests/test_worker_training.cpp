@@ -1,4 +1,7 @@
 #include "game/ai/WorkerTraining.hpp"
+#include "game/ai/TrainingPopulationStore.hpp"
+#include "game/ai/TrainingEncounter.hpp"
+#include "gameplay/Combat.hpp"
 
 #include "core/Hash.hpp"
 #include "gameplay/EnemyBrainContract.hpp"
@@ -254,6 +257,73 @@ void testFitness()
     dead.deaths = 1U;
     expect(scoreWorkerFitness(dead) < 0.0F,
         "death outweighs even maximum auxiliary reward");
+    WorkerFitnessMetrics careless = baseline;
+    careless.friendlyHits = 2U;
+    careless.friendlyDamage = 25.0F;
+    careless.friendlyFireHolds = 120U;
+    expect(scoreCooperativeTrainingStage(careless,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            < scoreCooperativeTrainingStage(baseline,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            && scoreCooperativeTrainingStage(careless,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::Aim)
+                == scoreTrainingStage(careless,
+                    gdp::entities::EnemyArchetype::Guard, TrainingStage::Aim),
+        "cooperative combat penalizes allied damage and prolonged fire holds");
+}
+
+void testCooperativeTraining()
+{
+    namespace fs = std::filesystem;
+    using namespace gdp::game::ai;
+    const fs::path root = fs::temp_directory_path()
+        / ("gdp_cooperative_training_test_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code error;
+    if (!fs::create_directory(root, error) || error) {
+        expect(false, "test owns a unique cooperative training directory");
+        return;
+    }
+    WorkerTrainingOptions options{
+        .archetype = gdp::entities::EnemyArchetype::Guard,
+        .seed = 42U,
+        .seedExplicit = true,
+        .brainContract = gdp::gameplay::EnemyBrainContract::Cooperative,
+        .curriculumGenerations = 1U,
+        .population = 2U,
+        .generations = 1U,
+        .saveDirectory = root / "first",
+        .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
+    };
+    std::ostringstream log;
+    const auto first = runEnemyTraining(options, log);
+    expect(first.succeeded && first.lastCheckpoint && first.lastPopulation
+            && log.str().find("reward_rules=6") != std::string::npos
+            && log.str().find("group_episodes=") != std::string::npos
+            && reportedMetric(log.str(), "group_episodes=") > 0.0F,
+        "cooperative training runs group episodes and reports their metrics");
+    if (first.lastCheckpoint && first.lastPopulation) {
+        const auto brain = gdp::persistence::loadEnemyBrain(*first.lastCheckpoint);
+        const auto population = loadTrainingPopulation(*first.lastPopulation);
+        expect(brain && population && brain->contract
+                == gdp::gameplay::EnemyBrainContract::Cooperative
+                && population->contract
+                    == gdp::gameplay::EnemyBrainContract::Cooperative,
+            "versioned cooperative brain and full population reload");
+        options.resumePopulation = first.lastPopulation;
+        options.saveDirectory = root / "resumed";
+        std::ostringstream resumeLog;
+        const auto resumed = runEnemyTraining(options, resumeLog);
+        expect(resumed.succeeded && resumed.lastGeneration == 2U,
+            "cooperative population resumes at the next generation");
+        options.brainContract = gdp::gameplay::EnemyBrainContract::Tactical;
+        options.saveDirectory.reset();
+        std::ostringstream mismatchLog;
+        expect(!runEnemyTraining(options, mismatchLog).succeeded,
+            "tactical training refuses a cooperative population");
+    }
+    fs::remove_all(root);
 }
 
 void testTrainingAndPersistence()
@@ -276,6 +346,7 @@ void testTrainingAndPersistence()
         .generations = 2U,
         .saveDirectory = firstDirectory,
         .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
     };
     std::ostringstream output;
     const WorkerTrainingResult first = runWorkerTraining(options, output);
@@ -564,12 +635,109 @@ void testOtherArchetypes()
     expect(!error, "all-archetype temporary checkpoints are cleaned up");
 }
 
+
+void testFullPopulationAndEncounters()
+{
+    using namespace gdp::game::ai;
+    namespace fs = std::filesystem;
+    const auto root = fs::temp_directory_path() / ("gdp_full_population_" + std::to_string(
+        std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::create_directories(root);
+    WorkerTrainingOptions options;
+    options.seed = 42;
+    options.population = 4;
+    options.generations = 4;
+    options.curriculumGenerations = 3;
+    options.trainAllScenarios = true;
+    options.diverseMaps = true;
+    options.saveDirectory = root / "continuous";
+    std::ostringstream continuousLog;
+    const auto continuous = runWorkerTraining(options, continuousLog);
+    auto splitOptions = options;
+    splitOptions.generations = 2;
+    splitOptions.saveDirectory = root / "split";
+    std::ostringstream firstLog;
+    const auto first = runWorkerTraining(splitOptions, firstLog);
+    expect(continuous.succeeded && first.succeeded && first.lastPopulation,
+        "diverse curriculum saves full populations");
+    if (continuous.succeeded && first.lastPopulation) {
+        const auto saved = loadTrainingPopulation(*first.lastPopulation);
+        expect(saved && saved->population.size() == 4 && saved->generation == 2,
+            "population snapshot includes every ranked individual and progress");
+        splitOptions.resumePopulation = first.lastPopulation;
+        splitOptions.saveDirectory = root / "continued";
+        std::ostringstream continuedLog;
+        const auto continued = runWorkerTraining(splitOptions, continuedLog);
+        expect(continued.succeeded && continued.lastGeneration == 4
+            && continued.finalBest == continuous.finalBest
+            && continued.holdoutFitness == continuous.holdoutFitness,
+            "split run exactly matches uninterrupted fitness and holdout");
+        if (continued.champion && continuous.champion) {
+            expect(std::equal(continued.champion->network.parameters().begin(),
+                continued.champion->network.parameters().end(),
+                continuous.champion->network.parameters().begin()),
+                "full resume reproduces champion weights exactly");
+        }
+        const auto resumedPopulation = continued.lastPopulation
+            ? loadTrainingPopulation(*continued.lastPopulation) : std::nullopt;
+        const auto fullPopulation = loadTrainingPopulation(*continuous.lastPopulation);
+        bool identical = resumedPopulation && fullPopulation;
+        if (identical) for (std::size_t i = 0; i < fullPopulation->population.size(); ++i) {
+            const auto& a = fullPopulation->population[i];
+            const auto& b = resumedPopulation->population[i];
+            identical = identical && a.id == b.id && a.fitness == b.fitness
+                && std::equal(a.network.parameters().begin(), a.network.parameters().end(),
+                    b.network.parameters().begin());
+        }
+        expect(identical, "full resume reproduces the entire ranked population");
+        splitOptions.population = 8;
+        std::ostringstream mismatchLog;
+        expect(!runWorkerTraining(splitOptions, mismatchLog).succeeded,
+            "full resume refuses population-size mismatch");
+        splitOptions.population = 4;
+        splitOptions.diverseMaps = false;
+        expect(!runWorkerTraining(splitOptions, mismatchLog).succeeded,
+            "full resume refuses curriculum mismatch");
+        expect(saved && !saveTrainingPopulation(*first.lastPopulation, *saved),
+            "population snapshots never overwrite existing state");
+        fs::remove(*first.lastPopulation / "member-001.brain");
+        expect(!loadTrainingPopulation(*first.lastPopulation),
+            "missing member invalidates entire population snapshot");
+    }
+    for (unsigned variant = 1; variant <= 5; ++variant) {
+        for (unsigned seed = 1; seed <= 8; ++seed) {
+            const auto encounter = makeTrainingEncounter({{-4,0,-4},{4,4,4}}, seed, variant);
+            expect(encounter.collision.canOccupy(encounter.player, {.radius=0.35F,.height=1.8F})
+                && encounter.collision.canOccupy(encounter.enemy, {.radius=0.52F,.height=1.9F}),
+                "all varied encounters have physically valid spawns");
+            if (variant == 4) {
+                const auto approach = wkc::core::Vec3{encounter.player.x,0,encounter.player.z+0.9F};
+                expect(encounter.collision.canOccupy(approach, {.radius=0.35F,.height=1.8F})
+                    && gdp::gameplay::hasLineOfSight(approach+wkc::core::Vec3{0,1.3F,0},
+                        encounter.player+wkc::core::Vec3{0,1.6F,0}, encounter.collision),
+                    "height encounter has a reachable melee attack position without climbing");
+            }
+            if (variant == 3 || variant == 5) {
+                const auto hidden = encounter.player + wkc::core::Vec3{0,1.6F,0};
+                const auto peek = hidden + wkc::core::Vec3{encounter.peekWidth,0,0};
+                const auto eye = encounter.enemy + wkc::core::Vec3{0,1.3F,0};
+                expect(!gdp::gameplay::hasLineOfSight(eye,hidden,encounter.collision)
+                    && gdp::gameplay::hasLineOfSight(eye,peek,encounter.collision),
+                    "peek trajectory actually alternates blocked and visible positions");
+            }
+        }
+    }
+    fs::remove_all(root);
+}
+
 } // namespace
 
 int main()
 {
     testFitness();
+    testCooperativeTraining();
     testTrainingAndPersistence();
     testOtherArchetypes();
+    testFullPopulationAndEncounters();
     return failures == 0 ? 0 : 1;
 }

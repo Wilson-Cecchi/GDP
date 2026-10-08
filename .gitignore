@@ -2,6 +2,8 @@
 /.cache/
 /compile_commands.json
 /CODEX_WKC_FORGE_REFACTOR.md
+__pycache__/
+*.pyc
 
 *.log
 *.core

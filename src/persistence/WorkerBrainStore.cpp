@@ -47,14 +47,16 @@ bool validRecord(const WorkerBrainRecord& record) noexcept
 std::string serialize(const WorkerBrainRecord& record)
 {
     std::ostringstream output;
-    if (record.contract == gdp::gameplay::EnemyBrainContract::Tactical) {
+    if (record.contract == gdp::gameplay::EnemyBrainContract::Cooperative) {
+        output << "GDP_ENEMY_BRAIN 4\n";
+    } else if (record.contract == gdp::gameplay::EnemyBrainContract::Tactical) {
         output << "GDP_ENEMY_BRAIN 3\n";
     } else {
         output << "GDP_ENEMY_BRAIN 2\n";
     }
     output << "archetype " << static_cast<unsigned>(record.archetype) << '\n';
-    if (record.contract == gdp::gameplay::EnemyBrainContract::Tactical) {
-        output << "contract 2\n";
+    if (record.contract != gdp::gameplay::EnemyBrainContract::Legacy) {
+        output << "contract " << static_cast<unsigned>(record.contract) << '\n';
     }
     output
            << "seed " << record.trainingSeed << '\n'
@@ -116,7 +118,7 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
     if (!(input >> magic >> version)
         || !((magic == "GDP_WORKER_BRAIN" && version == 1U)
             || (magic == "GDP_ENEMY_BRAIN"
-                && (version == 2U || version == 3U)))) {
+                && (version == 2U || version == 3U || version == 4U)))) {
         return std::nullopt;
     }
     if (version >= 2U && (!(input >> key >> archetypeNumber)
@@ -127,14 +129,17 @@ std::optional<WorkerBrainRecord> parse(const std::string& content)
     }
     gdp::gameplay::EnemyBrainContract contract
         = gdp::gameplay::EnemyBrainContract::Legacy;
-    if (version == 3U) {
+    if (version == 3U || version == 4U) {
         unsigned contractNumber = 0U;
         if (!(input >> key >> contractNumber) || key != "contract"
-            || contractNumber != static_cast<unsigned>(
-                gdp::gameplay::EnemyBrainContract::Tactical)) {
+            || contractNumber != (version == 4U
+                ? static_cast<unsigned>(gdp::gameplay::EnemyBrainContract::Cooperative)
+                : static_cast<unsigned>(gdp::gameplay::EnemyBrainContract::Tactical))) {
             return std::nullopt;
         }
-        contract = gdp::gameplay::EnemyBrainContract::Tactical;
+        contract = version == 4U
+            ? gdp::gameplay::EnemyBrainContract::Cooperative
+            : gdp::gameplay::EnemyBrainContract::Tactical;
     }
     const auto shape = gdp::gameplay::enemyBrainShape(contract);
     const std::size_t parameterCount = shape.hidden * (shape.inputs + 1U)

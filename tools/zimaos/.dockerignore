@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!train_service.py
+!training_evaluation.py
+!compare_population.py
+!evaluate_final.py
+!compiled/
+!compiled/**
+!source/
+!source/SOURCE_COMMIT
+!source/assets/
+!source/assets/ai/
+!source/assets/ai/**

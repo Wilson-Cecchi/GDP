@@ -1,5 +1,7 @@
 #include "gameplay/EnemyProjectile.hpp"
 
+#include "gameplay/Combat.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -38,7 +40,67 @@ bool projectileHitsPlayer(
         && point.y <= feet.y + height;
 }
 
+bool projectileHitsEnemy(const wkc::core::Vec3 point,
+    const entities::Entity& entity,
+    const entities::EnemyData& enemy) noexcept
+{
+    const float radius = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
+        ? 0.52F : 0.35F;
+    const float height = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
+        ? 1.9F : 1.8F;
+    const wkc::core::Vec3 feet = entity.transform.position;
+    return std::hypot(point.x - feet.x, point.z - feet.z) <= radius + 0.10F
+        && point.y >= feet.y + 0.10F && point.y <= feet.y + height;
+}
+
+bool allyOnSegment(const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction, const float distance,
+    const entities::Entity& entity,
+    const entities::EnemyData& enemy) noexcept
+{
+    const wkc::core::Vec3 center = entity.transform.position
+        + wkc::core::Vec3{0.0F,
+            enemy.archetype == entities::EnemyArchetype::IndustrialRobot
+                ? 1.0F : 0.9F, 0.0F};
+    const float along = wkc::core::dot(center - origin, direction);
+    if (along <= 0.0F || along >= distance) {
+        return false;
+    }
+    // Deliberately conservative: this is only a prediction, not collision.
+    const float radius = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
+        ? 0.62F : 0.45F;
+    const wkc::core::Vec3 nearest = origin + direction * along;
+    return std::hypot(nearest.x - center.x, nearest.z - center.z) < radius
+        && nearest.y >= entity.transform.position.y + 0.10F
+        && nearest.y <= entity.transform.position.y + 1.9F;
+}
+
 } // namespace
+
+bool allyInEnemyFireLane(const entities::EntityManager& enemies,
+    const entities::EntityId shooter, const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction, const float distance) noexcept
+{
+    if (!std::isfinite(distance) || distance <= 0.0F
+        || !std::isfinite(wkc::core::length(direction))
+        || wkc::core::length(direction) <= 1.0e-6F) {
+        return false;
+    }
+    const wkc::core::Vec3 ray = wkc::core::normalized(direction);
+    for (const entities::EntityId id : enemies.query(entities::EntityKind::Enemy)) {
+        if (id == shooter) {
+            continue;
+        }
+        const entities::Entity* entity = enemies.find(id);
+        const entities::EnemyData* enemy = enemies.findData<entities::EnemyData>(id);
+        if (entity != nullptr && enemy != nullptr && enemy->active
+            && enemy->behavior != entities::EnemyBehaviorState::Dead
+            && allyOnSegment(origin, ray, distance, *entity, *enemy)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void EnemyProjectileSystem::spawn(const std::span<const EnemyProjectile> shots)
 {
@@ -53,7 +115,8 @@ void EnemyProjectileSystem::spawn(const std::span<const EnemyProjectile> shots)
 }
 
 std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
-    const float step, Player& player, const CollisionWorld& world)
+    const float step, Player& player, const CollisionWorld& world,
+    entities::EntityManager& enemies)
 {
     std::vector<EnemyProjectileEvent> events;
     if (!std::isfinite(step) || step <= 0.0F) {
@@ -61,6 +124,8 @@ std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
     }
     std::vector<EnemyProjectile> remaining;
     remaining.reserve(projectiles_.size());
+    const std::vector<entities::EntityId> enemyIds
+        = enemies.query(entities::EntityKind::Enemy);
     for (EnemyProjectile shot : projectiles_) {
         const wkc::core::Vec3 displacement = shot.velocity * step;
         const float distance = wkc::core::length(displacement);
@@ -77,6 +142,29 @@ std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
             }
             shot.position = next;
             shot.traveledDistance += distance / static_cast<float>(samples);
+            for (const entities::EntityId id : enemyIds) {
+                if (id == shot.source) {
+                    continue;
+                }
+                const entities::Entity* entity = enemies.find(id);
+                const entities::EnemyData* enemy
+                    = enemies.findData<entities::EnemyData>(id);
+                if (entity == nullptr || enemy == nullptr || !enemy->active
+                    || enemy->behavior == entities::EnemyBehaviorState::Dead
+                    || !projectileHitsEnemy(next, *entity, *enemy)) {
+                    continue;
+                }
+                const float healthBefore = enemy->health;
+                const DamageOutcome outcome = applyDamage(enemies, id, shot.damage);
+                events.push_back({shot.source, shot.neural, false, false, false,
+                    healthBefore - enemy->health, id,
+                    outcome == DamageOutcome::Killed});
+                finished = true;
+                break;
+            }
+            if (finished) {
+                break;
+            }
             if (player.state().alive && projectileHitsPlayer(next, player)) {
                 const float healthAndArmorBefore
                     = player.state().health + player.state().armor;

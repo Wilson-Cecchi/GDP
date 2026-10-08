@@ -2702,6 +2702,7 @@ void Application::fixedUpdate(const double fixedStep)
     const gameplay::EnemyPerception perception{
         .playerFlashlightOn = flashlightOn_,
         .projectiles = &spawnedProjectiles,
+        .difficulty = session_.state().difficulty,
     };
     const auto brainFor = [this](const entities::EnemyArchetype archetype)
         -> gameplay::NeuralEnemyExperiment* {
@@ -2787,9 +2788,20 @@ void Application::fixedUpdate(const double fixedStep)
     }
     enemyProjectiles_.spawn(spawnedProjectiles);
     for (const gameplay::EnemyProjectileEvent& event
-         : enemyProjectiles_.update(step, player_, collisionWorld_)) {
+         : enemyProjectiles_.update(step, player_, collisionWorld_, entities_)) {
         if (event.hitPlayer) {
             ++attacksLanded;
+        }
+        if (event.hitEnemy.isValid() && audio_) {
+            if (const entities::Entity* target = entities_.find(event.hitEnemy)) {
+                audio_->playAt(event.killedEnemy
+                        ? gdp::audio::AudioEventKind::EnemyDeath
+                        : gdp::audio::AudioEventKind::EnemyHit,
+                    config_.worldSeed, audioEventCounter_++,
+                    target->transform.position
+                        + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
+                    player_.cameraPosition(), player_.forwardDirection());
+            }
         }
     }
     if (world_) {

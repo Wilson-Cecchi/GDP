@@ -132,3 +132,44 @@ execute_process(
 if(mismatch_result EQUAL 0)
     message(FATAL_ERROR "Wrong-archetype brain override was accepted")
 endif()
+
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 12345 --frames 360 --team
+    RESULT_VARIABLE first_team_result
+    OUTPUT_VARIABLE first_team_output
+    ERROR_VARIABLE first_team_error)
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 12345 --frames 360 --team
+    RESULT_VARIABLE second_team_result
+    OUTPUT_VARIABLE second_team_output
+    ERROR_VARIABLE second_team_error)
+if(NOT first_team_result EQUAL 0 OR NOT second_team_result EQUAL 0
+    OR NOT first_team_output STREQUAL second_team_output)
+    message(FATAL_ERROR "AI team evaluation is not reproducible:\n"
+        "first=${first_team_result}: ${first_team_error}\n"
+        "second=${second_team_result}: ${second_team_error}")
+endif()
+string(REGEX MATCHALL "\n(scripted|neural)," team_rows "${first_team_output}")
+list(LENGTH team_rows team_row_count)
+if(NOT team_row_count EQUAL 6)
+    message(FATAL_ERROR "Expected 6 mixed-team rows, got ${team_row_count}")
+endif()
+foreach(scenario firing_lane officer_guard engineer_guard)
+    foreach(policy scripted neural)
+        string(FIND "${first_team_output}"
+            "${policy},${scenario},12345," position)
+        if(position EQUAL -1)
+            message(FATAL_ERROR "AI team evaluation missing ${policy}/${scenario}")
+        endif()
+    endforeach()
+endforeach()
+string(REGEX MATCH "scripted,firing_lane,12345,[^\n]*"
+    firing_lane_row "${first_team_output}")
+string(REPLACE "," ";" firing_lane_fields "${firing_lane_row}")
+list(GET firing_lane_fields 15 friendly_hits)
+list(GET firing_lane_fields 18 fire_holds)
+if(friendly_hits LESS 1 OR fire_holds LESS 1)
+    message(FATAL_ERROR "Firing-lane fixture did not exercise friendly fire: ${firing_lane_row}")
+endif()

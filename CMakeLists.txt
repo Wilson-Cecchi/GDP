@@ -341,6 +341,8 @@ add_library(
     STATIC
     src/game/ai/ActiveEnemyBrains.cpp
     src/game/ai/WorkerTraining.cpp
+    src/game/ai/TrainingPopulationStore.cpp
+    src/game/ai/TrainingEncounter.cpp
     src/game/ai/TrainingReward.cpp
 )
 target_compile_features(gdp_training PUBLIC cxx_std_20)

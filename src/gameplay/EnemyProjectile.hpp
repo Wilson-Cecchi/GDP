@@ -33,13 +33,25 @@ struct EnemyProjectileEvent {
     bool blocked{false};
     bool dodged{false};
     float damageApplied{0.0F};
+    entities::EntityId hitEnemy{};
+    bool killedEnemy{false};
 };
+
+// Predict whether a living ally obstructs a shot. Physical projectile
+// collision remains authoritative if either character moves after launch.
+[[nodiscard]] bool allyInEnemyFireLane(
+    const entities::EntityManager& enemies,
+    entities::EntityId shooter,
+    wkc::core::Vec3 origin,
+    wkc::core::Vec3 direction,
+    float distance) noexcept;
 
 class EnemyProjectileSystem {
 public:
     void spawn(std::span<const EnemyProjectile> shots);
     [[nodiscard]] std::vector<EnemyProjectileEvent> update(
-        float step, Player& player, const CollisionWorld& world);
+        float step, Player& player, const CollisionWorld& world,
+        entities::EntityManager& enemies);
     void clear() noexcept { projectiles_.clear(); }
     [[nodiscard]] std::span<const EnemyProjectile> projectiles() const noexcept
     {

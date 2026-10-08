@@ -99,6 +99,27 @@ int main()
     expect(!error, "test copies a mismatched brain under the guard filename");
     const auto mismatched = gdp::game::ai::loadActiveEnemyBrains(temporary);
     expect(!mismatched[1U], "wrong archetype brain is rejected per enemy type");
+
+    const auto shape = gdp::gameplay::enemyBrainShape(
+        gdp::gameplay::EnemyBrainContract::Cooperative);
+    gdp::persistence::EnemyBrainRecord cooperative{
+        wkc::ai::Genome{wkc::ai::NeuralNetwork{
+                shape.inputs, shape.hidden, shape.outputs},
+            0.0F, 1U, 0U},
+        99U, gdp::entities::EnemyArchetype::Guard,
+        gdp::gameplay::EnemyBrainContract::Cooperative};
+    const fs::path cooperativePath = temporary / "cooperative.brain";
+    expect(gdp::persistence::saveEnemyBrain(cooperativePath, cooperative),
+        "new cooperative contract can be saved without changing active assets");
+    const auto loadedCooperative
+        = gdp::persistence::loadEnemyBrain(cooperativePath);
+    expect(loadedCooperative
+            && loadedCooperative->contract
+                == gdp::gameplay::EnemyBrainContract::Cooperative
+            && loadedCooperative->genome.network.inputCount() == shape.inputs
+            && loadedCooperative->genome.network.hiddenCount() == shape.hidden,
+        "cooperative contract round-trips with its versioned shape");
+
     fs::remove_all(temporary, error);
     expect(!error, "test removes only its own temporary directory");
     return failures == 0 ? 0 : 1;

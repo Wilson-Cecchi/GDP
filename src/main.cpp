@@ -24,7 +24,9 @@ void printUsage(const std::string_view executable)
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
-                 " [--save-dir DIR] [--resume FILE]\n"
+                 " [--diverse-maps] [--curriculum-generations N]"
+                 " [--cooperative-brain]"
+                 " [--save-dir DIR] [--resume FILE | --resume-population DIR]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
 #if GDP_ENABLE_TEST_MODE
               << "  --test-mode          Open the dedicated development arena directly.\n"
@@ -44,6 +46,10 @@ void printUsage(const std::string_view executable)
               << "  --cooldown-ms N     Sleep 1..10000 ms between generations to limit heat.\n"
               << "  --save-dir DIR      Save one best-brain checkpoint per generation.\n"
               << "  --resume FILE       Seed a new training run from a checkpoint.\n"
+              << "  --resume-population DIR  Continue an entire saved population exactly.\n"
+              << "  --diverse-maps      Train varied cover, peek, height and boss-phase encounters.\n"
+              << "  --cooperative-brain  Train a versioned brain with ally and firing-lane inputs.\n"
+              << "  --curriculum-generations N  Initial curriculum length, preserved on full resume.\n"
               << "  --help               Show this message.\n";
 }
 
@@ -202,14 +208,22 @@ int main(const int argc, char* argv[])
             continue;
         }
 
-        if (argument == "--all-scenarios") {
-            trainingOptions.trainAllScenarios = true;
+        if (argument == "--all-scenarios" || argument == "--diverse-maps") {
+            if (argument == "--all-scenarios") trainingOptions.trainAllScenarios = true;
+            else trainingOptions.diverseMaps = true;
+            trainingOnlyArgumentSeen = true;
+            continue;
+        }
+
+        if (argument == "--cooperative-brain") {
+            trainingOptions.brainContract
+                = gdp::gameplay::EnemyBrainContract::Cooperative;
             trainingOnlyArgumentSeen = true;
             continue;
         }
 
         if (argument == "--population" || argument == "--generations"
-            || argument == "--cooldown-ms") {
+            || argument == "--cooldown-ms" || argument == "--curriculum-generations") {
             if (index + 1 >= argc) {
                 std::cerr << "Missing value after " << argument << '\n';
                 return 2;
@@ -223,6 +237,8 @@ int main(const int argc, char* argv[])
                 trainingOptions.population = *value;
             } else if (argument == "--generations") {
                 trainingOptions.generations = *value;
+            } else if (argument == "--curriculum-generations") {
+                trainingOptions.curriculumGenerations = *value;
             } else {
                 trainingOptions.cooldownMilliseconds = *value;
             }
@@ -230,7 +246,8 @@ int main(const int argc, char* argv[])
             continue;
         }
 
-        if (argument == "--save-dir" || argument == "--resume") {
+        if (argument == "--save-dir" || argument == "--resume"
+            || argument == "--resume-population") {
             if (index + 1 >= argc) {
                 std::cerr << "Missing value after " << argument << '\n';
                 return 2;
@@ -242,6 +259,8 @@ int main(const int argc, char* argv[])
             }
             if (argument == "--save-dir") {
                 trainingOptions.saveDirectory = value;
+            } else if (argument == "--resume-population") {
+                trainingOptions.resumePopulation = value;
             } else {
                 trainingOptions.resumeBrain = value;
             }
@@ -307,8 +326,8 @@ int main(const int argc, char* argv[])
             std::cerr << "Training cannot be combined with gameplay or benchmark options\n";
             return 2;
         }
-        if (trainAll && trainingOptions.resumeBrain) {
-            std::cerr << "--resume requires a single training archetype\n";
+        if (trainAll && (trainingOptions.resumeBrain || trainingOptions.resumePopulation)) {
+            std::cerr << "resume requires a single training archetype\n";
             return 2;
         }
         trainingOptions.seed = requestedSeed.value_or(12'345U);

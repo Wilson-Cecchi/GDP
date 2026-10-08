@@ -87,6 +87,86 @@ void testSensors()
         "hidden player velocity and aim do not leak to tactical sensors");
 }
 
+void testCooperativeSensorsAndMemory()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld arena{{{-12.0F, 0.0F, -12.0F},
+        {12.0F, 4.0F, 12.0F}}};
+    EntityManager manager;
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const EntityId guard = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    (void)manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.5F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    EnemyData* enemy = manager.findData<EnemyData>(guard);
+    const auto visible = sampleCooperativeEnemySensors(manager,
+        *manager.find(guard), *enemy, player, arena, true, 16.0F);
+    expect(visible.size()
+            == enemyBrainShape(EnemyBrainContract::Cooperative).inputs
+            && visible[static_cast<std::size_t>(
+                CooperativeEnemySensor::FireLaneBlocked)] == 1.0F
+            && visible[static_cast<std::size_t>(
+                CooperativeEnemySensor::AllyDistance)] > -1.0F,
+        "cooperative brain observes ally and blocked firing lane");
+
+    enemy->lastKnownPlayerPosition = {1.0F, 0.0F, 0.0F};
+    enemy->investigationTime = 3.0F;
+    player.spawn({0.0F, 0.0F, 8.0F});
+    const auto hidden = sampleCooperativeEnemySensors(manager,
+        *manager.find(guard), *enemy, player, arena, false, 16.0F);
+    player.spawn({2.0F, 0.0F, 8.0F});
+    const auto hiddenMoved = sampleCooperativeEnemySensors(manager,
+        *manager.find(guard), *enemy, player, arena, false, 16.0F);
+    expect(hidden == hiddenMoved
+            && hidden[static_cast<std::size_t>(
+                CooperativeEnemySensor::KnownTargetDistance)] > -1.0F
+            && hidden[static_cast<std::size_t>(
+                CooperativeEnemySensor::FireLaneBlocked)] == -1.0F,
+        "hidden player position never leaks through cooperative sensors");
+    enemy->investigationTime = 0.0F;
+    const auto forgotten = sampleCooperativeEnemySensors(manager,
+        *manager.find(guard), *enemy, player, arena, false, 16.0F);
+    expect(forgotten[static_cast<std::size_t>(
+                CooperativeEnemySensor::KnownTargetDistance)] == -1.0F,
+        "expired sighting is unavailable to the cooperative brain");
+
+    const auto pursueMemory = [&](const wkc::core::Vec3 hiddenPlayer) {
+        EntityManager isolated;
+        Player target;
+        target.spawn(hiddenPlayer);
+        const EntityId id = isolated.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 3.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1U, .archetype = EnemyArchetype::Guard});
+        EnemyData* data = isolated.findData<EnemyData>(id);
+        data->lastKnownPlayerPosition = {0.0F, 0.0F, 0.0F};
+        data->investigationTime = 3.0F;
+        NeuralEnemyExperiment brain{42U, EnemyArchetype::Guard,
+            EnemyBrainContract::Cooperative};
+        auto parameters = brain.genome.network.parameters();
+        std::fill(parameters.begin(), parameters.end(), 0.0F);
+        const auto shape = enemyBrainShape(EnemyBrainContract::Cooperative);
+        const std::size_t outputBase = shape.hidden * (shape.inputs + 1U);
+        parameters[outputBase + shape.hidden] = 1.0F;
+        brain.controlAll = true;
+        brain.logSelection = false;
+        (void)updateGuards(isolated, target, 1U, arena, 0.1F,
+            {}, {}, &brain);
+        expect(brain.controlledTicks == 1U,
+            "cooperative brain remains active during a valid hidden sighting");
+        return isolated.find(id)->transform.position;
+    };
+    const auto first = pursueMemory({0.0F, 0.0F, 8.0F});
+    const auto second = pursueMemory({2.0F, 0.0F, 8.0F});
+    expect(first == second && first.z < 3.0F,
+        "hidden-target movement follows remembered position, not actual player");
+}
+
 void testTacticalMovement()
 {
     using namespace gdp::gameplay;
@@ -529,6 +609,7 @@ void testActiveWorkerMaintainsMeleeThreat()
 void testEnemyProjectiles()
 {
     using namespace gdp::gameplay;
+    gdp::entities::EntityManager manager;
     const CollisionWorld clear{{{-10.0F, 0.0F, -10.0F},
         {10.0F, 4.0F, 10.0F}}};
     Player player;
@@ -541,7 +622,7 @@ void testEnemyProjectiles()
         "enemy projectile does not damage on firing");
     std::vector<EnemyProjectileEvent> events;
     for (int tick = 0; tick < 60 && events.empty(); ++tick) {
-        events = shots.update(1.0F / 60.0F, player, clear);
+        events = shots.update(1.0F / 60.0F, player, clear, manager);
     }
     expect(events.size() == 1U && events[0].hitPlayer
             && player.state().health == 92.0F,
@@ -554,7 +635,7 @@ void testEnemyProjectiles()
     shots.spawn(std::span{&incoming, 1U});
     events.clear();
     for (int tick = 0; tick < 60 && events.empty(); ++tick) {
-        events = shots.update(1.0F / 60.0F, player, covered);
+        events = shots.update(1.0F / 60.0F, player, covered, manager);
     }
     expect(events.size() == 1U && events[0].blocked
             && player.state().health == 100.0F,
@@ -565,11 +646,162 @@ void testEnemyProjectiles()
         "player relocates out of incoming trajectory");
     events.clear();
     for (int tick = 0; tick < 60 && events.empty(); ++tick) {
-        events = shots.update(1.0F / 60.0F, player, clear);
+        events = shots.update(1.0F / 60.0F, player, clear, manager);
     }
     expect(events.size() == 1U && events[0].dodged
             && player.state().health == 100.0F,
         "moving away from a threatening launch earns real dodge event");
+}
+
+void testEnemyFriendlyFire()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld clear{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 4.0F, 10.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId shooter = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 5.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EntityId front = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EntityId rear = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 2.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EnemyProjectile incoming{{0.0F, 1.2F, 5.0F},
+        {0.0F, 0.0F, -10.0F}, shooter, 1U, 8.0F, 0.8F,
+        true, true, 5.0F};
+    expect(allyInEnemyFireLane(manager, shooter, incoming.position,
+            incoming.velocity, 5.0F),
+        "firing lane detects ally between shooter and player");
+    EnemyProjectileSystem shots;
+    shots.spawn(std::span{&incoming, 1U});
+    std::vector<EnemyProjectileEvent> events;
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, clear, manager);
+    }
+    expect(events.size() == 1U && events[0].hitEnemy == front
+            && !events[0].hitPlayer && !events[0].killedEnemy
+            && events[0].damageApplied == 8.0F
+            && manager.findData<EnemyData>(front)->health == 42.0F
+            && manager.findData<EnemyData>(rear)->health == 50.0F
+            && manager.findData<EnemyData>(shooter)->health == 50.0F
+            && player.state().health == 100.0F,
+        "first living ally takes real damage; shooter and rear ally are safe");
+
+    manager.findData<EnemyData>(front)->health = 4.0F;
+    shots.spawn(std::span{&incoming, 1U});
+    events.clear();
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, clear, manager);
+    }
+    expect(events.size() == 1U && events[0].hitEnemy == front
+            && events[0].killedEnemy && events[0].damageApplied == 4.0F
+            && manager.findData<EnemyData>(front)->behavior
+                == EnemyBehaviorState::Dead,
+        "friendly fire uses normal enemy death state and reports actual damage");
+
+    const CollisionWorld covered{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 4.0F, 10.0F}},
+        {{{-1.0F, 0.0F, 4.0F}, {1.0F, 2.0F, 4.2F}}}};
+    shots.spawn(std::span{&incoming, 1U});
+    events.clear();
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, covered, manager);
+    }
+    expect(events.size() == 1U && events[0].blocked
+            && manager.findData<EnemyData>(rear)->health == 50.0F,
+        "world cover intercepts the shot before a living ally");
+
+    manager.find(rear)->transform.position = {0.0F, 0.0F, -2.0F};
+    expect(!allyInEnemyFireLane(manager, shooter, incoming.position,
+            incoming.velocity, 5.0F),
+        "dead and rear allies do not block a clear shot");
+    shots.spawn(std::span{&incoming, 1U});
+    events.clear();
+    for (int tick = 0; tick < 60 && events.empty(); ++tick) {
+        events = shots.update(1.0F / 60.0F, player, clear, manager);
+    }
+    expect(events.size() == 1U && events[0].hitPlayer
+            && player.state().health == 92.0F
+            && manager.findData<EnemyData>(rear)->health == 50.0F,
+        "dead ally is ignored and player takes the first live impact");
+}
+
+void testDifficultyAndFireDiscipline()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld arena{{{-12.0F, 0.0F, -12.0F},
+        {12.0F, 4.0F, 12.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const auto sharedAt = [&](const Difficulty difficulty, const float allyX) {
+        EntityManager manager;
+        (void)manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1U, .archetype = EnemyArchetype::Guard});
+        const EntityId ally = manager.createEnemy({
+            .transform = {.position = {allyX, 0.0F, 6.0F},
+                .rotationDegrees = {0.0F, 0.0F, 0.0F}},
+            .roomId = 1U, .archetype = EnemyArchetype::Worker});
+        std::vector<EnemyProjectile> shots;
+        (void)updateGuards(manager, player, 1U, arena, 1.0F / 60.0F,
+            {}, {.projectiles = &shots, .difficulty = difficulty});
+        return manager.findData<EnemyData>(ally)->investigationTime > 0.0F;
+    };
+    expect(!sharedAt(Difficulty::Easy, 5.0F)
+            && sharedAt(Difficulty::Normal, 5.0F)
+            && !sharedAt(Difficulty::Normal, 8.0F)
+            && sharedAt(Difficulty::Hard, 8.0F),
+        "team awareness range scales by difficulty and Easy stays independent");
+
+    EntityManager hiddenManager;
+    (void)hiddenManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 6.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EntityId hiddenAlly = hiddenManager.createEnemy({
+        .transform = {.position = {5.0F, 0.0F, 6.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    const CollisionWorld screened{{{-12.0F, 0.0F, -12.0F},
+        {12.0F, 4.0F, 12.0F}},
+        {{{-1.0F, 0.0F, 2.0F}, {1.0F, 3.0F, 3.0F}}}};
+    std::vector<EnemyProjectile> hiddenShots;
+    (void)updateGuards(hiddenManager, player, 1U, screened,
+        1.0F / 60.0F, {},
+        {.projectiles = &hiddenShots, .difficulty = Difficulty::Hard});
+    expect(hiddenManager.findData<EnemyData>(hiddenAlly)->investigationTime
+            == 0.0F,
+        "Hard cannot share a player position that no ally observed");
+
+    EntityManager manager;
+    const EntityId guard = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 6.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    (void)manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    std::vector<EnemyProjectile> shots;
+    const EnemyPerception perception{
+        .projectiles = &shots, .difficulty = Difficulty::Hard};
+    const EnemyUpdateSummary first = updateGuards(
+        manager, player, 1U, arena, 0.1F, {}, perception);
+    expect(first.friendlyFireHolds == 1U && shots.empty()
+            && manager.findData<EnemyData>(guard)->magazineAmmo == 8U
+            && std::abs(manager.find(guard)->transform.position.x) > 0.01F,
+        "blocked shooter holds fire without spending ammo and sidesteps");
+    for (int tick = 0; tick < 120 && shots.empty(); ++tick) {
+        (void)updateGuards(manager, player, 1U, arena,
+            1.0F / 60.0F, {}, perception);
+    }
+    expect(!shots.empty() && shots.front().source == guard,
+        "shooter eventually finds a clear lane rather than holding forever");
 }
 
 void testRangedEnemyFiresDelayedProjectile()
@@ -601,7 +833,7 @@ void testRangedEnemyFiresDelayedProjectile()
     bool hit = false;
     for (int tick = 0; tick < 120 && !hit; ++tick) {
         for (const auto& event : projectiles.update(1.0F / 60.0F,
-                 player, arena)) {
+                 player, arena, manager)) {
             hit |= event.hitPlayer;
         }
     }
@@ -614,6 +846,7 @@ void testRangedEnemyFiresDelayedProjectile()
 int main()
 {
     testSensors();
+    testCooperativeSensorsAndMemory();
     testTacticalMovement();
     testExperimentalWorker();
     testNeuralWorkerRemembersVisiblePlayer();
@@ -624,6 +857,8 @@ int main()
     testNeuralBrainControlsEveryEnemyIndependently();
     testActiveWorkerMaintainsMeleeThreat();
     testEnemyProjectiles();
+    testEnemyFriendlyFire();
+    testDifficultyAndFireDiscipline();
     testRangedEnemyFiresDelayedProjectile();
     return failures == 0 ? 0 : 1;
 }

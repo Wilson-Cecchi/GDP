@@ -6,6 +6,7 @@
 #include "gameplay/EnemyBrainContract.hpp"
 #include "gameplay/EnemyProjectile.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/Session.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -137,6 +138,7 @@ struct EnemyPerception {
     bool playerFlashlightOn{false};
     std::vector<EnemyProjectile>* projectiles{nullptr};
     bool allowAttacks{true};
+    Difficulty difficulty{Difficulty::Normal};
 };
 
 struct NeuralEnemyMotorState {
@@ -185,6 +187,7 @@ struct EnemyUpdateSummary {
     std::size_t attacking{0};
     std::size_t attacksLanded{0};
     std::size_t shotsFired{0};
+    std::size_t friendlyFireHolds{0};
     std::size_t reloadsStarted{0};
     std::size_t commandsIssued{0};
     std::size_t alliesSupported{0};

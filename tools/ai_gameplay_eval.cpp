@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -33,6 +34,13 @@ constexpr std::array<std::string_view, 5> scenarioNames{
     "open", "center_cover", "elevated", "group", "boss_cover"};
 constexpr std::array<std::string_view, 2> duelScenarioNames{
     "ground_strafe", "bhop"};
+constexpr std::array<std::string_view, 3> teamScenarioNames{
+    "firing_lane", "officer_guard", "engineer_guard"};
+constexpr std::array<std::array<EnemyArchetype, 2>, 3> teamPairs{{
+    {EnemyArchetype::Guard, EnemyArchetype::Worker},
+    {EnemyArchetype::Officer, EnemyArchetype::Guard},
+    {EnemyArchetype::Engineer, EnemyArchetype::Guard},
+}};
 constexpr float fixedStep = 1.0F / 60.0F;
 
 struct EvaluationOptions {
@@ -41,6 +49,7 @@ struct EvaluationOptions {
     std::uint64_t seed{12'345U};
     std::uint32_t frames{360U};
     bool duel{false};
+    bool team{false};
 };
 
 struct ScenarioResult {
@@ -79,13 +88,31 @@ struct DuelResult {
     float enemyTravel{0.0F};
 };
 
+struct TeamResult {
+    std::string_view outcome{"timeout"};
+    std::uint32_t elapsedFrames{0U};
+    std::size_t playerShots{0U};
+    std::size_t playerHits{0U};
+    std::size_t enemyShots{0U};
+    std::size_t enemyHits{0U};
+    std::size_t friendlyHits{0U};
+    std::size_t friendlyKills{0U};
+    std::size_t fireHolds{0U};
+    std::size_t supportActions{0U};
+    std::uint64_t neuralTicks{0U};
+    float playerDamage{0.0F};
+    float enemyDamage{0.0F};
+    float friendlyDamage{0.0F};
+};
+
 void printUsage()
 {
     std::cout << "Usage: gdp_ai_gameplay_eval [--brain-dir DIR]"
-                 " [--brain TYPE=FILE] [--seed N] [--frames N] [--duel]\n"
+                 " [--brain TYPE=FILE] [--seed N] [--frames N] [--duel|--team]\n"
                  "Compares scripted and trained enemy AI in deterministic combat"
                  " fixtures built inside generated Start/Boss rooms.\n"
-                 "--duel adds player hitscan and physics-based ground/Bhop movement.\n";
+                 "--duel adds player hitscan and physics-based ground/Bhop movement.\n"
+                 "--team evaluates mixed-role fights and friendly-fire telemetry.\n";
 }
 
 std::optional<std::uint64_t> parseUnsigned(const std::string_view text)
@@ -122,6 +149,10 @@ std::optional<EvaluationOptions> parseOptions(const int argc, char* argv[])
             options.duel = true;
             continue;
         }
+        if (argument == "--team") {
+            options.team = true;
+            continue;
+        }
         if (index + 1 >= argc) {
             std::cerr << "Missing value for " << argument << '\n';
             return std::nullopt;
@@ -156,6 +187,10 @@ std::optional<EvaluationOptions> parseOptions(const int argc, char* argv[])
             std::cerr << "Unknown option: " << argument << '\n';
             return std::nullopt;
         }
+    }
+    if (options.duel && options.team) {
+        std::cerr << "Choose --duel or --team, not both\n";
+        return std::nullopt;
     }
     return options;
 }
@@ -346,7 +381,7 @@ std::optional<ScenarioResult> runScenario(
         result.hits += summary.attacksLanded;
         result.enemyShots += summary.shotsFired;
         result.reloads += summary.reloadsStarted;
-        for (const auto& event : projectiles.update(fixedStep, player, collision)) {
+        for (const auto& event : projectiles.update(fixedStep, player, collision, manager)) {
             result.hits += event.hitPlayer ? 1U : 0U;
             result.blockedShots += event.blocked ? 1U : 0U;
             result.dodgedShots += event.dodged ? 1U : 0U;
@@ -495,7 +530,7 @@ std::optional<DuelResult> runDuelScenario(
         result.enemyHits += summary.attacksLanded;
         result.enemyShots += summary.shotsFired;
         result.reloads += summary.reloadsStarted;
-        for (const auto& event : projectiles.update(fixedStep, player, collision)) {
+        for (const auto& event : projectiles.update(fixedStep, player, collision, manager)) {
             result.enemyHits += event.hitPlayer ? 1U : 0U;
             result.blockedShots += event.blocked ? 1U : 0U;
             result.dodgedShots += event.dodged ? 1U : 0U;
@@ -510,6 +545,206 @@ std::optional<DuelResult> runDuelScenario(
     result.damageToPlayer = 100.0F - player.state().health;
     result.neuralTicks = brain ? brain->controlledTicks : 0U;
     return result;
+}
+
+std::optional<TeamResult> runTeamScenario(
+    const gdp::world::World& world,
+    const std::size_t scenario,
+    const bool neural,
+    const gdp::game::ai::ActiveEnemyBrainCatalog& records,
+    const std::uint32_t frames)
+{
+    using namespace gdp;
+    if (scenario >= teamPairs.size()) {
+        return std::nullopt;
+    }
+    const world::RoomInstance* room = roomFor(world, EnemyArchetype::Guard);
+    if (room == nullptr) {
+        return std::nullopt;
+    }
+    const Vec3 center = (room->worldBounds.minimum
+        + room->worldBounds.maximum) * 0.5F;
+    const float floor = room->worldBounds.minimum.y;
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
+        world.masterSeed, 0x5445414d46585452ULL, scenario)};
+    const float playerLateral = random.rangeFloat(-0.35F, 0.35F);
+    const float enemyLateral = playerLateral
+        + random.rangeFloat(scenario == 0U ? -0.12F : -0.65F,
+            scenario == 0U ? 0.12F : 0.65F);
+    const float separation = random.rangeFloat(2.2F, 2.8F);
+    const std::uint32_t strafePeriod = static_cast<std::uint32_t>(
+        random.rangeInt(32, 58));
+    const float strafeSpeed = random.rangeFloat(0.45F, 0.75F);
+    const Vec3 playerStart{center.x + playerLateral, floor, center.z - separation};
+    const Vec3 primaryStart{center.x + enemyLateral
+            + (scenario == 0U ? 0.0F : -1.1F),
+        floor, center.z + 2.4F};
+    const Vec3 allyStart{center.x + enemyLateral
+            + (scenario == 0U ? 0.0F : 1.1F),
+        floor, center.z + (scenario == 0U ? 0.7F : 1.6F)};
+    const CollisionWorld collision{room->worldBounds, {}};
+    if (!collision.canOccupy(playerStart)
+        || !collision.canOccupy(primaryStart)
+        || !collision.canOccupy(allyStart)) {
+        return std::nullopt;
+    }
+    gameplay::Player player;
+    player.spawn(playerStart);
+    entities::EntityManager manager;
+    const auto types = teamPairs[scenario];
+    const std::array<Vec3, 2> starts{primaryStart, allyStart};
+    std::array<EntityId, 2> ids{};
+    std::array<float, 2> startingHealth{};
+    for (std::size_t index = 0U; index < ids.size(); ++index) {
+        startingHealth[index] = scenario == 2U && index == 1U
+            ? 35.0F : enemyHealth(types[index]);
+        ids[index] = manager.createEnemy({
+            .transform = {.position = starts[index],
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = room->id,
+            .archetype = types[index],
+            .health = enemyHealth(types[index]),
+            .visualSeed = world.masterSeed + index + 1U,
+        });
+        manager.findData<entities::EnemyData>(ids[index])->health
+            = startingHealth[index];
+    }
+    gameplay::Weapon weapon{{10.0F, 0.65F, 30.0F, 8U, 32U,
+        gameplay::WeaponArchetype::Pistol}};
+    std::array<std::optional<gameplay::NeuralEnemyExperiment>, 5> brains;
+    if (neural) {
+        for (const EnemyArchetype type : types) {
+            const std::size_t index = static_cast<std::size_t>(type);
+            if (!records[index]) {
+                return std::nullopt;
+            }
+            brains[index].emplace(world.masterSeed, type, records[index]->contract);
+            brains[index]->genome = records[index]->genome;
+            brains[index]->controlAll = true;
+            brains[index]->logSelection = false;
+        }
+    }
+
+    TeamResult result;
+    gameplay::EnemyProjectileSystem projectiles;
+    for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
+        gameplay::PlayerCommand command;
+        command.moveRight = (frame / strafePeriod) % 2U == 0U
+            ? strafeSpeed : -strafeSpeed;
+        player.fixedUpdate(command, fixedStep, collision);
+        weapon.fixedUpdate(fixedStep);
+        EntityId targetId;
+        float nearest = std::numeric_limits<float>::infinity();
+        for (const EntityId id : ids) {
+            const auto* enemy = manager.findData<entities::EnemyData>(id);
+            if (enemy == nullptr
+                || enemy->behavior == entities::EnemyBehaviorState::Dead) {
+                continue;
+            }
+            const float distance = planarDistance(
+                manager.find(id)->transform.position, player.state().position);
+            if (distance < nearest) {
+                nearest = distance;
+                targetId = id;
+            }
+        }
+        if (weapon.magazineAmmo() == 0U) {
+            (void)weapon.reload();
+        } else if (targetId.isValid() && !weapon.reloading()
+            && weapon.cooldownRemaining() <= 0.0F) {
+            const Vec3 target = manager.find(targetId)->transform.position
+                + Vec3{0.0F, 1.0F, 0.0F};
+            const auto shot = gameplay::fireHitscan(weapon,
+                player.cameraPosition(),
+                wkc::core::normalized(target - player.cameraPosition()),
+                room->id, collision, manager, 0.0F);
+            if (shot.outcome != gameplay::ShotOutcome::Cooldown
+                && shot.outcome != gameplay::ShotOutcome::Reloading
+                && shot.outcome != gameplay::ShotOutcome::Switching
+                && shot.outcome != gameplay::ShotOutcome::Empty) {
+                ++result.playerShots;
+            }
+            if (shot.hit && manager.findData<entities::EnemyData>(shot.hit->target)
+                && (shot.outcome == gameplay::ShotOutcome::Hit
+                    || shot.outcome == gameplay::ShotOutcome::Killed)) {
+                ++result.playerHits;
+            }
+        }
+        result.elapsedFrames = frame;
+        const bool allEnemiesDead = std::all_of(ids.begin(), ids.end(),
+            [&manager](const EntityId id) {
+                return manager.findData<entities::EnemyData>(id)->behavior
+                    == entities::EnemyBehaviorState::Dead;
+            });
+        if (allEnemiesDead) {
+            result.outcome = "player_win";
+            break;
+        }
+
+        std::vector<gameplay::EnemyProjectile> shots;
+        for (const EnemyArchetype type : types) {
+            const std::size_t index = static_cast<std::size_t>(type);
+            auto* brain = neural ? &*brains[index] : nullptr;
+            const auto summary = updateEnemy(type, manager, player,
+                room->id, collision, brain, shots);
+            result.enemyHits += summary.attacksLanded;
+            result.enemyShots += summary.shotsFired;
+            result.fireHolds += summary.friendlyFireHolds;
+            result.supportActions += summary.commandsIssued
+                + summary.repairsPerformed;
+        }
+        projectiles.spawn(shots);
+        for (const auto& event
+            : projectiles.update(fixedStep, player, collision, manager)) {
+            result.enemyHits += event.hitPlayer ? 1U : 0U;
+            result.friendlyHits += event.hitEnemy.isValid() ? 1U : 0U;
+            result.friendlyKills += event.killedEnemy ? 1U : 0U;
+            if (event.hitEnemy.isValid()) {
+                result.friendlyDamage += event.damageApplied;
+            }
+        }
+        if (!player.state().alive) {
+            result.outcome = "enemy_win";
+            break;
+        }
+    }
+    result.playerDamage = 100.0F - player.state().health;
+    for (std::size_t index = 0U; index < ids.size(); ++index) {
+        const auto* enemy = manager.findData<entities::EnemyData>(ids[index]);
+        result.enemyDamage += std::max(0.0F,
+            startingHealth[index] - enemy->health);
+    }
+    for (const auto& brain : brains) {
+        if (brain) {
+            result.neuralTicks += brain->controlledTicks;
+        }
+    }
+    return result;
+}
+
+void printTeamRow(const std::string_view policy,
+    const std::string_view scenario,
+    const std::uint64_t seed,
+    const EnemyArchetype primary,
+    const EnemyArchetype ally,
+    const gdp::game::ai::ActiveEnemyBrainCatalog& records,
+    const TeamResult& result)
+{
+    const auto generation = [&](const EnemyArchetype type) {
+        const auto& record = records[static_cast<std::size_t>(type)];
+        return policy == "neural" && record ? record->genome.generation : 0U;
+    };
+    std::cout << policy << ',' << scenario << ',' << seed << ','
+              << archetypeNames[static_cast<std::size_t>(primary)] << ','
+              << archetypeNames[static_cast<std::size_t>(ally)] << ','
+              << generation(primary) << ',' << generation(ally) << ','
+              << result.outcome << ',' << result.elapsedFrames << ','
+              << result.playerDamage << ',' << result.enemyDamage << ','
+              << result.playerShots << ',' << result.playerHits << ','
+              << result.enemyShots << ',' << result.enemyHits << ','
+              << result.friendlyHits << ',' << result.friendlyKills << ','
+              << result.friendlyDamage << ',' << result.fireHolds << ','
+              << result.supportActions << ',' << result.neuralTicks << '\n';
 }
 
 void printDuelRow(const std::string_view policy,
@@ -581,6 +816,28 @@ int main(const int argc, char* argv[])
         return 1;
     }
     std::cout << std::fixed << std::setprecision(3);
+    if (options->team) {
+        std::cout << "policy,scenario,seed,primary,ally,primary_generation,"
+                     "ally_generation,outcome,elapsed_frames,player_damage,"
+                     "enemy_damage,player_shots,player_hits,enemy_shots,"
+                     "enemy_hits,friendly_hits,friendly_kills,friendly_damage,"
+                     "fire_holds,support_actions,neural_ticks\n";
+        for (std::size_t scenario = 0U; scenario < teamScenarioNames.size(); ++scenario) {
+            for (const bool neural : {false, true}) {
+                const auto result = runTeamScenario(*generated.world,
+                    scenario, neural, brains, options->frames);
+                if (!result) {
+                    std::cerr << "Invalid team fixture: "
+                              << teamScenarioNames[scenario] << '\n';
+                    return 1;
+                }
+                printTeamRow(neural ? "neural" : "scripted",
+                    teamScenarioNames[scenario], options->seed,
+                    teamPairs[scenario][0], teamPairs[scenario][1], brains, *result);
+            }
+        }
+        return 0;
+    }
     if (options->duel) {
         std::cout << "policy,scenario,archetype,seed,brain_generation,"
                      "outcome,elapsed_frames,player_shots,player_hits,"

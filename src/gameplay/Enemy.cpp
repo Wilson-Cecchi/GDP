@@ -19,6 +19,20 @@ namespace {
 
 constexpr std::uint32_t rangedMagazineCapacity = 8U;
 
+struct EnemyFireContext {
+    gdp::entities::EntityManager& manager;
+    std::span<const gdp::entities::EntityId> enemyIds;
+    const CollisionWorld& collisionWorld;
+    float step;
+    float moveSpeed;
+    CharacterCollider collider;
+};
+
+void sidestepBlockedShot(EnemyFireContext context,
+    gdp::entities::Entity& entity, gdp::entities::EnemyData& enemy,
+    gdp::entities::EntityId id, const Player& player,
+    Difficulty difficulty) noexcept;
+
 void advanceEnemyReload(gdp::entities::EnemyData& enemy, const float step) noexcept
 {
     if (enemy.reloadRemaining <= 0.0F) {
@@ -48,7 +62,8 @@ bool startEnemyReload(gdp::entities::EnemyData& enemy,
 bool fireRangedEnemy(gdp::entities::Entity& entity,
     gdp::entities::EnemyData& enemy, const gdp::entities::EntityId id,
     Player& player, const float damage, const EnemyPerception perception,
-    const bool neural, EnemyUpdateSummary& summary)
+    const bool neural, EnemyUpdateSummary& summary,
+    const EnemyFireContext context)
 {
     if (perception.projectiles == nullptr) {
         player.applyDamage(damage);
@@ -75,6 +90,14 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
         target.x - muzzle.x, target.z - muzzle.z));
     const wkc::core::Vec3 direction = wkc::core::normalized({
         horizontal.x, (target.y - muzzle.y) / horizontalDistance, horizontal.z});
+    const float targetDistance = wkc::core::length(target - muzzle);
+    if (allyInEnemyFireLane(context.manager, id, muzzle, direction,
+            targetDistance)) {
+        ++summary.friendlyFireHolds;
+        sidestepBlockedShot(context, entity, enemy, id, player,
+            perception.difficulty);
+        return false;
+    }
     const float speed = enemy.archetype
             == gdp::entities::EnemyArchetype::IndustrialRobot ? 18.0F
         : enemy.archetype == gdp::entities::EnemyArchetype::Officer ? 13.0F
@@ -514,6 +537,37 @@ wkc::core::Vec3 moveEnemy(
     return detour.position;
 }
 
+void sidestepBlockedShot(const EnemyFireContext context,
+    gdp::entities::Entity& entity, gdp::entities::EnemyData& enemy,
+    const gdp::entities::EntityId id, const Player& player,
+    const Difficulty difficulty) noexcept
+{
+    const wkc::core::Vec3 offset = player.state().position
+        - entity.transform.position;
+    const wkc::core::Vec3 planar{offset.x, 0.0F, offset.z};
+    if (wkc::core::length(planar) <= 1.0e-6F) {
+        return;
+    }
+    const wkc::core::Vec3 toward = wkc::core::normalized(planar);
+    const wkc::core::Vec3 right{toward.z, 0.0F, -toward.x};
+    const float speedScale = difficulty == Difficulty::Hard ? 1.0F
+        : difficulty == Difficulty::Easy ? 0.45F : 0.75F;
+    const float sign = ((id.packed() ^ enemy.visualSeed) & 1U) == 0U
+        ? 1.0F : -1.0F;
+    const wkc::core::Vec3 previous = entity.transform.position;
+    for (const float side : {sign, -sign}) {
+        const wkc::core::Vec3 next = moveEnemy(
+            context.manager, context.enemyIds, context.collisionWorld,
+            id, entity.roomId, enemy, previous, right * side,
+            context.moveSpeed * speedScale, context.step, context.collider);
+        if (planarDistanceSquared(next, previous) > 1.0e-8F) {
+            entity.transform.position = next;
+            break;
+        }
+    }
+    enemy.behavior = gdp::entities::EnemyBehaviorState::Reposition;
+}
+
 constexpr float travelTurnRateDegreesPerSecond = 480.0F;
 constexpr float targetTurnRateDegreesPerSecond = 720.0F;
 
@@ -767,6 +821,39 @@ void rememberVisiblePlayer(
     enemy.investigationTime = investigationWindow(
         config, planarDistance, moveSpeed);
     enemy.recoverTime = 0.0F;
+}
+
+void shareVisiblePlayerWithAllies(
+    gdp::entities::EntityManager& manager,
+    const std::span<const gdp::entities::EntityId> enemyIds,
+    const gdp::entities::EntityId observerId,
+    const gdp::entities::Entity& observer,
+    const Player& player,
+    const Difficulty difficulty) noexcept
+{
+    if (difficulty == Difficulty::Easy || !player.state().alive) {
+        return;
+    }
+    const float range = difficulty == Difficulty::Hard ? 12.0F : 7.0F;
+    const float memory = difficulty == Difficulty::Hard ? 3.0F : 1.5F;
+    for (const gdp::entities::EntityId id : enemyIds) {
+        if (id == observerId) {
+            continue;
+        }
+        const gdp::entities::Entity* allyEntity = manager.find(id);
+        gdp::entities::EnemyData* ally
+            = manager.findData<gdp::entities::EnemyData>(id);
+        if (allyEntity == nullptr || ally == nullptr || !ally->active
+            || ally->behavior == gdp::entities::EnemyBehaviorState::Dead
+            || allyEntity->roomId != observer.roomId
+            || planarDistanceSquared(allyEntity->transform.position,
+                observer.transform.position) > range * range) {
+            continue;
+        }
+        ally->lastKnownPlayerPosition = player.state().position;
+        ally->investigationTime = std::max(ally->investigationTime, memory);
+        ally->recoverTime = 0.0F;
+    }
 }
 
 bool updateEnemyAlert(
@@ -1052,10 +1139,14 @@ bool updateNeuralEnemy(
             return false;
         }
     }
-    // Without a current sighting the network has no target-position sensor.
-    // Let the regular alert/investigation/navigation states use legitimate
-    // last-known information instead of drifting on stale motor outputs.
-    if (!lineOfSight) {
+    // Older contracts have no remembered-target sensor. A cooperative brain
+    // can pursue only a sighting that is still within its memory window.
+    const bool cooperative = experiment->contract == EnemyBrainContract::Cooperative;
+    if (!lineOfSight && cooperative) {
+        enemy.investigationTime = std::max(0.0F,
+            enemy.investigationTime - step);
+    }
+    if (!lineOfSight && (!cooperative || enemy.investigationTime <= 0.0F)) {
         if (experiment->controlAll) {
             const auto motor = experiment->motors.find(id.packed());
             if (motor != experiment->motors.end()) {
@@ -1082,17 +1173,28 @@ bool updateNeuralEnemy(
     ++experiment->controlledTicks;
     *decisionSecondsRemaining -= step;
     if (*decisionSecondsRemaining <= 0.0F) {
-        const std::vector<float> decision = experiment->contract
-                == EnemyBrainContract::Tactical
-            ? experiment->genome.network.forward(sampleTacticalEnemySensors(
-                entity, enemy, player, collisionWorld, lineOfSight,
-                detectionRange))
-            : experiment->genome.network.forward(sampleEnemySensors(
+        std::vector<float> decision;
+        switch (experiment->contract) {
+        case EnemyBrainContract::Legacy:
+            decision = experiment->genome.network.forward(sampleEnemySensors(
                 entity, enemy, player, collisionWorld, lineOfSight,
                 detectionRange));
+            break;
+        case EnemyBrainContract::Tactical:
+            decision = experiment->genome.network.forward(sampleTacticalEnemySensors(
+                entity, enemy, player, collisionWorld, lineOfSight,
+                detectionRange));
+            break;
+        case EnemyBrainContract::Cooperative:
+            decision = experiment->genome.network.forward(sampleCooperativeEnemySensors(
+                manager, entity, enemy, player, collisionWorld, lineOfSight,
+                detectionRange));
+            break;
+        }
         outputs->fill(0.0F);
         std::copy(decision.begin(), decision.end(), outputs->begin());
-        *decisionSecondsRemaining = 0.1F;
+        *decisionSecondsRemaining = perception.difficulty == Difficulty::Hard
+            ? 0.07F : perception.difficulty == Difficulty::Easy ? 0.15F : 0.1F;
     }
 
     constexpr float radiansPerDegree = 0.01745329251994329577F;
@@ -1105,7 +1207,7 @@ bool updateNeuralEnemy(
     // independent orthogonal axes with the same diagonal normalization as the
     // Player; changing old weights' meaning would silently break them.
     constexpr float maximumStrafeRatio = 0.25F;
-    const bool tactical = experiment->contract == EnemyBrainContract::Tactical;
+    const bool tactical = experiment->contract != EnemyBrainContract::Legacy;
     const float forwardIntent = tactical
         ? std::clamp((*outputs)[0], -1.0F, 1.0F)
         : std::abs((*outputs)[0]) < 0.15F
@@ -1117,8 +1219,10 @@ bool updateNeuralEnemy(
         + right * lateral;
     const wkc::core::Vec3 desired = wkc::core::length(rawDesired) > 1.0F
         ? wkc::core::normalized(rawDesired) : rawDesired;
+    const wkc::core::Vec3 targetPosition = lineOfSight
+        ? player.state().position : enemy.lastKnownPlayerPosition;
     const float distanceBeforeMovement = std::sqrt(
-        planarDistanceSquared(entity.transform.position, player.state().position));
+        planarDistanceSquared(entity.transform.position, targetPosition));
     const bool holdMeleeRange = motor != nullptr
         && enemy.archetype == gdp::entities::EnemyArchetype::Worker
         && distanceBeforeMovement <= attackRange;
@@ -1139,10 +1243,10 @@ bool updateNeuralEnemy(
                 ? enemy.avoidanceSide
                 : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
             const auto approach = reachablePlayerApproach(
-                collisionWorld, start, player.state().position, collider,
+                collisionWorld, start, targetPosition, collider,
                 preferredSide);
             const bool blockedApproach = approach
-                && planarDistanceSquared(*approach, player.state().position)
+                && planarDistanceSquared(*approach, targetPosition)
                     > 1.0e-6F;
             if (blockedApproach
                 && planarDistanceSquared(start, *approach) < 0.04F) {
@@ -1170,7 +1274,7 @@ bool updateNeuralEnemy(
         if (navigating) {
             turnEnemyToward(entity,
                 reachedApproach
-                    ? player.state().position - entity.transform.position
+                    ? targetPosition - entity.transform.position
                     : entity.transform.position - previous,
                 step, reachedApproach ? targetTurnRateDegreesPerSecond
                                       : travelTurnRateDegreesPerSecond);
@@ -1183,7 +1287,7 @@ bool updateNeuralEnemy(
     }
 
     const wkc::core::Vec3 attackOffset
-        = player.state().position - entity.transform.position;
+        = targetPosition - entity.transform.position;
     const float attackDistance = wkc::core::length(
         {attackOffset.x, 0.0F, attackOffset.z});
     const bool attackRequested = perception.allowAttacks
@@ -1223,7 +1327,9 @@ bool updateNeuralEnemy(
                 enemy.attackCooldown = attackInterval;
                 ++summary.attacksLanded;
             } else if (fireRangedEnemy(entity, enemy, id, player,
-                    attackDamage, perception, true, summary)) {
+                    attackDamage, perception, true, summary,
+                    {manager, enemyIds, collisionWorld, step, moveSpeed,
+                        collider})) {
                 enemy.attackCooldown = attackInterval;
             }
         }
@@ -1436,6 +1542,8 @@ EnemyUpdateSummary updateWorkers(
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
+            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                player, perception.difficulty);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1544,6 +1652,8 @@ EnemyUpdateSummary updateGuards(
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
+            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                player, perception.difficulty);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1609,7 +1719,9 @@ EnemyUpdateSummary updateGuards(
             step, targetTurnRateDegreesPerSecond);
         if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
-                    config.attackDamage, perception, false, summary)) {
+                    config.attackDamage, perception, false, summary,
+                    {manager, enemyIds, collisionWorld, step,
+                        config.moveSpeed, {.radius = 0.35F, .height = 1.8F}})) {
                 enemy->attackCooldown = config.attackInterval;
             }
         }
@@ -1675,6 +1787,8 @@ EnemyUpdateSummary updateOfficers(
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
+            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                player, perception.difficulty);
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1775,7 +1889,9 @@ EnemyUpdateSummary updateOfficers(
             step, targetTurnRateDegreesPerSecond);
         if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
-                    config.attackDamage, perception, false, summary)) {
+                    config.attackDamage, perception, false, summary,
+                    {manager, enemyIds, collisionWorld, step,
+                        config.moveSpeed, {.radius = 0.35F, .height = 1.8F}})) {
                 enemy->attackCooldown = config.attackInterval;
             }
         }
@@ -1844,6 +1960,8 @@ EnemyUpdateSummary updateEngineers(
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
+            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                player, perception.difficulty);
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -1982,7 +2100,9 @@ EnemyUpdateSummary updateEngineers(
             step, targetTurnRateDegreesPerSecond);
         if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
-                    config.attackDamage, perception, false, summary)) {
+                    config.attackDamage, perception, false, summary,
+                    {manager, enemyIds, collisionWorld, step,
+                        config.moveSpeed, {.radius = 0.35F, .height = 1.8F}})) {
                 enemy->attackCooldown = config.attackInterval;
             }
         }
@@ -2112,6 +2232,8 @@ EnemyUpdateSummary updateIndustrialRobots(
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, moveSpeed);
+            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                player, perception.difficulty);
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -2176,7 +2298,9 @@ EnemyUpdateSummary updateIndustrialRobots(
             step, targetTurnRateDegreesPerSecond);
         if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
             if (fireRangedEnemy(*entity, *enemy, id, player,
-                    attackDamage, perception, false, summary)) {
+                    attackDamage, perception, false, summary,
+                    {manager, enemyIds, collisionWorld, step,
+                        moveSpeed, {.radius = 0.52F, .height = 1.9F}})) {
                 enemy->attackCooldown = attackInterval;
             }
         }
