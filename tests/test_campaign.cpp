@@ -6,6 +6,7 @@
 #include "world/WorldGenerator.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -241,6 +242,40 @@ void testCampaignDifficultyProgression()
         "Campaign threat clamps invalid floor numbers safely");
 }
 
+void testCampaignMissionDecks()
+{
+    using namespace gdp::gameplay;
+    bool sawDifferentSequence = false;
+    std::array<CampaignMissionKind, campaignFloorCount> firstSequence{};
+    for (wkc::core::Seed seed = 1U; seed <= 1000U; ++seed) {
+        std::array<bool, 3> seen{};
+        CampaignMissionKind previous = CampaignMissionKind::SecureArena;
+        for (std::uint32_t floor = 1U; floor <= campaignFloorCount; ++floor) {
+            const auto kind = campaignMissionKind(seed, floor);
+            expect(kind == campaignMissionKind(seed, floor),
+                "mission deck repeats deterministically for a campaign seed");
+            if (floor == 1U) {
+                expect(kind == CampaignMissionKind::SecureArena,
+                    "first floor keeps the introductory Arena mission");
+            } else {
+                expect(kind != previous,
+                    "adjacent campaign floors never repeat the same mission");
+                seen[static_cast<std::size_t>(kind)] = true;
+                if (floor == 4U || floor == 7U || floor == 10U) {
+                    expect(std::all_of(seen.begin(), seen.end(), [](const bool value) {
+                            return value;
+                        }), "each three-floor deck contains all mission types");
+                    seen.fill(false);
+                }
+            }
+            if (seed == 1U) firstSequence[floor - 1U] = kind;
+            else sawDifferentSequence |= firstSequence[floor - 1U] != kind;
+            previous = kind;
+        }
+    }
+    expect(sawDifferentSequence, "campaign seeds produce different mission orders");
+}
+
 void testCampaignFloorVarietyAndMissions()
 {
     using namespace gdp;
@@ -271,7 +306,7 @@ void testCampaignFloorVarietyAndMissions()
             expect(generated.world->rooms.size() == layout.roomCount
                     && world::validateWorld(*generated.world).isValid(),
                 "campaign floor geometry and corridors validate");
-            const auto kind = gameplay::campaignMissionKind(floorSeed, floor);
+            const auto kind = gameplay::campaignMissionKind(initialSeed, floor);
             sawKey |= kind == gameplay::CampaignMissionKind::RecoverKey;
             sawArena |= kind == gameplay::CampaignMissionKind::SecureArena;
             sawTerminal |= kind == gameplay::CampaignMissionKind::SecureTerminal;
@@ -376,6 +411,7 @@ int main()
     testCampaignCarryoverRejectsInvalidStateAtomically();
     testCampaignCheckpointValidation();
     testCampaignDifficultyProgression();
+    testCampaignMissionDecks();
     testCampaignFloorVarietyAndMissions();
     if (failures != 0) {
         std::cerr << failures << " campaign test(s) failed\n";

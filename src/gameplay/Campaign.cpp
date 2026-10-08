@@ -4,6 +4,7 @@
 #include "game/SeedDomains.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace gdp::gameplay {
@@ -20,17 +21,31 @@ CampaignFloorLayout campaignFloorLayout(
 }
 
 CampaignMissionKind campaignMissionKind(
-    const wkc::core::Seed floorSeed, const std::uint32_t floor) noexcept
+    const wkc::core::Seed initialSeed, const std::uint32_t floor) noexcept
 {
     const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
     if (safeFloor == 1U) return CampaignMissionKind::SecureArena;
-    const wkc::core::Seed selection = wkc::core::deriveSeed(
-        floorSeed, gdp::game::SeedDomain::CampaignMission, safeFloor);
-    switch (selection % 3U) {
-    case 0U: return CampaignMissionKind::SecureArena;
-    case 1U: return CampaignMissionKind::RecoverKey;
-    default: return CampaignMissionKind::SecureTerminal;
+
+    // Each three-floor deck contains every objective once. Rotate a deck when
+    // needed so a boundary cannot repeat the preceding floor's objective.
+    constexpr std::array kinds{
+        CampaignMissionKind::SecureArena,
+        CampaignMissionKind::RecoverKey,
+        CampaignMissionKind::SecureTerminal,
+    };
+    CampaignMissionKind previous = CampaignMissionKind::SecureArena;
+    const std::uint32_t targetDeck = (safeFloor - 2U) / 3U;
+    for (std::uint32_t deck = 0U; deck <= targetDeck; ++deck) {
+        auto order = kinds;
+        const wkc::core::Seed selection = wkc::core::deriveSeed(
+            initialSeed, gdp::game::SeedDomain::CampaignMission, deck + 1U);
+        std::swap(order[2], order[selection % 3U]);
+        std::swap(order[1], order[(selection >> 8U) % 2U]);
+        if (order[0] == previous) std::rotate(order.begin(), order.begin() + 1, order.end());
+        if (deck == targetDeck) return order[(safeFloor - 2U) % 3U];
+        previous = order[2];
     }
+    return CampaignMissionKind::SecureArena;
 }
 
 bool advanceCampaignMission(

@@ -45,6 +45,8 @@ especializados das pastas numeradas.
   Cada andar varia deterministicamente entre 7 e 10 salas e pode ter uma rota
   alternativa. A missão do andar exige limpar o evento da Arena, recuperar a
   chave da sala Secret ou ativar o terminal da START e eliminar sua emboscada.
+  Do segundo ao décimo andar, cada grupo de três andares usa as três missões
+  uma vez, sem repetição em andares consecutivos; a ordem varia por campanha.
   O minimapa marca missão, Boss e saída após descobrir a
   sala correspondente. Matar o boss **e** cumprir a missão libera o console da
   sala Boss: Interagir (E por padrão) sobe para o próximo andar; no décimo,

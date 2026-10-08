@@ -2,9 +2,10 @@
 
 ## Escopo
 
-Na Campanha de 10 andares, o layout e uma tarefa secundária são derivados da
-seed do andar. Standard, Speedrun e Test Mode mantêm a geração e o fluxo
-anteriores. A mesma seed, andar e versão de regras reproduzem as mesmas escolhas.
+Na Campanha de 10 andares, o layout é derivado da seed do andar e a sequência
+de tarefas da seed inicial da campanha. Standard, Speedrun e Test Mode mantêm a
+geração e o fluxo anteriores. A mesma seed inicial, andar e versão de regras
+reproduzem as mesmas escolhas.
 Nenhum objetivo depende de texto narrativo ou de um objeto novo: a chave da
 sala Secret, o evento Lockdown da Arena e o terminal com emboscada da START já
 fazem parte do conteúdo obrigatório.
@@ -28,7 +29,12 @@ população permanecem reproduzíveis; o layout não é alterado por dificuldade
   libera. A ativação isolada não conclui a missão; o HUD muda de `ACTIVATE
   TERMINAL` para `CLEAR AMBUSH` (com traduções PT-BR).
 
-Nos andares 2–10, `CampaignMission` seleciona uma das três tarefas pela seed.
+Nos andares 2–10, `CampaignMission` embaralha três blocos de três andares
+(2–4, 5–7 e 8–10) pela seed inicial da campanha. Cada bloco contém as três
+tarefas uma vez, e o primeiro item do bloco é rotacionado quando repetiria a
+missão do andar anterior. O andar 1 continua com `SecureArena`. Assim, não há
+duas missões iguais em andares consecutivos; campanhas diferentes ainda podem
+ter ordens diferentes.
 A tarefa é concluída uma vez e não pode ser desfeita no mesmo andar. A saída
 na sala Boss só é liberada quando **boss morto e missão concluída**. A ordem
 dessas ações é livre; se o boss morrer primeiro, o jogador pode voltar e
@@ -54,9 +60,11 @@ o boss; não altera objetivos, não descobre salas e não aparece nos demais mod
 
 O checkpoint continua representando a entrada do andar. Replay/Continue
 regeneram a mesma missão e o mesmo mapa; progresso intermediário da missão não
-é persistido. A versão de regras passa a 39. Saves de regras 37 ou 38/schema
-7 são aceitos como entrada do andar e normalizados em memória; o arquivo
-original não é regravado no carregamento. Uma missão sem sala-alvo ou sem
+é persistido. A versão de regras passa a 40. Saves de regras 37–39/schema 7
+são aceitos como entrada do andar e normalizados em memória; o arquivo
+original não é regravado no carregamento. Ao continuar um save de regras 39,
+recursos, seed e layout do andar são preservados, mas a missão da entrada segue
+a sequência nova. Uma missão sem sala-alvo ou sem
 chave na Secret ou terminal na START falha na inicialização da run, em vez de criar um andar sem
 saída. Os formatos e regras de Standard/Speedrun não mudam.
 
@@ -65,6 +73,8 @@ saída. Os formatos e regras de Standard/Speedrun não mudam.
 Os testes geram 240 combinações de seed/andar, verificam os limites de salas,
 variação de rotas, determinismo e existência dos alvos. Há testes de conclusão
 de missão, bloqueio/liberação do terminal, migração de checkpoint, tradução e
-renderização do HUD. Playtest manual recomendado: iniciar com uma seed fixa,
+renderização do HUD. Outros 1.000 seeds verificam todos os blocos de missões,
+ausência de repetição consecutiva e variação de ordem. Playtest manual
+recomendado: iniciar com uma seed fixa,
 repetir o andar, matar o boss antes da missão, voltar à Arena/Secret/START e então
 ativar o terminal; verificar os três tipos de missão em andares diferentes.

@@ -987,7 +987,7 @@ bool Application::initializeRun()
     }
     if (session_.state().mode == gameplay::RunMode::Campaign) {
         campaignMission_.kind = gameplay::campaignMissionKind(
-            config_.worldSeed, session_.state().campaignFloor);
+            session_.state().initialSeed, session_.state().campaignFloor);
         const world::RoomRole targetRole = campaignMission_.kind
                 == gameplay::CampaignMissionKind::RecoverKey
             ? world::RoomRole::Secret
@@ -2025,7 +2025,7 @@ void Application::loadPersistedCampaignCheckpoint()
         const auto loaded = persistence::loadCampaignCheckpoint(*campaignSlotPaths_[i]);
         if (loaded.migratedRules)
             log(LogLevel::Info, "Campaign slot " + std::to_string(i + 1U)
-                + " migrated from rules 34 to 35; floor-entry resources preserved, loot uses new balance");
+                + " migrated to current rules; floor-entry resources preserved");
         campaignSlots_[i] = {loaded.checkpoint, loaded.status != persistence::CampaignCheckpointLoadStatus::Missing};
         if (loaded.status != persistence::CampaignCheckpointLoadStatus::Loaded
             && loaded.status != persistence::CampaignCheckpointLoadStatus::Missing)

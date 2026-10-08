@@ -9,7 +9,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 39U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 40U;
 
 struct CampaignFloorLayout {
     std::uint32_t roomCount{8U};
@@ -41,7 +41,7 @@ struct CampaignMissionProgress {
 [[nodiscard]] CampaignFloorLayout campaignFloorLayout(
     wkc::core::Seed floorSeed, std::uint32_t floor) noexcept;
 [[nodiscard]] CampaignMissionKind campaignMissionKind(
-    wkc::core::Seed floorSeed, std::uint32_t floor) noexcept;
+    wkc::core::Seed initialSeed, std::uint32_t floor) noexcept;
 [[nodiscard]] bool advanceCampaignMission(
     CampaignMissionState& mission, std::uint32_t roomId,
     CampaignMissionProgress progress) noexcept;
