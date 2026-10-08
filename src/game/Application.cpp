@@ -551,13 +551,24 @@ int Application::run()
             if (session_.state().phase == gameplay::SessionPhase::Playing
                 && !mainMenu_.active && !pauseMenu_.paused
                 && !settingsMenu_.active) {
-                constexpr float gamepadLookPixelsPerSecond = 1250.0F;
+                constexpr float gamepadLookDegreesPerSecond = 150.0F;
                 const float lookSeconds = std::clamp(
                     static_cast<float>(frameDelta), 0.0F, 0.05F);
-                const Vec2 gamepadLook = input_.gamepadLook();
-                const float lookScale = gamepadLookPixelsPerSecond * lookSeconds;
-                player_.applyLook(input_.mouseDelta()
-                    + Vec2{gamepadLook.x * lookScale, gamepadLook.y * lookScale});
+                const Vec2 rawLook = runtimeSettings_.gamepadSouthpaw
+                    ? input_.gamepadLeftStick() : input_.gamepadRightStick();
+                const Vec2 gamepadLook = wkc::platform::gamepadDeadzone(rawLook,
+                    static_cast<float>(runtimeSettings_.gamepadLookDeadzonePercent) / 100.0F);
+                const bool aiming = gameplay::controlDown(runtimeSettings_.controls,
+                    runtimeSettings_.gamepadControls, gameplay::ControlAction::Aim, input_);
+                const float aimScale = aiming
+                    ? static_cast<float>(runtimeSettings_.gamepadAimSensitivityPercent) / 100.0F : 1.0F;
+                player_.applyLook(input_.mouseDelta());
+                player_.applyGamepadLook({
+                    gamepadLook.x * gamepadLookDegreesPerSecond * lookSeconds * aimScale
+                        * static_cast<float>(runtimeSettings_.gamepadLookHorizontalPercent) / 100.0F,
+                    gamepadLook.y * gamepadLookDegreesPerSecond * lookSeconds * aimScale
+                        * static_cast<float>(runtimeSettings_.gamepadLookVerticalPercent) / 100.0F,
+                }, runtimeSettings_.invertGamepadY);
             }
 
             std::uint32_t fixedStepsThisFrame = 0U;
@@ -1617,7 +1628,10 @@ void Application::processEvents()
     using gameplay::ControlAction;
     const auto down = [&](ControlAction action) { return gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, action, input_); };
     const auto pressed = [&](ControlAction action) { return gameplay::controlPressed(runtimeSettings_.controls, runtimeSettings_.gamepadControls, action, input_); };
-    const Vec2 gamepadMove = input_.gamepadMove();
+    const Vec2 rawMove = runtimeSettings_.gamepadSouthpaw
+        ? input_.gamepadRightStick() : input_.gamepadLeftStick();
+    const Vec2 gamepadMove = wkc::platform::gamepadDeadzone(rawMove,
+        static_cast<float>(runtimeSettings_.gamepadMoveDeadzonePercent) / 100.0F);
     playerCommand_.moveForward = std::clamp(
         (down(ControlAction::Forward) ? 1.0F : 0.0F)
             - (down(ControlAction::Backward) ? 1.0F : 0.0F)

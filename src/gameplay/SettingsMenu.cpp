@@ -145,6 +145,26 @@ bool adjustRuntimeSetting(
     }
     case SettingsMenuOption::GamepadVibrationStrength:
         return adjustPercent(settings.gamepadVibrationPercent, direction, 0U, 100U, 10U);
+    case SettingsMenuOption::GamepadMoveStick: {
+        const bool previous = settings.gamepadSouthpaw;
+        settings.gamepadSouthpaw = direction > 0;
+        return settings.gamepadSouthpaw != previous;
+    }
+    case SettingsMenuOption::GamepadLookHorizontal:
+        return adjustPercent(settings.gamepadLookHorizontalPercent, direction, 30U, 200U, 10U);
+    case SettingsMenuOption::GamepadLookVertical:
+        return adjustPercent(settings.gamepadLookVerticalPercent, direction, 30U, 200U, 10U);
+    case SettingsMenuOption::GamepadAimSensitivity:
+        return adjustPercent(settings.gamepadAimSensitivityPercent, direction, 30U, 150U, 10U);
+    case SettingsMenuOption::GamepadMoveDeadzone:
+        return adjustPercent(settings.gamepadMoveDeadzonePercent, direction, 0U, 40U, 2U);
+    case SettingsMenuOption::GamepadLookDeadzone:
+        return adjustPercent(settings.gamepadLookDeadzonePercent, direction, 0U, 40U, 2U);
+    case SettingsMenuOption::GamepadInvertY: {
+        const bool previous = settings.invertGamepadY;
+        settings.invertGamepadY = direction > 0;
+        return settings.invertGamepadY != previous;
+    }
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
         return false;
@@ -271,6 +291,11 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     if (!validateControlBindings(settings.controls)) settings.controls = {};
     if (!validateGamepadBindings(settings.gamepadControls)) settings.gamepadControls = {};
     settings.gamepadVibrationPercent = std::min<std::uint16_t>(settings.gamepadVibrationPercent, 100U);
+    settings.gamepadLookHorizontalPercent = std::clamp<std::uint16_t>(settings.gamepadLookHorizontalPercent, 30U, 200U);
+    settings.gamepadLookVerticalPercent = std::clamp<std::uint16_t>(settings.gamepadLookVerticalPercent, 30U, 200U);
+    settings.gamepadAimSensitivityPercent = std::clamp<std::uint16_t>(settings.gamepadAimSensitivityPercent, 30U, 150U);
+    settings.gamepadMoveDeadzonePercent = std::min<std::uint16_t>(settings.gamepadMoveDeadzonePercent, 40U);
+    settings.gamepadLookDeadzonePercent = std::min<std::uint16_t>(settings.gamepadLookDeadzonePercent, 40U);
     return settings;
 }
 

@@ -61,6 +61,8 @@ enum class GamepadButton : std::uint8_t {
     Count,
 };
 
+[[nodiscard]] wkc::core::Vec2 gamepadDeadzone(wkc::core::Vec2 value, float threshold) noexcept;
+
 class Input {
 public:
     void beginFrame() noexcept;
@@ -90,6 +92,8 @@ public:
     [[nodiscard]] bool wasGamepadButtonPressed(GamepadButton button) const noexcept;
     [[nodiscard]] wkc::core::Vec2 gamepadMove() const noexcept;
     [[nodiscard]] wkc::core::Vec2 gamepadLook() const noexcept;
+    [[nodiscard]] wkc::core::Vec2 gamepadLeftStick() const noexcept;
+    [[nodiscard]] wkc::core::Vec2 gamepadRightStick() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(Key::Count);
@@ -112,6 +116,8 @@ private:
     std::array<bool, gamepadButtonCount> gamepadButtonsPressed_{};
     wkc::core::Vec2 gamepadMove_{};
     wkc::core::Vec2 gamepadLook_{};
+    wkc::core::Vec2 gamepadLeftStick_{};
+    wkc::core::Vec2 gamepadRightStick_{};
     wkc::core::Vec2 mouseDelta_{};
     wkc::core::Vec2 mousePosition_{};
     float mouseWheelDelta_{0.0F};

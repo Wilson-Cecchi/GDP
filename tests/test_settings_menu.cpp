@@ -168,13 +168,37 @@ void testRuntimeSettingsClamps()
             && !adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, 1),
         "controller vibration strength clamps at one hundred percent");
 
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadMoveStick, 1)
+            && settings.gamepadSouthpaw
+            && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadMoveStick, -1)
+            && !settings.gamepadSouthpaw,
+        "movement stick can swap between left and right without changing menu controls");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookHorizontal, 1)
+            && settings.gamepadLookHorizontalPercent == 110U
+            && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookVertical, -1)
+            && settings.gamepadLookVerticalPercent == 90U
+            && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadAimSensitivity, -1)
+            && settings.gamepadAimSensitivityPercent == 90U,
+        "controller camera axes and aiming sensitivity adjust independently");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadMoveDeadzone, -1)
+            && settings.gamepadMoveDeadzonePercent == 16U
+            && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookDeadzone, 1)
+            && settings.gamepadLookDeadzonePercent == 20U
+            && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadInvertY, 1)
+            && settings.invertGamepadY,
+        "controller deadzones and Y inversion have separate settings");
+
     settings.windowResolution = static_cast<WindowResolution>(99U);
     settings.graphicsQuality = static_cast<GraphicsQuality>(99U);
     settings.gamepadVibrationPercent = 200U;
+    settings.gamepadLookHorizontalPercent = 250U;
+    settings.gamepadMoveDeadzonePercent = 90U;
     const RuntimeSettings sanitized = sanitizeRuntimeSettings(settings);
     expect(sanitized.windowResolution == WindowResolution::R1280x720
             && sanitized.graphicsQuality == GraphicsQuality::Medium
-            && sanitized.gamepadVibrationPercent == 100U,
+            && sanitized.gamepadVibrationPercent == 100U
+            && sanitized.gamepadLookHorizontalPercent == 200U
+            && sanitized.gamepadMoveDeadzonePercent == 40U,
         "invalid video enums recover to their default presets");
 }
 

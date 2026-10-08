@@ -62,6 +62,7 @@ public:
     void setMouseSensitivity(float sensitivity) noexcept;
     void setInvertMouseY(bool inverted) noexcept;
     void applyLook(wkc::core::Vec2 mouseDelta) noexcept;
+    void applyGamepadLook(wkc::core::Vec2 degrees, bool invertY) noexcept;
     void fixedUpdate(
         const PlayerCommand& command,
         float fixedStepSeconds,

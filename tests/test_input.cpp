@@ -92,12 +92,19 @@ void testInputState()
     input.handleGamepadSticks({0.9F, 0.0F}, {0.0F, -1.0F});
     expect(input.gamepadMove().x > 0.8F
             && input.gamepadLook().y == -1.0F
+            && input.gamepadLeftStick().x == 0.9F
+            && input.gamepadRightStick().y == -1.0F
             && input.wasGamepadButtonPressed(GamepadButton::StickRight),
         "analog sticks retain strength and drive menu navigation");
+    expect(wkc::platform::gamepadDeadzone({0.1F, 0.0F}, 0.18F) == wkc::core::Vec2{}
+            && wkc::platform::gamepadDeadzone({0.1F, 0.0F}, 0.0F).x > 0.09F,
+        "configurable deadzone can suppress drift or preserve small movement");
     input.resetGamepad();
     expect(!input.isGamepadButtonDown(GamepadButton::South)
             && input.gamepadMove() == wkc::core::Vec2{}
-            && input.gamepadLook() == wkc::core::Vec2{},
+            && input.gamepadLook() == wkc::core::Vec2{}
+            && input.gamepadLeftStick() == wkc::core::Vec2{}
+            && input.gamepadRightStick() == wkc::core::Vec2{},
         "disconnect clears held buttons and axes");
 }
 

@@ -27,10 +27,12 @@ opções; A/✕ confirma e B/○ volta. Em `Settings > Controls`, escolha
 `Keyboard / Mouse` ou `Controller`. Cada dispositivo tem remapeamento e reset
 independentes. Se um botão já estiver associado a outra ação, as duas ações
 trocam seus comandos. Durante a captura do controle, `Options` ou `Esc`
-cancela e `Delete` remove a associação. `Options` fica reservado ao menu; os
-dois analógicos mantêm movimento/visão, embora também seja possível atribuir
-botões às quatro ações de movimento. Os atalhos de equipamento e item especial
-seguem reservados, sem função no jogo.
+cancela e `Delete` remove a associação. `Options` fica reservado ao menu.
+O movimento analógico não é um botão: ajuste `Move Stick` no menu `Controller`
+para usar o analógico esquerdo (padrão) ou direito (Southpaw); a câmera passa
+automaticamente para o outro analógico. As linhas Forward/Backward/Left/Right
+em `Remap Buttons` aceitam botões digitais opcionais, além do analógico escolhido.
+Os atalhos de equipamento e item especial seguem reservados, sem função no jogo.
 
 Para testar um DualSense por Bluetooth no Linux: emparelhe-o nas configurações do
 sistema, inicie `build/release/gdp --test-mode` e confira a linha
@@ -43,3 +45,12 @@ de 0% a 100%. Disparos e dano recebido produzem pulsos de vibração comum
 quando o controle e o driver oferecem suporte. A intensidade 0% não vibra,
 mesmo com a opção ligada. Efeitos específicos dos gatilhos adaptativos do
 DualSense continuam fora desta etapa.
+
+As opções de câmera do controle são independentes da sensibilidade e inversão
+do mouse: horizontal e vertical de 30% a 200%, sensibilidade ao mirar de 30%
+a 150%, inversão vertical e zonas mortas de movimento/câmera de 0% a 40%.
+O padrão é 100% para as sensibilidades, 18% para ambas as zonas mortas e
+analógico esquerdo para movimento. O analógico esquerdo continua navegando
+nos menus mesmo quando o layout da partida está invertido. As preferências
+são salvas em `settings.toml` (schema 10); arquivos anteriores recebem esses
+valores padrão sem perder os remapeamentos existentes.

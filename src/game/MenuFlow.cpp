@@ -85,7 +85,21 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         setting("INVERT MOUSE Y", SettingsMenuOption::InvertMouseY, settings.invertMouseY ? "ON" : "OFF");
         row("REMAP KEYS / MOUSE"); row("BACK"); break;
     case MenuPage::GamepadControls:
-        view.title = "CONTROLLER"; view.subtitle = "MENU BUTTONS STAY FIXED";
+        view.title = "CONTROLLER"; view.subtitle = "MOVE STICK ALSO CHANGES LOOK STICK";
+        setting("MOVE STICK", SettingsMenuOption::GamepadMoveStick,
+            settings.gamepadSouthpaw ? "RIGHT STICK" : "LEFT STICK");
+        setting("LOOK HORIZONTAL", SettingsMenuOption::GamepadLookHorizontal,
+            std::to_string(settings.gamepadLookHorizontalPercent) + "%");
+        setting("LOOK VERTICAL", SettingsMenuOption::GamepadLookVertical,
+            std::to_string(settings.gamepadLookVerticalPercent) + "%");
+        setting("AIM SENSITIVITY", SettingsMenuOption::GamepadAimSensitivity,
+            std::to_string(settings.gamepadAimSensitivityPercent) + "%");
+        setting("MOVE DEADZONE", SettingsMenuOption::GamepadMoveDeadzone,
+            std::to_string(settings.gamepadMoveDeadzonePercent) + "%");
+        setting("LOOK DEADZONE", SettingsMenuOption::GamepadLookDeadzone,
+            std::to_string(settings.gamepadLookDeadzonePercent) + "%");
+        setting("INVERT LOOK Y", SettingsMenuOption::GamepadInvertY,
+            settings.invertGamepadY ? "ON" : "OFF");
         setting("VIBRATION", SettingsMenuOption::GamepadVibration, settings.gamepadVibration ? "ON" : "OFF");
         setting("VIBRATION STRENGTH", SettingsMenuOption::GamepadVibrationStrength,
             std::to_string(settings.gamepadVibrationPercent) + "%");
@@ -100,7 +114,7 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
             : (firstPage ? "KEY BINDINGS 1/2" : "KEY BINDINGS 2/2");
         view.subtitle = s.capture
             ? (gamepad ? "PRESS BUTTON - OPTIONS / ESC CANCEL" : "KEY / MOUSE / WHEEL - ESC CANCEL")
-            : (gamepad ? "STICKS STAY FIXED - DUPLICATES SWAP" : "SELECT TO REMAP - DUPLICATES SWAP");
+            : (gamepad ? "MOVE STICK IN CONTROLLER - BUTTONS OPTIONAL" : "SELECT TO REMAP - DUPLICATES SWAP");
         const std::size_t first = firstPage ? 0U : 11U;
         for (std::size_t i = first; i < first + 11U; ++i) {
             auto action = static_cast<gameplay::ControlAction>(i);
@@ -173,7 +187,7 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     else if (s.page == MenuPage::Controls && selected < 2U)
         open(s, selected == 0U ? MenuPage::KeyboardControls : MenuPage::GamepadControls);
     else if (s.page == MenuPage::KeyboardControls && selected == 2U) open(s, MenuPage::Bindings);
-    else if (s.page == MenuPage::GamepadControls && selected == 2U) open(s, MenuPage::GamepadBindings);
+    else if (s.page == MenuPage::GamepadControls && selected == 9U) open(s, MenuPage::GamepadBindings);
     else if ((s.page == MenuPage::Bindings || s.page == MenuPage::MoreBindings) && selected == 11U)
         open(s, s.page == MenuPage::Bindings ? MenuPage::MoreBindings : MenuPage::Bindings);
     else if ((s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings) && selected == 11U)

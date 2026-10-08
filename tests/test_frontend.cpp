@@ -61,10 +61,12 @@ void menuTests() {
     expect(backMenu(state) == MenuCommand::CloseSettings, "back from categories returns to settings origin");
     state.page = MenuPage::Controls; state.selection = 1U;
     (void)activateMenu(state, view(), slots);
-    expect(state.page == MenuPage::GamepadControls && view().rows[0].setting == SettingsMenuOption::GamepadVibration
-        && view().rows[1].setting == SettingsMenuOption::GamepadVibrationStrength,
-        "controller page exposes independent vibration controls");
-    state.selection = 2U; (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::GamepadControls && view().rows[0].setting == SettingsMenuOption::GamepadMoveStick
+        && view().rows[1].setting == SettingsMenuOption::GamepadLookHorizontal
+        && view().rows[7].setting == SettingsMenuOption::GamepadVibration
+        && view().rows[8].setting == SettingsMenuOption::GamepadVibrationStrength,
+        "controller page exposes stick layout, camera tuning and vibration");
+    state.selection = 9U; (void)activateMenu(state, view(), slots);
     expect(state.page == MenuPage::GamepadBindings && view().rows.size() == 14U,
         "controller remapping has paged action bindings");
     state.selection = 0U; (void)activateMenu(state, view(), slots);
@@ -147,6 +149,9 @@ void layoutTests() {
             && localize(Language::PortugueseBrazil, "EXIT READY") == "SAÍDA LIBERADA",
         "Campaign run-status checklist is localized");
     expect(localize(Language::PortugueseBrazil, "JUMP  [SPACE]") == "PULAR  [SPACE]", "localized descriptions cannot translate saved key binding tokens");
+    expect(localize(Language::PortugueseBrazil, "MOVE STICK  RIGHT STICK")
+            == "ANALÓGICO DE MOVIMENTO  ANALÓGICO DIREITO",
+        "controller stick layout is legible in Portuguese");
     expect(localize(Language::PortugueseBrazil, "UNLISTED_ID_42") == "UNLISTED_ID_42", "unknown technical identifiers have a stable fallback");
     expect(uiTextLength("CONFIGURAÇÕES") == 13U && uiTextLength("PORTUGUÊS (BR)") == 14U,
         "width counts Unicode glyphs instead of UTF-8 bytes");
@@ -274,7 +279,7 @@ void persistenceTests(const std::filesystem::path& directory) {
         "v6 settings retain graphics and sensitivity while receiving default bindings");
     {
         std::ofstream file(directory / "invalid_bindings.toml");
-        file << "version = 9\nbinding_0 = S\nbinding_1 = S\n";
+        file << "version = 10\nbinding_0 = S\nbinding_1 = S\n";
     }
     const auto invalid = loadRuntimeSettings(directory / "invalid_bindings.toml");
     expect(invalid.status == SettingsLoadStatus::LoadedWithRecovery && invalid.settings.controls == ControlBindings{},

@@ -92,7 +92,14 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << (settings.verticalSync ? "true" : "false") << '\n'
            << "language = " << gameplay::languageName(settings.language) << '\n'
            << "gamepad_vibration = " << (settings.gamepadVibration ? "true" : "false") << '\n'
-           << "gamepad_vibration_strength = " << settings.gamepadVibrationPercent << '\n';
+           << "gamepad_vibration_strength = " << settings.gamepadVibrationPercent << '\n'
+           << "gamepad_southpaw = " << (settings.gamepadSouthpaw ? "true" : "false") << '\n'
+           << "gamepad_look_horizontal = " << settings.gamepadLookHorizontalPercent << '\n'
+           << "gamepad_look_vertical = " << settings.gamepadLookVerticalPercent << '\n'
+           << "gamepad_aim_sensitivity = " << settings.gamepadAimSensitivityPercent << '\n'
+           << "gamepad_move_deadzone = " << settings.gamepadMoveDeadzonePercent << '\n'
+           << "gamepad_look_deadzone = " << settings.gamepadLookDeadzonePercent << '\n'
+           << "gamepad_invert_y = " << (settings.invertGamepadY ? "true" : "false") << '\n';
     for (std::size_t i = 0U; i < gameplay::controlActionCount; ++i) {
         output << "binding_" << i << " = " << gameplay::bindingName(settings.controls.values[i]) << '\n';
         output << "gamepad_binding_" << i << " = "
@@ -167,6 +174,22 @@ SettingsLoadResult loadRuntimeSettings(
             } else if (key == "gamepad_vibration_strength") {
                 recovered = !assignClamped(result.settings.gamepadVibrationPercent, value, 0U, 100U)
                     || recovered;
+            } else if (key == "gamepad_southpaw") {
+                if (const auto enabled = parseBoolean(value)) result.settings.gamepadSouthpaw = *enabled;
+                else recovered = true;
+            } else if (key == "gamepad_look_horizontal") {
+                recovered = !assignClamped(result.settings.gamepadLookHorizontalPercent, value, 30U, 200U) || recovered;
+            } else if (key == "gamepad_look_vertical") {
+                recovered = !assignClamped(result.settings.gamepadLookVerticalPercent, value, 30U, 200U) || recovered;
+            } else if (key == "gamepad_aim_sensitivity") {
+                recovered = !assignClamped(result.settings.gamepadAimSensitivityPercent, value, 30U, 150U) || recovered;
+            } else if (key == "gamepad_move_deadzone") {
+                recovered = !assignClamped(result.settings.gamepadMoveDeadzonePercent, value, 0U, 40U) || recovered;
+            } else if (key == "gamepad_look_deadzone") {
+                recovered = !assignClamped(result.settings.gamepadLookDeadzonePercent, value, 0U, 40U) || recovered;
+            } else if (key == "gamepad_invert_y") {
+                if (const auto enabled = parseBoolean(value)) result.settings.invertGamepadY = *enabled;
+                else recovered = true;
             } else if (key == "master_volume") {
                 recovered = !assignClamped(
                     result.settings.masterVolumePercent, value, 0U, 100U)

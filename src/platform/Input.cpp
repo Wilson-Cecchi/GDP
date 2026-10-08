@@ -4,20 +4,17 @@
 #include <cstddef>
 #include <algorithm>
 
-namespace {
-wkc::core::Vec2 deadzone(const wkc::core::Vec2 value) noexcept
+namespace wkc::platform {
+wkc::core::Vec2 gamepadDeadzone(const wkc::core::Vec2 value, const float threshold) noexcept
 {
-    constexpr float threshold = 0.18F;
     if (!std::isfinite(value.x) || !std::isfinite(value.y)) return {};
+    const float minimum = std::clamp(threshold, 0.0F, 0.4F);
     const float length = std::sqrt(value.x * value.x + value.y * value.y);
-    if (length <= threshold) return {};
-    const float scale = std::clamp((length - threshold) / (1.0F - threshold),
+    if (length <= minimum) return {};
+    const float scale = std::clamp((length - minimum) / (1.0F - minimum),
         0.0F, 1.0F) / length;
     return {value.x * scale, value.y * scale};
 }
-} // namespace
-
-namespace wkc::platform {
 
 void Input::beginFrame() noexcept
 {
@@ -97,8 +94,10 @@ void Input::handleGamepadButton(const GamepadButton button, const bool down) noe
 void Input::handleGamepadSticks(
     const wkc::core::Vec2 move, const wkc::core::Vec2 look) noexcept
 {
-    gamepadMove_ = deadzone(move);
-    gamepadLook_ = deadzone(look);
+    gamepadLeftStick_ = std::isfinite(move.x) && std::isfinite(move.y) ? move : wkc::core::Vec2{};
+    gamepadRightStick_ = std::isfinite(look.x) && std::isfinite(look.y) ? look : wkc::core::Vec2{};
+    gamepadMove_ = gamepadDeadzone(gamepadLeftStick_, 0.18F);
+    gamepadLook_ = gamepadDeadzone(gamepadRightStick_, 0.18F);
     constexpr float navigationThreshold = 0.6F;
     handleGamepadButton(GamepadButton::StickUp,
         gamepadMove_.y < -navigationThreshold);
@@ -116,6 +115,8 @@ void Input::resetGamepad() noexcept
     gamepadButtonsPressed_.fill(false);
     gamepadMove_ = {};
     gamepadLook_ = {};
+    gamepadLeftStick_ = {};
+    gamepadRightStick_ = {};
 }
 
 bool Input::isKeyDown(const Key key) const noexcept
@@ -180,6 +181,8 @@ bool Input::wasGamepadButtonPressed(const GamepadButton button) const noexcept
 
 wkc::core::Vec2 Input::gamepadMove() const noexcept { return gamepadMove_; }
 wkc::core::Vec2 Input::gamepadLook() const noexcept { return gamepadLook_; }
+wkc::core::Vec2 Input::gamepadLeftStick() const noexcept { return gamepadLeftStick_; }
+wkc::core::Vec2 Input::gamepadRightStick() const noexcept { return gamepadRightStick_; }
 
 bool Input::isValidKey(const Key key) noexcept
 {

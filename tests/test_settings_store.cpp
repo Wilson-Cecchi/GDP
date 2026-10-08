@@ -82,6 +82,13 @@ void testMissingAndRoundTrip()
     settings.language = gdp::gameplay::Language::PortugueseBrazil;
     settings.gamepadVibration = false;
     settings.gamepadVibrationPercent = 80U;
+    settings.gamepadSouthpaw = true;
+    settings.gamepadLookHorizontalPercent = 130U;
+    settings.gamepadLookVerticalPercent = 90U;
+    settings.gamepadAimSensitivityPercent = 70U;
+    settings.gamepadMoveDeadzonePercent = 10U;
+    settings.gamepadLookDeadzonePercent = 22U;
+    settings.invertGamepadY = true;
     expect(gdp::gameplay::assignGamepadBinding(settings.gamepadControls,
             gdp::gameplay::ControlAction::Fire, wkc::platform::GamepadButton::West),
         "custom controller binding is accepted before persistence");
@@ -107,7 +114,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 9\n"
+        "version = 10\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -120,6 +127,9 @@ void testRecoveryAndForwardCompatibility()
         "fullscreen = maybe\n"
         "vertical_sync = maybe\n"
         "language = unavailable\n"
+        "gamepad_look_horizontal = 999\n"
+        "gamepad_look_deadzone = 999\n"
+        "gamepad_southpaw = maybe\n"
         "future_option = enabled\n");
 
     const SettingsLoadResult recovered = loadRuntimeSettings(path);
@@ -138,11 +148,14 @@ void testRecoveryAndForwardCompatibility()
                 == gdp::gameplay::WindowResolution::R1280x720
             && !recovered.settings.fullscreen
             && recovered.settings.verticalSync
-            && recovered.settings.language == gdp::gameplay::Language::English,
+            && recovered.settings.language == gdp::gameplay::Language::English
+            && recovered.settings.gamepadLookHorizontalPercent == 200U
+            && recovered.settings.gamepadLookDeadzonePercent == 40U
+            && !recovered.settings.gamepadSouthpaw,
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 9\n"
+        "version = 10\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -163,7 +176,16 @@ void testRecoveryAndForwardCompatibility()
             && previousV8.settings.gamepadControls == gdp::gameplay::GamepadBindings{},
         "v8 migration preserves keyboard bindings and adds controller defaults");
 
-    writeText(path, "version = 9\ngamepad_binding_7 = X / SQUARE\n"
+    writeText(path, "version = 9\ngamepad_vibration_strength = 70\n");
+    const auto previousV9 = loadRuntimeSettings(path);
+    expect(previousV9.status == SettingsLoadStatus::Migrated
+            && previousV9.settings.gamepadVibrationPercent == 70U
+            && !previousV9.settings.gamepadSouthpaw
+            && previousV9.settings.gamepadLookHorizontalPercent == 100U
+            && previousV9.settings.gamepadMoveDeadzonePercent == 18U,
+        "v9 migration preserves controller preferences and adds default camera controls");
+
+    writeText(path, "version = 10\ngamepad_binding_7 = X / SQUARE\n"
         "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
     const auto brokenGamepad = loadRuntimeSettings(path);
     expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery

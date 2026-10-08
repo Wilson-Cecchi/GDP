@@ -84,11 +84,20 @@ struct ApplicationMenuTestAccess {
         choose("CONTROLLER");
         expect(app.menuFlow_.page == MenuPage::GamepadControls,
             "controller settings are separate from keyboard and mouse");
-        app.menuFlow_.selection = 0U; key(Key::Left);
+        app.menuFlow_.selection = 0U; key(Key::Right);
+        expect(app.runtimeSettings_.gamepadSouthpaw,
+            "controller setting remaps movement to the right stick");
+        key(Key::Left);
+        expect(!app.runtimeSettings_.gamepadSouthpaw,
+            "controller setting restores movement to the left stick");
+        app.menuFlow_.selection = 1U; key(Key::Right);
+        expect(app.runtimeSettings_.gamepadLookHorizontalPercent == 110U,
+            "controller horizontal camera sensitivity adjusts in the menu");
+        app.menuFlow_.selection = 7U; key(Key::Left);
         expect(!app.runtimeSettings_.gamepadVibration, "vibration can be disabled");
         key(Key::Right);
         expect(app.runtimeSettings_.gamepadVibration, "vibration can be enabled again");
-        app.menuFlow_.selection = 1U; key(Key::Left);
+        app.menuFlow_.selection = 8U; key(Key::Left);
         expect(app.runtimeSettings_.gamepadVibrationPercent == 40U,
             "controller vibration intensity adjusts in ten-percent steps");
         choose("REMAP BUTTONS"); choose("FIRE");
@@ -168,6 +177,14 @@ struct ApplicationMenuTestAccess {
                     && app.playerCommand_.moveRight > 0.0F
                     && app.fireHeld_,
                 "analog movement and remapped controller fire drive live gameplay");
+            app.runtimeSettings_.gamepadSouthpaw = true;
+            release(); app.input_.handleGamepadSticks({}, {0.75F, -0.65F}); app.processEvents();
+            expect(app.playerCommand_.moveForward > 0.0F && app.playerCommand_.moveRight > 0.0F,
+                "Southpaw movement uses the right analog stick in live gameplay");
+            release(); app.input_.handleGamepadSticks({0.75F, -0.65F}, {}); app.processEvents();
+            expect(app.playerCommand_.moveForward == 0.0F && app.playerCommand_.moveRight == 0.0F,
+                "Southpaw movement no longer reads the left analog stick");
+            app.runtimeSettings_.gamepadSouthpaw = false;
             key(Key::Escape); choose("SETTINGS"); key(Key::Escape);
             const auto pausedTime = app.menuBackdropSeconds_;
             release(); app.fixedUpdate(1.0 / 60.0);

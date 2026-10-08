@@ -433,6 +433,19 @@ void testLookAndCamera()
     expect(wkc::core::nearlyEqual(configured.mouseSensitivity(), 0.24F),
         "runtime sensitivity clamps at its documented maximum");
 
+    Player padA;
+    Player padB;
+    padB.setMouseSensitivity(0.24F);
+    padB.setInvertMouseY(true);
+    padA.applyGamepadLook({15.0F, 10.0F}, false);
+    padB.applyGamepadLook({15.0F, 10.0F}, false);
+    expect(wkc::core::nearlyEqual(padA.state().yawDegrees, padB.state().yawDegrees)
+            && wkc::core::nearlyEqual(padA.state().pitchDegrees, padB.state().pitchDegrees),
+        "controller look is independent of mouse sensitivity and inversion");
+    padB.applyGamepadLook({0.0F, 10.0F}, true);
+    expect(wkc::core::nearlyEqual(padB.state().pitchDegrees, 0.0F),
+        "controller Y inversion reverses the vertical direction");
+
     Player regularVertical;
     Player invertedVertical;
     invertedVertical.setInvertMouseY(true);

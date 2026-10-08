@@ -33,6 +33,13 @@ enum class SettingsMenuOption : std::uint8_t {
     // its established numeric mapping through Back.
     GamepadVibration,
     GamepadVibrationStrength,
+    GamepadMoveStick,
+    GamepadLookHorizontal,
+    GamepadLookVertical,
+    GamepadAimSensitivity,
+    GamepadMoveDeadzone,
+    GamepadLookDeadzone,
+    GamepadInvertY,
 };
 
 enum class GraphicsQuality : std::uint8_t {
@@ -94,6 +101,13 @@ struct RuntimeSettings {
     GamepadBindings gamepadControls{};
     bool gamepadVibration{true};
     std::uint16_t gamepadVibrationPercent{50U};
+    bool gamepadSouthpaw{false};
+    std::uint16_t gamepadLookHorizontalPercent{100U};
+    std::uint16_t gamepadLookVerticalPercent{100U};
+    std::uint16_t gamepadAimSensitivityPercent{100U};
+    std::uint16_t gamepadMoveDeadzonePercent{18U};
+    std::uint16_t gamepadLookDeadzonePercent{18U};
+    bool invertGamepadY{false};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
 };
