@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Stable entry point. Updated game versions live beside the original package.
+set -u
+install_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+package_dir="$install_root"
+marker="$install_root/current-version.txt"
+if [[ -f "$marker" ]]; then
+    version="$(<"$marker")"
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        candidate="$install_root/versions/$version/IronSeed-Linux-x64"
+        if [[ -x "$candidate/bin/gdp" && -f "$candidate/updater.py" ]]; then
+            package_dir="$candidate"
+        fi
+    fi
+fi
+
+if [[ "${1:-}" == "--rollback-update" ]]; then
+    if command -v python3 >/dev/null 2>&1; then
+        exec python3 "$package_dir/updater.py" --install-root "$install_root" \
+            --current-package "$package_dir" --rollback
+    fi
+    echo "Iron Seed rollback requires python3" >&2
+    exit 1
+fi
+
+# CLI/test invocations must not perform network access or display update dialogs.
+if (( $# == 0 )) && command -v python3 >/dev/null 2>&1; then
+    python3 "$package_dir/updater.py" --install-root "$install_root" \
+        --current-package "$package_dir" || true
+    if [[ -f "$marker" ]]; then
+        version="$(<"$marker")"
+        if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            candidate="$install_root/versions/$version/IronSeed-Linux-x64"
+            if [[ -x "$candidate/bin/gdp" ]]; then package_dir="$candidate"; fi
+        fi
+    fi
+fi
+exec "$package_dir/bin/gdp" "$@"

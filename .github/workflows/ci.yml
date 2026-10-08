@@ -46,6 +46,10 @@ jobs:
         if: matrix.preset == 'release'
         run: python3 -m unittest discover -s tools -p 'test_release_manifest.py'
 
+      - name: Test Linux updater
+        if: matrix.preset == 'release'
+        run: python3 -m unittest discover -s packaging/linux -p 'test_updater.py'
+
   sanitizers:
     name: ASan + UBSan
     runs-on: ubuntu-24.04

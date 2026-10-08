@@ -495,8 +495,12 @@ if(UNIX AND NOT APPLE AND GDP_PORTABLE_PACKAGE)
     if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
         message(FATAL_ERROR "The Linux download workflow currently supports x64 only")
     endif()
-    install(TARGETS gdp RUNTIME DESTINATION .)
-    install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.txt"
+        CONTENT "${GDP_RELEASE_VERSION}\n")
+    install(TARGETS gdp RUNTIME DESTINATION bin)
+    install(DIRECTORY assets/ai/ DESTINATION bin/ai FILES_MATCHING PATTERN "*.brain")
+    install(PROGRAMS packaging/linux/gdp packaging/linux/updater.py DESTINATION .)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
     install(FILES README_LINUX.md DESTINATION .)
     install(FILES assets/fonts/LICENSE-DejaVu.txt DESTINATION licenses)
     install(FILES "${GDP_SDL_SOURCE_DIR}/LICENSE.txt"
@@ -966,6 +970,9 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(command_line_version PROPERTIES
         PASS_REGULAR_EXPRESSION "Iron Seed ${GDP_RELEASE_VERSION}"
         TIMEOUT 10)
+
+    add_test(NAME update_prompt_rejects_invalid_version COMMAND gdp --confirm-update invalid)
+    set_tests_properties(update_prompt_rejects_invalid_version PROPERTIES WILL_FAIL TRUE TIMEOUT 10)
 
     if(UNIX AND NOT APPLE)
         add_executable(gdp_capture_industrial_wall tests/capture_industrial_wall.cpp)

@@ -44,9 +44,14 @@ Cada release contém `IronSeed-Windows-x64.zip`,
 versão, o SHA da fonte privada, o tamanho, o SHA-256 e a URL imutável de cada
 pacote. O executável responde a `--version` com a mesma versão da tag.
 
-O manifesto **prepara** uma futura verificação de atualizações, mas os pacotes
-atuais ainda **não se atualizam sozinhos**. Antes de instalar atualizações
-automaticamente, faltam um launcher independente do processo do jogo,
-verificação autenticada do manifesto, instalação atômica com rollback e testes
-em cada sistema. No macOS também faltam assinatura Developer ID e notarização
-para uma distribuição sem avisos do Gatekeeper.
+O manifesto dá suporte ao iniciador Linux incluído nos pacotes posteriores à
+versão 0.1.2. Ele consulta atualizações **antes** da partida e exige confirmação
+antes de instalar. Falhas de rede ou instalação mantêm a versão anterior; as
+novas versões são guardadas em pastas separadas, sem tocar nos saves. As versões
+0.1.2 e anteriores não recebem essa função retroativamente. O atualizador
+Windows/macOS ainda será implementado e testado. Antes de distribuir macOS sem
+avisos do Gatekeeper, ainda faltam assinatura Developer ID e notarização.
+O iniciador Linux valida o SHA-256 do pacote anunciado pelo manifesto obtido
+via HTTPS, mas o manifesto ainda não possui uma assinatura independente do
+GitHub; não trate essa verificação como proteção contra comprometimento da
+conta ou do repositório de downloads.

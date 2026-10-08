@@ -4,6 +4,9 @@
 #include "game/LaunchSeed.hpp"
 #include "game/ai/WorkerTraining.hpp"
 
+#include <SDL3/SDL.h>
+
+#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <cstdint>
@@ -11,6 +14,7 @@
 #include <iostream>
 #include <optional>
 #include <random>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -52,6 +56,33 @@ void printUsage(const std::string_view executable)
               << "  --curriculum-generations N  Initial curriculum length, preserved on full resume.\n"
               << "  --help               Show this message.\n"
               << "  --version            Show the packaged game version.\n";
+}
+
+int confirmUpdate(const std::string_view version)
+{
+    if (version.empty() || version.size() > 32U
+        || version.find_first_not_of("0123456789.") != std::string_view::npos
+        || version.front() == '.' || version.back() == '.'
+        || std::count(version.begin(), version.end(), '.') != 2
+        || version.find("..") != std::string_view::npos) {
+        std::cerr << "Invalid update version\n";
+        return 2;
+    }
+    const std::string message = "Iron Seed " + std::string{version}
+        + " está disponível. Instalar antes de iniciar o jogo?\n\n"
+          "Iron Seed " + std::string{version} + " is available. Install before playing?";
+    const SDL_MessageBoxButtonData buttons[] = {
+        {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Mais tarde / Later"},
+        {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Instalar / Install"},
+    };
+    const SDL_MessageBoxData box{
+        SDL_MESSAGEBOX_INFORMATION, nullptr, "Iron Seed", message.c_str(), 2, buttons, nullptr};
+    int selection = -1;
+    if (!SDL_ShowMessageBox(&box, &selection)) {
+        std::cerr << "Cannot show update confirmation: " << SDL_GetError() << '\n';
+        return 1;
+    }
+    return selection == 1 ? 0 : 1;
 }
 
 std::optional<gdp::entities::EnemyArchetype> parseEnemyArchetype(
@@ -127,6 +158,9 @@ wkc::core::Seed collectLaunchEntropy()
 
 int main(const int argc, char* argv[])
 {
+    if (argc >= 2 && std::string_view{argv[1]} == "--confirm-update") {
+        return argc == 3 ? confirmUpdate(argv[2]) : 2;
+    }
     gdp::game::ApplicationConfig config;
     gdp::game::ai::WorkerTrainingOptions trainingOptions;
     bool trainingMode = false;
