@@ -3,9 +3,11 @@
 O código-fonte está em `Wilson-Cecchi/GDP`. Os quatro pacotes de jogo são
 publicados separadamente como assets de uma versão no repositório público
 [`Wilson-Cecchi/Iron-Seed-Downloads`](https://github.com/Wilson-Cecchi/Iron-Seed-Downloads).
-O portfólio pode continuar usando links `releases/latest/download` com nomes
-estáveis. O workflow não publica a cada commit: os runners de macOS só são
-usados em testes manuais ou em uma versão aprovada. A CI regular executa os
+Para visitantes, a [página de downloads no portfólio](https://wkcdev.dev/projetos/gdp/#downloads)
+reúne todas as plataformas; os botões dessa página apontam para os assets de
+`releases/latest/download` com nomes estáveis. O workflow não publica a cada
+commit: os runners de macOS só são usados em testes manuais ou em uma versão
+aprovada. A CI regular executa os
 testes Linux; o pacote Windows roda no lançamento ou quando a CI é iniciada
 manualmente.
 
@@ -33,7 +35,8 @@ Configure no repositório do código-fonte o secret de Actions
 `IRON_SEED_DOWNLOADS_TOKEN`. Use um token fine-grained ou um token de GitHub App
 com permissão `Contents: Read and write` **apenas** no repositório público
 `Iron-Seed-Downloads`. Não envie o valor do token no chat, no código ou em logs.
-O `GITHUB_TOKEN` padrão do repositório privado não publica em outro repositório.
+O `GITHUB_TOKEN` padrão do repositório do código-fonte não publica em outro
+repositório.
 Configure também `IRON_SEED_RELEASE_SIGNING_KEY` como secret de Actions no
 repositório do código-fonte. O valor é o PEM da chave privada correspondente a
 `packaging/linux/release-signing-public.pem`; **nunca** adicione a chave privada
@@ -69,7 +72,7 @@ Cada release contém `IronSeed-Windows-x64.zip`,
 `IronSeed-macOS-AppleSilicon.zip`, `update.json` e `update.json.sig`. O manifesto registra a
 versão, o SHA do código-fonte, o tamanho, o SHA-256 e a URL versionada de cada
 pacote. O executável responde a `--version` com a mesma versão da tag.
-Os quatro builds de distribuição usam `GDP_ENABLE_TEST_MODE=OFF`; a arena de
+Os próximos quatro builds de distribuição usam `GDP_ENABLE_TEST_MODE=OFF`; a arena de
 desenvolvimento permanece disponível nos builds locais de teste.
 
 O manifesto dá suporte ao iniciador Linux incluído nos pacotes posteriores à

@@ -5,6 +5,9 @@ de IA utilizados pelo jogo. O SDL3 está incorporado ao executável; não é
 necessário instalá-lo separadamente. A partir dos novos pacotes, `./gdp` é o
 iniciador; o jogo real fica em `bin/gdp`.
 
+Baixe a versão Linux pela
+[página do Iron Seed](https://wkcdev.dev/projetos/gdp/#downloads).
+
 ```bash
 tar -xzf IronSeed-Linux-x64.tar.gz
 cd IronSeed-Linux-x64

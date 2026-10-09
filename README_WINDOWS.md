@@ -2,9 +2,9 @@
 
 ## Executar o pacote pronto
 
-1. Baixe o artefato `GDP-Windows-x64` de uma execução bem-sucedida da CI no
-   GitHub.
-2. Extraia `GDP-Windows-x64.zip` por completo.
+1. Baixe `IronSeed-Windows-x64.zip` pela
+   [página do Iron Seed](https://wkcdev.dev/projetos/gdp/#downloads).
+2. Extraia o ZIP por completo.
 3. Execute `gdp.exe` dentro da pasta extraída. `SDL3.dll` e a pasta `ai/`
    devem permanecer ao lado do executável; nela ficam os cinco cérebros
    treinados usados automaticamente no jogo.
@@ -15,7 +15,7 @@ Configurações de elementos gráficos do Windows caso o driver escolha a GPU
 integrada.
 
 O executável ainda não possui assinatura digital. O Windows pode identificar o
-editor como desconhecido; confira se o ZIP veio do repositório oficial antes de
+editor como desconhecido; confira se chegou pela página oficial antes de
 executá-lo. Políticas administrativas da faculdade ainda podem impedir programas
 não assinados.
 

@@ -1,8 +1,41 @@
-# GDP Technical Bible
+# Iron Seed
 
-GDP é um FPS procedural jogável, desenvolvido em C++20, SDL3 e OpenGL sobre
-uma engine própria. Este repositório reúne a implementação, os testes e a
-documentação técnica modular que orienta a evolução do projeto.
+Iron Seed é um FPS procedural em desenvolvimento, feito em C++20, SDL3 e
+OpenGL sobre a engine própria WKC Forge. Há uma campanha de dez andares,
+Speedrun, mapas e encontros variáveis, cinco tipos de inimigo com cérebros
+treinados e perfis gráficos para diferentes computadores.
+
+## Jogar
+
+Escolha o pacote para Windows x64, Linux x64, macOS Intel ou Apple Silicon na
+[página de downloads do Iron Seed](https://wkcdev.dev/projetos/gdp/#downloads).
+O site apresenta as opções; os arquivos são servidos pelo GitHub Releases do
+projeto. Os pacotes são versões de desenvolvimento, não uma edição final.
+Consulte os guias de [Windows](README_WINDOWS.md), [Linux](README_LINUX.md) e
+[macOS](README_MACOS.md) para requisitos e instruções de execução.
+
+## Código-fonte
+
+O código, os testes e a documentação ficam neste repositório. Publicar o
+repositório não publica automaticamente um novo jogo: uma versão para download
+é preparada e aprovada separadamente, conforme [o processo de release](README_RELEASES.md).
+Para compilar localmente no Linux com os pré-requisitos de desenvolvimento
+instalados:
+
+```bash
+cmake --preset release
+cmake --build --preset release --target gdp
+build/release/gdp
+```
+
+O executável local inclui a arena `--test-mode`; os próximos pacotes de
+distribuição serão compilados sem ela.
+O nome técnico `gdp` permanece no executável e em alguns caminhos de saves.
+
+## Documentação técnica e histórico
+
+As seções abaixo registram a implementação e suas fases em ordem cronológica;
+descrições de fases antigas não substituem o estado atual resumido acima.
 
 `architecture.md` é o documento-mestre canônico. O arquivo
 `GDP_arquitetura_tecnica.md` preserva a versão-fonte consolidada usada nesta
@@ -34,7 +67,7 @@ Documentos `*_reference.md` preservam conteúdo e resultados históricos do GDP
 anterior. Contratos atuais são definidos por `architecture.md` e pelos documentos
 especializados das pastas numeradas.
 
-## Estado da implementação
+## Estado e histórico da implementação
 
 - **Menus atuais:** `TEST MODE` (arena dedicada de desenvolvimento),
   `CAMPAIGN / STORY`, `SPEEDRUN`, `SETTINGS` e `QUIT GAME`.
@@ -104,8 +137,8 @@ especializados das pastas numeradas.
   **Idioma:** `Settings → Language` permite alternar imediatamente entre
   English e Português (BR). A preferência fica salva; menus, controles,
   pausa, resultados e HUD têm tradução e suporte aos acentos de PT-BR.
-  Para distribuição final sem arena, configure `-DGDP_ENABLE_TEST_MODE=OFF`;
-  o pacote de desenvolvimento atual mantém o Test Mode para validar mecânicas.
+  Os builds locais mantêm o Test Mode para validar mecânicas. O fluxo dos
+  próximos pacotes de distribuição usa `-DGDP_ENABLE_TEST_MODE=OFF`.
   Detalhes e contratos atuais: `07_interface/menus_and_settings.md`.
 
 - **Fase 0 — Bootstrap:** implementada e validada.
@@ -2086,13 +2119,17 @@ usa (`cmake --build --preset debug --target gdp` ou
 `cmake --build --preset release --target gdp`). Um binário anterior em `build/`
 não recebe os controles novos apenas com `git pull`.
 
-No Windows 11 x64, use o pacote `GDP-Windows-x64` produzido pela CI ou siga o
+No Windows 11 x64, baixe `IronSeed-Windows-x64.zip` pela
+[página do Iron Seed](https://wkcdev.dev/projetos/gdp/#downloads) ou siga o
 guia de compilação em [`README_WINDOWS.md`](README_WINDOWS.md). O ZIP contém
 `gdp.exe`, `SDL3.dll` e o próprio guia, sem exigir CMake ou Visual Studio no
 computador que apenas executará o jogo.
 
-Os downloads experimentais para Windows x64, Linux x64 e macOS (Intel e Apple
-Silicon) são gerados juntos quando uma tag de publicação aprovada
+Os downloads de desenvolvimento para Windows x64, Linux x64 e macOS (Intel e
+Apple Silicon) são apresentados no
+[site do Iron Seed](https://wkcdev.dev/projetos/gdp/#downloads) e hospedados
+como arquivos de release no GitHub. Eles são gerados juntos quando uma tag
+aprovada
 `public-vMAJOR.MINOR.PATCH` é enviada. O workflow `Portable downloads` também
 pode ser executado manualmente para testar os pacotes sem publicá-los. Os
 builds macOS não rodam a cada push. O procedimento e os pré-requisitos da
