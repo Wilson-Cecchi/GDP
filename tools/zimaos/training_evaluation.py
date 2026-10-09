@@ -7,6 +7,9 @@ from pathlib import Path
 import shutil
 
 HALF_HIT = {'worker': 5.0, 'guard': 4.0, 'officer': 3.0, 'engineer': 2.5, 'robot': 3.0}
+TEAM_PAIRS = {'firing_lane': ('guard', 'worker'),
+              'officer_guard': ('officer', 'guard'),
+              'engineer_guard': ('engineer', 'guard')}
 
 
 def atomic_json(path, value):
@@ -83,6 +86,81 @@ def summarize(directory, role, seeds, frames, source_revision):
             'generation': generations.pop(), 'summary': summary, 'scenarios': per_scenario,
             'regressions': regressions, 'score': score,
             'eligible': not regressions and score > 1.0001}
+
+
+def summarize_team(directory, role, seeds, frames, source_revision):
+    """Compare identical mixed-role fights and reject allied damage regressions."""
+    scenarios = {name for name, pair in TEAM_PAIRS.items() if role in pair}
+    if not scenarios:
+        raise ValueError(f'No team evaluation fixture covers {role}')
+    samples = {}
+    generations = set()
+    for seed in seeds:
+        for policy in ('active', 'candidate'):
+            path = Path(directory) / f'{seed}-team-{policy}.csv'
+            with path.open() as source:
+                rows = [row for row in csv.DictReader(source)
+                        if row.get('policy') == 'neural']
+            if (len(rows) != len(TEAM_PAIRS)
+                    or {row.get('scenario') for row in rows} != set(TEAM_PAIRS)):
+                raise ValueError(f'incomplete team report: {path}')
+            for row in rows:
+                scenario = row['scenario']
+                if (int(row['seed']) != seed
+                        or (row['primary'], row['ally']) != TEAM_PAIRS[scenario]
+                        or not 1 <= int(row['elapsed_frames']) <= frames):
+                    raise ValueError(f'invalid team fixture: {path}')
+                if scenario not in scenarios:
+                    continue
+                generation = int(row['primary_generation'] if row['primary'] == role
+                                 else row['ally_generation'])
+                if policy == 'candidate':
+                    generations.add(generation)
+                values = {key: float(row[key]) for key in
+                          ('player_damage', 'friendly_damage', 'friendly_hits',
+                           'friendly_kills')}
+                if (not all(math.isfinite(v) and v >= 0 for v in values.values())
+                        or any(values[key] != int(values[key]) for key in
+                               ('friendly_hits', 'friendly_kills'))):
+                    raise ValueError(f'invalid team metric: {path}')
+                samples[scenario, seed, policy] = values
+    if len(generations) != 1 or next(iter(generations)) <= 0:
+        raise ValueError('candidate generation changed during team evaluation')
+    regressions = []
+    summary = {}
+    for policy in ('active', 'candidate'):
+        rows = [samples[scenario, seed, policy]
+                for scenario in sorted(scenarios) for seed in seeds]
+        summary[policy] = {key: sum(row[key] for row in rows) / len(rows)
+                           for key in rows[0]}
+    for scenario in sorted(scenarios):
+        for seed in seeds:
+            active = samples[scenario, seed, 'active']
+            candidate = samples[scenario, seed, 'candidate']
+            tolerance = max(HALF_HIT[role], active['player_damage'] * 0.10)
+            if candidate['player_damage'] < active['player_damage'] - tolerance:
+                regressions.append({'scenario': scenario, 'seed': seed,
+                                    'metric': 'player_damage',
+                                    'active': active['player_damage'],
+                                    'candidate': candidate['player_damage']})
+            if candidate['friendly_damage'] > active['friendly_damage'] + 0.001:
+                regressions.append({'scenario': scenario, 'seed': seed,
+                                    'metric': 'friendly_damage',
+                                    'active': active['friendly_damage'],
+                                    'candidate': candidate['friendly_damage']})
+            if candidate['friendly_kills'] > 0:
+                regressions.append({'scenario': scenario, 'seed': seed,
+                                    'metric': 'friendly_kills',
+                                    'active': active['friendly_kills'],
+                                    'candidate': candidate['friendly_kills']})
+    score = ((summary['candidate']['player_damage'] + HALF_HIT[role])
+             / (summary['active']['player_damage'] + HALF_HIT[role]))
+    return {'protocol': {'seeds': list(seeds), 'frames': frames,
+                         'source_revision': source_revision,
+                         'gate': 'paired-team-damage-friendly-v1'},
+            'role': role, 'generation': generations.pop(),
+            'summary': summary, 'regressions': regressions,
+            'score': score, 'eligible': not regressions and score > 1.0001}
 
 
 def archive_candidate(report, champion, data, label):

@@ -15,10 +15,14 @@ service = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(service)
 
 
-def write_brain(path, generation, role="worker", weight="0", identity=0):
-    body = (f"GDP_ENEMY_BRAIN 3\narchetype {service.ROLES.index(role)}\n"
-            f"contract 2\nseed 42\ngeneration {generation}\nid {identity}\n"
-            "fitness_bits 0\nweights 221\n" + (weight + "\n") * 221)
+def write_brain(path, generation, role="worker", weight="0", identity=0,
+                cooperative=False):
+    count = 305 if cooperative else 221
+    body = (f"GDP_ENEMY_BRAIN {4 if cooperative else 3}\n"
+            f"archetype {service.ROLES.index(role)}\n"
+            f"contract {3 if cooperative else 2}\nseed 42\n"
+            f"generation {generation}\nid {identity}\n"
+            f"fitness_bits 0\nweights {count}\n" + (weight + "\n") * count)
     checksum = 14695981039346656037
     for byte in body.encode():
         checksum = ((checksum ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
@@ -26,6 +30,37 @@ def write_brain(path, generation, role="worker", weight="0", identity=0):
 
 
 class TrainingServiceTests(unittest.TestCase):
+    def test_cooperative_checkpoint_cannot_resume_tactical_population(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            brain = root / 'guard_generation_000002.brain'
+            write_brain(brain, 2, role='guard', cooperative=True)
+            self.assertFalse(service.valid_checkpoint(brain, 'guard'))
+            with patch.object(service, 'COOPERATIVE', True):
+                self.assertTrue(service.valid_checkpoint(brain, 'guard'))
+                write_brain(brain, 2, role='guard')
+                self.assertFalse(service.valid_checkpoint(brain, 'guard'))
+
+    def test_cooperative_population_v2_can_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            population = root / 'guard_generation_000002.population'
+            population.mkdir()
+            body = ('GDP_TRAINING_POPULATION 2\narchetype 1\nseed 42\n'
+                    'generation 2\npopulation 2\nreward_rules 6\ncontract 3\n'
+                    'curriculum 15\nwarmup_start 1\nwarmup_generations 2\n')
+            checksum = 14695981039346656037
+            for byte in body.encode():
+                checksum = ((checksum ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+            (population / 'state.txt').write_text(body + f'checksum {checksum}\n')
+            for identity in range(2):
+                write_brain(population / f'member-{identity:03d}.brain', 2,
+                            role='guard', identity=identity, cooperative=True)
+            with patch.object(service, 'COOPERATIVE', True):
+                self.assertEqual(population,
+                    service.latest_population(root, 'guard', 2))
+            self.assertIsNone(service.population_metadata(population, 'guard', 2))
+
     def test_resume_uses_newest_valid_checkpoint(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

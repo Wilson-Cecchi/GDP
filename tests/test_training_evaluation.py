@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools/zimaos'))
-from training_evaluation import summarize, archive_candidate
+from training_evaluation import summarize, summarize_team, archive_candidate
 
 
 def reports(root, center_candidate=12):
@@ -28,6 +28,40 @@ def reports(root, center_candidate=12):
 
 
 class EvaluationTests(unittest.TestCase):
+    def test_team_friendly_fire_blocks_high_damage_candidate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fields = ['policy', 'scenario', 'seed', 'primary', 'ally',
+                      'primary_generation', 'ally_generation', 'elapsed_frames',
+                      'player_damage', 'friendly_damage', 'friendly_hits',
+                      'friendly_kills']
+            pairs = [('firing_lane', 'guard', 'worker'),
+                     ('officer_guard', 'officer', 'guard'),
+                     ('engineer_guard', 'engineer', 'guard')]
+            for seed in (9001, 9002):
+                for policy in ('active', 'candidate'):
+                    with (root / f'{seed}-team-{policy}.csv').open('w') as out:
+                        writer = csv.DictWriter(out, fieldnames=fields)
+                        writer.writeheader()
+                        for scenario, primary, ally in pairs:
+                            writer.writerow({'policy': 'neural', 'scenario': scenario,
+                                'seed': seed, 'primary': primary, 'ally': ally,
+                                'primary_generation': 2 if policy == 'candidate' and primary == 'guard' else 200,
+                                'ally_generation': 2 if policy == 'candidate' and ally == 'guard' else 200,
+                                'elapsed_frames': 480,
+                                'player_damage': 40 if policy == 'candidate' else 20,
+                                'friendly_damage': 16 if policy == 'candidate' else 8,
+                                'friendly_hits': 2 if policy == 'candidate' else 1,
+                                'friendly_kills': 0})
+            report = summarize_team(root, 'guard', (9001, 9002), 480, 'revision')
+            self.assertGreater(report['score'], 1)
+            self.assertFalse(report['eligible'])
+            self.assertEqual(6, len(report['regressions']))
+            self.assertTrue(all(row['metric'] == 'friendly_damage'
+                                for row in report['regressions']))
+            with self.assertRaises(ValueError):
+                summarize_team(root, 'robot', (9001, 9002), 480, 'revision')
+
     def test_mean_gain_cannot_hide_cover_regression(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); reports(root, center_candidate=4)
