@@ -152,9 +152,8 @@ na implementação para aceitação final.
 Ferramenta integrada `image_gen`, skill `imagegen`, sem fallback CLI.
 PNG 1672 × 941, RGB/sRGB, 8 bits.
 SHA-256: `62199cfbfb58915cc44cdc1aca786a173ebc3242e975712712513bdad2fa8911`.
-Original final preservado:
-`/home/wilson/.codex/generated_images/01a03e92-1b6d-7e50-b844-35adb1765df0/exec-f53d7ed3-fa45-4edd-a310-7a520b16b1ff.png`.
-Cópia no workspace sem retoque. V1 e torso/cinto v2 não foram sobrescritos.
+Original final preservado em `player_hands_proposal_v2.png`, sem retoque.
+V1 e torso/cinto v2 não foram sobrescritos.
 
 Na etapa de proposta só mudaram documentação e prancha. Código e candidatos
 locais preexistentes foram preservados; não se atribui os testes históricos

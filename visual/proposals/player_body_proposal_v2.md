@@ -107,9 +107,7 @@ Imagem v1 como alvo de edição não destrutiva; screenshot nativo e modelos
 existentes como referências. A v1 e seus screenshots não são sobrescritos.
 Saída final inspecionada: 1672 × 941, PNG RGB/sRGB de 8 bits.
 SHA-256: `208af9673352a395c0226125b48d1871dd29e4a86dc52808cef0aed05f858190`.
-Arquivo original da geração final:
-`/home/wilson/.codex/generated_images/01a03e92-1b6d-7e50-b844-35adb1765df0/exec-1a0a14a1-8555-4541-a4eb-53dd5984b86e.png`.
-Uma cópia sem retoque foi salva na pasta de propostas do projeto.
+Arquivo final preservado sem retoque em `player_body_proposal_v2.png`.
 
 Inspeção: Mantido/Usado/Gasto preservam a identidade; close distingue cintura,
 cinto, fivela e coldres; as vistas próprias do player mostram pistola à direita
