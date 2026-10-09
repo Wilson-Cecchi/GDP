@@ -153,15 +153,19 @@ wkc::core::Vec3 applyDeterministicWeaponSpread(
     wkc::core::Vec3 direction,
     const WeaponArchetype archetype,
     const std::uint32_t shotIndex,
-    const float spreadScale) noexcept
+    const float spreadScale,
+    const float movementInaccuracyDegrees) noexcept
 {
     direction = wkc::core::normalized(direction);
-    if (wkc::core::length(direction) <= 1.0e-7F || shotIndex == 0U) {
+    const float movement = std::isfinite(movementInaccuracyDegrees)
+        ? std::clamp(movementInaccuracyDegrees, 0.0F, 1.5F) : 0.0F;
+    if (wkc::core::length(direction) <= 1.0e-7F
+        || (shotIndex == 0U && movement <= 0.0F)) {
         return direction;
     }
 
     constexpr std::array<wkc::core::Vec2, 12> pattern{{
-        {0.00F, 0.00F},
+        {0.32F, -0.18F},
         {0.30F, 0.10F},
         {-0.22F, 0.36F},
         {0.45F, -0.20F},
@@ -178,8 +182,8 @@ wkc::core::Vec3 applyDeterministicWeaponSpread(
         = pattern[std::min<std::size_t>(shotIndex, pattern.size() - 1U)];
     const float safeScale = std::isfinite(spreadScale)
         ? std::clamp(spreadScale, 0.0F, 1.0F) : 1.0F;
-    const float spreadRadians = weaponSpreadProfile(archetype).maximumDegrees
-        * safeScale
+    const float spreadRadians = (weaponSpreadProfile(archetype).maximumDegrees
+        * safeScale + movement)
         * (std::numbers::pi_v<float> / 180.0F);
     const float horizontal = std::tan(sample.x * spreadRadians);
     const float vertical = std::tan(sample.y * spreadRadians);
@@ -193,6 +197,21 @@ wkc::core::Vec3 applyDeterministicWeaponSpread(
         = wkc::core::normalized(wkc::core::cross(right, direction));
     return wkc::core::normalized(
         direction + (right * horizontal) + (up * vertical));
+}
+
+float weaponMovementInaccuracyDegrees(
+    const WeaponArchetype archetype, const wkc::core::Vec3 velocity,
+    const bool grounded, const bool crouching, const float aimBlend) noexcept
+{
+    if (!isFirearmArchetype(archetype)
+        || !std::isfinite(velocity.x) || !std::isfinite(velocity.z)) return 0.0F;
+    const float speed = std::hypot(velocity.x, velocity.z);
+    const float movement = 0.50F * std::clamp(speed / 4.5F, 0.0F, 1.6F)
+        + (grounded ? 0.0F : 0.80F);
+    const float safeAim = std::isfinite(aimBlend)
+        ? std::clamp(aimBlend, 0.0F, 1.0F) : 0.0F;
+    return std::clamp(movement * (1.0F - 0.55F * safeAim)
+        * (crouching ? 0.80F : 1.0F), 0.0F, 1.5F);
 }
 
 DamageOutcome applyDamage(
@@ -442,7 +461,8 @@ ShotResult fireHitscan(
     Weapon& weapon, const wkc::core::Vec3 origin, const wkc::core::Vec3 direction,
     const std::uint32_t roomId, const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager, const float spreadScale,
-    const std::span<const std::uint32_t> additionalRoomIds) noexcept
+    const std::span<const std::uint32_t> additionalRoomIds,
+    const float movementInaccuracyDegrees) noexcept
 {
     const auto readiness = weapon.tryFire();
     if (readiness != FireReadiness::Fired) {
@@ -456,7 +476,9 @@ ShotResult fireHitscan(
     std::size_t representative = 0U;
     for (std::uint8_t i = 0U; i < count; ++i) {
         const auto index = count > 1U ? static_cast<std::uint32_t>(i + 1U) : weapon.spreadShotIndex();
-        const auto ray = applyDeterministicWeaponSpread(direction, weapon.definition().archetype, index, spreadScale);
+        const auto ray = applyDeterministicWeaponSpread(direction,
+            weapon.definition().archetype, index, spreadScale,
+            movementInaccuracyDegrees);
         contacts[i] = traceHitscan(weapon, origin, ray, roomId, collisionWorld, manager, additionalRoomIds);
         // Keep the most significant contact in the legacy summary fields.
         if (contacts[i].outcome > contacts[representative].outcome) representative = i;

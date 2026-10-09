@@ -53,8 +53,8 @@ sem multiplicação involuntária de upgrades. Não há nova fila global.
 Sniper e escopeta são semiautomáticas; SMG é automática. A sniper tem mira
 mais lenta e zoom proporcional ao FOV configurado. Nenhum atributo do boss
 foi alterado. Sniper, escopeta e SMG têm modelos próprios Used v1 após aprovação
-das pranchas, aguardando aceitação visual no jogo. A geometria nova não altera
-o ray lógico.
+das pranchas; o visual da SMG também foi aprovado na partida. A geometria nova
+não altera o ray lógico.
 
 As seções de fases abaixo preservam seu contexto histórico; por exemplo,
 o antigo slot 1 fixo da Carbine agora representa qualquer primária possuída,
@@ -113,6 +113,14 @@ envelope de `0,55°` e recuperação de `0,34 s`; a Carbine usa `0,90°` e `0,30
 Cooldown e arma vazia não avançam o padrão. Recarga, troca de arma, restauração
 de checkpoint ou o fim da janela de recuperação devolvem o próximo tiro ao
 centro. Não há consumo de RNG e o resultado independe do framerate.
+
+Na revisão de precisão por movimento, ficar parado mantém o primeiro disparo
+exatamente na retícula. Movimento horizontal adiciona uma pequena imprecisão
+determinística, inclusive ao primeiro tiro; caminhar silenciosamente custa menos
+que correr, e atirar durante um salto custa mais. Mira e agachamento atenuam o
+efeito. Os disparos seguintes conservam o padrão de rajada e o recuo da câmera
+permanece separado. A abertura da retícula sinaliza a perda de precisão.
+Ver [contrato e teste](movement_accuracy_2026-10-09.md).
 
 ## WeaponDefinition
 

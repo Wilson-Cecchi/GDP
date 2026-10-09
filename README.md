@@ -61,11 +61,15 @@ especializados das pastas numeradas.
   Campanha e no Test Mode. Pickups extras de campanha caíram de 55% para 25%.
   `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
   Sniper, escopeta e SMG têm modelos próprios metálicos Used v1, na mão e no
-  chão, implementados após aprovação das pranchas e aguardando aceitação no jogo.
+  chão, implementados após aprovação das pranchas; o visual da SMG foi aprovado
+  também na partida.
   Disparos agora deslocam a mira com recuo vertical e padrão horizontal próprio
   por arma; o jogador pode compensar com mouse ou controle. A sequência reinicia
   após uma pausa, sem recentralização automática da câmera.
   [Contrato e teste](04_gameplay/weapon_recoil_2026-10-08.md).
+  Tiros em movimento ou no ar também perdem um pouco de precisão; mirar,
+  agachar ou caminhar silenciosamente reduzem esse custo. A retícula abre para
+  indicar a imprecisão. [Detalhes](04_gameplay/movement_accuracy_2026-10-09.md).
   A sniper ganhou luneta Used v2 e visão circular com retículo ao segurar
   a ação Mira (`Mouse2` por padrão, remapeável). O zoom e o balanceamento
   permanecem iguais; recarga, troca, drop e menu retiram a visão de mira.

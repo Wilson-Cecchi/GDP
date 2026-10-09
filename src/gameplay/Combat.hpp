@@ -114,7 +114,12 @@ void updateEnemyHitReactions(
     wkc::core::Vec3 direction,
     WeaponArchetype archetype,
     std::uint32_t shotIndex,
-    float spreadScale = 1.0F) noexcept;
+    float spreadScale = 1.0F,
+    float movementInaccuracyDegrees = 0.0F) noexcept;
+
+[[nodiscard]] float weaponMovementInaccuracyDegrees(
+    WeaponArchetype archetype, wkc::core::Vec3 velocity,
+    bool grounded, bool crouching, float aimBlend) noexcept;
 
 [[nodiscard]] ShotResult fireHitscan(
     Weapon& weapon,
@@ -124,7 +129,8 @@ void updateEnemyHitReactions(
     const CollisionWorld& collisionWorld,
     gdp::entities::EntityManager& manager,
     float spreadScale = 1.0F,
-    std::span<const std::uint32_t> additionalRoomIds = {}) noexcept;
+    std::span<const std::uint32_t> additionalRoomIds = {},
+    float movementInaccuracyDegrees = 0.0F) noexcept;
 
 [[nodiscard]] bool hasLineOfSight(
     wkc::core::Vec3 origin,

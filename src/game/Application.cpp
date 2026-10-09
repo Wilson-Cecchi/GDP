@@ -2543,7 +2543,10 @@ void Application::fixedUpdate(const double fixedStep)
             collisionWorld_,
             entities_,
             1.0F - aimBlend_ * 0.60F,
-            reachableShotRooms);
+            reachableShotRooms,
+            gameplay::weaponMovementInaccuracyDegrees(
+                weapon_.definition().archetype, player_.state().velocity,
+                player_.state().grounded, player_.state().crouching, aimBlend_));
         const gameplay::CombatSignalBatch signals
             = gameplay::combatSignalsForShot(shot);
         const entities::PropData* hitProp = shot.hit
@@ -3827,7 +3830,11 @@ void Application::render()
         break;
     }
     hud.weaponOverdrive = weapon_.overdriveActive();
-    hud.weaponSpread = weapon_.spreadStrength();
+    hud.weaponSpread = std::clamp(weapon_.spreadStrength()
+        + gameplay::weaponMovementInaccuracyDegrees(
+            weapon_.definition().archetype, player_.state().velocity,
+            player_.state().grounded, player_.state().crouching, aimBlend_) / 1.5F,
+        0.0F, 1.0F);
     hud.keys = player_.state().keys;
     hud.level = progress.level;
     hud.runTimerVisible = true;

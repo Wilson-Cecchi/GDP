@@ -21,10 +21,11 @@ urgentes podem formar um pacote próprio; mudanças pequenas podem aguardar o
 próximo marco. O `Latest` e o manifesto de atualização só avançam após a tag
 de uma versão aprovada conforme o processo abaixo.
 
-A progressão de encontros dos andares e o modelo próprio da SMG pertencem à
-fila de melhorias seguinte à versão pública 0.1.4. A jogabilidade dos andares
-e a proposta visual da SMG foram aprovadas; a implementação da SMG ainda
-precisa de aceitação dentro do jogo antes de entrar em um pacote público.
+A progressão de encontros dos andares, o modelo próprio da SMG, o recuo
+controlável e a precisão em movimento pertencem à fila de melhorias seguinte
+à versão pública 0.1.4. A jogabilidade dos andares, o visual da SMG e o recuo
+foram aprovados; a precisão em movimento precisa de playtest antes de entrar
+em um pacote público.
 
 ## Preparação única
 

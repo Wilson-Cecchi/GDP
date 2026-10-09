@@ -282,6 +282,50 @@ void testDeterministicWeaponSpread()
         forward, WeaponArchetype::Carbine, 10U);
     expect(centered == forward,
         "first shot remains exactly aligned with the reticle");
+    const float stationary = weaponMovementInaccuracyDegrees(
+        WeaponArchetype::Carbine, {}, true, false, 0.0F);
+    const float walking = weaponMovementInaccuracyDegrees(
+        WeaponArchetype::Carbine, {4.5F, 0.0F, 0.0F}, true, false, 0.0F);
+    const float quiet = weaponMovementInaccuracyDegrees(
+        WeaponArchetype::Carbine, {2.25F, 0.0F, 0.0F}, true, false, 0.0F);
+    const float airborne = weaponMovementInaccuracyDegrees(
+        WeaponArchetype::Carbine, {4.5F, 5.0F, 0.0F}, false, false, 0.0F);
+    expect(near(stationary, 0.0F) && quiet > 0.0F
+            && quiet < walking && walking < airborne,
+        "walking, quiet walking and jumping have distinct accuracy costs");
+    expect(weaponMovementInaccuracyDegrees(
+               WeaponArchetype::Knife, {4.5F, 0.0F, 0.0F}, false, false, 0.0F) == 0.0F
+            && weaponMovementInaccuracyDegrees(
+                WeaponArchetype::Carbine, {4.5F, 0.0F, 0.0F}, true, true, 0.0F) < walking
+            && weaponMovementInaccuracyDegrees(
+                WeaponArchetype::Carbine, {4.5F, 0.0F, 0.0F}, true, false, 1.0F) < walking,
+        "knife remains exact while crouch and aiming mitigate movement spread");
+    const auto movingFirst = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Carbine, 0U, 1.0F, walking);
+    const auto jumpingFirst = applyDeterministicWeaponSpread(
+        forward, WeaponArchetype::Carbine, 0U, 1.0F, airborne);
+    expect(movingFirst != forward
+            && movingFirst == applyDeterministicWeaponSpread(
+                forward, WeaponArchetype::Carbine, 0U, 1.0F, walking)
+            && wkc::core::dot(jumpingFirst, forward)
+                < wkc::core::dot(movingFirst, forward),
+        "moving first shot has deterministic drift and jumping worsens it");
+    expect(applyDeterministicWeaponSpread(
+               forward, WeaponArchetype::Carbine, 0U, 1.0F, -1.0F) == forward,
+        "invalid negative movement penalty cannot alter a stationary first shot");
+    const CollisionWorld movementRoom{
+        {{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    gdp::entities::EntityManager movementEntities;
+    Weapon stillGun(baseWeaponDefinition(WeaponArchetype::Carbine));
+    Weapon movingGun(baseWeaponDefinition(WeaponArchetype::Carbine));
+    const auto stillShot = fireHitscan(stillGun, {0.0F, 1.0F, 0.0F},
+        forward, 1U, movementRoom, movementEntities);
+    const auto movingShot = fireHitscan(movingGun, {0.0F, 1.0F, 0.0F},
+        forward, 1U, movementRoom, movementEntities, 1.0F, {}, walking);
+    expect(stillShot.impact && movingShot.impact
+            && near(stillShot.impact->point.x, 0.0F)
+            && movingShot.impact->point.x > stillShot.impact->point.x,
+        "hitscan uses movement inaccuracy for the actual world impact");
     expect(pistol == repeated && !near(pistol.x, 0.0F)
             && !near(pistol.y, 0.0F),
         "later shots use a repeatable two-axis pattern without RNG");
