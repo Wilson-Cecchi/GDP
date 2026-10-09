@@ -3,6 +3,8 @@
 #include "entities/EntityManager.hpp"
 #include "world/World.hpp"
 
+#include <cstdint>
+
 namespace gdp::world {
 
 struct InitialEntitySet {
@@ -18,6 +20,7 @@ struct InitialEntitySet {
     gdp::entities::EntityManager& manager,
     gdp::entities::PlayerCreateInfo player,
     float difficulty = 1.0F,
-    bool campaignWeapons = false);
+    bool campaignWeapons = false,
+    std::uint32_t campaignFloor = 1U);
 
 } // namespace gdp::world

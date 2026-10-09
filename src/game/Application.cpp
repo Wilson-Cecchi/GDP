@@ -972,7 +972,9 @@ bool Application::initializeRun()
             .armor = player_.state().armor,
             .maximumArmor = player_.state().maximumArmor,
         },
-        runDifficulty_, session_.state().mode == gameplay::RunMode::Campaign);
+        runDifficulty_, session_.state().mode == gameplay::RunMode::Campaign,
+        session_.state().mode == gameplay::RunMode::Campaign
+            ? session_.state().campaignFloor : 1U);
     if (!initialEntities.isValid()) {
         log(LogLevel::Error, "Initial entity population did not find a START room");
         return false;

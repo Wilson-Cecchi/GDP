@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -918,6 +919,105 @@ void testCampaignExitTerminalPopulation()
         "Campaign exit seed batch exercises all four console rotations");
 }
 
+void testCampaignEncounterProgression()
+{
+    using namespace gdp::entities;
+    using namespace gdp::world;
+    using wkc::core::Vec3;
+    using EnemySnapshot = std::tuple<RoomRole, EnemyArchetype, Vec3, float>;
+
+    bool sawFloorVariation = false;
+    bool validPositions = true;
+    bool validCounts = true;
+    bool stableBoss = true;
+    bool deterministic = true;
+    for (wkc::core::Seed seed = 1U; seed <= 128U; ++seed) {
+        std::vector<EnemySnapshot> firstFloor;
+        std::vector<EnemySnapshot> lastFloor;
+        float firstBossHealth = 0.0F;
+        for (const std::uint32_t floor : {1U, 5U, 9U, 9U}) {
+            auto generated = generateWorld(seed);
+            if (!generated.world) {
+                validCounts = false;
+                continue;
+            }
+            EntityManager manager;
+            const auto initial = populateInitialEntities(*generated.world, manager,
+                {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
+                1.0F, true, floor);
+            validCounts &= initial.isValid();
+            std::vector<EnemySnapshot> snapshot;
+            for (const RoomInstance& room : generated.world->rooms) {
+                std::vector<Vec3> enemyPositions;
+                std::size_t count = 0U;
+                std::size_t workers = 0U;
+                for (const EntityId id : room.entities) {
+                    const auto* enemy = manager.findData<EnemyData>(id);
+                    const auto* entity = manager.find(id);
+                    if (!enemy || !entity) continue;
+                    ++count;
+                    workers += enemy->archetype == EnemyArchetype::Worker ? 1U : 0U;
+                    const Vec3 position = entity->transform.position;
+                    snapshot.emplace_back(room.role, enemy->archetype, position, enemy->health);
+                    if (floor > 1U && (room.role == RoomRole::Normal
+                            || room.role == RoomRole::Arena)) {
+                        constexpr float radius = 0.52F;
+                        validPositions &= position.x - radius >= room.worldBounds.minimum.x
+                            && position.x + radius <= room.worldBounds.maximum.x
+                            && position.z - radius >= room.worldBounds.minimum.z
+                            && position.z + radius <= room.worldBounds.maximum.z;
+                        for (const Vec3 other : enemyPositions) {
+                            const Vec3 delta = position - other;
+                            validPositions &= delta.x * delta.x + delta.z * delta.z
+                                >= 1.04F * 1.04F;
+                        }
+                        for (const EntityId propId : room.entities) {
+                            const auto* prop = manager.findData<PropData>(propId);
+                            const auto* obstacle = manager.find(propId);
+                            if (!prop || !prop->solid || !obstacle) continue;
+                            const float halfX = obstacle->transform.scale.x * 0.5F;
+                            const float halfZ = obstacle->transform.scale.z * 0.5F;
+                            const float closestX = std::clamp(position.x,
+                                obstacle->transform.position.x - halfX,
+                                obstacle->transform.position.x + halfX);
+                            const float closestZ = std::clamp(position.z,
+                                obstacle->transform.position.z - halfZ,
+                                obstacle->transform.position.z + halfZ);
+                            const float dx = position.x - closestX;
+                            const float dz = position.z - closestZ;
+                            validPositions &= dx * dx + dz * dz >= radius * radius;
+                        }
+                    }
+                    enemyPositions.push_back(position);
+                    if (room.role == RoomRole::Boss) {
+                        if (floor == 1U) firstBossHealth = enemy->health;
+                        else stableBoss &= enemy->archetype == EnemyArchetype::IndustrialRobot
+                            && enemy->health == firstBossHealth;
+                    }
+                }
+                if (room.role == RoomRole::Normal) {
+                    validCounts &= count >= 1U && count <= 2U
+                        && (floor < 8U || count == 2U);
+                } else if (room.role == RoomRole::Arena) {
+                    validCounts &= count >= (floor >= 8U ? 4U : floor >= 5U ? 3U : 2U)
+                        && count <= 4U && (floor < 8U || workers == 0U);
+                } else if (room.role == RoomRole::Boss) {
+                    validCounts &= count == 1U;
+                }
+            }
+            if (floor == 1U) firstFloor = snapshot;
+            if (floor == 9U && lastFloor.empty()) lastFloor = snapshot;
+            else if (floor == 9U) deterministic &= lastFloor == snapshot;
+        }
+        sawFloorVariation |= firstFloor != lastFloor;
+    }
+    expect(sawFloorVariation && validCounts,
+        "Campaign floors vary bounded enemy formations and late-floor pressure");
+    expect(validPositions, "Campaign encounter spawns clear walls, props and other enemies");
+    expect(stableBoss, "encounter profile does not alter the approved boss");
+    expect(deterministic, "Campaign enemy layout repeats for the same seed and floor");
+}
+
 } // namespace
 
 int main()
@@ -932,6 +1032,7 @@ int main()
     testCorridorRouting();
     testInitialEntityPopulation();
     testCampaignExitTerminalPopulation();
+    testCampaignEncounterProgression();
     testWorldSeedBatch();
 
     if (failures != 0) {

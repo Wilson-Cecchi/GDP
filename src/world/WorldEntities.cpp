@@ -30,7 +30,8 @@ InitialEntitySet populateInitialEntities(
     gdp::entities::EntityManager& manager,
     gdp::entities::PlayerCreateInfo player,
     const float difficulty,
-    const bool campaignWeapons)
+    const bool campaignWeapons,
+    const std::uint32_t campaignFloor)
 {
     using namespace gdp::entities;
 
@@ -43,6 +44,8 @@ InitialEntitySet populateInitialEntities(
     }
     const float safeDifficulty = std::clamp(
         std::isfinite(difficulty) ? difficulty : 1.0F, 0.5F, 2.0F);
+    const std::uint32_t encounterFloor = campaignWeapons
+        ? std::clamp(campaignFloor, 1U, 10U) : 1U;
     std::vector<LootLayout> lootLayouts;
     std::vector<PropLayout> propLayouts;
     std::vector<std::uint32_t> roomDepths;
@@ -195,13 +198,39 @@ InitialEntitySet populateInitialEntities(
 
         switch (room.role) {
         case RoomRole::Normal:
-            if (encounter.chance(0.5F)) {
+            if (encounterFloor == 1U && encounter.chance(0.5F)) {
                 addEnemy(EnemyArchetype::Worker, {}, 50.0F);
-            } else {
+            } else if (encounterFloor == 1U) {
                 addEnemy(EnemyArchetype::Worker, {-0.75F, 0.0F, 0.0F}, 50.0F);
                 const bool guarded = roomDepths[roomIndex] >= 3U;
                 addEnemy(guarded ? EnemyArchetype::Guard : EnemyArchetype::Worker,
                     {0.75F, 0.0F, 0.0F}, guarded ? 75.0F : 50.0F);
+            } else {
+                wkc::core::RandomStream formation{wkc::core::deriveSeed(
+                    room.seed, gdp::game::SeedDomain::EnemySpawn, encounterFloor)};
+                const bool pair = encounterFloor >= 8U
+                    || formation.chance(encounterFloor >= 5U ? 0.75F : 0.6F);
+                const bool alongX = formation.chance(0.5F);
+                const wkc::core::Vec3 leadPosition = alongX
+                    ? wkc::core::Vec3{-1.2F, 0.0F, 0.0F}
+                    : wkc::core::Vec3{-0.4F, 0.0F, -0.75F};
+                const wkc::core::Vec3 supportPosition = alongX
+                    ? wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+                    : wkc::core::Vec3{-0.4F, 0.0F, 0.75F};
+                const EnemyArchetype lead = encounterFloor >= 8U
+                    && formation.chance(0.5F) ? EnemyArchetype::Guard
+                    : EnemyArchetype::Worker;
+                addEnemy(lead, pair ? leadPosition : wkc::core::Vec3{},
+                    lead == EnemyArchetype::Guard ? 75.0F : 50.0F);
+                if (pair) {
+                    const EnemyArchetype support = encounterFloor >= 5U
+                        && formation.chance(0.4F) ? EnemyArchetype::Officer
+                        : roomDepths[roomIndex] >= 2U || encounterFloor >= 8U
+                            ? EnemyArchetype::Guard : EnemyArchetype::Worker;
+                    addEnemy(support, supportPosition,
+                        support == EnemyArchetype::Officer ? 65.0F
+                        : support == EnemyArchetype::Guard ? 75.0F : 50.0F);
+                }
             }
             break;
         case RoomRole::Hub:
@@ -212,11 +241,21 @@ InitialEntitySet populateInitialEntities(
                 EnemyArchetype::Worker, EnemyArchetype::Guard,
                 EnemyArchetype::Officer, EnemyArchetype::Engineer,
             };
+            constexpr std::array lateArchetypes{
+                EnemyArchetype::Guard, EnemyArchetype::Officer,
+                EnemyArchetype::Engineer, EnemyArchetype::Guard,
+            };
             constexpr std::array positions{
                 wkc::core::Vec3{-1.5F, 0.0F, 0.0F},
                 wkc::core::Vec3{1.5F, 0.0F, 0.0F},
                 wkc::core::Vec3{0.0F, 0.0F, 1.5F},
                 wkc::core::Vec3{0.0F, 0.0F, -1.5F},
+            };
+            constexpr std::array campaignPositions{
+                wkc::core::Vec3{-1.5F, 0.0F, -1.2F},
+                wkc::core::Vec3{0.0F, 0.0F, -1.2F},
+                wkc::core::Vec3{-1.5F, 0.0F, 1.2F},
+                wkc::core::Vec3{0.0F, 0.0F, 1.2F},
             };
             std::array<std::size_t, 4> order{0U, 1U, 2U, 3U};
             for (std::size_t index = 0; index < order.size(); ++index) {
@@ -224,13 +263,21 @@ InitialEntitySet populateInitialEntities(
                     static_cast<int>(index), static_cast<int>(order.size() - 1U)));
                 std::swap(order[index], order[selected]);
             }
-            const std::size_t count = static_cast<std::size_t>(encounter.rangeInt(2, 4));
+            const std::size_t count = static_cast<std::size_t>(encounter.rangeInt(
+                encounterFloor >= 8U ? 4 : encounterFloor >= 5U ? 3 : 2, 4));
+            wkc::core::RandomStream formation{wkc::core::deriveSeed(
+                room.seed, gdp::game::SeedDomain::EnemySpawn, encounterFloor)};
+            const std::size_t positionShift = encounterFloor == 1U ? 0U
+                : static_cast<std::size_t>(formation.rangeInt(0, 3));
             for (std::size_t index = 0; index < count; ++index) {
-                const EnemyArchetype archetype = archetypes[order[index]];
+                const EnemyArchetype archetype = encounterFloor >= 8U
+                    ? lateArchetypes[order[index]] : archetypes[order[index]];
                 const float health = archetype == EnemyArchetype::Guard ? 75.0F
                     : archetype == EnemyArchetype::Officer ? 65.0F
                     : archetype == EnemyArchetype::Engineer ? 58.0F : 50.0F;
-                addEnemy(archetype, positions[index], health);
+                addEnemy(archetype, encounterFloor == 1U ? positions[index]
+                    : campaignPositions[(index + positionShift) % campaignPositions.size()],
+                    health);
             }
             break;
         }

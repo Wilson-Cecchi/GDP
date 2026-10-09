@@ -47,6 +47,9 @@ especializados das pastas numeradas.
   chave da sala Secret ou ativar o terminal da START e eliminar sua emboscada.
   Do segundo ao décimo andar, cada grupo de três andares usa as três missões
   uma vez, sem repetição em andares consecutivos; a ordem varia por campanha.
+  Os encontros comuns também progridem: novas formações e mais especialistas
+  aparecem nos andares avançados, sem mudar a luta do boss. Detalhes em
+  [`04_gameplay/campaign_encounter_progression_2026-10-08.md`](04_gameplay/campaign_encounter_progression_2026-10-08.md).
   O minimapa marca missão, Boss e saída após descobrir a
   sala correspondente. Matar o boss **e** cumprir a missão libera o console da
   sala Boss: Interagir (E por padrão) sobe para o próximo andar; no décimo,
