@@ -5,6 +5,7 @@
 #include "persistence/SpeedrunLeaderboardStore.hpp"
 #include "platform/SdlInput.hpp"
 #include "gameplay/Props.hpp"
+#include "gameplay/Combat.hpp"
 #include "gameplay/Loot.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include <SDL3/SDL.h>
@@ -322,6 +323,49 @@ struct ApplicationMenuTestAccess {
         expect(app.session_.state().mode == gameplay::RunMode::TestMode && app.world_ && app.world_->rooms.size() == 1U
             && app.entities_.query(entities::EntityKind::Enemy).size() == 5U, "Test Mode creates dedicated arena with all enemy types");
         expect(app.weapon_.ownsWeapon(gameplay::WeaponArchetype::Carbine), "arena starts with firearms and knife available");
+        unsigned practiceTargets = 0U;
+        entities::EntityId nearPracticeTarget{};
+        for (const auto id : app.entities_.query(entities::EntityKind::Prop)) {
+            const auto* prop = app.entities_.findData<entities::PropData>(id);
+            const auto* entity = app.entities_.find(id);
+            if (prop && entity && prop->type == entities::PropType::Canister
+                && prop->maximumHealth == 1'000'000.0F) {
+                ++practiceTargets;
+                expect(entity->transform.position.x == 14.5F && prop->solid,
+                    "durable practice target stays against the arena side wall");
+                if (entity->transform.position.z == 1.0F) nearPracticeTarget = id;
+            }
+        }
+        expect(practiceTargets == 3U,
+            "Test Mode provides three reusable targets at different distances");
+        if (const auto* target = app.entities_.find(nearPracticeTarget)) {
+            const auto origin = app.player_.cameraPosition();
+            const auto direction = wkc::core::normalized(
+                target->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F} - origin);
+            app.weapon_.fixedUpdate(1.0F);
+            const auto shot = gameplay::fireHitscan(app.weapon_, origin, direction,
+                1U, app.collisionWorld_, app.entities_);
+            expect(shot.hit && shot.hit->target == nearPracticeTarget
+                && shot.impact && shot.impact->material == gameplay::ImpactMaterial::Metal,
+                "near practice plate is reachable and reports a metal impact");
+        } else {
+            expect(false, "near practice plate exists for the aiming fixture");
+        }
+        app.player_.applyDamage(15.0F);
+        expect(app.player_.relocate({0.0F, 0.0F, 6.0F}, 90.0F),
+            "practice fixture faces the supply terminal");
+        app.playerCommand_ = {};
+        app.playerCommand_.interact = true;
+        release(); app.fixedUpdate(1.0 / 60.0); app.render();
+        expect(app.weapon_.magazineAmmo() == app.weapon_.definition().magazineSize
+            && app.weapon_.reserveAmmo() == app.weapon_.definition().reserveMaximum
+            && app.player_.state().health == app.player_.state().maximumHealth
+            && app.player_.state().armor == app.player_.state().maximumArmor
+            && !app.fatalError_,
+            "Test Mode terminal replenishes ammo and survival resources on interaction");
+        expect(localize(gameplay::Language::PortugueseBrazil, "RESTOCK")
+                == "REABASTECER",
+            "practice terminal prompt has a Portuguese translation");
         for (const auto type : {gameplay::WeaponArchetype::Sniper, gameplay::WeaponArchetype::Shotgun, gameplay::WeaponArchetype::SubmachineGun}) {
             const auto items = app.entities_.query(entities::EntityKind::Item);
             const auto item = std::find_if(items.begin(), items.end(), [&](const auto id) {

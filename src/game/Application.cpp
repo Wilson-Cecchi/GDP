@@ -2868,6 +2868,17 @@ void Application::fixedUpdate(const double fixedStep)
         interactionPending_ = false;
         playerCommand_.interact = false;
     }
+    if (terminalUsed && session_.state().mode == gameplay::RunMode::TestMode) {
+        weapon_.restockAllFirearms();
+        player_.heal(player_.state().maximumHealth);
+        player_.addArmor(player_.state().maximumArmor);
+        if (auto* data = entities_.findData<entities::PlayerData>(player_.entity())) {
+            data->health = player_.state().health;
+            data->armor = player_.state().armor;
+        }
+        gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
+        log(LogLevel::Info, "Test Mode supplies replenished");
+    }
     const auto activeEvent = std::find_if(
         roomEvents_.begin(), roomEvents_.end(),
         [playerRoom](const gameplay::RoomEventRuntime& runtime) {
@@ -3978,6 +3989,21 @@ void Application::render()
                 : session_.state().campaignFloor < gameplay::campaignFloorCount
                     ? visual::HudPrompt::NextFloorTerminal
                     : visual::HudPrompt::FinishCampaignTerminal;
+        }
+        if (hud.prompt == visual::HudPrompt::None
+            && session_.state().mode == gameplay::RunMode::TestMode) {
+            const entities::Entity* terminal = entities_.find(terminalEntity_);
+            if (terminal != nullptr && terminal->roomId == playerRoom) {
+                const wkc::core::Vec3 position = terminal->transform.position;
+                const std::array targets{gameplay::InteractionTarget{
+                    terminalEntity_,
+                    {{position.x - 0.4F, position.y, position.z - 0.15F},
+                        {position.x + 0.4F, position.y + 2.0F,
+                            position.z + 0.15F}}}};
+                if (player_.findInteraction(targets) == terminalEntity_) {
+                    hud.prompt = visual::HudPrompt::Restock;
+                }
+            }
         }
         const std::optional<gameplay::RoomTransition> transition
             = gameplay::findRoomTransition(

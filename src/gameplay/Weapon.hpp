@@ -98,6 +98,8 @@ public:
         float durationSeconds = 12.0F) noexcept;
     [[nodiscard]] bool restoreCampaignProgress(
         const WeaponCampaignProgress& progress) noexcept;
+    // Refill owned firearms without changing selection, cooldown or overdrive.
+    void restockAllFirearms() noexcept;
 
     [[nodiscard]] const WeaponDefinition& definition() const noexcept;
     [[nodiscard]] std::uint32_t magazineAmmo() const noexcept;

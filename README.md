@@ -38,6 +38,10 @@ especializados das pastas numeradas.
 
 - **Menus atuais:** `TEST MODE` (arena dedicada de desenvolvimento),
   `CAMPAIGN / STORY`, `SPEEDRUN`, `SETTINGS` e `QUIT GAME`.
+  No Test Mode, três placas metálicas reutilizáveis servem para comparar recuo
+  e precisão em diferentes distâncias; o terminal atrás do ponto inicial
+  reabastece HP, colete e munição das armas possuídas com a ação Interagir.
+  [Detalhes do ensaio](04_gameplay/test_mode_calibration_2026-10-09.md).
   O título do menu inicial apresenta o nome **Iron Seed**; o executável e
   os caminhos de saves continuam com os identificadores técnicos GDP.
   Campanha: 10 andares, três slots independentes, Easy/Normal/Hard, checkpoint

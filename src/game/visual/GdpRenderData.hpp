@@ -335,6 +335,7 @@ enum class HudPrompt : std::uint8_t {
     OpenDoor,
     DoorLocked,
     UseTerminal,
+    Restock,
     Reload,
     ExitTerminalLocked,
     NextFloorTerminal,

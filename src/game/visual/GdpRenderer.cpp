@@ -3096,6 +3096,8 @@ bool GdpRenderer::render(
             promptColor = {0.98F, 0.24F, 0.12F};
         } else if (hud.prompt == HudPrompt::UseTerminal) {
             promptText = hud.interactBinding + " USE TERMINAL";
+        } else if (hud.prompt == HudPrompt::Restock) {
+            promptText = hud.interactBinding + " RESTOCK";
         } else if (hud.prompt == HudPrompt::Reload) {
             promptText = hud.reloadBinding + " RELOAD";
             promptColor = {0.98F, 0.62F, 0.14F};
@@ -3111,6 +3113,7 @@ bool GdpRenderer::render(
             promptText = hud.interactBinding + " FINISH CAMPAIGN";
         }
         if (!hud.paused && !promptText.empty()) {
+            promptText = localize(hud.language, promptText);
             const int promptWidth = bitmapTextWidth(promptText, hudScale)
                 + (hudPadding * 2);
             const int promptHeight = (7 * hudScale) + (hudPadding * 2);

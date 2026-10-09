@@ -24,8 +24,8 @@ de uma versão aprovada conforme o processo abaixo.
 A progressão de encontros dos andares, o modelo próprio da SMG, o recuo
 controlável e a precisão em movimento pertencem à fila de melhorias seguinte
 à versão pública 0.1.4. A jogabilidade dos andares, o visual da SMG e o recuo
-foram aprovados; a precisão em movimento precisa de playtest antes de entrar
-em um pacote público.
+foram aprovados; a precisão em movimento e os novos recursos do Test Mode
+precisam de playtest antes de entrar em um pacote público.
 
 ## Preparação única
 

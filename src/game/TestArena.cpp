@@ -1,6 +1,9 @@
 #include "game/TestArena.hpp"
 #include "gameplay/Weapon.hpp"
 
+#include <array>
+#include <utility>
+
 namespace gdp::game {
 world::World makeTestArena(const wkc::core::Seed seed)
 {
@@ -47,6 +50,17 @@ world::InitialEntitySet populateTestArena(world::World& arena, entities::EntityM
         manager.findData<ItemData>(id)->spawnedWeaponArchetype
             = static_cast<std::uint32_t>(gameplay::WeaponArchetype::Sniper) + i;
         room.entities.push_back(id);
+    }
+    // Durable plates along the right wall leave the enemy lanes unobstructed.
+    // The existing canister role gives them a red metallic hit material.
+    constexpr std::array<float, 3> targetDepths{1.0F, -7.0F, -17.0F};
+    for (unsigned i = 0U; i < targetDepths.size(); ++i) {
+        room.entities.push_back(manager.createProp({
+            .transform = {.position = {14.5F, 0.0F, targetDepths[i]},
+                .scale = {0.30F, 1.8F, 1.6F}},
+            .roomId = room.id, .type = PropType::Canister, .solid = true,
+            .health = 1'000'000.0F, .maximumHealth = 1'000'000.0F,
+            .visualSeed = arena.masterSeed + 40U + i}));
     }
     return result;
 }

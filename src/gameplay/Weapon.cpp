@@ -658,6 +658,24 @@ bool Weapon::restoreCampaignProgress(
     return true;
 }
 
+void Weapon::restockAllFirearms() noexcept
+{
+    if (!hasFirearm_) return;
+    magazineAmmo_ = definition_.magazineSize;
+    reserveAmmo_ = definition_.reserveMaximum;
+    if (stowedWeapon_) {
+        stowedWeapon_->magazineAmmo = stowedWeapon_->definition.magazineSize;
+        stowedWeapon_->reserveAmmo = stowedWeapon_->definition.reserveMaximum;
+    }
+    reloadRemaining_ = 0.0F;
+    reloadDuration_ = 0.0F;
+    reloadRoundCount_ = 0U;
+    reloadInsertedRounds_ = 0U;
+    spreadShotCount_ = 0U;
+    spreadShotIndex_ = 0U;
+    spreadRecoveryRemaining_ = 0.0F;
+}
+
 const WeaponDefinition& Weapon::definition() const noexcept
 {
     return selectedArchetype_ == WeaponArchetype::Knife

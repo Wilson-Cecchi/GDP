@@ -472,6 +472,51 @@ void testWeaponCameraRecoil()
         "a firing pause resets the recoil pattern");
 }
 
+void testPracticeRestock()
+{
+    using namespace gdp::gameplay;
+
+    Weapon carbine(baseWeaponDefinition(WeaponArchetype::Carbine));
+    expect(carbine.tryFire() == FireReadiness::Fired
+            && carbine.activateOverdrive(),
+        "practice restock fixture spends a round during overdrive");
+    const float cooldown = carbine.cooldownRemaining();
+    carbine.restockAllFirearms();
+    expect(carbine.magazineAmmo() == carbine.definition().magazineSize
+            && carbine.reserveAmmo() == carbine.definition().reserveMaximum
+            && carbine.overdriveActive() && near(carbine.cooldownRemaining(), cooldown),
+        "restock fills ammo without changing overdrive or bypassing fire cadence");
+
+    Weapon loadout;
+    expect(loadout.tryFire() == FireReadiness::Fired
+            && loadout.equip(WeaponArchetype::Carbine),
+        "practice fixture stows a used pistol behind a carbine");
+    loadout.fixedUpdate(1.0F);
+    expect(loadout.tryFire() == FireReadiness::Fired
+            && loadout.switchTo(WeaponArchetype::Knife),
+        "practice fixture selects the knife after spending carbine ammo");
+    loadout.restockAllFirearms();
+    const auto progress = loadout.campaignProgress();
+    expect(loadout.definition().archetype == WeaponArchetype::Knife
+            && progress.magazineAmmo == progress.definition.magazineSize
+            && progress.reserveAmmo == progress.definition.reserveMaximum
+            && progress.stowed
+            && progress.stowed->magazineAmmo == progress.stowed->definition.magazineSize
+            && progress.stowed->reserveAmmo == progress.stowed->definition.reserveMaximum,
+        "restock fills both firearms without switching away from the knife");
+
+    Weapon shotgun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    expect(shotgun.tryFire() == FireReadiness::Fired, "shotgun restock fixture fires");
+    shotgun.fixedUpdate(shotgun.definition().fireInterval);
+    expect(shotgun.reload(), "shotgun restock fixture begins a shell reload");
+    shotgun.restockAllFirearms();
+    shotgun.fixedUpdate(10.0F);
+    expect(!shotgun.reloading()
+            && shotgun.magazineAmmo() == shotgun.definition().magazineSize
+            && shotgun.reserveAmmo() == shotgun.definition().reserveMaximum,
+        "restock cancels an unfinished reload without double-consuming shells");
+}
+
 void testWeaponPickupEquipment()
 {
     using namespace gdp::gameplay;
@@ -3270,6 +3315,7 @@ int main()
     testPerShellShotgunReload();
     testDeterministicWeaponSpread();
     testWeaponCameraRecoil();
+    testPracticeRestock();
     testWeaponPickupEquipment();
     testKnifeFallback();
     testDirectionalAndLastWeaponSelection();
