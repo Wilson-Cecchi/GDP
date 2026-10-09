@@ -274,10 +274,13 @@ SHA-256: 5c65ae82b20ec2f728440f96db3cb1f32f83e059c74671f8b75e0af4c409f1a0
 variantes: Maintained / Used / Worn
 vistas: perfil, close, primeira pessoa ilustrativa e arma no chão
 pedido do usuário: visual próprio para a SMG aprovado como objetivo
-decisão visual desta prancha: pendente
+decisão visual desta prancha: "visual da arma aprovada" (2026-10-08) — Used v1
 data: 2026-10-08
-commit de implementação artística: nenhum
-estado: AGUARDANDO APROVAÇÃO
+commit de implementação artística: entrega SMG Used v1 (histórico Git)
+capturas nativas: visual/validation/weapon_smg_v1_used_gameplay.png;
+                 visual/validation/weapon_smg_v1_used_ground.png;
+                 visual/validation/weapon_smg_v1_used_potato.png
+estado: IMPLEMENTADA EM VALIDAÇÃO — aceitação no jogo pendente
 ```
 
 Funcionalidade das três aprovada pelo usuário em 2026-10-02. Sniper e escopeta
@@ -286,10 +289,13 @@ metálicos existentes, sem alterar seus mapas ou as armas anteriores. As seis
 capturas vêm do renderer nativo em uma fixture offscreen, não de um playtest
 manual nem da prancha ilustrativa. FOV 60/100, contato com chão e visibilidade
 em MEDIUM/POTATO têm gates técnicos; aceitação visual final cabe ao usuário.
-Somente a SMG reutiliza temporariamente a carabina. A aprovação genérica do
-visual próprio não escolhe ainda a silhueta e o acabamento exatos da prancha;
-ela não será implementada antes da decisão explícita sobre esta v1. A imagem
-é referência conceitual, não textura pronta ou captura do renderer.
+A SMG agora tem silhueta própria no viewmodel e no pickup, com carregador e
+mecanismo articulados nas recargas. A geometria reutiliza a família de
+materiais metálicos Used já existente; não foram geradas texturas novas. As
+capturas são da fixture nativa OpenGL offscreen, não de uma partida manual.
+A prancha continua sendo referência conceitual, não textura pronta. O usuário
+ainda precisa validar o resultado jogando antes da aceitação visual final ou
+de uma nova versão pública.
 
 ### Interface/menu — v4 (refinamento solicitado)
 

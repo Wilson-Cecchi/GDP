@@ -1395,6 +1395,10 @@ void testDroppedWeaponPose()
              std::tuple{HudWeaponRole::Sniper, PickupVisualRole::DroppedSniper, 128U},
              std::tuple{HudWeaponRole::Shotgun, PickupVisualRole::DroppedShotgun, 123U},
              std::tuple{HudWeaponRole::Shotgun, PickupVisualRole::DroppedShotgun, 128U},
+             std::tuple{HudWeaponRole::SubmachineGun,
+                 PickupVisualRole::DroppedSubmachineGun, 123U},
+             std::tuple{HudWeaponRole::SubmachineGun,
+                 PickupVisualRole::DroppedSubmachineGun, 128U},
          }) {
         const DroppedWeaponPose contact
             = sampleDroppedWeaponPose(seed, visualRole, 1.0F);
@@ -1409,6 +1413,10 @@ void testDroppedWeaponPose()
                     contact.height + sine * vertex.position.x
                         + cosine * vertex.position.y);
             }
+        }
+        if (lowestPoint < -0.002F || lowestPoint >= 0.025F) {
+            std::cerr << "Ground contact role=" << static_cast<int>(role)
+                << " seed=" << seed << " lowest=" << lowestPoint << '\n';
         }
         expect(lowestPoint >= -0.002F && lowestPoint < 0.025F,
             "settled weapon mesh touches floor without clipping");
@@ -1437,7 +1445,7 @@ void testWeaponReloadProfiles()
         }
         for (const auto other : roles) if (role != other)
             expect(sampleWeaponReloadPose(role, 0.45F) != sampleWeaponReloadPose(other, 0.45F),
-                "each firearm has a distinct reload profile, including the placeholder SMG");
+                "each firearm has a distinct reload profile, including the SMG");
         if (role != HudWeaponRole::Shotgun) {
             const auto outgoing = sampleWeaponReloadPose(role, 0.40F);
             const auto falling = sampleWeaponReloadPose(role, 0.60F);
@@ -1705,7 +1713,7 @@ void testPlayerHands()
             const wkc::render::Vertex probe{{0,.132F,-.0624F},{},{41,20},0};
             const Vec3 palm=deformPlayerHandsVertex(probe,magazine);
             Vec3 minimum{100,100,100},maximum{-100,-100,-100};
-            const auto parts=makeWeaponViewmodelParts(role==HudWeaponRole::SubmachineGun ? HudWeaponRole::Carbine : role);
+            const auto parts=makeWeaponViewmodelParts(role);
             const auto offset=sampleWeaponReloadPose(role,.6F).magazineOffset;
             for(const auto& mesh:parts[static_cast<std::size_t>(WeaponPart::Magazine)])
                 for(const auto& vertex:mesh.vertices) {
@@ -1941,7 +1949,8 @@ void testWeaponViewmodelAssets()
     using namespace gdp::game::visual;
     constexpr std::array roles{
         HudWeaponRole::Pistol, HudWeaponRole::Carbine, HudWeaponRole::Knife,
-        HudWeaponRole::Sniper, HudWeaponRole::Shotgun};
+        HudWeaponRole::Sniper, HudWeaponRole::Shotgun,
+        HudWeaponRole::SubmachineGun};
     for (const HudWeaponRole role : roles) {
         const auto meshes = makeWeaponViewmodelMeshes(role);
         std::size_t triangles = 0U;
@@ -2000,11 +2009,21 @@ void testWeaponViewmodelAssets()
     const auto sniper = makeWeaponViewmodelMeshes(HudWeaponRole::Sniper);
     const auto shotgun = makeWeaponViewmodelMeshes(HudWeaponRole::Shotgun);
     const auto carbine = makeWeaponViewmodelMeshes(HudWeaponRole::Carbine);
+    const auto smg = makeWeaponViewmodelMeshes(HudWeaponRole::SubmachineGun);
     const auto steel = static_cast<std::size_t>(WeaponMaterial::CoatedSteel);
     expect(sniper[steel].bounds.maximum.y > shotgun[steel].bounds.maximum.y + 0.1F
             && sniper[steel].vertices.size() != carbine[steel].vertices.size()
             && shotgun[steel].vertices.size() != carbine[steel].vertices.size(),
         "approved sniper has its optic and shotgun has a distinct non-carbine silhouette");
+    const auto maximumZ = [](const auto& meshes) {
+        float result = -std::numeric_limits<float>::max();
+        for (const auto& mesh : meshes) for (const auto& vertex : mesh.vertices)
+            result = std::max(result, vertex.position.z);
+        return result;
+    };
+    expect(maximumZ(smg) < maximumZ(carbine) - 0.2F
+            && smg[steel].vertices.size() != carbine[steel].vertices.size(),
+        "approved SMG has a shorter unique metallic silhouette");
     for (std::size_t material = 0U; material < weaponMaterialCount; ++material) {
         const auto images = makeUsedWeaponMaterialImages(
             static_cast<WeaponMaterial>(material));

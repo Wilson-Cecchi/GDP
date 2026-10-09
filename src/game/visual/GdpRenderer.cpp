@@ -2120,13 +2120,16 @@ bool GdpRenderer::render(
         if (pickup.role == PickupVisualRole::Weapon
             || pickup.role == PickupVisualRole::DroppedPistol
             || pickup.role == PickupVisualRole::DroppedSniper
-            || pickup.role == PickupVisualRole::DroppedShotgun) {
+            || pickup.role == PickupVisualRole::DroppedShotgun
+            || pickup.role == PickupVisualRole::DroppedSubmachineGun) {
             constexpr float degreesToRadians = std::numbers::pi_v<float> / 180.0F;
             const HudWeaponRole weaponRole
                 = pickup.role == PickupVisualRole::DroppedPistol
                 ? HudWeaponRole::Pistol
                 : pickup.role == PickupVisualRole::DroppedSniper ? HudWeaponRole::Sniper
                 : pickup.role == PickupVisualRole::DroppedShotgun ? HudWeaponRole::Shotgun
+                : pickup.role == PickupVisualRole::DroppedSubmachineGun
+                    ? HudWeaponRole::SubmachineGun
                 : HudWeaponRole::Carbine;
             const DroppedWeaponPose pose = sampleDroppedWeaponPose(
                 pickup.visualSeed, pickup.role, pickup.fallProgress);
@@ -2137,6 +2140,8 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 shadowScale
                 = weaponRole == HudWeaponRole::Pistol
                 ? wkc::core::Vec3{0.27F, 0.003F, 0.52F}
+                : weaponRole == HudWeaponRole::SubmachineGun
+                    ? wkc::core::Vec3{0.30F, 0.003F, 0.92F}
                 : wkc::core::Vec3{0.32F, 0.003F, 1.25F};
             shader.setMat4(gl_, "uModel",
                 wkc::core::translationMatrix(pickup.position
@@ -2277,8 +2282,7 @@ bool GdpRenderer::render(
         shader.setInt(gl_, "uPlayerSkinning", 0);
     }
 
-    const HudWeaponRole viewmodelRole = weaponViewmodel.role == HudWeaponRole::SubmachineGun
-        ? HudWeaponRole::Carbine : weaponViewmodel.role;
+    const HudWeaponRole viewmodelRole = weaponViewmodel.role;
     if (weaponViewmodel.visible && scopeStrength < 0.95F
         && static_cast<std::size_t>(viewmodelRole) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -2430,9 +2434,11 @@ bool GdpRenderer::render(
         };
         const float muzzlePosition = viewmodelRole == HudWeaponRole::Sniper ? 1.25F
             : viewmodelRole == HudWeaponRole::Shotgun ? 1.14F
+            : viewmodelRole == HudWeaponRole::SubmachineGun ? 0.81F
             : carbine ? 1.08F : knife ? 0.0F : 0.33F;
         const float muzzleHeight = viewmodelRole == HudWeaponRole::Sniper ? 0.014F
-            : viewmodelRole == HudWeaponRole::Shotgun ? 0.046F : 0.0F;
+            : viewmodelRole == HudWeaponRole::Shotgun ? 0.046F
+            : viewmodelRole == HudWeaponRole::SubmachineGun ? 0.005F : 0.0F;
 
         const float flash = std::clamp(
             std::isfinite(weaponViewmodel.muzzleFlashStrength)

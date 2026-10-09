@@ -209,7 +209,10 @@ Contacts contacts(const HudWeaponRole role) noexcept
     case HudWeaponRole::Shotgun:
         return {{.071F,-.180F,-.213F},{-.030F,-.120F,.410F},
             {-.029F,-.100F,.063F},{-.030F,-.120F,.410F}};
-    default: // SMG's current approved geometry is the carbine, not new gun art.
+    case HudWeaponRole::SubmachineGun:
+        return {{.065F,-.205F,-.11F},{-.035F,-.080F,.39F},
+            {-.070F,-.222F,.20F},{-.154F,-.019F,-.17F}};
+    default:
         return {{.078F,-.192F,-.108F},{-.040F,-.090F,.370F},
             {-.077F,-.220F,.225F},{-.134F,-.017F,-.170F}};
     }

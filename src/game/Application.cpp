@@ -3355,7 +3355,10 @@ void Application::render()
                 : type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Sniper)}
                     ? visual::PickupVisualRole::DroppedSniper
                     : type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::Shotgun)}
-                        ? visual::PickupVisualRole::DroppedShotgun : visual::PickupVisualRole::Weapon;
+                        ? visual::PickupVisualRole::DroppedShotgun
+                    : type == std::optional{static_cast<std::uint32_t>(gameplay::WeaponArchetype::SubmachineGun)}
+                        ? visual::PickupVisualRole::DroppedSubmachineGun
+                        : visual::PickupVisualRole::Weapon;
         } else if (item->type == entities::ItemType::Special) {
             role = visual::PickupVisualRole::Special;
         }

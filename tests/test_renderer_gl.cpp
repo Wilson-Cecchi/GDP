@@ -186,7 +186,7 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
         for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun, HudWeaponRole::SubmachineGun}) {
             hud.weapon = role;
             passed &= pixelsFor(hud) != empty;
-            // Approved roles have their own mesh; SMG safely retains the baseline.
+            // All approved firearms have their own mesh.
             WeaponViewmodelRenderData model;
             model.visible = true; model.role = role;
             passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud, {}, model);
@@ -480,8 +480,10 @@ bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
         SDL_DestroySurface(surface);
         return saved;
     };
-    for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun}) {
-        const std::string name = role == HudWeaponRole::Sniper ? "sniper" : "shotgun";
+    for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun,
+             HudWeaponRole::SubmachineGun}) {
+        const std::string name = role == HudWeaponRole::Sniper ? "sniper"
+            : role == HudWeaponRole::Shotgun ? "shotgun" : "smg";
         CameraData camera;
         WeaponViewmodelRenderData model{.visible = true, .role = role, .visualSeed = 1717U};
         for (const bool potato : {false, true}) {
@@ -502,8 +504,10 @@ bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
             model.role = role;
         }
         const std::array pickup{PickupRenderData{{0.0F, 0.0F, 0.0F},
-            role == HudWeaponRole::Sniper ? PickupVisualRole::DroppedSniper : PickupVisualRole::DroppedShotgun,
-            123U, 1.0F, 30.0F}};
+            role == HudWeaponRole::Sniper ? PickupVisualRole::DroppedSniper
+                : role == HudWeaponRole::Shotgun ? PickupVisualRole::DroppedShotgun
+                    : PickupVisualRole::DroppedSubmachineGun,
+            123U, 1.0F, role == HudWeaponRole::SubmachineGun ? 120.0F : 30.0F}};
         camera.position = {1.2F, 1.0F, 1.8F};
         camera.forward = wkc::core::normalized(wkc::core::Vec3{-1.2F, -0.9F, -1.8F});
         passed &= renderer.render(width, height, camera);
@@ -1807,7 +1811,8 @@ int main(const int argc, char** argv)
                     gdp::game::visual::HudWeaponRole::Carbine,
                     gdp::game::visual::HudWeaponRole::Knife,
                     gdp::game::visual::HudWeaponRole::Sniper,
-                    gdp::game::visual::HudWeaponRole::Shotgun}) {
+                    gdp::game::visual::HudWeaponRole::Shotgun,
+                    gdp::game::visual::HudWeaponRole::SubmachineGun}) {
                 WeaponFootprint narrow;
                 WeaponFootprint wide;
                 renderedFovViewmodels &= weaponFootprint(60.0F, role, narrow)

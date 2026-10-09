@@ -34,6 +34,7 @@ mudou.
 O teste de mundo verifica 128 seeds em andares iniciais, intermediários e
 finais: contagem, repetibilidade, boss intacto e distância das novas posições
 às paredes, aos obstáculos sólidos e entre inimigos. O teste de persistência
-verifica a migração inclusive da regra 40. Ainda é necessário playtest visual
-nos andares 5 e 9 para julgar o ritmo real de combate, XP e munição antes de
-publicar uma nova versão para download.
+verifica a migração inclusive da regra 40. O usuário aprovou a jogabilidade
+dos andares em 2026-10-08. Isso não publica uma versão automaticamente: os
+downloads serão agrupados em pacotes por marco, após validação do conjunto
+incluído conforme `README_RELEASES.md`.

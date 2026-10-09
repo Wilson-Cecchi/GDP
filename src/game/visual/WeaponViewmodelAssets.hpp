@@ -21,8 +21,8 @@ enum class WeaponMaterial : std::size_t {
 
 inline constexpr std::size_t weaponMaterialCount
     = static_cast<std::size_t>(WeaponMaterial::Count);
-// Pistol, Carbine, Knife plus the two approved v1 models. SMG uses Carbine.
-inline constexpr std::size_t weaponRoleCount = 5U;
+// Every playable weapon has its own geometry; materials remain shared.
+inline constexpr std::size_t weaponRoleCount = 6U;
 inline constexpr std::uint32_t weaponGripSemanticRegion = 1U;
 enum class WeaponPart : std::size_t { Body, Magazine, Mechanism, Count };
 inline constexpr std::size_t weaponPartCount = static_cast<std::size_t>(WeaponPart::Count);

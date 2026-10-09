@@ -52,9 +52,9 @@ sem multiplicação involuntária de upgrades. Não há nova fila global.
 
 Sniper e escopeta são semiautomáticas; SMG é automática. A sniper tem mira
 mais lenta e zoom proporcional ao FOV configurado. Nenhum atributo do boss
-foi alterado. Sniper e escopeta têm modelos próprios Used v1 após aprovação
-das pranchas, aguardando aceitação visual no jogo. Somente a SMG reutiliza
-provisoriamente a carabina aprovada. A geometria nova não altera o ray lógico.
+foi alterado. Sniper, escopeta e SMG têm modelos próprios Used v1 após aprovação
+das pranchas, aguardando aceitação visual no jogo. A geometria nova não altera
+o ray lógico.
 
 As seções de fases abaixo preservam seu contexto histórico; por exemplo,
 o antigo slot 1 fixo da Carbine agora representa qualquer primária possuída,

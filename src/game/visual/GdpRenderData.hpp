@@ -38,6 +38,7 @@ enum class PickupVisualRole : std::uint8_t {
     Special,
     DroppedSniper,
     DroppedShotgun,
+    DroppedSubmachineGun,
 };
 
 enum class HudWeaponRole : std::uint8_t {

@@ -1318,7 +1318,9 @@ DroppedWeaponPose sampleDroppedWeaponPose(
     const float settle = t * t * (3.0F - 2.0F * t);
     const float floorHeight = role == PickupVisualRole::DroppedPistol ? 0.11F
         : role == PickupVisualRole::DroppedSniper ? (side > 0.0F ? 0.113F : 0.24F)
-        : role == PickupVisualRole::DroppedShotgun ? 0.115F : 0.14F;
+        : role == PickupVisualRole::DroppedShotgun ? 0.115F
+        : role == PickupVisualRole::DroppedSubmachineGun
+            ? (side > 0.0F ? 0.16F : 0.115F) : 0.14F;
     return {
         .yawDegrees = yawVariation + (1.0F - settle) * side * 16.0F,
         .rollDegrees = side * (18.0F + 72.0F * settle),

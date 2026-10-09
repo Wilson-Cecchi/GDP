@@ -1,6 +1,6 @@
 # Weapon/SMG — proposta visual v1
 
-Estado: **AGUARDANDO APROVAÇÃO**. [Prancha ilustrativa](weapon_smg_proposal_v1.png)
+Estado: **IMPLEMENTADA EM VALIDAÇÃO**. [Prancha ilustrativa](weapon_smg_proposal_v1.png)
 gerada pela ferramenta integrada em 2026-10-08, 1536 × 1024 RGB, SHA-256
 `5c65ae82b20ec2f728440f96db3cb1f32f83e059c74671f8b75e0af4c409f1a0`.
 Não é captura do jogo nem textura pronta.
@@ -16,11 +16,16 @@ diferentes. A silhueta deve se distinguir da carabina tanto na mão quanto no
 chão. O enquadramento deve preservar o centro da tela livre e a escala do
 viewmodel aprovado. Nenhuma mudança de dano, cadência, munição, FOV ou loot.
 
-Após aprovação específica desta prancha: criar malha própria de baixo/médio
-custo, reutilizar a família de materiais metálicos existente, ajustar contatos
-das mãos/recarga e o modelo caído. Validar capturas nativas nos perfis MEDIUM e
-POTATO, FOV 60°/100°, contato com o chão e comparação direta com a carabina.
-A aceitação final ainda dependerá do teste visual dentro do jogo.
+O usuário aprovou esta prancha em 2026-10-08. A implementação usa malha própria
+de baixo/médio custo, a família de materiais metálicos existente, contatos
+próprios das mãos/recarga e o mesmo modelo no chão. Testes CPU verificam
+triângulos, silhueta, empunhadura, contato das mãos e do piso; testes OpenGL
+verificam visibilidade MEDIUM/POTATO, distinção da carabina e enquadramento
+estável nos FOVs 60°/100°. As [capturas de gameplay](../validation/weapon_smg_v1_used_gameplay.png),
+[pickup no chão](../validation/weapon_smg_v1_used_ground.png) e
+[POTATO](../validation/weapon_smg_v1_used_potato.png) são da fixture nativa
+offscreen, não de uma partida manual. A aceitação final ainda depende do teste
+visual dentro do jogo; nenhum download público novo foi publicado nesta fase.
 
 ## Prompt usado
 

@@ -9,6 +9,23 @@ usados em testes manuais ou em uma versão aprovada. A CI regular executa os
 testes Linux; o pacote Windows roda no lançamento ou quando a CI é iniciada
 manualmente.
 
+## Pacotes de melhorias por marco
+
+Não existe calendário semanal obrigatório. Commits e pushes na `main` reúnem
+trabalho em desenvolvimento, mas **não** atualizam o download público por si
+só. Um pacote público é candidato quando uma melhoria importante ou um grupo
+coeso de melhorias está completo, com testes, documentação e playtest visual
+proporcionais ao impacto. Antes da tag, registrar o conjunto incluído,
+validar os sistemas de destino e obter a decisão de lançamento. Correções
+urgentes podem formar um pacote próprio; mudanças pequenas podem aguardar o
+próximo marco. O `Latest` e o manifesto de atualização só avançam após a tag
+de uma versão aprovada conforme o processo abaixo.
+
+A progressão de encontros dos andares e o modelo próprio da SMG pertencem à
+fila de melhorias seguinte à versão pública 0.1.4. A jogabilidade dos andares
+e a proposta visual da SMG foram aprovadas; a implementação da SMG ainda
+precisa de aceitação dentro do jogo antes de entrar em um pacote público.
+
 ## Preparação única
 
 Configure no repositório privado o secret de Actions

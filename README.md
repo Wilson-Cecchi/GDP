@@ -60,9 +60,8 @@ especializados das pastas numeradas.
   **Armas:** sniper, escopeta de seis pellets e SMG estão disponíveis na
   Campanha e no Test Mode. Pickups extras de campanha caíram de 55% para 25%.
   `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
-  Sniper e escopeta têm modelos próprios metálicos Used v1, na mão e no chão,
-  implementados após aprovação das pranchas e aguardando aceitação no jogo.
-  A SMG ainda usa provisoriamente a carabina até sua proposta visual.
+  Sniper, escopeta e SMG têm modelos próprios metálicos Used v1, na mão e no
+  chão, implementados após aprovação das pranchas e aguardando aceitação no jogo.
   A sniper ganhou luneta Used v2 e visão circular com retículo ao segurar
   a ação Mira (`Mouse2` por padrão, remapeável). O zoom e o balanceamento
   permanecem iguais; recarga, troca, drop e menu retiram a visão de mira.
