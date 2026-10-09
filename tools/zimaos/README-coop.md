@@ -35,6 +35,15 @@ cat data/status.json
 cat data/state.json
 ```
 
+Para uma visão compacta atualizada a cada dois segundos, copie
+`watch_brains.py` para a pasta do serviço e adicione no Bash local:
+
+```sh
+alias brains='ssh -t zima "watch -n 2 -t python3 /DATA/AppData/gdp-coop-training/watch_brains.py"'
+```
+
+Execute `brains` e use Ctrl+C para sair. O alias requer a entrada SSH `zima`.
+
 Para voltar ao treino tático, pare primeiro o cooperativo e desative sua
 reinicialização automática. Então reative a política e inicie o antigo:
 
