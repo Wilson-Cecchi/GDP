@@ -92,6 +92,7 @@ CampaignCarryover captureCampaignCarryover(
             playerState.armor,
             playerState.maximumArmor,
             playerState.keys,
+            playerState.grenades,
         },
         weapon.campaignProgress(),
         progression.state(),
@@ -107,6 +108,7 @@ bool validateCampaignCarryover(const CampaignCarryover& carryover) noexcept
         && std::isfinite(player.armor) && player.armor >= 0.0F
         && std::isfinite(player.maximumArmor) && player.maximumArmor >= 0.0F
         && player.armor <= player.maximumArmor
+        && player.grenades <= 2U
         && validateWeaponCampaignProgress(carryover.weapon)
         && validateProgressionState(carryover.progression);
 }

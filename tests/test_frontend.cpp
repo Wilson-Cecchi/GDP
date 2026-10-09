@@ -82,10 +82,11 @@ void bindingsTests() {
     expect(validateControlBindings(bindings), "default bindings are valid and unique");
     expect(validateGamepadBindings(gamepad), "default gamepad bindings are valid and unique");
     expect(gamepad.values[static_cast<std::size_t>(ControlAction::LastWeapon)] == GamepadButton::North
-            && gamepad.values[static_cast<std::size_t>(ControlAction::Melee)] == GamepadButton::RightStick
+            && gamepad.values[static_cast<std::size_t>(ControlAction::QuickMelee)] == GamepadButton::RightStick
+            && gamepad.values[static_cast<std::size_t>(ControlAction::Equipment)] == GamepadButton::RightShoulder
             && gamepad.values[static_cast<std::size_t>(ControlAction::Interact)] == GamepadButton::DpadUp
             && gamepad.values[static_cast<std::size_t>(ControlAction::Reload)] == GamepadButton::West,
-        "FPS-style default gamepad layout assigns weapon switching, knife and interaction");
+        "FPS-style default gamepad layout assigns quick melee, grenade and interaction");
     for (auto button : gamepad.values)
         expect(gamepadBindingForName(gamepadBindingName(button)) == button,
             "gamepad binding names round trip");
@@ -284,7 +285,7 @@ void persistenceTests(const std::filesystem::path& directory) {
         "v6 settings retain graphics and sensitivity while receiving default bindings");
     {
         std::ofstream file(directory / "invalid_bindings.toml");
-        file << "version = 11\nbinding_0 = S\nbinding_1 = S\n";
+        file << "version = 12\nbinding_0 = S\nbinding_1 = S\n";
     }
     const auto invalid = loadRuntimeSettings(directory / "invalid_bindings.toml");
     expect(invalid.status == SettingsLoadStatus::LoadedWithRecovery && invalid.settings.controls == ControlBindings{},

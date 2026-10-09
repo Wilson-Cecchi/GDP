@@ -1247,7 +1247,9 @@ bool GdpRenderer::render(
     const std::span<const ImpactRenderData> impacts,
     const WeaponViewmodelRenderData weaponViewmodel,
     const std::span<const EnemyProjectileRenderData> enemyProjectiles,
-    const PlayerBodyRenderData playerBody)
+    const PlayerBodyRenderData playerBody,
+    const std::span<const GrenadeRenderData> grenades,
+    const std::span<const GrenadeBlastRenderData> grenadeBlasts)
 {
     lastFrameStats_ = {};
     if (!initialized_ || width <= 0 || height <= 0) {
@@ -1945,6 +1947,40 @@ bool GdpRenderer::render(
         shader.setFloat(gl_, "uEmissiveStrength", 2.0F);
         drawMesh(box_);
     }
+    for (const GrenadeRenderData& grenade : grenades) {
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setVec3(gl_, "uTint", {0.24F, 0.29F, 0.19F});
+        shader.setMat4(gl_, "uModel",
+            wkc::core::translationMatrix(grenade.position)
+                * wkc::core::scaleMatrix({0.18F, 0.21F, 0.18F}));
+        drawMesh(box_);
+        shader.setVec3(gl_, "uTint", {0.43F, 0.46F, 0.39F});
+        shader.setMat4(gl_, "uModel",
+            wkc::core::translationMatrix(grenade.position
+                + wkc::core::Vec3{0.0F, 0.12F, 0.0F})
+                * wkc::core::scaleMatrix({0.11F, 0.035F, 0.11F}));
+        drawMesh(box_);
+        shader.setVec3(gl_, "uTint", {0.72F, 0.60F, 0.18F});
+        shader.setMat4(gl_, "uModel",
+            wkc::core::translationMatrix(grenade.position)
+                * wkc::core::scaleMatrix({0.19F, 0.025F, 0.19F}));
+        drawMesh(box_);
+    }
+    for (const GrenadeBlastRenderData& blast : grenadeBlasts) {
+        const float strength = std::clamp(blast.strength, 0.0F, 1.0F);
+        const float extent = 0.18F + (1.0F - strength) * 2.4F;
+        shader.setVec3(gl_, "uTint", {1.0F, 0.45F * strength, 0.06F});
+        shader.setFloat(gl_, "uEmissiveStrength", 1.4F * strength);
+        for (const wkc::core::Vec3 scale : {
+                 wkc::core::Vec3{extent, 0.025F, 0.045F},
+                 wkc::core::Vec3{0.045F, 0.025F, extent}}) {
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(blast.position)
+                    * wkc::core::scaleMatrix(scale));
+            drawMesh(box_);
+        }
+    }
+    shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
 
     ceilingFixtureMaterial_.albedo.bind(gl_, textureBindings_, 0U);
     ceilingFixtureMaterial_.normal.bind(gl_, textureBindings_, 1U);
@@ -2341,7 +2377,9 @@ bool GdpRenderer::render(
         shader.setInt(gl_, "uDetailedMaterial", 1);
         const std::size_t weaponIndex = static_cast<std::size_t>(viewmodelRole);
         // One extra magazine pass exists only while the discarded instance falls.
-        for (std::size_t pass = 0; pass < weaponPartCount + 1U; ++pass) {
+        for (std::size_t pass = 0;
+             !weaponViewmodel.grenadeSelected && pass < weaponPartCount + 1U;
+             ++pass) {
             const bool discarded = pass == weaponPartCount;
             const std::size_t part = discarded
                 ? static_cast<std::size_t>(WeaponPart::Magazine) : pass;
@@ -2432,6 +2470,19 @@ bool GdpRenderer::render(
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
+        if (weaponViewmodel.grenadeSelected) {
+            const float charge = std::clamp(
+                weaponViewmodel.grenadeChargeStrength, 0.0F, 1.0F);
+            const float forwardOffset = charge * 0.14F;
+            drawWeaponPiece({0.07F, 0.12F, 0.22F + forwardOffset},
+                {0.23F, 0.29F, 0.21F}, {}, {0.25F, 0.30F, 0.20F});
+            drawWeaponPiece({0.07F, 0.285F, 0.22F + forwardOffset},
+                {0.14F, 0.055F, 0.13F}, {}, {0.48F, 0.50F, 0.44F});
+            drawWeaponPiece({0.07F, 0.13F, 0.22F + forwardOffset},
+                {0.245F, 0.03F, 0.225F}, {}, {0.69F, 0.58F, 0.18F});
+            drawWeaponPiece({0.04F, 0.32F, 0.22F + forwardOffset},
+                {0.08F, 0.05F, 0.13F}, {}, {0.10F, 0.11F, 0.10F});
+        }
         const float muzzlePosition = viewmodelRole == HudWeaponRole::Sniper ? 1.25F
             : viewmodelRole == HudWeaponRole::Shotgun ? 1.14F
             : viewmodelRole == HudWeaponRole::SubmachineGun ? 0.81F
@@ -2444,7 +2495,8 @@ bool GdpRenderer::render(
             std::isfinite(weaponViewmodel.muzzleFlashStrength)
                 ? weaponViewmodel.muzzleFlashStrength : 0.0F,
             0.0F, 1.0F);
-        if (flash > 0.0F && weaponViewmodel.role != HudWeaponRole::Knife) {
+        if (flash > 0.0F && !weaponViewmodel.grenadeSelected
+            && weaponViewmodel.role != HudWeaponRole::Knife) {
             const wkc::core::Vec3 flashColor{1.0F, 0.56F, 0.10F};
             drawWeaponPiece({0.0F, muzzleHeight, muzzlePosition + (0.07F * flash)},
                 {0.07F + (0.08F * flash), 0.07F + (0.08F * flash),
@@ -3011,15 +3063,36 @@ bool GdpRenderer::render(
             static_cast<int>(std::round(static_cast<float>(healthBarWidth) * armorRatio)),
             hudScale, uiTheme.mutedText);
 
-        const std::string weaponLabel = std::string{hud.weapon == HudWeaponRole::Knife ? "KNIFE"
+        const std::string weaponLabel = std::string{hud.grenadeSelected ? "FRAG"
+            : hud.weapon == HudWeaponRole::Knife ? "KNIFE"
             : hud.weapon == HudWeaponRole::Sniper ? "SNIPER"
             : hud.weapon == HudWeaponRole::Shotgun ? "SHOTGUN"
             : hud.weapon == HudWeaponRole::SubmachineGun ? "SMG"
             : hud.weapon == HudWeaponRole::Carbine ? "CARBINE" : "PISTOL"}
-            + (hud.weaponOverdrive ? " OD" : "");
+            + (hud.weaponOverdrive && !hud.grenadeSelected ? " OD" : "");
         drawBitmapText(rightEdge - bitmapTextWidth(weaponLabel, hudScale),
             resourceY + 54 * hudScale, hudScale, weaponLabel, uiTheme.mutedText);
-        if (hud.weapon == HudWeaponRole::Knife) {
+        if (hud.grenadeSelected) {
+            const std::string count = std::to_string(hud.grenades);
+            const std::string reserve = hud.language == gameplay::Language::PortugueseBrazil
+                ? "/ 2 GRANADAS" : "/ 2 GRENADES";
+            const int reserveWidth = bitmapTextWidth(reserve, hudScale);
+            drawBitmapText(rightEdge - reserveWidth - 3 * hudScale
+                    - bitmapTextWidth(count, largeScale),
+                resourceY + 34 * hudScale, largeScale, count,
+                hud.grenades == 0U ? uiTheme.warning : textColor);
+            drawBitmapText(rightEdge - reserveWidth, resourceY + 34 * hudScale,
+                hudScale, reserve, uiTheme.mutedText);
+            if (hud.grenadeChargeStrength > 0.0F) {
+                const int chargeWidth = std::min(tactical.weapon.width, 90 * hudScale);
+                drawSolidRect(rightEdge - chargeWidth, resourceY + 29 * hudScale,
+                    chargeWidth, hudScale, uiTheme.panelBorder);
+                drawSolidRect(rightEdge - chargeWidth, resourceY + 29 * hudScale,
+                    static_cast<int>(std::round(static_cast<float>(chargeWidth)
+                        * std::clamp(hud.grenadeChargeStrength, 0.0F, 1.0F))),
+                    hudScale, uiTheme.warning);
+            }
+        } else if (hud.weapon == HudWeaponRole::Knife) {
             constexpr std::string_view ready = "READY";
             drawBitmapText(rightEdge - bitmapTextWidth(ready, largeScale),
                 resourceY + 34 * hudScale, largeScale, ready, textColor);

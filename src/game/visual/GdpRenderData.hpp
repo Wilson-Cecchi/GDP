@@ -204,6 +204,15 @@ struct EnemyProjectileRenderData {
     wkc::core::Vec3 direction{0.0F, 0.0F, 1.0F};
 };
 
+struct GrenadeRenderData {
+    wkc::core::Vec3 position{};
+};
+
+struct GrenadeBlastRenderData {
+    wkc::core::Vec3 position{};
+    float strength{0.0F};
+};
+
 [[nodiscard]] wkc::core::Vec3 impactVisualColor(
     ImpactVisualMaterial material,
     float strength = 1.0F) noexcept;
@@ -223,6 +232,8 @@ struct PlayerBodyRenderData {
 
 struct WeaponViewmodelRenderData {
     bool visible{false};
+    bool grenadeSelected{false};
+    float grenadeChargeStrength{0.0F};
     HudWeaponRole role{HudWeaponRole::Pistol};
     float recoilStrength{0.0F};
     float reloadProgress{0.0F};
@@ -646,6 +657,9 @@ struct HudRenderData {
     float maximumArmor{50.0F};
     std::uint32_t magazineAmmo{0};
     std::uint32_t reserveAmmo{0};
+    std::uint32_t grenades{2U};
+    bool grenadeSelected{false};
+    float grenadeChargeStrength{0.0F};
     HudWeaponRole weapon{HudWeaponRole::Pistol};
     bool weaponOverdrive{false};
     float weaponSpread{0.0F};

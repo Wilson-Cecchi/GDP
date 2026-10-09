@@ -159,7 +159,9 @@ public:
         std::span<const ImpactRenderData> impacts = {},
         WeaponViewmodelRenderData weaponViewmodel = {},
         std::span<const EnemyProjectileRenderData> enemyProjectiles = {},
-        PlayerBodyRenderData playerBody = {});
+        PlayerBodyRenderData playerBody = {},
+        std::span<const GrenadeRenderData> grenades = {},
+        std::span<const GrenadeBlastRenderData> grenadeBlasts = {});
     [[nodiscard]] RendererFrameStats lastFrameStats() const noexcept
     {
         RendererFrameStats stats = lastFrameStats_;

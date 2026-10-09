@@ -9,7 +9,8 @@ namespace gdp::gameplay {
 enum class ControlAction : std::uint8_t {
     Forward, Backward, Left, Right, QuietWalk, Crouch, Jump, Fire, Aim,
     Reload, Interact, Flashlight, Drop, Primary, Secondary, Melee,
-    Equipment, SpecialItem, LastWeapon, Information, NextWeapon, PreviousWeapon, Count,
+    Equipment, SpecialItem, LastWeapon, Information, NextWeapon, PreviousWeapon,
+    QuickMelee, Count,
 };
 enum class BindingKind : std::uint8_t { Key, Mouse, WheelUp, WheelDown };
 struct ControlBinding {

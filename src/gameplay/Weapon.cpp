@@ -303,21 +303,13 @@ FireReadiness Weapon::tryFire() noexcept
         return FireReadiness::Reloading;
     }
     if (selectedArchetype_ == WeaponArchetype::Knife) {
-        if (knifeCooldownRemaining_ > 0.0F) {
-            return FireReadiness::Cooldown;
-        }
-        knifeCooldownRemaining_ = knifeDefinition_.fireInterval
-            * (overdriveActive() ? 0.65F : 1.0F);
-        spreadShotCount_ = 0U;
-        spreadShotIndex_ = 0U;
-        spreadRecoveryRemaining_ = 0.0F;
-        return FireReadiness::Fired;
+        return tryQuickMelee();
+    }
+    if (magazineAmmo_ == 0) {
+        return reload() ? FireReadiness::Reloading : FireReadiness::Empty;
     }
     if (cooldownRemaining_ > 0.0F) {
         return FireReadiness::Cooldown;
-    }
-    if (magazineAmmo_ == 0) {
-        return FireReadiness::Empty;
     }
     --magazineAmmo_;
     cooldownRemaining_ = definition_.fireInterval
@@ -328,6 +320,21 @@ FireReadiness Weapon::tryFire() noexcept
     }
     spreadRecoveryRemaining_
         = weaponSpreadProfile(definition_.archetype).recoverySeconds;
+    return FireReadiness::Fired;
+}
+
+FireReadiness Weapon::tryQuickMelee() noexcept
+{
+    if (switching()) return FireReadiness::Switching;
+    if (reloading()) return FireReadiness::Reloading;
+    if (knifeCooldownRemaining_ > 0.0F) return FireReadiness::Cooldown;
+    knifeCooldownRemaining_ = knifeDefinition_.fireInterval
+        * (overdriveActive() ? 0.65F : 1.0F);
+    if (selectedArchetype_ == WeaponArchetype::Knife) {
+        spreadShotCount_ = 0U;
+        spreadShotIndex_ = 0U;
+        spreadRecoveryRemaining_ = 0.0F;
+    }
     return FireReadiness::Fired;
 }
 
@@ -753,6 +760,16 @@ bool Weapon::switching() const noexcept
 float Weapon::damage() const noexcept
 {
     return definition().damage * (overdriveActive() ? 1.5F : 1.0F);
+}
+
+float Weapon::knifeDamage() const noexcept
+{
+    return knifeDefinition_.damage * (overdriveActive() ? 1.5F : 1.0F);
+}
+
+float Weapon::knifeRange() const noexcept
+{
+    return knifeDefinition_.range;
 }
 
 float Weapon::overdriveRemaining() const noexcept

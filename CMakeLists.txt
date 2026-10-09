@@ -193,6 +193,7 @@ add_library(
     src/gameplay/Door.cpp
     src/gameplay/Enemy.cpp
     src/gameplay/EnemyProjectile.cpp
+    src/gameplay/PlayerGrenade.cpp
     src/gameplay/EnemySensors.cpp
     src/gameplay/ExitConfirmation.cpp
     src/gameplay/Feedback.cpp

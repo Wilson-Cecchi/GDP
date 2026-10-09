@@ -9,14 +9,15 @@ procura outro controle disponível. Teclado e mouse continuam funcionando juntos
 | Controle Xbox / PlayStation | Ação |
 | --- | --- |
 | Analógico esquerdo | Mover; clique para caminhar silenciosamente |
-| Analógico direito | Olhar; clique para selecionar a faca |
-| RT / R2 | Atirar |
+| Analógico direito | Olhar; clique para golpe rápido de faca |
+| RT / R2 | Atirar; com granada equipada, segurar para carregar e soltar para lançar |
 | LT / L2 | Mirar |
 | A / ✕ | Pular; confirmar nos menus |
 | B / ○ | Agachar; voltar nos menus |
 | X / □ | Recarregar |
 | Y / △ | Voltar à última arma |
-| LB / L1, RB / R1 | Arma anterior, próxima arma |
+| LB / L1 | Arma anterior |
+| RB / R1 | Equipar granada de fragmentação (slot 4) |
 | Direcional ↑, →, ↓ | Interagir, selecionar a primária, ligar/desligar a lanterna |
 | Direcional ← | Largar arma |
 | View / Create | Informações da partida |
@@ -32,7 +33,10 @@ O movimento analógico não é um botão: ajuste `Move Stick` no menu `Controlle
 para usar o analógico esquerdo (padrão) ou direito (Southpaw); a câmera passa
 automaticamente para o outro analógico. As linhas Forward/Backward/Left/Right
 em `Remap Buttons` aceitam botões digitais opcionais, além do analógico escolhido.
-Os atalhos de equipamento e item especial seguem reservados, sem função no jogo.
+O item especial (slot 5) permanece reservado. Com a granada equipada, o
+lançamento curto é um toque em R2; segurá-lo até 1,2 s aumenta progressivamente
+a velocidade e a distância. Soltar R2 arremessa. O estoque inicial é de duas
+granadas; voltar à arma com △ ou outro atalho cancela a carga sem consumir uma.
 
 Para testar um DualSense por Bluetooth no Linux: emparelhe-o nas configurações do
 sistema, inicie `build/release/gdp --test-mode` e confira a linha
@@ -52,16 +56,15 @@ a 150%, inversão vertical e zonas mortas de movimento/câmera de 0% a 40%.
 O padrão é 100% para as sensibilidades, 18% para ambas as zonas mortas e
 analógico esquerdo para movimento. O analógico esquerdo continua navegando
 nos menus mesmo quando o layout da partida está invertido. As preferências
-são salvas em `settings.toml` (schema 11); arquivos anteriores recebem esses
+são salvas em `settings.toml` (schema 12); arquivos anteriores recebem esses
 valores padrão sem perder os remapeamentos existentes.
 
 O padrão de câmera agora gira até 300°/s com o analógico totalmente inclinado
 (antes, 150°/s), antes dos ajustes horizontal/vertical e de mira. O layout
-foi aproximado do padrão de FPS no DualSense: △ alterna para a última arma e
-R3 seleciona a faca. No Iron Seed, L3 ainda é caminhada silenciosa, não sprint;
-R3 não executa ataque corpo a corpo instantâneo; □ recarrega e a interação
-continua no direcional ↑. O jogo ainda não tem sprint tático, deitar, slide,
-mantle, granadas nem killstreaks. Controles salvos sem remapeamento próprio
-recebem o novo layout automaticamente (schema 11); remapeamentos personalizados
-são preservados. `RESET DEFAULTS` no menu de botões aplica o novo layout a
-qualquer momento.
+foi aproximado do padrão de FPS no DualSense: △ alterna para a última arma,
+R3 usa a faca sem trocar a arma selecionada e R1 equipa a granada. No Iron Seed,
+L3 ainda é caminhada silenciosa, não sprint; □ recarrega e a interação continua
+no direcional ↑. O jogo ainda não tem sprint tático, deitar, slide, mantle ou
+killstreaks. Controles salvos sem remapeamento próprio recebem o novo layout
+automaticamente (schema 12); remapeamentos personalizados são preservados.
+`RESET DEFAULTS` no menu de botões aplica o novo layout a qualquer momento.

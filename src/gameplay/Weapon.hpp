@@ -67,6 +67,7 @@ public:
 
     void fixedUpdate(float fixedStepSeconds) noexcept;
     [[nodiscard]] FireReadiness tryFire() noexcept;
+    [[nodiscard]] FireReadiness tryQuickMelee() noexcept;
     [[nodiscard]] bool reload() noexcept;
     // Reserve units: complete magazines, except shotgun shells.
     [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
@@ -114,6 +115,8 @@ public:
     [[nodiscard]] float switchStrength() const noexcept;
     [[nodiscard]] bool switching() const noexcept;
     [[nodiscard]] float damage() const noexcept;
+    [[nodiscard]] float knifeDamage() const noexcept;
+    [[nodiscard]] float knifeRange() const noexcept;
     [[nodiscard]] float overdriveRemaining() const noexcept;
     [[nodiscard]] bool overdriveActive() const noexcept;
     [[nodiscard]] std::uint32_t spreadShotIndex() const noexcept;

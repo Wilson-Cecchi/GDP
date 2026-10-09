@@ -21,7 +21,18 @@ gameplay::GamepadBindings oldDefaultGamepadBindings() noexcept
         B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
         B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
         B::DpadDown, B::Count, B::Count, B::Count, B::Back,
-        B::RightShoulder, B::LeftShoulder};
+        B::RightShoulder, B::LeftShoulder, B::Count};
+    return bindings;
+}
+
+gameplay::GamepadBindings previousGamepadBindings() noexcept
+{
+    using B = wkc::platform::GamepadButton;
+    gameplay::GamepadBindings bindings;
+    bindings.values[static_cast<std::size_t>(gameplay::ControlAction::Melee)] = B::RightStick;
+    bindings.values[static_cast<std::size_t>(gameplay::ControlAction::Equipment)] = B::Count;
+    bindings.values[static_cast<std::size_t>(gameplay::ControlAction::NextWeapon)] = B::RightShoulder;
+    bindings.values[static_cast<std::size_t>(gameplay::ControlAction::QuickMelee)] = B::Count;
     return bindings;
 }
 
@@ -138,6 +149,8 @@ SettingsLoadResult loadRuntimeSettings(
         }
 
         bool recovered = false;
+        bool sawGamepadBinding = false;
+        bool sawEquipmentBinding = false;
         bool foundVersion = false;
         std::optional<std::uint64_t> version;
         std::optional<std::uint64_t> windowWidth;
@@ -174,6 +187,9 @@ SettingsLoadResult loadRuntimeSettings(
                 }
             } else if (key.starts_with("gamepad_binding_")) {
                 const auto index = parseUnsigned(key.substr(16U));
+                sawGamepadBinding = true;
+                if (index && *index == static_cast<std::size_t>(gameplay::ControlAction::Equipment))
+                    sawEquipmentBinding = true;
                 const auto binding = gameplay::gamepadBindingForName(value);
                 if (index && *index < gameplay::controlActionCount && binding) {
                     result.settings.gamepadControls.values[static_cast<std::size_t>(*index)] = *binding;
@@ -279,6 +295,51 @@ SettingsLoadResult loadRuntimeSettings(
             result.status = SettingsLoadStatus::Invalid;
             return result;
         }
+        if (*version <= 11U) {
+            // Slots added in v12 must not collide with a player's existing
+            // v11 remaps. Keep customized buttons and only move the old
+            // default R3/R1 actions to their newly requested uses.
+            auto& controls = result.settings.controls;
+            const auto quick = static_cast<std::size_t>(gameplay::ControlAction::QuickMelee);
+            if (std::find(controls.values.begin(), controls.values.begin() + quick,
+                    controls.values[quick]) != controls.values.begin() + quick) {
+                for (std::size_t candidate = 0U;
+                     candidate < static_cast<std::size_t>(wkc::platform::Key::Count);
+                     ++candidate) {
+                    const auto key = static_cast<wkc::platform::Key>(candidate);
+                    const gameplay::ControlBinding binding{
+                        gameplay::BindingKind::Key, static_cast<std::uint8_t>(candidate)};
+                    const bool occupied = std::find(
+                        controls.values.begin(), controls.values.begin() + quick, binding)
+                        != controls.values.begin() + quick;
+                    if (gameplay::validControlBinding(binding) && !occupied
+                        && key != wkc::platform::Key::RightShift
+                        && key != wkc::platform::Key::RightControl
+                        && key != wkc::platform::Key::RightAlt) {
+                        controls.values[quick] = binding;
+                        break;
+                    }
+                }
+            }
+            if (sawGamepadBinding) {
+                result.settings.gamepadControls.values[quick]
+                    = wkc::platform::GamepadButton::Count;
+                const bool untouchedOldPreset = *version <= 10U
+                    && result.settings.gamepadControls == oldDefaultGamepadBindings();
+                const bool untouchedPreviousPreset = *version == 11U
+                    && result.settings.gamepadControls == previousGamepadBindings();
+                if (untouchedOldPreset || untouchedPreviousPreset) {
+                    result.settings.gamepadControls = {};
+                } else {
+                    auto& pad = result.settings.gamepadControls.values;
+                    pad[quick] = wkc::platform::GamepadButton::Count;
+                    if (!sawEquipmentBinding) {
+                        pad[static_cast<std::size_t>(gameplay::ControlAction::Equipment)]
+                            = wkc::platform::GamepadButton::Count;
+                    }
+                }
+            }
+        }
         if (!gameplay::validateControlBindings(result.settings.controls)) {
             result.settings.controls = {};
             recovered = true;
@@ -325,12 +386,6 @@ SettingsLoadResult loadRuntimeSettings(
             result.settings.graphicsQuality = gameplay::GraphicsQuality::Ultra;
         }
         if (*version <= 7U) result.settings.language = gameplay::Language::English;
-        // Upgrade only the untouched old preset. Any customized gamepad
-        // mapping remains exactly as the player saved it.
-        if (*version <= 10U
-            && result.settings.gamepadControls == oldDefaultGamepadBindings()) {
-            result.settings.gamepadControls = {};
-        }
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);
         if (*version < currentSettingsVersion) {
             result.status = SettingsLoadStatus::Migrated;

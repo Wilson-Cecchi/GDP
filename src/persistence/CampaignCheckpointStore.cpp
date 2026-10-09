@@ -78,6 +78,7 @@ struct Fields {
     std::optional<float> armor;
     std::optional<float> maximumArmor;
     std::optional<std::uint64_t> keys;
+    std::optional<std::uint64_t> grenades;
     std::optional<std::uint64_t> weaponArchetype;
     std::optional<std::uint64_t> firearmOwned;
     std::optional<float> weaponDamage;
@@ -160,6 +161,8 @@ bool assignField(
         unsignedTarget = &fields.floor;
     } else if (key == "player_keys") {
         unsignedTarget = &fields.keys;
+    } else if (key == "player_grenades") {
+        unsignedTarget = &fields.grenades;
     } else if (key == "weapon_archetype") {
         unsignedTarget = &fields.weaponArchetype;
     } else if (key == "weapon_owned") {
@@ -233,6 +236,7 @@ std::string serialize(const gameplay::CampaignCheckpoint& checkpoint)
            << "player_armor = " << state.player.armor << '\n'
            << "player_maximum_armor = " << state.player.maximumArmor << '\n'
            << "player_keys = " << state.player.keys << '\n'
+           << "player_grenades = " << state.player.grenades << '\n'
            << "weapon_archetype = "
            << static_cast<std::uint32_t>(state.weapon.definition.archetype) << '\n'
            << "weapon_owned = " << (state.weapon.firearmOwned ? 1U : 0U) << '\n'
@@ -323,6 +327,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             && *fields.version != 4U
             && *fields.version != 5U
             && *fields.version != 6U
+            && *fields.version != 7U
             && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::UnsupportedVersion;
             return result;
@@ -335,10 +340,11 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const bool migratePreviousRules = (*rulesVersion == 34U && *fields.version <= 5U)
             || (*rulesVersion == 35U && *fields.version <= 6U);
         const bool migratePreviousFloor = (*rulesVersion == 37U || *rulesVersion == 38U
-                || *rulesVersion == 39U || *rulesVersion == 40U)
-            && *fields.version == currentCampaignCheckpointFileVersion;
+                || *rulesVersion == 39U || *rulesVersion == 40U
+                || *rulesVersion == 41U) && *fields.version == 7U;
         // A current-rules file must not pretend to use the legacy round schema.
-        if (!migratePreviousRules && *fields.version != currentCampaignCheckpointFileVersion) {
+        if (!migratePreviousRules && !migratePreviousFloor
+            && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
             return result;
         }
@@ -351,6 +357,7 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto seedIndex = narrowUnsigned(fields.seedIndex);
         const auto floor = narrowUnsigned(fields.floor);
         const auto keys = narrowUnsigned(fields.keys);
+        const auto grenades = narrowUnsigned(fields.grenades);
         const auto weaponArchetype = narrowUnsigned(fields.weaponArchetype);
         const auto firearmOwned = narrowUnsigned(fields.firearmOwned);
         const auto magazineSize = narrowUnsigned(fields.magazineSize);
@@ -369,7 +376,9 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const auto capacityRank = narrowUnsigned(fields.capacityRank);
         if (!fields.initialSeed || !fields.currentSeed || !runIndex || !seedIndex
             || !floor || !fields.health || !fields.maximumHealth || !fields.armor
-            || !fields.maximumArmor || !keys || !weaponArchetype
+            || !fields.maximumArmor || !keys
+            || (*fields.version >= 8U && (!grenades || *grenades > 2U))
+            || !weaponArchetype
             || *weaponArchetype > (*fields.version >= 6U ? 5U : 1U)
             || *weaponArchetype == static_cast<std::uint32_t>(gameplay::WeaponArchetype::Knife)
             || (*fields.version >= 4U
@@ -423,7 +432,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
             *floor,
             {
                 {*fields.health, *fields.maximumHealth, *fields.armor,
-                    *fields.maximumArmor, *keys},
+                    *fields.maximumArmor, *keys,
+                    *fields.version >= 8U ? *grenades : 2U},
                 {{*fields.weaponDamage, *fields.fireInterval, *fields.range,
                     *magazineSize, *reserveMaximum,
                     static_cast<gameplay::WeaponArchetype>(*weaponArchetype)},

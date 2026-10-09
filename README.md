@@ -925,8 +925,12 @@ e recarrega com `R`; após encontrar a Carbine, `1` seleciona a Carbine, `2`
 seleciona a Pistol, `3` seleciona a Knife, `Q` retorna à última arma, e a roda
 percorre as armas disponíveis nos dois sentidos. `G` solta a arma de fogo
 selecionada mesmo quando é a última; a faca não pode ser solta. `F` alterna a
-lanterna e `Tab` mostra o painel rápido; `4` e `5` não executam ação por
-enquanto. `F3` alterna o
+lanterna e `Tab` mostra o painel rápido. `V` dá um golpe rápido de faca sem
+trocar de arma. `4` equipa uma granada de fragmentação: segure o botão esquerdo
+para carregar o arremesso, solte para lançar mais longe (carga máxima em 1,2 s).
+O jogador inicia com duas granadas; `5` continua reservado. Com o pente vazio,
+uma nova tentativa de disparo inicia a recarga automaticamente se houver munição
+de reserva; o último tiro não a inicia sozinho. `F3` alterna o
 diagnóstico de desempenho. Pickups próximos
 são coletados automaticamente; objetivo e
 resultado aparecem dentro do viewport, enquanto run, HP, munição, chaves e os

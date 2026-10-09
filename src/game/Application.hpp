@@ -24,6 +24,7 @@
 #include "gameplay/ViewMotion.hpp"
 #include "gameplay/Weapon.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/PlayerGrenade.hpp"
 #include "gameplay/Progression.hpp"
 #include "gameplay/ResultMenu.hpp"
 #include "platform/Input.hpp"
@@ -83,6 +84,11 @@ private:
     friend struct ApplicationMenuTestAccess;
     struct ActiveImpact {
         visual::ImpactRenderData render{};
+        std::uint32_t roomId{0U};
+        float remaining{0.0F};
+    };
+    struct ActiveGrenadeBlast {
+        wkc::core::Vec3 position{};
         std::uint32_t roomId{0U};
         float remaining{0.0F};
     };
@@ -158,7 +164,11 @@ private:
     bool interactionPending_{false};
     bool jumpPending_{false};
     bool firePending_{false};
+    bool quickMeleePending_{false};
     bool fireHeld_{false};
+    bool grenadeSelected_{false};
+    bool grenadeCharging_{false};
+    float grenadeChargeSeconds_{0.0F};
     bool reloadPending_{false};
     bool dropPending_{false};
     std::optional<gameplay::WeaponArchetype> weaponSwitchPending_;
@@ -180,6 +190,8 @@ private:
     std::unordered_map<std::uint64_t, visual::EnemyAnimationTransition>
         enemyAnimationTransitions_;
     std::vector<ActiveImpact> activeImpacts_;
+    std::vector<ActiveGrenadeBlast> activeGrenadeBlasts_;
+    gameplay::PlayerGrenadeSystem playerGrenades_;
     gameplay::EnemyProjectileSystem enemyProjectiles_;
     std::unique_ptr<gdp::audio::AudioSystem> audio_;
     std::unique_ptr<visual::GdpRenderer> renderer_;

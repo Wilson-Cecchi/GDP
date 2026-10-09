@@ -9,7 +9,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 41U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 42U;
 
 struct CampaignFloorLayout {
     std::uint32_t roomCount{8U};

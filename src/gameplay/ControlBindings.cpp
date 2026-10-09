@@ -15,8 +15,8 @@ constexpr std::array<std::string_view, static_cast<std::size_t>(Key::Count)> key
 constexpr std::array<std::string_view, controlActionCount> actionNames{
     "FORWARD", "BACKWARD", "STRAFE LEFT", "STRAFE RIGHT", "QUIET WALK", "CROUCH", "JUMP",
     "FIRE", "AIM", "RELOAD", "INTERACT", "FLASHLIGHT", "DROP WEAPON", "PRIMARY WEAPON",
-    "SECONDARY WEAPON", "MELEE", "EQUIPMENT (RESERVED)", "SPECIAL ITEM (RESERVED)",
-    "LAST WEAPON", "INFORMATION", "NEXT WEAPON", "PREVIOUS WEAPON",
+    "SECONDARY WEAPON", "KNIFE SLOT", "GRENADE", "SPECIAL ITEM (RESERVED)",
+    "LAST WEAPON", "INFORMATION", "NEXT WEAPON", "PREVIOUS WEAPON", "QUICK MELEE",
 };
 constexpr std::array<std::string_view, 5> mouseNames{"MOUSE1", "MOUSE3", "MOUSE2", "MOUSE4", "MOUSE5"};
 ControlBinding canonical(ControlBinding binding) noexcept {
@@ -53,15 +53,16 @@ std::array<ControlBinding, controlActionCount> defaultControlBindings() noexcept
     return {key(Key::W), key(Key::S), key(Key::A), key(Key::D), key(Key::LeftShift), key(Key::LeftControl),
         key(Key::Space), {BindingKind::Mouse, 0U}, {BindingKind::Mouse, 2U}, key(Key::R), key(Key::E),
         key(Key::F), key(Key::G), key(Key::Digit1), key(Key::Digit2), key(Key::Digit3), key(Key::Digit4),
-        key(Key::Digit5), key(Key::Q), key(Key::Tab), {BindingKind::WheelUp, 0U}, {BindingKind::WheelDown, 0U}};
+        key(Key::Digit5), key(Key::Q), key(Key::Tab), {BindingKind::WheelUp, 0U}, {BindingKind::WheelDown, 0U},
+        key(Key::V)};
 }
 std::array<GamepadButton, controlActionCount> defaultGamepadBindings() noexcept {
     using B = GamepadButton;
     return {B::Count, B::Count, B::Count, B::Count, B::LeftStick,
         B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
         B::DpadUp, B::DpadDown, B::DpadLeft, B::DpadRight, B::Count,
-        B::RightStick, B::Count, B::Count, B::North, B::Back,
-        B::RightShoulder, B::LeftShoulder};
+        B::Count, B::RightShoulder, B::Count, B::North, B::Back,
+        B::Count, B::LeftShoulder, B::RightStick};
 }
 std::string_view controlActionName(ControlAction action) noexcept {
     const auto i = static_cast<std::size_t>(action); return i < actionNames.size() ? actionNames[i] : "UNKNOWN";

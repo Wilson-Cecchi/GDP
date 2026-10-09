@@ -38,6 +38,7 @@ struct PlayerState {
     float armor{0.0F};
     float maximumArmor{50.0F};
     std::uint32_t keys{0};
+    std::uint32_t grenades{2U};
     bool grounded{true};
     bool crouching{false};
     float crouchAmount{0.0F};
@@ -50,6 +51,7 @@ struct PlayerCampaignProgress {
     float armor{0.0F};
     float maximumArmor{50.0F};
     std::uint32_t keys{0U};
+    std::uint32_t grenades{2U};
 
     constexpr bool operator==(const PlayerCampaignProgress&) const noexcept = default;
 };
@@ -84,6 +86,8 @@ public:
     void heal(float amount) noexcept;
     void addArmor(float amount) noexcept;
     void addKeys(std::uint32_t amount) noexcept;
+    [[nodiscard]] bool useGrenade() noexcept;
+    void refillGrenades() noexcept;
     [[nodiscard]] bool increaseMaximumHealth(
         float amount,
         float healing = 0.0F) noexcept;

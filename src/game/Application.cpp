@@ -878,6 +878,11 @@ bool Application::initializeRun()
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
+    activeGrenadeBlasts_.clear();
+    playerGrenades_.clear();
+    grenadeSelected_ = false;
+    grenadeCharging_ = false;
+    grenadeChargeSeconds_ = 0.0F;
     enemyProjectiles_.clear();
     roomFixtureEntities_.clear();
     visitedRooms_.clear();
@@ -1235,6 +1240,7 @@ void Application::processEvents()
         interactionPending_ = false;
         jumpPending_ = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
@@ -1326,6 +1332,7 @@ void Application::processEvents()
         interactionPending_ = false;
         jumpPending_ = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
@@ -1370,6 +1377,7 @@ void Application::processEvents()
         interactionPending_ = false;
         jumpPending_ = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
@@ -1511,6 +1519,7 @@ void Application::processEvents()
         interactionPending_ = false;
         jumpPending_ = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
@@ -1645,23 +1654,55 @@ void Application::processEvents()
     interactionPending_ = interactionPending_ || pressed(ControlAction::Interact);
     firePending_ = firePending_ || pressed(ControlAction::Fire);
     fireHeld_ = down(ControlAction::Fire);
-    reloadPending_ = reloadPending_ || pressed(ControlAction::Reload);
-    dropPending_ = dropPending_ || pressed(ControlAction::Drop);
+    quickMeleePending_ = quickMeleePending_ || pressed(ControlAction::QuickMelee);
+    reloadPending_ = reloadPending_ || (!grenadeSelected_ && pressed(ControlAction::Reload));
+    dropPending_ = dropPending_ || (!grenadeSelected_ && pressed(ControlAction::Drop));
     if (pressed(ControlAction::Flashlight)) {
         flashlightOn_ = !flashlightOn_;
         log(LogLevel::Info, flashlightOn_ ? "Flashlight enabled" : "Flashlight disabled");
     }
-    if (pressed(ControlAction::Primary)) weaponSwitchPending_ = weapon_.archetypeForSlot(1U);
-    else if (pressed(ControlAction::Secondary)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
-    else if (pressed(ControlAction::Melee)) weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
-    else if (pressed(ControlAction::LastWeapon)) weaponSwitchPending_ = weapon_.lastWeaponArchetype();
-    else if (pressed(ControlAction::NextWeapon)) weaponSwitchPending_ = weapon_.nextWeaponArchetype();
-    else if (pressed(ControlAction::PreviousWeapon)) weaponSwitchPending_ = weapon_.previousWeaponArchetype();
+    if (pressed(ControlAction::Equipment)) {
+        grenadeSelected_ = true;
+        grenadeCharging_ = false;
+        grenadeChargeSeconds_ = 0.0F;
+        weaponSwitchPending_.reset();
+        firePending_ = false;
+        reloadPending_ = false;
+        dropPending_ = false;
+    } else if (pressed(ControlAction::Primary)) {
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+        weaponSwitchPending_ = weapon_.archetypeForSlot(1U);
+    } else if (pressed(ControlAction::Secondary)) {
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
+    } else if (pressed(ControlAction::Melee)) {
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+        weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
+    } else if (pressed(ControlAction::LastWeapon)) {
+        if (!grenadeSelected_) weaponSwitchPending_ = weapon_.lastWeaponArchetype();
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+    } else if (pressed(ControlAction::NextWeapon)) {
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+        weaponSwitchPending_ = weapon_.nextWeaponArchetype();
+    } else if (pressed(ControlAction::PreviousWeapon)) {
+        grenadeSelected_ = false;
+        grenadeCharging_ = false;
+        weaponSwitchPending_ = weapon_.previousWeaponArchetype();
+    }
     playerCommand_.interact = interactionPending_;
 }
 
 void Application::setPaused(const bool paused)
 {
+    if (paused) {
+        grenadeCharging_ = false;
+        grenadeChargeSeconds_ = 0.0F;
+    }
     if (paused && weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
         aimBlend_ = 0.0F;
     if (paused) {
@@ -1673,6 +1714,7 @@ void Application::setPaused(const bool paused)
     interactionPending_ = false;
     jumpPending_ = false;
     firePending_ = false;
+    quickMeleePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();
@@ -1731,6 +1773,11 @@ bool Application::returnToMainMenu()
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    activeGrenadeBlasts_.clear();
+    playerGrenades_.clear();
+    grenadeSelected_ = false;
+    grenadeCharging_ = false;
+    grenadeChargeSeconds_ = 0.0F;
     enemyProjectiles_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
@@ -1752,6 +1799,7 @@ bool Application::returnToMainMenu()
     interactionPending_ = false;
     jumpPending_ = false;
     firePending_ = false;
+    quickMeleePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();
@@ -2144,13 +2192,14 @@ void Application::fixedUpdate(const double fixedStep)
     }
     gameplay::updateFeedback(feedback_, step);
     const bool aimRequested = player_.state().alive
+        && !grenadeSelected_
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
         && gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, gameplay::ControlAction::Aim, input_);
     const bool scopeBlocked = weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper
         && (weapon_.reloading() || weapon_.switching() || weaponEquipRemaining_ > 0.0F);
     aimBlend_ = gameplay::advanceWeaponAimBlend(aimBlend_, step,
         weapon_.definition().archetype, aimRequested,
-        scopeBlocked || !player_.state().alive
+        scopeBlocked || grenadeSelected_ || !player_.state().alive
             || session_.state().phase != gameplay::SessionPhase::Playing);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
@@ -2167,6 +2216,11 @@ void Application::fixedUpdate(const double fixedStep)
     std::erase_if(activeImpacts_, [](const ActiveImpact& impact) {
         return impact.remaining <= 0.0F;
     });
+    for (ActiveGrenadeBlast& blast : activeGrenadeBlasts_)
+        blast.remaining = std::max(0.0F, blast.remaining - step);
+    std::erase_if(activeGrenadeBlasts_, [](const ActiveGrenadeBlast& blast) {
+        return blast.remaining <= 0.0F;
+    });
     if (session_.state().phase != gameplay::SessionPhase::Playing) {
         updateEnemyAnimationTransitions(true);
         if (audio_) {
@@ -2181,6 +2235,7 @@ void Application::fixedUpdate(const double fixedStep)
         aimBlend_ = 0.0F;
         reloadPending_ = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         log(LogLevel::Info,
             std::string{"Weapon selected: "}
@@ -2438,6 +2493,7 @@ void Application::fixedUpdate(const double fixedStep)
                             : "Weapon dropped");
                     reloadPending_ = false;
                     firePending_ = false;
+                    quickMeleePending_ = false;
                     fireHeld_ = false;
                 } else {
                     gameplay::signalNotice(
@@ -2513,40 +2569,83 @@ void Application::fixedUpdate(const double fixedStep)
     }
     reloadPending_ = false;
     gameplay::updateEnemyHitReactions(entities_, step);
-    const bool fireRequested = gameplay::weaponFireRequested(
-        weapon_, firePending_, fireHeld_);
-    if (fireRequested && player_.state().alive) {
-        const bool meleeAttack = weapon_.definition().archetype
-            == gameplay::WeaponArchetype::Knife;
-        std::vector<std::uint32_t> reachableShotRooms;
-        if (world_) {
-            reachableShotRooms.reserve(4U);
-            for (const world::CorridorPath& corridor : world_->corridors) {
-                const world::RoomId neighbor = corridor.firstRoom == playerRoom
-                    ? corridor.secondRoom
-                    : corridor.secondRoom == playerRoom ? corridor.firstRoom : 0U;
-                if (neighbor == 0U) {
-                    continue;
-                }
-                const auto door = doorRuntimes_.find(corridor.edge);
-                if (door != doorRuntimes_.end()
-                    && gameplay::isDoorPassable(door->second)) {
-                    reachableShotRooms.push_back(neighbor);
-                }
+    std::vector<std::uint32_t> reachableShotRooms;
+    if (world_) {
+        reachableShotRooms.reserve(4U);
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            const world::RoomId neighbor = corridor.firstRoom == playerRoom
+                ? corridor.secondRoom
+                : corridor.secondRoom == playerRoom ? corridor.firstRoom : 0U;
+            if (neighbor == 0U) continue;
+            const auto door = doorRuntimes_.find(corridor.edge);
+            if (door != doorRuntimes_.end()
+                && gameplay::isDoorPassable(door->second)) {
+                reachableShotRooms.push_back(neighbor);
             }
         }
-        const gameplay::ShotResult shot = gameplay::fireHitscan(
-            weapon_,
-            player_.cameraPosition(),
-            player_.forwardDirection(),
-            playerRoom,
-            collisionWorld_,
-            entities_,
-            1.0F - aimBlend_ * 0.60F,
-            reachableShotRooms,
-            gameplay::weaponMovementInaccuracyDegrees(
-                weapon_.definition().archetype, player_.state().velocity,
-                player_.state().grounded, player_.state().crouching, aimBlend_));
+    }
+    if (grenadeSelected_ && player_.state().alive) {
+        if (firePending_ && !grenadeCharging_) {
+            if (player_.state().grenades > 0U) {
+                grenadeCharging_ = true;
+                grenadeChargeSeconds_ = 0.0F;
+            } else if (audio_) {
+                audio_->playAt(gdp::audio::AudioEventKind::DryFire,
+                    config_.worldSeed, audioEventCounter_++,
+                    player_.cameraPosition(), player_.cameraPosition(),
+                    player_.forwardDirection());
+            }
+        }
+        if (grenadeCharging_) {
+            if (fireHeld_) {
+                grenadeChargeSeconds_ = std::min(
+                    grenadeChargeSeconds_ + step,
+                    gameplay::grenadeMaximumChargeSeconds);
+            } else {
+                if (playerGrenades_.throwGrenade(player_.cameraPosition(),
+                        player_.forwardDirection(), grenadeChargeSeconds_,
+                        playerRoom, collisionWorld_, reachableShotRooms)
+                    && player_.useGrenade()) {
+                    log(LogLevel::Info, "Fragmentation grenade thrown");
+                    if (audio_) {
+                        audio_->playAt(gdp::audio::AudioEventKind::MeleeSwing,
+                            config_.worldSeed, audioEventCounter_++,
+                            player_.cameraPosition(), player_.cameraPosition(),
+                            player_.forwardDirection());
+                    }
+                }
+                grenadeCharging_ = false;
+                grenadeChargeSeconds_ = 0.0F;
+            }
+        }
+    }
+    const bool quickMelee = quickMeleePending_;
+    const bool fireRequested = quickMelee || (!grenadeSelected_
+        && gameplay::weaponFireRequested(
+            weapon_, firePending_, fireHeld_));
+    if (fireRequested && player_.state().alive) {
+        const bool meleeAttack = quickMelee || weapon_.definition().archetype
+            == gameplay::WeaponArchetype::Knife;
+        const bool wasReloading = weapon_.reloading();
+        const gameplay::ShotResult shot = quickMelee
+            ? gameplay::fireQuickMelee(weapon_, player_.cameraPosition(),
+                player_.forwardDirection(), playerRoom, collisionWorld_, entities_,
+                reachableShotRooms)
+            : gameplay::fireHitscan(weapon_, player_.cameraPosition(),
+                player_.forwardDirection(), playerRoom, collisionWorld_, entities_,
+                1.0F - aimBlend_ * 0.60F, reachableShotRooms,
+                gameplay::weaponMovementInaccuracyDegrees(
+                    weapon_.definition().archetype, player_.state().velocity,
+                    player_.state().grounded, player_.state().crouching, aimBlend_));
+        if (!wasReloading && weapon_.reloading()) {
+            if (weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
+                aimBlend_ = 0.0F;
+            log(LogLevel::Info, "Weapon empty; reload started on trigger");
+            if (audio_) {
+                audio_->play(gdp::audio::AudioEventKind::Reload,
+                    config_.worldSeed, audioEventCounter_++);
+            }
+        }
         const gameplay::CombatSignalBatch signals
             = gameplay::combatSignalsForShot(shot);
         const entities::PropData* hitProp = shot.hit
@@ -2700,14 +2799,65 @@ void Application::fixedUpdate(const double fixedStep)
                     << weapon_.magazineAmmo() << '/' << weapon_.reserveAmmo();
             log(LogLevel::Info, message.str());
         } else if (shot.outcome == gameplay::ShotOutcome::Empty) {
-            log(LogLevel::Info, "Weapon empty; press R to reload");
+            log(LogLevel::Info, "Weapon empty; no reserve ammo");
         } else if (shot.outcome == gameplay::ShotOutcome::ImpactProp) {
             log(LogLevel::Info, "Protected prop absorbed the shot");
         }
     }
     firePending_ = false;
+    quickMeleePending_ = false;
 
     const bool playerWasAlive = player_.state().alive;
+    bool grenadeHitPlayer = false;
+    for (const gameplay::GrenadeDetonation& blast : playerGrenades_.update(step)) {
+        activeGrenadeBlasts_.push_back({blast.position, blast.roomId, 0.36F});
+        const gameplay::GrenadeBlastResult result
+            = gameplay::resolveGrenadeBlast(blast, player_, entities_);
+        grenadeHitPlayer = grenadeHitPlayer || result.playerDamaged;
+        bool destroyedProp = false;
+        for (const gameplay::GrenadeHit& hit : result.hits) {
+            const auto* target = entities_.find(hit.target);
+            if (!target) continue;
+            if (hit.prop) {
+                destroyedProp = destroyedProp || hit.killed;
+                const auto* prop = entities_.findData<entities::PropData>(hit.target);
+                if (hit.killed && prop
+                    && prop->type != entities::PropType::CeilingFixture)
+                    awardProgress(gameplay::ProgressionEvent::PropDestroyed, 1U);
+            } else {
+                const auto* enemy = entities_.findData<entities::EnemyData>(hit.target);
+                if (hit.killed && enemy)
+                    awardProgress(progressionEventFor(enemy->archetype), 1U);
+            }
+            gameplay::signalHit(feedback_, hit.killed, false);
+            if (hit.spawnedDrop.isValid() && world_) {
+                const auto* item = entities_.find(hit.spawnedDrop);
+                if (item) {
+                    const auto room = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+                        [item](const world::RoomInstance& candidate) {
+                            return candidate.id == item->roomId;
+                        });
+                    if (room != world_->rooms.end()) room->entities.push_back(hit.spawnedDrop);
+                }
+            }
+        }
+        if (destroyedProp) {
+            collisionWorld_ = gameplay::collisionWorldWithProps(
+                baseCollisionWorld_, entities_, playerRoom);
+        }
+        (void)gameplay::alertEnemiesToNoise(entities_, blast.roomId,
+            {.position = blast.position, .radius = 20.0F});
+        for (const auto roomId : blast.reachableRooms) {
+            (void)gameplay::alertEnemiesToNoise(entities_, roomId,
+                {.position = blast.position, .radius = 20.0F});
+        }
+        if (audio_) {
+            audio_->playAt(gdp::audio::AudioEventKind::PropDestroyed,
+                config_.worldSeed, audioEventCounter_++, blast.position,
+                player_.cameraPosition(), player_.forwardDirection());
+        }
+        log(LogLevel::Info, "Fragmentation grenade detonated");
+    }
     const gameplay::EnemyDifficultyConfigs difficultyConfigs
         = gameplay::makeEnemyDifficultyConfigs(runDifficulty_);
     std::vector<gameplay::EnemyProjectile> spawnedProjectiles;
@@ -2767,7 +2917,7 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
     }
-    std::size_t attacksLanded = 0U;
+    std::size_t attacksLanded = grenadeHitPlayer ? 1U : 0U;
     for (const world::RoomId enemyRoom : activeEnemyRooms) {
         const auto neighbors = openNeighbors(enemyRoom);
         const gameplay::CollisionWorld enemyBase = enemyRoom == playerRoom
@@ -2870,6 +3020,7 @@ void Application::fixedUpdate(const double fixedStep)
     }
     if (terminalUsed && session_.state().mode == gameplay::RunMode::TestMode) {
         weapon_.restockAllFirearms();
+        player_.refillGrenades();
         player_.heal(player_.state().maximumHealth);
         player_.addArmor(player_.state().maximumArmor);
         if (auto* data = entities_.findData<entities::PlayerData>(player_.entity())) {
@@ -3014,6 +3165,7 @@ void Application::fixedUpdate(const double fixedStep)
         jumpPending_ = false;
         playerCommand_.jump = false;
         firePending_ = false;
+        quickMeleePending_ = false;
         fireHeld_ = false;
         reloadPending_ = false;
         weaponSwitchPending_.reset();
@@ -3818,6 +3970,10 @@ void Application::render()
     hud.maximumArmor = player_.state().maximumArmor;
     hud.magazineAmmo = weapon_.magazineAmmo();
     hud.reserveAmmo = weapon_.reserveAmmo();
+    hud.grenades = player_.state().grenades;
+    hud.grenadeSelected = grenadeSelected_;
+    hud.grenadeChargeStrength = grenadeCharging_
+        ? grenadeChargeSeconds_ / gameplay::grenadeMaximumChargeSeconds : 0.0F;
     switch (weapon_.definition().archetype) {
     case gameplay::WeaponArchetype::Carbine:
         hud.weapon = visual::HudWeaponRole::Carbine;
@@ -4038,7 +4194,7 @@ void Application::render()
                 }
             }
         }
-        if (hud.prompt == visual::HudPrompt::None
+        if (hud.prompt == visual::HudPrompt::None && !grenadeSelected_
             && !weapon_.reloading() && !weapon_.switching()
             && weapon_.magazineAmmo() == 0U
             && weapon_.reserveAmmo() > 0U) {
@@ -4061,13 +4217,27 @@ void Application::render()
                 projectile.velocity});
         }
     }
+    std::vector<visual::GrenadeRenderData> visibleGrenades;
+    for (const gameplay::PlayerGrenade& grenade : playerGrenades_.grenades()) {
+        if (sphereIsVisible(grenade.position, 0.25F))
+            visibleGrenades.push_back({grenade.position});
+    }
+    std::vector<visual::GrenadeBlastRenderData> visibleGrenadeBlasts;
+    for (const ActiveGrenadeBlast& blast : activeGrenadeBlasts_) {
+        if (sphereIsVisible(blast.position, gameplay::grenadeBlastRadius))
+            visibleGrenadeBlasts.push_back({blast.position,
+                blast.remaining / 0.36F});
+    }
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
+        .grenadeSelected = grenadeSelected_ && weaponMeleeRemaining_ <= 0.0F,
+        .grenadeChargeStrength = hud.grenadeChargeStrength,
         // SMG retains its animation identity even while sharing Carbine geometry.
-        .role = hud.weapon,
+        .role = grenadeSelected_ || weaponMeleeRemaining_ > 0.0F
+            ? visual::HudWeaponRole::Knife : hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
-        .reloadProgress = weapon_.reloadProgress(),
+        .reloadProgress = grenadeSelected_ ? 0.0F : weapon_.reloadProgress(),
         .equipStrength = std::max(
             weaponEquipRemaining_ / weaponEquipDuration,
             weapon_.switchStrength()),
@@ -4087,7 +4257,7 @@ void Application::render()
                 : hud.weapon == visual::HudWeaponRole::Knife
                     ? 0x4b4e494645ULL : 0x504953544f4cULL),
         .reloadRoundCount = weapon_.reloadRoundCount(),
-        .aimStrength = !pauseMenu_.paused && !controlsMenuActive_
+        .aimStrength = !grenadeSelected_ && !pauseMenu_.paused && !controlsMenuActive_
                 && !weapon_.reloading() && !weapon_.switching()
             ? aimBlend_ : 0.0F,
     };
@@ -4113,7 +4283,8 @@ void Application::render()
                     .gaitWeight = playerBodyMotion_.weight,
                     .forwardMovement = playerBodyMotion_.forward,
                     .rightMovement = playerBodyMotion_.right,
-                    .airborneStrength = playerBodyMotion_.airborne});
+                    .airborneStrength = playerBodyMotion_.airborne},
+                visibleGrenades, visibleGrenadeBlasts);
         }, "Renderer failed while drawing the frame")) {
         return;
     }
@@ -4136,6 +4307,11 @@ void Application::shutdown()
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    activeGrenadeBlasts_.clear();
+    playerGrenades_.clear();
+    grenadeSelected_ = false;
+    grenadeCharging_ = false;
+    grenadeChargeSeconds_ = 0.0F;
     enemyProjectiles_.clear();
     gamepad_.close(input_);
     gamepadConnected_ = false;
@@ -4158,6 +4334,7 @@ void Application::shutdown()
     interactionPending_ = false;
     jumpPending_ = false;
     firePending_ = false;
+    quickMeleePending_ = false;
     fireHeld_ = false;
     reloadPending_ = false;
     weaponSwitchPending_.reset();

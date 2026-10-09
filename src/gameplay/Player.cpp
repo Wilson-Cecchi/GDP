@@ -325,6 +325,18 @@ void Player::addKeys(const std::uint32_t amount) noexcept
     state_.keys += amount;
 }
 
+bool Player::useGrenade() noexcept
+{
+    if (!state_.alive || state_.grenades == 0U) return false;
+    --state_.grenades;
+    return true;
+}
+
+void Player::refillGrenades() noexcept
+{
+    if (state_.alive) state_.grenades = 2U;
+}
+
 bool Player::increaseMaximumHealth(
     const float amount,
     const float healing) noexcept
@@ -363,7 +375,8 @@ bool Player::restoreCampaignProgress(
         || progress.health <= 0.0F || progress.maximumHealth <= 0.0F
         || progress.health > progress.maximumHealth
         || progress.armor < 0.0F || progress.maximumArmor < 0.0F
-        || progress.armor > progress.maximumArmor) {
+        || progress.armor > progress.maximumArmor
+        || progress.grenades > 2U) {
         return false;
     }
     state_.health = progress.health;
@@ -371,6 +384,7 @@ bool Player::restoreCampaignProgress(
     state_.armor = progress.armor;
     state_.maximumArmor = progress.maximumArmor;
     state_.keys = progress.keys;
+    state_.grenades = progress.grenades;
     state_.alive = true;
     return true;
 }

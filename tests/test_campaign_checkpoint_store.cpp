@@ -454,8 +454,8 @@ void testKnifeOnlyAndLegacyRoundTrip()
         expect(persistence::loadCampaignCheckpoint(path).status
                 == persistence::CampaignCheckpointLoadStatus::Invalid,
             "schema 4 rejects missing ownership instead of inventing a gun");
-        serialized.replace(0U, std::string{"version = 7"}.size(), "version = 3");
-        serialized.replace(serialized.find("rules_version = 41"), std::string{"rules_version = 41"}.size(), "rules_version = 34");
+        serialized.replace(0U, std::string{"version = 8"}.size(), "version = 3");
+        serialized.replace(serialized.find("rules_version = 42"), std::string{"rules_version = 42"}.size(), "rules_version = 34");
         writeText(path, serialized);
         expect(persistence::loadCampaignCheckpoint(path).checkpoint == legacy,
             "schema 3 checkpoints migrate as an armed loadout");
@@ -486,8 +486,8 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
     const auto old = makeCheckpoint();
     expect(persistence::saveCampaignCheckpoint(path, legacyRoundReserves(old)), "previous-rule fixture is serializable");
     std::string serialized = readText(path);
-    serialized.replace(serialized.find("version = 7"), std::string{"version = 7"}.size(), "version = 5");
-    serialized.replace(serialized.find("rules_version = 41"), std::string{"rules_version = 41"}.size(), "rules_version = 34");
+    serialized.replace(serialized.find("version = 8"), std::string{"version = 8"}.size(), "version = 5");
+    serialized.replace(serialized.find("rules_version = 42"), std::string{"rules_version = 42"}.size(), "rules_version = 34");
     writeText(path, serialized);
     const auto migrated = persistence::loadCampaignCheckpoint(path);
     expect(migrated.migratedRules && migrated.checkpoint == old,
@@ -507,8 +507,8 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
         expect(saved, "schema six legacy fixture saves");
         if (!saved) continue; // Report the failure, not an out_of_range from missing text.
         std::string text = readText(path);
-        text.replace(text.find("version = 7"), 11U, "version = 6");
-        text.replace(text.find("rules_version = 41"), 18U, "rules_version = 35");
+        text.replace(text.find("version = 8"), 11U, "version = 6");
+        text.replace(text.find("rules_version = 42"), 18U, "rules_version = 35");
         writeText(path, text);
         const auto loaded = persistence::loadCampaignCheckpoint(path);
         expect(loaded.migratedRules && loaded.checkpoint == expected,
@@ -529,12 +529,13 @@ void testPreviousCampaignFloorMigration()
     expect(persistence::saveCampaignCheckpoint(path, expected),
         "current checkpoint can supply the prior-floor migration fixture");
     std::string oldFile = readText(path);
-    const auto version = oldFile.find("rules_version = 41");
+    const auto version = oldFile.find("rules_version = 42");
     expect(version != std::string::npos, "fixture has the current rules marker");
     if (version == std::string::npos) return;
-    for (const auto priorRules : {37U, 38U, 39U, 40U}) {
+    for (const auto priorRules : {37U, 38U, 39U, 40U, 41U}) {
         std::string priorFile = oldFile;
-        priorFile.replace(version, std::string{"rules_version = 41"}.size(),
+        priorFile.replace(0U, std::string{"version = 8"}.size(), "version = 7");
+        priorFile.replace(priorFile.find("rules_version = 42"), std::string{"rules_version = 42"}.size(),
             "rules_version = " + std::to_string(priorRules));
         writeText(path, priorFile);
         const auto migrated = persistence::loadCampaignCheckpoint(path);
@@ -544,14 +545,57 @@ void testPreviousCampaignFloorMigration()
         expect(migrated.checkpoint
                 && persistence::saveCampaignCheckpoint(path, *migrated.checkpoint)
                 && !persistence::loadCampaignCheckpoint(path).migratedRules,
-            "saving a resumed floor upgrades only the rules marker to 41");
+            "saving a resumed floor upgrades the rules marker and grenade schema");
     }
+}
+
+void testGrenadeInventoryCheckpointMigration()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const auto path = directory.path() / "grenade-inventory.toml";
+    auto checkpoint = makeCheckpoint();
+    checkpoint.floorEntry.player.grenades = 1U;
+    expect(persistence::saveCampaignCheckpoint(path, checkpoint)
+            && persistence::loadCampaignCheckpoint(path).checkpoint == checkpoint,
+        "current checkpoint preserves consumed grenade inventory");
+    std::string invalid = readText(path);
+    const auto count = invalid.find("player_grenades = 1");
+    expect(count != std::string::npos, "checkpoint writes explicit grenade count");
+    if (count != std::string::npos) {
+        invalid.replace(count, std::string{"player_grenades = 1"}.size(),
+            "player_grenades = 3");
+        writeText(path, invalid);
+        expect(persistence::loadCampaignCheckpoint(path).status
+                == persistence::CampaignCheckpointLoadStatus::Invalid,
+            "checkpoint rejects impossible grenade stock");
+    }
+    auto legacy = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, legacy),
+        "previous schema migration fixture can be saved");
+    std::string prior = readText(path);
+    prior.replace(0U, std::string{"version = 8"}.size(), "version = 7");
+    const auto rules = prior.find("rules_version = 42");
+    const auto grenades = prior.find("player_grenades = 2\n");
+    expect(rules != std::string::npos && grenades != std::string::npos,
+        "previous schema fixture has expected version and inventory markers");
+    if (rules == std::string::npos || grenades == std::string::npos) return;
+    prior.replace(rules, std::string{"rules_version = 42"}.size(),
+        "rules_version = 41");
+    prior.erase(prior.find("player_grenades = 2\n"),
+        std::string{"player_grenades = 2\n"}.size());
+    writeText(path, prior);
+    const auto migrated = persistence::loadCampaignCheckpoint(path);
+    expect(migrated.migratedRules && migrated.checkpoint == legacy
+            && readText(path) == prior,
+        "schema seven migration defaults to two grenades without rewriting old save");
 }
 
 } // namespace
 
 int main()
 {
+    testGrenadeInventoryCheckpointMigration();
     testMissingRoundTripReplacementAndRemoval();
     testFailedReplacementPreservesExistingCheckpoint();
     testMalformedDecimalFields();

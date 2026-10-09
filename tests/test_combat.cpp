@@ -3,6 +3,7 @@
 #include "gameplay/Combat.hpp"
 #include "gameplay/Enemy.hpp"
 #include "gameplay/Player.hpp"
+#include "gameplay/PlayerGrenade.hpp"
 #include "gameplay/Weapon.hpp"
 
 #include <algorithm>
@@ -116,6 +117,95 @@ void testEnemyDifficultyConfigs()
         "non-finite threat falls back to neutral tuning");
 }
 
+void testChargedGrenadeThrow()
+{
+    using namespace gdp::gameplay;
+    const CollisionWorld room{{{-100.0F, 0.0F, -100.0F}, {100.0F, 8.0F, 100.0F}}};
+    expect(near(grenadeThrowSpeed(0.0F), 8.0F)
+            && near(grenadeThrowSpeed(grenadeMaximumChargeSeconds), 24.0F)
+            && near(grenadeThrowSpeed(30.0F), 24.0F),
+        "grenade charge increases throw speed and caps at maximum charge");
+    PlayerGrenadeSystem shortThrow;
+    PlayerGrenadeSystem longThrow;
+    expect(shortThrow.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+               0.0F, 1U, room)
+            && longThrow.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                grenadeMaximumChargeSeconds, 1U, room),
+        "short and charged throws both spawn a physical grenade");
+    for (int frame = 0; frame < 25; ++frame) {
+        (void)shortThrow.update(0.02F);
+        (void)longThrow.update(0.02F);
+    }
+    expect(shortThrow.grenades().size() == 1U && longThrow.grenades().size() == 1U
+            && longThrow.grenades().front().position.z
+                > shortThrow.grenades().front().position.z + 5.0F,
+        "holding fire sends the grenade materially farther before detonation");
+    std::size_t detonations = 0U;
+    for (int frame = 0; frame < 100; ++frame)
+        detonations += longThrow.update(0.02F).size();
+    expect(detonations == 1U && longThrow.grenades().empty(),
+        "fuse detonates exactly once and removes the spent grenade");
+    Player player;
+    expect(player.state().grenades == 2U && player.useGrenade()
+            && player.useGrenade() && !player.useGrenade()
+            && player.state().grenades == 0U,
+        "player starts with two frags and cannot throw a third");
+}
+
+void testQuickMeleeKeepsEquippedFirearm()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    EntityManager manager;
+    const EntityId enemy = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, -1.4F}},
+        .roomId = 1U, .health = 60.0F});
+    Weapon pistol(baseWeaponDefinition(WeaponArchetype::Pistol));
+    const auto ammo = pistol.magazineAmmo();
+    const ShotResult stab = fireQuickMelee(pistol, {0.0F, 1.0F, 0.0F},
+        {0.0F, 0.0F, -1.0F}, 1U, room, manager);
+    expect(stab.outcome == ShotOutcome::Hit && stab.hit
+            && stab.hit->target == enemy
+            && pistol.definition().archetype == WeaponArchetype::Pistol
+            && pistol.magazineAmmo() == ammo,
+        "quick melee strikes without selecting knife or consuming firearm ammo");
+    expect(fireQuickMelee(pistol, {0.0F, 1.0F, 0.0F},
+               {0.0F, 0.0F, -1.0F}, 1U, room, manager).outcome
+            == ShotOutcome::Cooldown,
+        "quick melee obeys knife attack cooldown");
+}
+
+void testGrenadeBlastRespectsCover()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld open{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const CollisionWorld blocked{open.roomBounds(),
+        {{{-5.0F, 0.0F, 0.5F}, {5.0F, 4.0F, 0.7F}}}};
+    EntityManager exposed;
+    EntityManager protectedEnemy;
+    const EntityId target = exposed.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.2F}},
+        .roomId = 1U, .health = 100.0F});
+    const EntityId covered = protectedEnemy.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.2F}},
+        .roomId = 1U, .health = 100.0F});
+    Player safePlayer;
+    safePlayer.spawn({0.0F, 0.0F, -4.0F});
+    const auto exposedResult = resolveGrenadeBlast(
+        {{0.0F, 0.25F, 0.0F}, 1U, open, {}}, safePlayer, exposed);
+    const auto blockedResult = resolveGrenadeBlast(
+        {{0.0F, 0.25F, 0.0F}, 1U, blocked, {}}, safePlayer,
+        protectedEnemy);
+    expect(!exposedResult.hits.empty()
+            && exposed.findData<EnemyData>(target)->health < 100.0F,
+        "uncovered enemy inside blast radius takes grenade damage");
+    expect(blockedResult.hits.empty()
+            && near(protectedEnemy.findData<EnemyData>(covered)->health, 100.0F),
+        "solid cover protects an enemy from a grenade blast");
+}
+
 void testWeaponLifecycle()
 {
     using namespace gdp::gameplay;
@@ -223,6 +313,37 @@ void testDiscardedMagazineReloads()
     upgraded.fixedUpdate(1.0F);
     expect(upgraded.reserveCapacity() == 28U && upgraded.campaignProgress().stowed->definition.reserveMaximum == 5U,
         "one extra magazine upgrade becomes four shells, not four magazines");
+}
+
+void testEmptyTriggerStartsReloadOnlyWhenRequested()
+{
+    using namespace gdp::gameplay;
+    for (const auto type : {WeaponArchetype::Pistol, WeaponArchetype::Carbine,
+             WeaponArchetype::SubmachineGun, WeaponArchetype::Sniper,
+             WeaponArchetype::Shotgun}) {
+        Weapon gun(baseWeaponDefinition(type));
+        auto progress = gun.campaignProgress();
+        progress.magazineAmmo = 1U;
+        expect(gun.restoreCampaignProgress(progress),
+            "single-round auto-reload fixture restores firearm state");
+        expect(gun.tryFire() == FireReadiness::Fired && !gun.reloading()
+                && gun.magazineAmmo() == 0U,
+            "firing the last round does not start an automatic reload");
+        expect(gun.tryFire() == FireReadiness::Reloading && gun.reloading(),
+            "pressing fire on an empty firearm starts its normal reload");
+        const auto reserveBefore = gun.reserveAmmo();
+        gun.fixedUpdate(weaponReloadDurationSeconds(type) + 1.0F);
+        expect(!gun.reloading() && gun.magazineAmmo() > 0U
+                && gun.reserveAmmo() < reserveBefore,
+            "triggered reload uses the existing magazine or shell accounting");
+    }
+    Weapon dry(baseWeaponDefinition(WeaponArchetype::Pistol));
+    auto progress = dry.campaignProgress();
+    progress.magazineAmmo = 0U;
+    progress.reserveAmmo = 0U;
+    expect(dry.restoreCampaignProgress(progress)
+            && dry.tryFire() == FireReadiness::Empty && !dry.reloading(),
+        "an empty firearm without reserves stays dry instead of creating ammunition");
 }
 
 void testPerShellShotgunReload()
@@ -3307,11 +3428,15 @@ void testShotgunPelletsAndOcclusion()
 int main()
 {
     testCombatSignalBatch();
+    testChargedGrenadeThrow();
+    testGrenadeBlastRespectsCover();
+    testQuickMeleeKeepsEquippedFirearm();
     testExpandedWeaponProfilesAndInventory();
     testShotgunPelletsAndOcclusion();
     testEnemyDifficultyConfigs();
     testWeaponLifecycle();
     testDiscardedMagazineReloads();
+    testEmptyTriggerStartsReloadOnlyWhenRequested();
     testPerShellShotgunReload();
     testDeterministicWeaponSpread();
     testWeaponCameraRecoil();

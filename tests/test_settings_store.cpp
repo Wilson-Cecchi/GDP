@@ -114,7 +114,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 11\n"
+        "version = 12\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -155,7 +155,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 11\n"
+        "version = 12\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -191,9 +191,10 @@ void testRecoveryAndForwardCompatibility()
         B::East, B::South, B::RightTrigger, B::LeftTrigger, B::West,
         B::North, B::RightStick, B::DpadLeft, B::DpadUp, B::DpadRight,
         B::DpadDown, B::Count, B::Count, B::Count, B::Back,
-        B::RightShoulder, B::LeftShoulder};
-    const auto legacySettings = [](const gdp::gameplay::GamepadBindings& bindings) {
-        std::string text{"version = 10\n"};
+        B::RightShoulder, B::LeftShoulder, B::Count};
+    const auto legacySettings = [](const gdp::gameplay::GamepadBindings& bindings,
+        const unsigned int version = 10U) {
+        std::string text{"version = " + std::to_string(version) + "\n"};
         for (std::size_t index = 0; index < bindings.values.size(); ++index) {
             text += "gamepad_binding_" + std::to_string(index) + " = "
                 + std::string{gdp::gameplay::gamepadBindingName(bindings.values[index])} + "\n";
@@ -214,7 +215,31 @@ void testRecoveryAndForwardCompatibility()
             && preservedPreset.settings.gamepadControls == oldPreset,
         "custom v10 controller bindings remain unchanged during migration");
 
-    writeText(path, "version = 11\ngamepad_binding_7 = X / SQUARE\n"
+    gdp::gameplay::GamepadBindings v11Preset;
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::Melee)]
+        = B::RightStick;
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::Equipment)]
+        = B::Count;
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::NextWeapon)]
+        = B::RightShoulder;
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::QuickMelee)]
+        = B::Count;
+    writeText(path, legacySettings(v11Preset, 11U));
+    const auto v11Upgraded = loadRuntimeSettings(path);
+    expect(v11Upgraded.status == SettingsLoadStatus::Migrated
+            && v11Upgraded.settings.gamepadControls == gdp::gameplay::GamepadBindings{},
+        "untouched v11 controller layout gains R3 stab and R1 grenade");
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::Fire)]
+        = B::West;
+    v11Preset.values[static_cast<std::size_t>(gdp::gameplay::ControlAction::Reload)]
+        = B::RightTrigger;
+    writeText(path, legacySettings(v11Preset, 11U));
+    const auto v11Custom = loadRuntimeSettings(path);
+    expect(v11Custom.status == SettingsLoadStatus::Migrated
+            && v11Custom.settings.gamepadControls == v11Preset,
+        "custom v11 remaps survive without hijacking R3 or R1");
+
+    writeText(path, "version = 12\ngamepad_binding_7 = X / SQUARE\n"
         "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
     const auto brokenGamepad = loadRuntimeSettings(path);
     expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery

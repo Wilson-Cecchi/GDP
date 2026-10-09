@@ -323,7 +323,9 @@ CombatSignalBatch combatSignalsForShot(const ShotResult& shot) noexcept
 }
 
 static ShotContact traceHitscan(
-    const Weapon& weapon,
+    const float range,
+    const float baseDamage,
+    const WeaponArchetype archetype,
     const wkc::core::Vec3 origin,
     wkc::core::Vec3 direction,
     const std::uint32_t roomId,
@@ -332,7 +334,6 @@ static ShotContact traceHitscan(
     const std::span<const std::uint32_t> additionalRoomIds) noexcept
 {
     direction = wkc::core::normalized(direction);
-    const float range = weapon.definition().range;
     if (wkc::core::length(direction) <= 1.0e-7F || range <= 0.0F) {
         return {ShotOutcome::Miss, std::nullopt, {}, std::nullopt};
     }
@@ -418,8 +419,8 @@ static ShotContact traceHitscan(
             direction * -1.0F,
             material,
         };
-        const float damageAmount = weapon.damage()
-            * (weapon.definition().archetype == WeaponArchetype::Shotgun
+        const float damageAmount = baseDamage
+            * (archetype == WeaponArchetype::Shotgun
                 ? std::clamp(1.0F - nearestHit->distance / 20.0F, 0.25F, 1.0F) : 1.0F);
         if (targetIsProp) {
             const PropDamageResult damage
@@ -479,7 +480,9 @@ ShotResult fireHitscan(
         const auto ray = applyDeterministicWeaponSpread(direction,
             weapon.definition().archetype, index, spreadScale,
             movementInaccuracyDegrees);
-        contacts[i] = traceHitscan(weapon, origin, ray, roomId, collisionWorld, manager, additionalRoomIds);
+        contacts[i] = traceHitscan(weapon.definition().range, weapon.damage(),
+            weapon.definition().archetype, origin, ray, roomId, collisionWorld,
+            manager, additionalRoomIds);
         // Keep the most significant contact in the legacy summary fields.
         if (contacts[i].outcome > contacts[representative].outcome) representative = i;
     }
@@ -488,6 +491,25 @@ ShotResult fireHitscan(
     for (std::uint8_t i = 0U; i < count; ++i) if (i != representative)
         result.extraContacts[result.extraContactCount++] = contacts[i];
     return result;
+}
+
+ShotResult fireQuickMelee(
+    Weapon& weapon, const wkc::core::Vec3 origin, const wkc::core::Vec3 direction,
+    const std::uint32_t roomId, const CollisionWorld& collisionWorld,
+    gdp::entities::EntityManager& manager,
+    const std::span<const std::uint32_t> additionalRoomIds) noexcept
+{
+    const auto readiness = weapon.tryQuickMelee();
+    if (readiness != FireReadiness::Fired) {
+        const auto outcome = readiness == FireReadiness::Cooldown ? ShotOutcome::Cooldown
+            : readiness == FireReadiness::Reloading ? ShotOutcome::Reloading
+            : ShotOutcome::Switching;
+        return {outcome, std::nullopt, {}, std::nullopt};
+    }
+    const ShotContact contact = traceHitscan(weapon.knifeRange(), weapon.knifeDamage(),
+        WeaponArchetype::Knife, origin, direction, roomId, collisionWorld,
+        manager, additionalRoomIds);
+    return {contact.outcome, contact.hit, contact.spawnedItem, contact.impact};
 }
 
 bool hasLineOfSight(

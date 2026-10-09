@@ -132,6 +132,17 @@ void updateEnemyHitReactions(
     std::span<const std::uint32_t> additionalRoomIds = {},
     float movementInaccuracyDegrees = 0.0F) noexcept;
 
+// A knife strike independent of the selected firearm; shares knife cooldown
+// and upgrades with the equipped knife but never consumes firearm ammo.
+[[nodiscard]] ShotResult fireQuickMelee(
+    Weapon& weapon,
+    wkc::core::Vec3 origin,
+    wkc::core::Vec3 direction,
+    std::uint32_t roomId,
+    const CollisionWorld& collisionWorld,
+    gdp::entities::EntityManager& manager,
+    std::span<const std::uint32_t> additionalRoomIds = {}) noexcept;
+
 [[nodiscard]] bool hasLineOfSight(
     wkc::core::Vec3 origin,
     wkc::core::Vec3 target,
