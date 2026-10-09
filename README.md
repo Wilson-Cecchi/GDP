@@ -19,6 +19,10 @@ Consulte os guias de [Windows](README_WINDOWS.md), [Linux](README_LINUX.md) e
 O código, os testes e a documentação ficam neste repositório. Publicar o
 repositório não publica automaticamente um novo jogo: uma versão para download
 é preparada e aprovada separadamente, conforme [o processo de release](README_RELEASES.md).
+`tools/zimaos/` contém apenas o código e as receitas opcionais do treinamento
+de IA. Dados do servidor, checkpoints, logs, artefatos de build e credenciais
+não fazem parte do código-fonte e não devem ser versionados.
+
 Para compilar localmente no Linux com os pré-requisitos de desenvolvimento
 instalados:
 

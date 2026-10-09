@@ -16,3 +16,8 @@ __pycache__/
 *.key
 *.p12
 *.pfx
+
+# Local ZimaOS Compose mounts and Docker build inputs are never source files.
+/tools/zimaos/data/
+/tools/zimaos/compiled/
+/tools/zimaos/source/
