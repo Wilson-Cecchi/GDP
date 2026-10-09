@@ -67,6 +67,9 @@ public:
     void setInvertMouseY(bool inverted) noexcept;
     void applyLook(wkc::core::Vec2 mouseDelta) noexcept;
     void applyGamepadLook(wkc::core::Vec2 degrees, bool invertY) noexcept;
+    // Input-independent camera kick, so mouse sensitivity and Y inversion do
+    // not change the physical recoil of a weapon.
+    void applyRecoil(wkc::core::Vec2 degrees) noexcept;
     void fixedUpdate(
         const PlayerCommand& command,
         float fixedStepSeconds,

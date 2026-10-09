@@ -155,6 +155,13 @@ void Player::applyGamepadLook(const wkc::core::Vec2 degrees, const bool invertY)
         -89.0F, 89.0F);
 }
 
+void Player::applyRecoil(const wkc::core::Vec2 degrees) noexcept
+{
+    if (!state_.alive || !std::isfinite(degrees.x) || !std::isfinite(degrees.y)) return;
+    state_.yawDegrees = std::remainder(state_.yawDegrees + degrees.x, 360.0F);
+    state_.pitchDegrees = std::clamp(state_.pitchDegrees + degrees.y, -89.0F, 89.0F);
+}
+
 void Player::fixedUpdate(
     const PlayerCommand& command,
     const float fixedStepSeconds,

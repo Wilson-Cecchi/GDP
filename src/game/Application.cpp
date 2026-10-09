@@ -2599,6 +2599,13 @@ void Application::fixedUpdate(const double fixedStep)
                     player_.forwardDirection());
             }
         }
+        // The hitscan above uses the pre-kick aim. Only a successfully fired
+        // round moves the camera, so the next shot requires counter-steering.
+        if (!meleeAttack && signals.count > 0U) {
+            player_.applyRecoil(gameplay::weaponRecoilKickDegrees(
+                weapon_.definition().archetype, weapon_.spreadShotIndex(),
+                aimBlend_, player_.state().crouching));
+        }
         if (audio_ && shot.outcome == gameplay::ShotOutcome::Empty) {
             audio_->playAt(gdp::audio::AudioEventKind::DryFire,
                 config_.worldSeed, audioEventCounter_++,

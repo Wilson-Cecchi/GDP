@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/Math.hpp"
+
 #include <cstdint>
 #include <optional>
 
@@ -160,6 +162,10 @@ inline constexpr float shotgunReadySeconds = 0.30F;
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] WeaponSpreadProfile weaponSpreadProfile(
     WeaponArchetype archetype) noexcept;
+// Camera kick after an accepted shot. X is yaw; positive Y raises the aim.
+[[nodiscard]] wkc::core::Vec2 weaponRecoilKickDegrees(
+    WeaponArchetype archetype, std::uint32_t shotIndex,
+    float aimBlend = 0.0F, bool crouching = false) noexcept;
 [[nodiscard]] float weaponReloadDurationSeconds(
     WeaponArchetype archetype) noexcept;
 [[nodiscard]] float weaponSwitchDurationSeconds(

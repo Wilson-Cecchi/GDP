@@ -62,6 +62,10 @@ especializados das pastas numeradas.
   `1` seleciona a primária possuída; use `G` para largá-la e pegar outra.
   Sniper, escopeta e SMG têm modelos próprios metálicos Used v1, na mão e no
   chão, implementados após aprovação das pranchas e aguardando aceitação no jogo.
+  Disparos agora deslocam a mira com recuo vertical e padrão horizontal próprio
+  por arma; o jogador pode compensar com mouse ou controle. A sequência reinicia
+  após uma pausa, sem recentralização automática da câmera.
+  [Contrato e teste](04_gameplay/weapon_recoil_2026-10-08.md).
   A sniper ganhou luneta Used v2 e visão circular com retículo ao segurar
   a ação Mira (`Mouse2` por padrão, remapeável). O zoom e o balanceamento
   permanecem iguais; recarga, troca, drop e menu retiram a visão de mira.

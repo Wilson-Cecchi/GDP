@@ -474,6 +474,26 @@ void testLookAndCamera()
                 regularVertical.state().pitchDegrees,
                 -invertedVertical.state().pitchDegrees),
         "invert Y reverses only the vertical look direction");
+
+    Player recoilNormal;
+    Player recoilInverted;
+    recoilInverted.setInvertMouseY(true);
+    recoilInverted.setMouseSensitivity(0.24F);
+    const auto initialDirection = recoilNormal.forwardDirection();
+    recoilNormal.applyRecoil({0.5F, 1.0F});
+    recoilInverted.applyRecoil({0.5F, 1.0F});
+    expect(recoilNormal.state().pitchDegrees > 0.0F
+            && recoilNormal.state().yawDegrees > -90.0F
+            && recoilNormal.forwardDirection() != initialDirection,
+        "recoil moves the actual camera aim up and sideways");
+    expect(wkc::core::nearlyEqual(recoilNormal.state().yawDegrees,
+                recoilInverted.state().yawDegrees)
+            && wkc::core::nearlyEqual(recoilNormal.state().pitchDegrees,
+                recoilInverted.state().pitchDegrees),
+        "recoil is independent of sensitivity and inverted look controls");
+    recoilNormal.applyLook({0.0F, 10.0F});
+    expect(recoilNormal.state().pitchDegrees < recoilInverted.state().pitchDegrees,
+        "player look can immediately counter-steer the camera kick");
 }
 
 void testInteractionAndLife()

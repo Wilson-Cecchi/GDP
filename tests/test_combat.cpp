@@ -387,6 +387,47 @@ void testDeterministicWeaponSpread()
         "hitscan reports weapon entry without fabricating impact or ammo use");
 }
 
+void testWeaponCameraRecoil()
+{
+    using namespace gdp::gameplay;
+
+    expect(weaponRecoilKickDegrees(WeaponArchetype::Knife, 0U)
+            == wkc::core::Vec2{},
+        "knife never kicks the camera");
+    const auto first = weaponRecoilKickDegrees(WeaponArchetype::Carbine, 0U);
+    const auto second = weaponRecoilKickDegrees(WeaponArchetype::Carbine, 1U);
+    const auto aimed = weaponRecoilKickDegrees(WeaponArchetype::Carbine, 1U, 1.0F);
+    const auto crouched = weaponRecoilKickDegrees(WeaponArchetype::Carbine, 1U, 0.0F, true);
+    expect(near(first.x, 0.0F) && first.y > 0.0F
+            && second.x > 0.0F && second.y > 0.0F,
+        "accepted carbine shots climb and later shots shift horizontally");
+    expect(second == weaponRecoilKickDegrees(WeaponArchetype::Carbine, 1U)
+            && weaponRecoilKickDegrees(WeaponArchetype::Carbine, 5U).x < 0.0F,
+        "spray is repeatable and changes horizontal direction");
+    expect(aimed.y < second.y && crouched.y < second.y,
+        "aiming and crouching reduce but do not erase recoil");
+    expect(weaponRecoilKickDegrees(WeaponArchetype::Sniper, 0U).y > first.y
+            && weaponRecoilKickDegrees(WeaponArchetype::Shotgun, 0U).y > first.y
+            && weaponRecoilKickDegrees(WeaponArchetype::SubmachineGun, 0U).y < first.y,
+        "each firearm has a distinct camera kick");
+
+    Weapon gun(baseWeaponDefinition(WeaponArchetype::Carbine));
+    expect(gun.tryFire() == FireReadiness::Fired
+            && gun.spreadShotIndex() == 0U,
+        "the first accepted shot selects the first recoil step");
+    expect(gun.tryFire() == FireReadiness::Cooldown
+            && gun.spreadShotIndex() == 0U,
+        "a rejected shot cannot advance the recoil sequence");
+    gun.fixedUpdate(gun.definition().fireInterval);
+    expect(gun.tryFire() == FireReadiness::Fired
+            && gun.spreadShotIndex() == 1U,
+        "the next accepted shot advances the recoil sequence");
+    gun.fixedUpdate(weaponSpreadProfile(WeaponArchetype::Carbine).recoverySeconds);
+    expect(gun.tryFire() == FireReadiness::Fired
+            && gun.spreadShotIndex() == 0U,
+        "a firing pause resets the recoil pattern");
+}
+
 void testWeaponPickupEquipment()
 {
     using namespace gdp::gameplay;
@@ -3184,6 +3225,7 @@ int main()
     testDiscardedMagazineReloads();
     testPerShellShotgunReload();
     testDeterministicWeaponSpread();
+    testWeaponCameraRecoil();
     testWeaponPickupEquipment();
     testKnifeFallback();
     testDirectionalAndLastWeaponSelection();

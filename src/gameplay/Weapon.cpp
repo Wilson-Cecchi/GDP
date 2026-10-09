@@ -140,6 +140,33 @@ WeaponSpreadProfile weaponSpreadProfile(
         : WeaponSpreadProfile{};
 }
 
+wkc::core::Vec2 weaponRecoilKickDegrees(
+    const WeaponArchetype archetype, const std::uint32_t shotIndex,
+    const float aimBlend, const bool crouching) noexcept
+{
+    if (!isFirearmArchetype(archetype)) return {};
+
+    // A repeatable side-to-side spray: the weapon climbs on every shot, while
+    // horizontal corrections alternate during a sustained burst.
+    constexpr std::array<float, 12> horizontalPattern{
+        0.0F, 0.22F, 0.35F, 0.25F, -0.10F, -0.35F,
+        -0.42F, -0.20F, 0.20F, 0.45F, 0.35F, -0.15F};
+    float vertical = 0.76F;
+    float horizontal = 0.22F;
+    switch (archetype) {
+    case WeaponArchetype::Carbine: vertical = 0.61F; horizontal = 0.48F; break;
+    case WeaponArchetype::SubmachineGun: vertical = 0.45F; horizontal = 0.36F; break;
+    case WeaponArchetype::Shotgun: vertical = 1.85F; horizontal = 0.42F; break;
+    case WeaponArchetype::Sniper: vertical = 2.10F; horizontal = 0.34F; break;
+    default: break;
+    }
+    const float safeAim = std::isfinite(aimBlend)
+        ? std::clamp(aimBlend, 0.0F, 1.0F) : 0.0F;
+    const float scale = (1.0F - 0.24F * safeAim) * (crouching ? 0.85F : 1.0F);
+    return {horizontal * horizontalPattern[shotIndex % horizontalPattern.size()] * scale,
+        vertical * scale};
+}
+
 float weaponReloadDurationSeconds(
     const WeaponArchetype archetype) noexcept
 {
