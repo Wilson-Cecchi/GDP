@@ -996,6 +996,56 @@ void testCorridorRoofAndCornerWalls()
         "generated corridors exercise local roof and bent wall collision");
 }
 
+void testGeneratedCorridorSideWalls()
+{
+    using namespace gdp;
+    constexpr gameplay::CharacterCollider collider{0.3F, 1.8F};
+    std::size_t checkedSides = 0U;
+    for (wkc::core::Seed seed = 1U; seed <= 48U; ++seed) {
+        const auto generated = world::generateWorld(seed);
+        if (!generated.world) continue;
+        for (const world::CorridorPath& corridor : generated.world->corridors) {
+            const auto navigation = gameplay::makeRoomNavigationCollision(
+                *generated.world, corridor.firstRoom);
+            for (std::size_t index = 0U; index + 1U < corridor.points.size(); ++index) {
+                const auto first = corridor.points[index];
+                const auto second = corridor.points[index + 1U];
+                if (wkc::core::length(second - first) < 3.0F) continue;
+                const auto midpoint = (first + second) * 0.5F;
+                if (!navigation.canOccupy(midpoint, collider)) continue;
+                const auto forward = wkc::core::normalized(second - first);
+                const wkc::core::Vec3 lateral{-forward.z, 0.0F, forward.x};
+                for (const float sign : {-1.0F, 1.0F}) {
+                    const auto outside = midpoint + lateral *
+                        (sign * (corridor.width * 0.5F + collider.radius + 0.4F));
+                    const bool insideRoom = std::any_of(generated.world->rooms.begin(),
+                        generated.world->rooms.end(), [outside](const auto& room) {
+                            return room.worldBounds.contains(outside);
+                        });
+                    const bool nearOtherCorridor = std::any_of(
+                        generated.world->corridors.begin(), generated.world->corridors.end(),
+                        [&corridor, outside](const auto& other) {
+                            return other.edge != corridor.edge
+                                && gameplay::corridorProgressAt(other, outside).has_value();
+                        });
+                    if (insideRoom || nearOtherCorridor) continue;
+                    expect(!navigation.canOccupy(outside, collider),
+                        "isolated corridor side wall rejects an outside standing position");
+                    const auto motion = navigation.moveCharacter(
+                        midpoint, outside - midpoint, 1.0F, collider);
+                    expect(motion.collided && navigation.canOccupy(motion.position, collider)
+                            && wkc::core::length(motion.position - midpoint)
+                                <= corridor.width * 0.5F - collider.radius + 0.01F,
+                        "walking sideways into a corridor wall stops at the visible edge");
+                    ++checkedSides;
+                }
+            }
+        }
+    }
+    expect(checkedSides > 0U,
+        "generated maps include isolated side walls for collision regression testing");
+}
+
 void testDisconnectedWalkableVolumesCannotBeCrossedInOneStep()
 {
     using namespace gdp;
@@ -1034,6 +1084,7 @@ int main()
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
     testCampaignExitConsoleAccessAcrossSeeds();
     testCorridorRoofAndCornerWalls();
+    testGeneratedCorridorSideWalls();
     testDisconnectedWalkableVolumesCannotBeCrossedInOneStep();
 
     if (failures != 0) {

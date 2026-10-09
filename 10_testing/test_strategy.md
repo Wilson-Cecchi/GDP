@@ -1,5 +1,21 @@
 # Testing — Estratégia
 
+## Regressão sem playtest — 2026-10-09
+
+- `room_traversal_systems` percorre 48 seeds geradas e agora também tenta
+  atravessar lateralmente os dois lados de segmentos isolados de corredores.
+  Exige que a posição exterior seja rejeitada, que o movimento pare na parede
+  e que o personagem continue em área ocupável. Segmentos junto de salas ou
+  outros corredores são excluídos dessa asserção, pois podem ter passagem real.
+- Gate local desta revisão: `cmake --build build/release --target
+  gdp_room_traversal_tests -j 2` e `ctest --test-dir build/release
+  --output-on-failure -j 2`: 67/67 testes passaram. O gate específico de
+  travessia também passou no preset ASan/UBSan.
+- Até a revisão manual combinada para 11/10, este gate não equivale a aprovação
+  de sensação de movimento, aparência, balanceamento ou jogabilidade completa.
+  Mudanças dessas categorias continuam pendentes de playtest; nenhum cérebro de
+  IA é promovido com base apenas nesta suíte.
+
 ## Terminal da Campanha e ondas — revisão de 2026-10-02
 
 - `session_systems`: boss vivo bloqueia o terminal, interação antecipada não
