@@ -267,13 +267,17 @@ estado: IMPLEMENTADA EM VALIDAÇÃO; aceitação visual final pendente
 
 ```text
 unidade visual: Weapon/SMG
-versão: v1 — direção metálica Used ainda sem prancha
-contrato/prompts: visual/proposals/new_firearms_proposal_v1.md
-prancha: nenhuma; geração integrada rejeitada, sem fallback
-decisão do usuário: funcionalidade aprovada; visual pendente de prancha
-data: 2026-10-02
+versão: v1 — SMG compacta de aço metálico, variante Used recomendada
+contrato/prompt: visual/proposals/weapon_smg_proposal_v1.md
+prancha: visual/proposals/weapon_smg_proposal_v1.png
+SHA-256: 5c65ae82b20ec2f728440f96db3cb1f32f83e059c74671f8b75e0af4c409f1a0
+variantes: Maintained / Used / Worn
+vistas: perfil, close, primeira pessoa ilustrativa e arma no chão
+pedido do usuário: visual próprio para a SMG aprovado como objetivo
+decisão visual desta prancha: pendente
+data: 2026-10-08
 commit de implementação artística: nenhum
-estado: PROPOSTA EM PREPARAÇÃO
+estado: AGUARDANDO APROVAÇÃO
 ```
 
 Funcionalidade das três aprovada pelo usuário em 2026-10-02. Sniper e escopeta
@@ -282,8 +286,10 @@ metálicos existentes, sem alterar seus mapas ou as armas anteriores. As seis
 capturas vêm do renderer nativo em uma fixture offscreen, não de um playtest
 manual nem da prancha ilustrativa. FOV 60/100, contato com chão e visibilidade
 em MEDIUM/POTATO têm gates técnicos; aceitação visual final cabe ao usuário.
-Somente a SMG reutiliza temporariamente a carabina: não recebe aprovação
-artística sem artefato apresentado.
+Somente a SMG reutiliza temporariamente a carabina. A aprovação genérica do
+visual próprio não escolhe ainda a silhueta e o acabamento exatos da prancha;
+ela não será implementada antes da decisão explícita sobre esta v1. A imagem
+é referência conceitual, não textura pronta ou captura do renderer.
 
 ### Interface/menu — v4 (refinamento solicitado)
 

@@ -13,15 +13,17 @@ Nenhuma prancha é uma textura pronta ou substitui a aprovação de modelo.
   ilustrativa em primeira pessoa, com centro livre e empunhadura correta.
 - Sniper: [prancha v1](weapon_sniper_proposal_v1.png), IMPLEMENTADA EM VALIDAÇÃO.
 - Escopeta: [prancha v1](weapon_shotgun_proposal_v1.png), IMPLEMENTADA EM VALIDAÇÃO.
-- SMG: PROPOSTA EM PREPARAÇÃO. A ferramenta rejeitou a geração; nenhum
-  artefato foi obtido ou implementado. Não houve fallback CLI/API.
+- SMG: [prancha v1](weapon_smg_proposal_v1.png) gerada em 2026-10-08 e
+  AGUARDANDO APROVAÇÃO visual específica. A primeira tentativa de 2026-10-02
+  havia sido rejeitada pela ferramenta; não houve fallback CLI/API.
 - Aprovação do usuário em 2026-10-02: "aprovadas a parte visual e funcional".
   Abrange as duas pranchas v1 apresentadas, com direção Used, e as mecânicas
-  das três armas; não abrange uma futura prancha de SMG ainda inexistente.
+  das três armas; não abrange a prancha de SMG criada depois.
   Dimensões/viewmodel/FOV/drops devem
   ser validados em capturas reais após implementação aprovada.
 - No runtime, sniper e escopeta usam geometrias próprias, compartilhadas entre
-  viewmodel e pickup caído. Somente a SMG mantém a carabina provisória.
+  viewmodel e pickup caído. Somente a SMG mantém a carabina provisória até
+  aprovação e implementação de sua prancha própria.
   As pranchas ilustrativas não são carregadas pelo renderer nem pelo pacote Windows.
 
 ## Implementação nativa Used v1 — em validação
@@ -78,7 +80,7 @@ Text title exactly: "ESCOPETA".
 Subject: Custom realistic pump-action shotgun, tubular magazine under barrel, clear sliding fore-end pump, six-shell capacity concept, sturdy receiver, simple iron sights, conventional stock with pistol grip, no scope, no rifle box magazine. Clean believable working weapon silhouette, realistic proportions, no extreme accessories.
 ```
 
-### SMG — tentativa sem artefato
+### SMG — prompt histórico da tentativa sem artefato
 
 ```text
 Text title exactly: "SUBMETRALHADORA".
