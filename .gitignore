@@ -7,3 +7,12 @@ __pycache__/
 
 *.log
 *.core
+
+# Local release credentials must never enter source history.
+.env
+.env.*
+*.pem
+!packaging/linux/release-signing-public.pem
+*.key
+*.p12
+*.pfx

@@ -1,7 +1,7 @@
 # Publicação do Iron Seed
 
-O código continua no repositório privado `Wilson-Cecchi/GDP`. Os quatro pacotes
-de jogo são publicados como assets de uma versão no repositório público
+O código-fonte está em `Wilson-Cecchi/GDP`. Os quatro pacotes de jogo são
+publicados separadamente como assets de uma versão no repositório público
 [`Wilson-Cecchi/Iron-Seed-Downloads`](https://github.com/Wilson-Cecchi/Iron-Seed-Downloads).
 O portfólio pode continuar usando links `releases/latest/download` com nomes
 estáveis. O workflow não publica a cada commit: os runners de macOS só são
@@ -29,11 +29,19 @@ precisam de playtest antes de entrar em um pacote público.
 
 ## Preparação única
 
-Configure no repositório privado o secret de Actions
+Configure no repositório do código-fonte o secret de Actions
 `IRON_SEED_DOWNLOADS_TOKEN`. Use um token fine-grained ou um token de GitHub App
 com permissão `Contents: Read and write` **apenas** no repositório público
 `Iron-Seed-Downloads`. Não envie o valor do token no chat, no código ou em logs.
 O `GITHUB_TOKEN` padrão do repositório privado não publica em outro repositório.
+Configure também `IRON_SEED_RELEASE_SIGNING_KEY` como secret de Actions no
+repositório do código-fonte. O valor é o PEM da chave privada correspondente a
+`packaging/linux/release-signing-public.pem`; **nunca** adicione a chave privada
+ao Git, ao repositório público de downloads ou aos pacotes. Mantenha backup
+seguro e acesso separado do token de downloads. O workflow falha antes de
+publicar se o secret estiver ausente ou não corresponder à chave pública.
+Antes de tornar o código público, confirme que a chave privada permanece fora
+do Git e instale o secret de Actions sem imprimir seu conteúdo em logs ou chat.
 
 ## Versão aprovada
 
@@ -58,9 +66,11 @@ O `GITHUB_TOKEN` padrão do repositório privado não publica em outro repositó
 
 Cada release contém `IronSeed-Windows-x64.zip`,
 `IronSeed-Linux-x64.tar.gz`, `IronSeed-macOS-Intel.zip`,
-`IronSeed-macOS-AppleSilicon.zip` e `update.json`. Este manifesto registra a
-versão, o SHA da fonte privada, o tamanho, o SHA-256 e a URL imutável de cada
+`IronSeed-macOS-AppleSilicon.zip`, `update.json` e `update.json.sig`. O manifesto registra a
+versão, o SHA do código-fonte, o tamanho, o SHA-256 e a URL versionada de cada
 pacote. O executável responde a `--version` com a mesma versão da tag.
+Os quatro builds de distribuição usam `GDP_ENABLE_TEST_MODE=OFF`; a arena de
+desenvolvimento permanece disponível nos builds locais de teste.
 
 O manifesto dá suporte ao iniciador Linux incluído nos pacotes posteriores à
 versão 0.1.2. Ele consulta atualizações **antes** da partida e exige confirmação
@@ -69,7 +79,12 @@ novas versões são guardadas em pastas separadas, sem tocar nos saves. As vers�
 0.1.2 e anteriores não recebem essa função retroativamente. O atualizador
 Windows/macOS ainda será implementado e testado. Antes de distribuir macOS sem
 avisos do Gatekeeper, ainda faltam assinatura Developer ID e notarização.
-O iniciador Linux valida o SHA-256 do pacote anunciado pelo manifesto obtido
-via HTTPS, mas o manifesto ainda não possui uma assinatura independente do
-GitHub; não trate essa verificação como proteção contra comprometimento da
-conta ou do repositório de downloads.
+O iniciador Linux verifica a assinatura RSA-PSS/SHA-256 do manifesto com a
+chave pública embutida no pacote **antes** de analisar a versão, baixar ou
+executar o novo pacote. Se a assinatura faltar, for inválida ou `openssl` não
+estiver disponível, ele não atualiza e abre a versão já instalada. O SHA-256
+do arquivo continua protegendo o download contra divergências. Uma chave de
+assinatura comprometida exige rotação e distribuição manual confiável; não
+publique uma nova chave apenas no repositório de downloads. Pacotes já
+distribuídos com atualizador sem assinatura também exigem atualização manual
+para receber essa proteção.

@@ -13,14 +13,19 @@ cd IronSeed-Linux-x64
 
 O iniciador consulta uma nova versão antes de abrir o jogo. Se houver uma,
 mostra uma confirmação; **não baixa nem instala nada sem aceitar**. Ele instala
-em `versions/`, valida tamanho, SHA-256 e inicialização, e só então seleciona a
-nova versão. A anterior permanece no disco para retorno; saves e configurações
-continuam fora da pasta do jogo. Esse recurso exige Python 3.10+ e acesso HTTPS;
+em `versions/`, verifica a assinatura do manifesto, tamanho, SHA-256 e
+inicialização, e só então seleciona a nova versão. A anterior permanece no
+disco para retorno; saves e configurações continuam fora da pasta do jogo.
+Esse recurso exige Python 3.10+, o comando `openssl` e acesso HTTPS;
 sem eles, o jogo abre normalmente na versão instalada. Uma execução com
 argumentos, como `./gdp --headless --frames 3`, ignora a consulta de atualização.
 Os pacotes anteriores a essa mudança não ganham o iniciador retroativamente.
+Pacotes com o atualizador antigo, que não verifica assinatura, precisam ser
+substituídos manualmente por um pacote confiável para receber esta proteção.
 Se precisar voltar à versão anterior depois de uma atualização, execute
 `./gdp --rollback-update` na pasta original; o comando não apaga nenhuma versão.
+Ao voltar a um pacote antigo sem verificação de assinatura, o mecanismo de
+atualização desse pacote continua sem a nova proteção.
 
 O pacote é gerado em Ubuntu 22.04 x64, portanto requer uma distribuição
 compatível com glibc 2.35 ou mais recente, além de driver com OpenGL 3.3 Core.

@@ -22,12 +22,14 @@ jobs:
     outputs:
       version: ${{ steps.validate.outputs.version }}
     steps:
+      - uses: actions/checkout@v7
       - name: Validate tag and tested source revision
         id: validate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           DOWNLOADS_TOKEN: ${{ secrets.IRON_SEED_DOWNLOADS_TOKEN }}
+          RELEASE_SIGNING_KEY: ${{ secrets.IRON_SEED_RELEASE_SIGNING_KEY }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" != push ]]; then
@@ -43,6 +45,19 @@ jobs:
             echo "Configure IRON_SEED_DOWNLOADS_TOKEN before tagging a release" >&2
             exit 1
           }
+          test -n "$RELEASE_SIGNING_KEY" || {
+            echo "Configure IRON_SEED_RELEASE_SIGNING_KEY before tagging a release" >&2
+            exit 1
+          }
+          umask 077
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key_file"
+          openssl pkey -in "$key_file" -pubout \
+            | cmp - packaging/linux/release-signing-public.pem || {
+              echo "Release signing key does not match the bundled public key" >&2
+              exit 1
+            }
           main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
           if [[ "$GITHUB_SHA" != "$main_sha" ]]; then
             echo "Release tag must point to the current main commit" >&2
@@ -68,7 +83,7 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ needs.release-gate.outputs.version }}'
-          cmake --preset windows-release "-DGDP_RELEASE_VERSION:STRING=$version"
+          cmake --preset windows-release "-DGDP_RELEASE_VERSION:STRING=$version" -DGDP_ENABLE_TEST_MODE=OFF
       - name: Build
         run: cmake --build --preset windows-release --parallel 2
       - name: Test portable systems
@@ -124,6 +139,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DGDP_BUILD_TESTS=OFF
           -DGDP_PORTABLE_PACKAGE=ON
+          -DGDP_ENABLE_TEST_MODE=OFF
           -DGDP_RELEASE_VERSION=${{ needs.release-gate.outputs.version }}
       - name: Build game
         run: cmake --build build/linux-package --target gdp --parallel 2
@@ -144,6 +160,7 @@ jobs:
           test -x "$package/bin/gdp"
           test -s "$package/version.txt"
           test -s "$package/updater.py"
+          test -s "$package/release-signing-public.pem"
           for type in worker guard officer engineer robot; do
             test -s "$package/bin/ai/$type.brain"
           done
@@ -184,6 +201,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DGDP_BUILD_TESTS=OFF
           -DGDP_PORTABLE_PACKAGE=ON
+          -DGDP_ENABLE_TEST_MODE=OFF
           -DGDP_RELEASE_VERSION=${{ needs.release-gate.outputs.version }}
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
           -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
@@ -230,7 +248,7 @@ jobs:
           pattern: IronSeed-*
           path: build/release-assets
           merge-multiple: true
-      - name: Verify assets and create immutable manifest
+      - name: Verify assets and create release manifest
         shell: bash
         run: |
           set -euo pipefail
@@ -239,6 +257,24 @@ jobs:
             --source-sha "$GITHUB_SHA" \
             --directory build/release-assets \
             --output build/update.json
+      - name: Sign manifest with the private release key
+        shell: bash
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.IRON_SEED_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SIGNING_KEY"
+          umask 077
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key_file"
+          openssl dgst -sha256 -sign "$key_file" \
+            -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:-1 \
+            -out build/update.json.sig build/update.json
+          openssl dgst -sha256 -verify packaging/linux/release-signing-public.pem \
+            -signature build/update.json.sig \
+            -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:-1 \
+            build/update.json
       - name: Publish release in the public downloads repository
         shell: bash
         env:
@@ -253,11 +289,11 @@ jobs:
           fi
           notes="Iron Seed ${tag#public-v} — Windows x64, Linux x64, macOS Intel e Apple Silicon.
 
-          Código-fonte privado: ${GITHUB_SHA}.
-          Confira os arquivos e hashes em update.json. Builds macOS ainda não são notarizados pela Apple."
-          gh release create "$tag" build/release-assets/* build/update.json \
+          Revisão do código-fonte: ${GITHUB_SHA}.
+          Confira os arquivos e hashes em update.json, assinado em update.json.sig. Builds macOS ainda não são notarizados pela Apple."
+          gh release create "$tag" build/release-assets/* build/update.json build/update.json.sig \
             --repo "$repo" --target main --title "Iron Seed ${tag#public-v}" \
             --notes "$notes" --draft
           test "$(gh release view "$tag" --repo "$repo" --json assets \
-            --jq '.assets | length')" = 5
+            --jq '.assets | length')" = 6
           gh release edit "$tag" --repo "$repo" --draft=false --latest

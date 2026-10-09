@@ -17,11 +17,15 @@ import urllib.request
 
 REPOSITORY = "Wilson-Cecchi/Iron-Seed-Downloads"
 MANIFEST_URL = f"https://github.com/{REPOSITORY}/releases/latest/download/update.json"
+SIGNATURE_URL = MANIFEST_URL + ".sig"
+PUBLIC_KEY = Path(__file__).with_name("release-signing-public.pem")
 ARCHIVE_NAME = "IronSeed-Linux-x64.tar.gz"
 PACKAGE_NAME = "IronSeed-Linux-x64"
 BRAINS = ("worker", "guard", "officer", "engineer", "robot")
 MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
 MAX_EXPANDED_BYTES = 1024 * 1024 * 1024
+MAX_MANIFEST_BYTES = 65536
+MAX_SIGNATURE_BYTES = 8192
 
 
 class UpdateError(Exception):
@@ -66,12 +70,36 @@ def parse_manifest(raw: bytes, current_version: str) -> dict | None:
             "sha256": asset["sha256"], "size": asset["size"]}
 
 
-def fetch_manifest(current_version: str) -> dict | None:
-    request = urllib.request.Request(MANIFEST_URL, headers={"User-Agent": "IronSeed-Linux-Updater"})
+def fetch_limited(url: str, limit: int) -> bytes:
+    request = urllib.request.Request(url, headers={"User-Agent": "IronSeed-Linux-Updater"})
     with urllib.request.urlopen(request, timeout=8) as response:
-        raw = response.read(65537)
-    if len(raw) > 65536:
-        raise UpdateError("release manifest is too large")
+        raw = response.read(limit + 1)
+    if not raw or len(raw) > limit:
+        raise UpdateError("release metadata is empty or too large")
+    return raw
+
+
+def verify_manifest_signature(raw: bytes, signature: bytes) -> None:
+    if not PUBLIC_KEY.is_file():
+        raise UpdateError("release verification key is missing")
+    with tempfile.TemporaryDirectory(prefix="iron-seed-signature-") as temporary:
+        manifest_path = Path(temporary) / "update.json"
+        signature_path = Path(temporary) / "update.json.sig"
+        manifest_path.write_bytes(raw)
+        signature_path.write_bytes(signature)
+        result = subprocess.run(
+            ["openssl", "dgst", "-sha256", "-verify", str(PUBLIC_KEY),
+             "-signature", str(signature_path), "-sigopt", "rsa_padding_mode:pss",
+             "-sigopt", "rsa_pss_saltlen:-1", str(manifest_path)],
+            capture_output=True, timeout=10, check=False)
+    if result.returncode != 0:
+        raise UpdateError("release manifest signature is invalid")
+
+
+def fetch_manifest(current_version: str) -> dict | None:
+    raw = fetch_limited(MANIFEST_URL, MAX_MANIFEST_BYTES)
+    signature = fetch_limited(SIGNATURE_URL, MAX_SIGNATURE_BYTES)
+    verify_manifest_signature(raw, signature)
     return parse_manifest(raw, current_version)
 
 
@@ -125,10 +153,11 @@ def extract_archive(archive_path: Path, destination: Path) -> Path:
     return destination / PACKAGE_NAME
 
 
-def verify_package(package: Path, version: str) -> None:
+def verify_package(package: Path, version: str, require_verification_key: bool = True) -> None:
     executable = package / "bin" / "gdp"
     if not executable.is_file() or not (package / "gdp").is_file() \
         or not (package / "updater.py").is_file() \
+        or (require_verification_key and not (package / "release-signing-public.pem").is_file()) \
         or (package / "version.txt").read_text(encoding="utf-8").strip() != version:
         raise UpdateError("incomplete game package")
     for brain in BRAINS:
@@ -200,7 +229,8 @@ def rollback_update(root: Path) -> None:
         package = root / "versions" / previous / PACKAGE_NAME
         if not package.is_dir() or package.is_symlink():
             raise UpdateError("previous version is unavailable")
-    verify_package(package, (package / "version.txt").read_text(encoding="ascii").strip())
+    verify_package(package, (package / "version.txt").read_text(encoding="ascii").strip(),
+                   require_verification_key=False)
     write_marker(root, "current-version.txt", previous)
 
 

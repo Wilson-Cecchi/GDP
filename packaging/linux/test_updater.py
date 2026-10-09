@@ -2,6 +2,7 @@ import io
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -27,6 +28,67 @@ def manifest(version="0.1.3", url=None):
 
 
 class LinuxUpdaterTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.keys = tempfile.TemporaryDirectory()
+        key_dir = Path(cls.keys.name)
+        cls.signing_key = key_dir / "signing.pem"
+        cls.public_key = key_dir / "public.pem"
+        cls.other_public_key = key_dir / "other-public.pem"
+        subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt",
+                        "rsa_keygen_bits:2048", "-out", str(cls.signing_key)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["openssl", "pkey", "-in", str(cls.signing_key), "-pubout",
+                        "-out", str(cls.public_key)], check=True)
+        other_key = key_dir / "other.pem"
+        subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt",
+                        "rsa_keygen_bits:2048", "-out", str(other_key)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["openssl", "pkey", "-in", str(other_key), "-pubout",
+                        "-out", str(cls.other_public_key)], check=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.keys.cleanup()
+
+    def sign_manifest(self, raw):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "update.json"
+            signature_path = Path(temporary) / "update.json.sig"
+            path.write_bytes(raw)
+            subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(self.signing_key),
+                            "-sigopt", "rsa_padding_mode:pss", "-sigopt",
+                            "rsa_pss_saltlen:-1", "-out", str(signature_path), str(path)],
+                           check=True)
+            return signature_path.read_bytes()
+
+    def test_signed_manifest_is_required_before_parsing(self):
+        raw = manifest()
+        signature = self.sign_manifest(raw)
+        with patch.object(updater, "PUBLIC_KEY", self.public_key), \
+             patch.object(updater, "fetch_limited", side_effect=[raw, signature]) as fetch:
+            self.assertEqual(updater.fetch_manifest("0.1.2")["version"], "0.1.3")
+            self.assertEqual([call.args[0] for call in fetch.call_args_list],
+                             [updater.MANIFEST_URL, updater.SIGNATURE_URL])
+        with patch.object(updater, "PUBLIC_KEY", self.public_key), \
+             patch.object(updater, "fetch_limited", side_effect=[raw + b" ", signature]), \
+             patch.object(updater, "parse_manifest") as parse:
+            with self.assertRaisesRegex(updater.UpdateError, "signature is invalid"):
+                updater.fetch_manifest("0.1.2")
+            parse.assert_not_called()
+        with patch.object(updater, "PUBLIC_KEY", self.other_public_key), \
+             patch.object(updater, "fetch_limited", side_effect=[raw, signature]), \
+             patch.object(updater, "parse_manifest") as parse:
+            with self.assertRaisesRegex(updater.UpdateError, "signature is invalid"):
+                updater.fetch_manifest("0.1.2")
+            parse.assert_not_called()
+        with patch.object(updater, "fetch_limited",
+                          side_effect=[raw, updater.UpdateError("missing signature")]), \
+             patch.object(updater, "parse_manifest") as parse:
+            with self.assertRaisesRegex(updater.UpdateError, "missing signature"):
+                updater.fetch_manifest("0.1.2")
+            parse.assert_not_called()
+
     def test_newer_release_is_selected(self):
         result = updater.parse_manifest(manifest(), "0.1.2")
         self.assertEqual(result["version"], "0.1.3")
@@ -89,6 +151,7 @@ class LinuxUpdaterTests(unittest.TestCase):
             archive_path = root / "candidate.tar.gz"
             contents = {"version.txt": b"0.1.3\n", "gdp": b"#!/bin/sh\nexit 0\n",
                         "updater.py": b"# updater\n",
+                        "release-signing-public.pem": self.public_key.read_bytes(),
                         "bin/gdp": b"#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Iron Seed 0.1.3'; fi\n"}
             contents.update({f"bin/ai/{brain}.brain": b"brain" for brain in updater.BRAINS})
             with tarfile.open(archive_path, "w:gz") as archive:
@@ -97,7 +160,8 @@ class LinuxUpdaterTests(unittest.TestCase):
                     entry.size = len(data)
                     archive.addfile(entry, io.BytesIO(data))
 
-            old = {name: data.replace(b"0.1.3", b"0.1.2") for name, data in contents.items()}
+            old = {name: data.replace(b"0.1.3", b"0.1.2") for name, data in contents.items()
+                   if name != "release-signing-public.pem"}
             for name, data in old.items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
