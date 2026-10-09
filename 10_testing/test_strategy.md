@@ -11,6 +11,10 @@
   gdp_room_traversal_tests -j 2` e `ctest --test-dir build/release
   --output-on-failure -j 2`: 67/67 testes passaram. O gate específico de
   travessia também passou no preset ASan/UBSan.
+- `campaign_checkpoint_persistence_systems` agora bloqueia o caminho temporário
+  de gravação e confirma que uma substituição falha sem perder o checkpoint
+  anterior nem alterar dados preexistentes nesse caminho. O gate passou em
+  Release e ASan/UBSan; não simula falta real de espaço ou queda de energia.
 - Até a revisão manual combinada para 11/10, este gate não equivale a aprovação
   de sensação de movimento, aparência, balanceamento ou jogabilidade completa.
   Mudanças dessas categorias continuam pendentes de playtest; nenhum cérebro de

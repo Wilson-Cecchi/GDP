@@ -142,6 +142,29 @@ void testMissingRoundTripReplacementAndRemoval()
         "checkpoint removal is idempotent and returns to the empty state");
 }
 
+void testFailedReplacementPreservesExistingCheckpoint()
+{
+    using namespace gdp;
+    TemporaryDirectory directory;
+    const auto path = directory.path() / "campaign_checkpoint.toml";
+    const gameplay::CampaignCheckpoint original = makeCheckpoint();
+    expect(persistence::saveCampaignCheckpoint(path, original),
+        "failed replacement fixture starts with a valid checkpoint");
+
+    const auto stagingPath = std::filesystem::path{path.string() + ".tmp"};
+    std::filesystem::create_directory(stagingPath);
+    writeText(stagingPath / "blocker", "keep");
+    auto replacement = original;
+    replacement.floorEntry.player.health = 60.0F;
+    expect(!persistence::saveCampaignCheckpoint(path, replacement),
+        "an unavailable staging path prevents replacing a Campaign checkpoint");
+    const auto loaded = persistence::loadCampaignCheckpoint(path);
+    expect(loaded.status == persistence::CampaignCheckpointLoadStatus::Loaded
+            && loaded.checkpoint == original
+            && readText(stagingPath / "blocker") == "keep",
+        "failed replacement preserves the original save and unrelated staging data");
+}
+
 void testMalformedDecimalFields()
 {
     using namespace gdp;
@@ -530,6 +553,7 @@ void testPreviousCampaignFloorMigration()
 int main()
 {
     testMissingRoundTripReplacementAndRemoval();
+    testFailedReplacementPreservesExistingCheckpoint();
     testMalformedDecimalFields();
     testInvalidAndVersionedData();
     testCommentsAndFutureFields();
