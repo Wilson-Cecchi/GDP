@@ -109,6 +109,19 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             const auto equip=frame(); passed &= equip!=original; savePose("equip",equip);
             weapon.equipStrength=0;
             if(roles[r]==HudWeaponRole::Knife) {
+                weapon.grenadeSelected=true;
+                weapon.handsVisible=false;
+                const auto grenadeOnly=frame();
+                weapon.handsVisible=true;
+                const auto grenadeHeld=frame();
+                passed &= grenadeHeld!=grenadeOnly && frame()==grenadeHeld;
+                if(capture && width==1280 && !potato) save("grenade_held",grenadeHeld);
+                weapon.grenadeChargeStrength=1.0F;
+                const auto grenadeCharged=frame();
+                passed &= grenadeCharged!=grenadeHeld;
+                if(capture && width==1280 && !potato) save("grenade_charged",grenadeCharged);
+                weapon.grenadeSelected=false;
+                weapon.grenadeChargeStrength=0.0F;
                 for(const float phase:{.25F,.50F,.75F,1.0F}) {
                     weapon.meleeStrength=phase; const auto melee=frame();
                     passed &= phase<1.0F ? melee!=original : melee==original;

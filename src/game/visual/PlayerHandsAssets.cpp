@@ -416,14 +416,20 @@ PlayerHandsPose samplePlayerHandsPose(const WeaponViewmodelRenderData& weapon) n
 {
     PlayerHandsPose pose;
     const auto frame=sampleWeaponPresentationTransform(weapon);
-    const Contacts c=contacts(weapon.role);
+    Contacts c=contacts(weapon.role);
+    if (weapon.grenadeSelected) {
+        c.grip = grenadeViewmodelGrip + Vec3{0.0F, 0.0F,
+            safe(weapon.grenadeChargeStrength) * grenadeViewmodelChargeTravel};
+    }
     const float p=safe(weapon.reloadProgress);
     const auto reload=sampleWeaponReloadPose(weapon.role,p,weapon.reloadRoundCount);
     auto rightIdle=target(c.grip,HandContact::Grip);
     const bool knife=weapon.role==HudWeaponRole::Knife;
     if(knife) {
-        rightIdle.flex={.77F,.83F,.85F,.83F,.55F};
-        rightIdle.thumbOpposition=.75F;
+        rightIdle.flex = weapon.grenadeSelected
+            ? std::array<float, 5U>{.67F, .76F, .78F, .77F, .59F}
+            : std::array<float, 5U>{.77F, .83F, .85F, .83F, .55F};
+        rightIdle.thumbOpposition=weapon.grenadeSelected ? .59F : .75F;
     }
     // Long guns are cradled from below, not pinched against a receiver side.
     const Vec3 supportRotation=weapon.role==HudWeaponRole::Pistol || knife

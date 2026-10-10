@@ -256,16 +256,24 @@ struct ApplicationMenuTestAccess {
                         app.campaignMission_.targetRoomId, {.terminalActivated = true}),
                     "terminal mission activation alone does not release the Boss exit");
             }
-            expect(gameplay::advanceCampaignMission(app.campaignMission_,
-                    app.campaignMission_.targetRoomId, {
-                        .keysCollected = app.campaignMission_.kind
-                            == gameplay::CampaignMissionKind::RecoverKey ? 1U : 0U,
-                        .arenaCleared = app.campaignMission_.kind
-                            == gameplay::CampaignMissionKind::SecureArena,
-                        .terminalAmbushCleared = app.campaignMission_.kind
-                            == gameplay::CampaignMissionKind::SecureTerminal,
-                    }),
-                "fixture completes the seeded mission at its assigned room");
+            if (app.campaignMission_.kind == gameplay::CampaignMissionKind::RecoverAndSecure) {
+                expect(!gameplay::advanceCampaignMission(app.campaignMission_,
+                            app.campaignMission_.targetRoomId, {.keysCollected = 1U})
+                        && gameplay::advanceCampaignMission(app.campaignMission_,
+                            app.campaignMission_.secondaryRoomId, {.arenaCleared = true}),
+                    "fixture completes both route objectives before releasing Boss exit");
+            } else {
+                expect(gameplay::advanceCampaignMission(app.campaignMission_,
+                        app.campaignMission_.targetRoomId, {
+                            .keysCollected = app.campaignMission_.kind
+                                == gameplay::CampaignMissionKind::RecoverKey ? 1U : 0U,
+                            .arenaCleared = app.campaignMission_.kind
+                                == gameplay::CampaignMissionKind::SecureArena,
+                            .terminalAmbushCleared = app.campaignMission_.kind
+                                == gameplay::CampaignMissionKind::SecureTerminal,
+                        }),
+                    "fixture completes the seeded mission at its assigned room");
+            }
             app.playerCommand_ = {}; app.fixedUpdate(1.0 / 60.0); app.render();
             expect(app.session_.state().campaignExitReady && !app.restartRequested_,
                 "mission completion after Boss death unlocks the return trip to the console");

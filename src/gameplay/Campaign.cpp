@@ -26,24 +26,26 @@ CampaignMissionKind campaignMissionKind(
     const std::uint32_t safeFloor = std::clamp(floor, 1U, campaignFloorCount);
     if (safeFloor == 1U) return CampaignMissionKind::SecureArena;
 
-    // Each three-floor deck contains every objective once. Rotate a deck when
-    // needed so a boundary cannot repeat the preceding floor's objective.
+    // Two four-floor decks cover every objective. The final floor draws a
+    // non-repeating objective from its own seed stream.
     constexpr std::array kinds{
         CampaignMissionKind::SecureArena,
         CampaignMissionKind::RecoverKey,
         CampaignMissionKind::SecureTerminal,
+        CampaignMissionKind::RecoverAndSecure,
     };
     CampaignMissionKind previous = CampaignMissionKind::SecureArena;
-    const std::uint32_t targetDeck = (safeFloor - 2U) / 3U;
+    const std::uint32_t targetDeck = (safeFloor - 2U) / 4U;
     for (std::uint32_t deck = 0U; deck <= targetDeck; ++deck) {
         auto order = kinds;
         const wkc::core::Seed selection = wkc::core::deriveSeed(
             initialSeed, gdp::game::SeedDomain::CampaignMission, deck + 1U);
-        std::swap(order[2], order[selection % 3U]);
-        std::swap(order[1], order[(selection >> 8U) % 2U]);
+        std::swap(order[3], order[selection % 4U]);
+        std::swap(order[2], order[(selection >> 8U) % 3U]);
+        std::swap(order[1], order[(selection >> 16U) % 2U]);
         if (order[0] == previous) std::rotate(order.begin(), order.begin() + 1, order.end());
-        if (deck == targetDeck) return order[(safeFloor - 2U) % 3U];
-        previous = order[2];
+        if (deck == targetDeck) return order[(safeFloor - 2U) % 4U];
+        previous = order[3];
     }
     return CampaignMissionKind::SecureArena;
 }
@@ -52,8 +54,19 @@ bool advanceCampaignMission(
     CampaignMissionState& mission, const std::uint32_t roomId,
     const CampaignMissionProgress progress) noexcept
 {
-    if (mission.completed || mission.targetRoomId == 0U
-        || roomId != mission.targetRoomId) return false;
+    if (mission.completed || mission.targetRoomId == 0U) return false;
+    if (mission.kind == CampaignMissionKind::RecoverAndSecure) {
+        if (mission.secondaryRoomId == 0U) return false;
+        if (roomId == mission.targetRoomId && progress.keysCollected > 0U) {
+            mission.keyRecovered = true;
+        }
+        if (roomId == mission.secondaryRoomId && progress.arenaCleared) {
+            mission.arenaSecured = true;
+        }
+        mission.completed = mission.keyRecovered && mission.arenaSecured;
+        return mission.completed;
+    }
+    if (roomId != mission.targetRoomId) return false;
     switch (mission.kind) {
     case CampaignMissionKind::SecureArena:
         mission.completed = progress.arenaCleared;
@@ -65,8 +78,20 @@ bool advanceCampaignMission(
         mission.activated |= progress.terminalActivated;
         mission.completed = mission.activated && progress.terminalAmbushCleared;
         break;
+    case CampaignMissionKind::RecoverAndSecure:
+        break;
     }
     return mission.completed;
+}
+
+std::uint32_t campaignMissionPendingRoom(
+    const CampaignMissionState& mission) noexcept
+{
+    if (mission.kind == CampaignMissionKind::RecoverAndSecure
+        && mission.keyRecovered && !mission.arenaSecured) {
+        return mission.secondaryRoomId;
+    }
+    return mission.targetRoomId;
 }
 
 const char* campaignMissionName(const CampaignMissionKind kind) noexcept
@@ -75,6 +100,7 @@ const char* campaignMissionName(const CampaignMissionKind kind) noexcept
     case CampaignMissionKind::SecureArena: return "SecureArena";
     case CampaignMissionKind::RecoverKey: return "RecoverKey";
     case CampaignMissionKind::SecureTerminal: return "SecureTerminal";
+    case CampaignMissionKind::RecoverAndSecure: return "RecoverAndSecure";
     }
     return "Invalid";
 }

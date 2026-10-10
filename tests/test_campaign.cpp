@@ -280,7 +280,7 @@ void testCampaignMissionDecks()
     bool sawDifferentSequence = false;
     std::array<CampaignMissionKind, campaignFloorCount> firstSequence{};
     for (wkc::core::Seed seed = 1U; seed <= 1000U; ++seed) {
-        std::array<bool, 3> seen{};
+        std::array<bool, 4> seen{};
         CampaignMissionKind previous = CampaignMissionKind::SecureArena;
         for (std::uint32_t floor = 1U; floor <= campaignFloorCount; ++floor) {
             const auto kind = campaignMissionKind(seed, floor);
@@ -293,10 +293,10 @@ void testCampaignMissionDecks()
                 expect(kind != previous,
                     "adjacent campaign floors never repeat the same mission");
                 seen[static_cast<std::size_t>(kind)] = true;
-                if (floor == 4U || floor == 7U || floor == 10U) {
+                if (floor == 5U || floor == 9U) {
                     expect(std::all_of(seen.begin(), seen.end(), [](const bool value) {
                             return value;
-                        }), "each three-floor deck contains all mission types");
+                        }), "each four-floor deck contains all mission types");
                     seen.fill(false);
                 }
             }
@@ -312,7 +312,7 @@ void testCampaignFloorVarietyAndMissions()
 {
     using namespace gdp;
     bool sawSeven = false, sawTen = false, sawLoop = false, sawNoLoop = false;
-    bool sawKey = false, sawArena = false, sawTerminal = false;
+    bool sawKey = false, sawArena = false, sawTerminal = false, sawRoute = false;
     for (wkc::core::Seed initialSeed = 1U; initialSeed <= 24U; ++initialSeed) {
         for (std::uint32_t floor = 1U; floor <= gameplay::campaignFloorCount; ++floor) {
             const auto floorSeed = gameplay::seedForRun(initialSeed, floor - 1U);
@@ -342,7 +342,9 @@ void testCampaignFloorVarietyAndMissions()
             sawKey |= kind == gameplay::CampaignMissionKind::RecoverKey;
             sawArena |= kind == gameplay::CampaignMissionKind::SecureArena;
             sawTerminal |= kind == gameplay::CampaignMissionKind::SecureTerminal;
-            const auto role = kind == gameplay::CampaignMissionKind::RecoverKey
+            sawRoute |= kind == gameplay::CampaignMissionKind::RecoverAndSecure;
+            const auto role = (kind == gameplay::CampaignMissionKind::RecoverKey
+                    || kind == gameplay::CampaignMissionKind::RecoverAndSecure)
                 ? world::RoomRole::Secret
                 : kind == gameplay::CampaignMissionKind::SecureTerminal
                     ? world::RoomRole::Start : world::RoomRole::Arena;
@@ -359,7 +361,8 @@ void testCampaignFloorVarietyAndMissions()
                             .terminalActivated = true, .terminalAmbushCleared = true})
                     && !gameplay::advanceCampaignMission(mission, target->id, {}),
                 "another room and prior-floor keys cannot satisfy the mission");
-            if (kind == gameplay::CampaignMissionKind::RecoverKey) {
+            if (kind == gameplay::CampaignMissionKind::RecoverKey
+                || kind == gameplay::CampaignMissionKind::RecoverAndSecure) {
                 entities::EntityManager entities;
                 auto populated = world::populateInitialEntities(*generated.world, entities,
                     {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
@@ -371,11 +374,40 @@ void testCampaignFloorVarietyAndMissions()
                 }
                 expect(populated.isValid() && hasKey,
                     "key objective has a real collectible in the reachable Secret room");
-                expect(gameplay::advanceCampaignMission(mission, target->id,
-                            {.keysCollected = 1U})
-                    && !gameplay::advanceCampaignMission(mission, target->id,
-                            {.keysCollected = 1U}),
-                    "only a current-floor key pickup completes the key mission once");
+                if (kind == gameplay::CampaignMissionKind::RecoverKey) {
+                    expect(gameplay::advanceCampaignMission(mission, target->id,
+                                {.keysCollected = 1U})
+                        && !gameplay::advanceCampaignMission(mission, target->id,
+                                {.keysCollected = 1U}),
+                        "only a current-floor key pickup completes the key mission once");
+                } else {
+                    const auto arena = std::find_if(generated.world->rooms.begin(),
+                        generated.world->rooms.end(), [](const auto& room) {
+                            return room.role == world::RoomRole::Arena;
+                        });
+                    expect(arena != generated.world->rooms.end(),
+                        "route mission has a reachable Arena");
+                    if (arena == generated.world->rooms.end()) continue;
+                    mission.secondaryRoomId = arena->id;
+                    auto reverse = mission;
+                    expect(!gameplay::advanceCampaignMission(mission, target->id,
+                                {.keysCollected = 1U})
+                            && mission.keyRecovered && !mission.completed
+                            && gameplay::campaignMissionPendingRoom(mission) == arena->id
+                            && !gameplay::advanceCampaignMission(mission, arena->id,
+                                {.keysCollected = 1U}),
+                        "key alone does not complete route mission or accept a key in Arena");
+                    expect(gameplay::advanceCampaignMission(mission, arena->id,
+                                {.arenaCleared = true}) && mission.completed,
+                        "Arena clear after key completes route mission");
+                    expect(!gameplay::advanceCampaignMission(reverse, arena->id,
+                                {.arenaCleared = true})
+                            && reverse.arenaSecured && !reverse.completed
+                            && gameplay::campaignMissionPendingRoom(reverse) == target->id
+                            && gameplay::advanceCampaignMission(reverse, target->id,
+                                {.keysCollected = 1U}),
+                        "Arena-first route remains completable after collecting key");
+                }
             } else if (kind == gameplay::CampaignMissionKind::SecureArena) {
                 expect(gameplay::advanceCampaignMission(mission, target->id,
                             {.arenaCleared = true})
@@ -431,7 +463,7 @@ void testCampaignFloorVarietyAndMissions()
         }
     }
     expect(sawSeven && sawTen && sawLoop && sawNoLoop && sawKey && sawArena
-            && sawTerminal,
+            && sawTerminal && sawRoute,
         "campaign seeds cover multiple floor sizes, graph cycles and mission types");
 }
 

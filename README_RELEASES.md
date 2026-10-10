@@ -23,11 +23,11 @@ urgentes podem formar um pacote próprio; mudanças pequenas podem aguardar o
 próximo marco. O `Latest` e o manifesto de atualização só avançam após a tag
 de uma versão aprovada conforme o processo abaixo.
 
-A progressão de encontros dos andares, o modelo próprio da SMG, o recuo
-controlável e a precisão em movimento pertencem à fila de melhorias seguinte
-à versão pública 0.1.4. A jogabilidade dos andares, o visual da SMG e o recuo
-foram aprovados; a precisão em movimento e os novos recursos do Test Mode
-precisam de playtest antes de entrar em um pacote público.
+A versão pública 0.1.5 reúne progressão de encontros, visual da SMG, recuo,
+precisão em movimento, calibração no Test Mode, granadas e feedback dentro do
+jogo. A missão composta de chave e Arena, introduzida nas regras 43, ainda
+pertence ao desenvolvimento posterior à 0.1.5 e não altera os downloads até
+um novo pacote aprovado.
 
 ## Preparação única
 

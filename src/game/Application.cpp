@@ -64,6 +64,24 @@ constexpr float weaponMeleeDuration = 0.28F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
 constexpr float weaponEquipDuration = 0.48F;
 
+visual::ObjectiveRenderState campaignMissionObjective(
+    const gameplay::CampaignMissionState& mission) noexcept
+{
+    switch (mission.kind) {
+    case gameplay::CampaignMissionKind::RecoverKey:
+        return visual::ObjectiveRenderState::RecoverKey;
+    case gameplay::CampaignMissionKind::SecureTerminal:
+        return mission.activated ? visual::ObjectiveRenderState::ClearAmbush
+                                 : visual::ObjectiveRenderState::ActivateTerminal;
+    case gameplay::CampaignMissionKind::RecoverAndSecure:
+        return mission.keyRecovered ? visual::ObjectiveRenderState::SecureArena
+                                    : visual::ObjectiveRenderState::RecoverKey;
+    case gameplay::CampaignMissionKind::SecureArena:
+        return visual::ObjectiveRenderState::SecureArena;
+    }
+    return visual::ObjectiveRenderState::None;
+}
+
 std::uint32_t roundedPerformanceMetric(const double value) noexcept
 {
     if (!std::isfinite(value) || value <= 0.0) {
@@ -995,8 +1013,9 @@ bool Application::initializeRun()
     if (session_.state().mode == gameplay::RunMode::Campaign) {
         campaignMission_.kind = gameplay::campaignMissionKind(
             session_.state().initialSeed, session_.state().campaignFloor);
-        const world::RoomRole targetRole = campaignMission_.kind
+        const world::RoomRole targetRole = (campaignMission_.kind
                 == gameplay::CampaignMissionKind::RecoverKey
+                || campaignMission_.kind == gameplay::CampaignMissionKind::RecoverAndSecure)
             ? world::RoomRole::Secret
             : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
                 ? world::RoomRole::Start : world::RoomRole::Arena;
@@ -1009,7 +1028,19 @@ bool Application::initializeRun()
             return false;
         }
         campaignMission_.targetRoomId = target->id;
-        if (campaignMission_.kind == gameplay::CampaignMissionKind::RecoverKey) {
+        if (campaignMission_.kind == gameplay::CampaignMissionKind::RecoverAndSecure) {
+            const auto arena = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+                [](const world::RoomInstance& room) {
+                    return room.role == world::RoomRole::Arena;
+                });
+            if (arena == world_->rooms.end()) {
+                log(LogLevel::Error, "Campaign route mission has no Arena");
+                return false;
+            }
+            campaignMission_.secondaryRoomId = arena->id;
+        }
+        if (campaignMission_.kind == gameplay::CampaignMissionKind::RecoverKey
+            || campaignMission_.kind == gameplay::CampaignMissionKind::RecoverAndSecure) {
             const bool keyPresent = std::any_of(target->entities.begin(),
                 target->entities.end(), [this](const entities::EntityId id) {
                     const auto* item = entities_.findData<entities::ItemData>(id);
@@ -3903,7 +3934,7 @@ void Application::render()
         if (session_.state().mode == gameplay::RunMode::Campaign
             && session_.state().phase == gameplay::SessionPhase::Playing) {
             if (!campaignMission_.completed) {
-                mapTarget = {campaignMission_.targetRoomId,
+                mapTarget = {gameplay::campaignMissionPendingRoom(campaignMission_),
                     visual::HudMapMarker::Mission};
             } else if (const auto* exitTerminal = entities_.find(exitTerminalEntity_)) {
                 mapTarget = {exitTerminal->roomId,
@@ -4026,14 +4057,9 @@ void Application::render()
     hud.campaignFloor = session_.state().campaignFloor;
     hud.campaignFloorCount = gameplay::campaignFloorCount;
     if (hud.campaignMode) {
-        hud.campaignMission = campaignMission_.kind
-                == gameplay::CampaignMissionKind::RecoverKey
-            ? visual::ObjectiveRenderState::RecoverKey
-            : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
-                ? campaignMission_.activated
-                    ? visual::ObjectiveRenderState::ClearAmbush
-                    : visual::ObjectiveRenderState::ActivateTerminal
-                : visual::ObjectiveRenderState::SecureArena;
+        hud.campaignMission = campaignMissionObjective(campaignMission_);
+        hud.campaignRouteMission = campaignMission_.kind
+            == gameplay::CampaignMissionKind::RecoverAndSecure;
         hud.campaignMissionCompleted = campaignMission_.completed;
         const auto boss = gameplay::bossStatus(entities_, 0U);
         hud.campaignBossDefeated = boss.exists && !boss.alive;
@@ -4126,14 +4152,7 @@ void Application::render()
         && (!gameplay::bossStatus(entities_, 0U).alive
             || (!session_.state().bossEngaged
                 && renderedRoomRole != world::RoomRole::Boss))) {
-        hud.objective = campaignMission_.kind
-                == gameplay::CampaignMissionKind::RecoverKey
-            ? visual::ObjectiveRenderState::RecoverKey
-            : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
-                ? campaignMission_.activated
-                    ? visual::ObjectiveRenderState::ClearAmbush
-                    : visual::ObjectiveRenderState::ActivateTerminal
-                : visual::ObjectiveRenderState::SecureArena;
+        hud.objective = campaignMissionObjective(campaignMission_);
     } else if (session_.state().bossEngaged
         || renderedRoomRole == world::RoomRole::Boss) {
         hud.objective = visual::ObjectiveRenderState::DefeatBoss;

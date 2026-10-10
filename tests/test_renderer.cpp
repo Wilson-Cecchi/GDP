@@ -1867,6 +1867,18 @@ void testPlayerHands()
         const auto attached=samplePlayerHandsPose(model);
         expect(attached.contactPoints==idle.contactPoints,"root recoil/equip/posture transforms cannot detach palm contacts");
     }
+    WeaponViewmodelRenderData grenade{.visible=true, .grenadeSelected=true,
+        .role=HudWeaponRole::Knife};
+    const auto held=samplePlayerHandsPose(grenade);
+    const Vec3 grip=held.contactPoints[0]-grenadeViewmodelBodyCenter;
+    expect(std::abs(grip.x)<.103F && std::abs(grip.y)<.128F
+            && std::abs(grip.z)<.096F,
+        "grenade grip remains on its opaque body instead of in empty space");
+    grenade.grenadeChargeStrength=1.0F;
+    const auto charged=samplePlayerHandsPose(grenade);
+    expect(length(charged.contactPoints[0]-held.contactPoints[0]
+            -Vec3{0.0F,0.0F,grenadeViewmodelChargeTravel})<.0001F,
+        "the throwing hand follows the grenade through the full charge travel");
 }
 
 void testOptimizedShadowBudget()

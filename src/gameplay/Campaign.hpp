@@ -9,7 +9,7 @@
 
 namespace gdp::gameplay {
 
-inline constexpr std::uint32_t currentCampaignRulesVersion = 42U;
+inline constexpr std::uint32_t currentCampaignRulesVersion = 43U;
 
 struct CampaignFloorLayout {
     std::uint32_t roomCount{8U};
@@ -22,6 +22,7 @@ enum class CampaignMissionKind : std::uint8_t {
     SecureArena,
     RecoverKey,
     SecureTerminal,
+    RecoverAndSecure,
 };
 
 struct CampaignMissionState {
@@ -29,6 +30,9 @@ struct CampaignMissionState {
     std::uint32_t targetRoomId{0U};
     bool activated{false};
     bool completed{false};
+    std::uint32_t secondaryRoomId{0U};
+    bool keyRecovered{false};
+    bool arenaSecured{false};
 };
 
 struct CampaignMissionProgress {
@@ -45,6 +49,8 @@ struct CampaignMissionProgress {
 [[nodiscard]] bool advanceCampaignMission(
     CampaignMissionState& mission, std::uint32_t roomId,
     CampaignMissionProgress progress) noexcept;
+[[nodiscard]] std::uint32_t campaignMissionPendingRoom(
+    const CampaignMissionState& mission) noexcept;
 [[nodiscard]] const char* campaignMissionName(CampaignMissionKind kind) noexcept;
 
 struct CampaignCarryover {

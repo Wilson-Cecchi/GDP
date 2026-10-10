@@ -342,14 +342,17 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const bool migratePreviousFloor = (*rulesVersion == 37U || *rulesVersion == 38U
                 || *rulesVersion == 39U || *rulesVersion == 40U
                 || *rulesVersion == 41U) && *fields.version == 7U;
+        const bool migratePreviousCampaign = *rulesVersion == 42U
+            && *fields.version == currentCampaignCheckpointFileVersion;
         // A current-rules file must not pretend to use the legacy round schema.
-        if (!migratePreviousRules && !migratePreviousFloor
+        if (!migratePreviousRules && !migratePreviousFloor && !migratePreviousCampaign
             && *fields.version != currentCampaignCheckpointFileVersion) {
             result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
             return result;
         }
         if (*rulesVersion != gameplay::currentCampaignRulesVersion
-            && !migratePreviousRules && !migratePreviousFloor) {
+            && !migratePreviousRules && !migratePreviousFloor
+            && !migratePreviousCampaign) {
             result.status = CampaignCheckpointLoadStatus::IncompatibleRules;
             return result;
         }
@@ -466,7 +469,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         }
         result.checkpoint = std::move(checkpoint);
         result.status = CampaignCheckpointLoadStatus::Loaded;
-        result.migratedRules = migratePreviousRules || migratePreviousFloor;
+        result.migratedRules = migratePreviousRules || migratePreviousFloor
+            || migratePreviousCampaign;
         return result;
     } catch (...) {
         result.status = CampaignCheckpointLoadStatus::IoError;

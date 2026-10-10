@@ -84,3 +84,21 @@ ausência de repetição consecutiva e variação de ordem. Playtest manual
 recomendado: iniciar com uma seed fixa,
 repetir o andar, matar o boss antes da missão, voltar à Arena/Secret/START e então
 ativar o terminal; verificar os três tipos de missão em andares diferentes.
+
+## Ampliação de rota — regras 43
+
+A partir das regras 43, `RecoverAndSecure` exige recolher a chave da Secret e
+concluir o Lockdown da Arena no mesmo andar. As duas ações podem ocorrer em
+qualquer ordem; o progresso de ambas é registrado para não criar uma sequência
+impossível caso o jogador limpe a Arena primeiro. A missão só libera a saída
+depois das duas ações e da morte do boss. O minimapa indica a Secret enquanto
+a chave falta e passa a indicar a Arena quando ela é a única etapa pendente;
+`Tab` identifica a missão composta em PT-BR e inglês.
+
+O primeiro andar mantém `SecureArena`. Os andares 2–9 formam dois blocos de
+quatro, cada um com as quatro missões uma vez em ordem embaralhada pela seed;
+o décimo sorteia uma missão diferente da do nono andar. A troca de regras não
+reescreve checkpoints da versão 42/schema 8 ao carregar: eles retomam os
+recursos da entrada do andar e regeneram a missão pelas regras 43. As regras
+de Standard, Speedrun e Test Mode não mudam. Nenhuma textura, inimigo, bônus
+ou atributo do boss foi alterado nesta etapa.

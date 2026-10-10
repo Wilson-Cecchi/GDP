@@ -2473,15 +2473,32 @@ bool GdpRenderer::render(
         if (weaponViewmodel.grenadeSelected) {
             const float charge = std::clamp(
                 weaponViewmodel.grenadeChargeStrength, 0.0F, 1.0F);
-            const float forwardOffset = charge * 0.14F;
-            drawWeaponPiece({0.07F, 0.12F, 0.22F + forwardOffset},
-                {0.23F, 0.29F, 0.21F}, {}, {0.25F, 0.30F, 0.20F});
-            drawWeaponPiece({0.07F, 0.285F, 0.22F + forwardOffset},
-                {0.14F, 0.055F, 0.13F}, {}, {0.48F, 0.50F, 0.44F});
-            drawWeaponPiece({0.07F, 0.13F, 0.22F + forwardOffset},
-                {0.245F, 0.03F, 0.225F}, {}, {0.69F, 0.58F, 0.18F});
-            drawWeaponPiece({0.04F, 0.32F, 0.22F + forwardOffset},
-                {0.08F, 0.05F, 0.13F}, {}, {0.10F, 0.11F, 0.10F});
+            const auto center = grenadeViewmodelBodyCenter + wkc::core::Vec3{
+                0.0F, 0.0F, charge * grenadeViewmodelChargeTravel};
+            const auto bindGrenadeMaterial = [&](const WeaponMaterial material) {
+                const auto& gpu = weaponMaterials_[static_cast<std::size_t>(material)];
+                gpu.albedo.bind(gl_, textureBindings_, 0U);
+                gpu.normal.bind(gl_, textureBindings_, 1U);
+                gpu.properties.bind(gl_, textureBindings_, 2U);
+                shader.setInt(gl_, "uDetailedMaterial", 1);
+            };
+            // An opaque, textured housing stays in the dominant hand. The
+            // grip pose uses the same charge displacement as these pieces.
+            shader.setFloat(gl_, "uOpacity", 1.0F);
+            bindGrenadeMaterial(WeaponMaterial::Polymer);
+            drawWeaponPiece(center, {0.205F, 0.255F, 0.19F}, {},
+                {0.57F, 0.63F, 0.36F});
+            drawWeaponPiece(center + wkc::core::Vec3{0.0F, -0.092F, 0.0F},
+                {0.217F, 0.022F, 0.202F}, {}, {0.38F, 0.44F, 0.26F});
+            bindGrenadeMaterial(WeaponMaterial::CoatedSteel);
+            drawWeaponPiece(center + wkc::core::Vec3{0.0F, 0.151F, 0.0F},
+                {0.115F, 0.056F, 0.105F}, {}, {0.68F, 0.72F, 0.67F});
+            drawWeaponPiece(center + wkc::core::Vec3{-0.082F, 0.105F, 0.0F},
+                {0.031F, 0.20F, 0.11F}, {}, {0.47F, 0.52F, 0.45F});
+            drawWeaponPiece(center + wkc::core::Vec3{0.0F, 0.193F, 0.0F},
+                {0.05F, 0.035F, 0.105F}, {}, {0.29F, 0.32F, 0.31F});
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            fallbackTexture_.bind(gl_, textureBindings_);
         }
         const float muzzlePosition = viewmodelRole == HudWeaponRole::Sniper ? 1.25F
             : viewmodelRole == HudWeaponRole::Shotgun ? 1.14F
@@ -3302,6 +3319,8 @@ bool GdpRenderer::render(
                 std::string mission = "MISSION UNKNOWN";
                 if (hud.campaignMissionCompleted) {
                     mission = "MISSION COMPLETE";
+                } else if (hud.campaignRouteMission) {
+                    mission = "MISSION: KEY + ARENA";
                 } else {
                     switch (hud.campaignMission) {
                     case ObjectiveRenderState::SecureArena:

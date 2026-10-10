@@ -398,6 +398,9 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
             hud.prompt = HudPrompt::CampaignMissionRequired;
             hud.map.rooms[1].marker = HudMapMarker::Mission;
             const auto missionPending = pixelsFor();
+            hud.campaignRouteMission = true;
+            const auto routePending = pixelsFor();
+            hud.campaignRouteMission = false;
             hud.campaignMission = ObjectiveRenderState::ClearAmbush;
             hud.objective = ObjectiveRenderState::ClearAmbush;
             const auto ambushPending = pixelsFor();
@@ -416,7 +419,8 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                 && keyMission != terminalActivation
                 && terminalActivation != terminalClear
                 && terminalClear != ready && ready != final
-                && final != missionPending && missionPending != ambushPending
+                && final != missionPending && missionPending != routePending
+                && routePending != ambushPending
                 && ambushPending != bossFirst && bossFirst != missionFirst
                 && missionFirst != exitChecklist;
             if (capture) {
@@ -442,6 +446,7 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                     && save(terminalClear, "terminal-clear") && save(ready, "ready")
                     && save(final, "final")
                     && save(missionPending, "mission-pending-tab")
+                    && save(routePending, "route-pending-tab")
                     && save(ambushPending, "ambush-pending-tab")
                     && save(bossFirst, "boss-first-tab")
                     && save(missionFirst, "mission-first-tab")

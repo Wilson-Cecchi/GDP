@@ -198,6 +198,8 @@ void layoutTests() {
     expect(localize(Language::PortugueseBrazil, "FLOOR 7/10  HARD") == "ANDAR 7/10  DIFÍCIL", "dynamic labels retain numbers and translated difficulty");
     expect(localize(Language::PortugueseBrazil, "MISSION: CLEAR AMBUSH")
             == "MISSÃO: ELIMINE A EMBOSCADA"
+            && localize(Language::PortugueseBrazil, "MISSION: KEY + ARENA")
+                == "MISSÃO: CHAVE + ARENA"
             && localize(Language::PortugueseBrazil, "MISSION COMPLETE")
                 == "MISSÃO CONCLUÍDA"
             && localize(Language::PortugueseBrazil, "BOSS ALIVE") == "CHEFE VIVO"

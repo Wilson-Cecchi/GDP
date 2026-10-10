@@ -110,6 +110,7 @@ constexpr auto catalog = std::to_array<Translation>({
     {"LOOT", "COLETAS"}, {"TIME", "TEMPO"}, {"FLOOR", "ANDAR"},
     {"MISSION", "MISSÃO"}, {"MISSION COMPLETE", "MISSÃO CONCLUÍDA"},
     {"MISSION UNKNOWN", "MISSÃO DESCONHECIDA"},
+    {"MISSION: KEY + ARENA", "MISSÃO: CHAVE + ARENA"},
     {"BOSS ALIVE", "CHEFE VIVO"}, {"BOSS DOWN", "CHEFE DERROTADO"},
     {"EXIT LOCKED", "SAÍDA BLOQUEADA"}, {"EXIT READY", "SAÍDA LIBERADA"},
     {"THREAT", "AMEAÇA"}, {"MAP", "MAPA"}, {"OBJECTIVE", "OBJETIVO"},

@@ -250,6 +250,11 @@ struct WeaponViewmodelRenderData {
     bool handsVisible{true};
 };
 
+// Grenade and grip share weapon-local coordinates, including the throw wind-up.
+inline constexpr wkc::core::Vec3 grenadeViewmodelBodyCenter{0.04F, 0.105F, 0.10F};
+inline constexpr wkc::core::Vec3 grenadeViewmodelGrip{0.055F, 0.045F, 0.075F};
+inline constexpr float grenadeViewmodelChargeTravel = 0.14F;
+
 // Presentation only: no camera, input, damage or ammo ownership.
 [[nodiscard]] float sniperScopeStrength(const WeaponViewmodelRenderData& weapon) noexcept;
 
@@ -675,6 +680,7 @@ struct HudRenderData {
     std::uint32_t campaignFloorCount{1U};
     std::uint16_t campaignThreatPercent{100U};
     ObjectiveRenderState campaignMission{ObjectiveRenderState::None};
+    bool campaignRouteMission{false};
     bool campaignMissionCompleted{false};
     bool campaignBossDefeated{false};
     bool campaignExitReady{false};
