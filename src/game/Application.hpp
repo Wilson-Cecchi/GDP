@@ -5,6 +5,7 @@
 #include "game/LaunchSeed.hpp"
 #include "game/PerformanceMonitor.hpp"
 #include "game/MenuFlow.hpp"
+#include "game/PlayerFeedback.hpp"
 #include "game/ai/ActiveEnemyBrains.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/PlayerBodyAssets.hpp"
@@ -134,6 +135,7 @@ private:
     std::size_t activeCampaignSlot_{0U};
     std::array<std::optional<std::filesystem::path>, 3> campaignSlotPaths_{};
     MenuFlowState menuFlow_{};
+    PlayerFeedbackTransport playerFeedbackTransport_{};
     std::vector<gameplay::SpeedrunRecord> speedrunLeaderboard_;
     std::optional<std::filesystem::path> speedrunLeaderboardPath_;
     float runDifficulty_{1.0F};

@@ -9,9 +9,11 @@
 #include "world/LootGenerator.hpp"
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <thread>
 
 namespace {
 int failures = 0;
@@ -25,8 +27,8 @@ void menuTests() {
     std::array<CampaignSlotInfo, 3> slots{};
     RuntimeSettings settings;
     auto view = [&] { return makeMenuView(state, slots, {}, settings, true); };
-    expect(view().rows.size() == 5U && view().rows[0].text == "TEST MODE", "development root has five requested entries");
-    expect(makeMenuView(state, slots, {}, settings, false).rows.size() == 4U, "shipping root omits Test Mode");
+    expect(view().rows.size() == 6U && view().rows[0].text == "TEST MODE", "development root includes feedback");
+    expect(makeMenuView(state, slots, {}, settings, false).rows.size() == 5U, "shipping root omits Test Mode");
     state.selection = 1U; (void)activateMenu(state, view(), slots);
     expect(state.page == MenuPage::CampaignSlots && view().rows.size() == 4U, "campaign opens three independent slots");
     state.selection = 2U; (void)activateMenu(state, view(), slots);
@@ -72,6 +74,55 @@ void menuTests() {
     state.selection = 0U; (void)activateMenu(state, view(), slots);
     expect(state.capture == ControlAction::Forward && state.captureGamepad,
         "controller capture targets controller bindings only");
+    state = {}; state.selection = 4U;
+    (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::FeedbackCategory, "feedback opens from main menu");
+    state.selection = 1U; (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::FeedbackCompose && state.feedbackTopic == PlayerFeedbackTopic::Gameplay,
+        "feedback category carries into the composer");
+    state.feedbackDraft = "GAMEPLAY feedback";
+    settings.language = Language::PortugueseBrazil;
+    auto feedbackView = view();
+    expect(feedbackView.rows[1].rawText && feedbackView.rows[1].text == "GAMEPLAY feedback"
+        && feedbackView.rows[9].enabled, "player-written text stays untranslated and valid message enables send");
+    (void)backMenu(state);
+    expect(state.page == MenuPage::FeedbackCategory && state.feedbackDraft == "GAMEPLAY feedback",
+        "draft survives navigation");
+    state.page = MenuPage::Settings; state.selection = 4U;
+    (void)activateMenu(state, view(), slots);
+    expect(state.page == MenuPage::FeedbackCategory && state.feedbackFromSettings,
+        "settings can open the same feedback flow while paused");
+    (void)backMenu(state);
+    expect(state.page == MenuPage::Settings, "feedback returns to settings origin");
+}
+void feedbackTests() {
+    using namespace gdp::game;
+    expect(!validPlayerFeedback(" \n\t") && !validPlayerFeedback(""), "blank feedback cannot be sent");
+    expect(validPlayerFeedback("Erro ao abrir porta")
+        && !validPlayerFeedback(std::string(maximumFeedbackCharacters + 1U, 'x')),
+        "feedback requires text and enforces character cap");
+    const auto json = playerFeedbackJson(PlayerFeedbackTopic::Bug, "porta \"trava\"\\\nlinha",
+        "0.1.4", "Linux");
+    expect(json.find("\\\"trava\\\"") != std::string::npos
+        && json.find("\\\\") != std::string::npos
+        && json.find("\\n") != std::string::npos
+        && json.find("\"category\":\"BUG\"") != std::string::npos,
+        "JSON escapes player input and identifies the feedback category");
+    if (std::getenv("IRON_SEED_FEEDBACK_LIVE_TEST") != nullptr) {
+        PlayerFeedbackTransport transport;
+        const auto payload = playerFeedbackJson(PlayerFeedbackTopic::Bug,
+            "Teste tecnico do transporte HTTPS do Iron Seed. Pode ignorar esta mensagem.",
+            "dev", "Linux");
+        expect(transport.start(payload), "live feedback process starts");
+        auto result = PlayerFeedbackResult::Pending;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+        while (transport.sending() && result == PlayerFeedbackResult::Pending
+            && std::chrono::steady_clock::now() < deadline) {
+            result = transport.poll();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        expect(result == PlayerFeedbackResult::Sent, "live feedback transport receives HTTP success");
+    }
 }
 void bindingsTests() {
     using namespace gdp::gameplay;
@@ -188,20 +239,20 @@ void layoutTests() {
     using namespace gdp::game::visual;
     for (const auto dimensions : {std::array{1280, 720}, std::array{960, 540},
              std::array{640, 360}, std::array{320, 200}}) {
-        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
+        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 6U, true);
         expect(static_cast<int>(uiTextLength("IRON SEED")) * 6 * 3 * root.scale
             <= root.panel.width - 16 * root.scale,
             "complete Iron Seed title fits without truncating or expanding the menu");
     }
     for (const auto dimensions : {std::array{1280, 720}, std::array{1920, 1080}, std::array{2560, 1080}}) {
-        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 5U, true);
+        const auto root = makeListMenuLayout(dimensions[0], dimensions[1], 6U, true);
         expect(root.rows[0].width == 348 && root.rows[0].height == 30,
             "title buttons stay compact rather than scaling up with display size");
         const auto r = root.rows[3];
-        expect(listMenuSelectionAt(dimensions[0], dimensions[1], 5U,
+        expect(listMenuSelectionAt(dimensions[0], dimensions[1], 6U,
             static_cast<float>(r.x + r.width / 2), static_cast<float>(dimensions[1] - r.y - r.height / 2), true) == 3U,
             "left-aligned title uses exactly the same hit targets as rendering");
-        expect(!listMenuSelectionAt(dimensions[0], dimensions[1], 5U,
+        expect(!listMenuSelectionAt(dimensions[0], dimensions[1], 6U,
             static_cast<float>(r.x + r.width + 1), static_cast<float>(dimensions[1] - r.y - r.height / 2), true),
             "empty scene outside compact title buttons is not clickable");
     }
@@ -342,7 +393,7 @@ void campaignLootTests() {
 int main() {
     const auto directory = std::filesystem::temp_directory_path() / ("gdp_frontend_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(directory);
-    menuTests(); bindingsTests(); layoutTests(); backdropTests(); persistenceTests(directory); campaignLootTests();
+    menuTests(); feedbackTests(); bindingsTests(); layoutTests(); backdropTests(); persistenceTests(directory); campaignLootTests();
     std::error_code error; std::filesystem::remove_all(directory, error);
     return failures == 0 ? 0 : 1;
 }

@@ -196,6 +196,38 @@ void testCampaignCarryoverRejectsInvalidStateAtomically()
         "inconsistent progression ranks invalidate Campaign carry-over");
 }
 
+void testNextFloorGrenadeResupply()
+{
+    using namespace gdp::gameplay;
+    Player player;
+    Weapon weapon;
+    ProgressionSystem progression;
+    const CampaignCarryover full = captureCampaignCarryover(
+        player, weapon, progression);
+    expect(full.player.grenades == 2U
+            && prepareNextCampaignFloorCarryover(full).player.grenades == 2U,
+        "a full grenade inventory cannot exceed its two-grenade capacity");
+
+    expect(player.useGrenade() && player.useGrenade(),
+        "campaign fixture spends both starting grenades");
+    const CampaignCarryover empty = captureCampaignCarryover(
+        player, weapon, progression);
+    const CampaignCarryover nextFloor = prepareNextCampaignFloorCarryover(empty);
+    expect(empty.player.grenades == 0U && nextFloor.player.grenades == 1U
+            && validateCampaignCarryover(nextFloor),
+        "advancing a floor grants one grenade without changing the captured state");
+    expect(prepareNextCampaignFloorCarryover(nextFloor).player.grenades == 2U,
+        "a later floor can restore the second grenade without exceeding capacity");
+
+    Player replayed;
+    Weapon replayedWeapon;
+    ProgressionSystem replayedProgression;
+    expect(restoreCampaignCarryover(
+            nextFloor, replayed, replayedWeapon, replayedProgression)
+            && replayed.state().grenades == 1U,
+        "replaying the next floor restores its entry stock without another grant");
+}
+
 void testCampaignCheckpointValidation()
 {
     using namespace gdp::gameplay;
@@ -409,6 +441,7 @@ int main()
 {
     testCampaignCarryoverRoundTrip();
     testCampaignCarryoverRejectsInvalidStateAtomically();
+    testNextFloorGrenadeResupply();
     testCampaignCheckpointValidation();
     testCampaignDifficultyProgression();
     testCampaignMissionDecks();

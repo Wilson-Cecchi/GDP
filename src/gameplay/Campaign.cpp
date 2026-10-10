@@ -99,6 +99,17 @@ CampaignCarryover captureCampaignCarryover(
     };
 }
 
+CampaignCarryover prepareNextCampaignFloorCarryover(
+    CampaignCarryover carryover) noexcept
+{
+    // A floor change grants one tactical refill, not a new inventory capacity.
+    // Replay restores the already captured floor-entry state and never calls this.
+    if (carryover.player.grenades < 2U) {
+        ++carryover.player.grenades;
+    }
+    return carryover;
+}
+
 bool validateCampaignCarryover(const CampaignCarryover& carryover) noexcept
 {
     const PlayerCampaignProgress& player = carryover.player;

@@ -3,6 +3,7 @@
 #include "gameplay/Campaign.hpp"
 #include "gameplay/SettingsMenu.hpp"
 #include "gameplay/Speedrun.hpp"
+#include "game/PlayerFeedback.hpp"
 #include <array>
 #include <optional>
 #include <string>
@@ -13,6 +14,7 @@ enum class MenuPage : std::uint8_t {
     Root, CampaignSlots, CampaignSlot, Difficulty, Overwrite, Speedrun, Leaderboard,
     Settings, Display, Audio, Controls, KeyboardControls, GamepadControls,
     Bindings, MoreBindings, GamepadBindings, MoreGamepadBindings,
+    FeedbackCategory, FeedbackCompose,
 };
 enum class MenuCommand : std::uint8_t {
     None, TestMode, ContinueCampaign, NewCampaign, StartSpeedrun, BestSeed,
@@ -29,6 +31,11 @@ struct MenuFlowState {
     gameplay::Difficulty difficulty{gameplay::Difficulty::Normal};
     std::optional<gameplay::ControlAction> capture;
     bool captureGamepad{false};
+    PlayerFeedbackTopic feedbackTopic{PlayerFeedbackTopic::Bug};
+    std::string feedbackDraft;
+    bool feedbackEditing{false};
+    bool feedbackFromSettings{false};
+    bool feedbackSending{false};
     std::string notice;
 };
 struct MenuRow {
@@ -38,6 +45,7 @@ struct MenuRow {
     std::optional<gameplay::ControlAction> binding;
     std::optional<MenuPage> destination;
     MenuCommand command{MenuCommand::None};
+    bool rawText{false};
 };
 struct MenuView {
     std::string title;

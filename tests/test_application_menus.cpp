@@ -74,6 +74,21 @@ struct ApplicationMenuTestAccess {
         pad(GamepadButton::East);
         expect(app.menuFlow_.page == MenuPage::Root,
             "gamepad east face button returns to the previous menu");
+        choose("SEND FEEDBACK"); choose("BUG"); choose("WRITE MESSAGE");
+        expect(app.menuFlow_.feedbackEditing, "feedback composer starts text input");
+        SDL_Event textEvent{};
+        textEvent.type = SDL_EVENT_TEXT_INPUT;
+        textEvent.text.text = "Erro ao abrir porta";
+        (void)SDL_PushEvent(&textEvent);
+        release(); app.processEvents(); app.render();
+        expect(app.menuFlow_.feedbackDraft == "Erro ao abrir porta",
+            "SDL text input reaches the feedback draft");
+        key(Key::Enter);
+        expect(!app.menuFlow_.feedbackEditing && app.frontendMenuView().rows[9].enabled,
+            "feedback draft enables explicit send without sending automatically");
+        key(Key::Escape); key(Key::Escape);
+        expect(app.menuFlow_.page == MenuPage::Root && app.menuFlow_.feedbackDraft == "Erro ao abrir porta",
+            "leaving feedback does not discard an unsent draft");
         choose("SETTINGS"); choose("CONTROLS"); choose("KEYBOARD / MOUSE");
         choose("REMAP"); choose("FORWARD");
         expect(app.menuFlow_.capture == gameplay::ControlAction::Forward, "binding begins capture without assigning activation Enter");

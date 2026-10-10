@@ -2705,8 +2705,9 @@ bool GdpRenderer::render(
         } else {
             drawMenuPanel(layout.panel, scale, textColor);
         }
-        const auto fit = [&](const std::string& source, const int available, const int textScale) {
-            std::string text = localize(hud.language, source);
+        const auto fit = [&](const std::string& source, const int available, const int textScale,
+            const bool raw = false) {
+            std::string text = raw ? source : localize(hud.language, source);
             while (!text.empty() && bitmapTextWidth(text, textScale) > available) popUiCodepoint(text);
             return text;
         };
@@ -2723,7 +2724,8 @@ bool GdpRenderer::render(
             const bool enabled = i >= menu.enabled.size() || menu.enabled[i];
             if (i == menu.selection && enabled) drawSelectedRow(row, scale, textColor);
             const bool adjustable = i < menu.adjustable.size() && menu.adjustable[i];
-            const auto text = fit(menu.rows[i], row.width - (adjustable ? 48 : 12) * scale, scale);
+            const auto text = fit(menu.rows[i], row.width - (adjustable ? 48 : 12) * scale, scale,
+                i < menu.rawText.size() && menu.rawText[i]);
             drawBitmapText(row.x + 6 * scale, row.y + std::max(0, (row.height - 7 * scale) / 2),
                 scale, text, !enabled ? uiTheme.mutedText : textColor);
             if (adjustable) {

@@ -497,6 +497,7 @@ struct ListMenuRenderData {
     std::vector<std::string> rows;
     std::vector<bool> enabled;
     std::vector<bool> adjustable;
+    std::vector<bool> rawText;
     std::size_t selection{0U};
 };
 [[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count,

@@ -72,6 +72,8 @@ struct CampaignCheckpoint {
     const Player& player,
     const Weapon& weapon,
     const ProgressionSystem& progression) noexcept;
+[[nodiscard]] CampaignCarryover prepareNextCampaignFloorCarryover(
+    CampaignCarryover carryover) noexcept;
 [[nodiscard]] bool validateCampaignCarryover(
     const CampaignCarryover& carryover) noexcept;
 [[nodiscard]] bool restoreCampaignCarryover(

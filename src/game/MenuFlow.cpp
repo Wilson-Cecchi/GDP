@@ -2,10 +2,29 @@
 #include "game/visual/GdpRenderData.hpp"
 #include "game/Localization.hpp"
 #include <algorithm>
+#include <array>
 
 namespace gdp::game {
 namespace {
 void open(MenuFlowState& s, MenuPage p) { s.page = p; s.selection = 0U; s.capture.reset(); s.captureGamepad = false; s.notice.clear(); }
+std::array<std::string, 8> feedbackPreview(const std::string_view draft)
+{
+    std::vector<std::string> lines(1);
+    std::size_t offset = 0U;
+    while (offset < draft.size()) {
+        const auto start = offset;
+        const auto codepoint = nextUiCodepoint(draft, offset);
+        if (codepoint == '\n' || lines.back().size() >= 128U || uiTextLength(lines.back()) >= 42U)
+            lines.emplace_back();
+        if (codepoint != '\n') lines.back().append(draft.substr(start, offset - start));
+    }
+    std::array<std::string, 8> result{};
+    const auto first = lines.size() > result.size() ? lines.size() - result.size() : 0U;
+    for (std::size_t i = 0; i < result.size(); ++i)
+        if (first + i < lines.size()) result[i] = lines[first + i];
+    if (first != 0U) result[0] = "..." + result[0];
+    return result;
+}
 }
 MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo, 3>& slots,
     const std::vector<gameplay::SpeedrunRecord>& board, const gameplay::RuntimeSettings& settings, const bool testMode)
@@ -24,6 +43,7 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         row("SPEEDRUN"); view.rows.back().destination = MenuPage::Speedrun;
         row("SETTINGS"); view.rows.back().destination = MenuPage::Settings;
         view.rows.back().command = MenuCommand::OpenSettings;
+        row("SEND FEEDBACK"); view.rows.back().destination = MenuPage::FeedbackCategory;
         row("QUIT GAME"); view.rows.back().command = MenuCommand::ExitGame; break;
     case MenuPage::CampaignSlots:
         view.title = "CAMPAIGN / STORY"; view.subtitle = "3 SAVES  -  10 FLOORS";
@@ -60,7 +80,26 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         row("DISPLAY"); row("AUDIO"); row("CONTROLS");
         setting("LANGUAGE", SettingsMenuOption::Language,
             settings.language == gameplay::Language::PortugueseBrazil ? "PORTUGUÊS (BR)" : "ENGLISH");
+        row("SEND FEEDBACK");
         row("BACK"); break;
+    case MenuPage::FeedbackCategory:
+        view.title = "SEND FEEDBACK"; view.subtitle = "CHOOSE A CATEGORY";
+        row("BUG"); row("GAMEPLAY"); row("UPDATE IDEA"); row("BACK"); break;
+    case MenuPage::FeedbackCompose: {
+        view.title = "SEND FEEDBACK";
+        view.subtitle = s.feedbackEditing ? "TYPE MESSAGE - ENTER TO FINISH"
+            : s.feedbackSending ? "SENDING - PLEASE WAIT"
+            : "ONLY YOUR MESSAGE AND SYSTEM INFO ARE SENT";
+        row("WRITE MESSAGE  " + std::to_string(uiTextLength(s.feedbackDraft)) + "/"
+            + std::to_string(maximumFeedbackCharacters), !s.feedbackSending);
+        for (auto& line : feedbackPreview(s.feedbackDraft)) {
+            row(line.empty() ? " " : line, false);
+            view.rows.back().rawText = true;
+        }
+        row("SEND", !s.feedbackSending && validPlayerFeedback(s.feedbackDraft));
+        row("BACK", !s.feedbackSending);
+        break;
+    }
     case MenuPage::Display: {
         view.title = "DISPLAY";
         setting("FIELD OF VIEW", SettingsMenuOption::FieldOfView, std::to_string(settings.fieldOfViewDegrees));
@@ -129,12 +168,12 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
     if (!s.notice.empty()) view.subtitle = s.notice;
     view.title = localize(settings.language, view.title);
     view.subtitle = localize(settings.language, view.subtitle);
-    for (auto& item : view.rows) item.text = localize(settings.language, item.text);
+    for (auto& item : view.rows) if (!item.rawText) item.text = localize(settings.language, item.text);
     return view;
 }
 void moveMenuSelection(MenuFlowState& s, const MenuView& view, const int direction) noexcept
 {
-    if (view.rows.empty() || direction == 0 || s.capture) return;
+    if (view.rows.empty() || direction == 0 || s.capture || s.feedbackEditing) return;
     const auto count = view.rows.size();
     for (std::size_t i = 0; i < count; ++i) {
         s.selection = direction > 0 ? (s.selection + 1U) % count : (s.selection + count - 1U) % count;
@@ -144,6 +183,7 @@ void moveMenuSelection(MenuFlowState& s, const MenuView& view, const int directi
 MenuCommand backMenu(MenuFlowState& s) noexcept
 {
     if (s.capture) { s.capture.reset(); return MenuCommand::None; }
+    if (s.feedbackEditing) { s.feedbackEditing = false; return MenuCommand::None; }
     switch (s.page) {
     case MenuPage::Root: return MenuCommand::ExitGame;
     case MenuPage::CampaignSlots: case MenuPage::Speedrun: open(s, MenuPage::Root); break;
@@ -151,6 +191,8 @@ MenuCommand backMenu(MenuFlowState& s) noexcept
     case MenuPage::Difficulty: case MenuPage::Overwrite: open(s, MenuPage::CampaignSlot); break;
     case MenuPage::Leaderboard: open(s, MenuPage::Speedrun); break;
     case MenuPage::Settings: open(s, MenuPage::Root); return MenuCommand::CloseSettings;
+    case MenuPage::FeedbackCategory: open(s, s.feedbackFromSettings ? MenuPage::Settings : MenuPage::Root); break;
+    case MenuPage::FeedbackCompose: open(s, MenuPage::FeedbackCategory); break;
     case MenuPage::Display: case MenuPage::Audio: case MenuPage::Controls: open(s, MenuPage::Settings); break;
     case MenuPage::KeyboardControls: case MenuPage::GamepadControls: open(s, MenuPage::Controls); break;
     case MenuPage::Bindings: case MenuPage::MoreBindings: open(s, MenuPage::KeyboardControls); break;
@@ -160,7 +202,7 @@ MenuCommand backMenu(MenuFlowState& s) noexcept
 }
 MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::array<CampaignSlotInfo, 3>& slots)
 {
-    if (s.selection >= view.rows.size() || !view.rows[s.selection].enabled || s.capture) return MenuCommand::None;
+    if (s.selection >= view.rows.size() || !view.rows[s.selection].enabled || s.capture || s.feedbackEditing) return MenuCommand::None;
     const auto selected = s.selection;
     const auto& row = view.rows[selected];
     if (row.binding) {
@@ -170,8 +212,17 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     }
     if (row.setting) return MenuCommand::None;
     if (s.page == MenuPage::Root) {
+        if (row.destination == MenuPage::FeedbackCategory) s.feedbackFromSettings = false;
         if (row.destination) open(s, *row.destination);
         return row.command;
+    } else if (s.page == MenuPage::FeedbackCategory && selected < 3U) {
+        s.feedbackTopic = static_cast<PlayerFeedbackTopic>(selected);
+        open(s, MenuPage::FeedbackCompose);
+    } else if (s.page == MenuPage::FeedbackCompose && selected == 0U) {
+        s.feedbackEditing = true;
+        s.notice.clear();
+    } else if (s.page == MenuPage::FeedbackCompose && selected == 9U) {
+        return MenuCommand::None;
     } else if (s.page == MenuPage::CampaignSlots && selected < 3U) {
         s.slot = selected; open(s, MenuPage::CampaignSlot);
     } else if (s.page == MenuPage::CampaignSlot && selected == 0U) return MenuCommand::ContinueCampaign;
@@ -184,6 +235,9 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     else if (s.page == MenuPage::Speedrun && selected == 1U) { open(s, MenuPage::Leaderboard); }
     else if (s.page == MenuPage::Speedrun && selected == 2U) return MenuCommand::BestSeed;
     else if (s.page == MenuPage::Settings && selected < 3U) open(s, selected == 0U ? MenuPage::Display : selected == 1U ? MenuPage::Audio : MenuPage::Controls);
+    else if (s.page == MenuPage::Settings && selected == 4U) {
+        s.feedbackFromSettings = true; open(s, MenuPage::FeedbackCategory);
+    }
     else if (s.page == MenuPage::Controls && selected < 2U)
         open(s, selected == 0U ? MenuPage::KeyboardControls : MenuPage::GamepadControls);
     else if (s.page == MenuPage::KeyboardControls && selected == 2U) open(s, MenuPage::Bindings);

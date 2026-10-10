@@ -1188,6 +1188,18 @@ void Application::processEvents()
     while (SDL_PollEvent(&event)) {
         (void)wkc::platform::handleSdlInputEvent(input_, event);
         if (config_.enableGamepad) gamepad_.handleEvent(input_, event);
+        if (event.type == SDL_EVENT_TEXT_INPUT && menuFlow_.feedbackEditing
+            && menuFlow_.page == MenuPage::FeedbackCompose) {
+            const std::string_view incoming{event.text.text};
+            std::size_t offset = 0U;
+            while (offset < incoming.size()
+                && uiTextLength(menuFlow_.feedbackDraft) < maximumFeedbackCharacters) {
+                const auto start = offset;
+                const auto codepoint = nextUiCodepoint(incoming, offset);
+                if (codepoint >= 0x20U && codepoint != 0x7fU)
+                    menuFlow_.feedbackDraft.append(incoming.substr(start, offset - start));
+            }
+        }
         if (event.type == SDL_EVENT_QUIT) {
             running_ = false;
         }
@@ -1461,8 +1473,9 @@ void Application::processEvents()
                 = gameplay::canAdvanceCampaign(session_.state());
             if (nextCampaignFloor) {
                 gameplay::CampaignCarryover carryover
-                    = gameplay::captureCampaignCarryover(
-                        player_, weapon_, progression_);
+                    = gameplay::prepareNextCampaignFloorCarryover(
+                        gameplay::captureCampaignCarryover(
+                            player_, weapon_, progression_));
                 if (!gameplay::validateCampaignCarryover(carryover)) {
                     log(LogLevel::Error,
                         "Campaign result produced invalid carry-over state");
@@ -2809,7 +2822,7 @@ void Application::fixedUpdate(const double fixedStep)
 
     const bool playerWasAlive = player_.state().alive;
     bool grenadeHitPlayer = false;
-    for (const gameplay::GrenadeDetonation& blast : playerGrenades_.update(step)) {
+    for (const gameplay::GrenadeDetonation& blast : playerGrenades_.update(step, entities_)) {
         activeGrenadeBlasts_.push_back({blast.position, blast.roomId, 0.36F});
         const gameplay::GrenadeBlastResult result
             = gameplay::resolveGrenadeBlast(blast, player_, entities_);
@@ -3203,8 +3216,10 @@ void Application::fixedUpdate(const double fixedStep)
                 session_.state().currentSeed, audioEventCounter_++);
         }
         if (gameplay::canAdvanceCampaign(session_.state())) {
-            gameplay::CampaignCarryover carryover = gameplay::captureCampaignCarryover(
-                player_, weapon_, progression_);
+            gameplay::CampaignCarryover carryover
+                = gameplay::prepareNextCampaignFloorCarryover(
+                    gameplay::captureCampaignCarryover(
+                        player_, weapon_, progression_));
             if (!gameplay::validateCampaignCarryover(carryover)) {
                 log(LogLevel::Error, "Campaign exit produced invalid carry-over state");
                 fatalError_ = true;
@@ -3398,6 +3413,7 @@ void Application::render()
             hud.listMenu.rows.push_back(row.text);
             hud.listMenu.enabled.push_back(row.enabled);
             hud.listMenu.adjustable.push_back(row.setting.has_value());
+            hud.listMenu.rawText.push_back(row.rawText);
         }
         hud.exitConfirmation = exitConfirmation_.active;
         if (exitConfirmation_.selection == gameplay::ExitConfirmationOption::ExitGame)

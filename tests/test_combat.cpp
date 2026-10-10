@@ -127,14 +127,15 @@ void testChargedGrenadeThrow()
         "grenade charge increases throw speed and caps at maximum charge");
     PlayerGrenadeSystem shortThrow;
     PlayerGrenadeSystem longThrow;
+    gdp::entities::EntityManager emptyEnemies;
     expect(shortThrow.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
                0.0F, 1U, room)
             && longThrow.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
                 grenadeMaximumChargeSeconds, 1U, room),
         "short and charged throws both spawn a physical grenade");
     for (int frame = 0; frame < 25; ++frame) {
-        (void)shortThrow.update(0.02F);
-        (void)longThrow.update(0.02F);
+        (void)shortThrow.update(0.02F, emptyEnemies);
+        (void)longThrow.update(0.02F, emptyEnemies);
     }
     expect(shortThrow.grenades().size() == 1U && longThrow.grenades().size() == 1U
             && longThrow.grenades().front().position.z
@@ -142,7 +143,7 @@ void testChargedGrenadeThrow()
         "holding fire sends the grenade materially farther before detonation");
     std::size_t detonations = 0U;
     for (int frame = 0; frame < 100; ++frame)
-        detonations += longThrow.update(0.02F).size();
+        detonations += longThrow.update(0.02F, emptyEnemies).size();
     expect(detonations == 1U && longThrow.grenades().empty(),
         "fuse detonates exactly once and removes the spent grenade");
     Player player;
@@ -150,6 +151,46 @@ void testChargedGrenadeThrow()
             && player.useGrenade() && !player.useGrenade()
             && player.state().grenades == 0U,
         "player starts with two frags and cannot throw a third");
+}
+
+void testGrenadeCollidesWithEnemies()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-10.0F, 0.0F, -10.0F}, {10.0F, 5.0F, 10.0F}}};
+    EntityManager enemies;
+    const EntityId target = enemies.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F}},
+        .roomId = 1U, .health = 100.0F});
+    PlayerGrenadeSystem grenade;
+    expect(grenade.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+               grenadeMaximumChargeSeconds, 1U, room),
+        "charged grenade spawns in front of an enemy");
+    (void)grenade.update(0.05F, enemies);
+    expect(grenade.grenades().size() == 1U
+            && grenade.grenades().front().position.z < 0.70F
+            && grenade.grenades().front().velocity.z < 0.0F
+            && near(enemies.findData<EnemyData>(target)->health, 100.0F),
+        "swept contact bounces a fast grenade off an enemy without impact damage");
+
+    enemies.findData<EnemyData>(target)->behavior = EnemyBehaviorState::Dead;
+    PlayerGrenadeSystem throughDead;
+    expect(throughDead.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+               grenadeMaximumChargeSeconds, 1U, room),
+        "grenade spawns for dead-enemy collision check");
+    (void)throughDead.update(0.05F, enemies);
+    expect(throughDead.grenades().front().position.z > 1.0F,
+        "dead enemies do not block thrown grenades");
+
+    enemies.findData<EnemyData>(target)->behavior = EnemyBehaviorState::Idle;
+    enemies.find(target)->roomId = 2U;
+    PlayerGrenadeSystem otherRoom;
+    expect(otherRoom.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+               grenadeMaximumChargeSeconds, 1U, room),
+        "grenade spawns for room-filter check");
+    (void)otherRoom.update(0.05F, enemies);
+    expect(otherRoom.grenades().front().position.z > 1.0F,
+        "enemy in an unreachable room does not block the grenade");
 }
 
 void testQuickMeleeKeepsEquippedFirearm()
@@ -3429,6 +3470,7 @@ int main()
 {
     testCombatSignalBatch();
     testChargedGrenadeThrow();
+    testGrenadeCollidesWithEnemies();
     testGrenadeBlastRespectsCover();
     testQuickMeleeKeepsEquippedFirearm();
     testExpandedWeaponProfilesAndInventory();

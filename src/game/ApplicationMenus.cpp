@@ -1,4 +1,5 @@
 #include "game/Application.hpp"
+#include "game/Localization.hpp"
 #include "game/audio/AudioSystem.hpp"
 #include "core/Log.hpp"
 #include <SDL3/SDL.h>
@@ -19,6 +20,28 @@ void Application::processFrontendMenu()
     auto play = [&](gdp::audio::AudioEventKind kind) {
         if (audio_) audio_->playUi(kind, session_.state().currentSeed, uiAudioEventCounter_++);
     };
+    if (playerFeedbackTransport_.sending()) {
+        const auto result = playerFeedbackTransport_.poll();
+        if (result != PlayerFeedbackResult::Pending) {
+            menuFlow_.feedbackSending = false;
+            if (result == PlayerFeedbackResult::Sent) {
+                menuFlow_.feedbackDraft.clear();
+                menuFlow_.notice = "FEEDBACK SENT - THANK YOU";
+                menuFlow_.selection = 0U;
+            } else menuFlow_.notice = "SEND FAILED - TRY AGAIN";
+        }
+    }
+    if (menuFlow_.page == MenuPage::FeedbackCompose && menuFlow_.feedbackEditing) {
+        if (input_.wasKeyPressed(Key::Backspace)) popUiCodepoint(menuFlow_.feedbackDraft);
+        if (input_.wasKeyPressed(Key::Enter) || input_.wasKeyPressed(Key::Escape)
+            || input_.wasGamepadButtonPressed(GamepadButton::East)) {
+            SDL_StopTextInput(window_);
+            menuFlow_.feedbackEditing = false;
+            play(gdp::audio::AudioEventKind::UiConfirm);
+        }
+        return;
+    }
+    if (menuFlow_.feedbackSending) return;
     if (menuFlow_.capture) {
         if (input_.wasKeyPressed(Key::Escape)
             || input_.wasGamepadButtonPressed(
@@ -114,7 +137,23 @@ void Application::processFrontendMenu()
             else runtimeSettings_.controls = {};
             settingsDirty_ = true; (void)savePersistedSettings();
             menuFlow_.notice = "DEFAULT BINDINGS RESTORED";
-        } else command = activateMenu(menuFlow_, view, campaignSlots_);
+        } else if (menuFlow_.page == MenuPage::FeedbackCompose && menuFlow_.selection == 9U) {
+            const auto json = playerFeedbackJson(menuFlow_.feedbackTopic, menuFlow_.feedbackDraft,
+                GDP_VERSION_STRING, SDL_GetPlatform());
+            if (!json.empty() && playerFeedbackTransport_.start(json)) {
+                menuFlow_.feedbackSending = true;
+                menuFlow_.notice = "SENDING - PLEASE WAIT";
+            } else menuFlow_.notice = "SEND FAILED - CURL UNAVAILABLE";
+        } else {
+            command = activateMenu(menuFlow_, view, campaignSlots_);
+            if (menuFlow_.feedbackEditing) {
+                if (SDL_StartTextInput(window_)) menuFlow_.notice.clear();
+                else {
+                    menuFlow_.feedbackEditing = false;
+                    menuFlow_.notice = "TEXT INPUT UNAVAILABLE";
+                }
+            }
+        }
         play(gdp::audio::AudioEventKind::UiConfirm);
     }
     if (command == MenuCommand::OpenSettings) {

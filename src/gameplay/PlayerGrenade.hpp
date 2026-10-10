@@ -50,7 +50,8 @@ public:
         wkc::core::Vec3 direction, float chargeSeconds,
         std::uint32_t roomId, const CollisionWorld& collision,
         std::span<const std::uint32_t> reachableRooms = {});
-    [[nodiscard]] std::vector<GrenadeDetonation> update(float step);
+    [[nodiscard]] std::vector<GrenadeDetonation> update(
+        float step, const entities::EntityManager& entities);
     void clear() noexcept { grenades_.clear(); }
     [[nodiscard]] std::span<const PlayerGrenade> grenades() const noexcept
     {

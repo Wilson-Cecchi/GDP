@@ -42,6 +42,12 @@ terminar a missão. Interagir com o terminal antes disso não avança. O HUD
 mostra a tarefa pendente e o aviso de bloqueio em inglês ou português (Brasil).
 No décimo andar, a interação liberada abre a vitória final.
 
+Ao avançar para um novo andar, a Campanha recupera uma granada de fragmentação,
+até o limite de duas. O bônus é aplicado apenas na transição de andar, antes
+do checkpoint de entrada; reiniciar ou continuar o mesmo andar restaura esse
+checkpoint sem conceder outra granada. Standard, Speedrun e Test Mode não
+recebem essa reposição de campanha.
+
 ## Orientação pelo minimapa
 
 Enquanto a missão estiver pendente, o mapa destaca sua sala em âmbar quando
