@@ -5,6 +5,12 @@ materiais e texturas existentes são um **baseline técnico funcional**: podem
 continuar sendo usados durante o desenvolvimento, mas não representam arte
 final aprovada.
 
+Pranchas e capturas PNG/GIF em `visual/` são artefatos locais de revisão, não
+assets carregados pelo jogo. Elas não acompanham novos clones do repositório;
+os caminhos registrados abaixo documentam o histórico da aprovação e podem
+não estar disponíveis fora da máquina onde foram geradas. Para novas aprovações,
+anexe a proposta e as capturas ao pedido de revisão visual.
+
 ## Regra obrigatória
 
 Nenhuma textura ou receita visual revisada pode ser implementada no renderer,

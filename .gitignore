@@ -2,6 +2,10 @@
 /.cache/
 /compile_commands.json
 /CODEX_WKC_FORGE_REFACTOR.md
+
+# Visual proposals and validation captures are local review artifacts, not game assets.
+/visual/**/*.png
+/visual/**/*.gif
 __pycache__/
 *.pyc
 
