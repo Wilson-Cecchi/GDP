@@ -234,7 +234,8 @@ def atomic_write(path: Path, data: bytes) -> None:
 
 
 def promote(role: str, candidate: Path, expected_active_hash: str,
-            active_dir: Path, runtime_dir: Path, evaluator: Path) -> None:
+            active_dir: Path, runtime_dir: Path, evaluator: Path,
+            expected_candidate_hash: str) -> None:
     source = active_dir / f"{role}.brain"
     runtime = runtime_dir / f"{role}.brain"
     state_path = ROOT / "build" / "ai-promotion-state.json"
@@ -252,6 +253,8 @@ def promote(role: str, candidate: Path, expected_active_hash: str,
         previous = source.read_bytes()
         previous_state = state_path.read_bytes() if state_path.exists() else None
         replacement = candidate.read_bytes()
+        if hashlib.sha256(replacement).hexdigest() != expected_candidate_hash:
+            raise RuntimeError(f"Candidate {role} changed during evaluation; retry the gate")
         try:
             atomic_write(source, replacement)
             atomic_write(runtime, replacement)
@@ -276,8 +279,10 @@ def promote(role: str, candidate: Path, expected_active_hash: str,
             raise
 
 
-def run_gate(groups: dict[str, list[Path]], evaluator: Path,
-             active_dir: Path, runtime_dir: Path, dry_run: bool) -> int:
+def _run_gate_staged(groups: dict[str, list[Path]], originals: dict[Path, Path],
+                     snapshot_hashes: dict[Path, str],
+                     evaluator: Path, active_dir: Path, runtime_dir: Path,
+                     dry_run: bool) -> int:
     if not evaluator.is_file():
         raise ValueError(f"Build the evaluator first: {evaluator}")
     reports = ROOT / "build" / "ai-promotion-reports"
@@ -320,7 +325,8 @@ def run_gate(groups: dict[str, list[Path]], evaluator: Path,
                 passed, score, reason = decide(role, validation_baseline,
                                                 validation_result,
                                                 len(validation_seeds))
-            decisions.append({"candidate": str(candidate), "passed": passed,
+            decisions.append({"candidate": str(originals[candidate]),
+                              "sha256": snapshot_hashes[candidate], "passed": passed,
                               "score": round(score, 5), "reason": reason})
             if passed and (winner is None or score > winner[0]):
                 winner = score, candidate
@@ -331,7 +337,7 @@ def run_gate(groups: dict[str, list[Path]], evaluator: Path,
         final_baseline = None
         final_result = None
         final_reason = "no validation winner"
-        selected_for_final = str(winner[1]) if winner else None
+        selected_for_final = str(originals[winner[1]]) if winner else None
         if winner:
             final_baseline = measure(evaluator, active_dir, role, None,
                                      final_seeds, True)
@@ -348,7 +354,8 @@ def run_gate(groups: dict[str, list[Path]], evaluator: Path,
                   "final_seeds": final_seeds,
                   "policies_checked": len(candidates), "decisions": decisions,
                   "selected_for_final": selected_for_final,
-                  "winner": str(winner[1]) if winner else None,
+                  "winner": str(originals[winner[1]]) if winner else None,
+                  "winner_sha256": snapshot_hashes[winner[1]] if winner else None,
                   "validation_baseline_metrics": validation_baseline,
                   "validation_winner_metrics": winner_metrics,
                   "final_baseline_metrics": final_baseline,
@@ -362,15 +369,41 @@ def run_gate(groups: dict[str, list[Path]], evaluator: Path,
         report_path = reports / f"{label}-{role}.json"
         atomic_write(report_path, (json.dumps(report, indent=2) + "\n").encode())
         if winner and not dry_run:
-            promote(role, winner[1], current_hash, active_dir, runtime_dir, evaluator)
-            print(f"AI_PROMOTION role={role} decision=PROMOTE brain={winner[1]} "
+            promote(role, winner[1], current_hash, active_dir, runtime_dir,
+                    evaluator, snapshot_hashes[winner[1]])
+            print(f"AI_PROMOTION role={role} decision=PROMOTE brain={originals[winner[1]]} "
                   f"report={report_path}", flush=True)
         else:
             print(f"AI_PROMOTION role={role} decision={'DRY_RUN' if winner else 'KEEP'} "
-                  f"brain={winner[1] if winner else '-'} "
+                  f"brain={originals[winner[1]] if winner else '-'} "
                   f"reason={final_reason.replace(' ', '_')} report={report_path}",
                   flush=True)
     return 0
+
+
+def run_gate(groups: dict[str, list[Path]], evaluator: Path,
+             active_dir: Path, runtime_dir: Path, dry_run: bool) -> int:
+    if not evaluator.is_file():
+        raise ValueError(f"Build the evaluator first: {evaluator}")
+    reports = ROOT / "build" / "ai-promotion-reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="candidates-", dir=reports) as directory:
+        snapshots: dict[str, list[Path]] = {}
+        originals: dict[Path, Path] = {}
+        snapshot_hashes: dict[Path, str] = {}
+        for role, candidates in groups.items():
+            snapshots[role] = []
+            for index, candidate in enumerate(candidates):
+                if int(CHECKPOINT.fullmatch(candidate.name).group(2)) < 7:
+                    continue
+                snapshot = Path(directory) / role / str(index) / candidate.name
+                content = candidate.read_bytes()
+                atomic_write(snapshot, content)
+                snapshots[role].append(snapshot)
+                originals[snapshot] = candidate
+                snapshot_hashes[snapshot] = hashlib.sha256(content).hexdigest()
+        return _run_gate_staged(snapshots, originals, snapshot_hashes, evaluator,
+                                active_dir, runtime_dir, dry_run)
 
 
 def training_value(command: list[str], option: str) -> str:

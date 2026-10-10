@@ -138,7 +138,8 @@ class PromotionWriteTests(unittest.TestCase):
                 mock.patch.object(gate, "evaluator_rows"):
             gate.promote("worker", self.candidate, gate.sha256(self.source),
                          self.source.parent, self.runtime.parent,
-                         self.root / "build/release/gdp_ai_gameplay_eval")
+                         self.root / "build/release/gdp_ai_gameplay_eval",
+                         gate.sha256(self.candidate))
         self.assertEqual(b"new brain", self.source.read_bytes())
         self.assertEqual(b"new brain", self.runtime.read_bytes())
         state = self.root / "build/ai-promotion-state.json"
@@ -154,7 +155,8 @@ class PromotionWriteTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "invalid brain"):
                 gate.promote("worker", self.candidate, gate.sha256(self.source),
                              self.source.parent, self.runtime.parent,
-                             self.root / "build/release/gdp_ai_gameplay_eval")
+                             self.root / "build/release/gdp_ai_gameplay_eval",
+                             gate.sha256(self.candidate))
         self.assertEqual(b"old brain", self.source.read_bytes())
         self.assertEqual(b"old brain", self.runtime.read_bytes())
 
@@ -167,11 +169,66 @@ class PromotionWriteTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unrelated uncommitted"):
                 gate.promote("worker", self.candidate, gate.sha256(self.source),
                              self.source.parent, self.runtime.parent,
-                             self.root / "build/release/gdp_ai_gameplay_eval")
+                             self.root / "build/release/gdp_ai_gameplay_eval",
+                             gate.sha256(self.candidate))
         self.assertEqual(b"old brain", self.source.read_bytes())
+
+    def test_changed_candidate_is_rejected_before_active_write(self) -> None:
+        approved_hash = gate.sha256(self.candidate)
+        self.candidate.write_bytes(b"unevaluated brain")
+        clean = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        with mock.patch.object(gate, "ROOT", self.root), \
+                mock.patch.object(gate.subprocess, "run", return_value=clean):
+            with self.assertRaisesRegex(RuntimeError, "changed during evaluation"):
+                gate.promote("worker", self.candidate, gate.sha256(self.source),
+                             self.source.parent, self.runtime.parent,
+                             self.root / "build/release/gdp_ai_gameplay_eval",
+                             approved_hash)
+        self.assertEqual(b"old brain", self.source.read_bytes())
+        self.assertEqual(b"old brain", self.runtime.read_bytes())
 
 
 class PromotionWorkflowTests(unittest.TestCase):
+    def test_candidate_swap_after_final_gate_cannot_change_promoted_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "worker_generation_000007.brain"
+            approved = b"seed 42\napproved brain\n"
+            candidate.write_bytes(approved)
+            active_dir = root / "assets/ai"
+            active_dir.mkdir(parents=True)
+            (active_dir / "worker.brain").write_bytes(b"active")
+            evaluator = root / "gdp_ai_gameplay_eval"
+            evaluator.touch()
+            evaluated: list[bytes] = []
+            promoted: list[bytes] = []
+
+            def measure_candidate(_evaluator, _active_dir, _role, path,
+                                  _seeds, _include_long):
+                if path is not None:
+                    evaluated.append(path.read_bytes())
+                    if len(evaluated) == 3:
+                        candidate.write_bytes(b"seed 42\nunevaluated brain\n")
+                return {}
+
+            def record_promotion(_role, path, *_args):
+                self.assertEqual(gate.sha256(path), _args[-1])
+                promoted.append(path.read_bytes())
+
+            with mock.patch.object(gate, "ROOT", root), \
+                    mock.patch.object(gate, "measure", side_effect=measure_candidate), \
+                    mock.patch.object(gate, "decide", side_effect=[
+                        (True, 1.0, "quick"), (True, 2.0, "validation"),
+                        (True, 3.0, "final")]), \
+                    mock.patch.object(gate, "promote", side_effect=record_promotion):
+                gate.run_gate({"worker": [candidate]}, evaluator, active_dir,
+                              root / "build/release/ai", False)
+
+            self.assertEqual([approved] * 3, evaluated)
+            self.assertEqual([approved], promoted)
+            reports = list((root / "build/ai-promotion-reports").glob("*.json"))
+            self.assertEqual(str(candidate), json.loads(reports[0].read_text())["winner"])
+
     def test_final_holdout_failure_cannot_promote(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
