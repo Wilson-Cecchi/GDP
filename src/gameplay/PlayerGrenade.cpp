@@ -114,6 +114,65 @@ float blastDamage(const wkc::core::Vec3 origin,
 
 } // namespace
 
+bool GrenadeCookState::begin() noexcept
+{
+    if (phase_ != Phase::Idle) return false;
+    phase_ = Phase::PinPull;
+    return true;
+}
+
+void GrenadeCookState::reset() noexcept
+{
+    *this = GrenadeCookState{};
+}
+
+GrenadeCookOutcome GrenadeCookState::update(
+    const float step, const bool fireHeld) noexcept
+{
+    if (!active() || !std::isfinite(step) || step <= 0.0F)
+        return GrenadeCookOutcome::None;
+    if (!fireHeld) releasePending_ = true;
+
+    float cookingSeconds = step;
+    if (phase_ == Phase::PinPull) {
+        const float pinRemaining = grenadePinPullSeconds - pinSeconds_;
+        const float pinStep = std::min(cookingSeconds, pinRemaining);
+        pinSeconds_ += pinStep;
+        cookingSeconds -= pinStep;
+        if (pinSeconds_ < grenadePinPullSeconds) return GrenadeCookOutcome::None;
+        pinSeconds_ = grenadePinPullSeconds;
+        phase_ = Phase::Cooking;
+    }
+
+    // Input is observed at the start of this fixed step. A released grenade
+    // leaves the hand as soon as its pin is out, before this step burns fuse.
+    if (releasePending_) {
+        phase_ = Phase::Spent;
+        return GrenadeCookOutcome::Throw;
+    }
+
+    windupSeconds_ = std::min(grenadeMaximumChargeSeconds,
+        windupSeconds_ + cookingSeconds);
+    remainingFuseSeconds_ = std::max(0.0F,
+        remainingFuseSeconds_ - cookingSeconds);
+    if (remainingFuseSeconds_ <= 1.0e-5F) {
+        remainingFuseSeconds_ = 0.0F;
+        phase_ = Phase::Spent;
+        return GrenadeCookOutcome::DetonateInHand;
+    }
+    return GrenadeCookOutcome::None;
+}
+
+float GrenadeCookState::pinProgress() const noexcept
+{
+    return pinSeconds_ / grenadePinPullSeconds;
+}
+
+float GrenadeCookState::windupProgress() const noexcept
+{
+    return windupSeconds_ / grenadeMaximumChargeSeconds;
+}
+
 float grenadeThrowSpeed(const float chargeSeconds) noexcept
 {
     const float charge = std::isfinite(chargeSeconds)
@@ -126,11 +185,16 @@ bool PlayerGrenadeSystem::throwGrenade(
     const wkc::core::Vec3 origin, const wkc::core::Vec3 direction,
     const float chargeSeconds, const std::uint32_t roomId,
     const CollisionWorld& collision,
-    const std::span<const std::uint32_t> reachableRooms)
+    const std::span<const std::uint32_t> reachableRooms,
+    const float remainingFuseSeconds)
 {
     if (!std::isfinite(wkc::core::length(origin))
         || !std::isfinite(wkc::core::length(direction))
-        || wkc::core::length(direction) <= 1.0e-5F || roomId == 0U) {
+        || wkc::core::length(direction) <= 1.0e-5F || roomId == 0U
+        || !std::isfinite(chargeSeconds)
+        || !std::isfinite(remainingFuseSeconds)
+        || remainingFuseSeconds <= 0.0F
+        || remainingFuseSeconds > grenadeFuseSeconds) {
         return false;
     }
     const wkc::core::Vec3 forward = wkc::core::normalized(direction);
@@ -144,7 +208,7 @@ bool PlayerGrenadeSystem::throwGrenade(
     grenades_.push_back({position,
         forward * grenadeThrowSpeed(chargeSeconds)
             + wkc::core::Vec3{0.0F, 2.5F, 0.0F},
-        2.4F, roomId, collision,
+        remainingFuseSeconds, roomId, collision,
         {reachableRooms.begin(), reachableRooms.end()}});
     return true;
 }
@@ -181,7 +245,8 @@ std::vector<GrenadeDetonation> PlayerGrenadeSystem::update(
         }
         grenade.velocity.x *= std::max(0.0F, 1.0F - 0.7F * seconds);
         grenade.velocity.z *= std::max(0.0F, 1.0F - 0.7F * seconds);
-        grenade.fuseSeconds -= seconds;
+        // Physics limits a large step, but the fuse must still consume real time.
+        grenade.fuseSeconds -= step;
         if (grenade.fuseSeconds <= 0.0F) {
             detonations.push_back({grenade.position, grenade.roomId,
                 grenade.collision, grenade.reachableRooms});

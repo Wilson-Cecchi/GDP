@@ -1869,16 +1869,87 @@ void testPlayerHands()
     }
     WeaponViewmodelRenderData grenade{.visible=true, .grenadeSelected=true,
         .role=HudWeaponRole::Knife};
+    const auto ready=sampleGrenadeViewmodelPose(grenade);
     const auto held=samplePlayerHandsPose(grenade);
-    const Vec3 grip=held.contactPoints[0]-grenadeViewmodelBodyCenter;
-    expect(std::abs(grip.x)<.103F && std::abs(grip.y)<.128F
-            && std::abs(grip.z)<.096F,
-        "grenade grip remains on its opaque body instead of in empty space");
+    const Vec3 grip=held.contactPoints[0]-ready.bodyCenter;
+    const float ellipsoid=std::sqrt(grip.x*grip.x/(.10F*.10F)
+        +grip.y*grip.y/(.125F*.125F)+grip.z*grip.z/(.095F*.095F));
+    expect(length(held.contactPoints[0]-ready.gripContact)<.0001F
+            && ellipsoid>.75F && ellipsoid<1.05F,
+        "dominant palm contacts the rounded grenade housing");
+    expect(ready.pinVisible && ready.pinCenter.x<ready.bodyCenter.x,
+        "the installed pin is visible on the support-hand side");
+    grenade.grenadePriming=true;
+    grenade.grenadePinProgress=.40F;
+    const auto pinReached=sampleGrenadeViewmodelPose(grenade);
+    const auto handReached=samplePlayerHandsPose(grenade);
+    expect(length(handReached.contactPoints[1]-pinReached.pinCenter)<.0001F
+            && handReached.leftContact==HandContact::Shell,
+        "support index reaches the pin before it starts moving");
+    grenade.grenadePinProgress=.85F;
+    const auto pinPulled=sampleGrenadeViewmodelPose(grenade);
+    const auto handPulled=samplePlayerHandsPose(grenade);
+    expect(length(handPulled.contactPoints[1]-pinPulled.pinCenter)<.0001F
+            && pinPulled.pinCenter.x<pinReached.pinCenter.x-.15F
+            && pinPulled.bodyCenter==pinReached.bodyCenter,
+        "support hand pulls the pin while the grenade stays in place");
     grenade.grenadeChargeStrength=1.0F;
+    grenade.grenadePinProgress=1.0F;
+    const auto wound=sampleGrenadeViewmodelPose(grenade);
     const auto charged=samplePlayerHandsPose(grenade);
-    expect(length(charged.contactPoints[0]-held.contactPoints[0]
-            -Vec3{0.0F,0.0F,grenadeViewmodelChargeTravel})<.0001F,
-        "the throwing hand follows the grenade through the full charge travel");
+    expect(length(charged.contactPoints[0]-wound.gripContact)<.0001F
+            && wound.bodyCenter.z<ready.bodyCenter.z-.18F
+            && wound.pinCenter==pinPulled.pinCenter,
+        "dominant hand and grenade retreat while the pulled pin stays in the support hand");
+    grenade.grenadeVisible=false;
+    grenade.grenadeThrowStrength=.5F;
+    const auto released=sampleGrenadeViewmodelPose(grenade);
+    const auto followThrough=samplePlayerHandsPose(grenade);
+    expect(!released.pinVisible && released.bodyCenter.z>ready.bodyCenter.z+.25F
+            && length(followThrough.contactPoints[0]-released.gripContact)<.0001F
+            && followThrough.fingerFlexion[0][0]<charged.fingerFlexion[0][0],
+        "release hides the pin, opens the dominant hand and extends the arm");
+    grenade.grenadeThrowStrength=1.0F;
+    const auto recovered=sampleGrenadeViewmodelPose(grenade);
+    expect(length(recovered.bodyCenter-ready.bodyCenter)<.0001F,
+        "follow-through returns to the ready position for the next grenade");
+    grenade.grenadeThrowStrength=0.0F;
+    grenade.grenadeVisible=true;
+    grenade.grenadePinProgress=0.0F;
+    grenade.grenadeChargeStrength=0.0F;
+    auto previous=samplePlayerHandsPose(grenade);
+    for(unsigned int phase=1;phase<=100U;++phase) {
+        grenade.grenadePinProgress=float(phase)/100;
+        const auto next=samplePlayerHandsPose(grenade);
+        expect(length(next.wrists[1]-previous.wrists[1])<.05F,
+            "pin-pull support wrist follows a continuous trajectory");
+        previous=next;
+    }
+    grenade.grenadePinProgress=1.0F;
+    previous=samplePlayerHandsPose(grenade);
+    for(unsigned int phase=1;phase<=100U;++phase) {
+        grenade.grenadeChargeStrength=float(phase)/100;
+        const auto next=samplePlayerHandsPose(grenade);
+        expect(length(next.wrists[0]-previous.wrists[0])<.05F,
+            "windup dominant wrist follows a continuous trajectory");
+        previous=next;
+    }
+    grenade.grenadeVisible=false;
+    previous=samplePlayerHandsPose(grenade);
+    for(unsigned int phase=1;phase<=100U;++phase) {
+        grenade.grenadeThrowStrength=float(phase)/100;
+        const auto next=samplePlayerHandsPose(grenade);
+        for(std::size_t side=0;side<2U;++side) {
+            expect(length(next.wrists[side]-previous.wrists[side])<.05F,
+                "release hands follow continuous trajectories");
+            const auto& a=next.skin[side*playerHandBonesPerSide+2U].elements;
+            const Vec3 fore=normalized(next.wrists[side]-next.elbows[side]);
+            expect(dot(fore,{a[4],a[5],a[6]})
+                    >std::cos(31.0F*std::numbers::pi_v<float>/180),
+                "grenade release keeps the wrist within its anatomical bend limit");
+        }
+        previous=next;
+    }
 }
 
 void testOptimizedShadowBudget()

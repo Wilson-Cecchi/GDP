@@ -8,6 +8,7 @@
 #include "game/visual/VisualAssets.hpp"
 #include "game/visual/UiFontAtlas.hpp"
 #include "game/Localization.hpp"
+#include "gameplay/PlayerGrenade.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 
@@ -24,6 +25,44 @@
 
 namespace gdp::game::visual {
 namespace {
+
+wkc::render::MeshData makeGrenadeBodyMesh()
+{
+    constexpr std::uint32_t slices = 24U;
+    constexpr std::uint32_t stacks = 16U;
+    constexpr float pi = std::numbers::pi_v<float>;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve((slices + 1U) * (stacks + 1U));
+    mesh.indices.reserve(slices * stacks * 6U);
+    for (std::uint32_t row = 0U; row <= stacks; ++row) {
+        const float latitude = pi * static_cast<float>(row)
+            / static_cast<float>(stacks);
+        const float height = std::cos(latitude);
+        const float radius = std::sin(latitude);
+        for (std::uint32_t column = 0U; column <= slices; ++column) {
+            const float longitude = 2.0F * pi * static_cast<float>(column)
+                / static_cast<float>(slices);
+            const wkc::core::Vec3 normal{
+                radius * std::cos(longitude), height,
+                radius * std::sin(longitude)};
+            mesh.vertices.push_back({normal * 0.5F, normal,
+                {static_cast<float>(column) / static_cast<float>(slices),
+                    static_cast<float>(row) / static_cast<float>(stacks)}, 0U});
+        }
+    }
+    for (std::uint32_t row = 0U; row < stacks; ++row) {
+        for (std::uint32_t column = 0U; column < slices; ++column) {
+            const std::uint32_t top = row * (slices + 1U) + column;
+            const std::uint32_t bottom = top + slices + 1U;
+            mesh.indices.insert(mesh.indices.end(), {
+                top, top + 1U, bottom,
+                top + 1U, bottom + 1U, bottom});
+        }
+    }
+    mesh.bounds = {{-0.5F, -0.5F, -0.5F}, {0.5F, 0.5F, 0.5F}};
+    mesh.backfaceCullingSafe = true;
+    return mesh;
+}
 
 constexpr std::string_view uiVertexShader = R"glsl(#version 330 core
 layout(location = 0) in vec3 aPosition;
@@ -590,7 +629,8 @@ bool GdpRenderer::initialize(const int width, const int height)
             gl_, vertexShaderSource, makeLowSpecFragmentShaderSource())) {
         return false;
     }
-    if (!box_.upload(gl_, wkc::render::makeBoxMesh())) {
+    if (!box_.upload(gl_, wkc::render::makeBoxMesh())
+        || !grenadeBody_.upload(gl_, makeGrenadeBodyMesh())) {
         return false;
     }
     for (std::size_t role = 0; role < weaponRoleCount; ++role) {
@@ -2444,7 +2484,8 @@ bool GdpRenderer::render(
                 gpu.albedo.bind(gl_, textureBindings_, 0U);
                 gpu.normal.bind(gl_, textureBindings_, 1U);
                 gpu.properties.bind(gl_, textureBindings_, 2U);
-                drawMesh(knife ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
+                drawMesh(knife && !weaponViewmodel.grenadeSelected
+                    ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
             }
             shader.setInt(gl_, "uPlayerSkinning", 0);
         }
@@ -2470,11 +2511,10 @@ bool GdpRenderer::render(
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
-        if (weaponViewmodel.grenadeSelected) {
-            const float charge = std::clamp(
-                weaponViewmodel.grenadeChargeStrength, 0.0F, 1.0F);
-            const auto center = grenadeViewmodelBodyCenter + wkc::core::Vec3{
-                0.0F, 0.0F, charge * grenadeViewmodelChargeTravel};
+        if (weaponViewmodel.grenadeSelected && weaponViewmodel.grenadeVisible) {
+            const GrenadeViewmodelPose grenadePose
+                = sampleGrenadeViewmodelPose(presentationWeapon);
+            const auto center = grenadePose.bodyCenter;
             const auto bindGrenadeMaterial = [&](const WeaponMaterial material) {
                 const auto& gpu = weaponMaterials_[static_cast<std::size_t>(material)];
                 gpu.albedo.bind(gl_, textureBindings_, 0U);
@@ -2482,21 +2522,40 @@ bool GdpRenderer::render(
                 gpu.properties.bind(gl_, textureBindings_, 2U);
                 shader.setInt(gl_, "uDetailedMaterial", 1);
             };
-            // An opaque, textured housing stays in the dominant hand. The
-            // grip pose uses the same charge displacement as these pieces.
+            const auto drawRoundedPiece = [&](const wkc::core::Vec3 offset,
+                                              const wkc::core::Vec3 scale,
+                                              const wkc::core::Vec3 color) {
+                shader.setMat4(gl_, "uModel", root
+                    * wkc::core::translationMatrix(offset)
+                    * wkc::core::scaleMatrix(scale));
+                shader.setVec3(gl_, "uTint", color);
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(grenadeBody_);
+            };
             shader.setFloat(gl_, "uOpacity", 1.0F);
             bindGrenadeMaterial(WeaponMaterial::Polymer);
-            drawWeaponPiece(center, {0.205F, 0.255F, 0.19F}, {},
-                {0.57F, 0.63F, 0.36F});
-            drawWeaponPiece(center + wkc::core::Vec3{0.0F, -0.092F, 0.0F},
-                {0.217F, 0.022F, 0.202F}, {}, {0.38F, 0.44F, 0.26F});
+            drawRoundedPiece(center, {0.205F, 0.255F, 0.19F},
+                {0.48F, 0.55F, 0.35F});
             bindGrenadeMaterial(WeaponMaterial::CoatedSteel);
-            drawWeaponPiece(center + wkc::core::Vec3{0.0F, 0.151F, 0.0F},
-                {0.115F, 0.056F, 0.105F}, {}, {0.68F, 0.72F, 0.67F});
-            drawWeaponPiece(center + wkc::core::Vec3{-0.082F, 0.105F, 0.0F},
-                {0.031F, 0.20F, 0.11F}, {}, {0.47F, 0.52F, 0.45F});
-            drawWeaponPiece(center + wkc::core::Vec3{0.0F, 0.193F, 0.0F},
-                {0.05F, 0.035F, 0.105F}, {}, {0.29F, 0.32F, 0.31F});
+            drawRoundedPiece(center + wkc::core::Vec3{0.0F, 0.116F, 0.0F},
+                {0.105F, 0.052F, 0.105F}, {0.61F, 0.66F, 0.63F});
+            drawWeaponPiece(center + wkc::core::Vec3{-0.064F, 0.096F, 0.0F},
+                {0.014F, 0.116F, 0.040F}, {0.0F, 0.0F, -15.0F},
+                {0.43F, 0.48F, 0.45F});
+            if (grenadePose.pinVisible) {
+                constexpr std::uint32_t pinSegments = 12U;
+                constexpr float pi = std::numbers::pi_v<float>;
+                for (std::uint32_t segment = 0U; segment < pinSegments; ++segment) {
+                    const float angle = 2.0F * pi
+                        * static_cast<float>(segment) / static_cast<float>(pinSegments);
+                    drawWeaponPiece(grenadePose.pinCenter + wkc::core::Vec3{
+                            0.031F * std::cos(angle),
+                            0.031F * std::sin(angle), 0.0F},
+                        {0.010F, 0.020F, 0.011F},
+                        {0.0F, 0.0F, angle * 180.0F / pi},
+                        {0.74F, 0.78F, 0.75F});
+                }
+            }
             shader.setInt(gl_, "uDetailedMaterial", 0);
             fallbackTexture_.bind(gl_, textureBindings_);
         }
@@ -3128,24 +3187,42 @@ bool GdpRenderer::render(
             drawBitmapText(rightEdge - reserveWidth, resourceY + 34 * hudScale,
                 hudScale, reserve, uiTheme.mutedText);
         }
+        const bool grenadeFuseActive = hud.grenadeSelected && hud.grenadePriming
+            && hud.grenadeFuseRemainingSeconds > 0.0F;
+        const int fuseHundredths = static_cast<int>(std::lround(
+            std::clamp(hud.grenadeFuseRemainingSeconds,
+                0.0F, gameplay::grenadeFuseSeconds) * 100.0F));
         const std::string levelText = "LV " + std::to_string(hud.level);
         const std::string experienceText = "XP " + std::to_string(hud.experience)
             + (hud.experienceForNextLevel > 0U
                 ? "/" + std::to_string(hud.experienceForNextLevel) : " MAX");
-        const std::string progressText = levelText + "  " + experienceText;
+        const std::string progressText = grenadeFuseActive
+            ? std::string{hud.language == gameplay::Language::PortugueseBrazil
+                ? "TEMPO " : "FUSE "}
+                + std::to_string(fuseHundredths / 100)
+                + (hud.language == gameplay::Language::PortugueseBrazil ? "," : ".")
+                + (fuseHundredths % 100 < 10 ? "0" : "")
+                + std::to_string(fuseHundredths % 100) + "S"
+            : levelText + "  " + experienceText;
         const int progressScale = bitmapTextWidth(progressText, hudScale) <= tactical.weapon.width
             ? hudScale : 1;
         drawBitmapText(rightEdge - bitmapTextWidth(progressText, progressScale),
-            resourceY + 18 * hudScale, progressScale, progressText, uiTheme.mutedText);
+            resourceY + 18 * hudScale, progressScale, progressText,
+            grenadeFuseActive && hud.grenadeFuseRemainingSeconds <= 1.0F
+                ? uiTheme.danger : uiTheme.mutedText);
         const float experienceRatio = hud.experienceForNextLevel == 0U ? 1.0F
             : std::clamp(static_cast<float>(hud.experience)
                 / static_cast<float>(hud.experienceForNextLevel), 0.0F, 1.0F);
+        const float progressRatio = grenadeFuseActive
+            ? std::clamp(hud.grenadeFuseRemainingSeconds
+                / gameplay::grenadeFuseSeconds, 0.0F, 1.0F)
+            : experienceRatio;
         const int progressWidth = std::min(tactical.weapon.width, 90 * hudScale);
         drawSolidRect(rightEdge - progressWidth, resourceY + 12 * hudScale,
             progressWidth, hudScale, uiTheme.panelBorder);
         drawSolidRect(rightEdge - progressWidth, resourceY + 12 * hudScale,
-            static_cast<int>(std::round(static_cast<float>(progressWidth) * experienceRatio)),
-            hudScale, uiTheme.mutedText);
+            static_cast<int>(std::round(static_cast<float>(progressWidth) * progressRatio)),
+            hudScale, grenadeFuseActive ? uiTheme.warning : uiTheme.mutedText);
         if (hud.flashlightOn && width >= 640) {
             const std::string lightText = hud.flashlightBinding + " LIGHT ON";
             drawBitmapText((width - bitmapTextWidth(lightText, hudScale)) / 2,
@@ -3317,10 +3394,14 @@ bool GdpRenderer::render(
             std::size_t lineCount = 7U;
             if (hud.campaignMode) {
                 std::string mission = "MISSION UNKNOWN";
-                if (hud.campaignMissionCompleted) {
+                if (hud.campaignRouteMission) {
+                    const unsigned int key = hud.campaignKeyRecovered ? 1U : 0U;
+                    const unsigned int arena = hud.campaignArenaSecured ? 1U : 0U;
+                    mission = "MISSION " + std::to_string(key + arena)
+                        + "/2: KEY " + std::to_string(key)
+                        + "/1 ARENA " + std::to_string(arena) + "/1";
+                } else if (hud.campaignMissionCompleted) {
                     mission = "MISSION COMPLETE";
-                } else if (hud.campaignRouteMission) {
-                    mission = "MISSION: KEY + ARENA";
                 } else {
                     switch (hud.campaignMission) {
                     case ObjectiveRenderState::SecureArena:

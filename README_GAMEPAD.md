@@ -33,10 +33,14 @@ O movimento analógico não é um botão: ajuste `Move Stick` no menu `Controlle
 para usar o analógico esquerdo (padrão) ou direito (Southpaw); a câmera passa
 automaticamente para o outro analógico. As linhas Forward/Backward/Left/Right
 em `Remap Buttons` aceitam botões digitais opcionais, além do analógico escolhido.
-O item especial (slot 5) permanece reservado. Com a granada equipada, o
-lançamento curto é um toque em R2; segurá-lo até 1,2 s aumenta progressivamente
-a velocidade e a distância. Soltar R2 arremessa. O estoque inicial é de duas
-granadas; voltar à arma com △ ou outro atalho cancela a carga sem consumir uma.
+O item especial (slot 5) permanece reservado. Com a granada equipada, R2 inicia
+a retirada do pino pela outra mão. Após 0,32 s, começa o pavio de 4,87 s.
+Segurar R2 recua a mão de lançamento e aumenta a distância até 1,2 s de carga;
+soltar R2 arremessa com o tempo restante do pavio. Um toque curto é lançado
+assim que o pino sai. Se o tempo acabar antes de soltar, a granada explode na
+mão e causa dano ao jogador e a alvos próximos. A granada é consumida ao iniciar
+a retirada do pino; a troca de arma fica bloqueada até o lançamento ou a explosão.
+O estoque inicial é de duas granadas.
 
 Para testar um DualSense por Bluetooth no Linux: emparelhe-o nas configurações do
 sistema, inicie `build/release/gdp --test-mode` e confira a linha

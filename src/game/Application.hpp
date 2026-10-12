@@ -169,8 +169,9 @@ private:
     bool quickMeleePending_{false};
     bool fireHeld_{false};
     bool grenadeSelected_{false};
-    bool grenadeCharging_{false};
-    float grenadeChargeSeconds_{0.0F};
+    gameplay::GrenadeCookState grenadeCook_{};
+    float grenadeThrowRemaining_{0.0F};
+    float grenadeThrowChargeStrength_{0.0F};
     bool reloadPending_{false};
     bool dropPending_{false};
     std::optional<gameplay::WeaponArchetype> weaponSwitchPending_;

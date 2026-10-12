@@ -233,7 +233,11 @@ struct PlayerBodyRenderData {
 struct WeaponViewmodelRenderData {
     bool visible{false};
     bool grenadeSelected{false};
+    bool grenadePriming{false};
+    float grenadePinProgress{0.0F};
     float grenadeChargeStrength{0.0F};
+    float grenadeThrowStrength{0.0F};
+    bool grenadeVisible{true};
     HudWeaponRole role{HudWeaponRole::Pistol};
     float recoilStrength{0.0F};
     float reloadProgress{0.0F};
@@ -665,7 +669,9 @@ struct HudRenderData {
     std::uint32_t reserveAmmo{0};
     std::uint32_t grenades{2U};
     bool grenadeSelected{false};
+    bool grenadePriming{false};
     float grenadeChargeStrength{0.0F};
+    float grenadeFuseRemainingSeconds{0.0F};
     HudWeaponRole weapon{HudWeaponRole::Pistol};
     bool weaponOverdrive{false};
     float weaponSpread{0.0F};
@@ -681,6 +687,8 @@ struct HudRenderData {
     std::uint16_t campaignThreatPercent{100U};
     ObjectiveRenderState campaignMission{ObjectiveRenderState::None};
     bool campaignRouteMission{false};
+    bool campaignKeyRecovered{false};
+    bool campaignArenaSecured{false};
     bool campaignMissionCompleted{false};
     bool campaignBossDefeated{false};
     bool campaignExitReady{false};

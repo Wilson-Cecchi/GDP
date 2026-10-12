@@ -1,6 +1,7 @@
 #include "game/visual/GdpRenderer.hpp"
 #include "game/MenuFlow.hpp"
 #include "game/visual/MenuBackdrop.hpp"
+#include "gameplay/PlayerGrenade.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "WeaponReloadValidation.hpp"
@@ -191,19 +193,36 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
             model.visible = true; model.role = role;
             passed &= renderer.render(width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, hud, {}, model);
         }
+        hud.grenadeSelected = true;
+        hud.grenadePriming = true;
+        hud.grenades = 1U;
+        hud.grenadeFuseRemainingSeconds = gdp::gameplay::grenadeFuseSeconds;
+        const auto freshFuse = pixelsFor(hud);
+        hud.grenadeFuseRemainingSeconds = 0.75F;
+        const auto urgentFuse = pixelsFor(hud);
+        hud.grenadePriming = false;
+        const auto releasedFuse = pixelsFor(hud);
+        passed &= freshFuse != urgentFuse && urgentFuse != releasedFuse;
         if (capture) {
             std::filesystem::create_directories(capture);
-            std::vector<std::uint8_t> topDown(original.size());
-            const auto stride = static_cast<std::size_t>(width * 4);
-            for (int y = 0; y < height; ++y) std::copy_n(original.data()
-                + static_cast<std::size_t>(height - y - 1) * stride, stride,
-                topDown.data() + static_cast<std::size_t>(y) * stride);
-            const auto path = std::filesystem::path{capture} / (std::string{gdp::gameplay::languageName(language)} + "-tactical-hud-"
-                + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
-            auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
-                topDown.data(), width * 4);
-            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
-            SDL_DestroySurface(surface);
+            const auto save = [&](const auto& pixels, const std::string_view state) {
+                std::vector<std::uint8_t> topDown(pixels.size());
+                const auto stride = static_cast<std::size_t>(width * 4);
+                for (int y = 0; y < height; ++y) std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride, stride,
+                    topDown.data() + static_cast<std::size_t>(y) * stride);
+                const auto path = std::filesystem::path{capture}
+                    / (std::string{gdp::gameplay::languageName(language)}
+                        + "-tactical-hud-" + std::string{state} + "-"
+                        + std::to_string(width) + "x" + std::to_string(height) + ".bmp");
+                auto* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32,
+                    topDown.data(), width * 4);
+                const bool saved = surface && SDL_SaveBMP(surface, path.string().c_str());
+                SDL_DestroySurface(surface);
+                return saved;
+            };
+            passed &= save(original, "normal") && save(freshFuse, "fuse-full")
+                && save(urgentFuse, "fuse-urgent");
         }
     }
     }
@@ -399,8 +418,27 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
             hud.map.rooms[1].marker = HudMapMarker::Mission;
             const auto missionPending = pixelsFor();
             hud.campaignRouteMission = true;
-            const auto routePending = pixelsFor();
+            const auto routeNone = pixelsFor();
+            hud.infoOverlay = false;
+            const auto routeHiddenNone = pixelsFor();
+            hud.campaignKeyRecovered = true;
+            hud.campaignArenaSecured = true;
+            const auto routeHiddenComplete = pixelsFor();
+            hud.infoOverlay = true;
+            hud.campaignKeyRecovered = false;
+            hud.campaignArenaSecured = false;
+            hud.campaignKeyRecovered = true;
+            const auto routeKeyFirst = pixelsFor();
+            hud.campaignKeyRecovered = false;
+            hud.campaignArenaSecured = true;
+            const auto routeArenaFirst = pixelsFor();
+            hud.campaignKeyRecovered = true;
+            hud.campaignMissionCompleted = true;
+            const auto routeComplete = pixelsFor();
             hud.campaignRouteMission = false;
+            hud.campaignKeyRecovered = false;
+            hud.campaignArenaSecured = false;
+            hud.campaignMissionCompleted = false;
             hud.campaignMission = ObjectiveRenderState::ClearAmbush;
             hud.objective = ObjectiveRenderState::ClearAmbush;
             const auto ambushPending = pixelsFor();
@@ -419,8 +457,12 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                 && keyMission != terminalActivation
                 && terminalActivation != terminalClear
                 && terminalClear != ready && ready != final
-                && final != missionPending && missionPending != routePending
-                && routePending != ambushPending
+                && final != missionPending && missionPending != routeNone
+                && routeNone != routeKeyFirst && routeNone != routeArenaFirst
+                && routeNone != routeComplete && routeKeyFirst != routeArenaFirst
+                && routeKeyFirst != routeComplete && routeArenaFirst != routeComplete
+                && routeHiddenNone == routeHiddenComplete
+                && routeComplete != ambushPending
                 && ambushPending != bossFirst && bossFirst != missionFirst
                 && missionFirst != exitChecklist;
             if (capture) {
@@ -446,7 +488,10 @@ bool validateCampaignExitHud(gdp::game::visual::GdpRenderer& renderer)
                     && save(terminalClear, "terminal-clear") && save(ready, "ready")
                     && save(final, "final")
                     && save(missionPending, "mission-pending-tab")
-                    && save(routePending, "route-pending-tab")
+                    && save(routeNone, "route-0-of-2-tab")
+                    && save(routeKeyFirst, "route-key-1-of-2-tab")
+                    && save(routeArenaFirst, "route-arena-1-of-2-tab")
+                    && save(routeComplete, "route-2-of-2-tab")
                     && save(ambushPending, "ambush-pending-tab")
                     && save(bossFirst, "boss-first-tab")
                     && save(missionFirst, "mission-first-tab")
@@ -689,6 +734,10 @@ int main(const int argc, char** argv)
     const bool scopeOnly = argc == 2 && std::string{argv[1]} == "--scope-only";
     const bool bodyOnly = argc == 2 && std::string{argv[1]} == "--player-body-only";
     const bool handsOnly = argc == 2 && std::string{argv[1]} == "--player-hands-only";
+    const bool campaignHudOnly = argc == 2
+        && std::string{argv[1]} == "--campaign-hud-only";
+    const bool tacticalHudOnly = argc == 2
+        && std::string{argv[1]} == "--tactical-hud-only";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -855,6 +904,10 @@ int main(const int argc, char** argv)
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {
             passed = validatePlayerHands(renderer);
+        } else if (campaignHudOnly) {
+            passed = validateCampaignExitHud(renderer);
+        } else if (tacticalHudOnly) {
+            passed = validateTacticalHud(renderer);
         } else if (reloadOnly) {
             passed = validateWeaponReloads(renderer);
         } else if (scopeOnly) {

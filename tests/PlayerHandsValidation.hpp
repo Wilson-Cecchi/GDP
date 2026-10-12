@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -110,58 +111,64 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             weapon.equipStrength=0;
             if(roles[r]==HudWeaponRole::Knife) {
                 weapon.grenadeSelected=true;
-                std::vector<bool> narrowHeldFootprint;
-                std::vector<bool> narrowChargedFootprint;
+                struct GrenadePhase {
+                    const char* name;
+                    bool priming;
+                    float pin,charge,throwing;
+                    bool visible;
+                };
+                constexpr std::array phases{
+                    GrenadePhase{"ready",false,0.0F,0.0F,0.0F,true},
+                    GrenadePhase{"pin_reach",true,.40F,0.0F,0.0F,true},
+                    GrenadePhase{"pin_pulled",true,1.0F,0.0F,0.0F,true},
+                    GrenadePhase{"windup",false,1.0F,1.0F,0.0F,true},
+                    GrenadePhase{"release",false,1.0F,1.0F,.50F,false},
+                };
+                std::array<std::vector<bool>,phases.size()> narrowFootprints;
                 for(const int fov:{60,100}) {
                     camera.verticalFieldOfViewDegrees=static_cast<float>(fov);
-                    weapon.grenadeChargeStrength=0.0F;
-                    weapon.handsVisible=false;
-                    const auto grenadeOnly=frame();
-                    weapon.handsVisible=true;
-                    const auto grenadeHeld=frame();
-                    passed &= grenadeHeld!=grenadeOnly && frame()==grenadeHeld;
-                    weapon.grenadeChargeStrength=1.0F;
-                    weapon.handsVisible=false;
-                    const auto grenadeChargedOnly=frame();
-                    weapon.handsVisible=true;
-                    const auto grenadeCharged=frame();
-                    passed &= grenadeCharged!=grenadeHeld
-                        && grenadeCharged!=grenadeChargedOnly && frame()==grenadeCharged;
-                    if(capture && width==1280) {
-                        save("grenade_held_fov"+std::to_string(fov),grenadeHeld);
-                        save("grenade_charged_fov"+std::to_string(fov),grenadeCharged);
-                    }
-                    const auto grenadeFootprint=[&](const std::vector<std::uint8_t>& withHandPixels,
-                                                    const std::vector<std::uint8_t>& withoutHandPixels) {
-                        std::vector<bool> result(static_cast<std::size_t>(width*height));
-                        for(std::size_t i=0;i<result.size();++i)
-                            result[i]=!std::equal(withHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4),
-                                withHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4+3),
-                                withoutHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4));
-                        return result;
-                    };
-                    const auto heldFootprint=grenadeFootprint(grenadeHeld,grenadeOnly);
-                    const auto chargedFootprint=grenadeFootprint(grenadeCharged,grenadeChargedOnly);
-                    if(fov==60) {
-                        narrowHeldFootprint=heldFootprint;
-                        narrowChargedFootprint=chargedFootprint;
-                    } else {
-                        const auto grenadeMismatches=[&](const std::vector<bool>& narrowMask,
-                                                        const std::vector<bool>& wideMask) {
-                            std::size_t count=0;
-                            for(std::size_t i=0;i<narrowMask.size();++i)
-                                if(narrowMask[i]!=wideMask[i]) ++count;
-                            return count;
-                        };
-                        passed &= grenadeMismatches(narrowHeldFootprint,heldFootprint)
-                                <static_cast<std::size_t>(width*height)/100U;
-                        passed &= grenadeMismatches(narrowChargedFootprint,chargedFootprint)
-                                <static_cast<std::size_t>(width*height)/100U;
+                    std::vector<std::uint8_t> previousPhase;
+                    for(std::size_t phaseIndex=0;phaseIndex<phases.size();++phaseIndex) {
+                        const auto phase=phases[phaseIndex];
+                        weapon.grenadePriming=phase.priming;
+                        weapon.grenadePinProgress=phase.pin;
+                        weapon.grenadeChargeStrength=phase.charge;
+                        weapon.grenadeThrowStrength=phase.throwing;
+                        weapon.grenadeVisible=phase.visible;
+                        weapon.handsVisible=false;
+                        const auto withoutHands=frame();
+                        const auto baselineStats=renderer.lastFrameStats();
+                        weapon.handsVisible=true;
+                        const auto grenadeWithHands=frame();
+                        const auto handStats=renderer.lastFrameStats();
+                        passed &= grenadeWithHands!=withoutHands && frame()==grenadeWithHands
+                            && handStats.drawCalls==baselineStats.drawCalls+3U
+                            && handStats.triangles==baselineStats.triangles+4016U;
+                        if(!previousPhase.empty()) passed &= grenadeWithHands!=previousPhase;
+                        previousPhase=grenadeWithHands;
+                        if(capture && width==1280)
+                            save("grenade_"+std::string(phase.name)+"_fov"+std::to_string(fov),grenadeWithHands);
+                        std::vector<bool> handFootprint(static_cast<std::size_t>(width*height));
+                        for(std::size_t i=0;i<handFootprint.size();++i)
+                            handFootprint[i]=!std::equal(grenadeWithHands.begin()+static_cast<std::ptrdiff_t>(i*4),
+                                grenadeWithHands.begin()+static_cast<std::ptrdiff_t>(i*4+3),
+                                withoutHands.begin()+static_cast<std::ptrdiff_t>(i*4));
+                        if(fov==60) narrowFootprints[phaseIndex]=std::move(handFootprint);
+                        else {
+                            std::size_t grenadeMismatches=0;
+                            for(std::size_t i=0;i<handFootprint.size();++i)
+                                if(handFootprint[i]!=narrowFootprints[phaseIndex][i]) ++grenadeMismatches;
+                            passed &= grenadeMismatches<static_cast<std::size_t>(width*height)/100U;
+                        }
                     }
                 }
                 camera.verticalFieldOfViewDegrees=68;
                 weapon.grenadeSelected=false;
+                weapon.grenadePriming=false;
+                weapon.grenadePinProgress=0.0F;
                 weapon.grenadeChargeStrength=0.0F;
+                weapon.grenadeThrowStrength=0.0F;
+                weapon.grenadeVisible=true;
                 for(const float phase:{.25F,.50F,.75F,1.0F}) {
                     weapon.meleeStrength=phase; const auto melee=frame();
                     passed &= phase<1.0F ? melee!=original : melee==original;

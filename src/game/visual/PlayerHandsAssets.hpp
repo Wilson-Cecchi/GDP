@@ -21,6 +21,15 @@ struct PlayerHandsPose {
     HandContact leftContact{HandContact::Support};
 };
 
+// Shared grenade geometry and hand contacts in weapon-local coordinates.
+struct GrenadeViewmodelPose {
+    wkc::core::Vec3 bodyCenter{}, gripContact{}, pinCenter{};
+    bool pinVisible{false};
+};
+
+[[nodiscard]] GrenadeViewmodelPose sampleGrenadeViewmodelPose(
+    const WeaponViewmodelRenderData& weapon) noexcept;
+
 [[nodiscard]] std::array<wkc::render::MeshData, playerHandsMaterialCount>
 makePlayerHandsMeshes(bool includeSupportHand = true);
 [[nodiscard]] WeaponMaterialImages makeUsedPlayerHandsMaterialImages(PlayerHandsMaterial material);

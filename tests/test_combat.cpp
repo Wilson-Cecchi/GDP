@@ -142,7 +142,7 @@ void testChargedGrenadeThrow()
                 > shortThrow.grenades().front().position.z + 5.0F,
         "holding fire sends the grenade materially farther before detonation");
     std::size_t detonations = 0U;
-    for (int frame = 0; frame < 100; ++frame)
+    for (int frame = 0; frame < 250; ++frame)
         detonations += longThrow.update(0.02F, emptyEnemies).size();
     expect(detonations == 1U && longThrow.grenades().empty(),
         "fuse detonates exactly once and removes the spent grenade");
@@ -151,6 +151,124 @@ void testChargedGrenadeThrow()
             && player.useGrenade() && !player.useGrenade()
             && player.state().grenades == 0U,
         "player starts with two frags and cannot throw a third");
+}
+
+void testGrenadeCookingAndBlast()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-10.0F, 0.0F, -10.0F}, {10.0F, 5.0F, 10.0F}}};
+
+    GrenadeCookState earlyRelease;
+    expect(earlyRelease.begin() && !earlyRelease.begin(),
+        "pin pull begins once until the cook state is reset");
+    expect(earlyRelease.update(0.10F, true) == GrenadeCookOutcome::None
+            && near(earlyRelease.pinProgress(), 0.10F / grenadePinPullSeconds)
+            && near(earlyRelease.windupProgress(), 0.0F),
+        "holding fire advances pin removal before throw windup");
+    expect(earlyRelease.update(0.10F, false) == GrenadeCookOutcome::None
+            && earlyRelease.update(0.20F, true) == GrenadeCookOutcome::Throw
+            && near(earlyRelease.chargeSeconds(), 0.0F)
+            && near(earlyRelease.remainingFuseSeconds(), grenadeFuseSeconds),
+        "release during pin pull is latched until pin removal finishes");
+    expect(earlyRelease.update(1.0F, true) == GrenadeCookOutcome::None
+            && !earlyRelease.begin(),
+        "a finished cook emits its throw only once");
+    earlyRelease.reset();
+    expect(earlyRelease.begin() && near(earlyRelease.pinProgress(), 0.0F)
+            && near(earlyRelease.remainingFuseSeconds(), grenadeFuseSeconds),
+        "reset prepares a fresh grenade with an untouched fuse");
+
+    GrenadeCookState cooked;
+    expect(cooked.begin()
+            && cooked.update(grenadePinPullSeconds, true)
+                == GrenadeCookOutcome::None
+            && near(cooked.pinProgress(), 1.0F)
+            && near(cooked.remainingFuseSeconds(), grenadeFuseSeconds),
+        "fuse begins only after pin removal completes");
+    expect(cooked.update(grenadeMaximumChargeSeconds, true)
+                == GrenadeCookOutcome::None
+            && near(cooked.chargeSeconds(), grenadeMaximumChargeSeconds)
+            && near(cooked.windupProgress(), 1.0F)
+            && near(cooked.remainingFuseSeconds(), grenadeFuseSeconds - 1.2F),
+        "throw strength caps at 1.2 seconds while the fuse continues burning");
+    expect(cooked.update(0.30F, false) == GrenadeCookOutcome::Throw
+            && near(cooked.remainingFuseSeconds(), grenadeFuseSeconds - 1.2F),
+        "release carries the remaining fuse into the thrown grenade");
+
+    PlayerGrenadeSystem thrown;
+    expect(thrown.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                cooked.chargeSeconds(), 1U, room, {},
+                cooked.remainingFuseSeconds())
+            && thrown.grenades().size() == 1U
+            && near(thrown.grenades().front().fuseSeconds,
+                grenadeFuseSeconds - 1.2F)
+            && near(thrown.grenades().front().velocity.z,
+                grenadeThrowSpeed(grenadeMaximumChargeSeconds)),
+        "thrown grenade preserves cooked fuse and maximum throw speed");
+    const std::size_t count = thrown.grenades().size();
+    expect(!thrown.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                0.0F, 1U, room, {}, 0.0F)
+            && !thrown.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                0.0F, 1U, room, {}, grenadeFuseSeconds + 0.1F)
+            && !thrown.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                0.0F, 1U, room, {}, std::numeric_limits<float>::quiet_NaN())
+            && !thrown.throwGrenade({0.0F, 1.6F, 0.0F}, {0.0F, 0.0F, 1.0F},
+                std::numeric_limits<float>::infinity(), 1U, room)
+            && thrown.grenades().size() == count,
+        "invalid fuse and charge values cannot spawn a grenade");
+    EntityManager emptyEnemies;
+    for (int frame = 0; frame < 73; ++frame)
+        expect(thrown.update(0.05F, emptyEnemies).empty(),
+            "cooked grenade remains active before its carried fuse expires");
+    expect(thrown.grenades().size() == 1U
+            && thrown.update(0.05F, emptyEnemies).size() == 1U
+            && thrown.update(0.05F, emptyEnemies).empty(),
+        "carried fuse detonates a thrown grenade exactly once");
+
+    GrenadeCookState held;
+    expect(held.begin()
+            && held.update(grenadePinPullSeconds, true)
+                == GrenadeCookOutcome::None
+            && held.update(grenadeFuseSeconds - 0.01F, true)
+                == GrenadeCookOutcome::None
+            && near(held.remainingFuseSeconds(), 0.01F),
+        "holding through almost all of the fuse leaves a bounded remainder");
+    expect(held.update(0.01F, true) == GrenadeCookOutcome::DetonateInHand
+            && near(held.remainingFuseSeconds(), 0.0F)
+            && held.update(1.0F, true) == GrenadeCookOutcome::None,
+        "a held grenade detonates at the fuse deadline exactly once");
+    GrenadeCookState lastMomentRelease;
+    expect(lastMomentRelease.begin()
+            && lastMomentRelease.update(grenadePinPullSeconds, true)
+                == GrenadeCookOutcome::None
+            && lastMomentRelease.update(grenadeFuseSeconds - 0.005F, true)
+                == GrenadeCookOutcome::None
+            && lastMomentRelease.update(0.01F, false)
+                == GrenadeCookOutcome::Throw
+            && near(lastMomentRelease.remainingFuseSeconds(), 0.005F),
+        "release observed before the deadline throws instead of detonating in hand");
+    GrenadeCookState overdue;
+    expect(overdue.begin()
+            && overdue.update(grenadePinPullSeconds, true)
+                == GrenadeCookOutcome::None
+            && overdue.update(grenadeFuseSeconds + 0.01F, true)
+                == GrenadeCookOutcome::DetonateInHand
+            && overdue.update(0.01F, false) == GrenadeCookOutcome::None,
+        "a step crossing the 4.87-second fuse deadline detonates only once");
+
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager enemies;
+    const EntityId nearby = enemies.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F}},
+        .roomId = 1U, .health = 100.0F});
+    const GrenadeBlastResult blast = resolveGrenadeBlast(
+        {{0.0F, 1.0F, 0.0F}, 1U, room, {}}, player, enemies);
+    expect(blast.playerDamaged && player.state().health < 100.0F
+            && !blast.hits.empty()
+            && enemies.findData<EnemyData>(nearby)->health < 100.0F,
+        "an in-hand blast damages the player and a nearby exposed enemy");
 }
 
 void testGrenadeCollidesWithEnemies()
@@ -3470,6 +3588,7 @@ int main()
 {
     testCombatSignalBatch();
     testChargedGrenadeThrow();
+    testGrenadeCookingAndBlast();
     testGrenadeCollidesWithEnemies();
     testGrenadeBlastRespectsCover();
     testQuickMeleeKeepsEquippedFirearm();

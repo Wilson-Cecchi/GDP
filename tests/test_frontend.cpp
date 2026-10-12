@@ -207,6 +207,18 @@ void layoutTests() {
             && localize(Language::PortugueseBrazil, "EXIT LOCKED") == "SAÍDA BLOQUEADA"
             && localize(Language::PortugueseBrazil, "EXIT READY") == "SAÍDA LIBERADA",
         "Campaign run-status checklist is localized");
+    constexpr std::array routeProgress{
+        std::pair{"MISSION 0/2: KEY 0/1 ARENA 0/1", "MISSÃO 0/2: CHAVE 0/1 ARENA 0/1"},
+        std::pair{"MISSION 1/2: KEY 1/1 ARENA 0/1", "MISSÃO 1/2: CHAVE 1/1 ARENA 0/1"},
+        std::pair{"MISSION 1/2: KEY 0/1 ARENA 1/1", "MISSÃO 1/2: CHAVE 0/1 ARENA 1/1"},
+        std::pair{"MISSION 2/2: KEY 1/1 ARENA 1/1", "MISSÃO 2/2: CHAVE 1/1 ARENA 1/1"},
+    };
+    for (const auto& [english, portuguese] : routeProgress) {
+        expect(localize(Language::English, english) == english
+                && localize(Language::PortugueseBrazil, english) == portuguese
+                && uiTextLength(portuguese) == 31U,
+            "RecoverAndSecure route progress has exact compact English and Portuguese labels");
+    }
     expect(localize(Language::PortugueseBrazil, "JUMP  [SPACE]") == "PULAR  [SPACE]", "localized descriptions cannot translate saved key binding tokens");
     expect(localize(Language::PortugueseBrazil, "MOVE STICK  RIGHT STICK")
             == "ANALÓGICO DE MOVIMENTO  ANALÓGICO DIREITO",

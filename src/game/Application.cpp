@@ -899,8 +899,9 @@ bool Application::initializeRun()
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;
-    grenadeCharging_ = false;
-    grenadeChargeSeconds_ = 0.0F;
+    grenadeCook_.reset();
+    grenadeThrowRemaining_ = 0.0F;
+    grenadeThrowChargeStrength_ = 0.0F;
     enemyProjectiles_.clear();
     roomFixtureEntities_.clear();
     visitedRooms_.clear();
@@ -1698,44 +1699,40 @@ void Application::processEvents()
     interactionPending_ = interactionPending_ || pressed(ControlAction::Interact);
     firePending_ = firePending_ || pressed(ControlAction::Fire);
     fireHeld_ = down(ControlAction::Fire);
-    quickMeleePending_ = quickMeleePending_ || pressed(ControlAction::QuickMelee);
+    quickMeleePending_ = quickMeleePending_ || ((grenadeCook_.active()
+        || grenadeThrowRemaining_ > 0.0F)
+        ? false : pressed(ControlAction::QuickMelee));
     reloadPending_ = reloadPending_ || (!grenadeSelected_ && pressed(ControlAction::Reload));
     dropPending_ = dropPending_ || (!grenadeSelected_ && pressed(ControlAction::Drop));
     if (pressed(ControlAction::Flashlight)) {
         flashlightOn_ = !flashlightOn_;
         log(LogLevel::Info, flashlightOn_ ? "Flashlight enabled" : "Flashlight disabled");
     }
-    if (pressed(ControlAction::Equipment)) {
+    const bool grenadeAnimationLocked = grenadeCook_.active()
+        || grenadeThrowRemaining_ > 0.0F;
+    if (!grenadeAnimationLocked && pressed(ControlAction::Equipment)) {
         grenadeSelected_ = true;
-        grenadeCharging_ = false;
-        grenadeChargeSeconds_ = 0.0F;
         weaponSwitchPending_.reset();
         firePending_ = false;
         reloadPending_ = false;
         dropPending_ = false;
-    } else if (pressed(ControlAction::Primary)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::Primary)) {
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
         weaponSwitchPending_ = weapon_.archetypeForSlot(1U);
-    } else if (pressed(ControlAction::Secondary)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::Secondary)) {
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(2U);
-    } else if (pressed(ControlAction::Melee)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::Melee)) {
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
         weaponSwitchPending_ = gameplay::weaponArchetypeForSlot(3U);
-    } else if (pressed(ControlAction::LastWeapon)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::LastWeapon)) {
         if (!grenadeSelected_) weaponSwitchPending_ = weapon_.lastWeaponArchetype();
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
-    } else if (pressed(ControlAction::NextWeapon)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::NextWeapon)) {
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
         weaponSwitchPending_ = weapon_.nextWeaponArchetype();
-    } else if (pressed(ControlAction::PreviousWeapon)) {
+    } else if (!grenadeAnimationLocked && pressed(ControlAction::PreviousWeapon)) {
         grenadeSelected_ = false;
-        grenadeCharging_ = false;
         weaponSwitchPending_ = weapon_.previousWeaponArchetype();
     }
     playerCommand_.interact = interactionPending_;
@@ -1743,10 +1740,6 @@ void Application::processEvents()
 
 void Application::setPaused(const bool paused)
 {
-    if (paused) {
-        grenadeCharging_ = false;
-        grenadeChargeSeconds_ = 0.0F;
-    }
     if (paused && weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
         aimBlend_ = 0.0F;
     if (paused) {
@@ -1820,8 +1813,9 @@ bool Application::returnToMainMenu()
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;
-    grenadeCharging_ = false;
-    grenadeChargeSeconds_ = 0.0F;
+    grenadeCook_.reset();
+    grenadeThrowRemaining_ = 0.0F;
+    grenadeThrowChargeStrength_ = 0.0F;
     enemyProjectiles_.clear();
     input_ = Input{};
     player_ = gameplay::Player{};
@@ -2253,6 +2247,14 @@ void Application::fixedUpdate(const double fixedStep)
         = std::max(0.0F, weaponMuzzleFlashRemaining_ - step);
     weaponEquipRemaining_
         = std::max(0.0F, weaponEquipRemaining_ - step);
+    if (grenadeThrowRemaining_ > 0.0F) {
+        grenadeThrowRemaining_ = std::max(0.0F, grenadeThrowRemaining_ - step);
+        if (grenadeThrowRemaining_ == 0.0F) {
+            grenadeThrowChargeStrength_ = 0.0F;
+            if (player_.state().grenades == 0U && !grenadeCook_.active())
+                grenadeSelected_ = false;
+        }
+    }
     for (ActiveImpact& impact : activeImpacts_) {
         impact.remaining = std::max(0.0F, impact.remaining - step);
         impact.render.strength = impact.remaining / impactVisualDuration;
@@ -2628,11 +2630,15 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
     }
+    bool grenadeThrowPending = false;
+    bool grenadeHandBlastPending = false;
+    float grenadeThrowChargeSeconds = 0.0F;
+    float grenadeThrowFuseSeconds = gameplay::grenadeFuseSeconds;
     if (grenadeSelected_ && player_.state().alive) {
-        if (firePending_ && !grenadeCharging_) {
+        if (firePending_ && !grenadeCook_.active()
+            && grenadeThrowRemaining_ <= 0.0F) {
             if (player_.state().grenades > 0U) {
-                grenadeCharging_ = true;
-                grenadeChargeSeconds_ = 0.0F;
+                if (grenadeCook_.begin()) (void)player_.useGrenade();
             } else if (audio_) {
                 audio_->playAt(gdp::audio::AudioEventKind::DryFire,
                     config_.worldSeed, audioEventCounter_++,
@@ -2640,26 +2646,18 @@ void Application::fixedUpdate(const double fixedStep)
                     player_.forwardDirection());
             }
         }
-        if (grenadeCharging_) {
-            if (fireHeld_) {
-                grenadeChargeSeconds_ = std::min(
-                    grenadeChargeSeconds_ + step,
-                    gameplay::grenadeMaximumChargeSeconds);
-            } else {
-                if (playerGrenades_.throwGrenade(player_.cameraPosition(),
-                        player_.forwardDirection(), grenadeChargeSeconds_,
-                        playerRoom, collisionWorld_, reachableShotRooms)
-                    && player_.useGrenade()) {
-                    log(LogLevel::Info, "Fragmentation grenade thrown");
-                    if (audio_) {
-                        audio_->playAt(gdp::audio::AudioEventKind::MeleeSwing,
-                            config_.worldSeed, audioEventCounter_++,
-                            player_.cameraPosition(), player_.cameraPosition(),
-                            player_.forwardDirection());
-                    }
-                }
-                grenadeCharging_ = false;
-                grenadeChargeSeconds_ = 0.0F;
+        if (grenadeCook_.active()) {
+            const gameplay::GrenadeCookOutcome outcome
+                = grenadeCook_.update(step, fireHeld_);
+            if (outcome != gameplay::GrenadeCookOutcome::None) {
+                grenadeThrowChargeSeconds = grenadeCook_.chargeSeconds();
+                grenadeThrowFuseSeconds = grenadeCook_.remainingFuseSeconds();
+                grenadeThrowChargeStrength_ = grenadeCook_.windupProgress();
+                grenadeThrowRemaining_ = 0.28F;
+                grenadeThrowPending = outcome == gameplay::GrenadeCookOutcome::Throw;
+                grenadeHandBlastPending
+                    = outcome == gameplay::GrenadeCookOutcome::DetonateInHand;
+                grenadeCook_.reset();
             }
         }
     }
@@ -2853,7 +2851,29 @@ void Application::fixedUpdate(const double fixedStep)
 
     const bool playerWasAlive = player_.state().alive;
     bool grenadeHitPlayer = false;
-    for (const gameplay::GrenadeDetonation& blast : playerGrenades_.update(step, entities_)) {
+    auto grenadeDetonations = playerGrenades_.update(step, entities_);
+    if (grenadeThrowPending) {
+        if (playerGrenades_.throwGrenade(player_.cameraPosition(),
+                player_.forwardDirection(), grenadeThrowChargeSeconds,
+                playerRoom, collisionWorld_, reachableShotRooms,
+                grenadeThrowFuseSeconds)) {
+            log(LogLevel::Info, "Fragmentation grenade thrown");
+            if (audio_) {
+                audio_->playAt(gdp::audio::AudioEventKind::MeleeSwing,
+                    config_.worldSeed, audioEventCounter_++,
+                    player_.cameraPosition(), player_.cameraPosition(),
+                    player_.forwardDirection());
+            }
+        } else {
+            grenadeHandBlastPending = true;
+        }
+    }
+    if (grenadeHandBlastPending) {
+        grenadeDetonations.push_back({player_.cameraPosition(), playerRoom,
+            collisionWorld_, reachableShotRooms});
+        log(LogLevel::Info, "Fragmentation grenade detonated in hand");
+    }
+    for (const gameplay::GrenadeDetonation& blast : grenadeDetonations) {
         activeGrenadeBlasts_.push_back({blast.position, blast.roomId, 0.36F});
         const gameplay::GrenadeBlastResult result
             = gameplay::resolveGrenadeBlast(blast, player_, entities_);
@@ -4019,8 +4039,12 @@ void Application::render()
     hud.reserveAmmo = weapon_.reserveAmmo();
     hud.grenades = player_.state().grenades;
     hud.grenadeSelected = grenadeSelected_;
-    hud.grenadeChargeStrength = grenadeCharging_
-        ? grenadeChargeSeconds_ / gameplay::grenadeMaximumChargeSeconds : 0.0F;
+    hud.grenadePriming = grenadeCook_.active();
+    hud.grenadeChargeStrength = grenadeCook_.active()
+        ? grenadeCook_.windupProgress() : grenadeThrowChargeStrength_;
+    hud.grenadeFuseRemainingSeconds = grenadeCook_.active()
+        && grenadeCook_.pinProgress() >= 1.0F
+        ? grenadeCook_.remainingFuseSeconds() : 0.0F;
     switch (weapon_.definition().archetype) {
     case gameplay::WeaponArchetype::Carbine:
         hud.weapon = visual::HudWeaponRole::Carbine;
@@ -4060,6 +4084,8 @@ void Application::render()
         hud.campaignMission = campaignMissionObjective(campaignMission_);
         hud.campaignRouteMission = campaignMission_.kind
             == gameplay::CampaignMissionKind::RecoverAndSecure;
+        hud.campaignKeyRecovered = campaignMission_.keyRecovered;
+        hud.campaignArenaSecured = campaignMission_.arenaSecured;
         hud.campaignMissionCompleted = campaignMission_.completed;
         const auto boss = gameplay::bossStatus(entities_, 0U);
         hud.campaignBossDefeated = boss.exists && !boss.alive;
@@ -4267,7 +4293,13 @@ void Application::render()
         .visible = player_.state().alive
             && session_.state().phase == gameplay::SessionPhase::Playing,
         .grenadeSelected = grenadeSelected_ && weaponMeleeRemaining_ <= 0.0F,
+        .grenadePriming = hud.grenadePriming,
+        .grenadePinProgress = grenadeCook_.active()
+            ? grenadeCook_.pinProgress() : 0.0F,
         .grenadeChargeStrength = hud.grenadeChargeStrength,
+        .grenadeThrowStrength = grenadeThrowRemaining_ > 0.0F
+            ? 1.0F - grenadeThrowRemaining_ / 0.28F : 0.0F,
+        .grenadeVisible = grenadeThrowRemaining_ <= 0.0F,
         // SMG retains its animation identity even while sharing Carbine geometry.
         .role = grenadeSelected_ || weaponMeleeRemaining_ > 0.0F
             ? visual::HudWeaponRole::Knife : hud.weapon,
@@ -4345,8 +4377,9 @@ void Application::shutdown()
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;
-    grenadeCharging_ = false;
-    grenadeChargeSeconds_ = 0.0F;
+    grenadeCook_.reset();
+    grenadeThrowRemaining_ = 0.0F;
+    grenadeThrowChargeStrength_ = 0.0F;
     enemyProjectiles_.clear();
     gamepad_.close(input_);
     gamepadConnected_ = false;

@@ -1,20 +1,21 @@
-# Proposta — progresso de Chave + Arena na Campanha
+# Progresso de Chave + Arena na Campanha
 
-Data: 2026-10-12. Estado: **proposta; não implementada**.
+Data: 2026-10-12. Estado: **implementado; testes de frontend e pixels OpenGL aprovados**.
+A aceitação visual em partida permanece pendente.
 
-## Situação atual
+## Contexto
 
 `RecoverAndSecure` guarda `keyRecovered` e `arenaSecured` separadamente e conclui
-a missão quando ambos são verdadeiros. A linha da missão no painel `Tab` hoje
-mostra apenas `MISSION: KEY + ARENA` / `MISSÃO: CHAVE + ARENA` até a conclusão;
-ela não informa qual etapa já foi cumprida. O objetivo breve da HUD e o
+a missão quando ambos são verdadeiros. Antes desta mudança, a linha da missão
+no painel `Tab` mostrava apenas `MISSION: KEY + ARENA` /
+`MISSÃO: CHAVE + ARENA` até a conclusão. O objetivo breve da HUD e o
 marcador do mapa mudam segundo a etapa pendente. As linhas de boss e saída
 continuam independentes.
 
-## Texto proposto
+## Texto implementado
 
-Substituir **somente a linha da missão** do painel `Tab` em `RecoverAndSecure`.
-Usar a mesma ordem fixa, Chave depois Arena, em todos os estados; os números
+Somente a linha da missão do painel `Tab` muda em `RecoverAndSecure`.
+A ordem é fixa, Chave depois Arena, em todos os estados; os números
 explicam qualquer ordem de execução. `1/1` significa etapa concluída, não
 quantidade de chaves do inventário. O total corresponde à soma dos dois estados.
 
@@ -50,35 +51,37 @@ não altera os números da missão; a saída só muda quando a simulação a lib
   Se houver cor de sucesso na implementação, manter contraste e leitura completa
   em monocromia; não usar animação contínua ou ícones que dependam de FOV.
 
-## Dados mínimos e implementação posterior
+## Implementação
 
-No snapshot `HudRenderData`, adicionar apenas `campaignKeyRecovered` e
-`campaignArenaSecured` (booleans, falsos por padrão). Preenchê-los em
-`Application.cpp` diretamente de `CampaignMissionState` quando o modo for
-Campanha. `campaignRouteMission` já identifica o tipo e evita mostrar a linha
-em outras missões. Não derivar a primeira etapa de `campaignMission`, da
+O snapshot `HudRenderData` contém `campaignKeyRecovered` e
+`campaignArenaSecured` (booleans, falsos por padrão), preenchidos em
+`Application.cpp` diretamente de `CampaignMissionState` no modo Campanha.
+`campaignRouteMission` identifica o tipo e evita mostrar a linha em outras
+missões. A primeira etapa não é derivada de `campaignMission`, da
 contagem geral `keys`, do marcador de mapa ou do estado do boss: após Arena
 primeiro, o objetivo breve pode continuar `RECOVER KEY` e não indica que a Arena
-já foi cumprida. O renderer soma os booleans apenas para apresentação. Adicionar
-ao catálogo de `Localization.cpp` rótulos ou frases estáveis para que a linha
-seja traduzida integralmente e medida no idioma selecionado. Não mudar save,
-regras de missão, objetivo breve, terminal ou critério de saída nesta entrega.
+já foi cumprida. O renderer soma os booleans apenas para apresentação. O catálogo
+de `Localization.cpp` contém as quatro frases completas, traduzidas e medidas no
+idioma selecionado. Save, regras de missão, objetivo breve, terminal e critério
+de saída permanecem com seus contratos atuais.
 
-## Verificações para a fase de implementação
+## Validação
 
-1. Teste de snapshot para os quatro pares de flags e ambas as ordens de
-   progresso. Confirmar que boss morto antes da missão, terminal bloqueado e
-   retomada de checkpoint preservam os estados individuais corretos.
-2. Teste de localização com os quatro textos exatos acima em EN e PT-BR; medir
-   por caracteres UTF-8, inclusive `Ã` em `MISSÃO`, e alternar idioma em partida.
-3. Teste de pixels OpenGL do `Tab` em 320×200, 640×360, 960×540 e 1280×720 nos
-   dois idiomas. Capturar 0/2, ambas as variantes de 1/2 e 2/2; verificar
-   diferenças entre estados e ausência de corte, sobreposição com recursos,
-   boss, minimapa e painel `F3`. Testar boss vivo/morto e saída bloqueada/liberada.
-4. Conferir em partida a leitura no tamanho real de cada resolução. A aprovação
-   visual em jogo permanece uma decisão do usuário após as capturas; os testes
-   técnicos não a substituem.
+O teste de frontend verifica os quatro textos exatos em EN e PT-BR e a largura
+de 31 caracteres UTF-8 em português, inclusive `Ã` em `MISSÃO`.
+`./build/debug/gdp_frontend_tests` terminou com código 0; o CTest
+`frontend_menu_systems` passou em 0,04 s. `campaign_systems`,
+`campaign_checkpoint_persistence_systems` e `architecture_boundaries` também
+passaram na integração de 2026-10-12.
 
-Decisão visual proposta: progresso detalhado apenas no `Tab`. Se o usuário
-quiser acompanhamento persistente durante combate, definir esse requisito
-antes de reservar edições no HUD principal.
+O fixture OpenGL passou com `gdp_renderer_gl_tests --campaign-hud-only`. Ele
+cobre o painel `Tab` em 320×200, 640×360, 960×540 e 1280×720, nos dois
+idiomas, com 0/2, ambas as variantes de 1/2 e 2/2. Compara os pixels entre os
+quatro estados e confirma que as flags não mudam a imagem com `Tab` fechado.
+As capturas estão em `build/validation/campaign-route-20261012/`. A inspeção
+das amostras PT-BR 320×200 e 1280×720 e EN 1280×720 não encontrou corte da
+linha da missão nem sobreposição com os recursos de canto. A leitura em partida
+e a aceitação visual final pertencem ao usuário; os testes técnicos não as
+substituem.
+
+Decisão visual aprovada: progresso detalhado apenas no `Tab`.

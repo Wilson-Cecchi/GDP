@@ -412,14 +412,39 @@ WeaponMaterialImages makeUsedPlayerHandsMaterialImages(const PlayerHandsMaterial
     return images;
 }
 
+GrenadeViewmodelPose sampleGrenadeViewmodelPose(
+    const WeaponViewmodelRenderData& weapon) noexcept
+{
+    const float charge=ease(safe(weapon.grenadeChargeStrength),0.0F,1.0F);
+    const Vec3 windup{.08F,-.055F,-.21F};
+    Vec3 offset=windup*charge;
+    const float throwing=safe(weapon.grenadeThrowStrength);
+    if(throwing>0.0F) {
+        const Vec3 extension{-.12F,.09F,.33F};
+        offset=throwing<.5F
+            ? offset*(1.0F-ease(throwing,0.0F,.5F))
+                +extension*ease(throwing,0.0F,.5F)
+            : extension*(1.0F-ease(throwing,.5F,1.0F));
+    }
+    GrenadeViewmodelPose result;
+    result.bodyCenter=grenadeViewmodelBodyCenter+offset;
+    // The palm stays against the round housing through windup and release.
+    result.gripContact=result.bodyCenter+Vec3{.085F,-.05F,-.015F};
+    const float pull=ease(safe(weapon.grenadePinProgress),.40F,.85F);
+    // Once pulled, the pin stays in the support hand while the grenade retreats.
+    result.pinCenter=grenadeViewmodelBodyCenter+Vec3{-.09F,.14F,.02F}
+        +Vec3{-.18F,.035F,-.025F}*pull;
+    result.pinVisible=weapon.grenadeSelected && weapon.grenadeVisible && throwing==0.0F;
+    return result;
+}
+
 PlayerHandsPose samplePlayerHandsPose(const WeaponViewmodelRenderData& weapon) noexcept
 {
     PlayerHandsPose pose;
     const auto frame=sampleWeaponPresentationTransform(weapon);
     Contacts c=contacts(weapon.role);
     if (weapon.grenadeSelected) {
-        c.grip = grenadeViewmodelGrip + Vec3{0.0F, 0.0F,
-            safe(weapon.grenadeChargeStrength) * grenadeViewmodelChargeTravel};
+        c.grip=sampleGrenadeViewmodelPose(weapon).gripContact;
     }
     const float p=safe(weapon.reloadProgress);
     const auto reload=sampleWeaponReloadPose(weapon.role,p,weapon.reloadRoundCount);
@@ -436,6 +461,25 @@ PlayerHandsPose samplePlayerHandsPose(const WeaponViewmodelRenderData& weapon) n
         ? Vec3{} : Vec3{0,65,0};
     const auto leftIdle=target(c.support,knife ? HandContact::Ready : HandContact::Support,supportRotation);
     auto right=rightIdle,left=leftIdle;
+    if(weapon.grenadeSelected) {
+        const auto grenade=sampleGrenadeViewmodelPose(weapon);
+        const float pin=safe(weapon.grenadePinProgress);
+        const auto pinTarget=target(grenade.pinCenter,HandContact::Shell,{0,0,-15});
+        left=reach(leftIdle,pinTarget,pin/.40F,{-.035F,.015F,-.09F});
+        if(pin>=.40F) left=pinTarget;
+        const float throwing=safe(weapon.grenadeThrowStrength);
+        if(throwing>0.0F) {
+            left=reach(pinTarget,leftIdle,throwing,{-.05F,-.025F,-.10F});
+            // Turn the open palm toward the throw. Keeping the knife's grip
+            // orientation through extension made the hand roll backwards at
+            // the wrist even though the solver stayed inside its angle limit.
+            const auto open=target(grenade.gripContact,HandContact::Fetch,
+                {0.0F,0.0F,-70.0F});
+            const float release=ease(throwing,0.0F,.45F);
+            const float recover=ease(throwing,.55F,1.0F);
+            right=blend(rightIdle,open,release*(1.0F-recover));
+        }
+    }
     if(!knife && p>0 && p<1) {
         if(weapon.role==HudWeaponRole::Shotgun) {
             const float n=float(std::clamp(weapon.reloadRoundCount,1U,32U));
