@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -68,6 +69,105 @@ bool validateInstancingTolerance()
     actual.pop_back();
     passed &= !compareInstancingPixels(actual, reference).equivalent;
     if (!passed) std::cerr << "Instancing tolerance accepts a meaningful pixel regression\n";
+    return passed;
+}
+
+bool profileGrenadeBlast(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    constexpr unsigned int warmup = 8U;
+    constexpr unsigned int samples = 32U;
+    const CameraData camera{};
+    const auto median = [](std::vector<double> values) {
+        std::sort(values.begin(), values.end());
+        return values[values.size() / 2U];
+    };
+    bool passed = true;
+    for (const bool potato : {false, true}) {
+        HudRenderData hud;
+        hud.graphicsQuality = potato
+            ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+        hud.detailedMaterials = !potato;
+        hud.worldRenderScalePercent = potato ? 50U : 100U;
+        const auto render = [&](const std::span<const GrenadeBlastRenderData> blasts) {
+            return renderer.render(width, height, camera, {}, {}, {}, {}, {},
+                {}, {}, {}, hud, {}, {}, {}, {}, {}, blasts);
+        };
+        const auto pixels = [&](const std::span<const GrenadeBlastRenderData> blasts) {
+            passed &= render(blasts);
+            glFinish();
+            std::vector<std::uint8_t> result(
+                static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                result.data());
+            passed &= glGetError() == GL_NO_ERROR;
+            return result;
+        };
+        const auto baselinePixels = pixels({});
+        struct Case {
+            const char* name;
+            bool enabled;
+            wkc::core::Vec3 position;
+            float strength;
+        };
+        const std::array cases{
+            Case{"none", false, {}, 0.0F},
+            Case{"near_start", true, camera.position + camera.forward * .25F, 1.0F},
+            Case{"near_mid", true, camera.position + camera.forward * .25F, .50F},
+            Case{"near_late", true, camera.position + camera.forward * .25F, .10F},
+            Case{"far_late", true, camera.position + camera.forward * 3.0F, .10F},
+            Case{"none_after", false, {}, 0.0F},
+        };
+        for (const auto& entry : cases) {
+            const std::array blast{
+                GrenadeBlastRenderData{entry.position, entry.strength}};
+            const std::span<const GrenadeBlastRenderData> span = entry.enabled
+                ? std::span<const GrenadeBlastRenderData>{blast}
+                : std::span<const GrenadeBlastRenderData>{};
+            const auto effectPixels = pixels(span);
+            std::size_t changed = 0U;
+            for (std::size_t i = 0; i < effectPixels.size(); i += 4U) {
+                const int delta = std::abs(int(effectPixels[i]) - int(baselinePixels[i]))
+                    + std::abs(int(effectPixels[i + 1U]) - int(baselinePixels[i + 1U]))
+                    + std::abs(int(effectPixels[i + 2U]) - int(baselinePixels[i + 2U]));
+                changed += delta > 9;
+            }
+            std::vector<double> renderMilliseconds;
+            std::vector<double> finishMilliseconds;
+            std::vector<double> gpuMilliseconds;
+            RendererFrameStats stats{};
+            for (unsigned int frame = 0U; frame < warmup + samples; ++frame) {
+                const auto begin = std::chrono::steady_clock::now();
+                passed &= render(span);
+                const auto submitted = std::chrono::steady_clock::now();
+                glFinish();
+                const auto finished = std::chrono::steady_clock::now();
+                passed &= glGetError() == GL_NO_ERROR;
+                if (frame < warmup) continue;
+                stats = renderer.lastFrameStats();
+                renderMilliseconds.push_back(
+                    std::chrono::duration<double, std::milli>(submitted - begin).count());
+                finishMilliseconds.push_back(
+                    std::chrono::duration<double, std::milli>(finished - submitted).count());
+                if (stats.gpuTimingAvailable)
+                    gpuMilliseconds.push_back(stats.gpuMilliseconds);
+            }
+            std::cout << "GRENADE_BLAST_PROFILE quality="
+                << (potato ? "POTATO" : "MEDIUM")
+                << " case=" << entry.name
+                << " render_ms=" << median(renderMilliseconds)
+                << " finish_ms=" << median(finishMilliseconds)
+                << " gpu_ms="
+                << (gpuMilliseconds.empty() ? -1.0 : median(gpuMilliseconds))
+                << " gpu_samples=" << gpuMilliseconds.size()
+                << " draws=" << stats.drawCalls
+                << " triangles=" << stats.triangles
+                << " changed_pixels=" << changed
+                << " total_pixels=" << width * height << '\n';
+        }
+    }
     return passed;
 }
 
@@ -738,6 +838,8 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--campaign-hud-only";
     const bool tacticalHudOnly = argc == 2
         && std::string{argv[1]} == "--tactical-hud-only";
+    const bool grenadeBlastProfile = argc == 2
+        && std::string{argv[1]} == "--grenade-blast-profile";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -900,6 +1002,8 @@ int main(const int argc, char** argv)
             {0.0F, 3.82F, -7.0F}, {0.48F, 0.66F, 0.92F}, 0.88F, 5.4F};
         if (!renderer.initialize(width, height) || !renderer.render(width, height)) {
             std::cerr << "Renderer failed to produce a frame\n";
+        } else if (grenadeBlastProfile) {
+            passed = profileGrenadeBlast(renderer);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {

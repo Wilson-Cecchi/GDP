@@ -271,6 +271,63 @@ void testGrenadeCookingAndBlast()
         "an in-hand blast damages the player and a nearby exposed enemy");
 }
 
+void testFourSecondGrenadeCook()
+{
+    using namespace gdp::gameplay;
+    using gdp::entities::EntityManager;
+    constexpr float fixedStep = 1.0F / 60.0F;
+    const CollisionWorld room{{{-100.0F, 0.0F, -100.0F},
+        {100.0F, 8.0F, 100.0F}}};
+    GrenadeCookState fixed;
+    GrenadeCookState slowFrames;
+    expect(fixed.begin() && slowFrames.begin(),
+        "both four-second cook fixtures start with the pin attached");
+    for (int tick = 0; tick < 240; ++tick)
+        expect(fixed.update(fixedStep, true) == GrenadeCookOutcome::None,
+            "four seconds of 60 Hz holding do not exhaust the fuse");
+    for (int frame = 0; frame < 16; ++frame)
+        expect(slowFrames.update(0.25F, true) == GrenadeCookOutcome::None,
+            "four seconds in 0.25-second chunks do not exhaust the fuse");
+    const float expectedAtRelease = grenadeFuseSeconds - (4.0F - grenadePinPullSeconds);
+    expect(std::abs(fixed.remainingFuseSeconds() - expectedAtRelease) < 0.001F
+            && std::abs(slowFrames.remainingFuseSeconds() - expectedAtRelease) < 0.001F
+            && near(fixed.chargeSeconds(), grenadeMaximumChargeSeconds)
+            && near(slowFrames.chargeSeconds(), grenadeMaximumChargeSeconds),
+        "four seconds since trigger include pin time and leave about 1.19 seconds");
+    expect(fixed.update(fixedStep, false) == GrenadeCookOutcome::Throw
+            && slowFrames.update(0.25F, false) == GrenadeCookOutcome::Throw
+            && std::abs(fixed.remainingFuseSeconds() - expectedAtRelease) < 0.001F
+            && std::abs(slowFrames.remainingFuseSeconds() - expectedAtRelease) < 0.001F,
+        "release preserves the same fuse at either simulation step size");
+
+    PlayerGrenadeSystem projectile;
+    EntityManager emptyEnemies;
+    expect(projectile.throwGrenade({0.0F, 1.6F, 0.0F},
+            {0.0F, 0.0F, 1.0F}, fixed.chargeSeconds(), 1U,
+            room, {}, fixed.remainingFuseSeconds()),
+        "the four-second cook transfers its remaining fuse into a projectile");
+    for (int tick = 0; tick < 60; ++tick)
+        expect(projectile.update(fixedStep, emptyEnemies).empty(),
+            "one second of flight is shorter than the remaining fuse");
+    expect(projectile.grenades().size() == 1U
+            && std::abs(projectile.grenades().front().fuseSeconds - 0.19F) < 0.001F,
+        "after four seconds held and one second flown, about 0.19 second remains");
+    PlayerGrenadeSystem slowProjectile;
+    expect(slowProjectile.throwGrenade({0.0F, 1.6F, 0.0F},
+            {0.0F, 0.0F, 1.0F}, slowFrames.chargeSeconds(), 1U,
+            room, {}, slowFrames.remainingFuseSeconds())
+            && slowProjectile.update(1.0F, emptyEnemies).empty()
+            && slowProjectile.grenades().size() == 1U
+            && std::abs(slowProjectile.grenades().front().fuseSeconds - 0.19F)
+                < 0.001F,
+        "a one-second simulation step burns one full second of projectile fuse");
+    std::size_t detonations = 0U;
+    for (int tick = 0; tick < 12; ++tick)
+        detonations += projectile.update(fixedStep, emptyEnemies).size();
+    expect(detonations == 1U && projectile.grenades().empty(),
+        "the cooked grenade detonates near 1.20 seconds after release at 60 Hz");
+}
+
 void testGrenadeCollidesWithEnemies()
 {
     using namespace gdp::gameplay;
@@ -3589,6 +3646,7 @@ int main()
     testCombatSignalBatch();
     testChargedGrenadeThrow();
     testGrenadeCookingAndBlast();
+    testFourSecondGrenadeCook();
     testGrenadeCollidesWithEnemies();
     testGrenadeBlastRespectsCover();
     testQuickMeleeKeepsEquippedFirearm();

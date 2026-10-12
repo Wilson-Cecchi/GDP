@@ -3,7 +3,12 @@
 #include "gameplay/EnemyProjectile.hpp"
 
 #include <algorithm>
+#include <array>
+#include <bit>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <string_view>
 
@@ -841,10 +846,163 @@ void testRangedEnemyFiresDelayedProjectile()
         "enemy shot damages only after traveling to the player");
 }
 
+// Manual profile only. Both simulations use identical geometry and tick counts;
+// the single noise stimulus is the only difference at their starting state.
+void profileGrenadeAlert()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    using Clock = std::chrono::steady_clock;
+
+    constexpr float step = 1.0F / 60.0F;
+    constexpr int ticks = 900;
+    constexpr int repetitions = 4; // One warmup, three measured runs.
+    constexpr std::array<std::string_view, 4> phaseNames{
+        "alert", "investigate", "recover", "post"};
+    struct Sample {
+        double baselineMicroseconds{0.0};
+        double alertedMicroseconds{0.0};
+        std::size_t ticks{0U};
+        std::size_t alerting{0U};
+        std::size_t investigating{0U};
+        std::size_t recovering{0U};
+    };
+    std::array<Sample, phaseNames.size()> totals{};
+    double noiseCallMicroseconds = 0.0;
+    std::size_t totalAlerted = 0U;
+    std::uint64_t baselineTrajectory = 14695981039346656037ULL;
+    std::uint64_t alertedTrajectory = 14695981039346656037ULL;
+
+    const auto recordTrajectory = [](const EntityManager& manager,
+                                      std::uint64_t& hash) {
+        const auto mix = [&hash](const std::uint64_t value) {
+            hash = (hash ^ value) * 1099511628211ULL;
+        };
+        for (const EntityId id : manager.query(EntityKind::Enemy)) {
+            const Entity* entity = manager.find(id);
+            const EnemyData* enemy = manager.findData<EnemyData>(id);
+            mix(std::bit_cast<std::uint32_t>(entity->transform.position.x));
+            mix(std::bit_cast<std::uint32_t>(entity->transform.position.y));
+            mix(std::bit_cast<std::uint32_t>(entity->transform.position.z));
+            mix(std::bit_cast<std::uint32_t>(entity->transform.rotationDegrees.y));
+            mix(static_cast<std::uint64_t>(enemy->behavior));
+            mix(std::bit_cast<std::uint32_t>(enemy->alertTime));
+            mix(std::bit_cast<std::uint32_t>(enemy->investigationTime));
+            mix(std::bit_cast<std::uint32_t>(enemy->recoverTime));
+        }
+    };
+
+    const CollisionWorld room{
+        {{-12.0F, 0.0F, -12.0F}, {12.0F, 4.0F, 12.0F}},
+        {{{-10.8F, 0.0F, -0.5F}, {10.8F, 3.0F, 0.5F}}}};
+    const std::array<wkc::core::Vec3, 8> starts{{
+        {-4.0F, 0.0F, 5.0F}, {-3.0F, 0.0F, 6.0F},
+        {-2.0F, 0.0F, 5.0F}, {-1.0F, 0.0F, 6.0F},
+        {1.0F, 0.0F, 5.0F}, {2.0F, 0.0F, 6.0F},
+        {3.0F, 0.0F, 5.0F}, {4.0F, 0.0F, 6.0F},
+    }};
+    const auto populate = [&starts](EntityManager& manager) {
+        for (std::size_t index = 0U; index < starts.size(); ++index) {
+            (void)manager.createEnemy({
+                .transform = {.position = starts[index],
+                    .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+                .roomId = 1U,
+                .archetype = EnemyArchetype::Guard,
+                .visualSeed = 20261012U + index,
+            });
+        }
+    };
+
+    for (int repetition = 0; repetition < repetitions; ++repetition) {
+        EntityManager baseline;
+        EntityManager alerted;
+        Player baselinePlayer;
+        Player alertedPlayer;
+        baselinePlayer.spawn({0.0F, 0.0F, -8.0F});
+        alertedPlayer.spawn({0.0F, 0.0F, -8.0F});
+        populate(baseline);
+        populate(alerted);
+
+        const auto noiseStart = Clock::now();
+        const std::size_t alertedCount = alertEnemiesToNoise(alerted, 1U,
+            {.position = {0.0F, 0.0F, -2.0F}, .radius = 20.0F});
+        const auto noiseEnd = Clock::now();
+        if (repetition > 0) {
+            totalAlerted += alertedCount;
+            noiseCallMicroseconds += std::chrono::duration<double, std::micro>(
+                noiseEnd - noiseStart).count();
+        }
+
+        for (int tick = 0; tick < ticks; ++tick) {
+            const auto baselineStart = Clock::now();
+            (void)updateGuards(baseline, baselinePlayer, 1U, room, step,
+                {}, {.allowAttacks = false});
+            const auto baselineEnd = Clock::now();
+            const auto alertedStart = Clock::now();
+            const EnemyUpdateSummary summary = updateGuards(
+                alerted, alertedPlayer, 1U, room, step,
+                {}, {.allowAttacks = false});
+            const auto alertedEnd = Clock::now();
+            if (repetition == repetitions - 1) {
+                recordTrajectory(baseline, baselineTrajectory);
+                recordTrajectory(alerted, alertedTrajectory);
+            }
+            if (repetition == 0) continue;
+
+            const std::size_t phase = summary.alerting > 0U ? 0U
+                : summary.investigating > 0U ? 1U
+                : summary.recovering > 0U ? 2U : 3U;
+            Sample& sample = totals[phase];
+            sample.baselineMicroseconds += std::chrono::duration<double,
+                std::micro>(baselineEnd - baselineStart).count();
+            sample.alertedMicroseconds += std::chrono::duration<double,
+                std::micro>(alertedEnd - alertedStart).count();
+            ++sample.ticks;
+            sample.alerting += summary.alerting;
+            sample.investigating += summary.investigating;
+            sample.recovering += summary.recovering;
+        }
+    }
+
+    std::cout << std::fixed << std::setprecision(2)
+              << "grenade-alert-profile guards=" << starts.size()
+              << " ticks=" << ticks << " hz=60 measured_repetitions="
+              << repetitions - 1 << " alerted_per_run="
+              << totalAlerted / (repetitions - 1)
+              << " noise_call_us="
+              << noiseCallMicroseconds / (repetitions - 1)
+              << " baseline_trajectory=" << baselineTrajectory
+              << " alerted_trajectory=" << alertedTrajectory << '\n';
+    for (std::size_t phase = 0U; phase < totals.size(); ++phase) {
+        const Sample& sample = totals[phase];
+        if (sample.ticks == 0U) continue;
+        const double baselinePerTick = sample.baselineMicroseconds
+            / static_cast<double>(sample.ticks);
+        const double alertedPerTick = sample.alertedMicroseconds
+            / static_cast<double>(sample.ticks);
+        std::cout << phaseNames[phase]
+                  << " ticks_per_run=" << sample.ticks / (repetitions - 1)
+                  << " baseline_us_tick=" << baselinePerTick
+                  << " alerted_us_tick=" << alertedPerTick
+                  << " delta_us_tick=" << alertedPerTick - baselinePerTick
+                  << " alerting_enemy_ticks=" << sample.alerting
+                  << " investigating_enemy_ticks=" << sample.investigating
+                  << " recovering_enemy_ticks=" << sample.recovering << '\n';
+    }
+}
+
 } // namespace
 
-int main()
+int main(const int argc, char* argv[])
 {
+    if (argc == 2 && std::string_view{argv[1]} == "--grenade-alert-profile") {
+        profileGrenadeAlert();
+        return 0;
+    }
+    if (argc != 1) {
+        std::cerr << "Unknown argument\n";
+        return 2;
+    }
     testSensors();
     testCooperativeSensorsAndMemory();
     testTacticalMovement();

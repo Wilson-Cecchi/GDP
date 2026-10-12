@@ -137,6 +137,53 @@ bool navigationSegmentClear(
     if (distance <= 1.0e-6F) {
         return collisionWorld.canOccupy(end, collider);
     }
+
+    // An eroded walkable AABB is convex. When the whole segment fits inside
+    // one such volume and its swept collider AABB misses every relevant solid,
+    // all intermediate occupancy samples are guaranteed to be clear.
+    if (std::isfinite(start.x) && std::isfinite(start.y)
+        && std::isfinite(start.z) && std::isfinite(end.x)
+        && std::isfinite(end.y) && std::isfinite(end.z)
+        && std::isfinite(collider.radius) && collider.radius >= 0.0F
+        && std::isfinite(collider.height) && collider.height >= 0.0F) {
+        constexpr float horizontalMargin = 1.0e-4F;
+        const float minimumX = std::min(start.x, end.x);
+        const float maximumX = std::max(start.x, end.x);
+        const float minimumY = std::min(start.y, end.y);
+        const float maximumY = std::max(start.y, end.y);
+        const float minimumZ = std::min(start.z, end.z);
+        const float maximumZ = std::max(start.z, end.z);
+        const float radius = collider.radius + horizontalMargin;
+        const bool fitsOneVolume = std::any_of(
+            collisionWorld.walkableVolumes().begin(),
+            collisionWorld.walkableVolumes().end(),
+            [&](const wkc::core::Aabb& volume) {
+                return minimumX >= volume.minimum.x + radius
+                    && maximumX <= volume.maximum.x - radius
+                    && minimumZ >= volume.minimum.z + radius
+                    && maximumZ <= volume.maximum.z - radius
+                    && minimumY >= volume.minimum.y
+                    && maximumY + collider.height <= volume.maximum.y;
+            });
+        if (fitsOneVolume) {
+            const bool intersectsPossibleSolid = std::any_of(
+                collisionWorld.solids().begin(), collisionWorld.solids().end(),
+                [&](const wkc::core::Aabb& solid) {
+                    if (maximumY + collider.height <= solid.minimum.y
+                        || minimumY >= solid.maximum.y) {
+                        return false;
+                    }
+                    return maximumX + radius >= solid.minimum.x
+                        && minimumX - radius <= solid.maximum.x
+                        && maximumZ + radius >= solid.minimum.z
+                        && minimumZ - radius <= solid.maximum.z;
+                });
+            if (!intersectsPossibleSolid) {
+                return true;
+            }
+        }
+    }
+
     constexpr float sampleSpacing = 0.18F;
     const std::size_t sampleCount = static_cast<std::size_t>(
         std::ceil(distance / sampleSpacing));
@@ -610,14 +657,18 @@ void moveEnemyAndFaceTravel(
     const wkc::core::Vec3 target,
     const float speed,
     const float step,
-    const CharacterCollider collider) noexcept
+    const CharacterCollider collider,
+    const std::optional<wkc::core::Vec3> knownWaypoint = std::nullopt) noexcept
 {
     const wkc::core::Vec3 previous = entity.transform.position;
     const std::int8_t preferredSide = enemy.avoidanceSide != 0
         ? enemy.avoidanceSide
         : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
-    const wkc::core::Vec3 desiredDirection = navigationDirection(
-        collisionWorld, previous, target, collider, preferredSide);
+    const wkc::core::Vec3 desiredDirection = knownWaypoint
+        ? wkc::core::normalized({knownWaypoint->x - previous.x, 0.0F,
+              knownWaypoint->z - previous.z})
+        : navigationDirection(collisionWorld, previous, target, collider,
+              preferredSide);
     entity.transform.position = moveEnemy(
         manager, enemyIds, collisionWorld, id, roomId, enemy,
         previous, desiredDirection, speed, step, collider);
@@ -936,14 +987,17 @@ bool updateEnemyRecover(
             enemy.lastKnownPlayerPosition.x, entity.transform.position.y,
             enemy.lastKnownPlayerPosition.z};
         std::optional<wkc::core::Vec3> target;
+        std::optional<wkc::core::Vec3> targetWaypoint;
         for (const float offset : searchAngles) {
             const float angle = baseAngle + phaseAngle + offset;
             const wkc::core::Vec3 candidate = remembered + wkc::core::Vec3{
                 std::cos(angle) * searchRadius, 0.0F,
                 std::sin(angle) * searchRadius};
-            if (navigationWaypoint(collisionWorld, entity.transform.position,
+            if (const auto waypoint = navigationWaypoint(
+                    collisionWorld, entity.transform.position,
                     candidate, collider, preferredSide)) {
                 target = candidate;
+                targetWaypoint = *waypoint;
                 break;
             }
         }
@@ -951,10 +1005,13 @@ bool updateEnemyRecover(
             const auto approach = reachablePlayerApproach(
                 collisionWorld, entity.transform.position,
                 enemy.lastKnownPlayerPosition, collider, preferredSide);
-            if (approach && navigationWaypoint(collisionWorld,
-                    entity.transform.position, *approach, collider,
-                    preferredSide)) {
-                target = *approach;
+            if (approach) {
+                if (const auto waypoint = navigationWaypoint(collisionWorld,
+                        entity.transform.position, *approach, collider,
+                        preferredSide)) {
+                    target = *approach;
+                    targetWaypoint = *waypoint;
+                }
             }
         }
         const wkc::core::Vec3 previous = entity.transform.position;
@@ -962,7 +1019,7 @@ bool updateEnemyRecover(
             moveEnemyAndFaceTravel(
                 manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
                 *target, moveSpeed * std::max(config.speedScale, 0.0F),
-                step, collider);
+                step, collider, targetWaypoint);
             moved = planarDistanceSquared(previous, entity.transform.position)
                 > 1.0e-8F;
         }
