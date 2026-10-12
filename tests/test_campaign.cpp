@@ -308,6 +308,135 @@ void testCampaignMissionDecks()
     expect(sawDifferentSequence, "campaign seeds produce different mission orders");
 }
 
+void testRecoverAndSecureExitAndCheckpoint()
+{
+    using namespace gdp::gameplay;
+    constexpr wkc::core::Seed initialSeed = 0x524F5554455F5445ULL;
+    constexpr std::uint32_t secretRoom = 11U;
+    constexpr std::uint32_t arenaRoom = 22U;
+    const auto routeFloor = [&] {
+        for (std::uint32_t floor = 2U; floor <= 9U; ++floor) {
+            if (campaignMissionKind(initialSeed, floor)
+                == CampaignMissionKind::RecoverAndSecure) return floor;
+        }
+        return 0U;
+    }();
+    expect(routeFloor != 0U, "the fixture has a RecoverAndSecure floor");
+    if (routeFloor == 0U) return;
+
+    Player player;
+    Weapon weapon;
+    ProgressionSystem progression;
+    const CampaignCheckpoint checkpoint{
+        .initialSeed = initialSeed,
+        .currentSeed = seedForRun(initialSeed, routeFloor - 1U),
+        .runIndex = routeFloor - 1U,
+        .seedIndex = routeFloor - 1U,
+        .floor = routeFloor,
+        .floorEntry = captureCampaignCarryover(player, weapon, progression),
+    };
+    expect(validateCampaignCheckpoint(checkpoint),
+        "the route floor has a valid deterministic entry checkpoint");
+
+    for (const bool keyFirst : {true, false}) {
+        for (const bool bossFirst : {true, false}) {
+            SessionSystem session{0U};
+            expect(session.restoreCampaignCheckpoint(checkpoint.initialSeed,
+                    checkpoint.currentSeed, checkpoint.runIndex,
+                    checkpoint.seedIndex, checkpoint.floor, checkpoint.difficulty),
+                "checkpoint resumes the selected route floor");
+            CampaignMissionState mission{campaignMissionKind(
+                session.state().initialSeed, session.state().campaignFloor),
+                secretRoom};
+            mission.secondaryRoomId = arenaRoom;
+
+            if (bossFirst) {
+                (void)session.update(true, gdp::world::RoomRole::Boss,
+                    true, false, false, true, mission.completed);
+                expect(!session.state().campaignExitReady
+                        && session.state().phase == SessionPhase::Playing,
+                    "boss-first terminal interaction cannot bypass the route mission");
+            }
+            const auto firstRoom = keyFirst ? secretRoom : arenaRoom;
+            const auto secondRoom = keyFirst ? arenaRoom : secretRoom;
+            expect(!advanceCampaignMission(mission, firstRoom,
+                    keyFirst ? CampaignMissionProgress{.keysCollected = 1U}
+                             : CampaignMissionProgress{.arenaCleared = true})
+                    && !mission.completed
+                    && campaignMissionPendingRoom(mission) == secondRoom,
+                "the first route objective remains incomplete and points to the other room");
+            (void)session.update(true, gdp::world::RoomRole::Boss,
+                true, !bossFirst, false, true, mission.completed);
+            expect(!session.state().campaignExitReady
+                    && session.state().phase == SessionPhase::Playing,
+                "the exit remains blocked with one route objective pending");
+            expect(advanceCampaignMission(mission, secondRoom,
+                    keyFirst ? CampaignMissionProgress{.arenaCleared = true}
+                             : CampaignMissionProgress{.keysCollected = 1U})
+                    && mission.completed,
+                "the route completes in either order without repeating a pickup or event");
+            (void)session.update(true, gdp::world::RoomRole::Boss,
+                true, !bossFirst, false, !bossFirst, mission.completed);
+            expect(session.state().campaignExitReady == bossFirst
+                    && session.state().phase == SessionPhase::Playing,
+                "a boss killed before the mission unlocks now; a living boss still blocks");
+            if (!bossFirst) {
+                (void)session.update(true, gdp::world::RoomRole::Boss,
+                    true, false, false, false, mission.completed);
+                expect(session.state().campaignExitReady
+                        && session.state().phase == SessionPhase::Playing,
+                    "boss death after the mission unlocks without redoing the objectives");
+            }
+            expect(session.update(true, gdp::world::RoomRole::Boss,
+                    true, false, false, true, mission.completed).phase
+                    == SessionPhase::Victory,
+                "a new terminal use completes either ordering of mission and boss");
+
+            // A checkpoint is the floor entry, so mission progress is lost.
+            SessionSystem resumed{0U};
+            expect(resumed.restoreCampaignCheckpoint(checkpoint.initialSeed,
+                    checkpoint.currentSeed, checkpoint.runIndex,
+                    checkpoint.seedIndex, checkpoint.floor, checkpoint.difficulty)
+                    && resumed.state().currentSeed == session.state().currentSeed,
+                "continue restores the same floor and world seed");
+            CampaignMissionState freshMission{campaignMissionKind(
+                resumed.state().initialSeed, resumed.state().campaignFloor),
+                secretRoom};
+            freshMission.secondaryRoomId = arenaRoom;
+            expect(!freshMission.completed && !freshMission.keyRecovered
+                    && !freshMission.arenaSecured
+                    && campaignMissionPendingRoom(freshMission) == secretRoom
+                    && !resumed.state().bossEngaged
+                    && !resumed.state().campaignExitReady,
+                "continue resets mission, boss and exit progress to floor entry");
+            expect(!advanceCampaignMission(freshMission, secondRoom,
+                    keyFirst ? CampaignMissionProgress{.arenaCleared = true}
+                             : CampaignMissionProgress{.keysCollected = 1U})
+                    && !freshMission.completed,
+                "the prior attempt's first objective does not survive the checkpoint");
+            expect(advanceCampaignMission(freshMission, firstRoom,
+                    keyFirst ? CampaignMissionProgress{.keysCollected = 1U}
+                             : CampaignMissionProgress{.arenaCleared = true})
+                    && freshMission.completed,
+                "both objectives can complete after either checkpoint order");
+            (void)resumed.update(true, gdp::world::RoomRole::Boss,
+                true, true, false, true, freshMission.completed);
+            expect(!resumed.state().campaignExitReady
+                    && resumed.state().phase == SessionPhase::Playing,
+                "completed mission alone cannot pass a living boss");
+            (void)resumed.update(true, gdp::world::RoomRole::Boss,
+                true, false, false, false, freshMission.completed);
+            expect(resumed.state().campaignExitReady
+                    && resumed.state().phase == SessionPhase::Playing,
+                "both objectives and boss death unlock the exit without auto advancing");
+            const auto victory = resumed.update(true, gdp::world::RoomRole::Boss,
+                true, false, false, true, freshMission.completed);
+            expect(victory.changed && victory.phase == SessionPhase::Victory,
+                "a fresh terminal interaction advances after all three gates");
+        }
+    }
+}
+
 void testCampaignFloorVarietyAndMissions()
 {
     using namespace gdp;
@@ -477,6 +606,7 @@ int main()
     testCampaignCheckpointValidation();
     testCampaignDifficultyProgression();
     testCampaignMissionDecks();
+    testRecoverAndSecureExitAndCheckpoint();
     testCampaignFloorVarietyAndMissions();
     if (failures != 0) {
         std::cerr << failures << " campaign test(s) failed\n";

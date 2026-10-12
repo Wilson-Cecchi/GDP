@@ -110,16 +110,56 @@ bool validatePlayerHands(gdp::game::visual::GdpRenderer& renderer)
             weapon.equipStrength=0;
             if(roles[r]==HudWeaponRole::Knife) {
                 weapon.grenadeSelected=true;
-                weapon.handsVisible=false;
-                const auto grenadeOnly=frame();
-                weapon.handsVisible=true;
-                const auto grenadeHeld=frame();
-                passed &= grenadeHeld!=grenadeOnly && frame()==grenadeHeld;
-                if(capture && width==1280 && !potato) save("grenade_held",grenadeHeld);
-                weapon.grenadeChargeStrength=1.0F;
-                const auto grenadeCharged=frame();
-                passed &= grenadeCharged!=grenadeHeld;
-                if(capture && width==1280 && !potato) save("grenade_charged",grenadeCharged);
+                std::vector<bool> narrowHeldFootprint;
+                std::vector<bool> narrowChargedFootprint;
+                for(const int fov:{60,100}) {
+                    camera.verticalFieldOfViewDegrees=static_cast<float>(fov);
+                    weapon.grenadeChargeStrength=0.0F;
+                    weapon.handsVisible=false;
+                    const auto grenadeOnly=frame();
+                    weapon.handsVisible=true;
+                    const auto grenadeHeld=frame();
+                    passed &= grenadeHeld!=grenadeOnly && frame()==grenadeHeld;
+                    weapon.grenadeChargeStrength=1.0F;
+                    weapon.handsVisible=false;
+                    const auto grenadeChargedOnly=frame();
+                    weapon.handsVisible=true;
+                    const auto grenadeCharged=frame();
+                    passed &= grenadeCharged!=grenadeHeld
+                        && grenadeCharged!=grenadeChargedOnly && frame()==grenadeCharged;
+                    if(capture && width==1280) {
+                        save("grenade_held_fov"+std::to_string(fov),grenadeHeld);
+                        save("grenade_charged_fov"+std::to_string(fov),grenadeCharged);
+                    }
+                    const auto grenadeFootprint=[&](const std::vector<std::uint8_t>& withHandPixels,
+                                                    const std::vector<std::uint8_t>& withoutHandPixels) {
+                        std::vector<bool> result(static_cast<std::size_t>(width*height));
+                        for(std::size_t i=0;i<result.size();++i)
+                            result[i]=!std::equal(withHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4),
+                                withHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4+3),
+                                withoutHandPixels.begin()+static_cast<std::ptrdiff_t>(i*4));
+                        return result;
+                    };
+                    const auto heldFootprint=grenadeFootprint(grenadeHeld,grenadeOnly);
+                    const auto chargedFootprint=grenadeFootprint(grenadeCharged,grenadeChargedOnly);
+                    if(fov==60) {
+                        narrowHeldFootprint=heldFootprint;
+                        narrowChargedFootprint=chargedFootprint;
+                    } else {
+                        const auto grenadeMismatches=[&](const std::vector<bool>& narrowMask,
+                                                        const std::vector<bool>& wideMask) {
+                            std::size_t count=0;
+                            for(std::size_t i=0;i<narrowMask.size();++i)
+                                if(narrowMask[i]!=wideMask[i]) ++count;
+                            return count;
+                        };
+                        passed &= grenadeMismatches(narrowHeldFootprint,heldFootprint)
+                                <static_cast<std::size_t>(width*height)/100U;
+                        passed &= grenadeMismatches(narrowChargedFootprint,chargedFootprint)
+                                <static_cast<std::size_t>(width*height)/100U;
+                    }
+                }
+                camera.verticalFieldOfViewDegrees=68;
                 weapon.grenadeSelected=false;
                 weapon.grenadeChargeStrength=0.0F;
                 for(const float phase:{.25F,.50F,.75F,1.0F}) {
