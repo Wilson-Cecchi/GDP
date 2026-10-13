@@ -59,6 +59,7 @@ using wkc::platform::MouseButton;
 namespace {
 
 constexpr float impactVisualDuration = 0.32F;
+constexpr float grenadeBlastVisualDuration = 1.10F;
 constexpr float weaponRecoilDuration = 0.12F;
 constexpr float weaponMeleeDuration = 0.28F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
@@ -2874,7 +2875,8 @@ void Application::fixedUpdate(const double fixedStep)
         log(LogLevel::Info, "Fragmentation grenade detonated in hand");
     }
     for (const gameplay::GrenadeDetonation& blast : grenadeDetonations) {
-        activeGrenadeBlasts_.push_back({blast.position, blast.roomId, 0.36F});
+        activeGrenadeBlasts_.push_back({blast.position, blast.roomId,
+            grenadeBlastVisualDuration});
         const gameplay::GrenadeBlastResult result
             = gameplay::resolveGrenadeBlast(blast, player_, entities_);
         grenadeHitPlayer = grenadeHitPlayer || result.playerDamaged;
@@ -4287,7 +4289,7 @@ void Application::render()
     for (const ActiveGrenadeBlast& blast : activeGrenadeBlasts_) {
         if (sphereIsVisible(blast.position, gameplay::grenadeBlastRadius))
             visibleGrenadeBlasts.push_back({blast.position,
-                blast.remaining / 0.36F});
+                blast.remaining / grenadeBlastVisualDuration});
     }
     const visual::WeaponViewmodelRenderData weaponViewmodel{
         .visible = player_.state().alive

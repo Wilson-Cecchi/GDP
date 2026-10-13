@@ -276,6 +276,7 @@ private:
     wkc::render::Texture uiFont_{};
     wkc::render::Mesh box_{};
     wkc::render::Mesh grenadeBody_{};
+    wkc::render::Mesh smokePuff_{};
     std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
         weaponRoleCount> weaponMeshes_{};
     std::array<std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,

@@ -1877,6 +1877,8 @@ void testPlayerHands()
     expect(length(held.contactPoints[0]-ready.gripContact)<.0001F
             && ellipsoid>.75F && ellipsoid<1.05F,
         "dominant palm contacts the rounded grenade housing");
+    expect(held.skin[2].elements[8]>.25F,
+        "grenade glove dorsal faces away from the housing at rest");
     expect(ready.pinVisible && ready.pinCenter.x<ready.bodyCenter.x,
         "the installed pin is visible on the support-hand side");
     grenade.grenadePriming=true;
@@ -1909,6 +1911,8 @@ void testPlayerHands()
             && length(followThrough.contactPoints[0]-released.gripContact)<.0001F
             && followThrough.fingerFlexion[0][0]<charged.fingerFlexion[0][0],
         "release hides the pin, opens the dominant hand and extends the arm");
+    expect(followThrough.skin[2].elements[8]>.25F,
+        "open throwing hand keeps the glove dorsal outward instead of flipping palm up");
     grenade.grenadeThrowStrength=1.0F;
     const auto recovered=sampleGrenadeViewmodelPose(grenade);
     expect(length(recovered.bodyCenter-ready.bodyCenter)<.0001F,
@@ -1943,6 +1947,11 @@ void testPlayerHands()
             expect(length(next.wrists[side]-previous.wrists[side])<.05F,
                 "release hands follow continuous trajectories");
             const auto& a=next.skin[side*playerHandBonesPerSide+2U].elements;
+            const auto& prior=previous.skin[side*playerHandBonesPerSide+2U].elements;
+            expect(dot({a[8],a[9],a[10]}, {prior[8],prior[9],prior[10]})>.99F,
+                "grenade palm orientation stays continuous through release");
+            if(side==0U) expect(a[8]>.25F,
+                "dominant glove dorsal remains outward during the entire throw");
             const Vec3 fore=normalized(next.wrists[side]-next.elbows[side]);
             expect(dot(fore,{a[4],a[5],a[6]})
                     >std::cos(31.0F*std::numbers::pi_v<float>/180),

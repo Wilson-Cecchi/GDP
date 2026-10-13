@@ -72,6 +72,103 @@ bool validateInstancingTolerance()
     return passed;
 }
 
+// Manual offscreen capture; excluded from the normal renderer pixel suite.
+bool captureGrenadeSmoke(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    const char* directory = std::getenv("GDP_GRENADE_SMOKE_CAPTURE_DIR");
+    if (!directory || !*directory) {
+        std::cerr << "Set GDP_GRENADE_SMOKE_CAPTURE_DIR for manual grenade capture\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    bool passed = true;
+    for (const bool potato : {false, true}) {
+        HudRenderData hud;
+        hud.graphicsQuality = potato
+            ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+        hud.detailedMaterials = !potato;
+        hud.worldRenderScalePercent = potato ? 50U : 100U;
+        for (const float fov : {60.0F, 90.0F}) {
+            CameraData camera;
+            camera.position.x = 1.5F;
+            camera.verticalFieldOfViewDegrees = fov;
+            for (const float distance : {1.2F, 4.0F}) {
+                const bool near = distance < 2.0F;
+                const auto position = camera.position + camera.forward * distance;
+                const std::string prefix = std::string{potato ? "potato" : "medium"}
+                    + "_fov" + std::to_string(static_cast<int>(fov))
+                    + (near ? "_near" : "_far");
+                const auto capture = [&](const std::string& phase,
+                                         const std::span<const GrenadeRenderData> grenades,
+                                         const std::span<const GrenadeBlastRenderData> blasts) {
+                    passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+                        {}, {}, {}, {}, hud, {}, {}, {}, {}, grenades, blasts);
+                    const auto stats = renderer.lastFrameStats();
+                    glFinish();
+                    std::vector<std::uint8_t> pixels(
+                        static_cast<std::size_t>(width * height * 4));
+                    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                        pixels.data());
+                    passed &= glGetError() == GL_NO_ERROR;
+                    std::vector<std::uint8_t> topDown(pixels.size());
+                    const std::size_t stride = static_cast<std::size_t>(width * 4);
+                    for (int row = 0; row < height; ++row)
+                        std::copy_n(pixels.data()
+                            + static_cast<std::size_t>(height - row - 1) * stride,
+                            stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+                    const auto path = std::filesystem::path{directory}
+                        / (prefix + "_" + phase + ".bmp");
+                    SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                        SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                    passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+                    if (surface) SDL_DestroySurface(surface);
+                    std::cout << "GRENADE_SMOKE_FRAME quality="
+                        << (potato ? "POTATO" : "MEDIUM")
+                        << " fov=" << fov << " distance=" << distance
+                        << " phase=" << phase << " draws=" << stats.drawCalls
+                        << " triangles=" << stats.triangles << '\n';
+                    return pixels;
+                };
+                const auto changedPixels = [](const std::vector<std::uint8_t>& a,
+                                              const std::vector<std::uint8_t>& b) {
+                    std::size_t count = 0U;
+                    for (std::size_t pixel = 0U; pixel < a.size(); pixel += 4U)
+                        count += a[pixel] != b[pixel]
+                            || a[pixel + 1U] != b[pixel + 1U]
+                            || a[pixel + 2U] != b[pixel + 2U];
+                    return count;
+                };
+                const auto baseline = capture("baseline", {}, {});
+                const std::array grenade{GrenadeRenderData{position}};
+                const auto projectile = capture("in_flight", grenade, {});
+                const auto projectileChanged = changedPixels(projectile, baseline);
+                passed &= projectileChanged > 0U;
+                for (const auto& [phase, strength] : {
+                         std::pair{"blast_start", 1.0F},
+                         std::pair{"blast_mid", 0.5F},
+                         std::pair{"blast_end", 0.1F}}) {
+                    const std::array blast{GrenadeBlastRenderData{position, strength}};
+                    const auto effect = capture(phase, {}, blast);
+                    const auto changed = changedPixels(effect, baseline);
+                    passed &= changed > 0U;
+                    std::cout << "GRENADE_SMOKE quality="
+                        << (potato ? "POTATO" : "MEDIUM")
+                        << " fov=" << fov << " distance=" << distance
+                        << " phase=" << phase << " changed_pixels=" << changed << '\n';
+                }
+                std::cout << "GRENADE_SMOKE quality="
+                    << (potato ? "POTATO" : "MEDIUM")
+                    << " fov=" << fov << " distance=" << distance
+                    << " phase=in_flight changed_pixels=" << projectileChanged << '\n';
+            }
+        }
+    }
+    return passed;
+}
+
 bool profileGrenadeBlast(gdp::game::visual::GdpRenderer& renderer)
 {
     using namespace gdp::game::visual;
@@ -840,6 +937,8 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--tactical-hud-only";
     const bool grenadeBlastProfile = argc == 2
         && std::string{argv[1]} == "--grenade-blast-profile";
+    const bool grenadeSmokeCapture = argc == 2
+        && std::string{argv[1]} == "--grenade-smoke-capture";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -1004,6 +1103,8 @@ int main(const int argc, char** argv)
             std::cerr << "Renderer failed to produce a frame\n";
         } else if (grenadeBlastProfile) {
             passed = profileGrenadeBlast(renderer);
+        } else if (grenadeSmokeCapture) {
+            passed = captureGrenadeSmoke(renderer);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {

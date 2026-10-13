@@ -26,10 +26,9 @@
 namespace gdp::game::visual {
 namespace {
 
-wkc::render::MeshData makeGrenadeBodyMesh()
+wkc::render::MeshData makeRoundedMesh(
+    const std::uint32_t slices, const std::uint32_t stacks)
 {
-    constexpr std::uint32_t slices = 24U;
-    constexpr std::uint32_t stacks = 16U;
     constexpr float pi = std::numbers::pi_v<float>;
     wkc::render::MeshData mesh;
     mesh.vertices.reserve((slices + 1U) * (stacks + 1U));
@@ -181,6 +180,8 @@ uniform sampler2D uMaterialMap;
 uniform sampler2D uEmissionMap;
 uniform vec3 uTint;
 uniform float uOpacity;
+uniform int uSoftEdges;
+uniform float uUnlitMix;
 uniform vec3 uCameraPosition;
 #if GDP_LOW_SPEC
 const int MAX_LIGHTS = 4;
@@ -306,9 +307,7 @@ void main()
     }
 #endif
     vec3 result = albedo * uAmbientColor * uAmbientIntensity * ambientOcclusion;
-#if !GDP_LOW_SPEC
     vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
-#endif
     for (int index = 0; index < MAX_LIGHTS; ++index) {
         if (index >= uLightCount) {
             break;
@@ -377,8 +376,12 @@ void main()
     float emissiveMask = uUseEmissionMap != 0
         ? texture(uEmissionMap, materialUv).r
         : smoothstep(0.62, 0.82, max(albedo.r, max(albedo.g, albedo.b)));
-    fragmentColor = vec4(result + (albedo * emissiveMask * uEmissiveStrength),
-        uOpacity);
+    float edgeOpacity = uSoftEdges != 0
+        ? smoothstep(0.05, 0.75, max(dot(normal, viewDirection), 0.0))
+        : 1.0;
+    vec3 litColor = result + (albedo * emissiveMask * uEmissiveStrength);
+    fragmentColor = vec4(mix(litColor, uTint, uUnlitMix),
+        uOpacity * edgeOpacity);
 }
 )glsl";
 
@@ -630,7 +633,8 @@ bool GdpRenderer::initialize(const int width, const int height)
         return false;
     }
     if (!box_.upload(gl_, wkc::render::makeBoxMesh())
-        || !grenadeBody_.upload(gl_, makeGrenadeBodyMesh())) {
+        || !grenadeBody_.upload(gl_, makeRoundedMesh(24U, 16U))
+        || !smokePuff_.upload(gl_, makeRoundedMesh(12U, 8U))) {
         return false;
     }
     for (std::size_t role = 0; role < weaponRoleCount; ++role) {
@@ -1358,6 +1362,8 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uUseEmissionMap", 0);
     shader.setInt(gl_, "uViewmodel", 0);
     shader.setFloat(gl_, "uOpacity", 1.0F);
+    shader.setInt(gl_, "uSoftEdges", 0);
+    shader.setFloat(gl_, "uUnlitMix", 0.0F);
     shader.setInt(gl_, "uInstanced", 0);
     shader.setInt(gl_, "uPlayerSkinning", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
@@ -1973,6 +1979,46 @@ bool GdpRenderer::render(
         }
     }
 
+    // The world projectile and first-person viewmodel use the same mesh,
+    // proportions, tint and material. Only their transforms differ.
+    const auto drawGrenadeModel = [&](const wkc::core::Mat4& root,
+                                      const wkc::core::Vec3 center) {
+        const auto bindMaterial = [&](const WeaponMaterial material) {
+            const auto& gpu = weaponMaterials_[static_cast<std::size_t>(material)];
+            gpu.albedo.bind(gl_, textureBindings_, 0U);
+            gpu.normal.bind(gl_, textureBindings_, 1U);
+            gpu.properties.bind(gl_, textureBindings_, 2U);
+            shader.setInt(gl_, "uDetailedMaterial", 1);
+        };
+        const auto roundedPiece = [&](const wkc::core::Vec3 offset,
+                                      const wkc::core::Vec3 scale,
+                                      const wkc::core::Vec3 tint) {
+            shader.setMat4(gl_, "uModel", root
+                * wkc::core::translationMatrix(offset)
+                * wkc::core::scaleMatrix(scale));
+            shader.setVec3(gl_, "uTint", tint);
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            drawMesh(grenadeBody_);
+        };
+        shader.setFloat(gl_, "uOpacity", 1.0F);
+        shader.setInt(gl_, "uUseEmissionMap", 0);
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        bindMaterial(WeaponMaterial::Polymer);
+        roundedPiece(center, {0.205F, 0.255F, 0.19F},
+            {0.48F, 0.55F, 0.35F});
+        bindMaterial(WeaponMaterial::CoatedSteel);
+        roundedPiece(center + wkc::core::Vec3{0.0F, 0.116F, 0.0F},
+            {0.105F, 0.052F, 0.105F}, {0.61F, 0.66F, 0.63F});
+        shader.setMat4(gl_, "uModel", root
+            * wkc::core::translationMatrix(center
+                + wkc::core::Vec3{-0.064F, 0.096F, 0.0F})
+            * wkc::core::rotationZMatrix(-15.0F * std::numbers::pi_v<float> / 180.0F)
+            * wkc::core::scaleMatrix({0.014F, 0.116F, 0.040F}));
+        shader.setVec3(gl_, "uTint", {0.43F, 0.48F, 0.45F});
+        drawMesh(box_);
+    };
+
     for (const EnemyProjectileRenderData& projectile : enemyProjectiles) {
         const wkc::core::Vec3 direction
             = wkc::core::normalized(projectile.direction);
@@ -1987,39 +2033,13 @@ bool GdpRenderer::render(
         shader.setFloat(gl_, "uEmissiveStrength", 2.0F);
         drawMesh(box_);
     }
+    shader.setFloat(gl_, "uUnlitMix", 0.25F);
     for (const GrenadeRenderData& grenade : grenades) {
-        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
-        shader.setVec3(gl_, "uTint", {0.24F, 0.29F, 0.19F});
-        shader.setMat4(gl_, "uModel",
-            wkc::core::translationMatrix(grenade.position)
-                * wkc::core::scaleMatrix({0.18F, 0.21F, 0.18F}));
-        drawMesh(box_);
-        shader.setVec3(gl_, "uTint", {0.43F, 0.46F, 0.39F});
-        shader.setMat4(gl_, "uModel",
-            wkc::core::translationMatrix(grenade.position
-                + wkc::core::Vec3{0.0F, 0.12F, 0.0F})
-                * wkc::core::scaleMatrix({0.11F, 0.035F, 0.11F}));
-        drawMesh(box_);
-        shader.setVec3(gl_, "uTint", {0.72F, 0.60F, 0.18F});
-        shader.setMat4(gl_, "uModel",
-            wkc::core::translationMatrix(grenade.position)
-                * wkc::core::scaleMatrix({0.19F, 0.025F, 0.19F}));
-        drawMesh(box_);
+        drawGrenadeModel(wkc::core::translationMatrix(grenade.position), {});
     }
-    for (const GrenadeBlastRenderData& blast : grenadeBlasts) {
-        const float strength = std::clamp(blast.strength, 0.0F, 1.0F);
-        const float extent = 0.18F + (1.0F - strength) * 2.4F;
-        shader.setVec3(gl_, "uTint", {1.0F, 0.45F * strength, 0.06F});
-        shader.setFloat(gl_, "uEmissiveStrength", 1.4F * strength);
-        for (const wkc::core::Vec3 scale : {
-                 wkc::core::Vec3{extent, 0.025F, 0.045F},
-                 wkc::core::Vec3{0.045F, 0.025F, extent}}) {
-            shader.setMat4(gl_, "uModel",
-                wkc::core::translationMatrix(blast.position)
-                    * wkc::core::scaleMatrix(scale));
-            drawMesh(box_);
-        }
-    }
+    shader.setFloat(gl_, "uUnlitMix", 0.0F);
+    shader.setInt(gl_, "uDetailedMaterial", 0);
+    fallbackTexture_.bind(gl_, textureBindings_);
     shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
 
     ceilingFixtureMaterial_.albedo.bind(gl_, textureBindings_, 0U);
@@ -2358,6 +2378,87 @@ bool GdpRenderer::render(
         shader.setInt(gl_, "uPlayerSkinning", 0);
     }
 
+    // Draw translucent blast volumes after opaque world geometry, so walls
+    // and actors still occlude them. A short flash gives way to rising smoke.
+    if (!grenadeBlasts.empty()) {
+        fallbackTexture_.bind(gl_, textureBindings_);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setInt(gl_, "uUseEmissionMap", 0);
+        shader.setInt(gl_, "uSoftEdges", 1);
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        constexpr std::array<wkc::core::Vec3, 5> puffOffsets{{
+            {0.0F, 0.0F, 0.0F}, {-0.85F, 0.12F, 0.18F},
+            {0.68F, 0.32F, -0.48F}, {0.42F, -0.08F, 0.82F},
+            {-0.33F, 0.28F, -0.82F},
+        }};
+        for (const GrenadeBlastRenderData& blast : grenadeBlasts) {
+            const float remaining = std::clamp(
+                std::isfinite(blast.strength) ? blast.strength : 0.0F,
+                0.0F, 1.0F);
+            const float age = 1.0F - remaining;
+            const float flash = std::clamp(1.0F - age / 0.16F, 0.0F, 1.0F);
+            if (flash > 0.0F) {
+                const float diameter = 0.65F + age * 3.0F;
+                shader.setMat4(gl_, "uModel",
+                    wkc::core::translationMatrix(blast.position
+                        + wkc::core::Vec3{0.0F, 0.14F, 0.0F})
+                    * wkc::core::scaleMatrix(
+                        {diameter, diameter, diameter}));
+                shader.setVec3(gl_, "uTint", {1.0F, 0.57F, 0.18F});
+                shader.setFloat(gl_, "uEmissiveStrength", 2.0F);
+                shader.setFloat(gl_, "uOpacity", 0.76F * flash);
+                shader.setFloat(gl_, "uUnlitMix", 0.92F);
+                drawMesh(smokePuff_);
+            }
+            const float smoke = std::clamp(age / 0.18F, 0.0F, 1.0F)
+                * std::clamp((1.0F - age) / 0.22F, 0.0F, 1.0F);
+            if (smoke <= 0.0F) continue;
+            std::array<std::size_t, puffOffsets.size()> order{
+                0U, 1U, 2U, 3U, 4U};
+            const auto puffCenter = [&](const std::size_t index) {
+                const float spread = 0.26F + age * 0.68F;
+                return blast.position + wkc::core::Vec3{
+                    puffOffsets[index].x * spread,
+                    0.18F + age * 0.82F + puffOffsets[index].y * spread,
+                    puffOffsets[index].z * spread};
+            };
+            std::sort(order.begin(), order.end(), [&](const std::size_t a,
+                                                       const std::size_t b) {
+                const auto distanceSquared = [&](const std::size_t index) {
+                    const wkc::core::Vec3 offset = puffCenter(index) - camera.position;
+                    return wkc::core::dot(offset, offset);
+                };
+                return distanceSquared(a) > distanceSquared(b);
+            });
+            for (const std::size_t index : order) {
+                const float diameter = (index == 0U ? 0.92F : 0.64F)
+                    + age * (index == 0U ? 0.75F : 0.58F);
+                shader.setMat4(gl_, "uModel",
+                    wkc::core::translationMatrix(puffCenter(index))
+                    * wkc::core::scaleMatrix({diameter, diameter * 0.82F,
+                        diameter}));
+                shader.setVec3(gl_, "uTint", index == 0U
+                    ? wkc::core::Vec3{0.83F, 0.84F, 0.82F}
+                    : wkc::core::Vec3{0.77F, 0.79F, 0.77F});
+                shader.setFloat(gl_, "uEmissiveStrength", 0.45F);
+                shader.setFloat(gl_, "uOpacity", smoke
+                    * (index == 0U ? 0.32F : 0.25F));
+                shader.setFloat(gl_, "uUnlitMix", 0.78F);
+                drawMesh(smokePuff_);
+            }
+        }
+        shader.setFloat(gl_, "uOpacity", 1.0F);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setInt(gl_, "uSoftEdges", 0);
+        shader.setFloat(gl_, "uUnlitMix", 0.0F);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+    }
+
     const HudWeaponRole viewmodelRole = weaponViewmodel.role;
     if (weaponViewmodel.visible && scopeStrength < 0.95F
         && static_cast<std::size_t>(viewmodelRole) < weaponRoleCount) {
@@ -2514,34 +2615,7 @@ bool GdpRenderer::render(
         if (weaponViewmodel.grenadeSelected && weaponViewmodel.grenadeVisible) {
             const GrenadeViewmodelPose grenadePose
                 = sampleGrenadeViewmodelPose(presentationWeapon);
-            const auto center = grenadePose.bodyCenter;
-            const auto bindGrenadeMaterial = [&](const WeaponMaterial material) {
-                const auto& gpu = weaponMaterials_[static_cast<std::size_t>(material)];
-                gpu.albedo.bind(gl_, textureBindings_, 0U);
-                gpu.normal.bind(gl_, textureBindings_, 1U);
-                gpu.properties.bind(gl_, textureBindings_, 2U);
-                shader.setInt(gl_, "uDetailedMaterial", 1);
-            };
-            const auto drawRoundedPiece = [&](const wkc::core::Vec3 offset,
-                                              const wkc::core::Vec3 scale,
-                                              const wkc::core::Vec3 color) {
-                shader.setMat4(gl_, "uModel", root
-                    * wkc::core::translationMatrix(offset)
-                    * wkc::core::scaleMatrix(scale));
-                shader.setVec3(gl_, "uTint", color);
-                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
-                drawMesh(grenadeBody_);
-            };
-            shader.setFloat(gl_, "uOpacity", 1.0F);
-            bindGrenadeMaterial(WeaponMaterial::Polymer);
-            drawRoundedPiece(center, {0.205F, 0.255F, 0.19F},
-                {0.48F, 0.55F, 0.35F});
-            bindGrenadeMaterial(WeaponMaterial::CoatedSteel);
-            drawRoundedPiece(center + wkc::core::Vec3{0.0F, 0.116F, 0.0F},
-                {0.105F, 0.052F, 0.105F}, {0.61F, 0.66F, 0.63F});
-            drawWeaponPiece(center + wkc::core::Vec3{-0.064F, 0.096F, 0.0F},
-                {0.014F, 0.116F, 0.040F}, {0.0F, 0.0F, -15.0F},
-                {0.43F, 0.48F, 0.45F});
+            drawGrenadeModel(root, grenadePose.bodyCenter);
             if (grenadePose.pinVisible) {
                 constexpr std::uint32_t pinSegments = 12U;
                 constexpr float pi = std::numbers::pi_v<float>;

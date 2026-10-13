@@ -470,11 +470,7 @@ PlayerHandsPose samplePlayerHandsPose(const WeaponViewmodelRenderData& weapon) n
         const float throwing=safe(weapon.grenadeThrowStrength);
         if(throwing>0.0F) {
             left=reach(pinTarget,leftIdle,throwing,{-.05F,-.025F,-.10F});
-            // Turn the open palm toward the throw. Keeping the knife's grip
-            // orientation through extension made the hand roll backwards at
-            // the wrist even though the solver stayed inside its angle limit.
-            const auto open=target(grenade.gripContact,HandContact::Fetch,
-                {0.0F,0.0F,-70.0F});
+            const auto open=target(grenade.gripContact,HandContact::Fetch);
             const float release=ease(throwing,0.0F,.45F);
             const float recover=ease(throwing,.55F,1.0F);
             right=blend(rightIdle,open,release*(1.0F-recover));
@@ -566,7 +562,10 @@ PlayerHandsPose samplePlayerHandsPose(const WeaponViewmodelRenderData& weapon) n
         // The knife's four knuckles run along its handle; firearms' knuckles
         // run down their pistol grips. Reusing the latter left the knife
         // balanced on a couple of fingertips instead of inside a fist.
-        const Mat4 palmBasis=dominant && knife ? basis({0,0,1},{-1,0,0},{0,-1,0})
+        // A grenade is held at its right side with the palm facing inward.
+        // The knife's palm-up basis inverted the grenade hand as it opened.
+        const Mat4 palmBasis=dominant && knife && !weapon.grenadeSelected
+            ? basis({0,0,1},{-1,0,0},{0,-1,0})
             : dominant ? basis({0,1,0},{0,0,1},{1,0,0}) : basis({0,-1,0},{0,0,1},{-1,0,0});
         const Mat4 desired=rotationZMatrix(t.partRotationZ*pi/180)
             *palmBasis
