@@ -5,6 +5,9 @@
 #include "game/ai/WorkerTraining.hpp"
 
 #include <SDL3/SDL.h>
+#if defined(_WIN32) && defined(GDP_WINDOWS_GUI_EXECUTABLE)
+#include <SDL3/SDL_main.h>
+#endif
 
 #include <algorithm>
 #include <charconv>

@@ -20,11 +20,14 @@ struct CandidateOutcome {
 const RoomModule* selectModule(
     const std::span<const RoomModule> library,
     const RoomNode& node,
-    wkc::core::RandomStream& random)
+    wkc::core::RandomStream& random,
+    const bool requireWideNormal)
 {
     std::vector<const RoomModule*> candidates;
     for (const RoomModule& module : library) {
         if (module.theme == node.theme && module.supportsRole(node.role)
+            && (!requireWideNormal || (module.sizeClass == RoomSizeClass::Large
+                && module.footprint.x >= 16 && module.footprint.z >= 18))
             && validateRoomModule(module).isValid()) {
             candidates.push_back(&module);
         }
@@ -202,13 +205,30 @@ CandidateOutcome generateCandidate(
         return {std::nullopt, GenerationFailure::GraphInvalid};
     }
 
+    // Reserve the deepest eligible Normal for a hall. Other Normals retain
+    // the usual compact/medium/large selection; custom libraries without a
+    // matching hall keep their original selection behavior.
+    const auto wideNode = std::find_if(candidate.graph.nodes.rbegin(),
+        candidate.graph.nodes.rend(), [library](const RoomNode& node) {
+            return node.role == RoomRole::Normal
+                && std::any_of(library.begin(), library.end(), [&node](const RoomModule& module) {
+                    return module.theme == node.theme && module.supportsRole(RoomRole::Normal)
+                        && module.sizeClass == RoomSizeClass::Large
+                        && module.footprint.x >= 16 && module.footprint.z >= 18
+                        && validateRoomModule(module).isValid();
+                });
+        });
+    const RoomNodeId requiredWideId = wideNode == candidate.graph.nodes.rend()
+        ? 0U : wideNode->id;
+
     candidate.rooms.reserve(candidate.graph.nodes.size());
     for (const RoomNode& node : candidate.graph.nodes) {
         const wkc::core::Seed roomSeed = wkc::core::deriveSeed(
             attemptSeed, gdp::game::SeedDomain::Room, node.id);
         wkc::core::RandomStream random{wkc::core::deriveSeed(
             roomSeed, gdp::game::SeedDomain::RoomModule, node.id)};
-        const RoomModule* module = selectModule(library, node, random);
+        const RoomModule* module = selectModule(
+            library, node, random, node.id == requiredWideId);
         if (module == nullptr) {
             return {std::nullopt, GenerationFailure::ModuleUnavailable};
         }

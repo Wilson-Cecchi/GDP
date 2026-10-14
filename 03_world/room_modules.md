@@ -39,10 +39,28 @@ theme e role capability antes de usar o stream `RoomModule` da sala.
 
 ## Variedade estrutural implementada
 
-A Fase 20 substitui a base única por 23 módulos. As famílias compactas começam
+A Fase 20 substituiu a base única por 23 módulos. As famílias compactas começam
 em `7 × 4 × 9`, as médias variam proporção e altura, e as grandes chegam a
 `14 × 6 × 13`. Hub, Arena e Boss selecionam módulos grandes dedicados; Secret
 seleciona módulos compactos dedicados.
+
+Dimensões aprovadas pelo usuário em 2026-10-13: a ampliação acrescenta sete
+variantes exclusivas de `Normal`:
+Industrial `16 × 6 × 20`, Storage `18 × 6 × 20`, Office `16 × 6 × 18`,
+Laboratory `16 × 6 × 22`, Maintenance `16 × 6 × 20`, Security `18 × 6 × 18` e
+Cafeteria `18 × 6 × 18` metros. As variantes compactas e médias permanecem na
+biblioteca. Em cada mundo padrão de oito salas, o `Normal` elegível de maior
+profundidade escolhe uma variante ampla; os demais mantêm escolha uniforme e
+determinística entre alternativas do tema. A reserva não altera o orçamento de
+inimigos de `Normal`.
+Os três módulos dedicados de `Boss` (Laboratory, Maintenance e Security) passam
+a `28 × 7 × 32 m`, abaixo da área de `32 × 40 m` do Test Mode. O eixo central
+continua aberto para tiro longo; props procedurais ocupam o lado direito, e o
+lado esquerdo recebe cobertura fixa e rota lateral para escopeta.
+Esta aprovação cobre o tamanho das salas. Em 2026-10-13, o usuário também
+optou por manter a iluminação atual do Boss nas capturas MEDIUM/POTATO, sem
+aumento adicional de contraste. O equilíbrio do encontro segue em validação
+separada por playtest.
 
 A implementação cumpre estes contratos:
 

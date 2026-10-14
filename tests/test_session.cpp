@@ -358,6 +358,64 @@ void testBossStatusUsesArchetypeAndRoomOwnership()
         "Boss status inspection never mutates remote entities");
 }
 
+void testBossEncounterRequiresAllAides()
+{
+    using namespace gdp;
+    entities::EntityManager entities;
+    const entities::EntityId robot = entities.createEnemy({
+        .roomId = 8U,
+        .archetype = entities::EnemyArchetype::IndustrialRobot,
+    });
+    const entities::EntityId officer = entities.createEnemy({
+        .roomId = 8U,
+        .archetype = entities::EnemyArchetype::Officer,
+    });
+    expect(gameplay::bossEncounterAlive(entities, 8U),
+        "Boss encounter begins with live robot and aide");
+    entities.findData<entities::EnemyData>(robot)->behavior
+        = entities::EnemyBehaviorState::Dead;
+    entities.find(officer)->roomId = 9U;
+    expect(gameplay::bossEncounterAlive(entities, 8U),
+        "an aide that chases the player outside still belongs to the encounter");
+
+    gameplay::SessionSystem standard{1U};
+    (void)standard.update(true, world::RoomRole::Boss, true, true);
+    expect(!standard.update(true, world::RoomRole::Boss, true,
+                gameplay::bossEncounterAlive(entities, 8U)).changed,
+        "Standard remains active after robot death while an aide lives");
+    gameplay::SessionSystem campaign{2U};
+    (void)campaign.selectRunMode(gameplay::RunMode::Campaign);
+    (void)campaign.update(true, world::RoomRole::Boss, true, true,
+        false, false, true);
+    (void)campaign.update(true, world::RoomRole::Boss, true,
+        gameplay::bossEncounterAlive(entities, 8U), false, true, true);
+    expect(!campaign.state().campaignExitReady
+            && campaign.state().phase == gameplay::SessionPhase::Playing,
+        "Campaign rejects terminal use while an aide lives after robot death");
+
+    entities.findData<entities::EnemyData>(officer)->behavior
+        = entities::EnemyBehaviorState::Dead;
+    const entities::EntityId visitor = entities.createEnemy({
+        .roomId = 9U,
+        .archetype = entities::EnemyArchetype::Guard,
+    });
+    entities.find(visitor)->roomId = 8U;
+    expect(!gameplay::bossEncounterAlive(entities, 8U),
+        "Boss encounter clears after its last aide dies, even if a visitor enters");
+    expect(standard.update(true, world::RoomRole::Boss, true,
+                gameplay::bossEncounterAlive(entities, 8U)).phase
+            == gameplay::SessionPhase::Victory,
+        "Standard finishes when the whole Boss encounter is clear");
+    (void)campaign.update(true, world::RoomRole::Boss, true,
+        gameplay::bossEncounterAlive(entities, 8U), false, false, true);
+    expect(campaign.state().campaignExitReady
+            && campaign.state().phase == gameplay::SessionPhase::Playing,
+        "Campaign unlocks exit after both encounter and mission clear");
+    expect(campaign.update(true, world::RoomRole::Boss, true, false,
+                false, true, true).phase == gameplay::SessionPhase::Victory,
+        "Campaign advances only on a new terminal use after clearing the encounter");
+}
+
 void testRestartSeedRegeneratesAReproducibleWorld()
 {
     using namespace gdp;
@@ -394,6 +452,7 @@ int main()
     testCampaignMissionMustPrecedeExit();
     testCampaignCheckpointRestoresOnlyPristineSessions();
     testBossStatusUsesArchetypeAndRoomOwnership();
+    testBossEncounterRequiresAllAides();
     testRestartSeedRegeneratesAReproducibleWorld();
 
     if (failures != 0) {

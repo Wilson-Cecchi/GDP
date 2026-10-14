@@ -99,7 +99,7 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
         return false;
     }
     const float speed = enemy.archetype
-            == gdp::entities::EnemyArchetype::IndustrialRobot ? 18.0F
+            == gdp::entities::EnemyArchetype::IndustrialRobot ? 30.0F
         : enemy.archetype == gdp::entities::EnemyArchetype::Officer ? 13.0F
         : 16.0F;
     const float along = wkc::core::dot(target - muzzle, direction);
@@ -2215,6 +2215,8 @@ EnemyUpdateSummary updateIndustrialRobots(
     }
     config.longRangeMinimum = std::max(config.longRangeMinimum, 0.0F);
     config.longRangeMaximum = std::max(config.longRangeMaximum, 0.0F);
+    config.cannonRange = std::max(config.cannonRange, 0.0F);
+    config.cannonReadySeconds = std::max(config.cannonReadySeconds, 0.0F);
     if (config.longRangeMinimum > config.longRangeMaximum) {
         std::swap(config.longRangeMinimum, config.longRangeMaximum);
     }
@@ -2282,15 +2284,46 @@ EnemyUpdateSummary updateIndustrialRobots(
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
+        const float cannonMinimum = std::max(maximumRange, config.pressureMaximum);
+        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
+            ? planarOffset * (1.0F / distance)
+            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         const bool lineOfSight = playerVisibleToEnemy(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.45F,
             collisionWorld, perception);
+        const bool firstSight = enemy->investigationTime <= 0.0F;
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, moveSpeed);
             shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
                 player, perception.difficulty);
+            // Give the player a short reaction window on first sight. The
+            // cannon covers the arena while the robot closes to phase range.
+            if (firstSight) {
+                enemy->attackCooldown = std::max(
+                    enemy->attackCooldown, config.cannonReadySeconds);
+            }
+            if (distance > cannonMinimum
+                && distance <= config.cannonRange
+                && enemy->alertTime <= 0.0F) {
+                turnEnemyToward(*entity, planarOffset, step,
+                    targetTurnRateDegreesPerSecond);
+                const float yaw = entity->transform.rotationDegrees.y
+                    * 0.01745329251994329577F;
+                const wkc::core::Vec3 forward{
+                    std::sin(yaw), 0.0F, std::cos(yaw)};
+                const bool aimed = distance <= 1.0e-5F
+                    || wkc::core::dot(forward, towardPlayer) >= 0.9781476007F;
+                if (perception.allowAttacks && aimed
+                    && enemy->attackCooldown <= 0.0F
+                    && fireRangedEnemy(*entity, *enemy, id, player,
+                        config.longRangeDamage, perception, false, summary,
+                        {manager, enemyIds, collisionWorld, step,
+                            moveSpeed, {.radius = 0.52F, .height = 1.9F}})) {
+                    enemy->attackCooldown = config.longRangeAttackInterval;
+                }
+            }
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -2315,9 +2348,6 @@ EnemyUpdateSummary updateIndustrialRobots(
                 config.investigation, {.radius = 0.52F, .height = 1.9F}, summary);
             continue;
         }
-        const wkc::core::Vec3 towardPlayer = distance > 1.0e-7F
-            ? planarOffset * (1.0F / distance)
-            : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
         if (phase != IndustrialRobotPhase::Pursuit && distance < minimumRange) {
             enemy->behavior = EnemyBehaviorState::Reposition;
             ++summary.repositioning;

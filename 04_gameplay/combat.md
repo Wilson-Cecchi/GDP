@@ -51,10 +51,9 @@ Bônus de dano são normalizados pelo número de pellets na equip/progressão,
 sem multiplicação involuntária de upgrades. Não há nova fila global.
 
 Sniper e escopeta são semiautomáticas; SMG é automática. A sniper tem mira
-mais lenta e zoom proporcional ao FOV configurado. Nenhum atributo do boss
-foi alterado. Sniper, escopeta e SMG têm modelos próprios Used v1 após aprovação
-das pranchas; o visual da SMG também foi aprovado na partida. A geometria nova
-não altera o ray lógico.
+mais lenta e zoom proporcional ao FOV configurado. Sniper, escopeta e SMG têm
+modelos próprios Used v1 após aprovação das pranchas; o visual da SMG também
+foi aprovado na partida. A geometria nova não altera o ray lógico.
 
 As seções de fases abaixo preservam seu contexto histórico; por exemplo,
 o antigo slot 1 fixo da Carbine agora representa qualquer primária possuída,
@@ -91,12 +90,30 @@ A IA também atualiza inimigos nas salas ligadas à sala atual por corredores co
 porta transitável. Visão, ataque e perseguição usam a colisão contínua dessas
 salas e a cobertura de ambas; uma porta fechada não dá visão nem passagem. A
 ocupação por um inimigo no meio do corredor impede seu fechamento, e sua sala
-lógica só muda quando o collider entra inteiro no próximo cômodo. O boss pode
-ser enfrentado na passagem aberta: em Standard/Speedrun, sua morte conclui a
-partida sem exigir uma segunda entrada artificial. Na Campanha, sua morte
-libera o terminal da sala Boss; o jogador continua móvel e só avança o andar
-ao interagir com esse console. No décimo andar, essa interação mostra a vitória.
-Vida, dano, fases, mira e pontos fracos do boss não mudam nesta revisão.
+lógica só muda quando o collider entra inteiro no próximo cômodo. O Boss pode
+ser enfrentado na passagem aberta. Em Standard/Speedrun, limpar o encontro
+conclui a partida sem exigir uma segunda entrada artificial. Na Campanha,
+limpar o encontro e cumprir a missão libera o terminal da sala Boss; o jogador
+continua móvel e só avança o andar ao interagir com esse console. No décimo
+andar, essa interação mostra a vitória.
+
+O encontro inclui o IndustrialRobot e seus ajudantes. Um ajudante que sair da
+sala durante a perseguição continua pertencendo ao encontro; um inimigo de
+outra sala que entrar não passa a fazer parte dele. O robô detecta
+até 34 m e pode disparar o canhão até 32 m enquanto
+avança, inclusive nas fases de pressão e perseguição. O primeiro disparo após
+avistar o jogador tem preparo de 0,45 s; o projétil viaja a 30 m/s e a
+cobertura sólida bloqueia a linha de visão ou o tiro. Em Normal, os danos por
+acerto das três fases são 18/15/20 HP, com intervalos de 1,25/0,85/0,65 s,
+antes dos modificadores de dificuldade e armadura. Esses números são uma
+candidata de balanceamento e exigem playtest com o cérebro ativo empacotado.
+
+Ao abrir uma porta para uma sala ainda não visitada, os inimigos dessa sala
+recebem uma janela de reação de 1,25 s sem disparar. A primeira entrada renova
+essa janela; voltar a cruzar o mesmo limite não a concede de novo. Inimigos de
+outras salas continuam ativos, e projéteis já lançados conservam seu trajeto.
+O timer para junto com a partida pausada. A regra vale também quando um cérebro
+neural controla o inimigo.
 
 Na Fase 134, `HitResult` também identifica `Standard` ou `WeakPoint`. Inimigos
 orgânicos usam um volume menor sobre a cabeça; o IndustrialRobot usa o sensor

@@ -333,6 +333,7 @@ enum class ObjectiveRenderState : std::uint8_t {
     None,
     ReachBoss,
     DefeatBoss,
+    ClearBossEncounter,
     Victory,
     Defeat,
     TestArena,

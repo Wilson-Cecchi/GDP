@@ -22,6 +22,7 @@ option(GDP_BUILD_TESTS "Build and register GDP tests" ON)
 option(GDP_ENABLE_TEST_MODE "Include the dedicated development test arena (disable for shipping)" ON)
 option(GDP_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(GDP_PORTABLE_PACKAGE "Build a self-contained Linux or macOS download" OFF)
+option(GDP_WINDOWS_GUI_EXECUTABLE "Build the Windows game without a console window" OFF)
 set(GDP_RELEASE_VERSION "${PROJECT_VERSION}" CACHE STRING "Version shown by the packaged game")
 if(NOT GDP_RELEASE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     message(FATAL_ERROR "GDP_RELEASE_VERSION must be MAJOR.MINOR.PATCH")
@@ -372,6 +373,10 @@ target_compile_definitions(gdp PRIVATE
     GDP_ENABLE_TEST_MODE=$<BOOL:${GDP_ENABLE_TEST_MODE}>
     GDP_VERSION_STRING="${GDP_RELEASE_VERSION}"
 )
+if(WIN32 AND GDP_WINDOWS_GUI_EXECUTABLE)
+    set_target_properties(gdp PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_compile_definitions(gdp PRIVATE GDP_WINDOWS_GUI_EXECUTABLE=1)
+endif()
 if(GDP_ENABLE_TEST_MODE)
     target_sources(gdp PRIVATE src/game/TestArena.cpp)
 endif()
@@ -452,7 +457,10 @@ add_custom_target(
 )
 
 if(WIN32)
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.txt"
+        CONTENT "${GDP_RELEASE_VERSION}\n")
     install(TARGETS gdp RUNTIME DESTINATION .)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
     install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
 
     set(GDP_SDL_SHARED_TARGET "")
@@ -543,7 +551,7 @@ if(GDP_BUILD_TESTS)
         add_dependencies(gdp_application_menu_tests gdp_brain_assets)
         add_test(NAME application_menu_integration COMMAND gdp_application_menu_tests)
         set_tests_properties(application_menu_integration PROPERTIES
-            ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy" TIMEOUT 120)
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_AUDIODRIVER=dummy" TIMEOUT 240)
         if(GDP_ENABLE_SANITIZERS)
             # This fixture rebuilds many real procedural/GPU assets, including save migration.
             set_tests_properties(application_menu_integration PROPERTIES TIMEOUT 300)

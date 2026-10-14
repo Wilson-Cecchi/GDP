@@ -162,6 +162,7 @@ private:
         ai::activeEnemyBrainCount> activeEnemyBrains_;
     entities::EntityId terminalEntity_{};
     entities::EntityId exitTerminalEntity_{};
+    world::RoomId bossRoomId_{0U};
     gameplay::PlayerCommand playerCommand_{};
     bool interactionPending_{false};
     bool jumpPending_{false};
@@ -183,6 +184,7 @@ private:
     bool flashlightOn_{false};
     std::optional<world::World> world_;
     std::vector<world::RoomId> visitedRooms_;
+    std::unordered_map<world::RoomId, float> roomEntryGraceRemaining_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
     std::vector<world::RoomLightingPlan> roomLighting_;
     std::unordered_map<world::RoomId, std::vector<entities::EntityId>>

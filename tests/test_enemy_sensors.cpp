@@ -395,10 +395,25 @@ void testExperimentalArchetypes()
                 IndustrialRobotConfig{}, {}, &experiment);
             break;
         }
-        expect(experiment.selected == id && experiment.controlledTicks == 1U
-                && update.attacksLanded == 1U
-                && player.state().health < 100.0F,
-            "each non-Worker archetype can execute its neural attack");
+        if (archetype == EnemyArchetype::IndustrialRobot) {
+            expect(experiment.selected == id && experiment.controlledTicks == 1U
+                    && update.attacksLanded == 0U
+                    && player.state().health == 100.0F,
+                "neural Boss also respects the first-shot reaction window");
+            bool attackedAfterWindup = false;
+            for (int tick = 0; tick < 60 && !attackedAfterWindup; ++tick) {
+                update = updateIndustrialRobots(manager, player, 1, room, 0.01F,
+                    IndustrialRobotConfig{}, {}, &experiment);
+                attackedAfterWindup = update.attacksLanded == 1U;
+            }
+            expect(attackedAfterWindup && player.state().health < 100.0F,
+                "neural Boss attacks after its first-shot windup");
+        } else {
+            expect(experiment.selected == id && experiment.controlledTicks == 1U
+                    && update.attacksLanded == 1U
+                    && player.state().health < 100.0F,
+                "each other non-Worker archetype can execute its neural attack");
+        }
     }
 }
 

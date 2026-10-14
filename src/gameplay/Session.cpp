@@ -16,7 +16,7 @@ SessionUpdate SessionSystem::update(
     const bool playerAlive,
     const gdp::world::RoomRole currentRoomRole,
     const bool bossExists,
-    const bool bossAlive,
+    const bool bossEncounterStillAlive,
     const bool bossAccessible,
     const bool exitTerminalUsed,
     const bool campaignMissionComplete) noexcept
@@ -32,8 +32,8 @@ SessionUpdate SessionSystem::update(
                    || bossAccessible || state_.bossEngaged)) {
         state_.bossEngaged = true;
         state_.campaignExitReady = state_.mode == RunMode::Campaign
-            && !bossAlive && campaignMissionComplete;
-        if (!bossAlive && (state_.mode != RunMode::Campaign
+            && !bossEncounterStillAlive && campaignMissionComplete;
+        if (!bossEncounterStillAlive && (state_.mode != RunMode::Campaign
                 || (campaignMissionComplete && exitTerminalUsed))) {
             state_.phase = SessionPhase::Victory;
         }
@@ -232,6 +232,26 @@ BossStatus bossStatus(
             || enemy->behavior != gdp::entities::EnemyBehaviorState::Dead;
     }
     return status;
+}
+
+bool bossEncounterAlive(
+    const gdp::entities::EntityManager& entities,
+    const gdp::world::RoomId bossRoomId) noexcept
+{
+    if (bossRoomId == 0U) {
+        return false;
+    }
+    for (const gdp::entities::EntityId id
+        : entities.query(gdp::entities::EntityKind::Enemy)) {
+        const gdp::entities::EnemyData* enemy
+            = entities.findData<gdp::entities::EnemyData>(id);
+        if (enemy != nullptr && enemy->active
+            && enemy->behavior != gdp::entities::EnemyBehaviorState::Dead
+            && enemy->originRoomId == bossRoomId) {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace gdp::gameplay

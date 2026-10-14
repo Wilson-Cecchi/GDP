@@ -64,6 +64,43 @@ barricadas/props. Os quatro papéis possíveis da Arena e o IndustrialRobot já
 possuem IA, visual e combate; itens
 possuem coleta e efeitos funcionais.
 
+Na candidata de balanceamento, os 360/390/420 HP continuam a base determinística
+antes dos multiplicadores. Em Standard/Speedrun, o robô recebe `1,90×` dessa
+base; na Campanha, `1,65×` no piso 1, `1,72×` nos pisos 2–4, `1,82×` nos
+pisos 5–7 e `1,90×` nos pisos 8–10, além do multiplicador efetivo de
+dificuldade/andar. No Standard Normal isso resulta em 684–798 HP; na Campanha
+Hard do piso 10, em aproximadamente 1347–1572 HP. A população das salas
+`Normal` não muda.
+
+Os ajudantes iniciais do Boss são:
+
+| Modo/andar | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| Standard e Campanha piso 1 | Guard | Officer + Guard | Officer + 2 Guards |
+| Campanha pisos 2–7 | Officer | Officer + Guard | Officer + 2 Guards |
+| Campanha pisos 8–10 | Officer + Guard | Officer + 2 Guards | 2 Officers + 2 Guards |
+
+Speedrun usa a composição Standard Hard. Os ajudantes são ativos e ocupam
+pontos distintos à esquerda do robô, longe de portas, terminal e props;
+Engineer e Worker não fazem parte desse encontro. Duas
+barricadas fixas no flanco esquerdo, uma de `2,4 × 1,35 × 0,6 m` e outra de
+`0,6 × 2,25 × 2,4 m`, oferecem cobertura para a aproximação sem bloquear o
+eixo central. A mais baixa protege o jogador agachado; a alta protege em pé.
+A conclusão de Standard/Speedrun e a liberação do terminal na Campanha exigem
+derrotar o robô e todos os ajudantes do encontro. Um ajudante que perseguir o
+jogador para fora da sala ainda conta. A Campanha também exige concluir a missão
+do andar; matar o robô primeiro não dispensa nenhum desses requisitos.
+
+Referência de equilíbrio anterior à ampliação, obtida por probe temporária e
+proxy ideal de tiro, sem combate em partida: Standard seeds 1/2/3 tinham rota
+pelos centros de 66,5/60,5/64,5 m, 9/8/7 inimigos iniciais no caminho com
+541/516/416 HP somados, e Boss de 420/420/390 HP. Campanha seed 1, pisos
+1/5/10, tinha rotas de 54,3/74,7/76,7 m, 5/11/11 inimigos com
+316/865,9/1240,1 HP somados, e Boss de 420/554,4/670,8 HP. A probe não está
+preservada no repositório; estes números servem como referência histórica, não
+como medição pós-alteração. Playtest ainda deve conferir ritmo, uso da Sniper
+em 20–30 m e aproximação eficaz da escopeta.
+
 O evento da Arena ainda acrescenta uma onda de um inimigo depois de limpar a
 população inicial, totalizando três a cinco adversários ao longo do encontro.
 A variação usa `SeedDomain::EnemySpawn` e não altera os streams de loot, props,

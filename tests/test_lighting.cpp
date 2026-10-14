@@ -86,6 +86,73 @@ void testRoleAndThemeContracts()
         "hub receives four fixtures for navigation readability");
 }
 
+void testSpaciousRoomLighting()
+{
+    using namespace gdp::world;
+    constexpr wkc::core::Aabb bossBounds{
+        {-13.85F, 0.0F, -15.85F}, {13.85F, 7.0F, 15.85F}};
+    constexpr wkc::core::Aabb normalBounds{
+        {-8.85F, 0.0F, -10.85F}, {8.85F, 6.0F, 10.85F}};
+    constexpr wkc::core::Aabb smallerNormalBounds{
+        {-7.85F, 0.0F, -8.85F}, {7.85F, 5.0F, 8.85F}};
+    const auto checkCoverage = [](const RoomLightingPlan& plan,
+                                   const wkc::core::Aabb bounds,
+                                   const float maximumNormalizedDistance) {
+        for (const float x : {bounds.minimum.x + 0.5F, bounds.maximum.x - 0.5F}) {
+            for (const float z : {bounds.minimum.z + 0.5F, bounds.maximum.z - 0.5F}) {
+                float nearest = 100.0F;
+                for (const RoomPointLight& light : plan.lights) {
+                    const wkc::core::Vec3 offset
+                        = light.position - wkc::core::Vec3{x, 1.7F, z};
+                    nearest = std::min(nearest,
+                        wkc::core::length(offset) / light.range);
+                }
+                if (nearest > maximumNormalizedDistance) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
+    for (wkc::core::Seed seed = 1U; seed <= 1'000U; ++seed) {
+        const RoomLightingPlan boss = generateRoomLightingPlan(
+            seed, RoomRole::Boss, RoomTheme::Security, bossBounds);
+        const RoomLightingPlan normal = generateRoomLightingPlan(
+            seed, RoomRole::Normal, RoomTheme::Laboratory, normalBounds);
+        expect(validateRoomLightingPlan(boss, bossBounds).isValid()
+                && validateRoomLightingPlan(normal, normalBounds).isValid(),
+            "spacious Boss and Normal lighting validate across 1,000 seeds");
+        expect(boss.lights.size() == 4U && normal.lights.size() == 4U,
+            "spacious rooms stay within the four-light budget");
+        expect(boss.ambientIntensity >= 0.198F
+                && boss.ambientIntensity <= 0.222F,
+            "spacious Boss keeps its dark palette with readable ambient fill");
+        expect(checkCoverage(boss, bossBounds, 1.20F)
+                && checkCoverage(normal, normalBounds, 1.20F),
+            "four-point plans reach every corner at camera height");
+        for (const RoomPointLight& light : boss.lights) {
+            expect(light.range >= 11.0F && light.range <= 11.8F
+                    && light.intensity >= 1.05F && light.intensity <= 1.25F
+                    && light.position.x > bossBounds.minimum.x + 5.0F
+                    && light.position.x < bossBounds.maximum.x - 5.0F
+                    && light.position.z > bossBounds.minimum.z + 5.0F
+                    && light.position.z < bossBounds.maximum.z - 5.0F,
+                "Boss fixtures keep controlled reach away from room boundaries");
+        }
+        for (const RoomPointLight& light : normal.lights) {
+            expect(light.range >= 8.5F && light.range <= 9.3F
+                    && light.intensity >= 0.96F && light.intensity <= 1.14F,
+                "spacious Normal uses a shorter local lighting reach");
+        }
+    }
+    const RoomLightingPlan smallerNormal = generateRoomLightingPlan(
+        77U, RoomRole::Normal, RoomTheme::Industrial, smallerNormalBounds);
+    expect(smallerNormal.lights.size() == 4U
+            && validateRoomLightingPlan(smallerNormal, smallerNormalBounds).isValid(),
+        "a 16 by 18 module retains the spacious lighting plan after wall inset");
+}
+
 void testValidationFailures()
 {
     using namespace gdp::world;
@@ -153,6 +220,7 @@ int main()
 {
     testDeterministicPlan();
     testRoleAndThemeContracts();
+    testSpaciousRoomLighting();
     testValidationFailures();
     testSeedCoverageAndWorldIsolation();
 

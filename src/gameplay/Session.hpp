@@ -71,7 +71,7 @@ public:
         bool playerAlive,
         gdp::world::RoomRole currentRoomRole,
         bool bossExists,
-        bool bossAlive,
+        bool bossEncounterStillAlive,
         bool bossAccessible = false,
         bool exitTerminalUsed = false,
         bool campaignMissionComplete = false) noexcept;
@@ -103,5 +103,8 @@ private:
 [[nodiscard]] BossStatus bossStatus(
     const gdp::entities::EntityManager& entities,
     gdp::world::RoomId roomId) noexcept;
+[[nodiscard]] bool bossEncounterAlive(
+    const gdp::entities::EntityManager& entities,
+    gdp::world::RoomId bossRoomId) noexcept;
 
 } // namespace gdp::gameplay

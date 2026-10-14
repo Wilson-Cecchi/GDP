@@ -153,7 +153,25 @@ void testDefaultModuleStructuralVariety()
             }
         }
     }
-    expect(library.size() >= 20U && sawCompact && sawMedium && sawLarge,
+    std::size_t bossModules = 0U;
+    std::size_t wideNormalModules = 0U;
+    for (const RoomModule& module : library) {
+        if (module.supportsRole(RoomRole::Boss)) {
+            ++bossModules;
+            expect(module.footprint.x == 28 && module.footprint.y == 7
+                    && module.footprint.z == 32,
+                "each Boss module is 28 by 7 by 32 metres");
+        }
+        if (module.supportsRole(RoomRole::Normal)
+            && module.footprint.x >= 16 && module.footprint.z >= 18) {
+            ++wideNormalModules;
+            expect(module.footprint.y == 6 && !module.supportsRole(RoomRole::DeadEnd),
+                "wide Normal variants add height without widening DeadEnds");
+        }
+    }
+    expect(bossModules == 3U && wideNormalModules == 7U,
+        "library contains three expanded Boss modules and a hall for each Normal theme");
+    expect(library.size() >= 30U && sawCompact && sawMedium && sawLarge,
         "default library contains compact, medium and large structural families");
     expect(roleSizesValid,
         "Hub, Arena and Boss use large modules while Secret uses compact modules");
@@ -328,7 +346,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0xAB7EF9529E06FBE8ULL,
+    expect(fingerprint == 0xF65612E8273F76B8ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -485,7 +503,8 @@ void testInitialEntityPopulation()
             bossRobotValid = bossRobotValid || (room.role == RoomRole::Boss
                 && enemy != nullptr
                 && enemy->archetype == EnemyArchetype::IndustrialRobot
-                && enemy->health >= 360.0F && enemy->health <= 420.0F
+                && enemy->health >= 360.0F * 1.90F
+                && enemy->health <= 420.0F * 1.90F
                 && enemy->health == enemy->maximumHealth
                 && enemy->visualSeed != 0U);
         }
@@ -535,14 +554,14 @@ void testInitialEntityPopulation()
             ? PropLayout{}
             : generatePropLayout(
                 room.seed, room.role, room.theme, node->depth, room.propZones);
-        const std::size_t baseCount = room.role == RoomRole::Start ? 4U
-            : room.role == RoomRole::Boss ? 2U
-            : static_cast<std::size_t>(std::count_if(
+        const std::size_t enemyCount = static_cast<std::size_t>(std::count_if(
                 room.entities.begin(), room.entities.end(),
                 [&manager](const EntityId id) {
                     const Entity* entity = manager.find(id);
                     return entity != nullptr && entity->kind == EntityKind::Enemy;
                 }));
+        const std::size_t baseCount = room.role == RoomRole::Start ? 4U
+            : room.role == RoomRole::Boss ? enemyCount + 3U : enemyCount;
         const std::size_t expectedCount
             = baseCount + props.props.size() + loot.drops.size();
         if (room.entities.size() != expectedCount || manager.queryRoom(room.id) != room.entities) {
@@ -593,6 +612,12 @@ void testInitialEntityPopulation()
             if (room.role == RoomRole::Start
                 && prop->type == PropType::Barricade
                 && prop->maximumHealth == 180.0F) {
+                continue;
+            }
+            if (room.role == RoomRole::Boss
+                && prop->type == PropType::Barricade
+                && (prop->maximumHealth == 120.0F
+                    || prop->maximumHealth == 180.0F)) {
                 continue;
             }
             if (propIndex >= props.props.size()) {
@@ -655,7 +680,7 @@ void testInitialEntityPopulation()
             *harder.world,
             harderManager,
             {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
-            1.2F);
+            1.1F);
         const std::vector<EntityId> baselineEnemies = manager.query(EntityKind::Enemy);
         const std::vector<EntityId> harderEnemies = harderManager.query(EntityKind::Enemy);
         bool enemyHealthScaled = harderInitial.isValid()
@@ -669,7 +694,7 @@ void testInitialEntityPopulation()
             enemyHealthScaled = baselineEnemy != nullptr && harderEnemy != nullptr
                 && baselineEnemy->archetype == harderEnemy->archetype
                 && std::abs(harderEnemy->maximumHealth
-                    - (baselineEnemy->maximumHealth * 1.2F)) < 1.0e-4F;
+                    - (baselineEnemy->maximumHealth * 1.1F)) < 1.0e-4F;
         }
         expect(enemyHealthScaled,
             "higher threat scales every initial enemy without changing its archetype order");
@@ -719,6 +744,9 @@ void testWorldSeedBatch()
     bool sawCompact = false;
     bool sawMedium = false;
     bool sawLarge = false;
+    bool sawWideNormal = false;
+    bool sawCompactNormal = false;
+    bool everyWorldHasWideNormal = true;
     bool roleSizesValid = true;
     std::size_t secretAtHub = 0U;
     std::size_t secretFarther = 0U;
@@ -795,10 +823,18 @@ void testWorldSeedBatch()
                 secretFarther += hub != nodes.end() && secretLink->first != hub->id ? 1U : 0U;
             }
         }
+        bool worldHasWideNormal = false;
         for (const RoomInstance& room : generated.world->rooms) {
             sawCompact = sawCompact || room.sizeClass == RoomSizeClass::Compact;
             sawMedium = sawMedium || room.sizeClass == RoomSizeClass::Medium;
             sawLarge = sawLarge || room.sizeClass == RoomSizeClass::Large;
+            sawWideNormal = sawWideNormal || (room.role == RoomRole::Normal
+                && room.sizeClass == RoomSizeClass::Large);
+            worldHasWideNormal = worldHasWideNormal || (room.role == RoomRole::Normal
+                && room.sizeClass == RoomSizeClass::Large
+                && room.worldBounds.maximum.y - room.worldBounds.minimum.y == 6.0F);
+            sawCompactNormal = sawCompactNormal || (room.role == RoomRole::Normal
+                && room.sizeClass == RoomSizeClass::Compact);
             if ((room.role == RoomRole::Hub || room.role == RoomRole::Arena
                     || room.role == RoomRole::Boss)
                 && room.sizeClass != RoomSizeClass::Large) {
@@ -809,6 +845,7 @@ void testWorldSeedBatch()
                 roleSizesValid = false;
             }
         }
+        everyWorldHasWideNormal &= worldHasWideNormal;
         for (const CorridorPath& corridor : generated.world->corridors) {
             float length = 0.0F;
             for (std::size_t index = 1U; index < corridor.points.size(); ++index) {
@@ -832,8 +869,9 @@ void testWorldSeedBatch()
                     enemies += enemy != nullptr ? 1U : 0U;
                     secretWeapons += room.role == RoomRole::Secret && item != nullptr
                         && item->type == gdp::entities::ItemType::Weapon ? 1U : 0U;
-                    if (room.role == RoomRole::Boss && enemy != nullptr) {
-                        const float stepped = (enemy->maximumHealth - 360.0F) / 30.0F;
+                    if (room.role == RoomRole::Boss && enemy != nullptr
+                        && enemy->archetype == gdp::entities::EnemyArchetype::IndustrialRobot) {
+                        const float stepped = (enemy->maximumHealth / 1.90F - 360.0F) / 30.0F;
                         const int index = static_cast<int>(std::lround(stepped));
                         encountersValid = encountersValid && index >= 0 && index < 3
                             && std::abs(stepped - static_cast<float>(index)) < 1.0e-4F;
@@ -853,7 +891,7 @@ void testWorldSeedBatch()
                         arenaCounts[enemies - 2U] = true;
                     }
                 } else if (room.role == RoomRole::Boss) {
-                    encountersValid = encountersValid && enemies == 1U;
+                    encountersValid = encountersValid && enemies == 3U;
                 }
             }
             encountersValid = encountersValid && secretWeapons == 1U;
@@ -861,8 +899,11 @@ void testWorldSeedBatch()
     }
     expect(allValid, "1,000 deterministic seeds produce valid committed worlds");
     expect(maximumAcceptedAttempt < 32U, "batch stays inside configured attempt budget");
-    expect(sawCompact && sawMedium && sawLarge && roleSizesValid,
+    expect(sawCompact && sawMedium && sawLarge && sawWideNormal
+            && sawCompactNormal && roleSizesValid,
         "seed batch exercises all size families and preserves role-specific sizing");
+    expect(everyWorldHasWideNormal,
+        "each of 1,000 generated worlds contains a wide Normal room");
     expect(maximumCorridorLength <= 17.0F,
         "local loop policy prevents map-spanning corridors");
     expect(secondBranchAwayFromHub && secretAtHub > 0U
@@ -929,7 +970,7 @@ void testCampaignEncounterProgression()
     bool sawFloorVariation = false;
     bool validPositions = true;
     bool validCounts = true;
-    bool stableBoss = true;
+    bool scaledBoss = true;
     bool deterministic = true;
     for (wkc::core::Seed seed = 1U; seed <= 128U; ++seed) {
         std::vector<EnemySnapshot> firstFloor;
@@ -944,7 +985,7 @@ void testCampaignEncounterProgression()
             EntityManager manager;
             const auto initial = populateInitialEntities(*generated.world, manager,
                 {.transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F},
-                1.0F, true, floor);
+                1.0F + 0.08F * static_cast<float>(floor - 1U), true, floor);
             validCounts &= initial.isValid();
             std::vector<EnemySnapshot> snapshot;
             for (const RoomInstance& room : generated.world->rooms) {
@@ -960,7 +1001,7 @@ void testCampaignEncounterProgression()
                     const Vec3 position = entity->transform.position;
                     snapshot.emplace_back(room.role, enemy->archetype, position, enemy->health);
                     if (floor > 1U && (room.role == RoomRole::Normal
-                            || room.role == RoomRole::Arena)) {
+                            || room.role == RoomRole::Arena || room.role == RoomRole::Boss)) {
                         constexpr float radius = 0.52F;
                         validPositions &= position.x - radius >= room.worldBounds.minimum.x
                             && position.x + radius <= room.worldBounds.maximum.x
@@ -989,10 +1030,16 @@ void testCampaignEncounterProgression()
                         }
                     }
                     enemyPositions.push_back(position);
-                    if (room.role == RoomRole::Boss) {
+                    if (room.role == RoomRole::Boss
+                        && enemy->archetype == EnemyArchetype::IndustrialRobot) {
                         if (floor == 1U) firstBossHealth = enemy->health;
-                        else stableBoss &= enemy->archetype == EnemyArchetype::IndustrialRobot
-                            && enemy->health == firstBossHealth;
+                        else {
+                            const float scale = floor >= 8U ? 1.90F
+                                : floor >= 5U ? 1.82F : 1.72F;
+                            const float expected = firstBossHealth * (scale / 1.65F)
+                                * (1.0F + 0.08F * static_cast<float>(floor - 1U));
+                            scaledBoss &= std::abs(enemy->health - expected) < 1.0e-3F;
+                        }
                     }
                 }
                 if (room.role == RoomRole::Normal) {
@@ -1002,7 +1049,7 @@ void testCampaignEncounterProgression()
                     validCounts &= count >= (floor >= 8U ? 4U : floor >= 5U ? 3U : 2U)
                         && count <= 4U && (floor < 8U || workers == 0U);
                 } else if (room.role == RoomRole::Boss) {
-                    validCounts &= count == 1U;
+                    validCounts &= count == (floor >= 8U ? 4U : 3U);
                 }
             }
             if (floor == 1U) firstFloor = snapshot;
@@ -1014,8 +1061,184 @@ void testCampaignEncounterProgression()
     expect(sawFloorVariation && validCounts,
         "Campaign floors vary bounded enemy formations and late-floor pressure");
     expect(validPositions, "Campaign encounter spawns clear walls, props and other enemies");
-    expect(stableBoss, "encounter profile does not alter the approved boss");
+    expect(scaledBoss, "Campaign boss HP follows the floor bracket and difficulty scale");
     expect(deterministic, "Campaign enemy layout repeats for the same seed and floor");
+}
+
+void testBossDifficultyProfiles()
+{
+    using namespace gdp::entities;
+    using namespace gdp::world;
+    using namespace wkc::core;
+
+    struct Scenario {
+        float difficulty;
+        bool campaign;
+        std::uint32_t floor;
+        float bossScale;
+        std::array<EnemyArchetype, 4> aides;
+        std::size_t aideCount;
+    };
+    const std::array scenarios{
+        Scenario{0.75F, false, 1U, 1.90F, {EnemyArchetype::Guard}, 1U},
+        Scenario{1.0F, false, 1U, 1.90F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard}, 2U},
+        Scenario{1.25F, false, 1U, 1.90F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard}, 3U},
+        Scenario{0.75F, true, 1U, 1.65F, {EnemyArchetype::Guard}, 1U},
+        Scenario{1.0F, true, 1U, 1.65F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard}, 2U},
+        Scenario{1.25F, true, 1U, 1.65F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard}, 3U},
+        Scenario{0.83F, true, 2U, 1.72F, {EnemyArchetype::Officer}, 1U},
+        Scenario{1.08F, true, 2U, 1.72F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard}, 2U},
+        Scenario{1.33F, true, 2U, 1.72F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard}, 3U},
+        Scenario{1.07F, true, 5U, 1.82F, {EnemyArchetype::Officer}, 1U},
+        Scenario{1.32F, true, 5U, 1.82F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard}, 2U},
+        Scenario{1.57F, true, 5U, 1.82F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard}, 3U},
+        Scenario{1.47F, true, 10U, 1.90F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard}, 2U},
+        Scenario{1.72F, true, 10U, 1.90F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard}, 3U},
+        Scenario{1.97F, true, 10U, 1.90F,
+            {EnemyArchetype::Officer, EnemyArchetype::Guard,
+                EnemyArchetype::Guard, EnemyArchetype::Officer}, 4U},
+    };
+    bool validProfiles = true;
+    bool clearSpawns = true;
+    bool coverValid = true;
+    std::array<bool, 4> rotations{};
+    for (Seed seed = 0U; seed < 64U; ++seed) {
+        const auto generated = generateWorld(seed);
+        if (!generated.world) {
+            validProfiles = false;
+            continue;
+        }
+        const auto boss = std::find_if(generated.world->rooms.begin(),
+            generated.world->rooms.end(),
+            [](const RoomInstance& room) { return room.role == RoomRole::Boss; });
+        if (boss == generated.world->rooms.end()) {
+            validProfiles = false;
+            continue;
+        }
+        rotations[static_cast<std::size_t>(boss->rotation)] = true;
+        float seedBaseHealth = 0.0F;
+        for (const Scenario& scenario : scenarios) {
+            World populated = *generated.world;
+            EntityManager manager;
+            const InitialEntitySet initial = populateInitialEntities(populated, manager,
+                {.transform = {.position = {0.0F, 0.0F, 4.0F}}},
+                scenario.difficulty, scenario.campaign, scenario.floor);
+            validProfiles &= initial.isValid();
+            const auto room = std::find_if(populated.rooms.begin(), populated.rooms.end(),
+                [](const RoomInstance& candidate) { return candidate.role == RoomRole::Boss; });
+            if (room == populated.rooms.end()) {
+                validProfiles = false;
+                continue;
+            }
+            std::size_t fixedCoverCount = 0U;
+            for (const EntityId id : room->entities) {
+                const auto* prop = manager.findData<PropData>(id);
+                const auto* entity = manager.find(id);
+                if (!prop || !entity || prop->type != PropType::Barricade
+                    || (prop->maximumHealth != 120.0F
+                        && prop->maximumHealth != 180.0F)) continue;
+                ++fixedCoverCount;
+                const bool low = prop->maximumHealth == 120.0F;
+                const Vec3 offset = low ? Vec3{-8.5F, 0.0F, -8.5F}
+                    : Vec3{-8.5F, 0.0F, 8.5F};
+                const Vec3 localScale = low ? Vec3{2.4F, 1.35F, 0.6F}
+                    : Vec3{0.6F, 2.25F, 2.4F};
+                const Vec3 rotatedScale = rotateQuarterTurns(localScale, room->rotation);
+                coverValid &= prop->solid && prop->health == prop->maximumHealth
+                    && prop->visualSeed != 0U
+                    && nearlyEqual(entity->transform.position,
+                        room->transform.position + rotateQuarterTurns(offset, room->rotation))
+                    && nearlyEqual(entity->transform.scale,
+                        Vec3{std::abs(rotatedScale.x), localScale.y,
+                            std::abs(rotatedScale.z)});
+            }
+            coverValid &= fixedCoverCount == 2U;
+            std::vector<const EnemyData*> enemies;
+            std::vector<const Entity*> enemyEntities;
+            for (const EntityId id : room->entities) {
+                const auto* enemy = manager.findData<EnemyData>(id);
+                if (enemy) {
+                    enemies.push_back(enemy);
+                    enemyEntities.push_back(manager.find(id));
+                }
+            }
+            validProfiles &= enemies.size() == scenario.aideCount + 1U;
+            if (enemies.size() != scenario.aideCount + 1U) continue;
+            const float baseHealth = enemies[0]->health
+                / (scenario.difficulty * scenario.bossScale);
+            if (seedBaseHealth == 0.0F) seedBaseHealth = baseHealth;
+            validProfiles &= enemies[0]->archetype == EnemyArchetype::IndustrialRobot
+                && enemies[0]->active && std::abs(baseHealth - seedBaseHealth) < 0.001F
+                && (std::abs(baseHealth - 360.0F) < 0.001F
+                    || std::abs(baseHealth - 390.0F) < 0.001F
+                    || std::abs(baseHealth - 420.0F) < 0.001F);
+            for (std::size_t index = 0U; index < scenario.aideCount; ++index) {
+                constexpr std::array aideOffsets{
+                    Vec3{-5.0F, 0.0F, -4.0F}, Vec3{-5.0F, 0.0F, 4.0F},
+                    Vec3{-9.0F, 0.0F, -3.0F}, Vec3{-9.0F, 0.0F, 3.0F},
+                };
+                validProfiles &= enemies[index + 1U]->archetype == scenario.aides[index]
+                    && enemies[index + 1U]->active
+                    && nearlyEqual(enemyEntities[index + 1U]->transform.position,
+                        room->transform.position + rotateQuarterTurns(
+                            aideOffsets[index], room->rotation));
+            }
+            for (std::size_t index = 0U; index < enemyEntities.size(); ++index) {
+                const Entity* entity = enemyEntities[index];
+                if (!entity) { clearSpawns = false; continue; }
+                const Vec3 position = entity->transform.position;
+                constexpr float radius = 0.9F;
+                clearSpawns &= position.x - radius >= room->worldBounds.minimum.x
+                    && position.x + radius <= room->worldBounds.maximum.x
+                    && position.z - radius >= room->worldBounds.minimum.z
+                    && position.z + radius <= room->worldBounds.maximum.z;
+                for (std::size_t other = 0U; other < index; ++other) {
+                    const Vec3 delta = position - enemyEntities[other]->transform.position;
+                    clearSpawns &= delta.x * delta.x + delta.z * delta.z >= 4.0F;
+                }
+                for (const ConnectorInstance& connector : room->connectors) {
+                    const Vec3 delta = position - connector.worldPosition;
+                    clearSpawns &= delta.x * delta.x + delta.z * delta.z >= 4.0F;
+                }
+                for (const EntityId id : room->entities) {
+                    const auto* prop = manager.findData<PropData>(id);
+                    const auto* obstacle = manager.find(id);
+                    if (!prop || !prop->solid || !obstacle) continue;
+                    const float halfX = obstacle->transform.scale.x * 0.5F;
+                    const float halfZ = obstacle->transform.scale.z * 0.5F;
+                    const float closestX = std::clamp(position.x,
+                        obstacle->transform.position.x - halfX,
+                        obstacle->transform.position.x + halfX);
+                    const float closestZ = std::clamp(position.z,
+                        obstacle->transform.position.z - halfZ,
+                        obstacle->transform.position.z + halfZ);
+                    const float dx = position.x - closestX;
+                    const float dz = position.z - closestZ;
+                    clearSpawns &= dx * dx + dz * dz >= radius * radius;
+                }
+            }
+        }
+    }
+    expect(validProfiles, "Boss health and active aide composition match mode, difficulty and floor");
+    expect(clearSpawns, "Boss and aide spawns clear walls, doors, terminal, props and each other");
+    expect(coverValid, "Boss has two rotated low/tall barricades on the left flank");
+    expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
+        "Boss spawn batch covers all four room rotations");
 }
 
 } // namespace
@@ -1033,6 +1256,7 @@ int main()
     testInitialEntityPopulation();
     testCampaignExitTerminalPopulation();
     testCampaignEncounterProgression();
+    testBossDifficultyProfiles();
     testWorldSeedBatch();
 
     if (failures != 0) {

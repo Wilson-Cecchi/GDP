@@ -94,13 +94,15 @@ especializados das pastas numeradas.
   Do segundo ao décimo andar, cada grupo de três andares usa as três missões
   uma vez, sem repetição em andares consecutivos; a ordem varia por campanha.
   Os encontros comuns também progridem: novas formações e mais especialistas
-  aparecem nos andares avançados, sem mudar a luta do boss. Detalhes em
+  aparecem nos andares avançados. Detalhes em
   [`04_gameplay/campaign_encounter_progression_2026-10-08.md`](04_gameplay/campaign_encounter_progression_2026-10-08.md).
   O minimapa marca missão, Boss e saída após descobrir a
-  sala correspondente. Matar o boss **e** cumprir a missão libera o console da
+  sala correspondente. Limpar o encontro do Boss, incluindo os ajudantes,
+  **e** cumprir a missão libera o console da
   sala Boss: Interagir (E por padrão) sobe para o próximo andar; no décimo,
   mostra a vitória. HP, munição e progressão acompanham a subida, sem tela de
-  resultado intermediária. Standard/Speedrun mantêm a conclusão na morte do boss.
+  resultado intermediária. Standard/Speedrun concluem após limpar todo o
+  encontro do Boss.
   Reforços de Lockdown só aparecem quando sua onda é liberada, evitando corpos
   visíveis que não atacavam enquanto o grupo inicial ainda estava vivo.
   **Armas:** sniper, escopeta de seis pellets e SMG estão disponíveis na

@@ -455,7 +455,7 @@ void testKnifeOnlyAndLegacyRoundTrip()
                 == persistence::CampaignCheckpointLoadStatus::Invalid,
             "schema 4 rejects missing ownership instead of inventing a gun");
         serialized.replace(0U, std::string{"version = 8"}.size(), "version = 3");
-        serialized.replace(serialized.find("rules_version = 43"), std::string{"rules_version = 43"}.size(), "rules_version = 34");
+        serialized.replace(serialized.find("rules_version = 44"), std::string{"rules_version = 44"}.size(), "rules_version = 34");
         writeText(path, serialized);
         expect(persistence::loadCampaignCheckpoint(path).checkpoint == legacy,
             "schema 3 checkpoints migrate as an armed loadout");
@@ -487,7 +487,7 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
     expect(persistence::saveCampaignCheckpoint(path, legacyRoundReserves(old)), "previous-rule fixture is serializable");
     std::string serialized = readText(path);
     serialized.replace(serialized.find("version = 8"), std::string{"version = 8"}.size(), "version = 5");
-    serialized.replace(serialized.find("rules_version = 43"), std::string{"rules_version = 43"}.size(), "rules_version = 34");
+    serialized.replace(serialized.find("rules_version = 44"), std::string{"rules_version = 44"}.size(), "rules_version = 34");
     writeText(path, serialized);
     const auto migrated = persistence::loadCampaignCheckpoint(path);
     expect(migrated.migratedRules && migrated.checkpoint == old,
@@ -508,7 +508,7 @@ void testNewPrimaryRoundTripsAndPreviousRulesMigration()
         if (!saved) continue; // Report the failure, not an out_of_range from missing text.
         std::string text = readText(path);
         text.replace(text.find("version = 8"), 11U, "version = 6");
-        text.replace(text.find("rules_version = 43"), 18U, "rules_version = 35");
+        text.replace(text.find("rules_version = 44"), 18U, "rules_version = 35");
         writeText(path, text);
         const auto loaded = persistence::loadCampaignCheckpoint(path);
         expect(loaded.migratedRules && loaded.checkpoint == expected,
@@ -529,13 +529,13 @@ void testPreviousCampaignFloorMigration()
     expect(persistence::saveCampaignCheckpoint(path, expected),
         "current checkpoint can supply the prior-floor migration fixture");
     std::string oldFile = readText(path);
-    const auto version = oldFile.find("rules_version = 43");
+    const auto version = oldFile.find("rules_version = 44");
     expect(version != std::string::npos, "fixture has the current rules marker");
     if (version == std::string::npos) return;
     for (const auto priorRules : {37U, 38U, 39U, 40U, 41U}) {
         std::string priorFile = oldFile;
         priorFile.replace(0U, std::string{"version = 8"}.size(), "version = 7");
-        priorFile.replace(priorFile.find("rules_version = 43"), std::string{"rules_version = 43"}.size(),
+        priorFile.replace(priorFile.find("rules_version = 44"), std::string{"rules_version = 44"}.size(),
             "rules_version = " + std::to_string(priorRules));
         writeText(path, priorFile);
         const auto migrated = persistence::loadCampaignCheckpoint(path);
@@ -547,14 +547,17 @@ void testPreviousCampaignFloorMigration()
                 && !persistence::loadCampaignCheckpoint(path).migratedRules,
             "saving a resumed floor upgrades the rules marker and grenade schema");
     }
-    std::string previousRelease = oldFile;
-    previousRelease.replace(previousRelease.find("rules_version = 43"),
-        std::string{"rules_version = 43"}.size(), "rules_version = 42");
-    writeText(path, previousRelease);
-    const auto migratedRelease = persistence::loadCampaignCheckpoint(path);
-    expect(migratedRelease.migratedRules && migratedRelease.checkpoint == expected
-            && readText(path) == previousRelease,
-        "0.1.5 checkpoint migrates mission rules without losing grenade inventory");
+    for (const auto priorRules : {42U, 43U}) {
+        std::string previousRelease = oldFile;
+        previousRelease.replace(previousRelease.find("rules_version = 44"),
+            std::string{"rules_version = 44"}.size(),
+            "rules_version = " + std::to_string(priorRules));
+        writeText(path, previousRelease);
+        const auto migratedRelease = persistence::loadCampaignCheckpoint(path);
+        expect(migratedRelease.migratedRules && migratedRelease.checkpoint == expected
+                && readText(path) == previousRelease,
+            "prior schema-eight checkpoint migrates without losing floor-entry inventory");
+    }
 }
 
 void testGrenadeInventoryCheckpointMigration()
@@ -583,12 +586,12 @@ void testGrenadeInventoryCheckpointMigration()
         "previous schema migration fixture can be saved");
     std::string prior = readText(path);
     prior.replace(0U, std::string{"version = 8"}.size(), "version = 7");
-    const auto rules = prior.find("rules_version = 43");
+    const auto rules = prior.find("rules_version = 44");
     const auto grenades = prior.find("player_grenades = 2\n");
     expect(rules != std::string::npos && grenades != std::string::npos,
         "previous schema fixture has expected version and inventory markers");
     if (rules == std::string::npos || grenades == std::string::npos) return;
-    prior.replace(rules, std::string{"rules_version = 43"}.size(),
+    prior.replace(rules, std::string{"rules_version = 44"}.size(),
         "rules_version = 41");
     prior.erase(prior.find("player_grenades = 2\n"),
         std::string{"player_grenades = 2\n"}.size());

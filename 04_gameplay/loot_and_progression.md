@@ -115,6 +115,11 @@ conclui a run. Morte do jogador produz `Defeat`; ambos os resultados congelam
 Player, inimigos, armas, interações e eventos.
 Segredos são opcionais e nunca bloqueiam o caminho principal.
 
+Na ampliação posterior do encontro, Standard/Speedrun concluem a run após
+derrotar o robô e todos os ajudantes da sala Boss, inclusive os que perseguirem
+o jogador para fora dela. Na Campanha, limpar o encontro e completar a missão
+liberam o terminal; a interação com ele conclui o andar.
+
 `SessionSystem` é independente do loop visual. Ele recebe vida do jogador,
 papel da sala e status do Boss, mantém um estado terminal idempotente e expõe a
 seed da run. `NEW RUN/NEXT SEED` e `REPLAY SEED`, confirmados por teclado ou

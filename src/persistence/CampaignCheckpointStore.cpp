@@ -342,7 +342,8 @@ CampaignCheckpointLoadResult loadCampaignCheckpoint(
         const bool migratePreviousFloor = (*rulesVersion == 37U || *rulesVersion == 38U
                 || *rulesVersion == 39U || *rulesVersion == 40U
                 || *rulesVersion == 41U) && *fields.version == 7U;
-        const bool migratePreviousCampaign = *rulesVersion == 42U
+        const bool migratePreviousCampaign = (*rulesVersion == 42U
+                || *rulesVersion == 43U)
             && *fields.version == currentCampaignCheckpointFileVersion;
         // A current-rules file must not pretend to use the legacy round schema.
         if (!migratePreviousRules && !migratePreviousFloor && !migratePreviousCampaign

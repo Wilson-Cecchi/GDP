@@ -96,22 +96,24 @@ enum class IndustrialRobotPhase : std::uint8_t {
 };
 
 struct IndustrialRobotConfig {
-    float detectionRange{24.0F};
+    float detectionRange{34.0F};
     float phaseTwoHealthRatio{0.66F};
     float phaseThreeHealthRatio{0.33F};
     float longRangeMinimum{8.0F};
     float longRangeMaximum{13.0F};
+    float cannonRange{32.0F};
+    float cannonReadySeconds{0.45F};
     float pressureMinimum{4.0F};
     float pressureMaximum{8.0F};
     float pursuitAttackRange{2.25F};
     float longRangeMoveSpeed{0.75F};
     float pressureMoveSpeed{1.0F};
     float pursuitMoveSpeed{1.35F};
-    float longRangeDamage{12.0F};
-    float pressureDamage{10.0F};
-    float pursuitDamage{16.0F};
-    float longRangeAttackInterval{1.40F};
-    float pressureAttackInterval{0.90F};
+    float longRangeDamage{18.0F};
+    float pressureDamage{15.0F};
+    float pursuitDamage{20.0F};
+    float longRangeAttackInterval{1.25F};
+    float pressureAttackInterval{0.85F};
     float pursuitAttackInterval{0.65F};
     PatrolConfig patrol{1.6F, 0.25F, 5.5F, 1.0F, 0.35F};
     InvestigationConfig investigation{

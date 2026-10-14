@@ -46,6 +46,11 @@ InitialEntitySet populateInitialEntities(
         std::isfinite(difficulty) ? difficulty : 1.0F, 0.5F, 2.0F);
     const std::uint32_t encounterFloor = campaignWeapons
         ? std::clamp(campaignFloor, 1U, 10U) : 1U;
+    // Campaign adds 0.08 per floor to the selected base difficulty.
+    const float baseDifficulty = safeDifficulty
+        - (campaignWeapons ? 0.08F * static_cast<float>(encounterFloor - 1U) : 0.0F);
+    const bool easy = baseDifficulty < 0.875F;
+    const bool hard = baseDifficulty > 1.125F;
     std::vector<LootLayout> lootLayouts;
     std::vector<PropLayout> propLayouts;
     std::vector<std::uint32_t> roomDepths;
@@ -286,8 +291,53 @@ InitialEntitySet populateInitialEntities(
         case RoomRole::Secret:
             break;
         case RoomRole::Boss:
-            addEnemy(EnemyArchetype::IndustrialRobot, {},
-                360.0F + 30.0F * static_cast<float>(encounter.rangeInt(0, 2)));
+        {
+            const float bossHealthScale = !campaignWeapons || encounterFloor >= 8U
+                ? 1.90F : encounterFloor >= 5U ? 1.82F
+                : encounterFloor >= 2U ? 1.72F : 1.65F;
+            addEnemy(EnemyArchetype::IndustrialRobot, {}, bossHealthScale
+                * (360.0F + 30.0F * static_cast<float>(encounter.rangeInt(0, 2))));
+            // Two fixed left-flank barricades make a covered shotgun approach.
+            // The boss firing lane at local x=0 and procedural props at x>0
+            // remain open; offsets and footprints rotate with the room.
+            const auto addBossCover = [&](const wkc::core::Vec3 offset,
+                                          const wkc::core::Vec3 localScale,
+                                          const float health,
+                                          const std::uint64_t ordinal) {
+                const wkc::core::Vec3 rotatedScale
+                    = wkc::core::rotateQuarterTurns(localScale, room.rotation);
+                addToRoom(manager.createProp({
+                    .transform = {
+                        .position = positionInRoom(room, offset),
+                        .scale = {std::abs(rotatedScale.x), localScale.y,
+                            std::abs(rotatedScale.z)},
+                    },
+                    .roomId = room.id,
+                    .type = PropType::Barricade,
+                    .solid = true,
+                    .health = health,
+                    .maximumHealth = health,
+                    .visualSeed = wkc::core::deriveSeed(
+                        room.seed, gdp::game::SeedDomain::Props, ordinal),
+                }));
+            };
+            addBossCover({-8.5F, 0.0F, -8.5F}, {2.4F, 1.35F, 0.6F}, 120.0F, 901U);
+            addBossCover({-8.5F, 0.0F, 8.5F}, {0.6F, 2.25F, 2.4F}, 180.0F, 902U);
+            const bool lateCampaign = campaignWeapons && encounterFloor >= 8U;
+            const EnemyArchetype leadAide = campaignWeapons && encounterFloor >= 2U
+                ? EnemyArchetype::Officer : easy ? EnemyArchetype::Guard
+                : EnemyArchetype::Officer;
+            addEnemy(leadAide, {-5.0F, 0.0F, -4.0F},
+                leadAide == EnemyArchetype::Officer ? 65.0F : 75.0F);
+            if (!easy || lateCampaign) {
+                addEnemy(EnemyArchetype::Guard, {-5.0F, 0.0F, 4.0F}, 75.0F);
+            }
+            if (hard || (lateCampaign && !easy)) {
+                addEnemy(EnemyArchetype::Guard, {-9.0F, 0.0F, -3.0F}, 75.0F);
+            }
+            if (hard && lateCampaign) {
+                addEnemy(EnemyArchetype::Officer, {-9.0F, 0.0F, 3.0F}, 65.0F);
+            }
             addFixedProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
             if (campaignWeapons) {
                 // Reuse the authored teal console and its existing static solid.
@@ -306,6 +356,7 @@ InitialEntitySet populateInitialEntities(
                 addToRoom(result.exitTerminal);
             }
             break;
+        }
         case RoomRole::Start:
         case RoomRole::Count:
             break;

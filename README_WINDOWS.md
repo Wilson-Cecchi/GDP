@@ -9,6 +9,9 @@
    devem permanecer ao lado do executável; nela ficam os cinco cérebros
    treinados usados automaticamente no jogo.
 
+Os novos pacotes gerados por este fluxo abrem somente a janela do jogo, sem
+uma janela de terminal. A versão do pacote também está em `version.txt`.
+
 O computador precisa oferecer OpenGL 3.3 Core por meio do driver da placa de
 vídeo. Em notebooks híbridos, configure `gdp.exe` para usar a GPU dedicada nas
 Configurações de elementos gráficos do Windows caso o driver escolha a GPU
@@ -51,13 +54,22 @@ ctest --preset windows-release --output-on-failure
 cpack --config build/windows-release/CPackConfig.cmake -C Release -B dist
 ```
 
-O pacote final fica em `dist/GDP-Windows-x64.zip`. O build copia `SDL3.dll`
+O ZIP local de diagnóstico fica em `dist/GDP-Windows-x64.zip` e mantém o console.
+O fluxo de distribuição gera a variante sem console. O build copia `SDL3.dll`
 automaticamente para `build/windows-release/Release`, permitindo também iniciar
 diretamente com:
 
 ```powershell
 .\build\windows-release\Release\gdp.exe
 ```
+
+O build local padrão mantém o console para mensagens de depuração e comandos
+como `--help`, `--version` e `--headless`. Para reproduzir o executável sem
+console usado no download, reconfigure com
+`cmake --preset windows-release -DGDP_WINDOWS_GUI_EXECUTABLE=ON` e recompile o
+alvo `gdp`. Reconfigure com `-DGDP_WINDOWS_GUI_EXECUTABLE=OFF` para voltar ao
+executável de diagnóstico. Na variante sem console, os comandos ainda retornam
+um código de saída, mas não exibem texto no terminal.
 
 ## Diagnóstico
 

@@ -2495,27 +2495,28 @@ void testIndustrialRobotPhases()
         .archetype = EnemyArchetype::IndustrialRobot,
         .health = 250.0F,
     });
+    EnemyData* data = manager.findData<EnemyData>(robot);
     const EnemyUpdateSummary longApproach
         = updateIndustrialRobots(manager, player, 7, room, 1.0F);
     expect(longApproach.bossLongRange == 1U && longApproach.chasing == 1U
-            && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 13.25F),
-        "healthy IndustrialRobot advances slowly into its long-range envelope");
+            && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 13.25F)
+            && near(data->attackCooldown, 0.45F),
+        "healthy IndustrialRobot advances while winding up its cannon");
     manager.find(robot)->transform.position = {0.0F, 0.0F, 12.0F};
     const EnemyUpdateSummary longShot
-        = updateIndustrialRobots(manager, player, 7, room, 0.1F);
+        = updateIndustrialRobots(manager, player, 7, room, 0.5F);
     expect(longShot.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 88.0F),
+            && wkc::core::nearlyEqual(player.state().health, 82.0F),
         "phase-one IndustrialRobot fires a high-impact long-range attack");
 
-    EnemyData* data = manager.findData<EnemyData>(robot);
     data->health = 150.0F;
     data->attackCooldown = 0.0F;
     manager.find(robot)->transform.position = {0.0F, 0.0F, 6.0F};
     const EnemyUpdateSummary pressure
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(pressure.bossPressure == 1U && pressure.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 78.0F)
-            && wkc::core::nearlyEqual(data->attackCooldown, 0.9F),
+            && wkc::core::nearlyEqual(player.state().health, 67.0F)
+            && wkc::core::nearlyEqual(data->attackCooldown, 0.85F),
         "mid-health IndustrialRobot increases pressure and firing cadence");
 
     data->health = 50.0F;
@@ -2529,7 +2530,7 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary closeStrike
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(closeStrike.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 62.0F)
+            && wkc::core::nearlyEqual(player.state().health, 47.0F)
             && wkc::core::nearlyEqual(data->attackCooldown, 0.65F),
         "critical IndustrialRobot delivers its strongest, fastest close attack");
 
@@ -2594,6 +2595,132 @@ void testIndustrialRobotLineOfSightAndRoomIsolation()
     expect(manager.findData<EnemyData>(blockedRobot)->behavior
             != EnemyBehaviorState::Chase,
         "occluded IndustrialRobot remains unaware without a prior sighting");
+}
+
+void testIndustrialRobotCannonAcrossArena()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld open{{{-20.0F, 0.0F, -20.0F},
+        {20.0F, 7.0F, 36.0F}}};
+    const CollisionWorld screened{
+        {{-20.0F, 0.0F, -20.0F}, {20.0F, 7.0F, 36.0F}},
+        {{{-1.0F, 0.0F, 14.0F}, {1.0F, 3.0F, 15.0F}}},
+    };
+    const CollisionWorld lowCover{
+        {{-20.0F, 0.0F, -20.0F}, {20.0F, 7.0F, 36.0F}},
+        {{{-1.0F, 0.0F, 14.0F}, {1.0F, 1.4F, 15.0F}}},
+    };
+
+    const auto run = [&](const float health, const bool neural,
+                         const CollisionWorld& world) {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId robot = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 30.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1U,
+            .archetype = EnemyArchetype::IndustrialRobot,
+            .health = 250.0F,
+        });
+        manager.findData<EnemyData>(robot)->health = health;
+        IndustrialRobotConfig config;
+        config.longRangeMoveSpeed = 0.0F;
+        config.pressureMoveSpeed = 0.0F;
+        config.pursuitMoveSpeed = 0.0F;
+        NeuralEnemyExperiment brain{42U, EnemyArchetype::IndustrialRobot};
+        std::fill(brain.genome.network.parameters().begin(),
+            brain.genome.network.parameters().end(), 0.0F);
+        brain.controlAll = true;
+        std::vector<EnemyProjectile> spawned;
+        const EnemyPerception perception{.projectiles = &spawned};
+        const auto update = [&] {
+            return updateIndustrialRobots(manager, player, 1U, world,
+                1.0F / 60.0F, config, perception, neural ? &brain : nullptr);
+        };
+        (void)update();
+        const bool waited = spawned.empty() && player.state().health == 100.0F;
+        for (int tick = 0; tick < 31 && spawned.empty(); ++tick) {
+            (void)update();
+        }
+        const bool fired = spawned.size() == 1U;
+        const float speed = fired ? wkc::core::length(spawned.front().velocity) : 0.0F;
+        const float damage = fired ? spawned.front().damage : 0.0F;
+        EnemyProjectileSystem projectiles;
+        projectiles.spawn(spawned);
+        bool hit = false;
+        bool blocked = false;
+        for (int tick = 0; tick < 120 && !hit && !blocked; ++tick) {
+            for (const EnemyProjectileEvent& event : projectiles.update(
+                     1.0F / 60.0F, player, world, manager)) {
+                hit |= event.hitPlayer;
+                blocked |= event.blocked;
+            }
+        }
+        return std::tuple{waited, fired, speed, damage, hit, blocked,
+            player.state().health, brain.controlledTicks};
+    };
+
+    for (const float health : {250.0F, 150.0F, 50.0F}) {
+        for (const bool neural : {false, true}) {
+            const auto [waited, fired, speed, damage, hit, blocked,
+                remaining, controlled] = run(health, neural, open);
+            expect(waited && fired && near(speed, 30.0F)
+                    && near(damage, 18.0F) && hit && !blocked
+                    && near(remaining, 82.0F)
+                    && (!neural || controlled > 0U),
+                "boss cannon threatens 30 m in every phase with scripted and neural control");
+        }
+    }
+    const auto [coveredWait, coveredFire, coveredSpeed, coveredDamage,
+        coveredHit, coveredBlock, coveredHealth, coveredBrain] = run(
+        250.0F, false, screened);
+    expect(coveredWait && !coveredFire && !coveredHit
+            && near(coveredHealth, 100.0F),
+        "full cover prevents distant cannon fire");
+    const auto [lowWait, lowFire, lowSpeed, lowDamage,
+        lowHit, lowBlock, lowHealth, lowBrain] = run(
+        250.0F, false, lowCover);
+    expect(lowWait && lowFire && !lowHit && lowBlock
+            && near(lowHealth, 100.0F),
+        "low cover can intercept a cannon projectile after a visible launch");
+}
+
+void testIndustrialRobotFirstShotAndCadence()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld room{{{-16.0F, 0.0F, -16.0F},
+        {16.0F, 5.0F, 16.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId robot = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 12.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 250.0F,
+    });
+    for (int tick = 0; tick < 5; ++tick) {
+        (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
+    }
+    expect(near(player.state().health, 100.0F)
+            && manager.findData<EnemyData>(robot)->attackCooldown > 0.0F,
+        "newly visible boss leaves a reaction window before its first shot");
+    const EnemyUpdateSummary first = updateIndustrialRobots(
+        manager, player, 1U, room, 0.1F);
+    expect(first.attacksLanded == 1U && near(player.state().health, 82.0F),
+        "one Normal long-range hit deals 18 HP after the opening windup");
+    for (int tick = 0; tick < 12; ++tick) {
+        (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
+    }
+    expect(near(player.state().health, 82.0F),
+        "boss cannon respects its 1.25-second cooldown");
+    (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
+    expect(near(player.state().health, 64.0F),
+        "boss cannon resumes after cooldown without a one-shot burst");
 }
 
 void testEnemyFacingLifecycle()
@@ -3690,6 +3817,8 @@ int main()
     testEngineerRangedBehaviorAndRepairOcclusion();
     testIndustrialRobotPhases();
     testIndustrialRobotLineOfSightAndRoomIsolation();
+    testIndustrialRobotCannonAcrossArena();
+    testIndustrialRobotFirstShotAndCadence();
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();

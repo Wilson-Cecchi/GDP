@@ -3345,7 +3345,7 @@ bool GdpRenderer::render(
             promptText = hud.reloadBinding + " RELOAD";
             promptColor = {0.98F, 0.62F, 0.14F};
         } else if (hud.prompt == HudPrompt::ExitTerminalLocked) {
-            promptText = "DEFEAT BOSS TO UNLOCK";
+            promptText = "CLEAR ENCOUNTER TO UNLOCK";
             promptColor = uiTheme.warning;
         } else if (hud.prompt == HudPrompt::CampaignMissionRequired) {
             promptText = "COMPLETE MISSION";
@@ -3809,6 +3809,9 @@ bool GdpRenderer::render(
         objectiveText = "TEST ARENA";
     } else if (hud.objective == ObjectiveRenderState::DefeatBoss) {
         objectiveText = "DEFEAT BOSS";
+        objectiveColor = uiTheme.warning;
+    } else if (hud.objective == ObjectiveRenderState::ClearBossEncounter) {
+        objectiveText = "DEFEAT REMAINING ENEMIES";
         objectiveColor = uiTheme.warning;
     }
     std::string timerText;

@@ -906,6 +906,7 @@ bool Application::initializeRun()
     enemyProjectiles_.clear();
     roomFixtureEntities_.clear();
     visitedRooms_.clear();
+    roomEntryGraceRemaining_.clear();
     impactVisualCounter_ = 0U;
     jumpPending_ = false;
     weaponSwitchPending_.reset();
@@ -942,6 +943,11 @@ bool Application::initializeRun()
         return false;
     }
     world_ = std::move(generation.world);
+    const auto bossRoom = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+        [](const world::RoomInstance& room) {
+            return room.role == world::RoomRole::Boss;
+        });
+    bossRoomId_ = bossRoom == world_->rooms.end() ? 0U : bossRoom->id;
     const auto startRoom = std::find_if(
         world_->rooms.begin(), world_->rooms.end(),
         [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
@@ -1855,8 +1861,10 @@ bool Application::returnToMainMenu()
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     exitTerminalEntity_ = {};
+    bossRoomId_ = 0U;
     world_.reset();
     visitedRooms_.clear();
+    roomEntryGraceRemaining_.clear();
     clock_.reset();
     applyRuntimeSettings();
 
@@ -2277,6 +2285,23 @@ void Application::fixedUpdate(const double fixedStep)
         return;
     }
     weapon_.fixedUpdate(step);
+    for (auto it = roomEntryGraceRemaining_.begin();
+         it != roomEntryGraceRemaining_.end();) {
+        it->second = std::max(0.0F, it->second - step);
+        if (it->second <= 0.0F) {
+            it = roomEntryGraceRemaining_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    constexpr float roomEntryGraceSeconds = 1.25F;
+    const auto grantRoomEntryGrace = [this, roomEntryGraceSeconds](
+        const world::RoomId roomId) {
+        if (roomId != 0U) {
+            float& remaining = roomEntryGraceRemaining_[roomId];
+            remaining = std::max(remaining, roomEntryGraceSeconds);
+        }
+    };
     if (weaponSwitchPending_ && player_.state().alive
         && weapon_.switchTo(*weaponSwitchPending_)) {
         aimBlend_ = 0.0F;
@@ -2431,14 +2456,18 @@ void Application::fixedUpdate(const double fixedStep)
         player_.state().position, player_.state().yawDegrees,
         player_.state().grounded, player_.state().alive, step);
 
-    const auto adoptRoom = [this, &playerEntity, &playerRoom](
+    const auto adoptRoom = [this, &playerEntity, &playerRoom,
+                            &grantRoomEntryGrace](
         const world::RoomInstance& destination,
         const std::string_view transitionKind) {
         const std::uint32_t sourceRoom = playerRoom;
         playerRoom = destination.id;
-        if (std::find(visitedRooms_.begin(), visitedRooms_.end(), playerRoom)
-            == visitedRooms_.end()) {
+        const bool firstVisit = std::find(
+            visitedRooms_.begin(), visitedRooms_.end(), playerRoom)
+            == visitedRooms_.end();
+        if (firstVisit) {
             visitedRooms_.push_back(playerRoom);
+            grantRoomEntryGrace(playerRoom);
         }
         playerEntity->roomId = playerRoom;
         playerEntity->transform.position = player_.state().position;
@@ -2497,6 +2526,10 @@ void Application::fixedUpdate(const double fixedStep)
                         && previousState != world::DoorState::Open) {
                         playDoorAudio(
                             gdp::audio::AudioEventKind::DoorOpen, transition->edge);
+                        if (std::find(visitedRooms_.begin(), visitedRooms_.end(),
+                                transition->destinationRoom) == visitedRooms_.end()) {
+                            grantRoomEntryGrace(transition->destinationRoom);
+                        }
                     }
                     std::ostringstream message;
                     message << "Door opening on edge " << transition->edge;
@@ -2985,6 +3018,8 @@ void Application::fixedUpdate(const double fixedStep)
     }
     std::size_t attacksLanded = grenadeHitPlayer ? 1U : 0U;
     for (const world::RoomId enemyRoom : activeEnemyRooms) {
+        gameplay::EnemyPerception roomPerception = perception;
+        roomPerception.allowAttacks = !roomEntryGraceRemaining_.contains(enemyRoom);
         const auto neighbors = openNeighbors(enemyRoom);
         const gameplay::CollisionWorld enemyBase = enemyRoom == playerRoom
             ? baseCollisionWorld_
@@ -2995,23 +3030,23 @@ void Application::fixedUpdate(const double fixedStep)
                 enemyBase, entities_, enemyRoom, neighbors);
         attacksLanded += gameplay::updateWorkers(
             entities_, player_, enemyRoom, enemyCollision, step,
-            difficultyConfigs.worker, perception,
+            difficultyConfigs.worker, roomPerception,
             brainFor(entities::EnemyArchetype::Worker)).attacksLanded;
         attacksLanded += gameplay::updateGuards(
             entities_, player_, enemyRoom, enemyCollision, step,
-            difficultyConfigs.guard, perception,
+            difficultyConfigs.guard, roomPerception,
             brainFor(entities::EnemyArchetype::Guard)).attacksLanded;
         attacksLanded += gameplay::updateOfficers(
             entities_, player_, enemyRoom, enemyCollision, step,
-            difficultyConfigs.officer, perception,
+            difficultyConfigs.officer, roomPerception,
             brainFor(entities::EnemyArchetype::Officer)).attacksLanded;
         attacksLanded += gameplay::updateEngineers(
             entities_, player_, enemyRoom, enemyCollision, step,
-            difficultyConfigs.engineer, perception,
+            difficultyConfigs.engineer, roomPerception,
             brainFor(entities::EnemyArchetype::Engineer)).attacksLanded;
         attacksLanded += gameplay::updateIndustrialRobots(
             entities_, player_, enemyRoom, enemyCollision, step,
-            difficultyConfigs.industrialRobot, perception,
+            difficultyConfigs.industrialRobot, roomPerception,
             brainFor(entities::EnemyArchetype::IndustrialRobot)).attacksLanded;
     }
     enemyProjectiles_.spawn(spawnedProjectiles);
@@ -3221,10 +3256,11 @@ void Application::fixedUpdate(const double fixedStep)
     }
     const bool exitWasReady = session_.state().campaignExitReady;
     const gameplay::SessionUpdate sessionUpdate = session_.update(
-        player_.state().alive, currentRoomRole, boss.exists, boss.alive,
+        player_.state().alive, currentRoomRole, boss.exists,
+        gameplay::bossEncounterAlive(entities_, bossRoomId_),
         bossAccessible, exitTerminalUsed, campaignMission_.completed);
     if (!exitWasReady && session_.state().campaignExitReady) {
-        log(LogLevel::Info, "Campaign exit terminal unlocked after boss defeat");
+        log(LogLevel::Info, "Campaign exit terminal unlocked after Boss encounter clear");
     }
     if (sessionUpdate.changed) {
         interactionPending_ = false;
@@ -4177,13 +4213,15 @@ void Application::render()
         hud.objective = visual::ObjectiveRenderState::ActivateExit;
     } else if (session_.state().mode == gameplay::RunMode::Campaign
         && !campaignMission_.completed
-        && (!gameplay::bossStatus(entities_, 0U).alive
+        && (!gameplay::bossEncounterAlive(entities_, bossRoomId_)
             || (!session_.state().bossEngaged
                 && renderedRoomRole != world::RoomRole::Boss))) {
         hud.objective = campaignMissionObjective(campaignMission_);
     } else if (session_.state().bossEngaged
         || renderedRoomRole == world::RoomRole::Boss) {
-        hud.objective = visual::ObjectiveRenderState::DefeatBoss;
+        hud.objective = gameplay::bossStatus(entities_, 0U).alive
+            ? visual::ObjectiveRenderState::DefeatBoss
+            : visual::ObjectiveRenderState::ClearBossEncounter;
     } else {
         hud.objective = visual::ObjectiveRenderState::ReachBoss;
     }
@@ -4200,7 +4238,7 @@ void Application::render()
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing && world_) {
         if (isCampaignExitTargeted()) {
-            hud.prompt = !gameplay::bossStatus(entities_, 0U).alive
+            hud.prompt = !gameplay::bossEncounterAlive(entities_, bossRoomId_)
                     && !campaignMission_.completed
                 ? visual::HudPrompt::CampaignMissionRequired
                 : !session_.state().campaignExitReady
@@ -4420,8 +4458,10 @@ void Application::shutdown()
     impactVisualCounter_ = 0U;
     terminalEntity_ = {};
     exitTerminalEntity_ = {};
+    bossRoomId_ = 0U;
     world_.reset();
     visitedRooms_.clear();
+    roomEntryGraceRemaining_.clear();
 
     if (glContext_ != nullptr) {
         SDL_GL_DestroyContext(glContext_);

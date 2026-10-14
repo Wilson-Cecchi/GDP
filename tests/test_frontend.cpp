@@ -193,7 +193,11 @@ void layoutTests() {
             && localize(Language::PortugueseBrazil, "SECURE ARENA") == "CONTROLE A ARENA"
             && localize(Language::PortugueseBrazil, "ACTIVATE TERMINAL") == "ATIVE O TERMINAL"
             && localize(Language::PortugueseBrazil, "CLEAR AMBUSH") == "ELIMINE A EMBOSCADA"
-            && localize(Language::PortugueseBrazil, "COMPLETE MISSION") == "CONCLUA A MISSÃO",
+            && localize(Language::PortugueseBrazil, "COMPLETE MISSION") == "CONCLUA A MISSÃO"
+            && localize(Language::PortugueseBrazil, "DEFEAT REMAINING ENEMIES")
+                == "ELIMINE OS INIMIGOS RESTANTES"
+            && localize(Language::PortugueseBrazil, "CLEAR ENCOUNTER TO UNLOCK")
+                == "ELIMINE OS INIMIGOS PARA LIBERAR",
         "Campaign mission objective and exit gate are localized");
     expect(localize(Language::PortugueseBrazil, "FLOOR 7/10  HARD") == "ANDAR 7/10  DIFÍCIL", "dynamic labels retain numbers and translated difficulty");
     expect(localize(Language::PortugueseBrazil, "MISSION: CLEAR AMBUSH")

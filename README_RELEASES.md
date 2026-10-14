@@ -23,11 +23,17 @@ urgentes podem formar um pacote próprio; mudanças pequenas podem aguardar o
 próximo marco. O `Latest` e o manifesto de atualização só avançam após a tag
 de uma versão aprovada conforme o processo abaixo.
 
-A versão pública 0.1.5 reúne progressão de encontros, visual da SMG, recuo,
-precisão em movimento, calibração no Test Mode, granadas e feedback dentro do
-jogo. A missão composta de chave e Arena, introduzida nas regras 43, ainda
-pertence ao desenvolvimento posterior à 0.1.5 e não altera os downloads até
-um novo pacote aprovado.
+A versão 0.1.6 reúne as missões de campanha diversificadas, inclusive
+a rota de chave e Arena, e o progresso detalhado no Tab. A granada ganhou
+modelo consistente na mão e após o lançamento, animação de retirada do pino,
+pavio de 4,87 s após essa retirada, fumaça de explosão e ajustes de desempenho.
+Salas comuns e a sala Boss ficaram mais amplas e altas. O encontro final agora
+inclui ajudantes, mais vida e ataques de maior alcance; salas inéditas concedem
+uma breve janela de reação ao abrir a porta. O pacote Windows inicia sem janela
+de terminal, enquanto o build local de diagnóstico mantém o console. Os cinco
+cérebros ativos permanecem os mesmos da 0.1.5: os candidatos documentados em
+[`05_enemies/ai_evaluation_2026-10-13.md`](05_enemies/ai_evaluation_2026-10-13.md)
+não foram aprovados para promoção.
 
 ## Preparação única
 
@@ -55,8 +61,8 @@ do Git e instale o secret de Actions sem imprimir seu conteúdo em logs ou chat.
 
    ```bash
    git fetch origin main
-   git tag public-v0.1.1 origin/main
-   git push origin public-v0.1.1
+   git tag public-v0.1.6 origin/main
+   git push origin public-v0.1.6
    ```
 
 3. O workflow `Portable downloads` verifica que a tag aponta para a `main`

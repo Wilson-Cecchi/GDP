@@ -18,6 +18,16 @@ struct LightingPalette {
     wkc::core::Vec3 light;
 };
 
+bool isSpaciousNormal(const RoomRole role, const wkc::core::Aabb bounds) noexcept
+{
+    const float width = bounds.maximum.x - bounds.minimum.x;
+    const float depth = bounds.maximum.z - bounds.minimum.z;
+    // A 16 x 18 module has 0.15 m of wall inset on each side.
+    return role == RoomRole::Normal
+        && std::min(width, depth) >= 15.5F
+        && std::max(width, depth) >= 17.5F;
+}
+
 LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
 {
     if (role == RoomRole::Secret) {
@@ -53,6 +63,9 @@ std::size_t lightCountFor(const RoomRole role, const wkc::core::Aabb bounds) noe
     }
     const float width = bounds.maximum.x - bounds.minimum.x;
     const float depth = bounds.maximum.z - bounds.minimum.z;
+    if (isSpaciousNormal(role, bounds)) {
+        return maxRoomLights;
+    }
     return width * depth >= 72.0F ? 3U : 2U;
 }
 
@@ -103,22 +116,36 @@ RoomLightingPlan generateRoomLightingPlan(
     plan.ambientColor = palette.ambient;
     plan.supportsAlert = role == RoomRole::Start || role == RoomRole::Arena
         || role == RoomRole::Boss || theme == RoomTheme::Security;
+    const float width = roomBounds.maximum.x - roomBounds.minimum.x;
+    const float depth = roomBounds.maximum.z - roomBounds.minimum.z;
+    const bool spaciousBoss = roomBounds.isValid() && role == RoomRole::Boss
+        && std::min(width, depth) >= 24.0F
+        && std::max(width, depth) >= 28.0F;
 
     wkc::core::RandomStream random{wkc::core::deriveSeed(
         plan.seed, gdp::game::SeedDomain::Lighting, 1U)};
     const float roleAmbient = role == RoomRole::Secret ? 0.115F
-        : role == RoomRole::Boss ? 0.14F
+        : spaciousBoss ? 0.21F : role == RoomRole::Boss ? 0.14F
         : role == RoomRole::Arena ? 0.17F : 0.19F;
     plan.ambientIntensity = roleAmbient + random.rangeFloat(-0.012F, 0.012F);
     plan.fixtureEmissive = random.rangeFloat(0.68F, 0.92F);
 
     if (roomBounds.isValid()) {
-        constexpr std::array anchors{
+        constexpr std::array regularAnchors{
             wkc::core::Vec2{0.28F, 0.30F},
             wkc::core::Vec2{0.72F, 0.70F},
             wkc::core::Vec2{0.72F, 0.30F},
             wkc::core::Vec2{0.28F, 0.70F},
         };
+        constexpr std::array spaciousAnchors{
+            wkc::core::Vec2{0.25F, 0.25F},
+            wkc::core::Vec2{0.75F, 0.75F},
+            wkc::core::Vec2{0.75F, 0.25F},
+            wkc::core::Vec2{0.25F, 0.75F},
+        };
+        const bool spaciousNormal = isSpaciousNormal(role, roomBounds);
+        const auto& anchors = spaciousBoss || spaciousNormal
+            ? spaciousAnchors : regularAnchors;
         const std::size_t count = lightCountFor(role, roomBounds);
         const float ceiling = roomBounds.maximum.y - 0.16F;
         for (std::size_t index = 0; index < count; ++index) {
@@ -140,8 +167,12 @@ RoomLightingPlan generateRoomLightingPlan(
                         + ((roomBounds.maximum.z - roomBounds.minimum.z) * normalizedZ),
                 },
                 lightColor,
-                random.rangeFloat(0.86F, 1.16F),
-                random.rangeFloat(4.8F, 6.8F),
+                spaciousBoss ? random.rangeFloat(1.05F, 1.25F)
+                    : spaciousNormal ? random.rangeFloat(0.96F, 1.14F)
+                    : random.rangeFloat(0.86F, 1.16F),
+                spaciousBoss ? random.rangeFloat(11.0F, 11.8F)
+                    : spaciousNormal ? random.rangeFloat(8.5F, 9.3F)
+                    : random.rangeFloat(4.8F, 6.8F),
             });
         }
     }

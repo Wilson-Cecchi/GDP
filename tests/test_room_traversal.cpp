@@ -938,6 +938,63 @@ void testCampaignExitConsoleAccessAcrossSeeds()
     }
 }
 
+void testBossFlankCoverAcrossRotations()
+{
+    using namespace gdp;
+    using namespace wkc::core;
+    bool walkableFlank = true;
+    bool lowCrouchCover = true;
+    bool highStandingCover = true;
+    bool longCentralSightline = true;
+    std::array<bool, 4> rotations{};
+    for (Seed seed = 0U; seed < 64U; ++seed) {
+        auto generated = world::generateWorld(seed);
+        if (!generated.world) {
+            walkableFlank = false;
+            continue;
+        }
+        entities::EntityManager manager;
+        (void)world::populateInitialEntities(*generated.world, manager,
+            {.transform = {.position = {0.0F, 0.0F, 4.0F}}}, 1.0F, true);
+        const auto boss = std::find_if(generated.world->rooms.begin(),
+            generated.world->rooms.end(), [](const world::RoomInstance& room) {
+                return room.role == world::RoomRole::Boss;
+            });
+        if (boss == generated.world->rooms.end()) {
+            walkableFlank = false;
+            continue;
+        }
+        rotations[static_cast<std::size_t>(boss->rotation)] = true;
+        const auto collision = gameplay::collisionWorldWithProps(
+            gameplay::makeRoomNavigationCollision(*generated.world, boss->id),
+            manager, boss->id);
+        const auto local = [&boss](const Vec3 offset) {
+            return boss->transform.position + rotateQuarterTurns(offset, boss->rotation);
+        };
+        const Vec3 robotEye = local({0.0F, 1.5F, 0.0F});
+        const Vec3 lowFeet = local({-10.4F, 0.0F, -10.4F});
+        const Vec3 highFeet = local({-10.4F, 0.0F, 10.4F});
+        walkableFlank &= collision.canOccupy(lowFeet)
+            && collision.canOccupy(highFeet)
+            && collision.canOccupy(local({-10.4F, 0.0F, -13.0F}))
+            && collision.canOccupy(local({-10.4F, 0.0F, -6.0F}));
+        lowCrouchCover &= !gameplay::hasLineOfSight(robotEye,
+            lowFeet + Vec3{0.0F, 1.02F, 0.0F}, collision)
+            && gameplay::hasLineOfSight(robotEye,
+                lowFeet + Vec3{0.0F, 1.62F, 0.0F}, collision);
+        highStandingCover &= !gameplay::hasLineOfSight(robotEye,
+            highFeet + Vec3{0.0F, 1.62F, 0.0F}, collision);
+        longCentralSightline &= gameplay::hasLineOfSight(robotEye,
+            local({0.0F, 1.62F, -12.0F}), collision);
+    }
+    expect(walkableFlank, "Boss left flank has walkable points behind both barricades");
+    expect(lowCrouchCover && highStandingCover,
+        "low barricade protects a crouched approach and tall barricade protects standing player");
+    expect(longCentralSightline, "Boss central lane remains open for long-range shots");
+    expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
+        "Boss cover batch exercises all four rotations");
+}
+
 void testCorridorRoofAndCornerWalls()
 {
     using namespace gdp;
@@ -1083,6 +1140,7 @@ int main()
     testLockdownEntryKeepsPlayerMobile();
     testGeneratedCorridorsSupportContinuousWalkingAndLockdown();
     testCampaignExitConsoleAccessAcrossSeeds();
+    testBossFlankCoverAcrossRotations();
     testCorridorRoofAndCornerWalls();
     testGeneratedCorridorSideWalls();
     testDisconnectedWalkableVolumesCannotBeCrossedInOneStep();

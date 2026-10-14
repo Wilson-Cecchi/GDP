@@ -1,5 +1,6 @@
 #include "game/Application.hpp"
 #include "game/Localization.hpp"
+#include "game/visual/GdpRenderer.hpp"
 #include "persistence/CampaignCheckpointStore.hpp"
 #include "persistence/SettingsStore.hpp"
 #include "persistence/SpeedrunLeaderboardStore.hpp"
@@ -9,13 +10,120 @@
 #include "gameplay/Loot.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_opengl.h>
 #include <algorithm>
 #include <cmath>
 #include <chrono>
+#include <cstdint>
+#include <cstdlib>
 #include <iostream>
+#include <tuple>
+#include <vector>
 
 namespace gdp::game {
 struct ApplicationMenuTestAccess {
+    static int captureRoomScale(const std::filesystem::path& directory) {
+        ApplicationConfig config;
+        config.worldSeed = 12345U;
+        config.enableGamepad = false;
+        config.benchmarkQuality = gameplay::GraphicsQuality::Medium;
+        Application app{config};
+        if (!app.initialize() || !app.initializeRun() || !app.world_) return 1;
+        const auto boss = std::find_if(app.world_->rooms.begin(), app.world_->rooms.end(),
+            [](const world::RoomInstance& room) { return room.role == world::RoomRole::Boss; });
+        const auto hall = std::find_if(app.world_->rooms.begin(), app.world_->rooms.end(),
+            [](const world::RoomInstance& room) {
+                return room.role == world::RoomRole::Normal
+                    && room.sizeClass == world::RoomSizeClass::Large;
+            });
+        if (boss == app.world_->rooms.end() || hall == app.world_->rooms.end()) return 1;
+        const auto entrance = std::find_if(boss->connectors.begin(), boss->connectors.end(),
+            [](const world::ConnectorInstance& connector) {
+                return connector.edge.has_value();
+            });
+        if (entrance == boss->connectors.end()) return 1;
+        const char* requestedFrames = std::getenv("GDP_ROOM_CAPTURE_FRAMES");
+        const int sampleFrames = requestedFrames
+            ? std::clamp(std::atoi(requestedFrames), 1, 120) : 20;
+        const wkc::core::Vec3 entrancePosition = entrance->worldPosition
+            - entrance->worldNormal * 1.5F;
+        const wkc::core::Vec3 flankPosition = boss->transform.position
+            + wkc::core::rotateQuarterTurns({-10.5F, 0.0F, 3.0F}, boss->rotation);
+        const wkc::core::Vec3 hallPosition = hall->transform.position
+            + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 6.0F}, hall->rotation);
+        std::filesystem::create_directories(directory);
+        bool savedAll = true;
+        for (const auto quality : {gameplay::GraphicsQuality::Medium,
+                 gameplay::GraphicsQuality::Potato}) {
+            app.runtimeSettings_.graphicsQuality = quality;
+            app.runtimeSettings_.fieldOfViewDegrees = 70U;
+            app.applyRuntimeSettings();
+            for (const auto& [label, room, position] : {
+                     std::tuple{"boss_entrance", &*boss, entrancePosition},
+                     std::tuple{"boss_flank", &*boss, flankPosition},
+                     std::tuple{"normal_hall", &*hall, hallPosition}}) {
+                const wkc::core::Vec3 direction = wkc::core::normalized(
+                    room->transform.position - position);
+                app.player_.spawn(position,
+                    std::atan2(direction.z, direction.x) * 57.295779513F);
+                auto* playerEntity = app.entities_.find(app.player_.entity());
+                playerEntity->roomId = room->id;
+                playerEntity->transform.position = position;
+                double gpuTotal = 0.0;
+                std::size_t gpuSamples = 0U;
+                const auto frameStart = std::chrono::steady_clock::now();
+                for (int frame = 0; frame < sampleFrames; ++frame) {
+                    app.render();
+                    const auto sample = app.renderer_->lastFrameStats();
+                    if (sample.gpuTimingAvailable) {
+                        gpuTotal += sample.gpuMilliseconds;
+                        ++gpuSamples;
+                    }
+                }
+                const double frameMilliseconds = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - frameStart).count()
+                    / static_cast<double>(sampleFrames);
+                glFinish();
+                int width = 0;
+                int height = 0;
+                savedAll &= SDL_GetWindowSizeInPixels(app.window_, &width, &height)
+                    && width > 0 && height > 0;
+                if (!savedAll) break;
+                std::vector<std::uint8_t> pixels(
+                    static_cast<std::size_t>(width * height * 4));
+                glReadBuffer(GL_FRONT);
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    pixels.data());
+                savedAll &= glGetError() == GL_NO_ERROR;
+                std::vector<std::uint8_t> topDown(pixels.size());
+                const std::size_t stride = static_cast<std::size_t>(width * 4);
+                for (int row = 0; row < height; ++row) {
+                    std::copy_n(pixels.data()
+                        + static_cast<std::size_t>(height - row - 1) * stride,
+                        stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+                }
+                const std::string profile = quality == gameplay::GraphicsQuality::Potato
+                    ? "potato" : "medium";
+                const auto path = directory / (profile + "_" + label + ".bmp");
+                SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                    SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                savedAll &= surface != nullptr
+                    && SDL_SaveBMP(surface, path.string().c_str());
+                if (surface) SDL_DestroySurface(surface);
+                const auto stats = app.renderer_->lastFrameStats();
+                std::cout << "ROOM_CAPTURE profile=" << profile << " view=" << label
+                    << " seed=" << config.worldSeed << " room=" << room->moduleId
+                    << " draws=" << stats.drawCalls << " triangles=" << stats.triangles
+                    << " frame_ms=" << frameMilliseconds
+                    << " gpu_ms=" << (gpuSamples
+                        ? gpuTotal / static_cast<double>(gpuSamples) : 0.0)
+                    << " gpu_samples=" << gpuSamples << " file=" << path << '\n';
+            }
+        }
+        app.shutdown();
+        return savedAll ? 0 : 1;
+    }
+
     static int run(const std::filesystem::path& directory) {
         using wkc::platform::Key;
         using wkc::platform::MouseButton;
@@ -201,6 +309,49 @@ struct ApplicationMenuTestAccess {
             expect(app.playerCommand_.moveForward == 0.0F && app.playerCommand_.moveRight == 0.0F,
                 "Southpaw movement no longer reads the left analog stick");
             app.runtimeSettings_.gamepadSouthpaw = false;
+            if (slot == 0U && app.world_) {
+                const auto start = std::find_if(app.world_->rooms.begin(), app.world_->rooms.end(),
+                    [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
+                if (start != app.world_->rooms.end()) {
+                    const auto connector = std::find_if(start->connectors.begin(), start->connectors.end(),
+                        [](const world::ConnectorInstance& candidate) {
+                            return !candidate.sealed && candidate.edge.has_value();
+                        });
+                    if (connector != start->connectors.end()) {
+                        const auto position = connector->worldPosition
+                            - connector->worldNormal * 0.8F;
+                        const float yaw = std::atan2(connector->worldNormal.z,
+                            connector->worldNormal.x) * 57.295779513F;
+                        app.player_.spawn(position, yaw);
+                        auto* playerEntity = app.entities_.find(app.player_.entity());
+                        playerEntity->roomId = start->id;
+                        playerEntity->transform.position = position;
+                        const auto transition = gameplay::findRoomTransition(
+                            *app.world_, start->id, position,
+                            app.player_.planarForwardDirection());
+                        expect(transition.has_value(), "start door has a reachable neighboring room");
+                        if (transition) {
+                            app.player_.applyDamage(86.0F);
+                            app.fireHeld_ = false;
+                            app.firePending_ = false;
+                            app.playerCommand_ = {.interact = true};
+                            release(); app.fixedUpdate(1.0 / 60.0);
+                            const auto grace = app.roomEntryGraceRemaining_.find(
+                                transition->destinationRoom);
+                            expect(grace != app.roomEntryGraceRemaining_.end()
+                                    && grace->second >= 1.24F
+                                    && app.player_.state().alive
+                                    && app.player_.state().health == 14.0F,
+                                "opening an undiscovered room grants reaction time even at 14 HP");
+                            app.roomEntryGraceRemaining_[transition->destinationRoom] = 0.01F;
+                            app.playerCommand_ = {}; app.fixedUpdate(0.02);
+                            expect(!app.roomEntryGraceRemaining_.contains(
+                                    transition->destinationRoom),
+                                "entry grace ends instead of suppressing enemies indefinitely");
+                        }
+                    }
+                }
+            }
             key(Key::Escape); choose("SETTINGS"); key(Key::Escape);
             const auto pausedTime = app.menuBackdropSeconds_;
             release(); app.fixedUpdate(1.0 / 60.0);
@@ -240,6 +391,23 @@ struct ApplicationMenuTestAccess {
             expect(!app.session_.state().campaignExitReady && !app.restartRequested_
                 && app.session_.state().phase == gameplay::SessionPhase::Playing,
                 "terminal interaction before Boss death neither advances nor queues exit");
+            if (finalFloor) {
+                std::size_t aides = 0U;
+                for (const auto id : app.entities_.query(entities::EntityKind::Enemy)) {
+                    auto* enemy = app.entities_.findData<entities::EnemyData>(id);
+                    if (enemy->originRoomId != bossRoom->id) continue;
+                    if (enemy->archetype == entities::EnemyArchetype::IndustrialRobot) {
+                        enemy->health = 0.0F;
+                        enemy->behavior = entities::EnemyBehaviorState::Dead;
+                    } else {
+                        ++aides;
+                    }
+                }
+                app.playerCommand_ = {}; app.fixedUpdate(1.0 / 60.0);
+                expect(aides == 4U && !app.session_.state().campaignExitReady
+                        && app.session_.state().phase == gameplay::SessionPhase::Playing,
+                    "final-floor Boss helpers keep the exit locked after robot death");
+            }
             for (const auto id : app.entities_.query(entities::EntityKind::Enemy)) {
                 auto* enemy = app.entities_.findData<entities::EnemyData>(id);
                 enemy->health = 0.0F; enemy->behavior = entities::EnemyBehaviorState::Dead;
@@ -530,7 +698,12 @@ struct ApplicationMenuTestAccess {
     }
 };
 }
-int main() {
+int main(const int argc, char** argv) {
+    if (argc == 2 && std::string_view{argv[1]} == "--room-scale-capture") {
+        const char* directory = std::getenv("GDP_ROOM_CAPTURE_DIR");
+        return directory && *directory
+            ? gdp::game::ApplicationMenuTestAccess::captureRoomScale(directory) : 2;
+    }
     const auto directory = std::filesystem::temp_directory_path() / ("gdp_menu_integration_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(directory);
     (void)SDL_setenv_unsafe("XDG_DATA_HOME", directory.string().c_str(), 1);

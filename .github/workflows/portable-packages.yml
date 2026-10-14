@@ -83,11 +83,18 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ needs.release-gate.outputs.version }}'
-          cmake --preset windows-release "-DGDP_RELEASE_VERSION:STRING=$version" -DGDP_ENABLE_TEST_MODE=OFF
+          cmake --preset windows-release "-DGDP_RELEASE_VERSION:STRING=$version" -DGDP_ENABLE_TEST_MODE=OFF -DGDP_WINDOWS_GUI_EXECUTABLE=OFF
       - name: Build
         run: cmake --build --preset windows-release --parallel 2
       - name: Test portable systems
         run: ctest --preset windows-release --output-on-failure
+      - name: Configure game without console for the download
+        shell: pwsh
+        run: |
+          $version = '${{ needs.release-gate.outputs.version }}'
+          cmake --preset windows-release "-DGDP_RELEASE_VERSION:STRING=$version" -DGDP_ENABLE_TEST_MODE=OFF -DGDP_WINDOWS_GUI_EXECUTABLE=ON
+      - name: Build downloadable game
+        run: cmake --build --preset windows-release --target gdp --parallel 2
       - name: Package
         run: cpack --config build/windows-release/CPackConfig.cmake -C Release -B dist
       - name: Verify extracted package
@@ -99,16 +106,27 @@ jobs:
           $executable = Get-ChildItem dist/check -Recurse -Filter gdp.exe | Select-Object -First 1
           $runtime = Get-ChildItem dist/check -Recurse -Filter SDL3.dll | Select-Object -First 1
           if ($null -eq $executable -or $null -eq $runtime) { throw "Missing game or SDL3" }
+          $versionFile = Join-Path $executable.DirectoryName "version.txt"
+          if (-not (Test-Path $versionFile)) { throw "Missing package version" }
+          $version = (Get-Content $versionFile -Raw).Trim()
+          if ($version -ne '${{ needs.release-gate.outputs.version }}') {
+            throw "Wrong package version: $version"
+          }
+          $bytes = [System.IO.File]::ReadAllBytes($executable.FullName)
+          if ($bytes.Length -lt 0x100) { throw "Invalid Windows executable" }
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ($peOffset -lt 0 -or $peOffset + 24 + 70 -gt $bytes.Length -or
+              [Text.Encoding]::ASCII.GetString($bytes, $peOffset, 4) -ne "PE`0`0") {
+            throw "Invalid PE header"
+          }
+          $subsystem = [BitConverter]::ToUInt16($bytes, $peOffset + 24 + 68)
+          if ($subsystem -ne 2) { throw "Download must use the Windows GUI subsystem" }
           foreach ($type in @("worker", "guard", "officer", "engineer", "robot")) {
             $brain = Join-Path $executable.DirectoryName "ai/$type.brain"
             if (-not (Test-Path $brain)) { throw "Missing brain: $brain" }
           }
-          & $executable.FullName --headless --frames 3
-          if ($LASTEXITCODE -ne 0) { throw "Windows smoke test failed" }
-          $version = & $executable.FullName --version
-          if ($version -ne "Iron Seed ${{ needs.release-gate.outputs.version }}") {
-            throw "Wrong package version: $version"
-          }
+          $smoke = Start-Process -FilePath $executable.FullName -ArgumentList @('--headless', '--frames', '3') -Wait -PassThru
+          if ($smoke.ExitCode -ne 0) { throw "Windows smoke test failed: $($smoke.ExitCode)" }
           Copy-Item $archive dist/IronSeed-Windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:

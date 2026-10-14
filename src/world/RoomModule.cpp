@@ -333,6 +333,8 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {9, 4, 10}, roomRoleBit(RoomRole::Start)),
         makeRectangularModule(104, "IndustrialHub_01", RoomTheme::Industrial,
             RoomSizeClass::Large, {12, 5, 12}, roomRoleBit(RoomRole::Hub)),
+        makeRectangularModule(105, "IndustrialHall_01", RoomTheme::Industrial,
+            RoomSizeClass::Large, {16, 6, 20}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(201, "StorageCompact_01", RoomTheme::Storage,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -340,11 +342,15 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {10, 4, 9}, common),
         makeRectangularModule(203, "StorageSecret_01", RoomTheme::Storage,
             RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
+        makeRectangularModule(204, "StorageHall_01", RoomTheme::Storage,
+            RoomSizeClass::Large, {18, 6, 20}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(301, "OfficeCompact_01", RoomTheme::Office,
             RoomSizeClass::Compact, {7, 4, 9}, common),
         makeRectangularModule(302, "OfficeWide_01", RoomTheme::Office,
             RoomSizeClass::Medium, {10, 4, 9}, common),
+        makeRectangularModule(303, "OfficeHall_01", RoomTheme::Office,
+            RoomSizeClass::Large, {16, 6, 18}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(401, "LaboratoryCompact_01", RoomTheme::Laboratory,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -353,7 +359,9 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(403, "LaboratorySecret_01", RoomTheme::Laboratory,
             RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
         makeRectangularModule(404, "LaboratoryBoss_01", RoomTheme::Laboratory,
-            RoomSizeClass::Large, {14, 6, 12}, roomRoleBit(RoomRole::Boss)),
+            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
+        makeRectangularModule(405, "LaboratoryHall_01", RoomTheme::Laboratory,
+            RoomSizeClass::Large, {16, 6, 22}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(501, "MaintenanceCompact_01", RoomTheme::Maintenance,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -362,7 +370,9 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(503, "MaintenanceArena_01", RoomTheme::Maintenance,
             RoomSizeClass::Large, {12, 5, 11}, roomRoleBit(RoomRole::Arena)),
         makeRectangularModule(504, "MaintenanceBoss_01", RoomTheme::Maintenance,
-            RoomSizeClass::Large, {14, 6, 12}, roomRoleBit(RoomRole::Boss)),
+            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
+        makeRectangularModule(505, "MaintenanceHall_01", RoomTheme::Maintenance,
+            RoomSizeClass::Large, {16, 6, 20}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(601, "SecurityCompact_01", RoomTheme::Security,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -371,12 +381,16 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(603, "SecurityArena_01", RoomTheme::Security,
             RoomSizeClass::Large, {13, 5, 12}, roomRoleBit(RoomRole::Arena)),
         makeRectangularModule(604, "SecurityBoss_01", RoomTheme::Security,
-            RoomSizeClass::Large, {14, 6, 13}, roomRoleBit(RoomRole::Boss)),
+            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
+        makeRectangularModule(605, "SecurityHall_01", RoomTheme::Security,
+            RoomSizeClass::Large, {18, 6, 18}, roomRoleBit(RoomRole::Normal)),
 
         makeRectangularModule(701, "CafeteriaCompact_01", RoomTheme::Cafeteria,
             RoomSizeClass::Compact, {7, 4, 9}, common),
         makeRectangularModule(702, "CafeteriaWide_01", RoomTheme::Cafeteria,
             RoomSizeClass::Medium, {10, 4, 9}, common),
+        makeRectangularModule(703, "CafeteriaHall_01", RoomTheme::Cafeteria,
+            RoomSizeClass::Large, {18, 6, 18}, roomRoleBit(RoomRole::Normal)),
     };
 }
 
