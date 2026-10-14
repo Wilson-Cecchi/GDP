@@ -365,6 +365,23 @@ void testCooperativeTraining()
             && reportedMetric(bossLog.str(), "long_map_episodes=") > 0.0F
             && reportedMetric(bossLog.str(), "boss_helper_episodes=") > 0.0F,
         "cooperative Robot trains with long Boss room and two aides");
+    WorkerTrainingOptions layoutRetry{
+        .archetype = gdp::entities::EnemyArchetype::Guard,
+        .seed = 20261014U,
+        .seedExplicit = true,
+        .trainAllScenarios = true,
+        .diverseMaps = true,
+        .brainContract = gdp::gameplay::EnemyBrainContract::Cooperative,
+        .population = 2U,
+        .generations = 10U,
+        .saveDirectory = std::nullopt,
+        .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
+    };
+    std::ostringstream layoutLog;
+    const auto layoutResult = runEnemyTraining(layoutRetry, layoutLog);
+    expect(layoutResult.succeeded && layoutResult.lastGeneration == 10U,
+        "cooperative Guard retries a failed wide-room world seed deterministically");
     fs::remove_all(root);
 }
 

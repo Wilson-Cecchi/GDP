@@ -1,8 +1,8 @@
-name: gdp-coop-new-mechanics
+name: gdp-coop-new-mechanics-r2
 services:
   trainer:
-    image: gdp-training:coop-new-mechanics-v2
-    container_name: gdp-coop-new-mechanics
+    image: gdp-training:coop-new-mechanics-v2-r2
+    container_name: gdp-coop-new-mechanics-r2
     # Keep this disabled during the first pilot and until the old service is
     # stopped and its data has been preserved on the server.
     restart: "no"

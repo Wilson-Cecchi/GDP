@@ -35,6 +35,7 @@ constexpr std::uint64_t initialBrainDomain = 0x4149425241494E01ULL;
 constexpr std::uint64_t evolutionDomain = 0x414945564F4C5645ULL;
 constexpr std::uint64_t trainingScenarioDomain = 0x41495343454E4554ULL;
 constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
+constexpr std::uint64_t cooperativeWorldRetryDomain = 0x4149574F524C4432ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
 constexpr int bossEpisodeSteps = 720;
@@ -445,12 +446,24 @@ WorkerFitnessMetrics simulateEpisode(
     gameplay::CollisionWorld arena{
         {{-16.0F, 0.0F, -16.0F}, {16.0F, 4.0F, 16.0F}}, stageObstacles};
     if (stage == TrainingStage::RealMaps) {
-        const auto generated = world::generateWorld(seed,
-            {.roomCount = 7U, .loopBudget = 1U});
-        if (!generated.succeeded()) {
+        // Wide rooms can exhaust the generator's normal layout attempts for
+        // some seeds. Retry with bounded, derived seeds so an otherwise valid
+        // training generation remains deterministic and resumable.
+        const unsigned worldRetries = cooperative ? 4U : 1U;
+        for (unsigned retry = 0U; retry < worldRetries; ++retry) {
+            const wkc::core::Seed worldSeed = retry == 0U ? seed
+                : wkc::core::deriveSeed(seed, cooperativeWorldRetryDomain, retry);
+            auto generated = world::generateWorld(worldSeed,
+                {.roomCount = 7U, .loopBudget = 1U,
+                    .maximumAttempts = cooperative ? 64U : 32U});
+            if (generated.succeeded()) {
+                generatedWorld = std::move(*generated.world);
+                break;
+            }
+        }
+        if (!generatedWorld) {
             throw std::runtime_error("cannot generate stage-seven training world");
         }
-        generatedWorld = *generated.world;
         const auto start = std::find_if(generatedWorld->rooms.begin(),
             generatedWorld->rooms.end(), [](const world::RoomInstance& room) {
                 return room.role == world::RoomRole::Start;

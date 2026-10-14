@@ -63,6 +63,25 @@ O novo arquivo `tools/zimaos/compose.coop-new-mechanics.yaml` tem
 antigo e seus dados permanecem preservados. Nenhum release ou download muda
 durante esta preparação.
 
+## Implantação e correção de 14/10
+
+O primeiro serviço novo, da revisão `9724f42`, foi iniciado em
+`/DATA/AppData/gdp-coop-new-mechanics` com imagem
+`gdp-training:coop-new-mechanics-v2`. O teste C++ passou dentro da imagem e o
+avaliador produziu o encontro Boss com ajudantes e dano do Robot separado.
+O primeiro Worker completou 70 gerações. Sua bateria rápida deu score 1,009,
+mas foi rejeitada por regressão no cenário `group`; a ampla não o aprovou.
+O lote seguinte, Guard, encontrou uma seed para a qual as 32 tentativas
+normais de geração do mapa não bastaram. O serviço foi parado com
+`restart=no`. Seus dados e imagem permanecem para auditoria.
+
+A correção limita a quatro sementes de mapa derivadas, com até 64 tentativas
+cada, somente no currículo cooperativo. A mesma seed do Guard reproduziu a
+falha antes da correção e concluiu dez gerações depois dela. Por mudar o
+currículo efetivo, a retomada usará nova revisão e novo diretório
+`/DATA/AppData/gdp-coop-new-mechanics-r2`, sem reaproveitar a população do
+primeiro serviço. O manifesto Compose r2 usa contêiner e imagem próprios.
+
 ## Evidência local desta preparação
 
 - Build Release e suíte completa: **66/66 CTest**, 149,88 s. Testes Python de

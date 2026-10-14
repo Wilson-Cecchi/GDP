@@ -3,8 +3,10 @@
 Este documento descreve o serviço cooperativo original. O protocolo novo
 para as mecânicas da 0.1.6 está no
 [plano de 14/10](../../05_enemies/ai_training_plan_2026-10-14.md) e usa
-`compose.coop-new-mechanics.yaml` em diretório de dados próprio. Ele ainda
-não foi implantado no servidor.
+`compose.coop-new-mechanics.yaml` em diretório de dados próprio. A primeira
+implantação parou após encontrar uma seed de mapa que o gerador não concluiu;
+o contêiner e os dados ficaram preservados. A configuração r2 usa outra
+revisão e outro diretório, conforme o plano.
 
 O serviço cooperativo usa `compose.coop.yaml` em `/DATA/AppData/gdp-coop-training`.
 Ele usa o código de jogo do commit `dcfbb0b66fd4240e156a8ad3d850700a959064d6`
