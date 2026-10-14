@@ -300,9 +300,11 @@ void testCooperativeTraining()
     const auto first = runEnemyTraining(options, log);
     expect(first.succeeded && first.lastCheckpoint && first.lastPopulation
             && log.str().find("reward_rules=6") != std::string::npos
+            && log.str().find("curriculum=16") != std::string::npos
             && log.str().find("group_episodes=") != std::string::npos
-            && reportedMetric(log.str(), "group_episodes=") > 0.0F,
-        "cooperative training runs group episodes and reports their metrics");
+            && reportedMetric(log.str(), "group_episodes=") > 0.0F
+            && reportedMetric(log.str(), "large_room_episodes=") > 0.0F,
+        "cooperative training runs allied encounters in larger rooms");
     if (first.lastCheckpoint && first.lastPopulation) {
         const auto brain = gdp::persistence::loadEnemyBrain(*first.lastCheckpoint);
         const auto population = loadTrainingPopulation(*first.lastPopulation);
@@ -317,12 +319,52 @@ void testCooperativeTraining()
         const auto resumed = runEnemyTraining(options, resumeLog);
         expect(resumed.succeeded && resumed.lastGeneration == 2U,
             "cooperative population resumes at the next generation");
+        options.trainAllScenarios = true;
+        options.saveDirectory.reset();
+        std::ostringstream changedRepetitionsLog;
+        expect(!runEnemyTraining(options, changedRepetitionsLog).succeeded,
+            "cooperative population refuses changed scenario repetitions");
+        options.trainAllScenarios = false;
+        if (population) {
+            auto olderCurriculum = *population;
+            olderCurriculum.curriculum = 12U;
+            const auto oldPath = root / "older_curriculum.population";
+            expect(saveTrainingPopulation(oldPath, olderCurriculum),
+                "older cooperative curriculum fixture saves for rejection test");
+            options.resumePopulation = oldPath;
+            options.saveDirectory.reset();
+            std::ostringstream oldLog;
+            expect(!runEnemyTraining(options, oldLog).succeeded,
+                "cooperative training refuses a pre-0.1.6 curriculum population");
+        }
+        options.resumePopulation.reset();
+        options.resumeBrain = first.lastCheckpoint;
+        std::ostringstream brainLog;
+        const auto brainResume = runEnemyTraining(options, brainLog);
+        expect(!brainResume.succeeded
+                && brainResume.error.find("--resume-population") != std::string::npos,
+            "cooperative brain-only resume is rejected without curriculum metadata");
+        options.resumeBrain.reset();
+        options.resumePopulation = first.lastPopulation;
         options.brainContract = gdp::gameplay::EnemyBrainContract::Tactical;
         options.saveDirectory.reset();
         std::ostringstream mismatchLog;
         expect(!runEnemyTraining(options, mismatchLog).succeeded,
             "tactical training refuses a cooperative population");
     }
+    WorkerTrainingOptions bossOptions = options;
+    bossOptions.archetype = gdp::entities::EnemyArchetype::IndustrialRobot;
+    bossOptions.brainContract = gdp::gameplay::EnemyBrainContract::Cooperative;
+    bossOptions.resumePopulation.reset();
+    bossOptions.diverseMaps = true;
+    bossOptions.saveDirectory.reset();
+    std::ostringstream bossLog;
+    const auto trainedBoss = runEnemyTraining(bossOptions, bossLog);
+    expect(trainedBoss.succeeded
+            && bossLog.str().find("curriculum=18") != std::string::npos
+            && reportedMetric(bossLog.str(), "long_map_episodes=") > 0.0F
+            && reportedMetric(bossLog.str(), "boss_helper_episodes=") > 0.0F,
+        "cooperative Robot trains with long Boss room and two aides");
     fs::remove_all(root);
 }
 
@@ -724,6 +766,31 @@ void testFullPopulationAndEncounters()
                 expect(!gdp::gameplay::hasLineOfSight(eye,hidden,encounter.collision)
                     && gdp::gameplay::hasLineOfSight(eye,peek,encounter.collision),
                     "peek trajectory actually alternates blocked and visible positions");
+            }
+        }
+    }
+    for (unsigned variant = 6; variant <= 8; ++variant) {
+        const wkc::core::Aabb bounds = variant == 8
+            ? wkc::core::Aabb{{-9,0,-10},{9,6,10}}
+            : wkc::core::Aabb{{-14,0,-16},{14,7,16}};
+        for (unsigned seed = 1; seed <= 8; ++seed) {
+            const auto encounter = makeTrainingEncounter(bounds, seed, variant);
+            const auto distance = wkc::core::length(
+                encounter.player - encounter.enemy);
+            expect(distance >= (variant == 8 ? 10.0F : 20.0F)
+                    && encounter.collision.canOccupy(encounter.player,
+                        {.radius=0.35F,.height=1.8F})
+                    && encounter.collision.canOccupy(encounter.enemy,
+                        {.radius=0.52F,.height=1.9F}),
+                "large-room encounters have valid long-range spawns");
+            if (variant != 6) {
+                const auto eye = encounter.enemy + wkc::core::Vec3{0,1.3F,0};
+                const auto hidden = encounter.player + wkc::core::Vec3{0,1.6F,0};
+                const auto peek = hidden
+                    + wkc::core::Vec3{encounter.peekWidth,0,0};
+                expect(!gdp::gameplay::hasLineOfSight(eye,hidden,encounter.collision)
+                        && gdp::gameplay::hasLineOfSight(eye,peek,encounter.collision),
+                    "long cover lane has blocked and clear peeking sightlines");
             }
         }
     }

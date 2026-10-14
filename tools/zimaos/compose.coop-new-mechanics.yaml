@@ -1,0 +1,49 @@
+name: gdp-coop-new-mechanics
+services:
+  trainer:
+    image: gdp-training:coop-new-mechanics-v2
+    container_name: gdp-coop-new-mechanics
+    # Keep this disabled during the first pilot and until the old service is
+    # stopped and its data has been preserved on the server.
+    restart: "no"
+    user: "65534:65534"
+    cpus: 0.75
+    mem_limit: 512m
+    memswap_limit: 1g
+    pids_limit: 64
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 30s
+    environment:
+      GDP_COOPERATIVE: "1"
+      GDP_TRAIN_PROTOCOL: "2"
+      GDP_TRAIN_ROLES: "worker,guard,officer,engineer,robot"
+      GDP_POPULATION: "8"
+      GDP_BATCH_GENERATIONS: "70"
+      GDP_SEED: "20261014"
+      GDP_COOLDOWN_MS: "1000"
+      GDP_PAUSE_C: "80"
+      GDP_RESUME_C: "70"
+      GDP_WIDE_EVERY: "5"
+    volumes:
+      - ./data:/data
+      - /sys:/host-sys:ro
+    tmpfs:
+      - /tmp:size=16m
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import json,os,sys,time; p='/data/status.json'; s=json.load(open(p)); sys.exit(0 if s.get('state') in ('running','cooling','thermal_paused') and time.time()-os.stat(p).st_mtime < 300 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"

@@ -34,12 +34,13 @@ constexpr std::array<std::string_view, 5> scenarioNames{
     "open", "center_cover", "elevated", "group", "boss_cover"};
 constexpr std::array<std::string_view, 2> duelScenarioNames{
     "ground_strafe", "bhop"};
-constexpr std::array<std::string_view, 3> teamScenarioNames{
-    "firing_lane", "officer_guard", "engineer_guard"};
-constexpr std::array<std::array<EnemyArchetype, 2>, 3> teamPairs{{
+constexpr std::array<std::string_view, 4> teamScenarioNames{
+    "firing_lane", "officer_guard", "engineer_guard", "boss_helpers"};
+constexpr std::array<std::array<EnemyArchetype, 2>, 4> teamPairs{{
     {EnemyArchetype::Guard, EnemyArchetype::Worker},
     {EnemyArchetype::Officer, EnemyArchetype::Guard},
     {EnemyArchetype::Engineer, EnemyArchetype::Guard},
+    {EnemyArchetype::IndustrialRobot, EnemyArchetype::Officer},
 }};
 constexpr float fixedStep = 1.0F / 60.0F;
 
@@ -103,6 +104,17 @@ struct TeamResult {
     float playerDamage{0.0F};
     float enemyDamage{0.0F};
     float friendlyDamage{0.0F};
+    std::size_t enemiesAlive{0U};
+    std::uint32_t firstPlayerHitFrame{0U};
+    std::size_t bossLongRange{0U};
+    std::size_t bossPressure{0U};
+    std::size_t bossPursuit{0U};
+    float bossHealthRemaining{0.0F};
+    float bossDistanceInitial{0.0F};
+    float bossDistanceMinimum{0.0F};
+    float bossDistanceFinal{0.0F};
+    float robotPlayerDamage{0.0F};
+    float helpersPlayerDamage{0.0F};
 };
 
 void printUsage()
@@ -112,7 +124,8 @@ void printUsage()
                  "Compares scripted and trained enemy AI in deterministic combat"
                  " fixtures built inside generated Start/Boss rooms.\n"
                  "--duel adds player hitscan and physics-based ground/Bhop movement.\n"
-                 "--team evaluates mixed-role fights and friendly-fire telemetry.\n";
+                 "--team evaluates mixed-role fights and friendly-fire telemetry,"
+                 " including a protocol-2 Boss/helper arena fixture.\n";
 }
 
 std::optional<std::uint64_t> parseUnsigned(const std::string_view text)
@@ -231,10 +244,12 @@ gdp::gameplay::EnemyUpdateSummary updateEnemy(
     const gdp::world::RoomId roomId,
     const CollisionWorld& collision,
     gdp::gameplay::NeuralEnemyExperiment* const brain,
-    std::vector<gdp::gameplay::EnemyProjectile>& shots)
+    std::vector<gdp::gameplay::EnemyProjectile>& shots,
+    const bool allowAttacks = true)
 {
     using namespace gdp::gameplay;
-    const EnemyPerception perception{.projectiles = &shots};
+    const EnemyPerception perception{.projectiles = &shots,
+        .allowAttacks = allowAttacks};
     switch (archetype) {
     case EnemyArchetype::Worker:
         return updateWorkers(manager, player, roomId, collision,
@@ -547,6 +562,219 @@ std::optional<DuelResult> runDuelScenario(
     return result;
 }
 
+// Protocol 2: a separate fixture for the post-0.1.6 Boss room. The legacy
+// three team fixtures above this mode keep their original geometry and metrics.
+std::optional<TeamResult> runBossHelpersScenario(
+    const gdp::world::World& world,
+    const bool neural,
+    const gdp::game::ai::ActiveEnemyBrainCatalog& records,
+    const std::uint32_t frames)
+{
+    using namespace gdp;
+    constexpr std::array<EnemyArchetype, 3> types{
+        EnemyArchetype::IndustrialRobot, EnemyArchetype::Officer,
+        EnemyArchetype::Guard};
+    const world::RoomInstance* const room = roomFor(
+        world, EnemyArchetype::IndustrialRobot);
+    if (room == nullptr) {
+        return std::nullopt;
+    }
+    const Vec3 center = (room->worldBounds.minimum
+        + room->worldBounds.maximum) * 0.5F;
+    const float floor = room->worldBounds.minimum.y;
+    wkc::core::RandomStream random{wkc::core::deriveSeed(
+        world.masterSeed, 0x424f535346585432ULL, 0U)};
+    const float lateral = random.rangeFloat(-0.6F, 0.6F);
+    // Stratify the long sightline across seeds; a tiny lateral jitter alone
+    // does not meaningfully change the Robot's range/phase opportunity.
+    const float entranceDistance = 10.5F
+        + 0.5F * static_cast<float>(world.masterSeed % 5U);
+    const Vec3 playerStart{center.x + lateral, floor,
+        center.z - entranceDistance};
+    const std::array<Vec3, 3> starts{{
+        {center.x, floor, center.z + 2.0F},
+        {center.x - 5.0F, floor, center.z - 4.0F},
+        {center.x - 5.0F, floor, center.z + 4.0F},
+    }};
+    // The two left-flank barricades mirror the encounter's navigation choice.
+    const CollisionWorld collision{room->worldBounds, {
+        {{center.x - 9.7F, floor, center.z - 9.1F},
+            {center.x - 7.3F, floor + 1.35F, center.z - 7.9F}},
+        {{center.x - 9.1F, floor, center.z + 6.1F},
+            {center.x - 7.9F, floor + 2.25F, center.z + 10.9F}},
+    }};
+    if (!collision.canOccupy(playerStart)) {
+        return std::nullopt;
+    }
+    for (std::size_t index = 0U; index < starts.size(); ++index) {
+        const gameplay::CharacterCollider collider = index == 0U
+            ? gameplay::CharacterCollider{.radius = 0.52F, .height = 1.9F}
+            : gameplay::CharacterCollider{};
+        if (!collision.canOccupy(starts[index], collider)) {
+            return std::nullopt;
+        }
+    }
+
+    gameplay::Player player;
+    player.spawn(playerStart);
+    entities::EntityManager manager;
+    const std::array<float, 3> startingHealth{660.0F, 65.0F, 75.0F};
+    std::array<EntityId, 3> ids{};
+    for (std::size_t index = 0U; index < ids.size(); ++index) {
+        ids[index] = manager.createEnemy({
+            .transform = {.position = starts[index],
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = room->id,
+            .archetype = types[index],
+            .health = startingHealth[index],
+            .visualSeed = world.masterSeed + index + 1U,
+        });
+    }
+    // Fixed evaluation weapon, shared by both policies. Its moderate damage
+    // reaches the Robot after the helpers without ending the fight instantly.
+    gameplay::Weapon weapon{{22.0F, 0.24F, 34.0F, 24U, 8U,
+        gameplay::WeaponArchetype::Carbine}};
+    std::array<std::optional<gameplay::NeuralEnemyExperiment>, 5> brains;
+    if (neural) {
+        for (const EnemyArchetype type : types) {
+            const std::size_t index = static_cast<std::size_t>(type);
+            if (!records[index]) {
+                return std::nullopt;
+            }
+            brains[index].emplace(world.masterSeed, type, records[index]->contract);
+            brains[index]->genome = records[index]->genome;
+            brains[index]->controlAll = true;
+            brains[index]->logSelection = false;
+        }
+    }
+
+    TeamResult result;
+    result.bossDistanceInitial = planarDistance(starts[0], playerStart);
+    result.bossDistanceMinimum = result.bossDistanceInitial;
+    gameplay::EnemyProjectileSystem projectiles;
+    for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
+        gameplay::PlayerCommand command;
+        command.moveRight = (frame / 70U) % 2U == 0U ? 0.25F : -0.25F;
+        player.fixedUpdate(command, fixedStep, collision);
+        weapon.fixedUpdate(fixedStep);
+        EntityId targetId;
+        float nearest = std::numeric_limits<float>::infinity();
+        for (const EntityId id : ids) {
+            const auto* enemy = manager.findData<entities::EnemyData>(id);
+            if (enemy == nullptr
+                || enemy->behavior == entities::EnemyBehaviorState::Dead) {
+                continue;
+            }
+            const float distance = planarDistance(
+                manager.find(id)->transform.position, player.state().position);
+            if (distance < nearest) {
+                nearest = distance;
+                targetId = id;
+            }
+        }
+        if (weapon.magazineAmmo() == 0U) {
+            (void)weapon.reload();
+        } else if (targetId.isValid() && !weapon.reloading()
+            && weapon.cooldownRemaining() <= 0.0F) {
+            const Vec3 target = manager.find(targetId)->transform.position
+                + Vec3{0.0F, 1.0F, 0.0F};
+            const auto shot = gameplay::fireHitscan(weapon,
+                player.cameraPosition(),
+                wkc::core::normalized(target - player.cameraPosition()),
+                room->id, collision, manager, 0.0F);
+            if (shot.outcome != gameplay::ShotOutcome::Cooldown
+                && shot.outcome != gameplay::ShotOutcome::Reloading
+                && shot.outcome != gameplay::ShotOutcome::Switching
+                && shot.outcome != gameplay::ShotOutcome::Empty) {
+                ++result.playerShots;
+            }
+            if (shot.hit && manager.findData<entities::EnemyData>(shot.hit->target)
+                && (shot.outcome == gameplay::ShotOutcome::Hit
+                    || shot.outcome == gameplay::ShotOutcome::Killed)) {
+                ++result.playerHits;
+            }
+        }
+        result.elapsedFrames = frame;
+        const bool allEnemiesDead = std::all_of(ids.begin(), ids.end(),
+            [&manager](const EntityId id) {
+                return manager.findData<entities::EnemyData>(id)->behavior
+                    == entities::EnemyBehaviorState::Dead;
+            });
+        if (allEnemiesDead) {
+            result.outcome = "player_win";
+            break;
+        }
+
+        std::vector<gameplay::EnemyProjectile> shots;
+        for (const EnemyArchetype type : types) {
+            const std::size_t index = static_cast<std::size_t>(type);
+            const float healthBefore = player.state().health;
+            const auto summary = updateEnemy(type, manager, player,
+                room->id, collision, neural ? &*brains[index] : nullptr,
+                shots, frame > 75U); // same 1.25-second room-entry grace
+            const float directDamage = std::max(0.0F,
+                healthBefore - player.state().health);
+            (type == EnemyArchetype::IndustrialRobot
+                ? result.robotPlayerDamage : result.helpersPlayerDamage)
+                += directDamage;
+            result.enemyHits += summary.attacksLanded;
+            result.enemyShots += summary.shotsFired;
+            result.fireHolds += summary.friendlyFireHolds;
+            result.supportActions += summary.commandsIssued
+                + summary.repairsPerformed;
+            result.bossLongRange += summary.bossLongRange;
+            result.bossPressure += summary.bossPressure;
+            result.bossPursuit += summary.bossPursuit;
+        }
+        projectiles.spawn(shots);
+        for (const auto& event
+            : projectiles.update(fixedStep, player, collision, manager)) {
+            result.enemyHits += event.hitPlayer ? 1U : 0U;
+            result.friendlyHits += event.hitEnemy.isValid() ? 1U : 0U;
+            result.friendlyKills += event.killedEnemy ? 1U : 0U;
+            if (event.hitEnemy.isValid()) {
+                result.friendlyDamage += event.damageApplied;
+            }
+            if (event.hitPlayer) {
+                const auto* shooter = manager.findData<entities::EnemyData>(
+                    event.source);
+                (shooter != nullptr
+                    && shooter->archetype == EnemyArchetype::IndustrialRobot
+                    ? result.robotPlayerDamage : result.helpersPlayerDamage)
+                    += event.damageApplied;
+            }
+        }
+        if (result.firstPlayerHitFrame == 0U
+            && player.state().health < 100.0F) {
+            result.firstPlayerHitFrame = frame;
+        }
+        result.bossDistanceMinimum = std::min(result.bossDistanceMinimum,
+            planarDistance(manager.find(ids[0])->transform.position,
+                player.state().position));
+        if (!player.state().alive) {
+            result.outcome = "enemy_win";
+            break;
+        }
+    }
+    result.playerDamage = 100.0F - player.state().health;
+    for (std::size_t index = 0U; index < ids.size(); ++index) {
+        const auto* enemy = manager.findData<entities::EnemyData>(ids[index]);
+        result.enemyDamage += std::max(0.0F,
+            startingHealth[index] - enemy->health);
+        result.enemiesAlive += enemy->behavior
+            != entities::EnemyBehaviorState::Dead ? 1U : 0U;
+    }
+    result.bossHealthRemaining = manager.findData<entities::EnemyData>(ids[0])->health;
+    result.bossDistanceFinal = planarDistance(
+        manager.find(ids[0])->transform.position, player.state().position);
+    for (const auto& brain : brains) {
+        if (brain) {
+            result.neuralTicks += brain->controlledTicks;
+        }
+    }
+    return result;
+}
+
 std::optional<TeamResult> runTeamScenario(
     const gdp::world::World& world,
     const std::size_t scenario,
@@ -555,6 +783,9 @@ std::optional<TeamResult> runTeamScenario(
     const std::uint32_t frames)
 {
     using namespace gdp;
+    if (scenario == 3U) {
+        return runBossHelpersScenario(world, neural, records, frames);
+    }
     if (scenario >= teamPairs.size()) {
         return std::nullopt;
     }
@@ -709,6 +940,7 @@ std::optional<TeamResult> runTeamScenario(
         }
     }
     result.playerDamage = 100.0F - player.state().health;
+    result.helpersPlayerDamage = result.playerDamage;
     for (std::size_t index = 0U; index < ids.size(); ++index) {
         const auto* enemy = manager.findData<entities::EnemyData>(ids[index]);
         result.enemyDamage += std::max(0.0F,
@@ -744,7 +976,19 @@ void printTeamRow(const std::string_view policy,
               << result.enemyShots << ',' << result.enemyHits << ','
               << result.friendlyHits << ',' << result.friendlyKills << ','
               << result.friendlyDamage << ',' << result.fireHolds << ','
-              << result.supportActions << ',' << result.neuralTicks << '\n';
+              << result.supportActions << ',' << result.neuralTicks << ','
+              << 2 << ','
+              << (scenario == "boss_helpers" ? "guard" : "") << ','
+              << (scenario == "boss_helpers"
+                    ? generation(EnemyArchetype::Guard) : 0U) << ','
+              << result.enemiesAlive << ',' << result.bossHealthRemaining << ','
+              << result.firstPlayerHitFrame << ','
+              << result.bossDistanceInitial << ','
+              << result.bossDistanceMinimum << ','
+              << result.bossDistanceFinal << ','
+              << result.bossLongRange << ',' << result.bossPressure << ','
+              << result.bossPursuit << ',' << result.robotPlayerDamage << ','
+              << result.helpersPlayerDamage << '\n';
 }
 
 void printDuelRow(const std::string_view policy,
@@ -821,7 +1065,12 @@ int main(const int argc, char* argv[])
                      "ally_generation,outcome,elapsed_frames,player_damage,"
                      "enemy_damage,player_shots,player_hits,enemy_shots,"
                      "enemy_hits,friendly_hits,friendly_kills,friendly_damage,"
-                     "fire_holds,support_actions,neural_ticks\n";
+                     "fire_holds,support_actions,neural_ticks,protocol,third,"
+                     "third_generation,enemies_alive,boss_health_remaining,"
+                     "first_player_hit_frame,boss_distance_initial,"
+                     "boss_distance_minimum,boss_distance_final,boss_long_range,"
+                     "boss_pressure,boss_pursuit,robot_player_damage,"
+                     "helpers_player_damage\n";
         for (std::size_t scenario = 0U; scenario < teamScenarioNames.size(); ++scenario) {
             for (const bool neural : {false, true}) {
                 const auto result = runTeamScenario(*generated.world,

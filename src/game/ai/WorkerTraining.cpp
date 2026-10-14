@@ -154,7 +154,8 @@ const TrainingScenario& scenarioFor(
     return workerScenarios[index];
 }
 
-TrainingProfile profileFor(const EnemyArchetype archetype) noexcept
+TrainingProfile profileFor(const EnemyArchetype archetype,
+    const gameplay::EnemyBrainContract contract) noexcept
 {
     switch (archetype) {
     case EnemyArchetype::Worker: return {3.4F, 4.6F, 50.0F, 0.0F, 2.0F, 5.0F};
@@ -162,7 +163,10 @@ TrainingProfile profileFor(const EnemyArchetype archetype) noexcept
     case EnemyArchetype::Officer: return {7.0F, 9.0F, 70.0F, 6.0F, 10.0F, 11.0F};
     case EnemyArchetype::Engineer: return {5.0F, 7.0F, 70.0F, 3.0F, 6.0F, 10.0F};
     case EnemyArchetype::IndustrialRobot:
-        return {9.0F, 11.0F, 220.0F, 4.0F, 13.0F, 14.0F};
+        return {9.0F, 11.0F,
+            contract == gameplay::EnemyBrainContract::Cooperative ? 600.0F : 220.0F,
+            4.0F, 13.0F,
+            contract == gameplay::EnemyBrainContract::Cooperative ? 32.0F : 14.0F};
     }
     return {};
 }
@@ -265,10 +269,12 @@ gameplay::EnemyUpdateSummary updateTrainingEnemy(
     const gameplay::CollisionWorld& arena,
     gameplay::NeuralEnemyExperiment* brain,
     std::vector<gameplay::EnemyProjectile>& shots,
-    const TrainingStage stage)
+    const TrainingStage stage,
+    const bool roomEntryGraceElapsed)
 {
     const gameplay::EnemyPerception perception{.projectiles = &shots,
-        .allowAttacks = stage >= TrainingStage::FireControl};
+        .allowAttacks = stage >= TrainingStage::FireControl
+            && roomEntryGraceElapsed};
     switch (archetype) {
     case EnemyArchetype::Worker:
         return gameplay::updateWorkers(manager, player, roomId, arena,
@@ -398,7 +404,8 @@ WorkerFitnessMetrics simulateEpisode(
     const gameplay::EnemyBrainContract contract
         = gameplay::EnemyBrainContract::Tactical)
 {
-    const TrainingProfile profile = profileFor(archetype);
+    const TrainingProfile profile = profileFor(archetype, contract);
+    const bool cooperative = contract == gameplay::EnemyBrainContract::Cooperative;
     const TrainingStage stage = static_cast<TrainingStage>(scenario + 1U);
     TrainingScenario plan = scenarioFor(archetype, scenario);
     if (diverseMaps && stage == TrainingStage::RealMaps
@@ -451,13 +458,36 @@ WorkerFitnessMetrics simulateEpisode(
         if (start == generatedWorld->rooms.end()) {
             throw std::runtime_error("stage-seven world has no start room");
         }
-        roomId = start->id;
-        realRoomBounds = start->worldBounds;
+        const world::RoomInstance* trainingRoom = &*start;
+        if (contract == gameplay::EnemyBrainContract::Cooperative) {
+            if (archetype == EnemyArchetype::IndustrialRobot) {
+                const auto boss = std::find_if(generatedWorld->rooms.begin(),
+                    generatedWorld->rooms.end(), [](const world::RoomInstance& room) {
+                        return room.role == world::RoomRole::Boss;
+                    });
+                if (boss == generatedWorld->rooms.end()) {
+                    throw std::runtime_error("cooperative training world has no Boss room");
+                }
+                trainingRoom = &*boss;
+            } else {
+                for (const world::RoomInstance& room : generatedWorld->rooms) {
+                    const auto span = room.worldBounds.maximum - room.worldBounds.minimum;
+                    const auto selectedSpan = trainingRoom->worldBounds.maximum
+                        - trainingRoom->worldBounds.minimum;
+                    if (room.role == world::RoomRole::Normal
+                        && span.x * span.z > selectedSpan.x * selectedSpan.z) {
+                        trainingRoom = &room;
+                    }
+                }
+            }
+        }
+        roomId = trainingRoom->id;
+        realRoomBounds = trainingRoom->worldBounds;
         arenaOrigin = {
-            (start->worldBounds.minimum.x + start->worldBounds.maximum.x)
+            (trainingRoom->worldBounds.minimum.x + trainingRoom->worldBounds.maximum.x)
                 * 0.5F,
-            start->worldBounds.minimum.y,
-            (start->worldBounds.minimum.z + start->worldBounds.maximum.z)
+            trainingRoom->worldBounds.minimum.y,
+            (trainingRoom->worldBounds.minimum.z + trainingRoom->worldBounds.maximum.z)
                 * 0.5F};
         arena = gameplay::makeRoomNavigationCollision(
             *generatedWorld, roomId, false);
@@ -467,8 +497,18 @@ WorkerFitnessMetrics simulateEpisode(
         + wkc::core::Vec3{workerX, 0.0F, workerZ};
     bool corridorSpawn = false;
     std::optional<TrainingEncounter> encounter;
-    if (generatedWorld && diverseMaps && mapVariant > 0U) {
-        encounter = makeTrainingEncounter(*realRoomBounds, seed, mapVariant);
+    if (generatedWorld && diverseMaps && (mapVariant > 0U || cooperative)) {
+        const unsigned encounterVariant
+            = cooperative && archetype == EnemyArchetype::IndustrialRobot
+                ? 6U + (mapVariant % 2U)
+                : cooperative && archetype != EnemyArchetype::Worker
+                    && realRoomBounds
+                    && std::min(realRoomBounds->maximum.x - realRoomBounds->minimum.x,
+                        realRoomBounds->maximum.z - realRoomBounds->minimum.z) >= 16.0F
+                    && std::max(realRoomBounds->maximum.x - realRoomBounds->minimum.x,
+                        realRoomBounds->maximum.z - realRoomBounds->minimum.z) >= 18.0F
+                    ? 8U : std::max(mapVariant, 1U);
+        encounter = makeTrainingEncounter(*realRoomBounds, seed, encounterVariant);
         arena = encounter->collision;
         arenaOrigin = encounter->player;
         enemyStart = encounter->enemy;
@@ -522,8 +562,8 @@ WorkerFitnessMetrics simulateEpisode(
     });
     manager.findData<entities::EnemyData>(worker)->health
         = profile.health * plan.initialHealthRatio;
-    const bool cooperative = contract == gameplay::EnemyBrainContract::Cooperative;
     std::optional<entities::EntityId> supportAlly;
+    std::optional<entities::EntityId> secondSupportAlly;
     if (cooperative) {
         const EnemyArchetype allyArchetype = archetype == EnemyArchetype::Guard
             ? EnemyArchetype::Worker : EnemyArchetype::Guard;
@@ -558,6 +598,21 @@ WorkerFitnessMetrics simulateEpisode(
             }
             break;
         }
+        if (archetype == EnemyArchetype::IndustrialRobot) {
+            const wkc::core::Vec3 position = enemyStart
+                + lateral * -3.0F + towardPlayer * 1.0F;
+            if (arena.canOccupy(position, {.radius = 0.35F, .height = 1.8F})
+                && (!supportAlly || planarDistance(position,
+                    manager.find(*supportAlly)->transform.position) >= 1.2F)) {
+                secondSupportAlly = manager.createEnemy({
+                    .transform = {.position = position},
+                    .roomId = roomId,
+                    .archetype = EnemyArchetype::Officer,
+                    .health = 65.0F,
+                    .visualSeed = seed,
+                });
+            }
+        }
     } else if (archetype == EnemyArchetype::Officer) {
         const auto ally = manager.createEnemy({
             .transform = {.position = arenaOrigin + wkc::core::Vec3{
@@ -590,10 +645,18 @@ WorkerFitnessMetrics simulateEpisode(
     WorkerFitnessMetrics metrics;
     metrics.groupEpisodes = supportAlly && cooperative ? 1U : 0U;
     metrics.realMapEpisodes = generatedWorld ? 1U : 0U;
+    metrics.largeRoomEpisodes = realRoomBounds
+        && std::min(realRoomBounds->maximum.x - realRoomBounds->minimum.x,
+            realRoomBounds->maximum.z - realRoomBounds->minimum.z) >= 16.0F
+        && std::max(realRoomBounds->maximum.x - realRoomBounds->minimum.x,
+            realRoomBounds->maximum.z - realRoomBounds->minimum.z) >= 18.0F ? 1U : 0U;
     metrics.corridorSpawns = corridorSpawn ? 1U : 0U;
     metrics.coverMapEpisodes = encounter && !encounter->elevated ? 1U : 0U;
     metrics.peekMapEpisodes = encounter && encounter->peekWidth > 0.0F ? 1U : 0U;
     metrics.heightMapEpisodes = encounter && encounter->elevated ? 1U : 0U;
+    metrics.longMapEpisodes = encounter
+        && planarDistance(encounter->player, encounter->enemy) >= 10.0F ? 1U : 0U;
+    metrics.bossHelperEpisodes = supportAlly && secondSupportAlly ? 1U : 0U;
     gameplay::EnemyProjectileSystem enemyProjectiles;
     std::optional<IncomingTrainingShot> incomingShot;
     float shotCooldown = 1.0F;
@@ -684,7 +747,8 @@ WorkerFitnessMetrics simulateEpisode(
         std::vector<gameplay::EnemyProjectile> spawnedShots;
         const auto summary = updateTrainingEnemy(
             archetype, manager, player, roomId, arena, &brain, spawnedShots,
-            stage);
+            stage, !cooperative || stage != TrainingStage::RealMaps
+                || time >= 1.25F);
         const float playerHealthAfterCandidate = player.state().health;
         if (cooperative && supportAlly && player.state().alive) {
             const entities::EnemyData* ally
@@ -692,7 +756,17 @@ WorkerFitnessMetrics simulateEpisode(
             if (ally && ally->behavior != entities::EnemyBehaviorState::Dead) {
                 const EnemyArchetype allyArchetype = ally->archetype;
                 (void)updateTrainingEnemy(allyArchetype, manager, player,
-                    roomId, arena, nullptr, spawnedShots, stage);
+                    roomId, arena, nullptr, spawnedShots, stage,
+                    stage != TrainingStage::RealMaps || time >= 1.25F);
+            }
+        }
+        if (cooperative && secondSupportAlly && player.state().alive) {
+            const entities::EnemyData* ally
+                = manager.findData<entities::EnemyData>(*secondSupportAlly);
+            if (ally && ally->behavior != entities::EnemyBehaviorState::Dead) {
+                (void)updateTrainingEnemy(ally->archetype, manager, player,
+                    roomId, arena, nullptr, spawnedShots, stage,
+                    stage != TrainingStage::RealMaps || time >= 1.25F);
             }
         }
         const bool controlled = brain.controlledTicks != controlledBefore;
@@ -1006,10 +1080,13 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.coverEntries += sample.coverEntries;
     total.distanceSamples += sample.distanceSamples;
     total.realMapEpisodes += sample.realMapEpisodes;
+    total.largeRoomEpisodes += sample.largeRoomEpisodes;
     total.corridorSpawns += sample.corridorSpawns;
     total.coverMapEpisodes += sample.coverMapEpisodes;
     total.peekMapEpisodes += sample.peekMapEpisodes;
     total.heightMapEpisodes += sample.heightMapEpisodes;
+    total.longMapEpisodes += sample.longMapEpisodes;
+    total.bossHelperEpisodes += sample.bossHelperEpisodes;
     total.fallbackAttacksLanded += sample.fallbackAttacksLanded;
     total.fallbackShotsFired += sample.fallbackShotsFired;
     total.playerEliminations += sample.playerEliminations;
@@ -1262,9 +1339,15 @@ WorkerTrainingResult runEnemyTraining(
         std::optional<persistence::EnemyBrainRecord> resume;
         std::optional<TrainingPopulationRecord> fullResume;
         std::uint32_t firstGeneration = 1U;
-        const std::uint32_t curriculum = options.diverseMaps
-            ? (options.trainAllScenarios ? 15U : 14U)
-            : (options.trainAllScenarios ? 13U : 12U);
+        const bool cooperative
+            = options.brainContract == gameplay::EnemyBrainContract::Cooperative;
+        const std::uint32_t curriculum = cooperative
+            ? (options.diverseMaps
+                ? (options.trainAllScenarios ? 19U : 18U)
+                : (options.trainAllScenarios ? 17U : 16U))
+            : options.diverseMaps
+                ? (options.trainAllScenarios ? 15U : 14U)
+                : (options.trainAllScenarios ? 13U : 12U);
         std::uint32_t warmupStart = 1U;
         std::uint32_t warmupGenerations = options.curriculumGenerations > 0U
             ? options.curriculumGenerations : options.generations;
@@ -1288,6 +1371,12 @@ WorkerTrainingResult runEnemyTraining(
             warmupGenerations = fullResume->warmupGenerations;
         }
         if (options.resumeBrain) {
+            // A standalone brain has no curriculum metadata. Cooperative
+            // resumes must use the complete, versioned population snapshot.
+            if (cooperative) {
+                result.error = "cooperative --resume is unsupported; use --resume-population";
+                return result;
+            }
             resume = persistence::loadEnemyBrain(*options.resumeBrain);
             if (!resume || resume->archetype != options.archetype) {
                 result.error = "cannot load a matching enemy brain for resume";
@@ -1473,10 +1562,13 @@ WorkerTrainingResult runEnemyTraining(
                         : 0.0F)
                    << " range_error_s=" << bestMetrics.rangeErrorSeconds
                    << " real_map_episodes=" << bestMetrics.realMapEpisodes
+                   << " large_room_episodes=" << bestMetrics.largeRoomEpisodes
                    << " corridor_spawns=" << bestMetrics.corridorSpawns
                    << " cover_map_episodes=" << bestMetrics.coverMapEpisodes
                    << " peek_map_episodes=" << bestMetrics.peekMapEpisodes
                    << " height_map_episodes=" << bestMetrics.heightMapEpisodes
+                   << " long_map_episodes=" << bestMetrics.longMapEpisodes
+                   << " boss_helper_episodes=" << bestMetrics.bossHelperEpisodes
                    << " fallback_hits=" << bestMetrics.fallbackAttacksLanded
                    << " fallback_shots=" << bestMetrics.fallbackShotsFired
                    << " range_progress=" << bestMetrics.tacticalProgressMeters

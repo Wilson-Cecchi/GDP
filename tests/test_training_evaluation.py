@@ -28,6 +28,64 @@ def reports(root, center_candidate=12):
 
 
 class EvaluationTests(unittest.TestCase):
+    def test_v2_boss_requires_robot_contribution_and_complete_telemetry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fields = ['policy', 'scenario', 'seed', 'primary', 'ally',
+                      'primary_generation', 'ally_generation', 'elapsed_frames',
+                      'player_damage', 'friendly_damage', 'friendly_hits',
+                      'friendly_kills', 'protocol', 'third', 'third_generation',
+                      'enemy_shots', 'enemy_hits', 'fire_holds',
+                      'robot_player_damage', 'helpers_player_damage',
+                      'enemies_alive', 'boss_health_remaining',
+                      'first_player_hit_frame', 'boss_distance_initial',
+                      'boss_distance_minimum', 'boss_distance_final',
+                      'boss_long_range', 'boss_pressure', 'boss_pursuit']
+            pairs = [('firing_lane', 'guard', 'worker', ''),
+                     ('officer_guard', 'officer', 'guard', ''),
+                     ('engineer_guard', 'engineer', 'guard', ''),
+                     ('boss_helpers', 'robot', 'officer', 'guard')]
+            for policy in ('active', 'candidate'):
+                path = root / f'150001-team-{policy}.csv'
+                with path.open('w') as out:
+                    writer = csv.DictWriter(out, fieldnames=fields)
+                    writer.writeheader()
+                    for scenario, primary, ally, third in pairs:
+                        robot_damage = (20 if policy == 'active' else 5) \
+                            if scenario == 'boss_helpers' else 0
+                        helper_damage = (20 if policy == 'active' else 35) \
+                            if scenario == 'boss_helpers' else 20
+                        writer.writerow({'policy': 'neural', 'scenario': scenario,
+                            'seed': 150001, 'primary': primary, 'ally': ally,
+                            'primary_generation': 910 if policy == 'candidate'
+                                and primary == 'robot' else 200,
+                            'ally_generation': 200, 'third_generation': 200,
+                            'elapsed_frames': 480, 'player_damage':
+                                robot_damage + helper_damage,
+                            'friendly_damage': 0, 'friendly_hits': 0,
+                            'friendly_kills': 0, 'protocol': 2, 'third': third,
+                            'enemy_shots': 4, 'enemy_hits': 2, 'fire_holds': 0,
+                            'robot_player_damage': robot_damage,
+                            'helpers_player_damage': helper_damage,
+                            'enemies_alive': 1, 'boss_health_remaining': 20,
+                            'first_player_hit_frame': 80,
+                            'boss_distance_initial': 12,
+                            'boss_distance_minimum': 10,
+                            'boss_distance_final': 11,
+                            'boss_long_range': 200,
+                            'boss_pressure': 150, 'boss_pursuit': 130})
+            report = summarize_team(root, 'robot', (150001,), 480,
+                                    'revision', protocol_version=2)
+            self.assertFalse(report['eligible'])
+            self.assertEqual('robot_player_damage', report['regressions'][0]['metric'])
+            path = root / '150001-team-candidate.csv'
+            lines = path.read_text().splitlines()
+            lines[-1] = lines[-1].replace(',2,guard,200,', ',1,guard,200,')
+            path.write_text('\n'.join(lines) + '\n')
+            with self.assertRaises(ValueError):
+                summarize_team(root, 'robot', (150001,), 480,
+                               'revision', protocol_version=2)
+
     def test_team_friendly_fire_blocks_high_damage_candidate(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

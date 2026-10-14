@@ -153,10 +153,10 @@ if(NOT first_team_result EQUAL 0 OR NOT second_team_result EQUAL 0
 endif()
 string(REGEX MATCHALL "\n(scripted|neural)," team_rows "${first_team_output}")
 list(LENGTH team_rows team_row_count)
-if(NOT team_row_count EQUAL 6)
-    message(FATAL_ERROR "Expected 6 mixed-team rows, got ${team_row_count}")
+if(NOT team_row_count EQUAL 8)
+    message(FATAL_ERROR "Expected 8 mixed-team rows, got ${team_row_count}")
 endif()
-foreach(scenario firing_lane officer_guard engineer_guard)
+foreach(scenario firing_lane officer_guard engineer_guard boss_helpers)
     foreach(policy scripted neural)
         string(FIND "${first_team_output}"
             "${policy},${scenario},12345," position)
@@ -165,6 +165,40 @@ foreach(scenario firing_lane officer_guard engineer_guard)
         endif()
     endforeach()
 endforeach()
+string(REGEX MATCH "scripted,boss_helpers,12345,[^\n]*"
+    boss_row "${first_team_output}")
+string(REPLACE "," ";" boss_fields "${boss_row}")
+list(LENGTH boss_fields boss_field_count)
+if(NOT boss_field_count EQUAL 35)
+    message(FATAL_ERROR "Boss/team protocol-2 field count changed: ${boss_row}")
+endif()
+list(GET boss_fields 3 boss_primary)
+list(GET boss_fields 4 boss_ally)
+list(GET boss_fields 21 boss_protocol)
+list(GET boss_fields 22 boss_third)
+list(GET boss_fields 27 boss_initial_distance)
+list(GET boss_fields 30 boss_long_range)
+if(NOT boss_primary STREQUAL "robot" OR NOT boss_ally STREQUAL "officer"
+    OR NOT boss_third STREQUAL "guard" OR NOT boss_protocol EQUAL 2
+    OR boss_initial_distance LESS 12 OR boss_long_range LESS 1)
+    message(FATAL_ERROR "Boss fixture did not exercise the wide-room encounter: ${boss_row}")
+endif()
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 42 --frames 360 --team
+    RESULT_VARIABLE alternate_team_result
+    OUTPUT_VARIABLE alternate_team_output
+    ERROR_VARIABLE alternate_team_error)
+if(NOT alternate_team_result EQUAL 0)
+    message(FATAL_ERROR "Alternate Boss seed failed: ${alternate_team_error}")
+endif()
+string(REGEX MATCH "scripted,boss_helpers,42,[^\n]*"
+    alternate_boss_row "${alternate_team_output}")
+string(REPLACE "," ";" alternate_boss_fields "${alternate_boss_row}")
+list(GET alternate_boss_fields 27 alternate_boss_initial_distance)
+if(boss_initial_distance STREQUAL alternate_boss_initial_distance)
+    message(FATAL_ERROR "Distinct Boss seeds repeated the same sightline")
+endif()
 string(REGEX MATCH "scripted,firing_lane,12345,[^\n]*"
     firing_lane_row "${first_team_output}")
 string(REPLACE "," ";" firing_lane_fields "${firing_lane_row}")
@@ -173,3 +207,29 @@ list(GET firing_lane_fields 18 fire_holds)
 if(friendly_hits LESS 1 OR fire_holds LESS 1)
     message(FATAL_ERROR "Firing-lane fixture did not exercise friendly fire: ${firing_lane_row}")
 endif()
+
+# The long Boss fixture must expose Robot damage after the room-entry grace,
+# while keeping the same scripted setup for both policies.
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 12345 --frames 900 --team
+    RESULT_VARIABLE long_boss_result
+    OUTPUT_VARIABLE long_boss_output
+    ERROR_VARIABLE long_boss_error)
+if(NOT long_boss_result EQUAL 0)
+    message(FATAL_ERROR "Long Boss fixture failed: ${long_boss_error}")
+endif()
+foreach(policy scripted neural)
+    string(REGEX MATCH "${policy},boss_helpers,12345,[^\n]*"
+        long_boss_row "${long_boss_output}")
+    string(REPLACE "," ";" long_boss_fields "${long_boss_row}")
+    list(GET long_boss_fields 9 long_player_damage)
+    list(GET long_boss_fields 26 first_hit_frame)
+    list(GET long_boss_fields 33 robot_player_damage)
+    list(GET long_boss_fields 34 helpers_player_damage)
+    if(first_hit_frame LESS 76 OR robot_player_damage LESS 1
+        OR NOT long_player_damage STREQUAL robot_player_damage
+        OR NOT helpers_player_damage STREQUAL "0.000")
+        message(FATAL_ERROR "Boss fixture did not exercise attributed post-grace Robot damage: ${long_boss_row}")
+    endif()
+endforeach()

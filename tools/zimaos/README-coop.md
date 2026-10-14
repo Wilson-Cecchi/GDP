@@ -1,5 +1,11 @@
 # Treino cooperativo isolado no ZimaOS
 
+Este documento descreve o serviço cooperativo original. O protocolo novo
+para as mecânicas da 0.1.6 está no
+[plano de 14/10](../../05_enemies/ai_training_plan_2026-10-14.md) e usa
+`compose.coop-new-mechanics.yaml` em diretório de dados próprio. Ele ainda
+não foi implantado no servidor.
+
 O serviço cooperativo usa `compose.coop.yaml` em `/DATA/AppData/gdp-coop-training`.
 Ele usa o código de jogo do commit `dcfbb0b66fd4240e156a8ad3d850700a959064d6`
 e os scripts de serviço deste diretório. `SOURCE_COMMIT` registra o commit e os
@@ -29,8 +35,8 @@ Para acompanhar:
 
 ```sh
 cd /DATA/AppData/gdp-coop-training
-docker compose ps
-docker compose logs --tail 20
+docker compose -f compose.coop.yaml ps
+docker compose -f compose.coop.yaml logs --tail 20
 cat data/status.json
 cat data/state.json
 ```
@@ -50,10 +56,10 @@ reinicialização automática. Então reative a política e inicie o antigo:
 ```sh
 cd /DATA/AppData/gdp-coop-training
 docker update --restart=no gdp-coop-training
-docker compose stop
+docker compose -f compose.coop.yaml stop
 cd /DATA/AppData/gdp-training
 docker update --restart=always gdp-training
-docker compose start
+docker compose -f compose.coop.yaml start
 ```
 
 O teste curto inicial do Guard e seus CSVs estão em `data/smoke/`. Ele confirmou

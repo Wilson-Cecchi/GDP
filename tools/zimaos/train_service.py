@@ -17,10 +17,12 @@ import subprocess
 import tempfile
 import time
 
-from training_evaluation import summarize, summarize_team, archive_candidate
+from training_evaluation import (summarize, summarize_team,
+                                 combine_new_mechanics, archive_candidate)
 
 ROLES = ("worker", "guard", "officer", "engineer", "robot")
 COOPERATIVE = os.environ.get("GDP_COOPERATIVE", "0") == "1"
+TRAIN_PROTOCOL = int(os.environ.get("GDP_TRAIN_PROTOCOL", "1"))
 DATA = Path(os.environ.get("GDP_DATA_DIR", "/data"))
 APP = Path(os.environ.get("GDP_APP_DIR", "/opt/gdp"))
 HWMON = Path(os.environ.get("GDP_HWMON_DIR", "/host-sys/class/hwmon"))
@@ -145,7 +147,7 @@ def population_metadata(path: Path, role: str, population: int) -> dict | None:
                 return None
             fields[key] = int(value)
         if (fields["archetype"] != ROLES.index(role) or fields["population"] != population
-                or fields["curriculum"] != 15
+                or fields["curriculum"] != (19 if COOPERATIVE and TRAIN_PROTOCOL == 2 else 15)
                 or fields["reward_rules"] != (6 if COOPERATIVE else 5)
                 or (COOPERATIVE and fields["contract"] != 3)
                 or not 0 < fields["generation"] < 2**32
@@ -186,6 +188,36 @@ def latest_population(directory: Path, role: str, population: int) -> Path | Non
 def evaluate_candidate(role: str, champion: Path, directory: Path, seeds: tuple[int, ...],
                        frames: int, source_commit: str, pause_c: float, resume_c: float,
                        label: str) -> dict | None:
+    if COOPERATIVE and TRAIN_PROTOCOL == 2:
+        for eval_seed in seeds:
+            for mode in ("maps", "duel", "team"):
+                for candidate in (False, True):
+                    if STOP:
+                        return None
+                    policy = "candidate" if candidate else "active"
+                    log = directory / f"{eval_seed}-{mode}-{policy}.csv"
+                    command = [str(APP / "gdp_ai_gameplay_eval"), "--brain-dir",
+                               str(APP / "assets/ai"), "--seed", str(eval_seed),
+                               "--frames", str(frames)]
+                    if mode != "maps":
+                        command.append(f"--{mode}")
+                    if candidate:
+                        command += ["--brain", f"{role}={champion}"]
+                    if run(command, log, role, "evaluation", pause_c, resume_c) != 0:
+                        if STOP:
+                            return None
+                        raise RuntimeError(f"{mode} evaluation failed for {role}")
+        solo = summarize(directory, role, seeds, frames, source_commit)
+        team = summarize_team(directory, role, seeds, frames, source_commit,
+                              protocol_version=2)
+        report = combine_new_mechanics(solo, team)
+        atomic_json(directory / "report.json", report)
+        improved = archive_candidate(report, champion, DATA, label)
+        event("candidate_evaluated", role=role, label=label,
+              generation=report["generation"], eligible=report["eligible"],
+              new_archived_best=improved, regressions=len(report["regressions"]),
+              score=report["score"])
+        return report
     if COOPERATIVE:
         for eval_seed in seeds:
             for candidate in (False, True):
@@ -316,16 +348,24 @@ def main() -> None:
         if not (0 < resume_c < pause_c < 100):
             raise ValueError("thermal thresholds must satisfy 0 < resume < pause < 100")
         source_commit = (APP / "SOURCE_COMMIT").read_text().strip()
+        if TRAIN_PROTOCOL not in (1, 2) or (TRAIN_PROTOCOL == 2 and not COOPERATIVE):
+            raise ValueError("GDP_TRAIN_PROTOCOL=2 requires cooperative training")
         train_roles = tuple(role.strip() for role in os.environ.get(
-            "GDP_TRAIN_ROLES", "worker,guard,officer,engineer" if COOPERATIVE
+            "GDP_TRAIN_ROLES", "worker,guard,officer,engineer,robot"
+            if COOPERATIVE and TRAIN_PROTOCOL == 2 else
+            "worker,guard,officer,engineer" if COOPERATIVE
             else ",".join(ROLES)).split(","))
         if (not train_roles or len(set(train_roles)) != len(train_roles)
                 or any(role not in ROLES for role in train_roles)
-                or (COOPERATIVE and "robot" in train_roles)):
-            raise ValueError("Invalid GDP_TRAIN_ROLES; cooperative team evaluation covers worker, guard, officer, engineer")
+                or (COOPERATIVE and TRAIN_PROTOCOL == 1 and "robot" in train_roles)):
+            raise ValueError("Invalid GDP_TRAIN_ROLES for the selected training protocol")
         wide_every = bounded_integer("GDP_WIDE_EVERY", 5, 1, 100)
         state_file = DATA / "state.json"
         state = json.loads(state_file.read_text()) if state_file.exists() else {}
+        if (TRAIN_PROTOCOL == 2 and state
+                and (state.get("protocol") != 2
+                     or state.get("source_commit") != source_commit)):
+            raise ValueError("Training protocol or source changed; use a separate data directory")
         if state.get("train_roles") and state["train_roles"] != list(train_roles):
             raise ValueError("Training role rotation changed; use a separate data directory")
         if state.get("cooperative") is not None and state["cooperative"] != COOPERATIVE:
@@ -341,7 +381,11 @@ def main() -> None:
             role_runs = DATA / "runs" / role
             role_runs.mkdir(parents=True, exist_ok=True)
             full_resume = latest_population(role_runs, role, population)
-            resume = None if full_resume else latest_checkpoint(role_runs, role)
+            resume = (None if full_resume or (COOPERATIVE and TRAIN_PROTOCOL == 2)
+                      else latest_checkpoint(role_runs, role))
+            if COOPERATIVE and TRAIN_PROTOCOL == 2 and not full_resume \
+                    and any(role_runs.rglob(f"{role}_generation_*.brain")):
+                raise RuntimeError("V2 requires a complete compatible population; no champion import")
             batch = Path(tempfile.mkdtemp(prefix="batch-", dir=role_runs))
             command = [str(APP / "gdp"), "--ai-training", role,
                        "--all-scenarios", "--diverse-maps", "--population", str(population),
@@ -372,17 +416,24 @@ def main() -> None:
                 raise RuntimeError(f"Training produced no valid checkpoint for {role}")
             evaluation_root = DATA / "evaluations" / role / batch.name
             evaluate_candidate(role, champion, evaluation_root / "quick",
-                               (9001, 9002) if COOPERATIVE else (7, 1001),
+                               (150001, 150011) if COOPERATIVE and TRAIN_PROTOCOL == 2
+                               else (9001, 9002) if COOPERATIVE else (7, 1001),
                                480 if COOPERATIVE else 360, source_commit,
                                pause_c, resume_c,
+                               "quick-coop-new-mechanics-v2"
+                               if COOPERATIVE and TRAIN_PROTOCOL == 2 else
                                "quick-coop-v1" if COOPERATIVE else "quick-v2")
             role_completed = int(completed.get(role, 0)) + 1
             if not STOP and (role_completed == 1 or role_completed % wide_every == 0):
                 # Development validation only. Final seeds are reserved for a separate run.
                 evaluate_candidate(role, champion, evaluation_root / "wide",
+                                   (150001, 150011, 150031, 150053)
+                                   if COOPERATIVE and TRAIN_PROTOCOL == 2 else
                                    (9001, 9002, 12011, 14009) if COOPERATIVE
                                    else (7, 1001, 2027, 4099),
                                    1200, source_commit, pause_c, resume_c,
+                                   "wide-coop-new-mechanics-v2"
+                                   if COOPERATIVE and TRAIN_PROTOCOL == 2 else
                                    "wide-coop-v1" if COOPERATIVE else "wide-v2")
             if STOP:
                 break
@@ -392,6 +443,7 @@ def main() -> None:
             atomic_json(state_file, {"next_role": next_role,
                                     "source_commit": source_commit, "completed": completed,
                                     "cooperative": COOPERATIVE,
+                                    "protocol": TRAIN_PROTOCOL,
                                     "train_roles": list(train_roles)})
         atomic_json(DATA / "status.json", {"state": "stopped"})
         event("service_stop")

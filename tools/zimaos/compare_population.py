@@ -25,6 +25,8 @@ def seed_copy(source, target, role, seed):
 
 
 def main():
+    if service.COOPERATIVE and service.TRAIN_PROTOCOL == 2:
+        raise SystemExit('population comparison imports an old champion and is unavailable for protocol 2')
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--role',choices=service.ROLES,default='guard')
     parser.add_argument('--brain',type=Path,required=True)

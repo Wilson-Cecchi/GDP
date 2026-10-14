@@ -597,6 +597,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | HUD/Sniper scoped view | V1 implementada em validação |
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |
 | Weapon/ground pickup | V2 modelos Used caídos implementada em validação; V1 substituída |
+| Grenade/first-person and thrown | Aparência e efeito da 0.1.6 parcialmente aprovados em 14/10/2026; revisão geral de texturas planejada para fase posterior, sem aprovação automática de nova versão |
 | Lighting/CeilingFixture | V1 HD aceita no jogo |
 
 ## Relação com os testes

@@ -59,10 +59,13 @@ struct WorkerFitnessMetrics {
     std::uint32_t coverEntries{0};
     std::uint32_t distanceSamples{0};
     std::uint32_t realMapEpisodes{0};
+    std::uint32_t largeRoomEpisodes{0};
     std::uint32_t corridorSpawns{0};
     std::uint32_t coverMapEpisodes{0};
     std::uint32_t peekMapEpisodes{0};
     std::uint32_t heightMapEpisodes{0};
+    std::uint32_t longMapEpisodes{0};
+    std::uint32_t bossHelperEpisodes{0};
     std::uint32_t fallbackAttacksLanded{0};
     std::uint32_t fallbackShotsFired{0};
     std::uint32_t playerEliminations{0};

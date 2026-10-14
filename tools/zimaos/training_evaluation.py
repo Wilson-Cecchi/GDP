@@ -10,6 +10,8 @@ HALF_HIT = {'worker': 5.0, 'guard': 4.0, 'officer': 3.0, 'engineer': 2.5, 'robot
 TEAM_PAIRS = {'firing_lane': ('guard', 'worker'),
               'officer_guard': ('officer', 'guard'),
               'engineer_guard': ('engineer', 'guard')}
+TEAM_PARTICIPANTS_V2 = {**TEAM_PAIRS,
+                        'boss_helpers': ('robot', 'officer', 'guard')}
 
 
 def atomic_json(path, value):
@@ -88,9 +90,12 @@ def summarize(directory, role, seeds, frames, source_revision):
             'eligible': not regressions and score > 1.0001}
 
 
-def summarize_team(directory, role, seeds, frames, source_revision):
+def summarize_team(directory, role, seeds, frames, source_revision, protocol_version=1):
     """Compare identical mixed-role fights and reject allied damage regressions."""
-    scenarios = {name for name, pair in TEAM_PAIRS.items() if role in pair}
+    if protocol_version not in (1, 2):
+        raise ValueError('unsupported team evaluation protocol')
+    participants = TEAM_PAIRS if protocol_version == 1 else TEAM_PARTICIPANTS_V2
+    scenarios = {name for name, pair in participants.items() if role in pair}
     if not scenarios:
         raise ValueError(f'No team evaluation fixture covers {role}')
     samples = {}
@@ -101,39 +106,70 @@ def summarize_team(directory, role, seeds, frames, source_revision):
             with path.open() as source:
                 rows = [row for row in csv.DictReader(source)
                         if row.get('policy') == 'neural']
-            if (len(rows) != len(TEAM_PAIRS)
-                    or {row.get('scenario') for row in rows} != set(TEAM_PAIRS)):
+            if (len(rows) != len(participants)
+                    or {row.get('scenario') for row in rows} != set(participants)):
                 raise ValueError(f'incomplete team report: {path}')
             for row in rows:
                 scenario = row['scenario']
                 if (int(row['seed']) != seed
-                        or (row['primary'], row['ally']) != TEAM_PAIRS[scenario]
+                        or (row['primary'], row['ally']) != participants[scenario][:2]
                         or not 1 <= int(row['elapsed_frames']) <= frames):
                     raise ValueError(f'invalid team fixture: {path}')
+                if protocol_version == 2:
+                    if (row.get('protocol') != '2'
+                            or row.get('third') != (participants[scenario][2]
+                                if len(participants[scenario]) == 3 else '')):
+                        raise ValueError(f'invalid team protocol or third role: {path}')
                 if scenario not in scenarios:
                     continue
-                generation = int(row['primary_generation'] if row['primary'] == role
-                                 else row['ally_generation'])
+                generation_key = ('primary_generation' if row['primary'] == role
+                                  else 'ally_generation' if row['ally'] == role
+                                  else 'third_generation')
+                generation = int(row[generation_key])
                 if policy == 'candidate':
                     generations.add(generation)
-                values = {key: float(row[key]) for key in
-                          ('player_damage', 'friendly_damage', 'friendly_hits',
-                           'friendly_kills')}
+                metric_keys = ['player_damage', 'friendly_damage', 'friendly_hits',
+                               'friendly_kills']
+                if protocol_version == 2:
+                    metric_keys += ['enemy_shots', 'enemy_hits', 'fire_holds',
+                                    'robot_player_damage', 'helpers_player_damage',
+                                    'enemies_alive', 'boss_health_remaining',
+                                    'first_player_hit_frame', 'boss_distance_initial',
+                                    'boss_distance_minimum', 'boss_distance_final',
+                                    'boss_long_range', 'boss_pressure', 'boss_pursuit']
+                values = {key: float(row[key]) for key in metric_keys}
                 if (not all(math.isfinite(v) and v >= 0 for v in values.values())
                         or any(values[key] != int(values[key]) for key in
-                               ('friendly_hits', 'friendly_kills'))):
+                               ('friendly_hits', 'friendly_kills'))
+                        or (protocol_version == 2 and
+                            (abs(values['robot_player_damage']
+                                 + values['helpers_player_damage']
+                                 - values['player_damage']) > 0.02
+                             or any(values[key] != int(values[key]) for key in
+                                    ('enemy_shots', 'enemy_hits', 'fire_holds',
+                                     'enemies_alive', 'first_player_hit_frame',
+                                     'boss_long_range', 'boss_pressure',
+                                     'boss_pursuit'))
+                             or values['first_player_hit_frame']
+                                > int(row['elapsed_frames'])))):
                     raise ValueError(f'invalid team metric: {path}')
                 samples[scenario, seed, policy] = values
     if len(generations) != 1 or next(iter(generations)) <= 0:
         raise ValueError('candidate generation changed during team evaluation')
     regressions = []
     summary = {}
+    per_scenario = {}
     for policy in ('active', 'candidate'):
         rows = [samples[scenario, seed, policy]
                 for scenario in sorted(scenarios) for seed in seeds]
         summary[policy] = {key: sum(row[key] for row in rows) / len(rows)
                            for key in rows[0]}
     for scenario in sorted(scenarios):
+        per_scenario[scenario] = {}
+        for policy in ('active', 'candidate'):
+            rows = [samples[scenario, seed, policy] for seed in seeds]
+            per_scenario[scenario][policy] = {
+                key: sum(row[key] for row in rows) / len(rows) for key in rows[0]}
         for seed in seeds:
             active = samples[scenario, seed, 'active']
             candidate = samples[scenario, seed, 'candidate']
@@ -153,14 +189,52 @@ def summarize_team(directory, role, seeds, frames, source_revision):
                                     'metric': 'friendly_kills',
                                     'active': active['friendly_kills'],
                                     'candidate': candidate['friendly_kills']})
+            if protocol_version == 2 and scenario == 'boss_helpers' and role == 'robot':
+                active_robot = active['robot_player_damage']
+                candidate_robot = candidate['robot_player_damage']
+                if candidate_robot < active_robot - max(HALF_HIT[role], active_robot * 0.10):
+                    regressions.append({'scenario': scenario, 'seed': seed,
+                                        'metric': 'robot_player_damage',
+                                        'active': active_robot,
+                                        'candidate': candidate_robot})
     score = ((summary['candidate']['player_damage'] + HALF_HIT[role])
              / (summary['active']['player_damage'] + HALF_HIT[role]))
+    if (protocol_version == 2 and role == 'robot'
+            and summary['candidate']['robot_player_damage'] == 0):
+        regressions.append({'scenario': 'boss_helpers', 'metric':
+                            'robot_player_damage_missing', 'active':
+                            summary['active']['robot_player_damage'],
+                            'candidate': 0})
     return {'protocol': {'seeds': list(seeds), 'frames': frames,
                          'source_revision': source_revision,
-                         'gate': 'paired-team-damage-friendly-v1'},
+                         'gate': f'paired-team-damage-friendly-v{protocol_version}'},
             'role': role, 'generation': generations.pop(),
-            'summary': summary, 'regressions': regressions,
+            'summary': summary, 'scenarios': per_scenario,
+            'regressions': regressions,
             'score': score, 'eligible': not regressions and score > 1.0001}
+
+
+def combine_new_mechanics(solo, team):
+    """Require complete paired solo and team evidence before archiving."""
+    for key in ('role', 'generation'):
+        if solo[key] != team[key]:
+            raise ValueError(f'candidate {key} changed across evaluation modes')
+    for key in ('seeds', 'frames', 'source_revision'):
+        if solo['protocol'][key] != team['protocol'][key]:
+            raise ValueError(f'evaluation {key} changed across modes')
+    if team['protocol']['gate'] != 'paired-team-damage-friendly-v2':
+        raise ValueError('new-mechanics evaluation needs the version 2 team fixture')
+    regressions = ([{'mode': 'solo', **row} for row in solo['regressions']]
+                   + [{'mode': 'team', **row} for row in team['regressions']])
+    score = (solo['score'] + team['score']) / 2.0
+    return {'protocol': {**{key: solo['protocol'][key]
+                            for key in ('seeds', 'frames', 'source_revision')},
+                         'gate': 'paired-solo-and-team-new-mechanics-v2'},
+            'role': solo['role'], 'generation': solo['generation'],
+            'summary': {'solo': solo['summary'], 'team': team['summary']},
+            'scenarios': {'solo': solo['scenarios'], 'team': team['scenarios']},
+            'regressions': regressions, 'score': score,
+            'eligible': not regressions and score > 1.0001}
 
 
 def archive_candidate(report, champion, data, label):

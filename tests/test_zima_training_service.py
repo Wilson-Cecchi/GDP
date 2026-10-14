@@ -61,6 +61,29 @@ class TrainingServiceTests(unittest.TestCase):
                     service.latest_population(root, 'guard', 2))
             self.assertIsNone(service.population_metadata(population, 'guard', 2))
 
+    def test_new_mechanics_population_rejects_old_curriculum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            population = root / 'robot_generation_000002.population'
+            population.mkdir()
+            for curriculum in (15, 19):
+                body = ('GDP_TRAINING_POPULATION 2\narchetype 4\nseed 42\n'
+                        'generation 2\npopulation 2\nreward_rules 6\ncontract 3\n'
+                        f'curriculum {curriculum}\nwarmup_start 1\n'
+                        'warmup_generations 2\n')
+                checksum = 14695981039346656037
+                for byte in body.encode():
+                    checksum = ((checksum ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+                (population / 'state.txt').write_text(body + f'checksum {checksum}\n')
+                for identity in range(2):
+                    write_brain(population / f'member-{identity:03d}.brain', 2,
+                                role='robot', identity=identity, cooperative=True)
+                with patch.object(service, 'COOPERATIVE', True), \
+                     patch.object(service, 'TRAIN_PROTOCOL', 2):
+                    self.assertEqual(curriculum == 19,
+                                     service.population_metadata(population, 'robot', 2)
+                                     is not None)
+
     def test_resume_uses_newest_valid_checkpoint(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
