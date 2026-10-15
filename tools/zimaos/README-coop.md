@@ -6,7 +6,9 @@ para as mecânicas da 0.1.6 está no
 `compose.coop-new-mechanics.yaml` em diretório de dados próprio. A primeira
 implantação parou após encontrar uma seed de mapa que o gerador não concluiu;
 o contêiner e os dados ficaram preservados. A configuração r2 usa outra
-revisão e outro diretório, conforme o plano.
+revisão e outro diretório, conforme o plano. O r2 está em treino contínuo no
+ZimaOS e inclui o Robot; seus primeiros lotes e a retomada estão documentados
+no plano. Ele não substitui os cérebros ativos do jogo automaticamente.
 
 O serviço cooperativo usa `compose.coop.yaml` em `/DATA/AppData/gdp-coop-training`.
 Ele usa o código de jogo do commit `dcfbb0b66fd4240e156a8ad3d850700a959064d6`

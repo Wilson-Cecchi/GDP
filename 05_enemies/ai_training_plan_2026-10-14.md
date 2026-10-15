@@ -58,10 +58,10 @@ por cada um dos quatro papéis.
    Easy/Normal/Hard, especialmente na sala Boss. A promoção de
    `assets/ai/*.brain` e a inclusão no Download exigem decisão separada.
 
-O novo arquivo `tools/zimaos/compose.coop-new-mechanics.yaml` tem
-`restart: "no"` para impedir início automático antes do corte. O serviço
-antigo e seus dados permanecem preservados. Nenhum release ou download muda
-durante esta preparação.
+O manifesto `tools/zimaos/compose.coop-new-mechanics.yaml` começou com
+`restart: "no"`. Após o piloto r2 e a retomada da população serem validados,
+o serviço r2 passou a `restart: always`; os serviços anteriores permanecem
+parados com `restart=no`. Nenhum release ou download mudou.
 
 ## Implantação e correção de 14/10
 
@@ -78,9 +78,33 @@ normais de geração do mapa não bastaram. O serviço foi parado com
 A correção limita a quatro sementes de mapa derivadas, com até 64 tentativas
 cada, somente no currículo cooperativo. A mesma seed do Guard reproduziu a
 falha antes da correção e concluiu dez gerações depois dela. Por mudar o
-currículo efetivo, a retomada usará nova revisão e novo diretório
+currículo efetivo, a revisão `ba4c0e1` começou no diretório novo
 `/DATA/AppData/gdp-coop-new-mechanics-r2`, sem reaproveitar a população do
-primeiro serviço. O manifesto Compose r2 usa contêiner e imagem próprios.
+primeiro serviço. A imagem r2 é
+`sha256:b02a93852ad57a66a2c6527e034318a9a556570f4d8aa726b8f7f8b4f25d8ea1`.
+O teste C++ passou dentro da imagem; o avaliador r2 produziu dano separado do
+Robot no encontro Boss. A suíte Release local teve 66/66 testes, os testes
+Python 15/15 e a CI da revisão `ba4c0e1` ficou verde.
+
+No serviço r2, Worker e Guard concluíram 70 gerações cada, com população
+completa e avaliações rápida/ampla. O Worker teve score 1,009 na rápida, mas
+regrediu em `group`; a ampla não o aprovou. O Guard teve score 0,588 na rápida
+com 19 regressões e score 0,594 na ampla com 30 regressões. Nenhum desses
+candidatos foi arquivado como elegível. Uma parada controlada durante o lote
+do Officer e a retomada a partir da população da geração 31 foram confirmadas:
+o novo processo começou na geração 32, com healthcheck saudável. Depois disso,
+o reinício automático foi habilitado para o contêiner r2. O treino contínuo
+segue nos cinco papéis; avaliação final e playtest ainda não ocorreram.
+
+Para acompanhar o serviço r2:
+
+```sh
+cd /DATA/AppData/gdp-coop-new-mechanics-r2
+docker compose -f compose.coop-new-mechanics.yaml ps
+docker compose -f compose.coop-new-mechanics.yaml logs --tail 20
+cat data/status.json
+cat data/state.json
+```
 
 ## Evidência local desta preparação
 
@@ -97,7 +121,7 @@ primeiro serviço. O manifesto Compose r2 usa contêiner e imagem próprios.
   150001/150011, 480 frames: score solo 0,873, equipe 1,231 e três regressões
   individuais (`boss_cover` nas duas seeds e `ground_strafe` em uma). O piloto
   mostra execução e discriminação do gate, não qualidade suficiente para
-  implantação. O treino longo, a bateria ampla, as seeds finais e o playtest
+  implantação. O treino longo agora roda no r2; as seeds finais e o playtest
   continuam pendentes.
 - Os SHA-256 dos cinco cérebros ativos são os mesmos registrados na
   [avaliação de 13/10](ai_evaluation_2026-10-13.md). O ZimaOS respondeu após
