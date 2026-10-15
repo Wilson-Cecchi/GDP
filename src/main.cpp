@@ -31,7 +31,8 @@ void printUsage(const std::string_view executable)
               << "       " << executable
               << " --ai-training TYPE [--population N] [--generations N]"
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
-                 " [--diverse-maps] [--curriculum-generations N]"
+                 " [--diverse-maps] [--hard-case-curriculum]"
+                 " [--curriculum-generations N]"
                  " [--cooperative-brain]"
                  " [--save-dir DIR] [--resume FILE | --resume-population DIR]\n"
               << "  --headless           Run without creating a window or OpenGL context.\n"
@@ -55,6 +56,7 @@ void printUsage(const std::string_view executable)
               << "  --resume FILE       Seed a new training run from a checkpoint.\n"
               << "  --resume-population DIR  Continue an entire saved population exactly.\n"
               << "  --diverse-maps      Train varied cover, peek, height and boss-phase encounters.\n"
+              << "  --hard-case-curriculum  Pilot extra cooperative cover and team encounters.\n"
               << "  --cooperative-brain  Train a versioned brain with ally and firing-lane inputs.\n"
               << "  --curriculum-generations N  Initial curriculum length, preserved on full resume.\n"
               << "  --help               Show this message.\n"
@@ -251,9 +253,11 @@ int main(const int argc, char* argv[])
             continue;
         }
 
-        if (argument == "--all-scenarios" || argument == "--diverse-maps") {
+        if (argument == "--all-scenarios" || argument == "--diverse-maps"
+            || argument == "--hard-case-curriculum") {
             if (argument == "--all-scenarios") trainingOptions.trainAllScenarios = true;
-            else trainingOptions.diverseMaps = true;
+            else if (argument == "--diverse-maps") trainingOptions.diverseMaps = true;
+            else trainingOptions.hardCaseCurriculum = true;
             trainingOnlyArgumentSeen = true;
             continue;
         }

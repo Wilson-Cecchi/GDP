@@ -385,6 +385,111 @@ void testCooperativeTraining()
     fs::remove_all(root);
 }
 
+void testHardCaseCurriculum()
+{
+    namespace fs = std::filesystem;
+    using namespace gdp::game::ai;
+    const fs::path root = fs::temp_directory_path()
+        / ("gdp_hard_case_training_test_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code error;
+    if (!fs::create_directory(root, error) || error) {
+        expect(false, "hard-case test owns a unique output directory");
+        return;
+    }
+    WorkerTrainingOptions options{
+        .archetype = gdp::entities::EnemyArchetype::Guard,
+        .seed = 20261014U,
+        .seedExplicit = true,
+        .trainAllScenarios = true,
+        .diverseMaps = true,
+        .hardCaseCurriculum = true,
+        .brainContract = gdp::gameplay::EnemyBrainContract::Cooperative,
+        .curriculumGenerations = 1U,
+        .population = 2U,
+        .generations = 2U,
+        .saveDirectory = root / "continuous",
+        .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
+    };
+    std::ostringstream continuousLog;
+    const auto continuous = runEnemyTraining(options, continuousLog);
+    expect(continuous.succeeded && continuous.lastPopulation
+            && continuousLog.str().find("curriculum=20") != std::string::npos
+            && reportedMetric(continuousLog.str(), "hard_case_episodes=") == 2.0F
+            && reportedMetric(continuousLog.str(), "hard_case_group_episodes=")
+                == 2.0F
+            && reportedMetric(continuousLog.str(), "hard_case_player_jumps=")
+                > 0.0F,
+        "opt-in Guard pilot exercises two additional cover/group fixtures");
+    if (continuous.lastPopulation) {
+        const auto saved = loadTrainingPopulation(*continuous.lastPopulation);
+        expect(saved && saved->curriculum == 20U,
+            "hard-case population stores a distinct curriculum ID");
+        if (saved) {
+            auto legacy = *saved;
+            legacy.curriculum = 19U;
+            const fs::path legacyPath = root / "legacy.population";
+            expect(saveTrainingPopulation(legacyPath, legacy),
+                "curriculum 19 compatibility fixture saves");
+            WorkerTrainingOptions incompatible = options;
+            incompatible.generations = 1U;
+            incompatible.resumePopulation = legacyPath;
+            incompatible.saveDirectory.reset();
+            std::ostringstream incompatibleLog;
+            expect(!runEnemyTraining(incompatible, incompatibleLog).succeeded,
+                "curriculum 20 cannot resume a curriculum 19 population");
+        }
+    }
+    WorkerTrainingOptions split = options;
+    split.generations = 1U;
+    split.saveDirectory = root / "split";
+    std::ostringstream firstLog;
+    const auto first = runEnemyTraining(split, firstLog);
+    expect(first.succeeded && first.lastPopulation,
+        "hard-case pilot creates a resumable first generation");
+    if (first.lastPopulation) {
+        split.resumePopulation = first.lastPopulation;
+        split.saveDirectory = root / "resumed";
+        std::ostringstream resumedLog;
+        const auto resumed = runEnemyTraining(split, resumedLog);
+        expect(resumed.succeeded && continuous.succeeded
+                && resumed.lastGeneration == 2U
+                && resumed.finalBest == continuous.finalBest
+                && resumed.holdoutFitness == continuous.holdoutFitness
+                && resumed.champion && continuous.champion
+                && std::equal(resumed.champion->network.parameters().begin(),
+                    resumed.champion->network.parameters().end(),
+                    continuous.champion->network.parameters().begin()),
+            "hard-case split run exactly reproduces uninterrupted champion");
+        split.hardCaseCurriculum = false;
+        split.saveDirectory.reset();
+        std::ostringstream incompatibleLog;
+        expect(!runEnemyTraining(split, incompatibleLog).succeeded,
+            "curriculum 19 cannot resume a curriculum 20 population");
+    }
+    options.generations = 1U;
+    options.archetype = gdp::entities::EnemyArchetype::IndustrialRobot;
+    options.saveDirectory.reset();
+    std::ostringstream robotLog;
+    const auto robot = runEnemyTraining(options, robotLog);
+    expect(robot.succeeded && robotLog.str().find("curriculum=20")
+            != std::string::npos
+            && reportedMetric(robotLog.str(), "hard_case_episodes=") == 2.0F
+            && reportedMetric(robotLog.str(), "hard_case_player_jumps=") > 0.0F
+            && reportedMetric(robotLog.str(), "hard_case_cover_map_episodes=")
+                > 0.0F
+            && reportedMetric(robotLog.str(), "hard_case_boss_helper_episodes=")
+                > 0.0F,
+        "Robot pilot exercises Bhop with cover and Boss helpers");
+    options.archetype = gdp::entities::EnemyArchetype::Worker;
+    std::ostringstream invalidLog;
+    expect(!runEnemyTraining(options, invalidLog).succeeded,
+        "hard-case pilot is limited to Guard and Robot");
+    fs::remove_all(root, error);
+    expect(!error, "hard-case temporary checkpoints are cleaned up");
+}
+
 void testTrainingAndPersistence()
 {
     namespace fs = std::filesystem;
@@ -820,6 +925,7 @@ int main()
 {
     testFitness();
     testCooperativeTraining();
+    testHardCaseCurriculum();
     testTrainingAndPersistence();
     testOtherArchetypes();
     testFullPopulationAndEncounters();

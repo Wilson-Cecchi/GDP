@@ -35,6 +35,7 @@ constexpr std::uint64_t initialBrainDomain = 0x4149425241494E01ULL;
 constexpr std::uint64_t evolutionDomain = 0x414945564F4C5645ULL;
 constexpr std::uint64_t trainingScenarioDomain = 0x41495343454E4554ULL;
 constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
+constexpr std::uint64_t hardCaseScenarioDomain = 0x4149484152444331ULL;
 constexpr std::uint64_t cooperativeWorldRetryDomain = 0x4149574F524C4432ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
@@ -403,12 +404,22 @@ WorkerFitnessMetrics simulateEpisode(
     const unsigned mapVariant = 0U,
     const unsigned bossPhase = 0U,
     const gameplay::EnemyBrainContract contract
-        = gameplay::EnemyBrainContract::Tactical)
+        = gameplay::EnemyBrainContract::Tactical,
+    const bool hardCase = false)
 {
     const TrainingProfile profile = profileFor(archetype, contract);
     const bool cooperative = contract == gameplay::EnemyBrainContract::Cooperative;
     const TrainingStage stage = static_cast<TrainingStage>(scenario + 1U);
     TrainingScenario plan = scenarioFor(archetype, scenario);
+    if (hardCase && archetype == EnemyArchetype::Guard
+        && stage == TrainingStage::Positioning) {
+        plan.player = PlayerPattern::Peek;
+    }
+    if (hardCase && archetype == EnemyArchetype::IndustrialRobot
+        && stage == TrainingStage::Dodge) {
+        plan.player = PlayerPattern::Bhop;
+        plan.initialHealthRatio = 1.0F;
+    }
     if (diverseMaps && stage == TrainingStage::RealMaps
         && archetype == EnemyArchetype::IndustrialRobot) {
         plan.initialHealthRatio = bossPhase == 0U ? 1.0F : bossPhase == 1U ? 0.58F : 0.28F;
@@ -440,7 +451,9 @@ WorkerFitnessMetrics simulateEpisode(
             ? std::vector<wkc::core::Aabb>{{{-0.75F, 0.0F, 1.4F},
                 {0.75F, 0.75F, 2.3F}}}
         : stage == TrainingStage::Dodge
-            ? std::vector<wkc::core::Aabb>{}
+            ? hardCase && archetype == EnemyArchetype::IndustrialRobot
+                ? coverFor(CoverPattern::Center)
+                : std::vector<wkc::core::Aabb>{}
         : stage == TrainingStage::Aim
             ? coverFor(CoverPattern::Right) : coverFor(plan.cover);
     gameplay::CollisionWorld arena{
@@ -526,6 +539,10 @@ WorkerFitnessMetrics simulateEpisode(
         arenaOrigin = encounter->player;
         enemyStart = encounter->enemy;
         plan.player = encounter->peekWidth > 0.0F ? PlayerPattern::Peek : PlayerPattern::Sweep;
+    }
+    if (hardCase && stage == TrainingStage::RealMaps
+        && archetype == EnemyArchetype::Guard) {
+        plan.player = PlayerPattern::Bhop;
     }
     if (generatedWorld && !encounter) {
         for (const world::CorridorPath& corridor : generatedWorld->corridors) {
@@ -1030,6 +1047,14 @@ struct WorkerEvaluation {
     std::array<std::uint32_t, scenarioCount> stageDodges{};
     std::array<std::uint32_t, scenarioCount> stageDodgeOpportunities{};
     std::uint32_t combatEpisodesWithHit{0U};
+    std::uint32_t hardCaseEpisodes{0U};
+    std::uint32_t hardCaseHitEpisodes{0U};
+    std::uint32_t hardCasePlayerJumps{0U};
+    std::uint32_t hardCaseGroupEpisodes{0U};
+    std::uint32_t hardCaseCoverMapEpisodes{0U};
+    std::uint32_t hardCaseBossHelperEpisodes{0U};
+    float hardCaseScore{0.0F};
+    float hardCaseFriendlyDamage{0.0F};
     bool combatCompetent{true};
 };
 
@@ -1125,7 +1150,8 @@ WorkerEvaluation evaluateGenome(
     const std::size_t unlockedStages = scenarioCount,
     const bool diverseMaps = false,
     const gameplay::EnemyBrainContract contract
-        = gameplay::EnemyBrainContract::Tactical)
+        = gameplay::EnemyBrainContract::Tactical,
+    const bool hardCaseCurriculum = false)
 {
     WorkerEvaluation evaluation;
     float worst = std::numeric_limits<float>::infinity();
@@ -1171,6 +1197,53 @@ WorkerEvaluation evaluateGenome(
         * (evaluation.score
             / static_cast<float>(count * repetitions))
         + 0.25F * worst;
+    if (hardCaseCurriculum && !holdout) {
+        // Development fixtures use a separate seed domain. The final paired
+        // evaluator seeds never enter training, and the standard holdout stays
+        // comparable with curriculum 19.
+        const std::array<std::size_t, 2> stressScenarios
+            = archetype == EnemyArchetype::IndustrialRobot
+                ? std::array<std::size_t, 2>{3U, 6U}
+                : std::array<std::size_t, 2>{5U, 6U};
+        float hardCaseWorst = std::numeric_limits<float>::infinity();
+        for (const std::size_t scenario : stressScenarios) {
+            if (scenario >= count) continue;
+            const WorkerFitnessMetrics metrics = simulateEpisode(genome,
+                wkc::core::deriveSeed(scenarioSeed, hardCaseScenarioDomain,
+                    scenario), scenario, archetype, diverseMaps,
+                archetype == EnemyArchetype::IndustrialRobot ? 1U : 5U,
+                0U, contract, true);
+            const TrainingStage scoreStage
+                = archetype == EnemyArchetype::IndustrialRobot && scenario == 3U
+                    ? TrainingStage::Duel
+                    : static_cast<TrainingStage>(scenario + 1U);
+            const float score = scoreCooperativeTrainingStage(metrics,
+                archetype, scoreStage);
+            evaluation.hardCaseScore += score;
+            hardCaseWorst = std::min(hardCaseWorst, score);
+            ++evaluation.hardCaseEpisodes;
+            evaluation.hardCaseHitEpisodes += metrics.attacksLanded > 0U;
+            evaluation.hardCasePlayerJumps += metrics.playerJumps;
+            evaluation.hardCaseGroupEpisodes += metrics.groupEpisodes;
+            evaluation.hardCaseCoverMapEpisodes += metrics.coverMapEpisodes;
+            evaluation.hardCaseBossHelperEpisodes += metrics.bossHelperEpisodes;
+            evaluation.hardCaseFriendlyDamage += metrics.friendlyDamage;
+            addMetrics(evaluation.metrics, metrics);
+        }
+        if (evaluation.hardCaseEpisodes > 0U) {
+            evaluation.hardCaseScore = 0.75F
+                * (evaluation.hardCaseScore
+                    / static_cast<float>(evaluation.hardCaseEpisodes))
+                + 0.25F * hardCaseWorst;
+            if (count == scenarioCount && evaluation.hardCaseHitEpisodes == 0U) {
+                evaluation.hardCaseScore
+                    = std::min(evaluation.hardCaseScore, -2.0F);
+            }
+            evaluation.score = 0.75F * evaluation.score
+                + 0.25F * evaluation.hardCaseScore;
+            evaluation.worstScenario = std::min(worst, hardCaseWorst);
+        }
+    }
     // A melee attacker or Engineer that never participates in a representative
     // share of the combat stages must not beat a risky but useful policy by
     // merely avoiding the terminal death penalty. Early curriculum stages
@@ -1347,6 +1420,15 @@ WorkerTrainingResult runEnemyTraining(
             "and cooldown 0..10000 ms";
         return result;
     }
+    if (options.hardCaseCurriculum
+        && (options.brainContract != gameplay::EnemyBrainContract::Cooperative
+            || !options.trainAllScenarios || !options.diverseMaps
+            || (options.archetype != EnemyArchetype::Guard
+                && options.archetype != EnemyArchetype::IndustrialRobot))) {
+        result.error = "hard-case curriculum requires cooperative Guard or Robot, "
+            "--all-scenarios and --diverse-maps";
+        return result;
+    }
     try {
         wkc::core::Seed seed = options.seed;
         std::optional<persistence::EnemyBrainRecord> resume;
@@ -1354,13 +1436,14 @@ WorkerTrainingResult runEnemyTraining(
         std::uint32_t firstGeneration = 1U;
         const bool cooperative
             = options.brainContract == gameplay::EnemyBrainContract::Cooperative;
-        const std::uint32_t curriculum = cooperative
-            ? (options.diverseMaps
-                ? (options.trainAllScenarios ? 19U : 18U)
-                : (options.trainAllScenarios ? 17U : 16U))
-            : options.diverseMaps
-                ? (options.trainAllScenarios ? 15U : 14U)
-                : (options.trainAllScenarios ? 13U : 12U);
+        const std::uint32_t curriculum = options.hardCaseCurriculum ? 20U
+            : cooperative
+                ? (options.diverseMaps
+                    ? (options.trainAllScenarios ? 19U : 18U)
+                    : (options.trainAllScenarios ? 17U : 16U))
+                : options.diverseMaps
+                    ? (options.trainAllScenarios ? 15U : 14U)
+                    : (options.trainAllScenarios ? 13U : 12U);
         std::uint32_t warmupStart = 1U;
         std::uint32_t warmupGenerations = options.curriculumGenerations > 0U
             ? options.curriculumGenerations : options.generations;
@@ -1468,6 +1551,7 @@ WorkerTrainingResult runEnemyTraining(
                     == gameplay::EnemyBrainContract::Cooperative ? 6 : 5)
                << " brain_contract=" << static_cast<unsigned>(options.brainContract)
                << " curriculum=" << curriculum
+               << " hard_case_curriculum=" << options.hardCaseCurriculum
                << " resume_population=" << static_cast<bool>(fullResume)
                << " stage_immigrants=2"
                << " runtime_control_all=1"
@@ -1521,7 +1605,8 @@ WorkerTrainingResult runEnemyTraining(
                 genome.fitness = evaluateGenome(
                     genome, generationScenarios, options.archetype,
                     false, options.trainAllScenarios, unlockedStages,
-                    options.diverseMaps, options.brainContract).score;
+                    options.diverseMaps, options.brainContract,
+                    options.hardCaseCurriculum).score;
                 total += genome.fitness;
             }
             std::sort(population.begin(), population.end(),
@@ -1539,7 +1624,8 @@ WorkerTrainingResult runEnemyTraining(
             const WorkerEvaluation bestEvaluation
                 = evaluateGenome(*result.champion, generationScenarios,
                     options.archetype, false, options.trainAllScenarios, scenarioCount,
-                    options.diverseMaps, options.brainContract);
+                    options.diverseMaps, options.brainContract,
+                    options.hardCaseCurriculum);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
                    << " scenario_seed=" << generationScenarios
@@ -1614,6 +1700,20 @@ WorkerTrainingResult runEnemyTraining(
                        << " friendly_fire_holds="
                        << bestMetrics.friendlyFireHolds;
             }
+            output << " hard_case_episodes=" << bestEvaluation.hardCaseEpisodes
+                   << " hard_case_hit_episodes="
+                   << bestEvaluation.hardCaseHitEpisodes
+                   << " hard_case_player_jumps="
+                   << bestEvaluation.hardCasePlayerJumps
+                   << " hard_case_group_episodes="
+                   << bestEvaluation.hardCaseGroupEpisodes
+                   << " hard_case_cover_map_episodes="
+                   << bestEvaluation.hardCaseCoverMapEpisodes
+                   << " hard_case_boss_helper_episodes="
+                   << bestEvaluation.hardCaseBossHelperEpisodes
+                   << " hard_case_score=" << bestEvaluation.hardCaseScore
+                   << " hard_case_friendly_damage="
+                   << bestEvaluation.hardCaseFriendlyDamage;
             output << '\n';
             if (options.saveDirectory) {
                 const std::filesystem::path path

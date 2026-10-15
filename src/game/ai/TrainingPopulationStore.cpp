@@ -59,7 +59,9 @@ std::optional<TrainingPopulationRecord> loadTrainingPopulation(
             record.contract = gameplay::EnemyBrainContract::Cooperative;
         }
         if (!(input >> key >> record.curriculum) || key != "curriculum"
-                || record.curriculum < 12 || record.curriculum > 19
+                || record.curriculum < 12 || record.curriculum > 20
+                || (record.curriculum == 20
+                    && record.contract != gameplay::EnemyBrainContract::Cooperative)
             || !(input >> key >> record.warmupStart) || key != "warmup_start"
                 || record.warmupStart == 0 || record.warmupStart > record.generation
             || !(input >> key >> record.warmupGenerations) || key != "warmup_generations"
