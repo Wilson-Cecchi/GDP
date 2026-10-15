@@ -115,6 +115,7 @@ struct WorkerTrainingOptions {
     bool trainAllScenarios{false};
     bool diverseMaps{false};
     bool hardCaseCurriculum{false}; // Isolated cooperative Guard/Robot pilot.
+    bool hardCaseCurriculumV2{false}; // Revised, incompatible pilot.
     gameplay::EnemyBrainContract brainContract{
         gameplay::EnemyBrainContract::Tactical};
     std::uint32_t curriculumGenerations{0U}; // Zero uses first run length.

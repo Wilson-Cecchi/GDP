@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -37,6 +38,38 @@ float reportedMetric(const std::string& output, const std::string_view key)
     float value = -1.0F;
     input >> value;
     return value;
+}
+
+bool observedCleanHardCaseHit(const std::string& output)
+{
+    std::istringstream input{output};
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.starts_with("AI_GENERATION")
+            && reportedMetric(line, "hard_case_hit_episodes=") > 0.0F
+            && reportedMetric(line, "hard_case_damage=") > 0.0F
+            && reportedMetric(line, "hard_case_friendly_damage=") == 0.0F) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool observedDistinctMissScores(const std::string& output)
+{
+    std::istringstream input{output};
+    std::string line;
+    std::optional<float> firstScore;
+    while (std::getline(input, line)) {
+        if (!line.starts_with("AI_GENERATION")
+            || reportedMetric(line, "hard_case_hit_episodes=") != 0.0F) {
+            continue;
+        }
+        const float score = reportedMetric(line, "hard_case_score=");
+        if (firstScore && score != *firstScore) return true;
+        firstScore = score;
+    }
+    return false;
 }
 
 void testFitness()
@@ -490,6 +523,111 @@ void testHardCaseCurriculum()
     expect(!error, "hard-case temporary checkpoints are cleaned up");
 }
 
+void testHardCaseCurriculumV2()
+{
+    namespace fs = std::filesystem;
+    using namespace gdp::game::ai;
+    const fs::path root = fs::temp_directory_path()
+        / ("gdp_hard_case_v2_test_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code error;
+    if (!fs::create_directory(root, error) || error) {
+        expect(false, "v21 test owns a unique output directory");
+        return;
+    }
+    WorkerTrainingOptions options{
+        .archetype = gdp::entities::EnemyArchetype::Guard,
+        .seed = 20261014U,
+        .seedExplicit = true,
+        .trainAllScenarios = true,
+        .diverseMaps = true,
+        .hardCaseCurriculumV2 = true,
+        .brainContract = gdp::gameplay::EnemyBrainContract::Cooperative,
+        .curriculumGenerations = 1U,
+        .population = 8U,
+        .generations = 2U,
+        .saveDirectory = root / "continuous",
+        .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
+    };
+    std::ostringstream continuousLog;
+    const auto continuous = runEnemyTraining(options, continuousLog);
+    expect(continuous.succeeded && continuous.lastPopulation
+            && continuousLog.str().find("curriculum=21") != std::string::npos
+            && observedCleanHardCaseHit(continuousLog.str())
+            && reportedMetric(continuousLog.str(), "hard_case_group_episodes=")
+                == 2.0F,
+        "v21 Guard fixture allows a neural hit with no allied damage");
+    if (continuous.lastPopulation) {
+        const auto saved = loadTrainingPopulation(*continuous.lastPopulation);
+        expect(saved && saved->curriculum == 21U,
+            "v21 population carries an incompatible curriculum ID");
+        if (saved) for (const std::uint32_t olderId : {19U, 20U}) {
+            auto older = *saved;
+            older.curriculum = olderId;
+            const fs::path olderPath = root
+                / ("curriculum_" + std::to_string(olderId) + ".population");
+            expect(saveTrainingPopulation(olderPath, older),
+                "older curriculum compatibility fixture saves");
+            WorkerTrainingOptions incompatible = options;
+            incompatible.generations = 1U;
+            incompatible.resumePopulation = olderPath;
+            incompatible.saveDirectory.reset();
+            std::ostringstream incompatibleLog;
+            expect(!runEnemyTraining(incompatible, incompatibleLog).succeeded,
+                "v21 refuses curriculum 19 and 20 populations");
+        }
+    }
+    WorkerTrainingOptions split = options;
+    split.generations = 1U;
+    split.saveDirectory = root / "split";
+    std::ostringstream firstLog;
+    const auto first = runEnemyTraining(split, firstLog);
+    expect(first.succeeded && first.lastPopulation,
+        "v21 saves a full first-generation population");
+    if (first.lastPopulation) {
+        split.resumePopulation = first.lastPopulation;
+        split.saveDirectory = root / "resumed";
+        std::ostringstream resumedLog;
+        const auto resumed = runEnemyTraining(split, resumedLog);
+        expect(resumed.succeeded && continuous.succeeded
+                && resumed.lastGeneration == 2U
+                && resumed.finalBest == continuous.finalBest
+                && resumed.holdoutFitness == continuous.holdoutFitness
+                && resumed.champion && continuous.champion
+                && std::equal(resumed.champion->network.parameters().begin(),
+                    resumed.champion->network.parameters().end(),
+                    continuous.champion->network.parameters().begin()),
+            "v21 split resume reproduces the uninterrupted champion");
+        split.hardCaseCurriculumV2 = false;
+        split.saveDirectory.reset();
+        std::ostringstream incompatibleLog;
+        expect(!runEnemyTraining(split, incompatibleLog).succeeded,
+            "curriculum 19 refuses a v21 population");
+        split.hardCaseCurriculum = true;
+        expect(!runEnemyTraining(split, incompatibleLog).succeeded,
+            "curriculum 20 refuses a v21 population");
+    }
+    options.saveDirectory.reset();
+    options.generations = 6U;
+    options.curriculumGenerations = 3U;
+    options.archetype = gdp::entities::EnemyArchetype::IndustrialRobot;
+    std::ostringstream robotLog;
+    const auto robot = runEnemyTraining(options, robotLog);
+    expect(robot.succeeded && observedCleanHardCaseHit(robotLog.str())
+            && observedDistinctMissScores(robotLog.str())
+            && reportedMetric(robotLog.str(), "hard_case_boss_helper_episodes=")
+                == 2.0F
+            && reportedMetric(robotLog.str(), "hard_case_player_jumps=") > 0.0F,
+        "v21 Robot has feasible Boss/Bhop fixtures and graded misses");
+    options.hardCaseCurriculum = true;
+    std::ostringstream invalidLog;
+    expect(!runEnemyTraining(options, invalidLog).succeeded,
+        "v20 and v21 cannot be selected together");
+    fs::remove_all(root, error);
+    expect(!error, "v21 temporary checkpoints are cleaned up");
+}
+
 void testTrainingAndPersistence()
 {
     namespace fs = std::filesystem;
@@ -926,6 +1064,7 @@ int main()
     testFitness();
     testCooperativeTraining();
     testHardCaseCurriculum();
+    testHardCaseCurriculumV2();
     testTrainingAndPersistence();
     testOtherArchetypes();
     testFullPopulationAndEncounters();
