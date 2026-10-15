@@ -96,6 +96,26 @@ o novo processo começou na geração 32, com healthcheck saudável. Depois diss
 o reinício automático foi habilitado para o contêiner r2. O treino contínuo
 segue nos cinco papéis; avaliação final e playtest ainda não ocorreram.
 
+O primeiro ciclo completo terminou e voltou ao Worker na geração 71 por
+`resume_population=1`. Todos os cinco papéis produziram população e relatório
+do protocolo 2. Os scores abaixo são relativos ao cérebro ativo da 0.1.6;
+qualquer regressão por cenário bloqueia elegibilidade.
+
+| Papel | Geração | Rápida: score / regressões | Ampla: score / regressões |
+| --- | ---: | ---: | ---: |
+| Worker | 70 | 1,009 / 1 | 1,000 / 0 |
+| Guard | 70 | 0,588 / 19 | 0,594 / 30 |
+| Officer | 101 | 1,049 / 2 | 1,014 / 5 |
+| Engineer | 70 | 0,699 / 9 | 0,577 / 21 |
+| Robot | 70 | 1,314 / 2 | 1,048 / 2 |
+
+Nenhum dos cinco foi elegível nessa rodada. No Robot, `center_cover` e `bhop`
+regrediram na rápida, apesar do score médio maior. O treino registrou mapas
+longos, dois ajudantes, pressão e perseguição do Boss. O contêiner r2 estava
+saudável a 49 °C, com 397 GiB livres em `/DATA`; sua imagem e revisão seguem
+as registradas acima. Os hashes dos cinco `assets/ai/*.brain` continuam iguais
+aos da avaliação de 13/10.
+
 Para acompanhar o serviço r2:
 
 ```sh
