@@ -153,3 +153,13 @@ cat data/state.json
   `worker_training_systems` excedeu o timeout de 600 s nessa configuração.
   A suíte Release completa passou. Este timeout não demonstra falha de
   memória, mas limita a evidência do teste instrumentado.
+
+## Auditoria de checkpoints e piloto de currículo
+
+A [auditoria e os A/B de 14–15/10](ai_training_improvements_2026-10-14.md)
+compararam checkpoints intermediários de Guard e Robot e testaram currículos
+20 e 21 isolados em duas seeds de treino por papel. O currículo 21 gerou um
+Robot elegível na bateria rápida, mas ele reprovou na ampla por uma regressão
+em `boss_cover`; nenhum candidato foi adotado no serviço contínuo. O r2 foi
+retomado com população completa após cada piloto. Seus dados, os cérebros
+ativos e o Download seguem preservados.

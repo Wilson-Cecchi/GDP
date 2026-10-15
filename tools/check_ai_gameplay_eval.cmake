@@ -1,6 +1,7 @@
 if(NOT DEFINED GDP_AI_EVAL OR NOT DEFINED GDP_BRAIN_DIR)
     message(FATAL_ERROR "GDP_AI_EVAL and GDP_BRAIN_DIR are required")
 endif()
+cmake_policy(SET CMP0007 NEW) # Preserve the empty third-role field in CSV lists.
 
 execute_process(
     COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
@@ -156,6 +157,52 @@ list(LENGTH team_rows team_row_count)
 if(NOT team_row_count EQUAL 8)
     message(FATAL_ERROR "Expected 8 mixed-team rows, got ${team_row_count}")
 endif()
+string(REGEX MATCH "^[^\n]*" team_header "${first_team_output}")
+string(REPLACE "," ";" team_header_fields "${team_header}")
+list(LENGTH team_header_fields team_header_count)
+if(NOT team_header_count EQUAL 44)
+    message(FATAL_ERROR "Expected 35 original and 9 role columns, got ${team_header_count}")
+endif()
+set(role_columns primary_shots ally_shots third_shots
+    primary_player_hits ally_player_hits third_player_hits
+    primary_fire_holds ally_fire_holds third_fire_holds)
+foreach(index RANGE 35 43)
+    math(EXPR role_index "${index} - 35")
+    list(GET team_header_fields ${index} actual_column)
+    list(GET role_columns ${role_index} expected_column)
+    if(NOT actual_column STREQUAL expected_column)
+        message(FATAL_ERROR "Team role column ${index} is ${actual_column}, expected ${expected_column}")
+    endif()
+endforeach()
+string(REGEX MATCHALL "(scripted|neural),[^\n]*" attributed_rows
+    "${first_team_output}")
+foreach(row IN LISTS attributed_rows)
+    string(REPLACE "," ";" fields "${row}")
+    list(LENGTH fields field_count)
+    if(NOT field_count EQUAL 44)
+        message(FATAL_ERROR "Team row has ${field_count} fields: ${row}")
+    endif()
+    list(GET fields 13 total_shots)
+    list(GET fields 14 total_hits)
+    list(GET fields 18 total_holds)
+    list(GET fields 35 primary_shots)
+    list(GET fields 36 ally_shots)
+    list(GET fields 37 third_shots)
+    list(GET fields 38 primary_hits)
+    list(GET fields 39 ally_hits)
+    list(GET fields 40 third_hits)
+    list(GET fields 41 primary_holds)
+    list(GET fields 42 ally_holds)
+    list(GET fields 43 third_holds)
+    math(EXPR attributed_shots "${primary_shots} + ${ally_shots} + ${third_shots}")
+    math(EXPR attributed_hits "${primary_hits} + ${ally_hits} + ${third_hits}")
+    math(EXPR attributed_holds "${primary_holds} + ${ally_holds} + ${third_holds}")
+    if(NOT attributed_shots EQUAL total_shots
+        OR NOT attributed_hits EQUAL total_hits
+        OR NOT attributed_holds EQUAL total_holds)
+        message(FATAL_ERROR "Team role telemetry does not sum to totals: ${row}")
+    endif()
+endforeach()
 foreach(scenario firing_lane officer_guard engineer_guard boss_helpers)
     foreach(policy scripted neural)
         string(FIND "${first_team_output}"
@@ -169,7 +216,7 @@ string(REGEX MATCH "scripted,boss_helpers,12345,[^\n]*"
     boss_row "${first_team_output}")
 string(REPLACE "," ";" boss_fields "${boss_row}")
 list(LENGTH boss_fields boss_field_count)
-if(NOT boss_field_count EQUAL 35)
+if(NOT boss_field_count EQUAL 44)
     message(FATAL_ERROR "Boss/team protocol-2 field count changed: ${boss_row}")
 endif()
 list(GET boss_fields 3 boss_primary)
@@ -204,7 +251,10 @@ string(REGEX MATCH "scripted,firing_lane,12345,[^\n]*"
 string(REPLACE "," ";" firing_lane_fields "${firing_lane_row}")
 list(GET firing_lane_fields 15 friendly_hits)
 list(GET firing_lane_fields 18 fire_holds)
-if(friendly_hits LESS 1 OR fire_holds LESS 1)
+list(GET firing_lane_fields 41 primary_fire_holds)
+list(GET firing_lane_fields 39 ally_player_hits)
+if(friendly_hits LESS 1 OR fire_holds LESS 1
+    OR NOT primary_fire_holds EQUAL fire_holds OR ally_player_hits LESS 1)
     message(FATAL_ERROR "Firing-lane fixture did not exercise friendly fire: ${firing_lane_row}")
 endif()
 
@@ -227,9 +277,32 @@ foreach(policy scripted neural)
     list(GET long_boss_fields 26 first_hit_frame)
     list(GET long_boss_fields 33 robot_player_damage)
     list(GET long_boss_fields 34 helpers_player_damage)
+    list(GET long_boss_fields 35 robot_shots)
+    list(GET long_boss_fields 38 robot_hits)
     if(first_hit_frame LESS 76 OR robot_player_damage LESS 1
         OR NOT long_player_damage STREQUAL robot_player_damage
-        OR NOT helpers_player_damage STREQUAL "0.000")
+        OR NOT helpers_player_damage STREQUAL "0.000"
+        OR robot_shots LESS 1 OR robot_hits LESS 1)
         message(FATAL_ERROR "Boss fixture did not exercise attributed post-grace Robot damage: ${long_boss_row}")
     endif()
 endforeach()
+
+# A second fixed Boss seed keeps the Guard alive long enough to fire and hit.
+# This tests source-ID attribution for a projectile from the third role.
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 2 --frames 900 --team
+    RESULT_VARIABLE third_role_result
+    OUTPUT_VARIABLE third_role_output
+    ERROR_VARIABLE third_role_error)
+if(NOT third_role_result EQUAL 0)
+    message(FATAL_ERROR "Third-role Boss fixture failed: ${third_role_error}")
+endif()
+string(REGEX MATCH "scripted,boss_helpers,2,[^\n]*"
+    third_role_row "${third_role_output}")
+string(REPLACE "," ";" third_role_fields "${third_role_row}")
+list(GET third_role_fields 37 guard_shots)
+list(GET third_role_fields 40 guard_hits)
+if(guard_shots LESS 1 OR guard_hits LESS 1)
+    message(FATAL_ERROR "Boss third role did not fire and hit: ${third_role_row}")
+endif()

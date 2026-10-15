@@ -90,6 +90,12 @@ struct DuelResult {
 };
 
 struct TeamResult {
+    struct RoleTelemetry {
+        std::size_t shots{0U};
+        std::size_t playerHits{0U};
+        std::size_t fireHolds{0U};
+    };
+
     std::string_view outcome{"timeout"};
     std::uint32_t elapsedFrames{0U};
     std::size_t playerShots{0U};
@@ -115,7 +121,24 @@ struct TeamResult {
     float bossDistanceFinal{0.0F};
     float robotPlayerDamage{0.0F};
     float helpersPlayerDamage{0.0F};
+    std::array<RoleTelemetry, 3> roles{};
 };
+
+// Projectile events retain the firing entity, including after that enemy dies.
+// Team fixtures have one entity per role, so the source is unambiguous.
+template <std::size_t Count>
+void attributeTeamProjectileHit(TeamResult& result,
+    const std::array<EntityId, Count>& ids,
+    const gdp::gameplay::EnemyProjectileEvent& event)
+{
+    if (!event.hitPlayer) {
+        return;
+    }
+    const auto source = std::find(ids.begin(), ids.end(), event.source);
+    if (source != ids.end()) {
+        ++result.roles[static_cast<std::size_t>(source - ids.begin())].playerHits;
+    }
+}
 
 void printUsage()
 {
@@ -706,7 +729,8 @@ std::optional<TeamResult> runBossHelpersScenario(
         }
 
         std::vector<gameplay::EnemyProjectile> shots;
-        for (const EnemyArchetype type : types) {
+        for (std::size_t role = 0U; role < types.size(); ++role) {
+            const EnemyArchetype type = types[role];
             const std::size_t index = static_cast<std::size_t>(type);
             const float healthBefore = player.state().health;
             const auto summary = updateEnemy(type, manager, player,
@@ -720,6 +744,9 @@ std::optional<TeamResult> runBossHelpersScenario(
             result.enemyHits += summary.attacksLanded;
             result.enemyShots += summary.shotsFired;
             result.fireHolds += summary.friendlyFireHolds;
+            result.roles[role].playerHits += summary.attacksLanded;
+            result.roles[role].shots += summary.shotsFired;
+            result.roles[role].fireHolds += summary.friendlyFireHolds;
             result.supportActions += summary.commandsIssued
                 + summary.repairsPerformed;
             result.bossLongRange += summary.bossLongRange;
@@ -730,6 +757,7 @@ std::optional<TeamResult> runBossHelpersScenario(
         for (const auto& event
             : projectiles.update(fixedStep, player, collision, manager)) {
             result.enemyHits += event.hitPlayer ? 1U : 0U;
+            attributeTeamProjectileHit(result, ids, event);
             result.friendlyHits += event.hitEnemy.isValid() ? 1U : 0U;
             result.friendlyKills += event.killedEnemy ? 1U : 0U;
             if (event.hitEnemy.isValid()) {
@@ -913,7 +941,8 @@ std::optional<TeamResult> runTeamScenario(
         }
 
         std::vector<gameplay::EnemyProjectile> shots;
-        for (const EnemyArchetype type : types) {
+        for (std::size_t role = 0U; role < types.size(); ++role) {
+            const EnemyArchetype type = types[role];
             const std::size_t index = static_cast<std::size_t>(type);
             auto* brain = neural ? &*brains[index] : nullptr;
             const auto summary = updateEnemy(type, manager, player,
@@ -921,6 +950,9 @@ std::optional<TeamResult> runTeamScenario(
             result.enemyHits += summary.attacksLanded;
             result.enemyShots += summary.shotsFired;
             result.fireHolds += summary.friendlyFireHolds;
+            result.roles[role].playerHits += summary.attacksLanded;
+            result.roles[role].shots += summary.shotsFired;
+            result.roles[role].fireHolds += summary.friendlyFireHolds;
             result.supportActions += summary.commandsIssued
                 + summary.repairsPerformed;
         }
@@ -928,6 +960,7 @@ std::optional<TeamResult> runTeamScenario(
         for (const auto& event
             : projectiles.update(fixedStep, player, collision, manager)) {
             result.enemyHits += event.hitPlayer ? 1U : 0U;
+            attributeTeamProjectileHit(result, ids, event);
             result.friendlyHits += event.hitEnemy.isValid() ? 1U : 0U;
             result.friendlyKills += event.killedEnemy ? 1U : 0U;
             if (event.hitEnemy.isValid()) {
@@ -988,7 +1021,15 @@ void printTeamRow(const std::string_view policy,
               << result.bossDistanceFinal << ','
               << result.bossLongRange << ',' << result.bossPressure << ','
               << result.bossPursuit << ',' << result.robotPlayerDamage << ','
-              << result.helpersPlayerDamage << '\n';
+              << result.helpersPlayerDamage << ','
+              << result.roles[0].shots << ',' << result.roles[1].shots << ','
+              << result.roles[2].shots << ','
+              << result.roles[0].playerHits << ','
+              << result.roles[1].playerHits << ','
+              << result.roles[2].playerHits << ','
+              << result.roles[0].fireHolds << ','
+              << result.roles[1].fireHolds << ','
+              << result.roles[2].fireHolds << '\n';
 }
 
 void printDuelRow(const std::string_view policy,
@@ -1070,7 +1111,10 @@ int main(const int argc, char* argv[])
                      "first_player_hit_frame,boss_distance_initial,"
                      "boss_distance_minimum,boss_distance_final,boss_long_range,"
                      "boss_pressure,boss_pursuit,robot_player_damage,"
-                     "helpers_player_damage\n";
+                     "helpers_player_damage,primary_shots,ally_shots,"
+                     "third_shots,primary_player_hits,ally_player_hits,"
+                     "third_player_hits,primary_fire_holds,ally_fire_holds,"
+                     "third_fire_holds\n";
         for (std::size_t scenario = 0U; scenario < teamScenarioNames.size(); ++scenario) {
             for (const bool neural : {false, true}) {
                 const auto result = runTeamScenario(*generated.world,
