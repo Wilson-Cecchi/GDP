@@ -331,6 +331,41 @@ struct ApplicationMenuTestAccess {
                             app.player_.planarForwardDirection());
                         expect(transition.has_value(), "start door has a reachable neighboring room");
                         if (transition) {
+                            auto destinationEvent = std::find_if(app.roomEvents_.begin(),
+                                app.roomEvents_.end(), [transition](const auto& runtime) {
+                                    return runtime.roomId == transition->destinationRoom;
+                                });
+                            const auto destinationRoom = std::find_if(app.world_->rooms.begin(),
+                                app.world_->rooms.end(), [transition](const auto& room) {
+                                    return room.id == transition->destinationRoom;
+                                });
+                            expect(destinationEvent != app.roomEvents_.end()
+                                    && destinationRoom != app.world_->rooms.end(),
+                                "door destination has a room event and world room");
+                            entities::EntityId stagedEnemy;
+                            if (destinationEvent != app.roomEvents_.end()
+                                && destinationRoom != app.world_->rooms.end()) {
+                                world::RoomEventPlan plan;
+                                plan.seed = destinationRoom->seed;
+                                plan.type = world::RoomEventType::Reinforcements;
+                                plan.trigger = world::RoomEventTrigger::RoomEntry;
+                                plan.waveCount = 1U;
+                                plan.spawns.push_back({
+                                    .archetype = entities::EnemyArchetype::Worker,
+                                    .position = destinationRoom->transform.position,
+                                    .health = 50.0F,
+                                    .visualSeed = destinationRoom->seed,
+                                });
+                                *destinationEvent = gameplay::makeRoomEventRuntime(
+                                    std::move(plan), transition->destinationRoom);
+                                const auto staged = gameplay::stageRoomEventFirstWave(
+                                    *destinationEvent, app.entities_);
+                                if (!staged.empty()) stagedEnemy = staged.front();
+                                const auto* stagedData = app.entities_.findData<entities::EnemyData>(
+                                    stagedEnemy);
+                                expect(stagedData != nullptr && !stagedData->active,
+                                    "reinforcement is staged but inactive behind a closed door");
+                            }
                             app.player_.applyDamage(86.0F);
                             app.fireHeld_ = false;
                             app.firePending_ = false;
@@ -343,6 +378,32 @@ struct ApplicationMenuTestAccess {
                                     && app.player_.state().alive
                                     && app.player_.state().health == 14.0F,
                                 "opening an undiscovered room grants reaction time even at 14 HP");
+                            if (stagedEnemy.isValid()) {
+                                bool activatedBeforePassable = false;
+                                bool activatedAtDoorway = false;
+                                app.playerCommand_ = {};
+                                for (int tick = 0; tick < 60; ++tick) {
+                                    app.fixedUpdate(1.0 / 60.0);
+                                    const bool passable = gameplay::isDoorPassable(
+                                        app.doorRuntimes_.at(transition->edge));
+                                    const auto* enemy = app.entities_.findData<entities::EnemyData>(
+                                        stagedEnemy);
+                                    if (enemy && enemy->active && !passable)
+                                        activatedBeforePassable = true;
+                                    if (enemy && enemy->active && passable) {
+                                        activatedAtDoorway = true;
+                                        break;
+                                    }
+                                }
+                                expect(!activatedBeforePassable && activatedAtDoorway
+                                        && playerEntity->roomId == start->id
+                                        && destinationEvent->nextWave == 1U,
+                                    "opening a door activates adjacent reinforcements before room entry");
+                                const auto eventEnemyCount = destinationEvent->eventEnemies.size();
+                                app.fixedUpdate(1.0 / 60.0);
+                                expect(destinationEvent->eventEnemies.size() == eventEnemyCount,
+                                    "doorway activation does not duplicate staged reinforcements");
+                            }
                             app.roomEntryGraceRemaining_[transition->destinationRoom] = 0.01F;
                             app.playerCommand_ = {}; app.fixedUpdate(0.02);
                             expect(!app.roomEntryGraceRemaining_.contains(

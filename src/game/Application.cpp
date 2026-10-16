@@ -3137,19 +3137,16 @@ void Application::fixedUpdate(const double fixedStep)
         gameplay::signalNotice(feedback_, gameplay::NoticeFeedbackKind::Pickup);
         log(LogLevel::Info, "Test Mode supplies replenished");
     }
-    const auto activeEvent = std::find_if(
-        roomEvents_.begin(), roomEvents_.end(),
-        [playerRoom](const gameplay::RoomEventRuntime& runtime) {
-            return runtime.roomId == playerRoom;
-        });
-    if (activeEvent != roomEvents_.end()) {
+    const auto updateAndPresentRoomEvent = [this, &awardProgress, step](
+        gameplay::RoomEventRuntime& runtime, const bool usedTerminal) {
+        auto* activeEvent = &runtime;
         const gameplay::RoomEventUpdateSummary event = gameplay::updateRoomEvent(
-            *activeEvent, entities_, true, terminalUsed, step);
+            *activeEvent, entities_, true, usedTerminal, step);
         if (!event.createdEntities.empty() && world_) {
             const auto room = std::find_if(
                 world_->rooms.begin(), world_->rooms.end(),
-                [playerRoom](const world::RoomInstance& candidate) {
-                    return candidate.id == playerRoom;
+                [activeEvent](const world::RoomInstance& candidate) {
+                    return candidate.id == activeEvent->roomId;
                 });
             if (room != world_->rooms.end()) {
                 room->entities.insert(
@@ -3223,6 +3220,26 @@ void Application::fixedUpdate(const double fixedStep)
                 feedback_, gameplay::NoticeFeedbackKind::EventClear);
             awardProgress(gameplay::ProgressionEvent::RoomEventCompleted, 1U);
         }
+    };
+    const auto activeEvent = std::find_if(
+        roomEvents_.begin(), roomEvents_.end(),
+        [playerRoom](const gameplay::RoomEventRuntime& runtime) {
+            return runtime.roomId == playerRoom;
+        });
+    if (activeEvent != roomEvents_.end()) {
+        updateAndPresentRoomEvent(*activeEvent, terminalUsed);
+    }
+    // A reinforcement visible through an open doorway must be able to react
+    // and take damage before the player crosses into its room. Arena lockdown
+    // waves and terminal ambushes retain their separate triggers.
+    for (gameplay::RoomEventRuntime& runtime : roomEvents_) {
+        if (runtime.plan.type != world::RoomEventType::Reinforcements
+            || runtime.plan.trigger != world::RoomEventTrigger::RoomEntry
+            || std::find(playerRoomNeighbors.begin(), playerRoomNeighbors.end(),
+                runtime.roomId) == playerRoomNeighbors.end()) {
+            continue;
+        }
+        updateAndPresentRoomEvent(runtime, false);
     }
 
     world::RoomRole currentRoomRole = world::RoomRole::Count;

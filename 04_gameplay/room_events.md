@@ -37,10 +37,17 @@ Revisão de 2026-10-02: a onda extra de `Lockdown` da Arena não é pré-criada
 como corpos visíveis e inativos. Ela só nasce, já ativa, quando o encontro
 inicial termina. Isso corrige os inimigos aparentando esperar a morte dos
 outros para poder atacar. A primeira onda de `Reinforcements` por entrada
-continua usando o staging existente e é ativada ao entrar, sem duplicação;
+continua usando o staging existente, sem duplicação;
 emboscadas de terminal continuam ocultas até a interação. Não mudam planos,
 contagem de ondas, HP, recompensas ou RNG. A regressão cobre espera, inimigo
 que saiu da sala, liberação única e ativação dos handles pré-criados.
+
+Revisão de 2026-10-16: `Reinforcements` também é atualizado quando uma porta
+para a sala vizinha se torna passável. O inimigo pré-criado passa a reagir e
+pode ser atingido antes de o jogador cruzar a soleira. Entrar por uma passagem
+já aberta continua ativando o evento. O tempo de reação concedido ao abrir uma
+sala inédita permanece; a onda de `Lockdown` da Arena e a emboscada do terminal
+mantêm seus gatilhos próprios.
 
 A limpeza considera a sala de origem de cada inimigo, preservada ao nascer,
 e também intrusos ainda vivos dentro da sala. Perseguir o Player por um
