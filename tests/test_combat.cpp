@@ -2687,6 +2687,51 @@ void testIndustrialRobotCannonAcrossArena()
         "low cover can intercept a cannon projectile after a visible launch");
 }
 
+void testIndustrialRobotHoldsForVisibleHelper()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld open{{{-20.0F, 0.0F, -20.0F},
+        {20.0F, 7.0F, 36.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId robot = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 30.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 250.0F,
+    });
+    const EntityId helper = manager.createEnemy({
+        .transform = {.position = {0.55F, 0.0F, 15.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard,
+    });
+    IndustrialRobotConfig config;
+    config.longRangeMoveSpeed = 0.0F;
+    config.pressureMoveSpeed = 0.0F;
+    config.pursuitMoveSpeed = 0.0F;
+    std::vector<EnemyProjectile> spawned;
+    const EnemyPerception perception{.projectiles = &spawned};
+    std::size_t holds = 0U;
+    for (int tick = 0; tick < 45; ++tick) {
+        const EnemyUpdateSummary summary = updateIndustrialRobots(
+            manager, player, 1U, open, 1.0F / 60.0F, config, perception);
+        holds += summary.friendlyFireHolds;
+    }
+    expect(spawned.empty() && holds > 0U
+            && manager.findData<EnemyData>(robot)->magazineAmmo == 8U,
+        "boss holds cannon when a helper visibly overlaps its firing lane");
+
+    manager.find(helper)->transform.position.x = 3.0F;
+    for (int tick = 0; tick < 15 && spawned.empty(); ++tick) {
+        (void)updateIndustrialRobots(
+            manager, player, 1U, open, 1.0F / 60.0F, config, perception);
+    }
+    expect(spawned.size() == 1U,
+        "boss resumes cannon fire when the helper clears the lane");
+}
+
 void testIndustrialRobotFirstShotAndCadence()
 {
     using namespace gdp::entities;
@@ -3818,6 +3863,7 @@ int main()
     testIndustrialRobotPhases();
     testIndustrialRobotLineOfSightAndRoomIsolation();
     testIndustrialRobotCannonAcrossArena();
+    testIndustrialRobotHoldsForVisibleHelper();
     testIndustrialRobotFirstShotAndCadence();
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();

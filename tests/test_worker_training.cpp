@@ -609,7 +609,9 @@ void testHardCaseCurriculumV2()
             "curriculum 20 refuses a v21 population");
     }
     options.saveDirectory.reset();
-    options.generations = 6U;
+    // The robot now waits for a wider clear lane around helpers; this seed
+    // first produces a clean hard-case hit at generation eight.
+    options.generations = 8U;
     options.curriculumGenerations = 3U;
     options.archetype = gdp::entities::EnemyArchetype::IndustrialRobot;
     std::ostringstream robotLog;

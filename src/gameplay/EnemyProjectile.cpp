@@ -56,7 +56,7 @@ bool projectileHitsEnemy(const wkc::core::Vec3 point,
 bool allyOnSegment(const wkc::core::Vec3 origin,
     const wkc::core::Vec3 direction, const float distance,
     const entities::Entity& entity,
-    const entities::EnemyData& enemy) noexcept
+    const entities::EnemyData& enemy, const float clearance) noexcept
 {
     const wkc::core::Vec3 center = entity.transform.position
         + wkc::core::Vec3{0.0F,
@@ -70,7 +70,8 @@ bool allyOnSegment(const wkc::core::Vec3 origin,
     const float radius = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
         ? 0.62F : 0.45F;
     const wkc::core::Vec3 nearest = origin + direction * along;
-    return std::hypot(nearest.x - center.x, nearest.z - center.z) < radius
+    return std::hypot(nearest.x - center.x, nearest.z - center.z)
+            < radius + clearance
         && nearest.y >= entity.transform.position.y + 0.10F
         && nearest.y <= entity.transform.position.y + 1.9F;
 }
@@ -87,6 +88,13 @@ bool allyInEnemyFireLane(const entities::EntityManager& enemies,
         return false;
     }
     const wkc::core::Vec3 ray = wkc::core::normalized(direction);
+    const entities::EnemyData* shooterData
+        = enemies.findData<entities::EnemyData>(shooter);
+    // The robot's cannon needs room around helpers' visible arms and gear.
+    // Keep the existing lane for the other ranged enemies.
+    const float clearance = shooterData != nullptr
+            && shooterData->archetype == entities::EnemyArchetype::IndustrialRobot
+        ? 0.12F : 0.0F;
     for (const entities::EntityId id : enemies.query(entities::EntityKind::Enemy)) {
         if (id == shooter) {
             continue;
@@ -95,7 +103,8 @@ bool allyInEnemyFireLane(const entities::EntityManager& enemies,
         const entities::EnemyData* enemy = enemies.findData<entities::EnemyData>(id);
         if (entity != nullptr && enemy != nullptr && enemy->active
             && enemy->behavior != entities::EnemyBehaviorState::Dead
-            && allyOnSegment(origin, ray, distance, *entity, *enemy)) {
+            && allyOnSegment(origin, ray, distance, *entity, *enemy,
+                clearance)) {
             return true;
         }
     }
