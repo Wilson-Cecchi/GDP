@@ -21,6 +21,8 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
         return 1U;
     case RoomRole::Normal:
         return 2U + std::min(depth / 3U, 1U);
+    case RoomRole::Terminal:
+        return 2U;
     case RoomRole::Arena:
     case RoomRole::Boss:
         return 2U;
@@ -230,7 +232,8 @@ PropLayout generatePropLayout(
         return layout;
     }
 
-    if (role == RoomRole::Start || role == RoomRole::DeadEnd
+    if (role == RoomRole::Start || role == RoomRole::Terminal
+        || role == RoomRole::DeadEnd
         || role == RoomRole::Secret) {
         addProp(layout, PropType::Crate, propZones);
     } else if (role == RoomRole::Boss) {

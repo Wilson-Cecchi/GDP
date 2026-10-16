@@ -10,15 +10,6 @@
 #include <cmath>
 
 namespace gdp::world {
-namespace {
-
-float yawForDirection(const wkc::core::Vec3 direction) noexcept
-{
-    constexpr float radiansToDegrees = 57.29577951308232F;
-    return std::atan2(direction.x, direction.z) * radiansToDegrees;
-}
-
-} // namespace
 
 bool InitialEntitySet::isValid() const noexcept
 {
@@ -39,7 +30,10 @@ InitialEntitySet populateInitialEntities(
     const bool hasStartRoom = std::any_of(
         world.rooms.begin(), world.rooms.end(),
         [](const RoomInstance& room) { return room.role == RoomRole::Start; });
-    if (!hasStartRoom || manager.activeCount() != 0) {
+    const bool hasTerminalRoom = std::any_of(
+        world.rooms.begin(), world.rooms.end(),
+        [](const RoomInstance& room) { return room.role == RoomRole::Terminal; });
+    if (!hasStartRoom || !hasTerminalRoom || manager.activeCount() != 0) {
         return result;
     }
     const float safeDifficulty = std::clamp(
@@ -124,50 +118,6 @@ InitialEntitySet populateInitialEntities(
             player.roomId = room.id;
             result.player = manager.createPlayer(player);
             addToRoom(result.player);
-
-            result.terminal = manager.createProp({
-                .transform = {.position = positionInRoom(room, {0.0F, 0.0F, 2.2F})},
-                .roomId = room.id,
-                .type = PropType::Terminal,
-                .solid = true,
-            });
-            addToRoom(result.terminal);
-
-            const wkc::core::Vec3 workerPosition
-                = positionInRoom(room, {2.4F, 0.0F, -0.5F});
-            addToRoom(manager.createEnemy({
-                .transform = {
-                    .position = workerPosition,
-                    .rotationDegrees = {0.0F,
-                        yawForDirection(player.transform.position - workerPosition),
-                        0.0F},
-                },
-                .roomId = room.id,
-                .archetype = EnemyArchetype::Worker,
-                .health = 68.0F * safeDifficulty,
-                .visualSeed = wkc::core::deriveSeed(
-                    room.seed, gdp::game::SeedDomain::EnemyVisual, 0),
-            }));
-            constexpr wkc::core::Vec3 localCoverScale{0.46F, 2.25F, 2.80F};
-            const wkc::core::Vec3 rotatedCoverScale
-                = wkc::core::rotateQuarterTurns(localCoverScale, room.rotation);
-            addToRoom(manager.createProp({
-                .transform = {
-                    .position = positionInRoom(room, {-2.55F, 0.0F, 0.0F}),
-                    .scale = {
-                        std::abs(rotatedCoverScale.x),
-                        localCoverScale.y,
-                        std::abs(rotatedCoverScale.z),
-                    },
-                },
-                .roomId = room.id,
-                .type = PropType::Barricade,
-                .solid = true,
-                .health = 180.0F,
-                .maximumHealth = 180.0F,
-                .visualSeed = wkc::core::deriveSeed(
-                    room.seed, gdp::game::SeedDomain::Props, 900U),
-            }));
             addProps();
             addLoot();
             continue;
@@ -202,6 +152,21 @@ InitialEntitySet populateInitialEntities(
             room.seed, gdp::game::SeedDomain::EnemySpawn, 0)};
 
         switch (room.role) {
+        case RoomRole::Terminal:
+            result.terminal = manager.createProp({
+                .transform = {.position = positionInRoom(room, {0.0F, 0.0F, 2.2F})},
+                .roomId = room.id,
+                .type = PropType::Terminal,
+                .solid = true,
+            });
+            addToRoom(result.terminal);
+            // The encounter starts fully populated. These offsets sit outside
+            // the central event-spawn zone of both Terminal hall modules and
+            // clear the left-rear loot and right-side prop zones.
+            addEnemy(EnemyArchetype::Worker, {-5.0F, 0.0F, 0.0F}, 50.0F);
+            addEnemy(EnemyArchetype::Guard, {0.0F, 0.0F, -5.0F}, 75.0F);
+            addEnemy(EnemyArchetype::Officer, {0.0F, 0.0F, 5.0F}, 65.0F);
+            break;
         case RoomRole::Normal:
             if (encounterFloor == 1U && encounter.chance(0.5F)) {
                 addEnemy(EnemyArchetype::Worker, {}, 50.0F);

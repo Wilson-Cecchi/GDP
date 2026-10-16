@@ -19,6 +19,8 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
     switch (role) {
     case RoomRole::Start:
         return 1U;
+    case RoomRole::Terminal:
+        return 2U + std::min(depth / 3U, 1U);
     case RoomRole::Normal:
         return 1U + std::min(depth / 2U, 2U);
     case RoomRole::Hub:
@@ -232,6 +234,9 @@ LootLayout generateLootLayout(
 
     switch (role) {
     case RoomRole::Start:
+        addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
+        break;
+    case RoomRole::Terminal:
         addDrop(layout, gdp::entities::ItemType::Ammo, lootZones);
         break;
     case RoomRole::Arena:

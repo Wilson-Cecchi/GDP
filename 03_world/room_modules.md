@@ -57,6 +57,9 @@ Os três módulos dedicados de `Boss` (Laboratory, Maintenance e Security) passa
 a `28 × 7 × 32 m`, abaixo da área de `32 × 40 m` do Test Mode. O eixo central
 continua aberto para tiro longo; props procedurais ocupam o lado direito, e o
 lado esquerdo recebe cobertura fixa e rota lateral para escopeta.
+O papel `Terminal` usa os halls amplos de Laboratory (`16 × 6 × 22 m`) ou
+Security (`18 × 6 × 18 m`), com espaço para o encontro ampliado previsto nessa
+sala. A sala inicial mantém seu módulo próprio; o terminal não ocupa Start.
 Esta aprovação cobre o tamanho das salas. Em 2026-10-13, o usuário também
 optou por manter a iluminação atual do Boss nas capturas MEDIUM/POTATO, sem
 aumento adicional de contraste. O equilíbrio do encontro segue em validação

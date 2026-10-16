@@ -38,26 +38,37 @@ void testDeterministicEventPlan()
 {
     using namespace gdp::world;
     constexpr wkc::core::Seed seed = 0x4556454E545F5631ULL;
+    const RoomEventPlan start = generateRoomEventPlan(
+        seed, RoomRole::Start, RoomTheme::Industrial, 0, eventZones);
     const RoomEventPlan first = generateRoomEventPlan(
-        seed, RoomRole::Start, RoomTheme::Industrial, 0, eventZones);
+        seed, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones);
     const RoomEventPlan repeated = generateRoomEventPlan(
-        seed, RoomRole::Start, RoomTheme::Industrial, 0, eventZones);
+        seed, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones);
     const RoomEventPlan different = generateRoomEventPlan(
-        seed + 1U, RoomRole::Start, RoomTheme::Industrial, 0, eventZones);
+        seed + 1U, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones);
+    expect(validateRoomEventPlan(start, eventZones).isValid()
+            && start.type == RoomEventType::None && start.spawns.empty()
+            && start.rewardQuantity == 0U && start.waveCount == 0U,
+        "START has no room event, enemy spawns or reward");
+    constexpr std::uint64_t startGoldenHash = 0x1D0E2C09C83186D7ULL;
+    expect(start.planHash == startGoldenHash,
+        "START's empty event plan remains stable across builds");
     expect(validateRoomEventPlan(first, eventZones).isValid(),
         "representative terminal ambush plan validates");
     expect(first.spawns == repeated.spawns && first.planHash == repeated.planHash,
         "same room inputs reproduce event type, wave, enemies and reward");
     expect(first.planHash != different.planHash,
         "different room seed changes the canonical event plan");
-    constexpr std::uint64_t goldenHash = 0xB04A437A8394B962ULL;
+    constexpr std::uint64_t goldenHash = 0xC586E4CCCD8B1265ULL;
     expect(first.planHash == goldenHash,
         "golden procedural event hash remains stable across builds");
     expect(first.type == RoomEventType::TerminalAmbush
             && first.trigger == RoomEventTrigger::TerminalUse
             && first.locksRoom && first.requiresRoomClear
-            && first.waveCount == 1U && first.spawns.size() == 1U,
-        "START event is a deliberate one-wave terminal ambush");
+            && first.waveCount == 1U && first.spawns.size() == 2U
+            && first.spawns[0].archetype == gdp::entities::EnemyArchetype::Worker
+            && first.spawns[1].archetype == gdp::entities::EnemyArchetype::Guard,
+        "TERMINAL event has one planned wave with a Worker and Guard");
 
     RoomEventPlan invalid = first;
     invalid.trigger = RoomEventTrigger::RoomEntry;
@@ -77,6 +88,12 @@ void testDeterministicEventPlan()
                validateRoomEventPlan(invalid, eventZones),
                EventValidationError::InvalidPlanHash),
         "event validation detects canonical hash corruption");
+    invalid = start;
+    invalid.type = RoomEventType::TerminalAmbush;
+    expect(containsError(
+               validateRoomEventPlan(invalid, eventZones),
+               EventValidationError::InvalidWave),
+        "START rejects a combat event");
 }
 
 void testEventPlanBatchAndWorlds()
@@ -86,8 +103,9 @@ void testEventPlanBatchAndWorlds()
     std::array<bool, static_cast<std::size_t>(RoomEventType::Count)> found{};
     bool allValid = true;
     for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
-        const RoomRole role = static_cast<RoomRole>(seed % 7U);
-        const RoomTheme theme = static_cast<RoomTheme>((seed / 7U) % 7U);
+        const auto roleIndex = static_cast<wkc::core::Seed>(RoomRole::Count);
+        const RoomRole role = static_cast<RoomRole>(seed % roleIndex);
+        const RoomTheme theme = static_cast<RoomTheme>((seed / roleIndex) % 7U);
         const RoomEventPlan plan = generateRoomEventPlan(
             seed, role, theme, static_cast<std::uint32_t>(seed % 6U), eventZones);
         const EventValidationResult validation = validateRoomEventPlan(plan, eventZones);
@@ -158,36 +176,40 @@ void testTerminalAmbushRuntime()
     using namespace gdp::world;
     EntityManager manager;
     (void)manager.createEnemy({.roomId = 1, .health = 50.0F});
+    (void)manager.createEnemy({
+        .roomId = 1, .archetype = EnemyArchetype::Guard, .health = 75.0F});
+    (void)manager.createEnemy({
+        .roomId = 1, .archetype = EnemyArchetype::Officer, .health = 65.0F});
     RoomEventRuntime runtime = makeRoomEventRuntime(generateRoomEventPlan(
-        99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);
+        99, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones), 1);
     const std::vector<EntityId> staged = stageRoomEventEnemies(runtime, manager);
     expect(staged.size() == runtime.plan.spawns.size()
             && runtime.eventEnemies == staged
             && runtime.nextWave == runtime.plan.waveCount
             && runtime.phase == RoomEventPhase::Dormant,
-        "terminal enemy is present while the terminal event remains dormant");
-    if (!staged.empty()) {
-        const auto* entity = manager.find(staged.front());
-        const auto* enemy = manager.findData<EnemyData>(staged.front());
-        const auto& planned = runtime.plan.spawns.front();
+        "both terminal event enemies are present while the event remains dormant");
+    for (std::size_t index = 0; index < staged.size(); ++index) {
+        const auto* entity = manager.find(staged[index]);
+        const auto* enemy = manager.findData<EnemyData>(staged[index]);
+        const auto& planned = runtime.plan.spawns[index];
         expect(entity != nullptr && enemy != nullptr && enemy->active
                 && entity->roomId == 1U
                 && entity->transform.position == planned.position
                 && enemy->archetype == planned.archetype
                 && enemy->health == planned.health
                 && enemy->visualSeed == planned.visualSeed,
-            "terminal enemy preserves its planned room, position, archetype, HP and visual seed");
+            "terminal enemies preserve their planned room, position, archetype, HP and visual seed");
     }
     expect(stageRoomEventEnemies(runtime, manager).empty()
-            && manager.queryRoom(1).size() == 2U,
-        "preparing the terminal enemy twice does not duplicate it");
+            && manager.queryRoom(1).size() == 5U,
+        "preparing the two terminal enemies twice does not duplicate either");
 
     const RoomEventUpdateSummary dormant
         = updateRoomEvent(runtime, manager, true, false, 1.0F / 60.0F);
     expect(!dormant.activated && dormant.createdEntities.empty()
             && runtime.phase == RoomEventPhase::Dormant
             && !isRoomLocked(runtime),
-        "START event remains dormant on entry until terminal interaction");
+        "TERMINAL event remains dormant on entry until terminal interaction");
 
     const RoomEventUpdateSummary activated
         = updateRoomEvent(runtime, manager, true, true, 1.0F / 60.0F);
@@ -213,7 +235,7 @@ void testTerminalAmbushRuntime()
     EntityManager preclearedManager;
     (void)preclearedManager.createEnemy({.roomId = 2, .health = 50.0F});
     RoomEventRuntime precleared = makeRoomEventRuntime(generateRoomEventPlan(
-        99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 2);
+        99, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones), 2);
     const auto preclearedEnemies = stageRoomEventEnemies(precleared, preclearedManager);
     killAllEnemies(preclearedManager, 2);
     const RoomEventUpdateSummary beforeUse = updateRoomEvent(
@@ -341,7 +363,7 @@ void testLockdownEnemyAndPursuit()
         "defeating the final Arena enemy completes the event");
 
     RoomEventRuntime terminal = makeRoomEventRuntime(generateRoomEventPlan(
-        99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);
+        99, RoomRole::Terminal, RoomTheme::Industrial, 0, eventZones), 1);
     const auto terminalEnemies = stageRoomEventEnemies(terminal, manager);
     expect(terminalEnemies.size() == terminal.plan.spawns.size()
             && terminal.phase == RoomEventPhase::Dormant,

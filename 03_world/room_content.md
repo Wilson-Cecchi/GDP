@@ -54,7 +54,11 @@ Security favorece painéis/monitores/barricadas; Laboratory equipamentos cientí
 
 `populateInitialEntities()` roda depois do gate estrutural e registra em cada
 `RoomInstance` apenas os handles controlados pelo `EntityManager`. START recebe
-Player, terminal, um Worker ativo, Ammo e um crate procedural; Normal recebe
+Player, Ammo e um crate procedural, sem inimigos nem terminal. A sala Terminal,
+colocada separadamente no mapa, recebe o console da missão, um Worker, um Guard
+e um Officer ativos desde a criação, além de Ammo e props. Seu evento acrescenta
+mais dois inimigos também presentes desde a criação, para cinco adversários no
+encontro. Normal recebe
 um ou dois inimigos (Worker, com Guard possível em maior profundidade), props e
 loot variáveis; Hub recebe Health e prop temático; Arena recebe dois a quatro
 inimigos distintos escolhidos entre Worker, Guard, Officer e Engineer, mais
@@ -101,23 +105,14 @@ preservada no repositório; estes números servem como referência histórica, n
 como medição pós-alteração. Playtest ainda deve conferir ritmo, uso da Sniper
 em 20–30 m e aproximação eficaz da escopeta.
 
-O evento da Arena ainda acrescenta uma onda de um inimigo depois de limpar a
-população inicial, totalizando três a cinco adversários ao longo do encontro.
+O evento da Arena acrescenta um inimigo já ativo com a população inicial,
+totalizando três a cinco adversários no encontro.
 A variação usa `SeedDomain::EnemySpawn` e não altera os streams de loot, props,
 eventos ou o visual dos inimigos. A sala Secret continua garantindo a Carbine,
 mas sua ligação no grafo varia; o boss tem mais tempo para apresentar as três
 faixas de comportamento. A dificuldade efetiva ainda exige playtest humano.
 
-Desde a Fase 102, START também recebe uma divisória industrial fixa de
-`0,46 × 2,25 × 2,80 m`, posicionada fora do eixo das portas e no lado oposto ao
-Worker. A escala horizontal acompanha a rotação da sala, mantendo o mesmo espaço
-de ocultação em qualquer orientação. O vão atrás da divisória permite caminhar
-por aproximadamente `2 m` ainda sem linha de visão e sair por uma borda para
-forçar a readquisição. Ela reutiliza o papel visual funcional de Barricade, tem
-180 HP e não consome budget nem RNG do layout procedural. O acabamento HD final
-permanece pendente de aprovação visual.
-
-A operação exige um world com START e um manager vazio; se uma dessas
+A operação exige um world com START, Terminal e um manager vazio; se uma dessas
 pré-condições falhar, retorna handles inválidos sem criar conteúdo parcial.
 
 ## Props funcionais
@@ -136,17 +131,18 @@ estado. Terminal e door não recebem HP e absorvem tiros sem serem destruídos.
 ## Eventos funcionais
 
 Cada sala recebe um `RoomEventPlan` derivado de `SeedDomain::Events` depois do
-commit estrutural. START usa o terminal; Normal/DeadEnd podem receber reforços;
+commit estrutural. A sala Terminal usa o terminal; Normal/DeadEnd podem receber reforços;
 Hub/Secret recebem suporte; Arena/Boss mantêm lockdown até suas condições de
-limpeza. Inimigos e recompensas surgem somente no runtime, preservam ownership
-por sala e nunca duplicam após `Completed`.
+limpeza. Os inimigos planejados já estão ativos desde a criação do andar; as
+recompensas surgem quando o evento termina. Ambos preservam ownership por sala
+e não duplicam após `Completed`.
 
 ## Iluminação funcional
 
 Cada sala recebe um `RoomLightingPlan` derivado somente de
 `SeedDomain::Lighting`. Papel, tema e bounds definem mood, ambiente e de uma a
 quatro luminárias próximas ao teto. Secret permanece escura mas legível;
-Hub/Arena/Boss recebem quatro pontos. START/Arena/Boss e Security podem reagir
+Hub/Terminal/Arena/Boss recebem quatro pontos. Terminal/Arena/Boss e Security podem reagir
 ao lockdown com alerta vermelho temporário sem regenerar o plano.
 
 ## Variação
@@ -155,8 +151,8 @@ Mesmo RoomModule pode variar iluminação, props, inimigos, loot, dano e sujeira
 
 ## Testes
 
-O teste atual confirma ownership por sala, IDs válidos, ordem determinística e
-40 objetos para a seed 12345 do mundo padrão de oito salas. Cada Item é
+O teste de população confirma ownership por sala, IDs válidos, ordem determinística
+e ausência de inimigos ou console na START. Cada Item é
 comparado com tipo, quantidade e posição de seu `LootLayout`; budget, zonas,
 separação e distribuição são gates dedicados. Cada prop procedural também é
 comparado integralmente com seu `PropLayout`.

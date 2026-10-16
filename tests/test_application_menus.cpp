@@ -312,21 +312,24 @@ struct ApplicationMenuTestAccess {
             if (slot == 0U && app.world_) {
                 const auto terminalEvent = std::find_if(app.roomEvents_.begin(),
                     app.roomEvents_.end(), [](const auto& runtime) {
-                        return runtime.plan.role == world::RoomRole::Start;
+                        return runtime.plan.role == world::RoomRole::Terminal;
                     });
+                const auto* terminalEntity = app.entities_.find(app.terminalEntity_);
                 expect(terminalEvent != app.roomEvents_.end()
                         && terminalEvent->plan.type == world::RoomEventType::TerminalAmbush
+                        && terminalEntity != nullptr
+                        && terminalEntity->roomId == terminalEvent->roomId
                         && terminalEvent->phase == gameplay::RoomEventPhase::Dormant
                         && terminalEvent->eventEnemies.size()
                             == terminalEvent->plan.spawns.size()
-                        && !terminalEvent->eventEnemies.empty()
+                        && terminalEvent->eventEnemies.size() == 2U
                         && terminalEvent->nextWave == terminalEvent->plan.waveCount
                         && std::all_of(terminalEvent->eventEnemies.begin(),
                             terminalEvent->eventEnemies.end(), [&app](const auto id) {
                                 const auto* enemy = app.entities_.findData<entities::EnemyData>(id);
                                 return enemy != nullptr && enemy->active;
                             }),
-                    "terminal encounter enemy is active before terminal use");
+                    "dedicated Terminal room has both event enemies active before use");
                 const auto arenaEvent = std::find_if(app.roomEvents_.begin(),
                     app.roomEvents_.end(), [](const auto& runtime) {
                         return runtime.plan.role == world::RoomRole::Arena;
@@ -345,6 +348,12 @@ struct ApplicationMenuTestAccess {
                 const auto start = std::find_if(app.world_->rooms.begin(), app.world_->rooms.end(),
                     [](const world::RoomInstance& room) { return room.role == world::RoomRole::Start; });
                 if (start != app.world_->rooms.end()) {
+                    expect(std::none_of(start->entities.begin(), start->entities.end(),
+                            [&app](const auto id) {
+                                return app.entities_.findData<entities::EnemyData>(id) != nullptr;
+                            }) && std::find(start->entities.begin(), start->entities.end(),
+                                app.terminalEntity_) == start->entities.end(),
+                        "spawn room has no enemies or mission terminal");
                     const auto connector = std::find_if(start->connectors.begin(), start->connectors.end(),
                         [](const world::ConnectorInstance& candidate) {
                             return !candidate.sealed && candidate.edge.has_value();

@@ -48,12 +48,18 @@ void testDeterministicPlan()
         "same room seed reproduces the complete lighting plan");
     expect(first.seed == wkc::core::deriveSeed(seed, gdp::game::SeedDomain::Lighting, 0U),
         "lighting plan starts from the isolated Lighting seed domain");
-    expect(first.supportsAlert && first.lights.size() == 3U,
-        "START lighting is readable and can react to lockdown");
+    expect(!first.supportsAlert && first.lights.size() == 3U,
+        "safe START lighting is readable without lockdown alert");
     expect(validateRoomLightingPlan(first, roomBounds).isValid(),
         "representative START lighting plan validates");
 
-    constexpr std::uint64_t goldenHash = 0x2D7AF8E8762A807FULL;
+    const RoomLightingPlan terminal = generateRoomLightingPlan(
+        seed, RoomRole::Terminal, RoomTheme::Security, roomBounds);
+    expect(terminal.supportsAlert && terminal.lights.size() == 4U
+            && validateRoomLightingPlan(terminal, roomBounds).isValid(),
+        "dedicated Terminal room supports lockdown lighting");
+
+    constexpr std::uint64_t goldenHash = 0x9784746862ECF493ULL;
     expect(first.planHash == goldenHash,
         "representative lighting plan keeps its golden hash");
 }

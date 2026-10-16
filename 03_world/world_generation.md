@@ -51,10 +51,11 @@ for (int attempt=0; attempt<maxAttempts; ++attempt) {
 
 A tentativa usada faz parte do resultado reproduzível.
 
-`generateWorld()` usa até 32 tentativas derivadas e só retorna um `World` após
+`generateWorld()` usa até 128 tentativas derivadas por padrão e só retorna um `World` após
 `validateWorld()`. A saída preserva master seed, attempt seed, versão, tentativa
 aceita, graph, rooms e corridors. Falhas distinguem graph, module, overlap,
-connector e corridor.
+connector e corridor. O limite maior acomoda a sala Terminal grande em mapas
+compactos sem remover os loops ou aceitar corredores inválidos.
 
 ## Separação lógica/física
 

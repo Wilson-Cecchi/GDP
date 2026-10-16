@@ -116,12 +116,15 @@ RoomEventPlan generateRoomEventPlan(
 
     switch (role) {
     case RoomRole::Start:
+        break;
+    case RoomRole::Terminal:
         plan.type = RoomEventType::TerminalAmbush;
         plan.trigger = RoomEventTrigger::TerminalUse;
         plan.locksRoom = true;
         plan.requiresRoomClear = true;
         plan.waveCount = 1U;
         addSpawn(plan, EnemyArchetype::Worker, 0U, eventZones, safeDifficulty);
+        addSpawn(plan, EnemyArchetype::Guard, 0U, eventZones, safeDifficulty);
         configureReward(plan, ItemType::Ammo, 10U, eventZones);
         break;
     case RoomRole::Normal:
@@ -234,6 +237,10 @@ EventValidationResult validateRoomEventPlan(
     const bool invalidTypeContract
         = (plan.type == RoomEventType::None
             && (plan.locksRoom || plan.requiresRoomClear || plan.waveCount != 0U))
+        || (plan.role == RoomRole::Start && plan.type != RoomEventType::None)
+        || (plan.role == RoomRole::Terminal
+            && (plan.type != RoomEventType::TerminalAmbush
+                || plan.spawns.size() != 2U))
         || (plan.type == RoomEventType::SupplyDrop
             && (plan.locksRoom || plan.requiresRoomClear || plan.waveCount != 0U))
         || (plan.type == RoomEventType::Reinforcements

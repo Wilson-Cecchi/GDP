@@ -361,7 +361,8 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(404, "LaboratoryBoss_01", RoomTheme::Laboratory,
             RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
         makeRectangularModule(405, "LaboratoryHall_01", RoomTheme::Laboratory,
-            RoomSizeClass::Large, {16, 6, 22}, roomRoleBit(RoomRole::Normal)),
+            RoomSizeClass::Large, {16, 6, 22},
+            roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal)),
 
         makeRectangularModule(501, "MaintenanceCompact_01", RoomTheme::Maintenance,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -383,7 +384,8 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(604, "SecurityBoss_01", RoomTheme::Security,
             RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
         makeRectangularModule(605, "SecurityHall_01", RoomTheme::Security,
-            RoomSizeClass::Large, {18, 6, 18}, roomRoleBit(RoomRole::Normal)),
+            RoomSizeClass::Large, {18, 6, 18},
+            roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal)),
 
         makeRectangularModule(701, "CafeteriaCompact_01", RoomTheme::Cafeteria,
             RoomSizeClass::Compact, {7, 4, 9}, common),

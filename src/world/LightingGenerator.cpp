@@ -58,7 +58,8 @@ std::size_t lightCountFor(const RoomRole role, const wkc::core::Aabb bounds) noe
     if (role == RoomRole::Secret) {
         return 1U;
     }
-    if (role == RoomRole::Hub || role == RoomRole::Arena || role == RoomRole::Boss) {
+    if (role == RoomRole::Hub || role == RoomRole::Terminal
+        || role == RoomRole::Arena || role == RoomRole::Boss) {
         return maxRoomLights;
     }
     const float width = bounds.maximum.x - bounds.minimum.x;
@@ -114,8 +115,9 @@ RoomLightingPlan generateRoomLightingPlan(
     const LightingPalette palette = paletteFor(role, theme);
     plan.mood = palette.mood;
     plan.ambientColor = palette.ambient;
-    plan.supportsAlert = role == RoomRole::Start || role == RoomRole::Arena
-        || role == RoomRole::Boss || theme == RoomTheme::Security;
+    plan.supportsAlert = role != RoomRole::Start
+        && (role == RoomRole::Terminal || role == RoomRole::Arena
+            || role == RoomRole::Boss || theme == RoomTheme::Security);
     const float width = roomBounds.maximum.x - roomBounds.minimum.x;
     const float depth = roomBounds.maximum.z - roomBounds.minimum.z;
     const bool spaciousBoss = roomBounds.isValid() && role == RoomRole::Boss

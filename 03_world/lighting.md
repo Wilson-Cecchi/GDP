@@ -58,14 +58,15 @@ O renderer recebe somente dados prontos, sem acessar geradores ou RNG. Quando
 um evento compatível entra em lockdown, ambiente, pontos e luminárias mudam
 temporariamente para alerta vermelho; a conclusão restaura o plano original.
 
-O mundo já possui planos para todas as salas, mas a navegação física ainda
-renderiza apenas a START. Nela, usar o terminal com `E` permite observar a
-transição normal → alerta → normal durante a emboscada.
+O mundo possui planos para todas as salas navegáveis. Na sala Terminal, usar o
+console com `E` ativa o lockdown e permite observar a transição de iluminação
+normal → alerta → normal após a limpeza do encontro. A START permanece sem
+inimigos e sem terminal de missão.
 
 ## Gates
 
 O teste dedicado cobre 1.000 seeds, seis moods, papéis/temas, bounds, limites de
-leitura, hash dourado `0x2D7AF8E8762A807F`, seeds padrão/12345 e estabilidade do
+leitura, hash dourado da START `0x9784746862ECF493`, seeds padrão/12345 e estabilidade do
 fingerprint estrutural. Outro lote de 1.000 seeds confere Boss e Normal amplos,
 incluindo alcance dos quatro cantos à altura da câmera e limite de pontos.
 A regressão OpenGL exige mudança de pixels entre luz padrão, plano procedural

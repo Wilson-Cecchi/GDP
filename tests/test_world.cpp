@@ -102,6 +102,7 @@ void testDefaultModuleStructuralVariety()
         sawLarge = sawLarge || module.sizeClass == RoomSizeClass::Large;
         if ((module.supportsRole(RoomRole::Hub)
                 || module.supportsRole(RoomRole::Arena)
+                || module.supportsRole(RoomRole::Terminal)
                 || module.supportsRole(RoomRole::Boss))
             && module.sizeClass != RoomSizeClass::Large) {
             roleSizesValid = false;
@@ -120,7 +121,7 @@ void testDefaultModuleStructuralVariety()
             for (const RoomRole candidate : {
                      RoomRole::Start, RoomRole::Normal, RoomRole::Hub,
                      RoomRole::Arena, RoomRole::DeadEnd, RoomRole::Secret,
-                     RoomRole::Boss}) {
+                     RoomRole::Boss, RoomRole::Terminal}) {
                 if (module.supportsRole(candidate)) {
                     role = candidate;
                     break;
@@ -346,7 +347,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0xF65612E8273F76B8ULL,
+    expect(fingerprint == 0x9F371F09C5AB76F3ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -430,65 +431,30 @@ void testInitialEntityPopulation()
         "population creates exactly one player entity");
     const PropData* terminal = manager.findData<PropData>(initial.terminal);
     expect(terminal != nullptr && terminal->type == PropType::Terminal && terminal->solid,
-        "START room receives the solid interaction terminal");
+        "dedicated Terminal room receives the solid interaction terminal");
     expect(!initial.exitTerminal.isValid(), "non-Campaign population has no exit terminal");
 
     bool arenaCompositionValid = true;
     std::size_t arenaEnemyCount = 0U;
     bool bossRobotValid = false;
-    bool startCoverValid = false;
-    bool startCoverSpawnClear = false;
-    bool startWorkerFacesPlayer = false;
+    bool startEnemyFree = true;
+    bool startTerminalFree = true;
+    std::size_t terminalEnemyCount = 0U;
+    bool terminalOwnsConsole = false;
     for (const RoomInstance& room : generated.world->rooms) {
         for (const EntityId id : room.entities) {
             const EnemyData* enemy = manager.findData<EnemyData>(id);
             const Entity* entity = manager.find(id);
             const PropData* prop = manager.findData<PropData>(id);
-            if (room.role == RoomRole::Start && entity != nullptr
-                && enemy != nullptr
-                && enemy->archetype == EnemyArchetype::Worker) {
-                constexpr float degreesToRadians = 0.01745329251994329577F;
-                const float yaw
-                    = entity->transform.rotationDegrees.y * degreesToRadians;
-                const wkc::core::Vec3 forward{std::sin(yaw), 0.0F, std::cos(yaw)};
-                const Entity* playerEntity = manager.find(initial.player);
-                const wkc::core::Vec3 towardPlayer = playerEntity == nullptr
-                    ? wkc::core::Vec3{}
-                    : wkc::core::normalized(
-                        playerEntity->transform.position - entity->transform.position);
-                startWorkerFacesPlayer = wkc::core::dot(forward, towardPlayer) > 0.99F;
+            if (room.role == RoomRole::Start) {
+                startEnemyFree &= enemy == nullptr;
+                startTerminalFree &= id != initial.terminal;
             }
-            startCoverValid = startCoverValid || (room.role == RoomRole::Start
-                && entity != nullptr && prop != nullptr
-                && prop->type == PropType::Barricade && prop->solid
-                && prop->health == 180.0F && prop->maximumHealth == 180.0F
-                && prop->visualSeed != 0U
-                && entity->transform.scale.y == 2.25F
-                && std::max(
-                    entity->transform.scale.x, entity->transform.scale.z) == 2.80F
-                && std::min(
-                    entity->transform.scale.x, entity->transform.scale.z) == 0.46F);
-            if (room.role == RoomRole::Start && entity != nullptr && prop != nullptr
-                && prop->type == PropType::Barricade
-                && prop->maximumHealth == 180.0F) {
-                const wkc::core::Vec3 halfScale{
-                    entity->transform.scale.x * 0.5F,
-                    0.0F,
-                    entity->transform.scale.z * 0.5F,
-                };
-                const wkc::core::Aabb coverBounds{
-                    entity->transform.position - halfScale,
-                    entity->transform.position + wkc::core::Vec3{
-                        halfScale.x, entity->transform.scale.y, halfScale.z},
-                };
-                startCoverSpawnClear = room.worldBounds.contains(coverBounds.minimum)
-                    && room.worldBounds.contains(coverBounds.maximum);
-                for (const EntityId otherId : room.entities) {
-                    const Entity* other = manager.find(otherId);
-                    startCoverSpawnClear = startCoverSpawnClear
-                        && (otherId == id || other == nullptr
-                            || !coverBounds.contains(other->transform.position));
-                }
+            if (room.role == RoomRole::Terminal) {
+                terminalEnemyCount += enemy != nullptr ? 1U : 0U;
+                terminalOwnsConsole |= id == initial.terminal
+                    && entity != nullptr && prop != nullptr
+                    && prop->type == PropType::Terminal;
             }
             if (room.role == RoomRole::Arena && enemy != nullptr) {
                 ++arenaEnemyCount;
@@ -513,12 +479,10 @@ void testInitialEntityPopulation()
         "Arena population uses two to four healthy seeded enemies");
     expect(bossRobotValid,
         "Boss population includes one healthy IndustrialRobot with an isolated visual seed");
-    expect(startCoverValid,
-        "START includes one tall and wide cover volume for perception validation");
-    expect(startCoverSpawnClear,
-        "START cover stays inside the room without enclosing any initial entity");
-    expect(startWorkerFacesPlayer,
-        "START Worker initially faces the Player for the perception tutorial");
+    expect(startEnemyFree && startTerminalFree,
+        "START has no initial enemies or mission terminal");
+    expect(terminalOwnsConsole && terminalEnemyCount == 3U,
+        "dedicated Terminal room owns its console and three initial enemies");
 
     const auto collectEnemyVisualSeeds = [](const EntityManager& entities) {
         std::vector<wkc::core::Seed> seeds;
@@ -539,7 +503,6 @@ void testInitialEntityPopulation()
     bool roomLinksValid = true;
     bool lootLayoutsValid = true;
     bool propLayoutsValid = true;
-    bool proceduralArmorPresent = false;
     bool proceduralWeaponPresent = false;
     bool proceduralSpecialPresent = false;
     for (const RoomInstance& room : generated.world->rooms) {
@@ -560,7 +523,8 @@ void testInitialEntityPopulation()
                     const Entity* entity = manager.find(id);
                     return entity != nullptr && entity->kind == EntityKind::Enemy;
                 }));
-        const std::size_t baseCount = room.role == RoomRole::Start ? 4U
+        const std::size_t baseCount = room.role == RoomRole::Start ? 1U
+            : room.role == RoomRole::Terminal ? enemyCount + 1U
             : room.role == RoomRole::Boss ? enemyCount + 3U : enemyCount;
         const std::size_t expectedCount
             = baseCount + props.props.size() + loot.drops.size();
@@ -582,8 +546,6 @@ void testInitialEntityPopulation()
             if (entity == nullptr || item == nullptr) {
                 continue;
             }
-            proceduralArmorPresent = proceduralArmorPresent
-                || item->type == ItemType::Armor;
             proceduralWeaponPresent = proceduralWeaponPresent
                 || item->type == ItemType::Weapon;
             proceduralSpecialPresent = proceduralSpecialPresent
@@ -607,11 +569,6 @@ void testInitialEntityPopulation()
                 || (prop->type != PropType::Crate
                     && prop->type != PropType::Canister
                     && prop->type != PropType::Barricade)) {
-                continue;
-            }
-            if (room.role == RoomRole::Start
-                && prop->type == PropType::Barricade
-                && prop->maximumHealth == 180.0F) {
                 continue;
             }
             if (room.role == RoomRole::Boss
@@ -645,8 +602,6 @@ void testInitialEntityPopulation()
         "every RoomInstance owns its expected valid deterministic content handles");
     expect(lootLayoutsValid,
         "room population preserves each deterministic procedural loot layout exactly");
-    expect(proceduralArmorPresent,
-        "representative populated world exposes procedural Armor as playable loot");
     expect(proceduralWeaponPresent,
         "representative populated world exposes the Secret weapon pickup");
     expect(proceduralSpecialPresent,
@@ -726,6 +681,17 @@ void testInitialEntityPopulation()
             && rejectedManager.activeCount() == 0,
         "population rejects a world without START before creating partial content");
 
+    World missingTerminal = *generated.world;
+    for (RoomInstance& room : missingTerminal.rooms) {
+        if (room.role == RoomRole::Terminal) {
+            room.role = RoomRole::Normal;
+        }
+    }
+    EntityManager missingTerminalManager;
+    expect(!populateInitialEntities(missingTerminal, missingTerminalManager, {}).isValid()
+            && missingTerminalManager.activeCount() == 0,
+        "population rejects a world without Terminal before creating partial content");
+
     EntityManager occupiedManager;
     (void)occupiedManager.createProp({});
     const std::size_t occupiedCount = occupiedManager.activeCount();
@@ -761,6 +727,7 @@ void testWorldSeedBatch()
     std::array<bool, 3> arenaCounts{};
     std::array<bool, 3> bossHealthValues{};
     bool encountersValid = true;
+    bool sawArmorLoot = false;
     for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
         WorldGenerationResult generated = generateWorld(seed);
         if (!generated.world || !validateWorld(*generated.world).isValid()) {
@@ -836,7 +803,8 @@ void testWorldSeedBatch()
             sawCompactNormal = sawCompactNormal || (room.role == RoomRole::Normal
                 && room.sizeClass == RoomSizeClass::Compact);
             if ((room.role == RoomRole::Hub || room.role == RoomRole::Arena
-                    || room.role == RoomRole::Boss)
+                    || room.role == RoomRole::Boss
+                    || room.role == RoomRole::Terminal)
                 && room.sizeClass != RoomSizeClass::Large) {
                 roleSizesValid = false;
             }
@@ -867,6 +835,8 @@ void testWorldSeedBatch()
                     const auto* enemy = manager.findData<gdp::entities::EnemyData>(id);
                     const auto* item = manager.findData<gdp::entities::ItemData>(id);
                     enemies += enemy != nullptr ? 1U : 0U;
+                    sawArmorLoot |= item != nullptr
+                        && item->type == gdp::entities::ItemType::Armor;
                     secretWeapons += room.role == RoomRole::Secret && item != nullptr
                         && item->type == gdp::entities::ItemType::Weapon ? 1U : 0U;
                     if (room.role == RoomRole::Boss && enemy != nullptr
@@ -890,6 +860,8 @@ void testWorldSeedBatch()
                     if (enemies >= 2U && enemies <= 4U) {
                         arenaCounts[enemies - 2U] = true;
                     }
+                } else if (room.role == RoomRole::Terminal) {
+                    encountersValid = encountersValid && enemies == 3U;
                 } else if (room.role == RoomRole::Boss) {
                     encountersValid = encountersValid && enemies == 3U;
                 }
@@ -919,6 +891,8 @@ void testWorldSeedBatch()
             && std::all_of(arenaCounts.begin(), arenaCounts.end(), [](bool seen) { return seen; })
             && std::all_of(bossHealthValues.begin(), bossHealthValues.end(), [](bool seen) { return seen; }),
         "seed batch keeps a weapon and exercises all bounded enemy and boss variants");
+    expect(sawArmorLoot,
+        "seed batch still offers procedural Armor pickups");
 }
 
 void testCampaignExitTerminalPopulation()
@@ -1001,7 +975,9 @@ void testCampaignEncounterProgression()
                     const Vec3 position = entity->transform.position;
                     snapshot.emplace_back(room.role, enemy->archetype, position, enemy->health);
                     if (floor > 1U && (room.role == RoomRole::Normal
-                            || room.role == RoomRole::Arena || room.role == RoomRole::Boss)) {
+                            || room.role == RoomRole::Arena
+                            || room.role == RoomRole::Terminal
+                            || room.role == RoomRole::Boss)) {
                         constexpr float radius = 0.52F;
                         validPositions &= position.x - radius >= room.worldBounds.minimum.x
                             && position.x + radius <= room.worldBounds.maximum.x
@@ -1241,6 +1217,50 @@ void testBossDifficultyProfiles()
         "Boss spawn batch covers all four room rotations");
 }
 
+void testSeparatedTerminalAcrossMapSizes()
+{
+    using namespace gdp::world;
+    bool mapsValid = true;
+    bool terminalSeparated = true;
+    bool branchPlacement = true;
+    for (std::uint32_t roomCount = 4U; roomCount <= 10U; ++roomCount) {
+        for (wkc::core::Seed seed = 0U; seed < 1'000U; ++seed) {
+            const auto generated = generateWorld(seed,
+                {.roomCount = roomCount, .loopBudget = 1U,
+                    .maximumAttempts = 128U});
+            if (!generated.world || !validateWorld(*generated.world).isValid()) {
+                mapsValid = false;
+                std::cerr << "Terminal layout failed rooms=" << roomCount
+                    << " seed=" << seed << '\n';
+                continue;
+            }
+            const auto& graph = generated.world->graph;
+            const auto terminal = std::find_if(graph.nodes.begin(), graph.nodes.end(),
+                [](const RoomNode& node) { return node.role == RoomRole::Terminal; });
+            const auto start = std::find_if(graph.nodes.begin(), graph.nodes.end(),
+                [](const RoomNode& node) { return node.role == RoomRole::Start; });
+            terminalSeparated &= terminal != graph.nodes.end()
+                && start != graph.nodes.end() && terminal->id != start->id;
+            if (terminal == graph.nodes.end() || start == graph.nodes.end()) continue;
+            for (const MapEdge& edge : graph.edges) {
+                terminalSeparated &= !((edge.first == start->id
+                    && edge.second == terminal->id)
+                    || (edge.second == start->id
+                        && edge.first == terminal->id));
+            }
+            if (roomCount >= 6U) {
+                branchPlacement &= std::find(graph.mainPath.begin(),
+                    graph.mainPath.end(), terminal->id) == graph.mainPath.end();
+            }
+        }
+    }
+    expect(mapsValid, "Terminal layouts generate valid maps across 4-10 rooms");
+    expect(terminalSeparated,
+        "Terminal is separate from START and never directly connected to it");
+    expect(branchPlacement,
+        "Terminal occupies a procedural branch when the map has branches");
+}
+
 } // namespace
 
 int main()
@@ -1258,6 +1278,7 @@ int main()
     testCampaignEncounterProgression();
     testBossDifficultyProfiles();
     testWorldSeedBatch();
+    testSeparatedTerminalAcrossMapSizes();
 
     if (failures != 0) {
         std::cerr << failures << " world module test(s) failed\n";

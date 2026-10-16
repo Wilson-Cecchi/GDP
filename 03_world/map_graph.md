@@ -30,15 +30,24 @@ base conectada → MST → loops controlados → roles → branches/secrets
 A implementação parte de um caminho autoritativo START→BOSS e gasta um
 `loopBudget` explícito sem self-edge, duplicata ou grau maior que quatro. Oito
 salas são o perfil inicial, com duas branches e um loop. Hub e Arena variam de
-posição entre os nós internos do caminho; uma branch permanece conectada ao
-Hub e a outra escolhe outro nó interno. Secret e DeadEnd trocam de branch por
+posição entre os nós internos do caminho. Uma branch permanece conectada ao
+Hub e a outra escolhe outro nó interno. Secret e Terminal trocam de branch por
 seed, com a Secret favorecendo a branch fora do Hub. Assim, a arma garantida na
-Secret e o encontro da Arena não seguem sempre a mesma ordem. Os loops
-continuam locais para não gerar corredores excessivamente longos.
+Secret, o terminal e o encontro da Arena não seguem sempre a mesma ordem. Os
+loops continuam locais, passam pela branch Secret para respeitar o limite de
+corredor e nunca ligam Terminal diretamente a Start.
+
+Com seis ou mais salas, as duas branches contêm Secret e Terminal. Com quatro ou cinco
+salas, uma sala Normal interna, após a vizinha de Start, assume o papel Terminal;
+no mapa mínimo de quatro salas, a Arena ocupa a primeira sala para manter o
+Terminal mais distante. O ramo que antes recebia DeadEnd passa a abrigar o
+Terminal no perfil gerado; o papel DeadEnd permanece disponível para outros
+layouts. Em todos os tamanhos, existe exatamente um Terminal.
 
 ## Regras
 
 - exatamente um START;
+- exatamente um TERMINAL, fora de START e sem ligação direta a ele;
 - exatamente um BOSS quando o andar exigir;
 - START alcança BOSS;
 - SECRET nunca é único caminho obrigatório;

@@ -14,7 +14,7 @@ namespace gdp::world {
 struct WorldGenerationConfig {
     std::uint32_t roomCount{8};
     std::uint32_t loopBudget{1};
-    std::uint32_t maximumAttempts{32};
+    std::uint32_t maximumAttempts{128};
     float roomSpacing{12.0F};
 };
 

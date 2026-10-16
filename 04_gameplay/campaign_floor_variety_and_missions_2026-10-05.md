@@ -102,3 +102,21 @@ reescreve checkpoints da versão 42/schema 8 ao carregar: eles retomam os
 recursos da entrada do andar e regeneram a missão pelas regras 43. As regras
 de Standard, Speedrun e Test Mode não mudam. Nenhuma textura, inimigo, bônus
 ou atributo do boss foi alterado nesta etapa.
+
+## Sala Terminal separada — regras 45
+
+A START é uma sala de entrada sem inimigos e sem terminal de missão. O terminal
+fica em uma sala grande própria, em um dos ramos procedurais do mapa, separada
+da START. Três inimigos iniciais e dois do evento já estão presentes nessa sala
+antes da interação. `SecureTerminal` aponta para a sala Terminal; usar o console
+ativa a missão e o lockdown, e limpar os inimigos conclui o objetivo. Se a sala
+for limpa antes do uso, a missão aguarda a interação. A sala Boss e a chave na
+Secret mantêm suas condições de progressão.
+
+Checkpoints de regras 44/schema 8 preservam inventário e entrada do andar ao
+carregar; o mapa do andar é regenerado pelas regras 45. O arquivo original só
+é atualizado ao salvar novamente. O terminal de suprimentos do Test Mode usa
+seu populador separado e continua nessa arena.
+
+Como o mapa e a segurança do spawn também afetam tempos, Speedrun passa às
+regras 41; recordes de regras anteriores não entram na comparação atual.

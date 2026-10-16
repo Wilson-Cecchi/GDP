@@ -11,6 +11,7 @@
 #include <iostream>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -476,7 +477,7 @@ void testCampaignFloorVarietyAndMissions()
                     || kind == gameplay::CampaignMissionKind::RecoverAndSecure)
                 ? world::RoomRole::Secret
                 : kind == gameplay::CampaignMissionKind::SecureTerminal
-                    ? world::RoomRole::Start : world::RoomRole::Arena;
+                    ? world::RoomRole::Terminal : world::RoomRole::Arena;
             const auto target = std::find_if(generated.world->rooms.begin(),
                 generated.world->rooms.end(), [role](const auto& room) {
                     return room.role == role;
@@ -555,7 +556,7 @@ void testCampaignFloorVarietyAndMissions()
                     });
                 expect(populated.isValid() && entities.find(populated.terminal)
                         && node != generated.world->graph.nodes.end(),
-                    "terminal objective has a real interactable in Start");
+                    "terminal objective has a real interactable in its separate room");
                 if (node == generated.world->graph.nodes.end()) continue;
                 const auto plan = world::generateRoomEventPlan(target->seed,
                     target->role, target->theme, node->depth, target->enemyZones, 1.0F);
@@ -574,9 +575,25 @@ void testCampaignFloorVarietyAndMissions()
                     expect(enemy != nullptr && enemy->active,
                         "terminal objective enemy is active before interaction");
                 }
+                std::vector<wkc::core::Vec3> terminalEnemyPositions;
+                bool terminalEncounterClear = true;
+                for (const auto id : entities.queryRoom(target->id)) {
+                    const auto* enemy = entities.findData<entities::EnemyData>(id);
+                    const auto* entity = entities.find(id);
+                    if (enemy == nullptr || entity == nullptr) continue;
+                    terminalEncounterClear &= enemy->active;
+                    for (const auto& other : terminalEnemyPositions) {
+                        const auto delta = entity->transform.position - other;
+                        terminalEncounterClear &= delta.x * delta.x + delta.z * delta.z
+                            >= 1.04F * 1.04F;
+                    }
+                    terminalEnemyPositions.push_back(entity->transform.position);
+                }
+                expect(terminalEncounterClear && terminalEnemyPositions.size() == 5U,
+                    "five active Terminal enemies start without overlapping each other");
                 expect(!gameplay::updateRoomEvent(runtime, entities, true, false,
                         1.0F / 60.0F).activated,
-                    "entering Start alone cannot complete the terminal mission");
+                    "entering the Terminal room alone cannot complete its mission");
                 expect(!gameplay::advanceCampaignMission(mission, target->id,
                         {.terminalAmbushCleared = true}) && !mission.activated,
                     "ambush completion without terminal activation cannot satisfy the mission");
@@ -587,7 +604,7 @@ void testCampaignFloorVarietyAndMissions()
                         && !gameplay::advanceCampaignMission(
                         mission, target->id, {.terminalActivated = activated.activated})
                         && mission.activated && !mission.completed,
-                    "using the Start terminal activates without spawning or finishing the mission");
+                    "using the separated terminal activates without spawning or finishing the mission");
                 for (const auto id : entities.query(entities::EntityKind::Enemy)) {
                     if (auto* enemy = entities.findData<entities::EnemyData>(id)) {
                         enemy->active = false;

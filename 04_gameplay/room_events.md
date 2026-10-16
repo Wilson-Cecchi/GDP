@@ -1,7 +1,8 @@
 # Gameplay — Eventos procedurais de sala
 
 > **Estado:** geração, validação e runtime funcional implementados no terceiro
-> incremento da Fase 12. A START oferece o fluxo jogável pelo terminal;
+> incremento da Fase 12. A START é um ponto de entrada seguro; a sala TERMINAL
+> abriga o fluxo jogável da missão;
 > transições entre salas e combate nos corredores já são físicos e contínuos.
 
 ## Plano determinístico
@@ -18,8 +19,10 @@ Lockdown
 SupplyDrop
 ```
 
-- START: inimigo adicional de `TerminalAmbush` presente desde a criação do
-  andar; usar `E` no terminal ativa o evento e sua missão;
+- START: nenhum evento ou inimigo;
+- Terminal: dois inimigos adicionais (`Worker` e `Guard`) de
+  `TerminalAmbush` presentes desde a criação do andar, além dos três do
+  encontro inicial; usar `E` no terminal ativa o evento e sua missão;
 - Normal: chance determinística de um ou dois grupos adicionais, presentes
   juntos desde a criação do andar;
 - Hub/Secret: `SupplyDrop` ao entrar;
@@ -50,7 +53,7 @@ onda ou recompensa da sala original. Enquanto um inimigo da sala estiver vivo
 do lado de fora, as portas deixam de ser seladas pelo lockdown para que o
 Player possa persegui-lo; quando ele retorna ou morre, a trava volta a valer.
 
-Na START atual, o Worker adicional já está ativo antes do uso. Usar o terminal
+Na sala Terminal, os cinco inimigos já estão ativos antes do uso. Usar o terminal
 ativa a missão e o lockdown; a sala precisa ficar sem inimigos para liberar Ammo.
 Se todos forem derrotados antes da interação, a missão e o evento só se concluem
 quando o terminal for usado. O título da janela mostra tipo, fase e `[LOCKDOWN]`;
@@ -66,6 +69,8 @@ layouts já comprometidos.
 
 O gate percorre 1.000 room seeds, exige os cinco tipos, hashes únicos, triggers
 compatíveis, ondas completas, spawns/recompensa dentro das zonas e protege o
-hash dourado `0xB04A437A8394B962`. Testes funcionais cobrem terminal, entrada,
+hashes dourados da START `0x1D0E2C09C83186D7` e da sala Terminal
+`0xC586E4CCCD8B1265` (novo papel e segundo inimigo).
+Testes funcionais cobrem START vazia, terminal, entrada,
 dois grupos simultâneos, inimigo adicional da Arena, lockdown, suporte,
 conclusão e recompensa única.

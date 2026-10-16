@@ -982,7 +982,8 @@ if(GDP_BUILD_TESTS)
     set_tests_properties(
         first_gameplay_headless
         PROPERTIES
-            PASS_REGULAR_EXPRESSION "Player died"
+            PASS_REGULAR_EXPRESSION "Run 0 ended as Playing after 900 frame"
+            FAIL_REGULAR_EXPRESSION "Player died"
             TIMEOUT 10
     )
 

@@ -928,7 +928,7 @@ bool Application::initializeRun()
             config_.worldSeed, session_.state().campaignFloor);
         worldConfig.roomCount = layout.roomCount;
         worldConfig.loopBudget = layout.loopBudget;
-        worldConfig.maximumAttempts = 64U;
+        worldConfig.maximumAttempts = 128U;
     }
     world::WorldGenerationResult generation = world::generateWorld(
         config_.worldSeed, worldConfig);
@@ -1007,7 +1007,7 @@ bool Application::initializeRun()
         session_.state().mode == gameplay::RunMode::Campaign
             ? session_.state().campaignFloor : 1U);
     if (!initialEntities.isValid()) {
-        log(LogLevel::Error, "Initial entity population did not find a START room");
+        log(LogLevel::Error, "Initial entity population requires START and Terminal rooms");
         return false;
     }
     player_.bindEntity(initialEntities.player);
@@ -1026,7 +1026,7 @@ bool Application::initializeRun()
                 || campaignMission_.kind == gameplay::CampaignMissionKind::RecoverAndSecure)
             ? world::RoomRole::Secret
             : campaignMission_.kind == gameplay::CampaignMissionKind::SecureTerminal
-                ? world::RoomRole::Start : world::RoomRole::Arena;
+                ? world::RoomRole::Terminal : world::RoomRole::Arena;
         const auto target = std::find_if(world_->rooms.begin(), world_->rooms.end(),
             [targetRole](const world::RoomInstance& room) {
                 return room.role == targetRole;
@@ -1059,10 +1059,13 @@ bool Application::initializeRun()
                 return false;
             }
         } else if (campaignMission_.kind
-                == gameplay::CampaignMissionKind::SecureTerminal
-            && !entities_.find(terminalEntity_)) {
-            log(LogLevel::Error, "Campaign terminal mission has no usable terminal");
-            return false;
+                == gameplay::CampaignMissionKind::SecureTerminal) {
+            const entities::Entity* terminal = entities_.find(terminalEntity_);
+            if (terminal == nullptr || terminal->roomId != target->id) {
+                log(LogLevel::Error,
+                    "Campaign terminal mission has no terminal in its target room");
+                return false;
+            }
         }
         log(LogLevel::Info, "Campaign floor "
             + std::to_string(session_.state().campaignFloor)
@@ -3171,7 +3174,7 @@ void Application::fixedUpdate(const double fixedStep)
         if (event.activated) {
             (void)gameplay::advanceCampaignMission(campaignMission_,
                 activeEvent->roomId, {
-                    .terminalActivated = activeEvent->plan.role == world::RoomRole::Start
+                    .terminalActivated = activeEvent->plan.role == world::RoomRole::Terminal
                         && activeEvent->plan.type == world::RoomEventType::TerminalAmbush,
                 });
             std::ostringstream message;
@@ -3200,7 +3203,7 @@ void Application::fixedUpdate(const double fixedStep)
             const gameplay::CampaignMissionProgress missionProgress{
                 .arenaCleared = activeEvent->plan.role == world::RoomRole::Arena
                     && activeEvent->plan.type == world::RoomEventType::Lockdown,
-                .terminalAmbushCleared = activeEvent->plan.role == world::RoomRole::Start
+                .terminalAmbushCleared = activeEvent->plan.role == world::RoomRole::Terminal
                     && activeEvent->plan.type == world::RoomEventType::TerminalAmbush,
             };
             if (gameplay::advanceCampaignMission(campaignMission_,

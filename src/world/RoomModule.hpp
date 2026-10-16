@@ -23,6 +23,7 @@ enum class RoomRole : std::uint8_t {
     DeadEnd,
     Secret,
     Boss,
+    Terminal,
     Count,
 };
 

@@ -3,6 +3,7 @@
 #include "core/Random.hpp"
 
 #include <algorithm>
+#include <array>
 #include <queue>
 #include <sstream>
 #include <unordered_map>
@@ -29,6 +30,8 @@ RoomTheme chooseTheme(const RoomRole role, wkc::core::RandomStream& random)
         return random.chance(0.5F) ? RoomTheme::Security : RoomTheme::Maintenance;
     case RoomRole::Secret:
         return random.chance(0.5F) ? RoomTheme::Laboratory : RoomTheme::Storage;
+    case RoomRole::Terminal:
+        return random.chance(0.5F) ? RoomTheme::Security : RoomTheme::Laboratory;
     case RoomRole::Boss: {
         constexpr RoomTheme choices[]{
             RoomTheme::Laboratory,
@@ -107,11 +110,17 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
 
     const std::uint32_t branchCount = config.roomCount >= 6U ? 2U : 0U;
     const std::uint32_t mainCount = config.roomCount - branchCount;
-    const bool secretFirst = branchCount > 0U && random.chance(0.33F);
+    std::array branchRoles{RoomRole::Secret, RoomRole::Terminal};
+    if (branchCount == 2U) {
+        if (!random.chance(0.33F)) {
+            std::swap(branchRoles[0], branchRoles[1]);
+        }
+    }
     const std::uint32_t hubIndex = branchCount > 0U
         ? static_cast<std::uint32_t>(random.rangeInt(1, static_cast<int>(mainCount - 3U)))
         : 0U;
-    std::uint32_t arenaIndex = mainCount - 2U;
+    std::uint32_t arenaIndex = mainCount == 4U && branchCount == 0U
+        ? 1U : mainCount - 2U;
     if (mainCount >= 5U) {
         do {
             arenaIndex = static_cast<std::uint32_t>(random.rangeInt(
@@ -129,11 +138,23 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
         } else if (index == arenaIndex) {
             role = RoomRole::Arena;
         } else if (index >= mainCount) {
-            const bool firstBranch = index == mainCount;
-            role = firstBranch == secretFirst
-                ? RoomRole::Secret : RoomRole::DeadEnd;
+            role = branchRoles[index - mainCount];
         }
         graph.nodes.push_back({index + 1U, role, chooseTheme(role, random), 0});
+    }
+
+    if (branchCount == 0U) {
+        std::vector<std::uint32_t> terminalCandidates;
+        for (std::uint32_t index = 2U; index + 1U < mainCount; ++index) {
+            if (graph.nodes[index].role == RoomRole::Normal) {
+                terminalCandidates.push_back(index);
+            }
+        }
+        const auto selected = static_cast<std::size_t>(random.rangeInt(
+            0, static_cast<int>(terminalCandidates.size() - 1U)));
+        RoomNode& terminal = graph.nodes[terminalCandidates[selected]];
+        terminal.role = RoomRole::Terminal;
+        terminal.theme = chooseTheme(terminal.role, random);
     }
 
     EdgeId nextEdge = 1;
@@ -148,15 +169,23 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
     }
     graph.mainPath.push_back(mainCount);
 
+    std::vector<RoomNodeId> branchParents;
+    for (RoomNodeId id = 2U; id < mainCount; ++id) {
+        if (id != hubIndex + 1U) {
+            branchParents.push_back(id);
+        }
+    }
+    for (std::size_t index = branchParents.size(); index > 1U; --index) {
+        const auto selected = static_cast<std::size_t>(random.rangeInt(
+            0, static_cast<int>(index - 1U)));
+        std::swap(branchParents[index - 1U], branchParents[selected]);
+    }
     for (std::uint32_t index = mainCount; index < config.roomCount; ++index) {
-        // Keep one branch on the Hub while varying where both the Hub and
-        // second branch appear along the main route.
+        // Keep one branch on the Hub and distribute the others across
+        // different internal nodes before reusing a parent.
         RoomNodeId parent = hubIndex + 1U;
         if (index != mainCount) {
-            do {
-                parent = static_cast<RoomNodeId>(random.rangeInt(
-                    2, static_cast<int>(mainCount - 1U)));
-            } while (parent == hubIndex + 1U);
+            parent = branchParents[(index - mainCount - 1U) % branchParents.size()];
         }
         graph.edges.push_back({nextEdge++, parent, index + 1U, false});
         connections.insert(connectionKey(parent, index + 1U));
@@ -178,8 +207,13 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
              secondIndex < config.roomCount; ++secondIndex) {
             const RoomNodeId first = firstIndex + 1U;
             const RoomNodeId second = secondIndex + 1U;
+            const RoomRole mainRole = isMainNode(first)
+                ? graph.nodes[firstIndex].role : graph.nodes[secondIndex].role;
             if (isMainNode(first) == isMainNode(second)
-                || connections.contains(connectionKey(first, second))) {
+                || connections.contains(connectionKey(first, second))
+                || graph.nodes[firstIndex].role == RoomRole::Terminal
+                || graph.nodes[secondIndex].role == RoomRole::Terminal
+                || mainRole == RoomRole::Start || mainRole == RoomRole::Boss) {
                 continue;
             }
             const bool shareNeighbor = std::any_of(
