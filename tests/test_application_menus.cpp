@@ -310,6 +310,23 @@ struct ApplicationMenuTestAccess {
                 "Southpaw movement no longer reads the left analog stick");
             app.runtimeSettings_.gamepadSouthpaw = false;
             if (slot == 0U && app.world_) {
+                const auto terminalEvent = std::find_if(app.roomEvents_.begin(),
+                    app.roomEvents_.end(), [](const auto& runtime) {
+                        return runtime.plan.role == world::RoomRole::Start;
+                    });
+                expect(terminalEvent != app.roomEvents_.end()
+                        && terminalEvent->plan.type == world::RoomEventType::TerminalAmbush
+                        && terminalEvent->phase == gameplay::RoomEventPhase::Dormant
+                        && terminalEvent->eventEnemies.size()
+                            == terminalEvent->plan.spawns.size()
+                        && !terminalEvent->eventEnemies.empty()
+                        && terminalEvent->nextWave == terminalEvent->plan.waveCount
+                        && std::all_of(terminalEvent->eventEnemies.begin(),
+                            terminalEvent->eventEnemies.end(), [&app](const auto id) {
+                                const auto* enemy = app.entities_.findData<entities::EnemyData>(id);
+                                return enemy != nullptr && enemy->active;
+                            }),
+                    "terminal encounter enemy is active before terminal use");
                 const auto arenaEvent = std::find_if(app.roomEvents_.begin(),
                     app.roomEvents_.end(), [](const auto& runtime) {
                         return runtime.plan.role == world::RoomRole::Arena;

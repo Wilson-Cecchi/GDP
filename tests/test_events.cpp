@@ -160,21 +160,41 @@ void testTerminalAmbushRuntime()
     (void)manager.createEnemy({.roomId = 1, .health = 50.0F});
     RoomEventRuntime runtime = makeRoomEventRuntime(generateRoomEventPlan(
         99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);
+    const std::vector<EntityId> staged = stageRoomEventEnemies(runtime, manager);
+    expect(staged.size() == runtime.plan.spawns.size()
+            && runtime.eventEnemies == staged
+            && runtime.nextWave == runtime.plan.waveCount
+            && runtime.phase == RoomEventPhase::Dormant,
+        "terminal enemy is present while the terminal event remains dormant");
+    if (!staged.empty()) {
+        const auto* entity = manager.find(staged.front());
+        const auto* enemy = manager.findData<EnemyData>(staged.front());
+        const auto& planned = runtime.plan.spawns.front();
+        expect(entity != nullptr && enemy != nullptr && enemy->active
+                && entity->roomId == 1U
+                && entity->transform.position == planned.position
+                && enemy->archetype == planned.archetype
+                && enemy->health == planned.health
+                && enemy->visualSeed == planned.visualSeed,
+            "terminal enemy preserves its planned room, position, archetype, HP and visual seed");
+    }
+    expect(stageRoomEventEnemies(runtime, manager).empty()
+            && manager.queryRoom(1).size() == 2U,
+        "preparing the terminal enemy twice does not duplicate it");
 
     const RoomEventUpdateSummary dormant
         = updateRoomEvent(runtime, manager, true, false, 1.0F / 60.0F);
-    expect(!dormant.activated && runtime.phase == RoomEventPhase::Dormant
+    expect(!dormant.activated && dormant.createdEntities.empty()
+            && runtime.phase == RoomEventPhase::Dormant
             && !isRoomLocked(runtime),
         "START event remains dormant on entry until terminal interaction");
 
     const RoomEventUpdateSummary activated
         = updateRoomEvent(runtime, manager, true, true, 1.0F / 60.0F);
-    expect(activated.activated && activated.wavesSpawned == 1U
-            && activated.enemiesSpawned == 1U && isRoomLocked(runtime),
-        "terminal use activates ambush, spawns its wave and enters lockdown");
-    expect(activated.createdEntities == activated.spawnedEnemies
-            && manager.queryRoom(1).size() == 2U,
-        "event-created enemy remains owned by the active room");
+    expect(activated.activated && !activated.completed
+            && activated.wavesSpawned == 0U && activated.enemiesSpawned == 0U
+            && activated.createdEntities.empty() && isRoomLocked(runtime),
+        "terminal use activates lockdown without adding an enemy");
 
     killAllEnemies(manager, 1);
     const RoomEventUpdateSummary completed
@@ -189,6 +209,31 @@ void testTerminalAmbushRuntime()
         = updateRoomEvent(runtime, manager, true, true, 1.0F);
     expect(repeated.createdEntities.empty() && manager.activeCount() == count,
         "completed event cannot reactivate or duplicate its reward");
+
+    EntityManager preclearedManager;
+    (void)preclearedManager.createEnemy({.roomId = 2, .health = 50.0F});
+    RoomEventRuntime precleared = makeRoomEventRuntime(generateRoomEventPlan(
+        99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 2);
+    const auto preclearedEnemies = stageRoomEventEnemies(precleared, preclearedManager);
+    killAllEnemies(preclearedManager, 2);
+    const RoomEventUpdateSummary beforeUse = updateRoomEvent(
+        precleared, preclearedManager, true, false, 1.0F / 60.0F);
+    expect(preclearedEnemies.size() == precleared.plan.spawns.size()
+            && !beforeUse.activated && !beforeUse.completed
+            && preclearedManager.query(EntityKind::Item).empty(),
+        "clearing the terminal room before interaction does not complete its event");
+    const RoomEventUpdateSummary useAfterClear = updateRoomEvent(
+        precleared, preclearedManager, true, true, 1.0F / 60.0F);
+    expect(useAfterClear.activated && useAfterClear.completed
+            && useAfterClear.enemiesSpawned == 0U
+            && useAfterClear.spawnedEnemies.empty()
+            && useAfterClear.rewardsSpawned == 1U
+            && precleared.phase == RoomEventPhase::Completed,
+        "using a cleared terminal completes and rewards it without respawning enemies");
+    expect(updateRoomEvent(precleared, preclearedManager, true, true, 1.0F)
+            .createdEntities.empty()
+            && preclearedManager.query(EntityKind::Item).size() == 1U,
+        "precleared terminal event grants its reward only once");
 }
 
 void testLockdownAndSupplyRuntime()
@@ -297,8 +342,10 @@ void testLockdownEnemyAndPursuit()
 
     RoomEventRuntime terminal = makeRoomEventRuntime(generateRoomEventPlan(
         99, RoomRole::Start, RoomTheme::Industrial, 0, eventZones), 1);
-    expect(stageRoomEventEnemies(terminal, manager).empty(),
-        "terminal ambush remains concealed until explicit terminal interaction");
+    const auto terminalEnemies = stageRoomEventEnemies(terminal, manager);
+    expect(terminalEnemies.size() == terminal.plan.spawns.size()
+            && terminal.phase == RoomEventPhase::Dormant,
+        "terminal enemy is present before the terminal event is triggered");
 }
 
 void testTwoWaveReinforcementRuntime()

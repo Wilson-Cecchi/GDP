@@ -76,7 +76,8 @@ std::vector<gdp::entities::EntityId> stageRoomEventEnemies(
     std::vector<gdp::entities::EntityId> created;
     if (runtime.phase != RoomEventPhase::Dormant
         || (runtime.plan.type != RoomEventType::Reinforcements
-            && runtime.plan.type != RoomEventType::Lockdown)
+            && runtime.plan.type != RoomEventType::Lockdown
+            && runtime.plan.type != RoomEventType::TerminalAmbush)
         || runtime.nextWave >= runtime.plan.waveCount) {
         return created;
     }
@@ -106,6 +107,7 @@ RoomEventUpdateSummary updateRoomEvent(
 {
     using gdp::world::RoomEventTrigger;
     using gdp::world::RoomEventType;
+    (void)fixedStepSeconds;
     RoomEventUpdateSummary summary;
     if (runtime.phase == RoomEventPhase::Completed
         || runtime.plan.type == RoomEventType::None) {
@@ -134,42 +136,12 @@ RoomEventUpdateSummary updateRoomEvent(
         return summary;
     }
 
-    runtime.cooldownRemaining = std::max(
-        0.0F, runtime.cooldownRemaining - std::max(fixedStepSeconds, 0.0F));
     const std::size_t liveEventEnemies = static_cast<std::size_t>(std::count_if(
         runtime.eventEnemies.begin(), runtime.eventEnemies.end(),
         [&manager](const gdp::entities::EntityId id) {
             return enemyIsAlive(manager, id);
         }));
     const std::size_t liveRoomEnemies = liveEnemiesInRoom(manager, runtime.roomId);
-    // Room-entry reinforcements and Arena enemies already exist from world
-    // creation. Only the terminal ambush creates enemies during an update.
-    if (runtime.plan.type == RoomEventType::TerminalAmbush
-        && runtime.nextWave < runtime.plan.waveCount
-        && liveEventEnemies == 0U && runtime.cooldownRemaining <= 0.0F) {
-        const std::uint32_t wave = runtime.nextWave;
-        for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
-            if (spawn.wave != wave) {
-                continue;
-            }
-            const gdp::entities::EntityId enemy = manager.createEnemy({
-                .transform = {.position = spawn.position},
-                .roomId = runtime.roomId,
-                .archetype = spawn.archetype,
-                .health = spawn.health,
-                .visualSeed = spawn.visualSeed,
-            });
-            runtime.eventEnemies.push_back(enemy);
-            summary.spawnedEnemies.push_back(enemy);
-            summary.createdEntities.push_back(enemy);
-        }
-        ++runtime.nextWave;
-        runtime.cooldownRemaining = runtime.plan.interWaveDelay;
-        summary.wavesSpawned = 1U;
-        summary.enemiesSpawned = summary.spawnedEnemies.size();
-        return summary;
-    }
-
     const bool allWavesSpawned = runtime.nextWave >= runtime.plan.waveCount;
     const bool eventWaveClear = liveEventEnemies == 0U;
     const bool completionClear = runtime.plan.requiresRoomClear

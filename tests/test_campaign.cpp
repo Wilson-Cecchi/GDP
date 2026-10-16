@@ -562,8 +562,18 @@ void testCampaignFloorVarietyAndMissions()
                 expect(plan.type == world::RoomEventType::TerminalAmbush
                         && plan.trigger == world::RoomEventTrigger::TerminalUse
                         && world::validateRoomEventPlan(plan, target->enemyZones).isValid(),
-                    "terminal objective has a valid ambush event gated by interaction");
+                    "terminal objective has a valid event gated by interaction");
                 auto runtime = gameplay::makeRoomEventRuntime(plan, target->id);
+                const auto staged = gameplay::stageRoomEventEnemies(runtime, entities);
+                expect(staged.size() == plan.spawns.size()
+                        && runtime.phase == gameplay::RoomEventPhase::Dormant
+                        && runtime.nextWave == plan.waveCount,
+                    "terminal objective enemies are present before interaction");
+                for (const auto id : staged) {
+                    const auto* enemy = entities.findData<entities::EnemyData>(id);
+                    expect(enemy != nullptr && enemy->active,
+                        "terminal objective enemy is active before interaction");
+                }
                 expect(!gameplay::updateRoomEvent(runtime, entities, true, false,
                         1.0F / 60.0F).activated,
                     "entering Start alone cannot complete the terminal mission");
@@ -572,10 +582,12 @@ void testCampaignFloorVarietyAndMissions()
                     "ambush completion without terminal activation cannot satisfy the mission");
                 const auto activated = gameplay::updateRoomEvent(runtime, entities,
                     true, true, 1.0F / 60.0F);
-                expect(activated.activated && !gameplay::advanceCampaignMission(
+                expect(activated.activated && activated.spawnedEnemies.empty()
+                        && activated.createdEntities.empty()
+                        && !gameplay::advanceCampaignMission(
                         mission, target->id, {.terminalActivated = activated.activated})
                         && mission.activated && !mission.completed,
-                    "using the Start terminal activates but does not finish the mission");
+                    "using the Start terminal activates without spawning or finishing the mission");
                 for (const auto id : entities.query(entities::EntityKind::Enemy)) {
                     if (auto* enemy = entities.findData<entities::EnemyData>(id)) {
                         enemy->active = false;
@@ -588,6 +600,37 @@ void testCampaignFloorVarietyAndMissions()
                         mission, target->id,
                         {.terminalAmbushCleared = completed.completed}),
                     "clearing the activated ambush completes the terminal mission");
+
+                entities::EntityManager preclearedEntities;
+                (void)preclearedEntities.createEnemy({.roomId = target->id});
+                auto preclearedRuntime = gameplay::makeRoomEventRuntime(plan, target->id);
+                const auto preclearedEnemies = gameplay::stageRoomEventEnemies(
+                    preclearedRuntime, preclearedEntities);
+                for (const auto id : preclearedEntities.query(entities::EntityKind::Enemy)) {
+                    if (auto* enemy = preclearedEntities.findData<entities::EnemyData>(id)) {
+                        enemy->active = false;
+                        enemy->behavior = entities::EnemyBehaviorState::Dead;
+                    }
+                }
+                auto preclearedMission = gameplay::CampaignMissionState{kind, target->id};
+                const auto beforeUse = gameplay::updateRoomEvent(preclearedRuntime,
+                    preclearedEntities, true, false, 1.0F / 60.0F);
+                expect(preclearedEnemies.size() == plan.spawns.size()
+                        && !beforeUse.completed && !preclearedMission.completed,
+                    "killing terminal enemies first does not finish the mission");
+                const auto afterUse = gameplay::updateRoomEvent(preclearedRuntime,
+                    preclearedEntities, true, true, 1.0F / 60.0F);
+                const bool activatedMission = gameplay::advanceCampaignMission(
+                    preclearedMission, target->id,
+                    {.terminalActivated = afterUse.activated});
+                const bool completedMission = gameplay::advanceCampaignMission(
+                    preclearedMission, target->id,
+                    {.terminalAmbushCleared = afterUse.completed});
+                expect(afterUse.activated && afterUse.completed
+                        && afterUse.spawnedEnemies.empty()
+                        && !activatedMission && completedMission
+                        && preclearedMission.completed,
+                    "using a precleared terminal completes the mission without new enemies");
             }
         }
     }

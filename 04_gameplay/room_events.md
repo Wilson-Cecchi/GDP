@@ -18,7 +18,8 @@ Lockdown
 SupplyDrop
 ```
 
-- START: `TerminalAmbush`, acionada com `E` no terminal;
+- START: inimigo adicional de `TerminalAmbush` presente desde a criação do
+  andar; usar `E` no terminal ativa o evento e sua missão;
 - Normal: chance determinística de um ou dois grupos adicionais, presentes
   juntos desde a criação do andar;
 - Hub/Secret: `SupplyDrop` ao entrar;
@@ -30,15 +31,16 @@ SupplyDrop
 ## Runtime
 
 `RoomEventRuntime` percorre `Dormant → Active → Completed`. Todos os inimigos
-planejados de `Reinforcements` e `Lockdown` nascem ativos com o andar, na sala
-dona do plano. Eles preservam archetype, HP, posição e `visualSeed`
+planejados de `TerminalAmbush`, `Reinforcements` e `Lockdown` nascem ativos com
+o andar, na sala dona do plano. Eles preservam archetype, HP, posição e `visualSeed`
 precomputados, e os handles são registrados no `RoomInstance`. A marcação de
 onda permanece no plano determinístico para preservar hash e contagens, mas
-não retarda a aparição desses inimigos. A Arena tem o inimigo adicional junto
-com o encontro inicial. As emboscadas de terminal continuam ocultas até a
-interação. O evento ainda é ativado ao entrar ou, para reforços adjacentes,
-quando a porta se torna passável. Lockdown permanece ativo até a limpeza; a
-conclusão cria uma única recompensa. Eventos completos não reativam nem
+não retarda a aparição desses inimigos. A Arena e a sala do terminal têm seus
+inimigos adicionais junto com o encontro inicial. O evento do terminal
+permanece dormente até a interação; o uso não cria inimigos. Outros eventos
+são ativados ao entrar ou, para reforços adjacentes, quando a porta se torna
+passável. Lockdown permanece ativo até a limpeza; a conclusão cria uma única
+recompensa. Eventos completos não reativam nem
 duplicam entidades. O tempo de reação ao abrir uma sala inédita permanece.
 
 A limpeza considera a sala de origem de cada inimigo, preservada ao nascer,
@@ -48,9 +50,11 @@ onda ou recompensa da sala original. Enquanto um inimigo da sala estiver vivo
 do lado de fora, as portas deixam de ser seladas pelo lockdown para que o
 Player possa persegui-lo; quando ele retorna ou morre, a trava volta a valer.
 
-Na START, usar o terminal ativa uma emboscada de um Worker adicional. A sala
-precisa ficar sem inimigos para liberar Ammo. O título da janela mostra tipo,
-fase e `[LOCKDOWN]`; logs registram ativação, onda e conclusão.
+Na START atual, o Worker adicional já está ativo antes do uso. Usar o terminal
+ativa a missão e o lockdown; a sala precisa ficar sem inimigos para liberar Ammo.
+Se todos forem derrotados antes da interação, a missão e o evento só se concluem
+quando o terminal for usado. O título da janela mostra tipo, fase e `[LOCKDOWN]`;
+logs registram ativação e conclusão.
 
 ## Isolamento
 
