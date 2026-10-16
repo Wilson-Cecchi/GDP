@@ -588,11 +588,15 @@ if(GDP_BUILD_TESTS)
     gdp_enable_warnings(gdp_worker_training_tests)
     gdp_enable_sanitizers(gdp_worker_training_tests)
 
-    add_test(NAME worker_training_systems COMMAND gdp_worker_training_tests)
-    # ASan/UBSan runs the role-specific arena curriculum substantially slower.
-    # The deterministic multi-archetype simulation is intentionally allowed
-    # to run under a CPU quota on older laptops without false timeout failures.
-    set_tests_properties(worker_training_systems PROPERTIES TIMEOUT 600)
+    # ASan/UBSan runs arena simulation much slower. Keep independent cases in
+    # separate CTest invocations so each 600-second limit covers one case.
+    foreach(group fitness cooperative persistence other-archetypes
+            population-encounters curriculum-v20 curriculum-v21)
+        string(REPLACE "-" "_" test_suffix "${group}")
+        add_test(NAME worker_training_${test_suffix}
+            COMMAND gdp_worker_training_tests --${group})
+        set_tests_properties(worker_training_${test_suffix} PROPERTIES TIMEOUT 600)
+    endforeach()
 
     add_executable(gdp_active_enemy_brain_tests tests/test_active_enemy_brains.cpp)
     target_link_libraries(gdp_active_enemy_brain_tests PRIVATE gdp_training)

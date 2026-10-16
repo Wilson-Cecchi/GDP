@@ -1059,14 +1059,31 @@ void testFullPopulationAndEncounters()
 
 } // namespace
 
-int main()
+int main(const int argc, char* argv[])
 {
-    testFitness();
-    testCooperativeTraining();
-    testHardCaseCurriculum();
-    testHardCaseCurriculumV2();
-    testTrainingAndPersistence();
-    testOtherArchetypes();
-    testFullPopulationAndEncounters();
+    const std::string_view selection = argc == 1 ? "--all"
+        : argc == 2 ? std::string_view{argv[1]} : "";
+    if (selection != "--all" && selection != "--fitness"
+        && selection != "--cooperative" && selection != "--persistence"
+        && selection != "--other-archetypes"
+        && selection != "--population-encounters"
+        && selection != "--curriculum-v20"
+        && selection != "--curriculum-v21") {
+        std::cerr << "Unknown worker-training test group\n";
+        return 2;
+    }
+    if (selection == "--all" || selection == "--fitness") testFitness();
+    if (selection == "--all" || selection == "--cooperative")
+        testCooperativeTraining();
+    if (selection == "--all" || selection == "--persistence")
+        testTrainingAndPersistence();
+    if (selection == "--all" || selection == "--other-archetypes")
+        testOtherArchetypes();
+    if (selection == "--all" || selection == "--population-encounters")
+        testFullPopulationAndEncounters();
+    if (selection == "--all" || selection == "--curriculum-v20")
+        testHardCaseCurriculum();
+    if (selection == "--all" || selection == "--curriculum-v21")
+        testHardCaseCurriculumV2();
     return failures == 0 ? 0 : 1;
 }
