@@ -120,6 +120,16 @@ std::string_view gamepadBindingName(const GamepadButton button) noexcept {
     const auto index = static_cast<std::size_t>(button);
     return index < gamepadNames.size() ? gamepadNames[index] : "UNBOUND";
 }
+std::string_view activeBindingName(const ControlBindings& keyboard,
+    const GamepadBindings& gamepad, const ControlAction action,
+    const wkc::platform::InputDevice device) noexcept {
+    const auto index = static_cast<std::size_t>(action);
+    if (index >= controlActionCount) return "INVALID";
+    if (device == wkc::platform::InputDevice::Gamepad
+        && gamepad.values[index] != GamepadButton::Count)
+        return gamepadBindingName(gamepad.values[index]);
+    return bindingName(keyboard.values[index]);
+}
 std::optional<GamepadButton> gamepadBindingForName(const std::string_view name) noexcept {
     if (name == "UNBOUND") return GamepadButton::Count;
     for (std::size_t index = 0; index < gamepadNames.size(); ++index)

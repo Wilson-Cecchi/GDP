@@ -61,6 +61,11 @@ enum class GamepadButton : std::uint8_t {
     Count,
 };
 
+enum class InputDevice : std::uint8_t {
+    KeyboardMouse,
+    Gamepad,
+};
+
 [[nodiscard]] wkc::core::Vec2 gamepadDeadzone(wkc::core::Vec2 value, float threshold) noexcept;
 
 class Input {
@@ -94,6 +99,7 @@ public:
     [[nodiscard]] wkc::core::Vec2 gamepadLook() const noexcept;
     [[nodiscard]] wkc::core::Vec2 gamepadLeftStick() const noexcept;
     [[nodiscard]] wkc::core::Vec2 gamepadRightStick() const noexcept;
+    [[nodiscard]] InputDevice lastActiveDevice() const noexcept;
 
 private:
     static constexpr std::size_t keyCount = static_cast<std::size_t>(Key::Count);
@@ -118,9 +124,12 @@ private:
     wkc::core::Vec2 gamepadLook_{};
     wkc::core::Vec2 gamepadLeftStick_{};
     wkc::core::Vec2 gamepadRightStick_{};
+    wkc::core::Vec2 gamepadActivityMove_{};
+    wkc::core::Vec2 gamepadActivityLook_{};
     wkc::core::Vec2 mouseDelta_{};
     wkc::core::Vec2 mousePosition_{};
     float mouseWheelDelta_{0.0F};
+    InputDevice lastActiveDevice_{InputDevice::KeyboardMouse};
 };
 
 } // namespace wkc::platform

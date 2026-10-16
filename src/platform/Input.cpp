@@ -36,6 +36,7 @@ void Input::handleKey(const Key key, const bool down, const bool repeat) noexcep
     if (down) {
         if (!repeat && !keysDown_[index]) {
             keysPressed_[index] = true;
+            lastActiveDevice_ = InputDevice::KeyboardMouse;
         }
         keysDown_[index] = true;
         return;
@@ -58,6 +59,7 @@ void Input::handleMouseButton(
     if (down) {
         if (!mouseButtonsDown_[index]) {
             mouseButtonsPressed_[index] = true;
+            lastActiveDevice_ = InputDevice::KeyboardMouse;
         }
         mouseButtonsDown_[index] = true;
         return;
@@ -73,12 +75,17 @@ void Input::handleMouseMotion(
 {
     mouseDelta_ = mouseDelta_ + delta;
     mousePosition_ = position;
+    if (std::isfinite(delta.x) && std::isfinite(delta.y)
+        && (delta.x != 0.0F || delta.y != 0.0F)) {
+        lastActiveDevice_ = InputDevice::KeyboardMouse;
+    }
 }
 
 void Input::handleMouseWheel(const float delta) noexcept
 {
     if (std::isfinite(delta)) {
         mouseWheelDelta_ += delta;
+        if (delta != 0.0F) lastActiveDevice_ = InputDevice::KeyboardMouse;
     }
 }
 
@@ -86,8 +93,9 @@ void Input::handleGamepadButton(const GamepadButton button, const bool down) noe
 {
     if (!isValidGamepadButton(button)) return;
     const auto index = static_cast<std::size_t>(button);
-    gamepadButtonsPressed_[index] = gamepadButtonsPressed_[index]
-        || (down && !gamepadButtonsDown_[index]);
+    const bool pressed = down && !gamepadButtonsDown_[index];
+    gamepadButtonsPressed_[index] = gamepadButtonsPressed_[index] || pressed;
+    if (pressed) lastActiveDevice_ = InputDevice::Gamepad;
     gamepadButtonsDown_[index] = down;
 }
 
@@ -98,6 +106,24 @@ void Input::handleGamepadSticks(
     gamepadRightStick_ = std::isfinite(look.x) && std::isfinite(look.y) ? look : wkc::core::Vec2{};
     gamepadMove_ = gamepadDeadzone(gamepadLeftStick_, 0.18F);
     gamepadLook_ = gamepadDeadzone(gamepadRightStick_, 0.18F);
+    // Polling a held stick must not override newer keyboard or mouse input.
+    // Compare against the last meaningful sample so gradual movement still counts.
+    constexpr float activityDeltaSquared = 0.1F * 0.1F;
+    const auto analogActivity = [](const wkc::core::Vec2 current,
+                                    wkc::core::Vec2& anchor) noexcept {
+        if (current == wkc::core::Vec2{}) {
+            anchor = {};
+            return false;
+        }
+        const float dx = current.x - anchor.x;
+        const float dy = current.y - anchor.y;
+        if (dx * dx + dy * dy <= activityDeltaSquared) return false;
+        anchor = current;
+        return true;
+    };
+    const bool moveActivity = analogActivity(gamepadMove_, gamepadActivityMove_);
+    const bool lookActivity = analogActivity(gamepadLook_, gamepadActivityLook_);
+    if (moveActivity || lookActivity) lastActiveDevice_ = InputDevice::Gamepad;
     constexpr float navigationThreshold = 0.6F;
     handleGamepadButton(GamepadButton::StickUp,
         gamepadMove_.y < -navigationThreshold);
@@ -117,6 +143,9 @@ void Input::resetGamepad() noexcept
     gamepadLook_ = {};
     gamepadLeftStick_ = {};
     gamepadRightStick_ = {};
+    gamepadActivityMove_ = {};
+    gamepadActivityLook_ = {};
+    lastActiveDevice_ = InputDevice::KeyboardMouse;
 }
 
 bool Input::isKeyDown(const Key key) const noexcept
@@ -183,6 +212,7 @@ wkc::core::Vec2 Input::gamepadMove() const noexcept { return gamepadMove_; }
 wkc::core::Vec2 Input::gamepadLook() const noexcept { return gamepadLook_; }
 wkc::core::Vec2 Input::gamepadLeftStick() const noexcept { return gamepadLeftStick_; }
 wkc::core::Vec2 Input::gamepadRightStick() const noexcept { return gamepadRightStick_; }
+InputDevice Input::lastActiveDevice() const noexcept { return lastActiveDevice_; }
 
 bool Input::isValidKey(const Key key) noexcept
 {

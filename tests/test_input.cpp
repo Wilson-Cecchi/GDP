@@ -108,11 +108,70 @@ void testInputState()
         "disconnect clears held buttons and axes");
 }
 
+void testActiveDevice()
+{
+    using wkc::platform::GamepadButton;
+    using wkc::platform::InputDevice;
+    using wkc::platform::Key;
+    using wkc::platform::MouseButton;
+
+    wkc::platform::Input input;
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "keyboard prompts are the default before controller activity");
+
+    input.handleGamepadSticks({0.05F, 0.04F}, {});
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "stick drift inside the deadzone does not activate controller prompts");
+    input.handleGamepadButton(GamepadButton::South, true);
+    expect(input.lastActiveDevice() == InputDevice::Gamepad,
+        "controller button press activates controller prompts");
+    input.handleMouseMotion({30.0F, 40.0F}, {});
+    expect(input.lastActiveDevice() == InputDevice::Gamepad,
+        "mouse position updates without movement do not steal controller prompts");
+
+    input.handleKey(Key::E, true);
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "keyboard press restores keyboard prompts");
+    input.beginFrame();
+    input.handleGamepadButton(GamepadButton::South, true);
+    input.handleGamepadSticks({}, {});
+    input.handleGamepadSticks({0.05F, 0.04F}, {});
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "polling a held button or drifting sticks does not restore controller prompts");
+
+    input.handleGamepadSticks({0.75F, 0.0F}, {});
+    expect(input.lastActiveDevice() == InputDevice::Gamepad,
+        "meaningful stick motion activates controller prompts");
+    input.handleMouseMotion({30.0F, 40.0F}, {1.0F, 0.0F});
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "mouse motion restores keyboard and mouse prompts");
+    input.beginFrame();
+    input.handleGamepadSticks({0.75F, 0.0F}, {});
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "polling a stationary active stick does not steal prompt focus");
+
+    input.handleGamepadSticks({0.8F, 0.0F}, {});
+    input.handleGamepadSticks({0.85F, 0.0F}, {});
+    expect(input.lastActiveDevice() == InputDevice::Gamepad,
+        "gradual stick motion eventually activates controller prompts");
+    input.handleKey(Key::E, true, true);
+    expect(input.lastActiveDevice() == InputDevice::Gamepad,
+        "keyboard repeat does not steal controller prompt focus");
+    input.handleMouseButton(MouseButton::Primary, true, {30.0F, 40.0F});
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "mouse button press restores keyboard and mouse prompts");
+    input.handleGamepadButton(GamepadButton::East, true);
+    input.resetGamepad();
+    expect(input.lastActiveDevice() == InputDevice::KeyboardMouse,
+        "controller disconnect restores keyboard and mouse prompts");
+}
+
 } // namespace
 
 int main()
 {
     testInputState();
+    testActiveDevice();
 
     if (failures != 0) {
         std::cerr << failures << " input test(s) failed\n";

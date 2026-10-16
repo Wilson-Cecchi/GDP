@@ -29,6 +29,11 @@ opções; A/✕ confirma e B/○ volta. Em `Settings > Controls`, escolha
 independentes. Se um botão já estiver associado a outra ação, as duas ações
 trocam seus comandos. Durante a captura do controle, `Options` ou `Esc`
 cancela e `Delete` remove a associação. `Options` fica reservado ao menu.
+As dicas de interação da HUD acompanham o último dispositivo usado: ao mover
+ou apertar um botão do controle, a porta mostra `DPAD UP` por padrão em vez de
+`E`. As dicas de recarga e lanterna também usam os botões configurados. Ao
+voltar ao teclado ou mouse, a HUD mostra as respectivas teclas; se uma ação do
+controle estiver sem botão, a dica mostra o atalho de teclado disponível.
 O movimento analógico não é um botão: ajuste `Move Stick` no menu `Controller`
 para usar o analógico esquerdo (padrão) ou direito (Southpaw); a câmera passa
 automaticamente para o outro analógico. As linhas Forward/Backward/Left/Right
@@ -43,10 +48,11 @@ a retirada do pino; a troca de arma fica bloqueada até o lançamento ou a explo
 O estoque inicial é de duas granadas.
 
 Para testar um DualSense por Bluetooth no Linux: emparelhe-o nas configurações do
-sistema, inicie `build/release/gdp --test-mode` e confira a linha
+sistema, inicie `build/release/gdp` e confira a linha
 `Gamepad connected: ...` no terminal. Teste o menu, os dois analógicos, os
-gatilhos e a desconexão/reconexão. O teste automatizado usa um gamepad virtual;
-ele não substitui a validação com seu DualSense real.
+gatilhos, as dicas da HUD e a desconexão/reconexão. Para usar a sala de testes,
+configure o build `build/playtest` descrito no README. O teste automatizado usa
+um gamepad virtual; ele não substitui a validação com seu DualSense real.
 
 `Controller` também permite ligar/desligar a vibração e regular sua intensidade
 de 0% a 100%. Disparos e dano recebido produzem pulsos de vibração comum

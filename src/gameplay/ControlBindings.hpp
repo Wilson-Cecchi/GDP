@@ -39,6 +39,9 @@ struct GamepadBindings {
 [[nodiscard]] bool assignControlBinding(ControlBindings& bindings, ControlAction action, ControlBinding binding) noexcept;
 [[nodiscard]] std::optional<ControlBinding> pressedControlBinding(const wkc::platform::Input& input) noexcept;
 [[nodiscard]] std::string_view gamepadBindingName(wkc::platform::GamepadButton button) noexcept;
+[[nodiscard]] std::string_view activeBindingName(
+    const ControlBindings& keyboard, const GamepadBindings& gamepad,
+    ControlAction action, wkc::platform::InputDevice device) noexcept;
 [[nodiscard]] std::optional<wkc::platform::GamepadButton> gamepadBindingForName(std::string_view name) noexcept;
 [[nodiscard]] bool validGamepadBinding(wkc::platform::GamepadButton button) noexcept;
 [[nodiscard]] bool validateGamepadBindings(const GamepadBindings& bindings) noexcept;

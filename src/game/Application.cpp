@@ -3989,9 +3989,15 @@ void Application::render()
     hud.language = runtimeSettings_.language;
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
-    hud.interactBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Interact)]);
-    hud.reloadBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Reload)]);
-    hud.flashlightBinding = gameplay::bindingName(runtimeSettings_.controls.values[static_cast<std::size_t>(gameplay::ControlAction::Flashlight)]);
+    const auto promptDevice = config_.enableGamepad && gamepadConnected_
+        ? input_.lastActiveDevice() : wkc::platform::InputDevice::KeyboardMouse;
+    const auto promptBinding = [this, promptDevice](const gameplay::ControlAction action) {
+        return gameplay::activeBindingName(runtimeSettings_.controls,
+            runtimeSettings_.gamepadControls, action, promptDevice);
+    };
+    hud.interactBinding = promptBinding(gameplay::ControlAction::Interact);
+    hud.reloadBinding = promptBinding(gameplay::ControlAction::Reload);
+    hud.flashlightBinding = promptBinding(gameplay::ControlAction::Flashlight);
     hud.infoOverlay = gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, gameplay::ControlAction::Information, input_);
     if (world_) {
         HudMapTarget mapTarget;

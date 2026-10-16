@@ -143,6 +143,24 @@ void bindingsTests() {
             "gamepad binding names round trip");
     expect(!gamepadBindingForName("MENU / OPTIONS") && !validGamepadBinding(GamepadButton::Start),
         "pause button remains reserved while remapping");
+    using wkc::platform::InputDevice;
+    expect(activeBindingName(bindings, gamepad, ControlAction::Interact,
+            InputDevice::KeyboardMouse) == "E"
+            && activeBindingName(bindings, gamepad, ControlAction::Interact,
+                InputDevice::Gamepad) == "DPAD UP"
+            && activeBindingName(bindings, gamepad, ControlAction::Reload,
+                InputDevice::Gamepad) == "X / SQUARE",
+        "HUD action hints follow the active device and its assigned buttons");
+    auto hintGamepad = gamepad;
+    expect(assignGamepadBinding(hintGamepad, ControlAction::Interact,
+            GamepadButton::DpadRight)
+            && activeBindingName(bindings, hintGamepad, ControlAction::Interact,
+                InputDevice::Gamepad) == "DPAD RIGHT"
+            && assignGamepadBinding(hintGamepad, ControlAction::Interact,
+                GamepadButton::Count)
+            && activeBindingName(bindings, hintGamepad, ControlAction::Interact,
+                InputDevice::Gamepad) == "E",
+        "HUD action hints use remapped buttons and keyboard fallback when unbound");
     for (auto binding : bindings.values) expect(bindingForName(bindingName(binding)) == binding, "binding names round trip");
     expect(!bindingForName("ESC") && !bindingForName("F3") && !bindingForName("NOT A KEY"), "reserved and unknown bindings rejected");
     auto oldForward = bindings.values[0];
