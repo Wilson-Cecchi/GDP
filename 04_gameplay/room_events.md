@@ -19,35 +19,27 @@ SupplyDrop
 ```
 
 - START: `TerminalAmbush`, acionada com `E` no terminal;
-- Normal: chance determinística de uma ou duas ondas;
+- Normal: chance determinística de um ou dois grupos adicionais, presentes
+  juntos desde a criação do andar;
 - Hub/Secret: `SupplyDrop` ao entrar;
-- Arena: limpa o encontro inicial, libera uma onda e mantém lockdown;
+- Arena: inimigo adicional presente junto ao encontro inicial; mantém lockdown
+  até limpar a sala;
 - DeadEnd: suporte ou reforço;
 - Boss: lockdown até o IndustrialRobot morrer.
 
 ## Runtime
 
-`RoomEventRuntime` percorre `Dormant → Active → Completed`. Cada onda só nasce
-na sala dona do plano, usa archetype/HP/posição/`visualSeed` precomputados e
-registra os novos handles no `RoomInstance`. Lockdown permanece ativo até a
-condição de limpeza; a conclusão cria uma única recompensa. Eventos completos
-não reativam nem duplicam entidades.
-
-Revisão de 2026-10-02: a onda extra de `Lockdown` da Arena não é pré-criada
-como corpos visíveis e inativos. Ela só nasce, já ativa, quando o encontro
-inicial termina. Isso corrige os inimigos aparentando esperar a morte dos
-outros para poder atacar. A primeira onda de `Reinforcements` por entrada
-continua usando o staging existente, sem duplicação;
-emboscadas de terminal continuam ocultas até a interação. Não mudam planos,
-contagem de ondas, HP, recompensas ou RNG. A regressão cobre espera, inimigo
-que saiu da sala, liberação única e ativação dos handles pré-criados.
-
-Revisão de 2026-10-16: `Reinforcements` também é atualizado quando uma porta
-para a sala vizinha se torna passável. O inimigo pré-criado passa a reagir e
-pode ser atingido antes de o jogador cruzar a soleira. Entrar por uma passagem
-já aberta continua ativando o evento. O tempo de reação concedido ao abrir uma
-sala inédita permanece; a onda de `Lockdown` da Arena e a emboscada do terminal
-mantêm seus gatilhos próprios.
+`RoomEventRuntime` percorre `Dormant → Active → Completed`. Todos os inimigos
+planejados de `Reinforcements` e `Lockdown` nascem ativos com o andar, na sala
+dona do plano. Eles preservam archetype, HP, posição e `visualSeed`
+precomputados, e os handles são registrados no `RoomInstance`. A marcação de
+onda permanece no plano determinístico para preservar hash e contagens, mas
+não retarda a aparição desses inimigos. A Arena tem o inimigo adicional junto
+com o encontro inicial. As emboscadas de terminal continuam ocultas até a
+interação. O evento ainda é ativado ao entrar ou, para reforços adjacentes,
+quando a porta se torna passável. Lockdown permanece ativo até a limpeza; a
+conclusão cria uma única recompensa. Eventos completos não reativam nem
+duplicam entidades. O tempo de reação ao abrir uma sala inédita permanece.
 
 A limpeza considera a sala de origem de cada inimigo, preservada ao nascer,
 e também intrusos ainda vivos dentro da sala. Perseguir o Player por um
@@ -71,4 +63,5 @@ layouts já comprometidos.
 O gate percorre 1.000 room seeds, exige os cinco tipos, hashes únicos, triggers
 compatíveis, ondas completas, spawns/recompensa dentro das zonas e protege o
 hash dourado `0xB04A437A8394B962`. Testes funcionais cobrem terminal, entrada,
-duas ondas, espera da Arena, lockdown, suporte, conclusão e recompensa única.
+dois grupos simultâneos, inimigo adicional da Arena, lockdown, suporte,
+conclusão e recompensa única.

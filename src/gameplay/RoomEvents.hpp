@@ -22,7 +22,6 @@ struct RoomEventRuntime {
     std::uint32_t nextWave{0};
     float cooldownRemaining{0.0F};
     bool rewardSpawned{false};
-    std::vector<gdp::entities::EntityId> stagedEnemies;
     std::vector<gdp::entities::EntityId> eventEnemies;
 };
 
@@ -40,7 +39,7 @@ struct RoomEventUpdateSummary {
     gdp::world::RoomEventPlan plan,
     std::uint32_t roomId);
 
-[[nodiscard]] std::vector<gdp::entities::EntityId> stageRoomEventFirstWave(
+[[nodiscard]] std::vector<gdp::entities::EntityId> stageRoomEventEnemies(
     RoomEventRuntime& runtime,
     gdp::entities::EntityManager& manager);
 

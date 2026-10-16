@@ -68,36 +68,33 @@ RoomEventRuntime makeRoomEventRuntime(
     return runtime;
 }
 
-std::vector<gdp::entities::EntityId> stageRoomEventFirstWave(
+std::vector<gdp::entities::EntityId> stageRoomEventEnemies(
     RoomEventRuntime& runtime,
     gdp::entities::EntityManager& manager)
 {
-    using gdp::world::RoomEventTrigger;
-    std::vector<gdp::entities::EntityId> staged;
-    // Lockdown reinforcements wait for the baseline encounter. Do not expose
-    // their inactive bodies before that wave can fight.
+    using gdp::world::RoomEventType;
+    std::vector<gdp::entities::EntityId> created;
     if (runtime.phase != RoomEventPhase::Dormant
-        || runtime.plan.type == gdp::world::RoomEventType::Lockdown
-        || runtime.plan.trigger != RoomEventTrigger::RoomEntry
-        || runtime.plan.waveCount == 0U || !runtime.stagedEnemies.empty()) {
-        return staged;
+        || (runtime.plan.type != RoomEventType::Reinforcements
+            && runtime.plan.type != RoomEventType::Lockdown)
+        || runtime.nextWave >= runtime.plan.waveCount) {
+        return created;
     }
+    created.reserve(runtime.plan.spawns.size());
     for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
-        if (spawn.wave != 0U) {
-            continue;
-        }
         const gdp::entities::EntityId enemy = manager.createEnemy({
             .transform = {.position = spawn.position},
             .roomId = runtime.roomId,
             .archetype = spawn.archetype,
             .health = spawn.health,
             .visualSeed = spawn.visualSeed,
-            .active = false,
+            .active = true,
         });
-        runtime.stagedEnemies.push_back(enemy);
-        staged.push_back(enemy);
+        runtime.eventEnemies.push_back(enemy);
+        created.push_back(enemy);
     }
-    return staged;
+    runtime.nextWave = runtime.plan.waveCount;
+    return created;
 }
 
 RoomEventUpdateSummary updateRoomEvent(
@@ -145,43 +142,26 @@ RoomEventUpdateSummary updateRoomEvent(
             return enemyIsAlive(manager, id);
         }));
     const std::size_t liveRoomEnemies = liveEnemiesInRoom(manager, runtime.roomId);
-    const bool lockdownWaitingForInitialClear
-        = runtime.plan.type == RoomEventType::Lockdown
-        && runtime.nextWave == 0U && liveRoomEnemies > 0U;
-
-    if (runtime.nextWave < runtime.plan.waveCount
-        && liveEventEnemies == 0U && runtime.cooldownRemaining <= 0.0F
-        && !lockdownWaitingForInitialClear) {
+    // Room-entry reinforcements and Arena enemies already exist from world
+    // creation. Only the terminal ambush creates enemies during an update.
+    if (runtime.plan.type == RoomEventType::TerminalAmbush
+        && runtime.nextWave < runtime.plan.waveCount
+        && liveEventEnemies == 0U && runtime.cooldownRemaining <= 0.0F) {
         const std::uint32_t wave = runtime.nextWave;
-        if (wave == 0U && !runtime.stagedEnemies.empty()) {
-            for (const gdp::entities::EntityId id : runtime.stagedEnemies) {
-                gdp::entities::EnemyData* enemy
-                    = manager.findData<gdp::entities::EnemyData>(id);
-                if (enemy == nullptr
-                    || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
-                    continue;
-                }
-                enemy->active = true;
-                runtime.eventEnemies.push_back(id);
-                summary.spawnedEnemies.push_back(id);
+        for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
+            if (spawn.wave != wave) {
+                continue;
             }
-            runtime.stagedEnemies.clear();
-        } else {
-            for (const gdp::world::EventEnemySpawn& spawn : runtime.plan.spawns) {
-                if (spawn.wave != wave) {
-                    continue;
-                }
-                const gdp::entities::EntityId enemy = manager.createEnemy({
-                    .transform = {.position = spawn.position},
-                    .roomId = runtime.roomId,
-                    .archetype = spawn.archetype,
-                    .health = spawn.health,
-                    .visualSeed = spawn.visualSeed,
-                });
-                runtime.eventEnemies.push_back(enemy);
-                summary.spawnedEnemies.push_back(enemy);
-                summary.createdEntities.push_back(enemy);
-            }
+            const gdp::entities::EntityId enemy = manager.createEnemy({
+                .transform = {.position = spawn.position},
+                .roomId = runtime.roomId,
+                .archetype = spawn.archetype,
+                .health = spawn.health,
+                .visualSeed = spawn.visualSeed,
+            });
+            runtime.eventEnemies.push_back(enemy);
+            summary.spawnedEnemies.push_back(enemy);
+            summary.createdEntities.push_back(enemy);
         }
         ++runtime.nextWave;
         runtime.cooldownRemaining = runtime.plan.interWaveDelay;

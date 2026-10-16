@@ -1132,9 +1132,9 @@ bool Application::initializeRun()
         roomLighting_.push_back(std::move(lighting));
     }
     for (gameplay::RoomEventRuntime& runtime : roomEvents_) {
-        const std::vector<entities::EntityId> staged
-            = gameplay::stageRoomEventFirstWave(runtime, entities_);
-        if (staged.empty()) {
+        const std::vector<entities::EntityId> eventEnemies
+            = gameplay::stageRoomEventEnemies(runtime, entities_);
+        if (eventEnemies.empty()) {
             continue;
         }
         const auto room = std::find_if(
@@ -1143,7 +1143,8 @@ bool Application::initializeRun()
                 return candidate.id == runtime.roomId;
             });
         if (room != world_->rooms.end()) {
-            room->entities.insert(room->entities.end(), staged.begin(), staged.end());
+            room->entities.insert(room->entities.end(),
+                eventEnemies.begin(), eventEnemies.end());
         }
     }
     if (const entities::Entity* playerEntity = entities_.find(player_.entity())) {
@@ -3229,9 +3230,8 @@ void Application::fixedUpdate(const double fixedStep)
     if (activeEvent != roomEvents_.end()) {
         updateAndPresentRoomEvent(*activeEvent, terminalUsed);
     }
-    // A reinforcement visible through an open doorway must be able to react
-    // and take damage before the player crosses into its room. Arena lockdown
-    // waves and terminal ambushes retain their separate triggers.
+    // An encounter cleared through an open doorway must advance its reward
+    // and mission state before the player crosses into the room.
     for (gameplay::RoomEventRuntime& runtime : roomEvents_) {
         if (runtime.plan.type != world::RoomEventType::Reinforcements
             || runtime.plan.trigger != world::RoomEventTrigger::RoomEntry
