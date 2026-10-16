@@ -14,7 +14,7 @@ world::World makeTestArena(const wkc::core::Seed seed)
     world::RoomInstance room;
     room.id = 1U; room.role = world::RoomRole::Start; room.seed = seed;
     room.sizeClass = world::RoomSizeClass::Large;
-    room.worldBounds = {{-16.0F, 0.0F, -28.0F}, {16.0F, 5.0F, 12.0F}};
+    room.worldBounds = {{-16.0F, 0.0F, -36.0F}, {16.0F, 5.0F, 12.0F}};
     arena.rooms.push_back(std::move(room));
     return arena;
 }
@@ -28,9 +28,19 @@ world::InitialEntitySet populateTestArena(world::World& arena, entities::EntityM
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({.transform = {.position = {0.0F, 0.0F, 8.0F}}, .roomId = 1U, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
+    // Two tall bulkheads shelter the weapon pickups and target lane from the
+    // robot's long-range cannon. The four-metre center gap stays walkable.
+    for (const float x : {-9.0F, 9.0F}) {
+        room.entities.push_back(manager.createProp({
+            .transform = {.position = {x, 0.0F, -18.0F},
+                .scale = {14.0F, 3.5F, 1.5F}},
+            .roomId = room.id, .type = PropType::Barricade, .solid = true,
+            .health = 1'000'000.0F, .maximumHealth = 1'000'000.0F,
+            .visualSeed = arena.masterSeed + (x < 0.0F ? 50U : 51U)}));
+    }
     for (unsigned i = 0U; i < 5U; ++i) {
         room.entities.push_back(manager.createEnemy({
-            .transform = {.position = {-10.0F + static_cast<float>(i) * 5.0F, 0.0F, -18.0F}},
+            .transform = {.position = {-10.0F + static_cast<float>(i) * 5.0F, 0.0F, -28.0F}},
             .roomId = 1U, .archetype = static_cast<EnemyArchetype>(i),
             .health = i == 4U ? 260.0F : 80.0F, .visualSeed = arena.masterSeed + i}));
     }
@@ -51,9 +61,9 @@ world::InitialEntitySet populateTestArena(world::World& arena, entities::EntityM
             = static_cast<std::uint32_t>(gameplay::WeaponArchetype::Sniper) + i;
         room.entities.push_back(id);
     }
-    // Durable plates along the right wall leave the enemy lanes unobstructed.
+    // Durable plates remain on the preparation side of the divider.
     // The existing canister role gives them a red metallic hit material.
-    constexpr std::array<float, 3> targetDepths{1.0F, -7.0F, -17.0F};
+    constexpr std::array<float, 3> targetDepths{1.0F, -7.0F, -14.0F};
     for (unsigned i = 0U; i < targetDepths.size(); ++i) {
         room.entities.push_back(manager.createProp({
             .transform = {.position = {14.5F, 0.0F, targetDepths[i]},

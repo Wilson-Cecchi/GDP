@@ -932,6 +932,14 @@ if(GDP_BUILD_TESTS)
     add_test(NAME combat_systems COMMAND gdp_combat_tests)
     set_tests_properties(combat_systems PROPERTIES TIMEOUT 30)
 
+    add_executable(gdp_test_arena_tests tests/test_test_arena.cpp src/game/TestArena.cpp)
+    target_link_libraries(gdp_test_arena_tests PRIVATE gdp_gameplay gdp_world)
+    gdp_enable_warnings(gdp_test_arena_tests)
+    gdp_enable_sanitizers(gdp_test_arena_tests)
+
+    add_test(NAME test_arena_systems COMMAND gdp_test_arena_tests)
+    set_tests_properties(test_arena_systems PROPERTIES TIMEOUT 10)
+
     add_executable(gdp_entity_tests tests/test_entities.cpp)
     target_link_libraries(gdp_entity_tests PRIVATE gdp_entities)
     gdp_enable_warnings(gdp_entity_tests)

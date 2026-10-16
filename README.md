@@ -51,9 +51,16 @@ cmake --build --preset release --parallel
 ctest --preset release
 ```
 
-O build local inclui `build/release/gdp --test-mode` por padrão. Pacotes de
-distribuição podem ser gerados sem essa arena. O executável ainda se chama
-`gdp` por motivos técnicos.
+Para abrir a sala de testes, configure um build separado com a arena habilitada:
+
+```bash
+cmake -S . -B build/playtest -G Ninja -DCMAKE_BUILD_TYPE=Release -DGDP_ENABLE_TEST_MODE=ON -DGDP_BUILD_TESTS=OFF
+cmake --build build/playtest --target gdp --parallel 4
+build/playtest/gdp --test-mode
+```
+
+Pacotes de distribuição podem ser gerados sem essa arena. O executável ainda
+se chama `gdp` por motivos técnicos.
 
 ## Encontrar a documentação
 
