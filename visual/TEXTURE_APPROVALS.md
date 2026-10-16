@@ -565,6 +565,28 @@ Objetivo, direção, paleta, regras e prompt reproduzível estão no arquivo
 A eventual aprovação desta proposta não se estende a Floor, Ceiling, Door ou
 outro ambiente.
 
+## Worker — variação de braços e pernas v1
+
+```text
+unidade visual: Worker / silhueta dos membros v1
+versão da proposta: v1
+arquivo/prancha: visual/proposals/worker_limb_variation_v1.svg
+contrato: visual/proposals/worker_limb_variation_v1.md
+seeds mostradas: 101, 202 e 303 (ilustrativas; não são capturas do gerador)
+decisão do usuário: APROVADA PARA IMPLEMENTAÇÃO (resposta: "aprovado")
+data: 2026-10-15
+implementação técnica: 2026-10-16
+commit de implementação: feat(visual): vary Worker limb proportions by seed
+capturas do renderer: visual/validation/medium_worker_seed{101,202,303}_{near,far}_idle.png;
+                      visual/validation/medium_worker_seed{101,202,303}_near_{walk,attack}.png;
+                      visual/validation/potato_worker_seed{101,202,303}_{near,far}_idle.png
+capturas em partida: pendentes
+resultado final: IMPLEMENTADA EM VALIDAÇÃO; aceitação no jogo pendente
+```
+
+A aprovação cobre proporções e variação dos membros do Worker. Outros papéis,
+materiais e texturas exigem propostas próprias.
+
 ## Inventário inicial de ambientes
 
 Todas as superfícies abaixo começam como `NÃO REVISADA`.
@@ -586,6 +608,7 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 |---|---|
 | Door/Frame | Não revisada |
 | Door/Panel | Não revisada |
+| Worker/silhueta dos membros | V1 implementada em validação; aceitação no jogo pendente |
 | Worker/material families | Não revisada |
 | Guard/material families | Não revisada |
 | Officer/material families | Não revisada |

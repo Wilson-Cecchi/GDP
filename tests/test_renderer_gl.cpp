@@ -72,6 +72,80 @@ bool validateInstancingTolerance()
     return passed;
 }
 
+// Manual renderer capture of the approved Worker limb proposal. These frames
+// support technical review; final appearance is judged in a played build.
+bool captureWorkerLimbVariation(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* directory = std::getenv("GDP_WORKER_LIMB_CAPTURE_DIR");
+    if (!directory || !*directory) {
+        std::cerr << "Set GDP_WORKER_LIMB_CAPTURE_DIR for Worker captures\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    RoomRenderData room;
+    room.origin = {0.0F, 0.0F, -20.0F};
+    room.worldBounds = {{-5.0F, 0.0F, -4.0F}, {5.0F, 4.0F, 9.0F}};
+    RoomLightingRenderData lighting;
+    lighting.ambientColor = {1.0F, 1.0F, 1.0F};
+    lighting.ambientIntensity = 0.48F;
+    lighting.lights[0] = {
+        {0.0F, 3.3F, 2.0F}, {1.0F, 1.0F, 1.0F}, 1.25F, 8.0F};
+    bool passed = true;
+    for (const bool potato : {false, true}) {
+        HudRenderData hud;
+        hud.graphicsQuality = potato
+            ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+        hud.detailedMaterials = !potato;
+        hud.worldRenderScalePercent = potato ? 50U : 100U;
+        for (const wkc::core::Seed seed : {101U, 202U, 303U}) {
+            passed &= renderer.prepareWorkerVisual(seed);
+            for (const bool near : {true, false}) {
+                CameraData camera;
+                camera.position = {0.0F, 1.55F, near ? 2.7F : 7.5F};
+                for (const EnemyAnimationState state : {
+                         EnemyAnimationState::Idle, EnemyAnimationState::Walk,
+                         EnemyAnimationState::Attack}) {
+                    if (!near && state != EnemyAnimationState::Idle) continue;
+                    if (potato && state != EnemyAnimationState::Idle) continue;
+                    EnemyRenderData worker{{0.0F, 0.0F, 0.0F}, true, seed};
+                    worker.animationState = state;
+                    worker.animationTick = 15U;
+                    const std::array enemies{worker};
+                    passed &= renderer.render(width, height, camera, enemies,
+                        {}, {}, lighting, room, {}, {}, {}, hud);
+                    glFinish();
+                    std::vector<std::uint8_t> pixels(
+                        static_cast<std::size_t>(width * height * 4));
+                    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                        pixels.data());
+                    passed &= glGetError() == GL_NO_ERROR;
+                    std::vector<std::uint8_t> topDown(pixels.size());
+                    const std::size_t stride = static_cast<std::size_t>(width * 4);
+                    for (int row = 0; row < height; ++row) {
+                        std::copy_n(pixels.data()
+                                + static_cast<std::size_t>(height - row - 1) * stride,
+                            stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+                    }
+                    const char* phase = state == EnemyAnimationState::Walk ? "walk"
+                        : state == EnemyAnimationState::Attack ? "attack" : "idle";
+                    const auto path = std::filesystem::path{directory}
+                        / (std::string{potato ? "potato" : "medium"}
+                            + "_worker_seed" + std::to_string(seed)
+                            + (near ? "_near_" : "_far_") + phase + ".bmp");
+                    SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                        SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                    passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+                    if (surface) SDL_DestroySurface(surface);
+                }
+            }
+        }
+    }
+    return passed;
+}
+
 // Manual offscreen capture; excluded from the normal renderer pixel suite.
 bool captureGrenadeSmoke(gdp::game::visual::GdpRenderer& renderer)
 {
@@ -939,6 +1013,8 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--grenade-blast-profile";
     const bool grenadeSmokeCapture = argc == 2
         && std::string{argv[1]} == "--grenade-smoke-capture";
+    const bool workerLimbCapture = argc == 2
+        && std::string{argv[1]} == "--worker-limb-capture";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -1105,6 +1181,8 @@ int main(const int argc, char** argv)
             passed = profileGrenadeBlast(renderer);
         } else if (grenadeSmokeCapture) {
             passed = captureGrenadeSmoke(renderer);
+        } else if (workerLimbCapture) {
+            passed = captureWorkerLimbVariation(renderer);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {

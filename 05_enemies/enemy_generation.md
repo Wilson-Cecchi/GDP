@@ -22,6 +22,25 @@ IndustrialRobotVisual generateIndustrialRobotVisual(Seed visualSeed);
 `EnemyGenerationRequest` com role e tema continua sendo a expansão prevista
 para o elenco completo.
 
+## Worker: proporções dos membros v1
+
+A proposta [Worker v1](../visual/proposals/worker_limb_variation_v1.md) foi
+aprovada em 15/10/2026. Cada braço e perna recebe comprimento e espessura
+derivados de sub-seeds versionadas de `visualSeed`; a aparência permanece
+estável ao reiniciar ou retomar a mesma seed. A receita mantém a ordem das oito
+partes, ancora os pés no piso e ajusta a ferramenta à posição da mão direita.
+Somente a apresentação do Worker mudou; colisão, hitboxes, combate, IA, texturas e os
+outros quatro papéis preservam seus contratos.
+
+O teste `enemy_generation_systems` valida 1.000 seeds, limites de proporção,
+contato das partes, determinismo, hash e zero fallbacks. A seed dourada do
+Worker passou a `0x26410B31411A905A` após a versão 2 da receita de malha.
+O modo manual `gdp_renderer_gl_tests --worker-limb-capture`, com
+`GDP_WORKER_LIMB_CAPTURE_DIR` definido, produz quadros do renderer em MEDIUM e
+POTATO, perto e longe, para as seeds 101, 202 e 303, além de caminhada e
+ataque em MEDIUM. Essas capturas técnicas não substituem a aceitação visual
+em partida.
+
 ## Pipeline autoritativo
 
 ```text

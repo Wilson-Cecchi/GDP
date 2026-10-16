@@ -1061,6 +1061,27 @@ std::uint64_t addFloat(const std::uint64_t hash, const float value) noexcept
     return wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
 }
 
+std::array<WorkerLimbShape, 4> workerLimbShapes(const wkc::core::Seed seed) noexcept
+{
+    std::array<WorkerLimbShape, 4> shapes{};
+    constexpr wkc::core::GenerationVersion version{workerLimbRecipeVersion, 0U};
+    for (std::size_t index = 0; index < shapes.size(); ++index) {
+        wkc::core::RandomStream random{wkc::core::deriveSeed(
+            seed, gdp::game::SeedDomain::EnemyBody, 0x574C0000U + index, version)};
+        const bool arm = index < 2U;
+        shapes[index] = {
+            random.rangeFloat(arm ? 0.86F : 0.92F, arm ? 1.14F : 1.08F),
+            random.rangeFloat(arm ? 0.78F : 0.80F, arm ? 1.25F : 1.22F),
+        };
+    }
+    // Keep neighboring parts distinct without creating broken-looking pairs.
+    shapes[1].widthScale = std::clamp(shapes[1].widthScale,
+        shapes[0].widthScale - 0.20F, shapes[0].widthScale + 0.20F);
+    shapes[3].widthScale = std::clamp(shapes[3].widthScale,
+        shapes[2].widthScale - 0.18F, shapes[2].widthScale + 0.18F);
+    return shapes;
+}
+
 } // namespace
 
 std::vector<EnemyRigidPartRecipe> splitEnemyRigidParts(
@@ -1162,6 +1183,11 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     visual.genome.rightLeg = rightLeg->id;
     visual.genome.back = back->id;
     visual.genome.tool = tool->id;
+    const auto limbShapes = workerLimbShapes(visualSeed);
+    visual.genome.leftArmShape = limbShapes[0];
+    visual.genome.rightArmShape = limbShapes[1];
+    visual.genome.leftLegShape = limbShapes[2];
+    visual.genome.rightLegShape = limbShapes[3];
 
     constexpr float baseHeight = 1.80F;
     const float height = baseHeight * visual.body.heightScale;
@@ -1173,6 +1199,28 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     const float armHeight = height * visual.body.armLength;
     const float armWidth = height * 0.13F;
     const float legWidth = torsoWidth * 0.34F;
+    const float leftArmHeight = armHeight * visual.genome.leftArmShape.lengthScale
+        * leftArm->dimensionScale.y;
+    const float rightArmHeight = armHeight * visual.genome.rightArmShape.lengthScale
+        * rightArm->dimensionScale.y;
+    const float leftLegHeight = legHeight * visual.genome.leftLegShape.lengthScale
+        * leftLeg->dimensionScale.y;
+    const float rightLegHeight = legHeight * visual.genome.rightLegShape.lengthScale
+        * rightLeg->dimensionScale.y;
+    const float rightArmWidth = armWidth * visual.body.rightMassBias
+        * visual.genome.rightArmShape.widthScale;
+    // Extend only the Worker apron to cover the lower of the two hip joints.
+    const float torsoLower = std::min(leftLegHeight, rightLegHeight) - 0.012F * height;
+    const float torsoUpper = legHeight + torsoHeight;
+    const float torsoVisualHeight
+        = (torsoUpper - torsoLower) / torso->dimensionScale.y;
+    const float torsoVisualCenter = (torsoUpper + torsoLower) * 0.5F;
+    const auto toolSocketIt = std::find_if(visual.body.sockets.begin(),
+        visual.body.sockets.end(), [](const SocketDefinition& socket) {
+            return socket.type == SocketType::Tool;
+        });
+    toolSocketIt->position.y = findSocket(visual.body, SocketType::ShoulderRight)->position.y
+        - rightArmHeight;
     const SocketDefinition* leftShoulder = findSocket(visual.body, SocketType::ShoulderLeft);
     const SocketDefinition* rightShoulder = findSocket(visual.body, SocketType::ShoulderRight);
     const SocketDefinition* leftHip = findSocket(visual.body, SocketType::HipLeft);
@@ -1180,26 +1228,32 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
     const SocketDefinition* toolSocket = findSocket(visual.body, SocketType::Tool);
 
+    visual.meshRecipe.version = 2U;
     visual.meshRecipe.seed = visualSeed;
     visual.meshRecipe.primitives = {
-        makePrimitive(*torso, {0.0F, legHeight + (torsoHeight * 0.5F), 0.0F},
-            {torsoWidth, torsoHeight, torsoDepth}, {visual.body.forwardLean, 0.0F, 0.0F}),
+        makePrimitive(*torso, {0.0F, torsoVisualCenter, 0.0F},
+            {torsoWidth, torsoVisualHeight, torsoDepth},
+            {visual.body.forwardLean, 0.0F, 0.0F}),
         makePrimitive(*head, {0.0F, legHeight + torsoHeight + (headHeight * 0.5F), 0.0F},
             {headHeight, headHeight, headHeight}),
         makePrimitive(*leftArm,
-            {leftShoulder->position.x, leftShoulder->position.y - (armHeight * 0.5F), 0.0F},
-            {armWidth * visual.body.leftMassBias, armHeight, armWidth}),
+            {leftShoulder->position.x, leftShoulder->position.y - (leftArmHeight * 0.5F), 0.0F},
+            {armWidth * visual.body.leftMassBias * visual.genome.leftArmShape.widthScale,
+                armHeight * visual.genome.leftArmShape.lengthScale, armWidth}),
         makePrimitive(*rightArm,
-            {rightShoulder->position.x, rightShoulder->position.y - (armHeight * 0.5F), 0.0F},
-            {armWidth * visual.body.rightMassBias, armHeight, armWidth}),
-        makePrimitive(*leftLeg, {leftHip->position.x, legHeight * 0.5F, 0.0F},
-            {legWidth * visual.body.leftMassBias, legHeight, torsoDepth * 0.72F}),
-        makePrimitive(*rightLeg, {rightHip->position.x, legHeight * 0.5F, 0.0F},
-            {legWidth * visual.body.rightMassBias, legHeight, torsoDepth * 0.72F}),
+            {rightShoulder->position.x, rightShoulder->position.y - (rightArmHeight * 0.5F), 0.0F},
+            {rightArmWidth, armHeight * visual.genome.rightArmShape.lengthScale, armWidth}),
+        makePrimitive(*leftLeg, {leftHip->position.x, leftLegHeight * 0.5F, 0.0F},
+            {legWidth * visual.body.leftMassBias * visual.genome.leftLegShape.widthScale,
+                legHeight * visual.genome.leftLegShape.lengthScale, torsoDepth * 0.72F}),
+        makePrimitive(*rightLeg, {rightHip->position.x, rightLegHeight * 0.5F, 0.0F},
+            {legWidth * visual.body.rightMassBias * visual.genome.rightLegShape.widthScale,
+                legHeight * visual.genome.rightLegShape.lengthScale, torsoDepth * 0.72F}),
         makePrimitive(*back, backSocket->position,
             {height, height, height}),
         makePrimitive(*tool,
-            toolSocket->position + wkc::core::Vec3{armWidth * 0.55F, 0.0F, 0.0F},
+            toolSocket->position + wkc::core::Vec3{
+                rightArmWidth * rightArm->dimensionScale.x * 0.55F, 0.0F, 0.0F},
             {height, height, height},
             {0.0F, 0.0F, -8.0F}),
     };
@@ -1258,15 +1312,61 @@ WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual)
     addPartError(result, visual.body, visual.genome.rightLeg, WorkerPartSlot::Leg);
     addPartError(result, visual.body, visual.genome.back, WorkerPartSlot::Back);
     addPartError(result, visual.body, visual.genome.tool, WorkerPartSlot::Tool);
+    const auto expectedShapes = workerLimbShapes(visual.genome.seed);
+    if (visual.genome.limbRecipeVersion != workerLimbRecipeVersion
+        || visual.genome.leftArmShape != expectedShapes[0]
+        || visual.genome.rightArmShape != expectedShapes[1]
+        || visual.genome.leftLegShape != expectedShapes[2]
+        || visual.genome.rightLegShape != expectedShapes[3]
+        || visual.meshRecipe.version != 2U) {
+        result.errors.push_back(WorkerVisualValidationError::InvalidLimbVariation);
+    }
     if (!validateMeshRecipe(visual.meshRecipe).isValid()) {
         result.errors.push_back(WorkerVisualValidationError::InvalidMeshRecipe);
     }
     if (!validateTextureRecipe(visual.textureRecipe).isValid()) {
         result.errors.push_back(WorkerVisualValidationError::InvalidTextureRecipe);
     }
+    if (visual.meshRecipe.primitives.size() == 8U) {
+        const auto& primitives = visual.meshRecipe.primitives;
+        const auto top = [](const PrimitiveRecipe& part) {
+            return part.localTransform.position.y
+                + part.dimensions.y * part.localTransform.scale.y * 0.5F;
+        };
+        const auto bottom = [](const PrimitiveRecipe& part) {
+            return part.localTransform.position.y
+                - part.dimensions.y * part.localTransform.scale.y * 0.5F;
+        };
+        const SocketDefinition* leftShoulder
+            = findSocket(visual.body, SocketType::ShoulderLeft);
+        const SocketDefinition* rightShoulder
+            = findSocket(visual.body, SocketType::ShoulderRight);
+        const SocketDefinition* toolSocket
+            = findSocket(visual.body, SocketType::Tool);
+        if (leftShoulder == nullptr || rightShoulder == nullptr || toolSocket == nullptr
+            || std::abs(top(primitives[2]) - leftShoulder->position.y) > 0.0001F
+            || std::abs(top(primitives[3]) - rightShoulder->position.y) > 0.0001F
+            || std::abs(bottom(primitives[4])) > 0.0001F
+            || std::abs(bottom(primitives[5])) > 0.0001F
+            || bottom(primitives[0]) > std::min(top(primitives[4]), top(primitives[5]))
+            || std::abs(toolSocket->position.y - bottom(primitives[3])) > 0.0001F
+            || std::abs(primitives[7].localTransform.position.y
+                - toolSocket->position.y) > 0.0001F
+            || std::abs(primitives[7].localTransform.position.x
+                - primitives[3].localTransform.position.x)
+                > (primitives[7].dimensions.x * primitives[7].localTransform.scale.x
+                    + primitives[3].dimensions.x * primitives[3].localTransform.scale.x)
+                    * 0.5F) {
+            result.errors.push_back(WorkerVisualValidationError::InvalidLimbVariation);
+        }
+    } else {
+        result.errors.push_back(WorkerVisualValidationError::InvalidLimbVariation);
+    }
     if (const auto generated = generateMesh(visual.meshRecipe)) {
         if (generated->mesh.bounds.minimum.y < -0.001F
-            || generated->mesh.bounds.maximum.y > 2.05F) {
+            || generated->mesh.bounds.maximum.y > 2.05F
+            || generated->mesh.bounds.minimum.x < -1.0F
+            || generated->mesh.bounds.maximum.x > 1.0F) {
             result.errors.push_back(WorkerVisualValidationError::InvalidBounds);
         }
     } else {
@@ -1283,6 +1383,7 @@ std::uint64_t workerVisualHash(const WorkerVisual& visual) noexcept
 {
     std::uint64_t hash = wkc::core::hashCombine(
         0x574F524B45525F56ULL, visual.genome.seed);
+    hash = wkc::core::hashCombine(hash, visual.genome.limbRecipeVersion);
     hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.genome.bodyProfile));
     hash = wkc::core::hashCombine(hash, visual.genome.torso);
     hash = wkc::core::hashCombine(hash, visual.genome.head);
@@ -1292,6 +1393,12 @@ std::uint64_t workerVisualHash(const WorkerVisual& visual) noexcept
     hash = wkc::core::hashCombine(hash, visual.genome.rightLeg);
     hash = wkc::core::hashCombine(hash, visual.genome.back);
     hash = wkc::core::hashCombine(hash, visual.genome.tool);
+    for (const WorkerLimbShape shape : {
+             visual.genome.leftArmShape, visual.genome.rightArmShape,
+             visual.genome.leftLegShape, visual.genome.rightLegShape}) {
+        hash = addFloat(hash, shape.lengthScale);
+        hash = addFloat(hash, shape.widthScale);
+    }
     hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.materials.family));
     hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(visual.wear.condition));
     hash = addFloat(hash, visual.wear.wear);

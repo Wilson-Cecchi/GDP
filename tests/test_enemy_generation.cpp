@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <string_view>
@@ -120,6 +121,10 @@ void testDeterministicWorker()
     const WorkerVisual different = generateWorkerVisual(seed + 1U);
     expect(validateWorkerVisual(first).isValid(), "representative Worker visual validates");
     expect(first.genome.visualHash == repeated.genome.visualHash
+            && first.genome.leftArmShape == repeated.genome.leftArmShape
+            && first.genome.rightArmShape == repeated.genome.rightArmShape
+            && first.genome.leftLegShape == repeated.genome.leftLegShape
+            && first.genome.rightLegShape == repeated.genome.rightLegShape
             && first.meshRecipe == repeated.meshRecipe
             && first.textureRecipe == repeated.textureRecipe,
         "same visual seed reproduces genome, mesh and texture recipes exactly");
@@ -134,8 +139,8 @@ void testDeterministicWorker()
         "complete Worker genome produces renderer-valid mesh data");
     expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Worker genome produces renderer-valid albedo data");
-    expect(first.genome.visualHash == 0x47FC8A2095B5F922ULL,
-        "golden Worker visual hash remains stable across builds");
+    expect(first.genome.visualHash == 0x26410B31411A905AULL,
+        "versioned Worker limb visual hash remains stable across builds");
 
     WorkerVisual invalid = first;
     invalid.genome.head = 999'999;
@@ -151,6 +156,24 @@ void testDeterministicWorker()
     expect(containsError(
                validateWorkerVisual(invalid), WorkerVisualValidationError::InvalidVisualHash),
         "assembly validation detects genome hash corruption");
+    invalid = first;
+    invalid.genome.rightArmShape.lengthScale = 2.0F;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidLimbVariation),
+        "Worker assembly rejects a limb factor outside the seeded recipe");
+    invalid = first;
+    invalid.meshRecipe.primitives[5].localTransform.position.y += 0.05F;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidLimbVariation),
+        "Worker assembly rejects a floating foot even with a matching hash");
+    invalid = first;
+    invalid.meshRecipe.primitives[7].localTransform.position.x += 0.5F;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidLimbVariation),
+        "Worker assembly rejects a tool detached from its hand");
 }
 
 void testWorkerSeedBatch()
@@ -165,6 +188,20 @@ void testWorkerSeedBatch()
     std::unordered_set<std::uint64_t> visualHashes;
     bool allValid = true;
     bool foundAsymmetry = false;
+    bool foundShapeAsymmetry = false;
+    bool variedWithinProfile = true;
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> minArmLength;
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> maxArmLength{};
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> minLegLength;
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> maxLegLength{};
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> minArmWidth;
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> maxArmWidth{};
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> minLegWidth;
+    std::array<float, static_cast<std::size_t>(WorkerBodyProfileId::Count)> maxLegWidth{};
+    minArmLength.fill(2.0F);
+    minLegLength.fill(2.0F);
+    minArmWidth.fill(2.0F);
+    minLegWidth.fill(2.0F);
     std::uint32_t fallbackCount = 0;
 
     for (wkc::core::Seed seed = 0; seed < 1'000; ++seed) {
@@ -179,6 +216,49 @@ void testWorkerSeedBatch()
             break;
         }
         profiles[static_cast<std::size_t>(visual.genome.bodyProfile)] = true;
+        const auto profileIndex = static_cast<std::size_t>(visual.genome.bodyProfile);
+        minArmLength[profileIndex] = std::min(minArmLength[profileIndex],
+            visual.genome.leftArmShape.lengthScale);
+        maxArmLength[profileIndex] = std::max(maxArmLength[profileIndex],
+            visual.genome.leftArmShape.lengthScale);
+        minLegLength[profileIndex] = std::min(minLegLength[profileIndex],
+            visual.genome.rightLegShape.lengthScale);
+        maxLegLength[profileIndex] = std::max(maxLegLength[profileIndex],
+            visual.genome.rightLegShape.lengthScale);
+        minArmWidth[profileIndex] = std::min(minArmWidth[profileIndex],
+            visual.genome.rightArmShape.widthScale);
+        maxArmWidth[profileIndex] = std::max(maxArmWidth[profileIndex],
+            visual.genome.rightArmShape.widthScale);
+        minLegWidth[profileIndex] = std::min(minLegWidth[profileIndex],
+            visual.genome.leftLegShape.widthScale);
+        maxLegWidth[profileIndex] = std::max(maxLegWidth[profileIndex],
+            visual.genome.leftLegShape.widthScale);
+        const auto& genome = visual.genome;
+        const auto inRange = [](const float value, const float lower,
+                                 const float upper) {
+            return value >= lower && value <= upper;
+        };
+        variedWithinProfile = variedWithinProfile
+            && genome.limbRecipeVersion == workerLimbRecipeVersion
+            && visual.meshRecipe.version == 2U
+            && inRange(genome.leftArmShape.lengthScale, 0.86F, 1.14F)
+            && inRange(genome.rightArmShape.lengthScale, 0.86F, 1.14F)
+            && inRange(genome.leftLegShape.lengthScale, 0.92F, 1.08F)
+            && inRange(genome.rightLegShape.lengthScale, 0.92F, 1.08F)
+            && inRange(genome.leftArmShape.widthScale, 0.78F, 1.25F)
+            && inRange(genome.rightArmShape.widthScale, 0.78F, 1.25F)
+            && inRange(genome.leftLegShape.widthScale, 0.80F, 1.22F)
+            && inRange(genome.rightLegShape.widthScale, 0.80F, 1.22F)
+            && std::abs(genome.leftArmShape.widthScale
+                - genome.rightArmShape.widthScale) <= 0.201F
+            && std::abs(genome.leftLegShape.widthScale
+                - genome.rightLegShape.widthScale) <= 0.181F;
+        foundShapeAsymmetry = foundShapeAsymmetry
+            || genome.leftArmShape != genome.rightArmShape
+            || genome.leftLegShape != genome.rightLegShape;
+        variedWithinProfile = variedWithinProfile
+            && mesh->mesh.bounds.minimum.x >= -1.0F
+            && mesh->mesh.bounds.maximum.x <= 1.0F;
         wearConditions[static_cast<std::size_t>(visual.wear.condition)] = true;
         materials[static_cast<std::size_t>(visual.materials.family)] = true;
         selectedParts.insert(visual.genome.torso);
@@ -202,6 +282,17 @@ void testWorkerSeedBatch()
     expect(selectedParts.size() == workerPartLibrary().size(),
         "seed batch reaches every compatible built-in Worker part");
     expect(foundAsymmetry, "seed batch exercises allowed left/right part asymmetry");
+    expect(foundShapeAsymmetry,
+        "seed batch gives Worker limbs independent left/right proportions");
+    for (std::size_t index = 0; index < minArmLength.size(); ++index) {
+        variedWithinProfile = variedWithinProfile
+            && maxArmLength[index] - minArmLength[index] > 0.20F
+            && maxLegLength[index] - minLegLength[index] > 0.10F
+            && maxArmWidth[index] - minArmWidth[index] > 0.20F
+            && maxLegWidth[index] - minLegWidth[index] > 0.20F;
+    }
+    expect(variedWithinProfile,
+        "1,000 Workers vary limb size in every profile and obey visual envelope");
 
     bool allProfiles = true;
     for (const bool selected : profiles) {

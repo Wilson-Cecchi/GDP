@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="850" viewBox="0 0 1200 850" role="img" aria-labelledby="title description">
+  <title id="title">Worker: variação de braços e pernas, proposta visual v1</title>
+  <desc id="description">Três Workers quadrados, compacto, esguio e robusto, vistos de perto e em escala aproximada de gameplay. Braços e pernas variam em comprimento e espessura, mas pés tocam o piso e ferramentas permanecem junto às mãos. Prancha conceitual, não implementada.</desc>
+  <defs>
+
+    <!-- Coordenadas locais: topo da cabeça = 0; contato dos pés = 400. -->
+    <g id="worker-compact">
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-33" y="43" width="66" height="32"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-43" y="0" width="86" height="68"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-43" y="0" width="14" height="68"/>
+      <rect fill="#a8dfe1" x="-23" y="28" width="46" height="10"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-59" y="75" width="118" height="147"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-65" y="79" width="130" height="145"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-65" y="79" width="18" height="145"/>
+      <rect fill="#e8be70" x="-46" y="115" width="92" height="13"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="-17" y="144" width="34" height="31"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-88" y="87" width="28" height="28"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="60" y="87" width="28" height="28"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-101" y="101" width="37" height="140"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-101" y="101" width="8" height="140"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="64" y="101" width="39" height="143"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="64" y="101" width="8" height="143"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-101" y="225" width="37" height="21"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="64" y="228" width="39" height="21"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-48" y="214" width="38" height="28"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="10" y="214" width="38" height="28"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-46" y="235" width="37" height="151"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="9" y="235" width="39" height="151"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-46" y="235" width="8" height="151"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="9" y="235" width="8" height="151"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-52" y="381" width="48" height="19"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="4" y="381" width="49" height="19"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="102" y="224" width="18" height="62"/>
+      <rect fill="#e8be70" x="102" y="246" width="18" height="8"/>
+    </g>
+
+    <g id="worker-lanky">
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-25" y="46" width="50" height="27"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-34" y="0" width="68" height="63"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-34" y="0" width="11" height="63"/>
+      <rect fill="#a8dfe1" x="-20" y="25" width="40" height="8"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-52" y="77" width="104" height="131"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-52" y="77" width="15" height="131"/>
+      <rect fill="#e8be70" x="-39" y="111" width="78" height="10"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="-15" y="134" width="30" height="28"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-68" y="84" width="24" height="25"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="44" y="84" width="24" height="25"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-77" y="96" width="25" height="167"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-77" y="96" width="6" height="167"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="52" y="96" width="29" height="158"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="52" y="96" width="6" height="158"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-77" y="249" width="25" height="18"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="52" y="240" width="29" height="18"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-37" y="200" width="26" height="27"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="11" y="200" width="26" height="27"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-36" y="220" width="27" height="167"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="9" y="220" width="29" height="167"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-36" y="220" width="6" height="167"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="9" y="220" width="6" height="167"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-41" y="384" width="36" height="16"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="4" y="384" width="39" height="16"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="80" y="234" width="14" height="74"/>
+      <rect fill="#e8be70" x="80" y="257" width="14" height="8"/>
+    </g>
+
+    <g id="worker-heavy">
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-37" y="48" width="74" height="31"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-44" y="0" width="88" height="68"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-44" y="0" width="13" height="68"/>
+      <rect fill="#a8dfe1" x="-25" y="27" width="50" height="10"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-79" y="82" width="158" height="159"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-79" y="82" width="19" height="159"/>
+      <rect fill="#e8be70" x="-57" y="123" width="114" height="16"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="-20" y="160" width="40" height="36"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-102" y="97" width="29" height="34"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="73" y="97" width="29" height="34"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-116" y="112" width="49" height="133"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-116" y="112" width="10" height="133"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="67" y="112" width="54" height="145"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="67" y="112" width="11" height="145"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-116" y="231" width="49" height="21"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="67" y="243" width="54" height="21"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="-58" y="232" width="43" height="28"/>
+      <rect fill="#283943" stroke="#111b22" stroke-width="3" x="15" y="232" width="43" height="28"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="-57" y="253" width="46" height="134"/>
+      <rect fill="#b87938" stroke="#162129" stroke-width="3" x="11" y="253" width="49" height="134"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="-57" y="253" width="10" height="134"/>
+      <rect fill="#e5aa58" stroke="#162129" stroke-width="3" x="11" y="253" width="10" height="134"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="-64" y="382" width="59" height="18"/>
+      <rect fill="#594d3d" stroke="#162129" stroke-width="3" x="5" y="382" width="61" height="18"/>
+      <rect fill="#81939a" stroke="#162129" stroke-width="3" x="120" y="242" width="21" height="71"/>
+      <rect fill="#e8be70" x="120" y="266" width="21" height="10"/>
+    </g>
+  </defs>
+
+  <rect fill="#121b22" width="1200" height="850"/>
+  <text fill="#f2e2c5" font-family="sans-serif" font-size="30" font-weight="700" x="36" y="48">WORKER / membros quadrados variáveis</text>
+  <text fill="#c2d0d1" font-family="sans-serif" font-size="16" x="36" y="77">Proporções diferentes por seed; identidade, encaixes e leitura em combate preservados.</text>
+  <rect x="846" y="24" width="318" height="31" fill="#5b3920"/>
+  <text fill="#e2ae64" font-family="sans-serif" font-size="10" font-weight="700" letter-spacing="0.4" x="855" y="44">PROPOSTA VISUAL — NÃO IMPLEMENTADA</text>
+
+  <rect fill="#1e2a32" stroke="#425661" stroke-width="2" x="24" y="101" width="369" height="655" rx="6"/>
+  <rect fill="#1e2a32" stroke="#425661" stroke-width="2" x="415" y="101" width="369" height="655" rx="6"/>
+  <rect fill="#1e2a32" stroke="#425661" stroke-width="2" x="806" y="101" width="369" height="655" rx="6"/>
+  <text fill="#f2e2c5" font-family="sans-serif" font-size="23" font-weight="700" x="44" y="137">A · Compacto</text>
+  <text fill="#f2e2c5" font-family="sans-serif" font-size="23" font-weight="700" x="435" y="137">B · Esguio</text>
+  <text fill="#f2e2c5" font-family="sans-serif" font-size="23" font-weight="700" x="826" y="137">C · Robusto</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="44" y="160">seed ilustrativa: 101</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="435" y="160">seed ilustrativa: 202</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="826" y="160">seed ilustrativa: 303</text>
+
+  <line stroke="#69808a" stroke-width="2" x1="46" y1="601" x2="371" y2="601"/>
+  <line stroke="#69808a" stroke-width="2" x1="437" y1="601" x2="762" y2="601"/>
+  <line stroke="#69808a" stroke-width="2" x1="828" y1="601" x2="1153" y2="601"/>
+  <use xlink:href="#worker-compact" transform="translate(203 201)"/>
+  <use xlink:href="#worker-lanky" transform="translate(594 201)"/>
+  <use xlink:href="#worker-heavy" transform="translate(985 201)"/>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="15" x="44" y="627">Braços médios · pernas curtas/largas</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="15" x="435" y="627">Braços longos · pernas finas/longas</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="15" x="826" y="627">Braços desiguais · pernas largas</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="44" y="651">mãos na ferramenta · pés no piso</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="435" y="651">mãos na ferramenta · pés no piso</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="826" y="651">mãos na ferramenta · pés no piso</text>
+
+  <rect x="39" y="667" width="339" height="74" fill="#152128"/>
+  <rect x="430" y="667" width="339" height="74" fill="#152128"/>
+  <rect x="821" y="667" width="339" height="74" fill="#152128"/>
+  <line stroke="#69808a" stroke-width="2" x1="55" y1="731" x2="362" y2="731"/>
+  <line stroke="#69808a" stroke-width="2" x1="446" y1="731" x2="753" y2="731"/>
+  <line stroke="#69808a" stroke-width="2" x1="837" y1="731" x2="1144" y2="731"/>
+  <use xlink:href="#worker-compact" transform="translate(226 731) scale(.14) translate(0 -400)"/>
+  <use xlink:href="#worker-lanky" transform="translate(617 731) scale(.14) translate(0 -400)"/>
+  <use xlink:href="#worker-heavy" transform="translate(1008 731) scale(.14) translate(0 -400)"/>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="49" y="685">Leitura à distância / escala ilustrativa</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="440" y="685">Leitura à distância / escala ilustrativa</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="13" x="831" y="685">Leitura à distância / escala ilustrativa</text>
+
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="15" x="36" y="793">Luz neutra simulada · silhueta frontal · formas em caixas · material/paleta apenas para leitura da proposta</text>
+  <text fill="#b7c7c8" font-family="sans-serif" font-size="15" x="36" y="819">AGUARDANDO APROVAÇÃO · A prancha não é captura do jogo nem saída atual do gerador.</text>
+</svg>

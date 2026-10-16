@@ -104,8 +104,18 @@ struct WorkerMaterialSet {
     wkc::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
 };
 
+inline constexpr std::uint32_t workerLimbRecipeVersion = 1;
+
+struct WorkerLimbShape {
+    float lengthScale{1.0F};
+    float widthScale{1.0F};
+
+    constexpr bool operator==(const WorkerLimbShape&) const noexcept = default;
+};
+
 struct WorkerVisualGenome {
     wkc::core::Seed seed{0};
+    std::uint32_t limbRecipeVersion{workerLimbRecipeVersion};
     WorkerBodyProfileId bodyProfile{WorkerBodyProfileId::Standard};
     WorkerPartId torso{0};
     WorkerPartId head{0};
@@ -115,6 +125,10 @@ struct WorkerVisualGenome {
     WorkerPartId rightLeg{0};
     WorkerPartId back{0};
     WorkerPartId tool{0};
+    WorkerLimbShape leftArmShape;
+    WorkerLimbShape rightArmShape;
+    WorkerLimbShape leftLegShape;
+    WorkerLimbShape rightLegShape;
     std::uint64_t visualHash{0};
 };
 
@@ -145,6 +159,7 @@ enum class WorkerVisualValidationError : std::uint8_t {
     IncompatiblePart,
     InvalidMeshRecipe,
     InvalidTextureRecipe,
+    InvalidLimbVariation,
     InvalidBounds,
     InvalidVisualHash,
 };
