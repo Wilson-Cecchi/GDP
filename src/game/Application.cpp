@@ -1719,6 +1719,7 @@ void Application::processEvents()
         || grenadeThrowRemaining_ > 0.0F;
     if (!grenadeAnimationLocked && pressed(ControlAction::Equipment)) {
         grenadeSelected_ = true;
+        weapon_.cancelQueuedShotgunFire();
         weaponSwitchPending_.reset();
         firePending_ = false;
         reloadPending_ = false;
@@ -2283,6 +2284,11 @@ void Application::fixedUpdate(const double fixedStep)
         }
         ++fixedUpdates_;
         return;
+    }
+    if (!player_.state().alive) {
+        weapon_.cancelQueuedShotgunFire();
+    } else if (firePending_ && !grenadeSelected_ && !quickMeleePending_) {
+        (void)weapon_.queueShotgunFireDuringReload();
     }
     weapon_.fixedUpdate(step);
     for (auto it = roomEntryGraceRemaining_.begin();

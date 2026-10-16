@@ -69,6 +69,10 @@ public:
     [[nodiscard]] FireReadiness tryFire() noexcept;
     [[nodiscard]] FireReadiness tryQuickMelee() noexcept;
     [[nodiscard]] bool reload() noexcept;
+    // A shotgun trigger press during reload waits for the shell in progress.
+    [[nodiscard]] bool queueShotgunFireDuringReload() noexcept;
+    void cancelQueuedShotgunFire() noexcept;
+    [[nodiscard]] bool shotgunFireQueued() const noexcept;
     // Reserve units: complete magazines, except shotgun shells.
     [[nodiscard]] std::uint32_t addReserveAmmo(std::uint32_t amount) noexcept;
     [[nodiscard]] std::uint32_t addReserveAmmoFor(WeaponArchetype archetype, std::uint32_t amount) noexcept;
@@ -139,6 +143,7 @@ private:
     float reloadDuration_{0.0F};
     std::uint32_t reloadRoundCount_{0U};
     std::uint32_t reloadInsertedRounds_{0U};
+    bool queuedShotgunFire_{false};
     float switchRemaining_{0.0F};
     float overdriveRemaining_{0.0F};
     std::uint32_t spreadShotCount_{0U};

@@ -604,6 +604,78 @@ void testPerShellShotgunReload()
         "shotgun finishes with available shells, no invented cartridges");
 }
 
+void testShotgunFireQueuedDuringReload()
+{
+    using namespace gdp::gameplay;
+    Weapon gun(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    auto state = gun.campaignProgress();
+    state.magazineAmmo = 2U;
+    state.reserveAmmo = 4U;
+    expect(gun.restoreCampaignProgress(state) && gun.reload(),
+        "shotgun interrupt fixture starts with two shells loaded");
+    gun.fixedUpdate(0.12F);
+    expect(gun.queueShotgunFireDuringReload()
+            && !weaponFireRequested(gun, false, false),
+        "shotgun holds a trigger press until the current shell is seated");
+    gun.fixedUpdate(0.22F);
+    expect(gun.reloading() && gun.magazineAmmo() == 2U,
+        "queued shot does not skip the shell insertion animation");
+    gun.fixedUpdate(0.01F);
+    expect(!gun.reloading() && gun.magazineAmmo() == 3U
+            && gun.reserveAmmo() == 3U
+            && weaponFireRequested(gun, false, false),
+        "one shell completes and the queued shot becomes ready");
+    expect(gun.tryFire() == FireReadiness::Fired
+            && gun.magazineAmmo() == 2U
+            && !weaponFireRequested(gun, false, false),
+        "queued shot consumes one shell exactly once");
+    gun.fixedUpdate(5.0F);
+    expect(gun.magazineAmmo() == 2U && gun.reserveAmmo() == 3U,
+        "remaining shells do not insert after the shot");
+
+    Weapon largeStep(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    expect(largeStep.restoreCampaignProgress(state) && largeStep.reload()
+            && largeStep.queueShotgunFireDuringReload(),
+        "large-step fixture queues its interruption");
+    largeStep.fixedUpdate(5.0F);
+    expect(largeStep.magazineAmmo() == 3U && largeStep.reserveAmmo() == 3U
+            && !largeStep.reloading(),
+        "large fixed step still inserts only the requested shell");
+    expect(largeStep.switchTo(WeaponArchetype::Knife)
+            && !weaponFireRequested(largeStep, false, false),
+        "switching cancels a queued shotgun shot");
+
+    Weapon cadence(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    expect(cadence.restoreCampaignProgress(state)
+            && cadence.tryFire() == FireReadiness::Fired
+            && cadence.reload()
+            && cadence.queueShotgunFireDuringReload(),
+        "shotgun can queue an interruption immediately after a shot");
+    cadence.fixedUpdate(shotgunShellReloadSeconds);
+    expect(!cadence.reloading() && cadence.magazineAmmo() == 2U
+            && cadence.tryFire() == FireReadiness::Cooldown
+            && weaponFireRequested(cadence, false, false),
+        "queued shot waits for normal fire cadence without loading another shell");
+    cadence.fixedUpdate(cadence.cooldownRemaining());
+    expect(cadence.tryFire() == FireReadiness::Fired
+            && cadence.magazineAmmo() == 1U
+            && !weaponFireRequested(cadence, false, false),
+        "queued shot fires once when the weapon becomes ready");
+
+    Weapon ready(baseWeaponDefinition(WeaponArchetype::Shotgun));
+    auto lastShell = ready.campaignProgress();
+    lastShell.magazineAmmo = 5U;
+    lastShell.reserveAmmo = 1U;
+    expect(ready.restoreCampaignProgress(lastShell) && ready.reload(),
+        "last-shell fixture starts a one-shell reload");
+    ready.fixedUpdate(shotgunShellReloadSeconds);
+    expect(ready.reloading() && ready.magazineAmmo() == 6U
+            && ready.queueShotgunFireDuringReload()
+            && !ready.reloading()
+            && ready.tryFire() == FireReadiness::Fired,
+        "click during the final ready animation fires the seated shell");
+}
+
 void testDeterministicWeaponSpread()
 {
     using namespace gdp::gameplay;
@@ -3829,6 +3901,7 @@ int main()
     testDiscardedMagazineReloads();
     testEmptyTriggerStartsReloadOnlyWhenRequested();
     testPerShellShotgunReload();
+    testShotgunFireQueuedDuringReload();
     testDeterministicWeaponSpread();
     testWeaponCameraRecoil();
     testPracticeRestock();

@@ -684,6 +684,10 @@ novo e o retorno exato ao repouso nos perfis MEDIUM/POTATO.
 Escopeta: testes de 1–6 cartuchos verificam duração proporcional, inserção
 autoritativa por cartucho, reserva curta, interrupção, reinício, dt longo e
 quantidade visual planejada constante enquanto o carregamento avança.
+Um clique de tiro durante a recarga da escopeta termina apenas o cartucho em
+andamento, interrompe os seguintes e dispara uma vez quando a cadência permitir.
+Os testes cobrem clique antes da inserção, atualização longa, troca de arma,
+cadência pendente e clique durante o retorno após o último cartucho.
 
 Quando disponíveis, usar AddressSanitizer e UndefinedBehaviorSanitizer.
 

@@ -219,6 +219,9 @@ bool weaponFireRequested(
     if (weapon.reloading() || weapon.switching()) {
         return false;
     }
+    if (weapon.shotgunFireQueued()) {
+        return true;
+    }
     if (weapon.definition().archetype == WeaponArchetype::Knife) {
         return triggerPressed;
     }
@@ -266,15 +269,20 @@ void Weapon::fixedUpdate(const float fixedStepSeconds) noexcept
     reloadRemaining_ = std::max(0.0F, reloadRemaining_ - step);
     if (wasReloading && definition_.archetype == WeaponArchetype::Shotgun) {
         const double elapsed = static_cast<double>(reloadDuration_ - reloadRemaining_);
-        const auto inserted = reloadCompleted ? reloadRoundCount_
+        const auto completed = reloadCompleted ? reloadRoundCount_
             : static_cast<std::uint32_t>(std::clamp(
                 std::floor((elapsed + 0.000001) / shotgunShellReloadSeconds),
                 0.0, static_cast<double>(reloadRoundCount_)));
+        const auto inserted = queuedShotgunFire_
+            ? std::min(completed, reloadInsertedRounds_ + 1U) : completed;
         if (inserted > reloadInsertedRounds_) {
             const auto transferred = std::min(inserted - reloadInsertedRounds_, reserveAmmo_);
             magazineAmmo_ += transferred;
             reserveAmmo_ -= transferred;
             reloadInsertedRounds_ += transferred;
+            if (queuedShotgunFire_ && transferred > 0U) {
+                reloadRemaining_ = 0.0F;
+            }
         }
     }
     // Ejection is irreversible, even if a switch/drop interrupts insertion.
@@ -320,6 +328,7 @@ FireReadiness Weapon::tryFire() noexcept
     }
     spreadRecoveryRemaining_
         = weaponSpreadProfile(definition_.archetype).recoverySeconds;
+    queuedShotgunFire_ = false;
     return FireReadiness::Fired;
 }
 
@@ -352,10 +361,35 @@ bool Weapon::reload() noexcept
         ? static_cast<float>(reloadRoundCount_) * shotgunShellReloadSeconds + shotgunReadySeconds
         : weaponReloadDurationSeconds(definition_.archetype);
     reloadRemaining_ = reloadDuration_;
+    queuedShotgunFire_ = false;
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
     spreadRecoveryRemaining_ = 0.0F;
     return true;
+}
+
+bool Weapon::queueShotgunFireDuringReload() noexcept
+{
+    if (selectedArchetype_ != WeaponArchetype::Shotgun
+        || !reloading() || switching()) {
+        return false;
+    }
+    queuedShotgunFire_ = true;
+    // The final shell may already be seated during the ready animation.
+    if (reloadInsertedRounds_ >= reloadRoundCount_) {
+        reloadRemaining_ = 0.0F;
+    }
+    return true;
+}
+
+void Weapon::cancelQueuedShotgunFire() noexcept
+{
+    queuedShotgunFire_ = false;
+}
+
+bool Weapon::shotgunFireQueued() const noexcept
+{
+    return queuedShotgunFire_ && selectedArchetype_ == WeaponArchetype::Shotgun;
 }
 
 std::uint32_t Weapon::addReserveAmmo(const std::uint32_t amount) noexcept
@@ -450,6 +484,7 @@ bool Weapon::equip(const WeaponArchetype archetype) noexcept
     reserveAmmo_ = definition_.reserveMaximum;
     cooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    queuedShotgunFire_ = false;
     switchRemaining_ = weaponSwitchDurationSeconds(definition_.archetype);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
@@ -513,6 +548,7 @@ Weapon::dropSelectedFirearm() noexcept
     cooldownRemaining_ = hasFirearm_ ? stowedCooldownRemaining_ : 0.0F;
     stowedCooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    queuedShotgunFire_ = false;
     switchRemaining_ = weaponSwitchDurationSeconds(selectedArchetype_);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
@@ -539,6 +575,7 @@ bool Weapon::switchTo(const WeaponArchetype archetype) noexcept
     lastSelectedArchetype_ = selectedArchetype_;
     selectedArchetype_ = archetype;
     reloadRemaining_ = 0.0F;
+    queuedShotgunFire_ = false;
     switchRemaining_ = weaponSwitchDurationSeconds(selectedArchetype_);
     spreadShotCount_ = 0U;
     spreadShotIndex_ = 0U;
@@ -657,6 +694,7 @@ bool Weapon::restoreCampaignProgress(
     stowedCooldownRemaining_ = 0.0F;
     knifeCooldownRemaining_ = 0.0F;
     reloadRemaining_ = 0.0F;
+    queuedShotgunFire_ = false;
     switchRemaining_ = 0.0F;
     overdriveRemaining_ = 0.0F;
     spreadShotCount_ = 0U;
@@ -675,6 +713,7 @@ void Weapon::restockAllFirearms() noexcept
         stowedWeapon_->reserveAmmo = stowedWeapon_->definition.reserveMaximum;
     }
     reloadRemaining_ = 0.0F;
+    queuedShotgunFire_ = false;
     reloadDuration_ = 0.0F;
     reloadRoundCount_ = 0U;
     reloadInsertedRounds_ = 0U;
