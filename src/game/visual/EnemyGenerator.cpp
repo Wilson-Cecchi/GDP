@@ -1458,14 +1458,21 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     sawBlade.meshRecipe.primitives.front().localTransform.rotationDegrees.z = -90.0F;
     constexpr std::uint32_t toothCount = 12U;
     constexpr float toothDegrees = 360.0F / static_cast<float>(toothCount);
-    constexpr float toRadians = std::numbers::pi_v<float> / 180.0F;
+    // Fixed unit directions keep the saved visual hash identical across math
+    // libraries. libm sin/cos can differ by one bit between Linux and Windows.
+    constexpr float diagonal = 0.8660254037844386F;
+    constexpr std::array<std::array<float, 2>, toothCount> toothDirections{{
+        {1.0F, 0.0F}, {diagonal, 0.5F}, {0.5F, diagonal}, {0.0F, 1.0F},
+        {-0.5F, diagonal}, {-diagonal, 0.5F}, {-1.0F, 0.0F},
+        {-diagonal, -0.5F}, {-0.5F, -diagonal}, {0.0F, -1.0F},
+        {0.5F, -diagonal}, {diagonal, -0.5F},
+    }};
     for (std::uint32_t tooth = 0; tooth < toothCount; ++tooth) {
         const float angle = static_cast<float>(tooth) * toothDegrees;
-        const float radians = angle * toRadians;
         sawBlade.meshRecipe.primitives.push_back({PrimitiveType::Box,
             {.position = bladeCenter + wkc::core::Vec3{0.0F,
-                std::cos(radians) * bladeRadius * 0.96F,
-                std::sin(radians) * bladeRadius * 0.96F},
+                toothDirections[tooth][0] * bladeRadius * 0.96F,
+                toothDirections[tooth][1] * bladeRadius * 0.96F},
              .rotationDegrees = {angle, 0.0F, 0.0F}},
             {0.075F, bladeRadius * 0.25F, bladeRadius * 0.16F},
             MaterialSlot::Primary, SemanticRegion::Weapon});

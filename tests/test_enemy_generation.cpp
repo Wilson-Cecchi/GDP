@@ -141,7 +141,7 @@ void testDeterministicWorker()
         "complete Worker genome produces renderer-valid mesh data");
     expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Worker genome produces renderer-valid albedo data");
-    expect(first.genome.visualHash == 0x9A19153D1316F3F5ULL,
+    expect(first.genome.visualHash == 0x1F5F969F87DCD73AULL,
         "versioned Worker saw visual hash remains stable across builds");
 
     WorkerVisual invalid = first;

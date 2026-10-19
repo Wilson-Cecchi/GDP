@@ -35,7 +35,7 @@ cérebros ativos permanecem os mesmos da 0.1.5: os candidatos documentados em
 [`05_enemies/ai_evaluation_2026-10-13.md`](05_enemies/ai_evaluation_2026-10-13.md)
 não foram aprovados para promoção.
 
-### Versão 0.1.7
+### Versão 0.1.8
 
 O pacote reúne as cinco reconstruções visuais de inimigos (Worker,
 Guard, Officer, Engineer e IndustrialRobot/Boss), com animações de ataque e
@@ -83,8 +83,8 @@ do Git e instale o secret de Actions sem imprimir seu conteúdo em logs ou chat.
 
    ```bash
    git fetch origin main
-   git tag public-v0.1.7 origin/main
-   git push origin public-v0.1.7
+   git tag public-v0.1.8 origin/main
+   git push origin public-v0.1.8
    ```
 
 3. O workflow `Portable downloads` verifica que a tag aponta para a `main`
