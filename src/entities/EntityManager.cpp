@@ -60,6 +60,8 @@ EntityId EntityManager::createEnemy(const EnemyCreateInfo& info)
             .visualSeed = info.visualSeed,
             .active = info.active,
             .patrolOrigin = info.transform.position,
+            .magazineAmmo = info.archetype == EnemyArchetype::IndustrialRobot
+                ? 12U : 8U,
         });
 }
 

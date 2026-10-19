@@ -56,6 +56,13 @@ enum class EnemyBehaviorState : std::uint8_t {
     Recover,
 };
 
+enum class EnemyKnowledgeSource : std::uint8_t {
+    None,
+    DirectSight,
+    Noise,
+    AllyReport,
+};
+
 enum class ItemType : std::uint8_t {
     Health,
     Ammo,
@@ -95,6 +102,9 @@ struct EnemyData {
     float maximumHealth{50.0F};
     EnemyBehaviorState behavior{EnemyBehaviorState::Idle};
     float attackCooldown{0.0F};
+    // Short presentation pulse set only when an attack actually connects or fires.
+    float attackVisualTime{0.0F};
+    std::uint8_t lastAttackKind{0U}; // 0 none, 1 ranged, 2 melee.
     wkc::core::Seed visualSeed{0};
     float supportCooldown{0.0F};
     bool active{true};
@@ -106,6 +116,9 @@ struct EnemyData {
     float patrolWaypointTime{0.0F};
     float patrolPauseTime{0.0F};
     wkc::core::Vec3 lastKnownPlayerPosition{};
+    EnemyKnowledgeSource knowledgeSource{EnemyKnowledgeSource::None};
+    float knowledgeAgeSeconds{0.0F};
+    bool directSightPreviousUpdate{false};
     float investigationTime{0.0F};
     float alertTime{0.0F};
     float recoverTime{0.0F};

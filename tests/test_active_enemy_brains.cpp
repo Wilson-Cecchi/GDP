@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -55,11 +56,15 @@ int main()
     namespace fs = std::filesystem;
     const fs::path bundled = fs::path{GDP_SOURCE_DIRECTORY} / "assets" / "ai";
     const auto brains = gdp::game::ai::loadActiveEnemyBrains(bundled);
+    constexpr std::array<std::uint32_t, 5> expectedGenerations{
+        280U, 200U, 200U, 200U, 200U};
+    constexpr std::array<std::uint32_t, 5> expectedSeeds{
+        20261019U, 42U, 42U, 42U, 42U};
     for (std::size_t index = 0U; index < brains.size(); ++index) {
         expect(brains[index]
                 && static_cast<std::size_t>(brains[index]->archetype) == index
-                && brains[index]->genome.generation == 200U
-                && brains[index]->trainingSeed == 42U,
+                && brains[index]->genome.generation == expectedGenerations[index]
+                && brains[index]->trainingSeed == expectedSeeds[index],
             "every bundled brain has the expected type and training snapshot");
     }
 
@@ -89,8 +94,9 @@ int main()
         expect(windowsLineEndings[index]
                 && static_cast<std::size_t>(
                     windowsLineEndings[index]->archetype) == index
-                && windowsLineEndings[index]->genome.generation == 200U
-                && windowsLineEndings[index]->trainingSeed == 42U,
+                && windowsLineEndings[index]->genome.generation
+                    == expectedGenerations[index]
+                && windowsLineEndings[index]->trainingSeed == expectedSeeds[index],
             "CRLF transport preserves each checked brain");
     }
 

@@ -15,6 +15,15 @@ namespace gdp::gameplay {
 inline constexpr float enemyHitReactionDuration = 0.12F;
 inline constexpr float weakPointDamageMultiplier = 1.75F;
 
+// Body zones of the optional reference meshes; tools and rear equipment are
+// excluded. Navigation retains its separate movement collider.
+[[nodiscard]] bool referenceEnemyHitboxesEnabled() noexcept;
+[[nodiscard]] bool referenceEnemyBodyContainsPoint(
+    wkc::core::Vec3 point,
+    const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy,
+    float padding = 0.0F) noexcept;
+
 enum class DamageOutcome : std::uint8_t {
     Ignored,
     Damaged,

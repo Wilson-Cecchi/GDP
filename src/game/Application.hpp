@@ -180,6 +180,13 @@ private:
     float weaponMeleeRemaining_{0.0F};
     float weaponMuzzleFlashRemaining_{0.0F};
     float weaponEquipRemaining_{0.0F};
+    gameplay::WeaponArchetype presentedWeapon_{gameplay::WeaponArchetype::Pistol};
+    gameplay::WeaponArchetype equipOutgoingWeapon_{gameplay::WeaponArchetype::Pistol};
+    bool presentedGrenade_{false};
+    bool equipOutgoingGrenade_{false};
+    bool equipOutgoingVisible_{false};
+    float equipSequenceRemaining_{0.0F};
+    float equipSequenceDuration_{0.0F};
     float aimBlend_{0.0F};
     bool flashlightOn_{false};
     std::optional<world::World> world_;

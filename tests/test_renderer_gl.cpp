@@ -90,12 +90,17 @@ bool captureWorkerLimbVariation(gdp::game::visual::GdpRenderer& renderer)
     room.worldBounds = {{-5.0F, 0.0F, -4.0F}, {5.0F, 4.0F, 9.0F}};
     RoomLightingRenderData lighting;
     lighting.ambientColor = {1.0F, 1.0F, 1.0F};
-    lighting.ambientIntensity = 0.48F;
+    const bool darkEyeCapture = std::getenv("GDP_WORKER_EYE_DARK_CAPTURE") != nullptr;
+    lighting.ambientIntensity = darkEyeCapture ? 0.12F : 0.48F;
     lighting.lights[0] = {
         {0.0F, 3.3F, 2.0F}, {1.0F, 1.0F, 1.0F}, 1.25F, 8.0F};
+    if (darkEyeCapture) lighting.lightCount = 0U;
     bool passed = true;
     for (const bool potato : {false, true}) {
         HudRenderData hud;
+        // Suppress the central reticle so it cannot cover the eye in the
+        // manual Worker review captures.
+        hud.weapon = HudWeaponRole::Sniper;
         hud.graphicsQuality = potato
             ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
         hud.detailedMaterials = !potato;
@@ -103,17 +108,132 @@ bool captureWorkerLimbVariation(gdp::game::visual::GdpRenderer& renderer)
         for (const wkc::core::Seed seed : {101U, 202U, 303U}) {
             passed &= renderer.prepareWorkerVisual(seed);
             for (const bool near : {true, false}) {
+                for (const bool side : {false, true}) {
+                    if (side && !near) continue;
+                    CameraData camera;
+                    camera.position = side
+                        ? wkc::core::Vec3{3.3F, 1.55F, 0.0F}
+                        : wkc::core::Vec3{0.0F, 1.55F, near ? 2.7F : 7.5F};
+                    camera.forward = side
+                        ? wkc::core::Vec3{-1.0F, 0.0F, 0.0F}
+                        : wkc::core::Vec3{0.0F, 0.0F, -1.0F};
+                    for (const EnemyAnimationState state : {
+                             EnemyAnimationState::Idle, EnemyAnimationState::Walk,
+                             EnemyAnimationState::Attack}) {
+                        if (!near && state != EnemyAnimationState::Idle) continue;
+                        if (side && state == EnemyAnimationState::Walk) continue;
+                        if (potato && state != EnemyAnimationState::Idle) continue;
+                        EnemyRenderData worker{{0.0F, 0.0F, 0.0F}, true, seed};
+                        worker.animationState = state;
+                        worker.animationTick = 15U;
+                        const std::array enemies{worker};
+                        passed &= renderer.render(width, height, camera, enemies,
+                            {}, {}, lighting, room, {}, {}, {}, hud);
+                        glFinish();
+                        std::vector<std::uint8_t> pixels(
+                            static_cast<std::size_t>(width * height * 4));
+                        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                            pixels.data());
+                        passed &= glGetError() == GL_NO_ERROR;
+                        std::vector<std::uint8_t> topDown(pixels.size());
+                        const std::size_t stride = static_cast<std::size_t>(width * 4);
+                        for (int row = 0; row < height; ++row) {
+                            std::copy_n(pixels.data()
+                                    + static_cast<std::size_t>(height - row - 1) * stride,
+                                stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+                        }
+                        const char* phase = state == EnemyAnimationState::Walk ? "walk"
+                            : state == EnemyAnimationState::Attack ? "attack" : "idle";
+                        const auto path = std::filesystem::path{directory}
+                            / (std::string{potato ? "potato" : "medium"}
+                                + "_worker_seed" + std::to_string(seed)
+                                + (side ? "_side_" : near ? "_near_" : "_far_")
+                                + phase + ".bmp");
+                        SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                        passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+                        if (surface) SDL_DestroySurface(surface);
+                    }
+                }
+            }
+        }
+    }
+    return passed;
+}
+
+// Review-only orthographic comparisons for the reconstructed enemy models.
+bool captureEnemyReferenceModels(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* const directory = std::getenv("GDP_ENEMY_REFERENCE_CAPTURE_DIR");
+    const char* const enabled = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+    if (directory == nullptr || *directory == '\0' || enabled == nullptr
+        || std::string_view{enabled} != "1") {
+        std::cerr << "Set GDP_ENEMY_REFERENCE_MODELS=1 and "
+                     "GDP_ENEMY_REFERENCE_CAPTURE_DIR for model captures\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    RoomRenderData room;
+    room.origin = {0.0F, 0.0F, -20.0F};
+    room.worldBounds = {{-5.0F, 0.0F, -4.0F}, {5.0F, 4.0F, 9.0F}};
+    RoomLightingRenderData lighting;
+    lighting.ambientColor = {1.0F, 1.0F, 1.0F};
+    lighting.ambientIntensity = 0.34F;
+    lighting.lights[0] = {{0.0F, 3.3F, 2.0F},
+        {1.0F, 0.95F, 0.85F}, 0.85F, 8.0F};
+    lighting.lightCount = 1U;
+    constexpr std::array roles{
+        EnemyVisualRole::Worker, EnemyVisualRole::Guard,
+        EnemyVisualRole::Officer, EnemyVisualRole::Engineer,
+        EnemyVisualRole::IndustrialRobot};
+    constexpr std::array names{"worker", "guard", "officer", "engineer", "robot"};
+    constexpr std::array angles{
+        "front", "left", "back", "right", "oblique_right"};
+    constexpr std::array positions{
+        wkc::core::Vec3{0.0F, 1.55F, 2.9F},
+        wkc::core::Vec3{-2.9F, 1.55F, 0.0F},
+        wkc::core::Vec3{0.0F, 1.55F, -2.9F},
+        wkc::core::Vec3{2.9F, 1.55F, 0.0F},
+        wkc::core::Vec3{2.3F, 1.55F, 2.3F}};
+    bool passed = true;
+    for (std::size_t roleIndex = 0U; roleIndex < roles.size(); ++roleIndex) {
+        for (const bool potato : {false, true}) {
+            HudRenderData hud;
+            hud.weapon = HudWeaponRole::Sniper;
+            hud.graphicsQuality = potato
+                ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+            hud.detailedMaterials = !potato;
+            hud.worldRenderScalePercent = potato ? 50U : 100U;
+            for (std::size_t angle = 0U; angle <= angles.size(); ++angle) {
+                if (potato && angle != 0U) continue;
                 CameraData camera;
-                camera.position = {0.0F, 1.55F, near ? 2.7F : 7.5F};
-                for (const EnemyAnimationState state : {
-                         EnemyAnimationState::Idle, EnemyAnimationState::Walk,
-                         EnemyAnimationState::Attack}) {
-                    if (!near && state != EnemyAnimationState::Idle) continue;
-                    if (potato && state != EnemyAnimationState::Idle) continue;
-                    EnemyRenderData worker{{0.0F, 0.0F, 0.0F}, true, seed};
-                    worker.animationState = state;
-                    worker.animationTick = 15U;
-                    const std::array enemies{worker};
+                const bool detailFront = angle == angles.size();
+                camera.position = positions[detailFront ? 0U : angle];
+                camera.forward = wkc::core::Vec3{} - camera.position;
+                camera.forward.y = 0.0F;
+                if (detailFront || angle == 4U) {
+                    camera.verticalFieldOfViewDegrees = 48.0F;
+                }
+                const int variants = detailFront && !potato
+                    ? roles[roleIndex] == EnemyVisualRole::IndustrialRobot ? 3 : 2
+                    : !potato && roles[roleIndex] == EnemyVisualRole::Guard
+                        && (angle == 1U || angle == 3U || angle == 4U) ? 2 : 1;
+                for (int variant = 0; variant < variants; ++variant) {
+                    EnemyRenderData enemy{{0.0F, 0.0F, 0.0F}, true,
+                        static_cast<wkc::core::Seed>(101U + roleIndex), roles[roleIndex]};
+                    if (variant != 0) {
+                        enemy.animationState = EnemyAnimationState::Attack;
+                        enemy.previousAnimationState = EnemyAnimationState::Attack;
+                        enemy.attackVisualKind = variant == 2
+                                || roles[roleIndex] == EnemyVisualRole::Worker
+                            ? EnemyAttackVisualKind::Melee
+                            : EnemyAttackVisualKind::Ranged;
+                        enemy.attackPulse = 1.0F;
+                    }
+                    const std::array enemies{enemy};
                     passed &= renderer.render(width, height, camera, enemies,
                         {}, {}, lighting, room, {}, {}, {}, hud);
                     glFinish();
@@ -129,12 +249,13 @@ bool captureWorkerLimbVariation(gdp::game::visual::GdpRenderer& renderer)
                                 + static_cast<std::size_t>(height - row - 1) * stride,
                             stride, topDown.data() + static_cast<std::size_t>(row) * stride);
                     }
-                    const char* phase = state == EnemyAnimationState::Walk ? "walk"
-                        : state == EnemyAnimationState::Attack ? "attack" : "idle";
+                    const std::string view = variant == 2 ? "melee_front"
+                        : variant == 1 ? (detailFront ? "attack_front"
+                            : std::string{"attack_"} + angles[angle])
+                        : potato ? "potato_front" : detailFront
+                            ? "detail_front" : angles[angle];
                     const auto path = std::filesystem::path{directory}
-                        / (std::string{potato ? "potato" : "medium"}
-                            + "_worker_seed" + std::to_string(seed)
-                            + (near ? "_near_" : "_far_") + phase + ".bmp");
+                        / (std::string{names[roleIndex]} + "_" + view + ".bmp");
                     SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
                         SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
                     passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
@@ -1015,6 +1136,8 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--grenade-smoke-capture";
     const bool workerLimbCapture = argc == 2
         && std::string{argv[1]} == "--worker-limb-capture";
+    const bool enemyReferenceCapture = argc == 2
+        && std::string{argv[1]} == "--enemy-reference-capture";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -1183,6 +1306,8 @@ int main(const int argc, char** argv)
             passed = captureGrenadeSmoke(renderer);
         } else if (workerLimbCapture) {
             passed = captureWorkerLimbVariation(renderer);
+        } else if (enemyReferenceCapture) {
+            passed = captureEnemyReferenceModels(renderer);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {
@@ -2580,7 +2705,13 @@ int main(const int argc, char** argv)
                 && performanceFrameStats.drawCalls > 0U
                 && performanceFrameStats.triangles
                     >= performanceFrameStats.drawCalls
-                && performanceFrameStats.meshCacheEntries > 0U
+                // Reference enemy assets are prebuilt GPU meshes and bypass
+                // the procedural mesh cache; mesh binds and enemy pixel gates
+                // below still verify that geometry rendered.
+                && (performanceFrameStats.meshCacheEntries > 0U
+                    || (std::getenv("GDP_ENEMY_REFERENCE_MODELS") == nullptr
+                        || std::string_view{std::getenv("GDP_ENEMY_REFERENCE_MODELS")}
+                            != "0"))
                 && performanceFrameStats.textureCacheEntries > 0U
                 && performanceFrameStats.uniformUploads > 0U
                 && performanceFrameStats.uniformSkips > 0U
@@ -2665,7 +2796,14 @@ int main(const int argc, char** argv)
                           << " knife=" << knifeViewmodelChangedChannels
                           << " fovStable=" << fovFootprintsStable
                           << " firing=" << firingViewmodelChangedChannels
-                          << " impactRendered=" << renderedImpacts << '\n';
+                          << " impactRendered=" << renderedImpacts
+                          << " enemyContrast=" << unsigned(brightest) - unsigned(darkest)
+                          << " enemyChanged=" << enemyChangedChannels
+                          << " worker=" << workerChangedChannels
+                          << " guard=" << guardChangedChannels
+                          << " officer=" << officerChangedChannels
+                          << " engineer=" << engineerChangedChannels
+                          << " robot=" << industrialRobotChangedChannels << '\n';
                 std::cerr << "UI gates: map=" << mapHudChangedChannels
                           << " route=" << mapRouteChangedChannels << " footprint=" << mapFootprintChangedChannels
                           << " exploration=" << mapExplorationChangedChannels

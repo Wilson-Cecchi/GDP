@@ -9,8 +9,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <string_view>
 #include <tuple>
 
@@ -343,7 +345,8 @@ void testGrenadeCollidesWithEnemies()
         "charged grenade spawns in front of an enemy");
     (void)grenade.update(0.05F, enemies);
     expect(grenade.grenades().size() == 1U
-            && grenade.grenades().front().position.z < 0.70F
+            && grenade.grenades().front().position.z
+                < (referenceEnemyHitboxesEnabled() ? 0.90F : 0.70F)
             && grenade.grenades().front().velocity.z < 0.0F
             && near(enemies.findData<EnemyData>(target)->health, 100.0F),
         "swept contact bounces a fast grenade off an enemy without impact damage");
@@ -1536,7 +1539,9 @@ void testWeakPointDamageAndClassification()
         .range = 20.0F,
     });
     const ShotResult robotCore = fireHitscan(
-        robotWeapon, {0.0F, 1.48F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        robotWeapon,
+        {0.0F, referenceEnemyHitboxesEnabled() ? 2.05F : 1.48F, 0.0F},
+        {0.0F, 0.0F, -1.0F},
         1, room, robotManager);
     expect(robotCore.outcome == ShotOutcome::Hit && robotCore.hit
             && robotCore.hit->target == robot
@@ -1544,6 +1549,93 @@ void testWeakPointDamageAndClassification()
             && robotCore.impact
             && robotCore.impact->material == ImpactMaterial::Metal,
         "IndustrialRobot sensor core is a metal weak point");
+}
+
+void testReferenceEnemyHitboxes()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const char* const previousValue = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+    const std::string previous = previousValue != nullptr ? previousValue : "";
+    const bool wasSet = previousValue != nullptr;
+#if defined(_WIN32)
+    expect(_putenv_s("GDP_ENEMY_REFERENCE_MODELS", "1") == 0,
+        "reference hitbox preview environment can be enabled");
+#else
+    expect(setenv("GDP_ENEMY_REFERENCE_MODELS", "1", 1) == 0,
+        "reference hitbox preview environment can be enabled");
+#endif
+
+    const CollisionWorld room{{{-10.0F, 0.0F, -10.0F}, {10.0F, 4.0F, 10.0F}}};
+    EntityManager manager;
+    const EntityId robot = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 0.0F}},
+        .roomId = 1U,
+        .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 1000.0F,
+    });
+    Weapon weapon({.damage = 10.0F, .fireInterval = 0.0F,
+        .range = 20.0F, .magazineSize = 32U});
+    const auto shoot = [&](const wkc::core::Vec3 origin,
+                           const wkc::core::Vec3 direction) {
+        return fireHitscan(weapon, origin, direction, 1U, room, manager);
+    };
+    const ShotResult head = shoot({0.0F, 2.05F, 3.0F}, {0.0F, 0.0F, -1.0F});
+    expect(head.hit && head.hit->target == robot
+            && head.hit->zone == HitZone::WeakPoint
+            && near(manager.findData<EnemyData>(robot)->health,
+                1000.0F - 10.0F * weakPointDamageMultiplier),
+        "reference Boss visible sensor at 2.05 m is a damaging weak point");
+    expect(!shoot({0.0F, 2.23F, 3.0F}, {0.0F, 0.0F, -1.0F}).hit
+            && !shoot({0.35F, 2.05F, 3.0F}, {0.0F, 0.0F, -1.0F}).hit
+            && !shoot({0.0F, 2.35F, -3.0F}, {0.0F, 0.0F, 1.0F}).hit,
+        "shots above or beside Boss head and through rear modules do not damage it");
+    const ShotResult body = shoot({0.0F, 1.25F, 3.0F}, {0.0F, 0.0F, -1.0F});
+    expect(body.hit && body.hit->target == robot
+            && body.hit->zone == HitZone::Standard,
+        "reference Boss torso is a standard hit beneath its head");
+    expect(shoot({0.70F, 1.30F, 3.0F}, {0.0F, 0.0F, -1.0F}).hit.has_value(),
+        "reference Boss right arm is targetable beside its torso");
+
+    manager.find(robot)->transform.rotationDegrees.y = 90.0F;
+    const ShotResult turnedHead = shoot({3.0F, 2.05F, 0.0F}, {-1.0F, 0.0F, 0.0F});
+    expect(turnedHead.hit && turnedHead.hit->zone == HitZone::WeakPoint
+            && !shoot({0.70F, 1.30F, 3.0F}, {0.0F, 0.0F, -1.0F}).hit,
+        "reference head and asymmetric arm zones rotate with Boss yaw 90");
+    manager.find(robot)->transform.rotationDegrees.y = 180.0F;
+    const ShotResult backTurnedHead = shoot({0.0F, 2.05F, -3.0F}, {0.0F, 0.0F, 1.0F});
+    expect(backTurnedHead.hit && backTurnedHead.hit->zone == HitZone::WeakPoint,
+        "reference Boss head stays aligned at yaw 180");
+
+    for (const EnemyArchetype archetype : {EnemyArchetype::Worker,
+             EnemyArchetype::Guard, EnemyArchetype::Officer,
+             EnemyArchetype::Engineer}) {
+        EntityManager roleManager;
+        const EntityId role = roleManager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 0.0F}},
+            .roomId = 1U, .archetype = archetype, .health = 1000.0F});
+        Weapon roleWeapon({.damage = 10.0F, .fireInterval = 0.0F, .range = 20.0F});
+        const ShotResult roleHead = fireHitscan(roleWeapon,
+            {0.0F, 1.65F, 3.0F}, {0.0F, 0.0F, -1.0F}, 1U, room, roleManager);
+        const ShotResult roleBody = fireHitscan(roleWeapon,
+            {0.0F, 1.20F, 3.0F}, {0.0F, 0.0F, -1.0F}, 1U, room, roleManager);
+        const ShotResult roleMiss = fireHitscan(roleWeapon,
+            {0.70F, 1.20F, 3.0F}, {0.0F, 0.0F, -1.0F}, 1U, room, roleManager);
+        expect(roleHead.hit && roleHead.hit->target == role
+                && roleHead.hit->zone == HitZone::WeakPoint
+                && roleBody.hit && roleBody.hit->zone == HitZone::Standard
+                && !roleMiss.hit,
+            "reference common enemies have separate head, body and off-silhouette zones");
+    }
+
+#if defined(_WIN32)
+    expect(_putenv_s("GDP_ENEMY_REFERENCE_MODELS", wasSet ? previous.c_str() : "") == 0,
+        "reference hitbox preview environment can be restored");
+#else
+    expect((wasSet ? setenv("GDP_ENEMY_REFERENCE_MODELS", previous.c_str(), 1)
+                   : unsetenv("GDP_ENEMY_REFERENCE_MODELS")) == 0,
+        "reference hitbox preview environment can be restored");
+#endif
 }
 
 void testWalkableUnionBlocksShotsAcrossDisconnectedSpace()
@@ -2578,8 +2670,8 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary longShot
         = updateIndustrialRobots(manager, player, 7, room, 0.5F);
     expect(longShot.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 82.0F),
-        "phase-one IndustrialRobot fires a high-impact long-range attack");
+            && near(player.state().health, 91.5F),
+        "phase-one IndustrialRobot begins its machine-gun burst");
 
     data->health = 150.0F;
     data->attackCooldown = 0.0F;
@@ -2587,9 +2679,9 @@ void testIndustrialRobotPhases()
     const EnemyUpdateSummary pressure
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(pressure.bossPressure == 1U && pressure.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 67.0F)
-            && wkc::core::nearlyEqual(data->attackCooldown, 0.85F),
-        "mid-health IndustrialRobot increases pressure and firing cadence");
+            && std::abs(player.state().health - 84.4167F) < 0.01F
+            && std::abs(data->attackCooldown - 0.646F) < 0.01F,
+        "mid-health IndustrialRobot preserves phase damage while its burst accelerates");
 
     data->health = 50.0F;
     data->attackCooldown = 0.0F;
@@ -2599,12 +2691,18 @@ void testIndustrialRobotPhases()
     expect(pursuit.bossPursuit == 1U && pursuit.chasing == 1U
             && wkc::core::nearlyEqual(manager.find(robot)->transform.position.z, 1.975F),
         "critical IndustrialRobot commits to its fastest close pursuit");
+    const float healthBeforeClose = player.state().health;
     const EnemyUpdateSummary closeStrike
         = updateIndustrialRobots(manager, player, 7, room, 0.1F);
     expect(closeStrike.attacksLanded == 1U
-            && wkc::core::nearlyEqual(player.state().health, 47.0F)
-            && wkc::core::nearlyEqual(data->attackCooldown, 0.65F),
-        "critical IndustrialRobot delivers its strongest, fastest close attack");
+            && (referenceEnemyHitboxesEnabled()
+                ? near(player.state().health,
+                    healthBeforeClose - IndustrialRobotConfig{}.pursuitDamage)
+                    && near(data->attackCooldown,
+                        IndustrialRobotConfig{}.pursuitAttackInterval)
+                : std::abs(player.state().health - 74.9722F) < 0.01F
+                    && std::abs(data->attackCooldown - 0.592F) < 0.01F),
+        "critical IndustrialRobot uses a close strike with reference models and a burst round with legacy models");
 
     data->health = 250.0F;
     data->attackCooldown = 0.0F;
@@ -2739,8 +2837,8 @@ void testIndustrialRobotCannonAcrossArena()
             const auto [waited, fired, speed, damage, hit, blocked,
                 remaining, controlled] = run(health, neural, open);
             expect(waited && fired && near(speed, 30.0F)
-                    && near(damage, 18.0F) && hit && !blocked
-                    && near(remaining, 82.0F)
+                    && near(damage, 8.5F) && hit && !blocked
+                    && near(remaining, 91.5F)
                     && (!neural || controlled > 0U),
                 "boss cannon threatens 30 m in every phase with scripted and neural control");
         }
@@ -2792,7 +2890,7 @@ void testIndustrialRobotHoldsForVisibleHelper()
         holds += summary.friendlyFireHolds;
     }
     expect(spawned.empty() && holds > 0U
-            && manager.findData<EnemyData>(robot)->magazineAmmo == 8U,
+            && manager.findData<EnemyData>(robot)->magazineAmmo == 12U,
         "boss holds cannon when a helper visibly overlaps its firing lane");
 
     manager.find(helper)->transform.position.x = 3.0F;
@@ -2810,34 +2908,126 @@ void testIndustrialRobotFirstShotAndCadence()
     using namespace gdp::gameplay;
     const CollisionWorld room{{{-16.0F, 0.0F, -16.0F},
         {16.0F, 5.0F, 16.0F}}};
+    constexpr float step = 1.0F / 60.0F;
+
+    for (const bool neural : {false, true}) {
+        Player player;
+        player.spawn({0.0F, 0.0F, 0.0F});
+        EntityManager manager;
+        const EntityId robot = manager.createEnemy({
+            .transform = {.position = {0.0F, 0.0F, 12.0F},
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = 1U,
+            .archetype = EnemyArchetype::IndustrialRobot,
+            .health = 250.0F,
+        });
+        IndustrialRobotConfig config;
+        config.longRangeMoveSpeed = 0.0F;
+        config.pressureMoveSpeed = 0.0F;
+        config.pursuitMoveSpeed = 0.0F;
+        NeuralEnemyExperiment brain{42U, EnemyArchetype::IndustrialRobot};
+        auto parameters = brain.genome.network.parameters();
+        std::fill(parameters.begin(), parameters.end(), 0.0F);
+        parameters[7] = 2.0F;
+        parameters[64 + 3 * 9] = 2.0F;
+        brain.controlAll = true;
+        brain.logSelection = false;
+        std::vector<EnemyProjectile> projectiles;
+        const EnemyPerception perception{.projectiles = &projectiles};
+        std::vector<float> shotTimes;
+        bool fullAfterReload = false;
+        bool lastRoundStartedReload = false;
+        std::size_t reloadCount = 0U;
+        for (int tick = 0; tick < 700 && shotTimes.size() < 13U; ++tick) {
+            const EnemyUpdateSummary update = updateIndustrialRobots(
+                manager, player, 1U, room, step, config, perception,
+                neural ? &brain : nullptr);
+            reloadCount += update.reloadsStarted;
+            while (shotTimes.size() < projectiles.size()) {
+                shotTimes.push_back(static_cast<float>(tick + 1) * step);
+            }
+            const EnemyData* data = manager.findData<EnemyData>(robot);
+            if (shotTimes.size() == 12U && data->magazineAmmo == 0U
+                && data->reloadRemaining > 2.3F) {
+                lastRoundStartedReload = true;
+            }
+            if (lastRoundStartedReload && shotTimes.size() == 13U
+                && data->magazineAmmo == 11U
+                && data->reloadRemaining == 0.0F) {
+                fullAfterReload = true;
+            }
+        }
+        expect(shotTimes.size() == 13U && shotTimes[0] >= 0.44F
+                && shotTimes[0] <= 0.48F && (!neural || brain.controlledTicks > 0U),
+            "scripted and neural boss preserve the first-sight reaction window");
+        if (shotTimes.size() == 13U) {
+            const float firstGap = shotTimes[1] - shotTimes[0];
+            const float finalGap = shotTimes[11] - shotTimes[10];
+            expect(std::abs(firstGap - 0.70F) <= step * 1.1F
+                    && std::abs(finalGap - 0.16F) <= step * 1.1F
+                    && finalGap < firstGap,
+                "boss cannon accelerates from 0.70 to 0.16 seconds between shots");
+            expect(shotTimes[12] - shotTimes[11] >= 2.38F
+                    && shotTimes[12] - shotTimes[11] <= 2.44F
+                    && lastRoundStartedReload && fullAfterReload
+                    && reloadCount == 1U,
+                "twelfth round starts one 2.4-second reload before firing resumes");
+            expect(near(projectiles.front().damage, 8.5F)
+                    && projectiles.front().damage < 18.0F,
+                "each Normal boss round deals less damage than the old cannon shot");
+        }
+    }
+}
+
+void testIndustrialRobotBurstPausesWithoutTarget()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    const CollisionWorld open{{{-16.0F, 0.0F, -16.0F},
+        {16.0F, 5.0F, 16.0F}}};
+    const CollisionWorld blocked{
+        {{-16.0F, 0.0F, -16.0F}, {16.0F, 5.0F, 16.0F}},
+        {{{-1.0F, 0.0F, 5.0F}, {1.0F, 4.0F, 6.0F}}},
+    };
     Player player;
     player.spawn({0.0F, 0.0F, 0.0F});
     EntityManager manager;
     const EntityId robot = manager.createEnemy({
         .transform = {.position = {0.0F, 0.0F, 12.0F},
             .rotationDegrees = {0.0F, 180.0F, 0.0F}},
-        .roomId = 1U,
-        .archetype = EnemyArchetype::IndustrialRobot,
+        .roomId = 1U, .archetype = EnemyArchetype::IndustrialRobot,
         .health = 250.0F,
     });
-    for (int tick = 0; tick < 5; ++tick) {
-        (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
+    IndustrialRobotConfig config;
+    config.longRangeMoveSpeed = 0.0F;
+    config.pressureMoveSpeed = 0.0F;
+    config.pursuitMoveSpeed = 0.0F;
+    std::vector<EnemyProjectile> projectiles;
+    const EnemyPerception perception{.projectiles = &projectiles};
+    constexpr float step = 1.0F / 60.0F;
+    for (int tick = 0; tick < 40 && projectiles.empty(); ++tick) {
+        (void)updateIndustrialRobots(manager, player, 1U, open,
+            step, config, perception);
     }
-    expect(near(player.state().health, 100.0F)
-            && manager.findData<EnemyData>(robot)->attackCooldown > 0.0F,
-        "newly visible boss leaves a reaction window before its first shot");
-    const EnemyUpdateSummary first = updateIndustrialRobots(
-        manager, player, 1U, room, 0.1F);
-    expect(first.attacksLanded == 1U && near(player.state().health, 82.0F),
-        "one Normal long-range hit deals 18 HP after the opening windup");
-    for (int tick = 0; tick < 12; ++tick) {
-        (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
+    expect(projectiles.size() == 1U
+            && manager.findData<EnemyData>(robot)->magazineAmmo == 11U,
+        "boss fires one round before losing line of sight");
+    for (int tick = 0; tick < 120; ++tick) {
+        (void)updateIndustrialRobots(manager, player, 1U, blocked,
+            step, config, perception);
     }
-    expect(near(player.state().health, 82.0F),
-        "boss cannon respects its 1.25-second cooldown");
-    (void)updateIndustrialRobots(manager, player, 1U, room, 0.1F);
-    expect(near(player.state().health, 64.0F),
-        "boss cannon resumes after cooldown without a one-shot burst");
+    expect(projectiles.size() == 1U
+            && manager.findData<EnemyData>(robot)->magazineAmmo == 11U,
+        "lost target neither spends ammunition nor advances the burst");
+    for (int tick = 0; tick < 20 && projectiles.size() == 1U; ++tick) {
+        (void)updateIndustrialRobots(manager, player, 1U, open,
+            step, config, perception);
+    }
+    expect(projectiles.size() == 2U
+            && manager.findData<EnemyData>(robot)->magazineAmmo == 10U
+            && std::abs(manager.findData<EnemyData>(robot)->attackCooldown
+                - 0.646F) < 0.01F,
+        "reacquired target resumes at the next round without phantom acceleration");
 }
 
 void testEnemyFacingLifecycle()
@@ -3883,6 +4073,66 @@ void testShotgunPelletsAndOcclusion()
         "each shotgun pellet respects cover/closed-door solids even for neighboring rooms");
 }
 
+void testAllyReportsAreCoarseAndEventDriven()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    Player player;
+    player.spawn({0.3F, 0.0F, 0.4F});
+    EntityManager manager;
+    const EntityId observer = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    const EntityId ally = manager.createEnemy({
+        .transform = {.position = {3.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 0.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    const EntityId distant = manager.createEnemy({
+        .transform = {.position = {12.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 0.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    const CollisionWorld room{
+        {{-15.0F, 0.0F, -10.0F}, {15.0F, 4.0F, 12.0F}},
+        {{{1.0F, 0.0F, 2.0F}, {4.0F, 3.0F, 3.0F}}}};
+    const CollisionWorld sightBlocked{
+        {{-15.0F, 0.0F, -10.0F}, {15.0F, 4.0F, 12.0F}},
+        {{{-2.0F, 0.0F, 2.0F}, {4.0F, 3.0F, 3.0F}}}};
+    const EnemyPerception perception{
+        .allowAttacks = false, .difficulty = Difficulty::Normal};
+    const auto update = [&](const CollisionWorld& world, const float step) {
+        (void)updateWorkers(manager, player, 1U, world, step,
+            WorkerConfig{}, perception);
+    };
+
+    update(room, 0.0F);
+    EnemyData* observerData = manager.findData<EnemyData>(observer);
+    EnemyData* allyData = manager.findData<EnemyData>(ally);
+    expect(observerData->knowledgeSource == EnemyKnowledgeSource::DirectSight
+            && observerData->lastKnownPlayerPosition == player.state().position
+            && allyData->knowledgeSource == EnemyKnowledgeSource::AllyReport
+            && allyData->lastKnownPlayerPosition
+                == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && manager.findData<EnemyData>(distant)->knowledgeSource
+                == EnemyKnowledgeSource::None,
+        "first visual contact sends a coarse local report, not a live position");
+
+    (void)player.relocate({0.3F, 0.0F, -2.2F}, 0.0F);
+    update(room, 0.1F);
+    expect(allyData->knowledgeSource == EnemyKnowledgeSource::AllyReport
+            && allyData->lastKnownPlayerPosition
+                == wkc::core::Vec3{0.0F, 0.0F, 0.0F}
+            && allyData->knowledgeAgeSeconds > 0.0F,
+        "continuing sight does not stream the Player location to an ally");
+
+    update(sightBlocked, 0.0F);
+    update(room, 0.0F);
+    expect(allyData->lastKnownPlayerPosition
+            == wkc::core::Vec3{0.0F, 0.0F, -2.0F}
+            && near(allyData->knowledgeAgeSeconds, 0.0F),
+        "reacquiring sight sends a new, time-stamped approximate report");
+}
+
 } // namespace
 
 int main()
@@ -3916,6 +4166,7 @@ int main()
     testDormantEnemyIgnoresCombat();
     testHitscanSelectionAndBlocking();
     testWeakPointDamageAndClassification();
+    testReferenceEnemyHitboxes();
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testShotsThroughOpenCorridor();
     testWorkerBehavior();
@@ -3938,6 +4189,7 @@ int main()
     testIndustrialRobotCannonAcrossArena();
     testIndustrialRobotHoldsForVisibleHelper();
     testIndustrialRobotFirstShotAndCadence();
+    testIndustrialRobotBurstPausesWithoutTarget();
     testEnemyFacingLifecycle();
     testDeterministicLocalPatrol();
     testEnemyInvestigationLifecycle();
@@ -3945,6 +4197,7 @@ int main()
     testEnemySearchWithoutHiddenPlayerTracking();
     testEnemySearchRejectsUnreachableFlanks();
     testEnemyNoisePerception();
+    testAllyReportsAreCoarseAndEventDriven();
 
     if (failures != 0) {
         std::cerr << failures << " combat test(s) failed\n";

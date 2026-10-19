@@ -126,7 +126,9 @@ void testDeterministicWorker()
             && first.genome.leftLegShape == repeated.genome.leftLegShape
             && first.genome.rightLegShape == repeated.genome.rightLegShape
             && first.meshRecipe == repeated.meshRecipe
-            && first.textureRecipe == repeated.textureRecipe,
+            && first.textureRecipe == repeated.textureRecipe
+            && first.partTints == repeated.partTints
+            && first.details == repeated.details,
         "same visual seed reproduces genome, mesh and texture recipes exactly");
     expect(first.genome.visualHash != different.genome.visualHash,
         "different visual seed changes the Worker genome hash");
@@ -139,8 +141,8 @@ void testDeterministicWorker()
         "complete Worker genome produces renderer-valid mesh data");
     expect(albedo && wkc::render::validateImageData(*albedo),
         "complete Worker genome produces renderer-valid albedo data");
-    expect(first.genome.visualHash == 0x26410B31411A905AULL,
-        "versioned Worker limb visual hash remains stable across builds");
+    expect(first.genome.visualHash == 0x9A19153D1316F3F5ULL,
+        "versioned Worker saw visual hash remains stable across builds");
 
     WorkerVisual invalid = first;
     invalid.genome.head = 999'999;
@@ -174,6 +176,24 @@ void testDeterministicWorker()
     expect(containsError(validateWorkerVisual(invalid),
                WorkerVisualValidationError::InvalidLimbVariation),
         "Worker assembly rejects a tool detached from its hand");
+    invalid = first;
+    invalid.details[3].parentPartIndex = 5U;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidDetails),
+        "Worker assembly rejects a detail attached to the wrong animated limb");
+    invalid = first;
+    invalid.details[13].meshRecipe.primitives[2].localTransform.position.y += 0.08F;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidDetails),
+        "Worker assembly rejects a blade tooth detached from the disk");
+    invalid = first;
+    invalid.partTints[1].x = 2.0F;
+    invalid.genome.visualHash = workerVisualHash(invalid);
+    expect(containsError(validateWorkerVisual(invalid),
+               WorkerVisualValidationError::InvalidPartTint),
+        "Worker assembly rejects an unsafe part tint");
 }
 
 void testWorkerSeedBatch()
@@ -240,7 +260,46 @@ void testWorkerSeedBatch()
         };
         variedWithinProfile = variedWithinProfile
             && genome.limbRecipeVersion == workerLimbRecipeVersion
-            && visual.meshRecipe.version == 2U
+            && visual.meshRecipe.version == 4U
+            && visual.textureRecipe.version == 2U
+            && visual.details.size() == 14U
+            && visual.meshRecipe.primitives.size() == 8U
+            && visual.meshRecipe.primitives[1].type == PrimitiveType::Cylinder
+            && visual.details[0].meshRecipe.primitives.size() == 10U
+            && visual.details[2].meshRecipe.primitives[0].type
+                == PrimitiveType::Cylinder
+            && visual.details[4].meshRecipe.primitives.size() == 2U
+            && visual.details[6].meshRecipe.primitives.size() == 2U
+            && visual.details[8].meshRecipe.primitives.size() == 3U
+            && visual.details[11].meshRecipe.primitives.size() == 3U
+            && visual.details[12].parentPartIndex == 7U
+            && visual.details[13].parentPartIndex == 7U
+            && visual.details[12].meshRecipe.primitives.size() == 2U
+            && visual.details[13].meshRecipe.primitives.size() == 14U
+            && visual.details[13].meshRecipe.primitives[0].type
+                == PrimitiveType::Cylinder
+            && visual.details[13].meshRecipe.primitives[0]
+                    .localTransform.rotationDegrees.z == -90.0F
+            && visual.details[13].meshRecipe.primitives[0].dimensions.y == 0.065F
+            && visual.details[13].meshRecipe.primitives[1].dimensions.x == 0.075F
+            && visual.details[13].tint.x < 0.40F
+            && visual.details[13].meshRecipe.primitives[0]
+                    .localTransform.position.x
+                    + visual.details[13].meshRecipe.primitives[0].dimensions.y * 0.5F
+                > visual.details[12].meshRecipe.primitives[0]
+                      .localTransform.position.x
+                    + visual.details[12].meshRecipe.primitives[0].dimensions.x * 0.5F
+                    + 0.02F
+            && visual.details[8].meshRecipe.primitives[0].type
+                == PrimitiveType::Cylinder
+            && visual.details[11].meshRecipe.primitives[2]
+                    .localTransform.rotationDegrees.x == 90.0F
+            && visual.details[8].tint.x < visual.partTints[4].x
+            && visual.details[0].tint.x < visual.details[1].tint.x
+            && visual.partTints[4].x + 0.15F < visual.details[6].tint.x
+            && visual.partTints[5].x + 0.15F < visual.details[7].tint.x
+            && visual.meshRecipe.primitives[7].dimensions.x
+                >= 1.80F * visual.body.heightScale * 0.13F
             && inRange(genome.leftArmShape.lengthScale, 0.86F, 1.14F)
             && inRange(genome.rightArmShape.lengthScale, 0.86F, 1.14F)
             && inRange(genome.leftLegShape.lengthScale, 0.92F, 1.08F)
@@ -305,9 +364,8 @@ void testWorkerSeedBatch()
     expect(allProfiles, "seed batch reaches every Worker BodyProfile");
     expect(allWear, "seed batch reaches every Worker wear condition");
     expect(materials[static_cast<std::size_t>(MaterialFamily::PaintedSteel)]
-            && materials[static_cast<std::size_t>(MaterialFamily::BareSteel)]
-            && materials[static_cast<std::size_t>(MaterialFamily::Aluminum)],
-        "seed batch reaches every Worker material family");
+            && std::count(materials.begin(), materials.end(), true) == 1,
+        "Worker v2 uses painted steel across every seed");
 }
 
 void testGuardPartLibrary()

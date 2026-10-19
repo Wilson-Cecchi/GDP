@@ -72,6 +72,14 @@ enum class EnemyAnimationState : std::uint8_t {
     Recover,
 };
 
+// An actual hit or shot starts the visual pulse. This is separate from
+// EnemyAnimationState::Attack, which also describes aiming while on cooldown.
+enum class EnemyAttackVisualKind : std::uint8_t {
+    None,
+    Ranged,
+    Melee,
+};
+
 struct EnemyRootPose {
     wkc::core::Vec3 offset{};
     wkc::core::Vec3 scale{1.0F, 1.0F, 1.0F};
@@ -142,7 +150,9 @@ void advanceEnemyAnimationTransition(
     std::uint32_t partCount,
     float hitReactionStrength = 0.0F,
     bool active = true,
-    EnemyVisualRole role = EnemyVisualRole::Worker) noexcept;
+    EnemyVisualRole role = EnemyVisualRole::Worker,
+    EnemyAttackVisualKind attackKind = EnemyAttackVisualKind::None,
+    float attackPulse = 0.0F) noexcept;
 
 struct EnemyRenderData {
     wkc::core::Vec3 position{};
@@ -156,6 +166,8 @@ struct EnemyRenderData {
     float hitReactionStrength{0.0F};
     EnemyAnimationState previousAnimationState{EnemyAnimationState::Idle};
     float animationTransitionBlend{1.0F};
+    EnemyAttackVisualKind attackVisualKind{EnemyAttackVisualKind::None};
+    float attackPulse{0.0F};
 };
 
 struct PickupRenderData {
@@ -246,6 +258,14 @@ struct WeaponViewmodelRenderData {
     float crouchStrength{0.0F};
     float airborneStrength{0.0F};
     float muzzleFlashStrength{0.0F};
+    float gaitPhase{0.0F};
+    float gaitWeight{0.0F};
+    float carryMotion{0.0F};
+    bool equipTransitionActive{false};
+    HudWeaponRole equipOutgoingRole{HudWeaponRole::Pistol};
+    bool equipOutgoingGrenade{false};
+    bool equipOutgoingVisible{true};
+    float equipTransitionProgress{1.0F};
     bool overdrive{false};
     wkc::core::Seed visualSeed{0U};
     std::uint32_t reloadRoundCount{6U};
@@ -253,6 +273,14 @@ struct WeaponViewmodelRenderData {
     // Fixture/diagnostic switch; gameplay always supplies the approved hands.
     bool handsVisible{true};
 };
+
+struct WeaponEquipPresentation {
+    WeaponViewmodelRenderData weapon{};
+    bool visible{true};
+};
+
+[[nodiscard]] WeaponEquipPresentation sampleWeaponEquipPresentation(
+    const WeaponViewmodelRenderData& weapon) noexcept;
 
 // Grenade and grip share weapon-local coordinates, including the throw wind-up.
 inline constexpr wkc::core::Vec3 grenadeViewmodelBodyCenter{0.04F, 0.105F, 0.10F};

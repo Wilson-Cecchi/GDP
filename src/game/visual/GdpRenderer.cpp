@@ -12,11 +12,15 @@
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
 
+#include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <numbers>
 #include <sstream>
 #include <string>
@@ -25,6 +29,81 @@
 
 namespace gdp::game::visual {
 namespace {
+
+bool referenceEnemyModelsEnabled() noexcept
+{
+    const char* const value = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+    return value == nullptr || std::string_view{value} != "0";
+}
+
+std::optional<wkc::render::ImageData> loadWorkerImage(
+    const std::string_view fileName)
+{
+    const char* const basePath = SDL_GetBasePath();
+    const std::filesystem::path base = basePath != nullptr
+        ? std::filesystem::path{basePath} : std::filesystem::path{};
+    const std::array candidates{
+        base / "visual" / fileName,
+        base / "../Resources/visual" / fileName,
+        std::filesystem::path{"assets/visual"} / fileName,
+    };
+    for (const auto& path : candidates) {
+        SDL_Surface* const source = SDL_LoadPNG(path.string().c_str());
+        if (source == nullptr) continue;
+        SDL_Surface* const rgba = SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
+        SDL_DestroySurface(source);
+        if (rgba == nullptr || rgba->w <= 0 || rgba->h <= 0) {
+            if (rgba != nullptr) SDL_DestroySurface(rgba);
+            return std::nullopt;
+        }
+        wkc::render::ImageData image;
+        image.width = rgba->w;
+        image.height = rgba->h;
+        const std::size_t rowBytes = static_cast<std::size_t>(rgba->w) * 4U;
+        image.rgba.resize(rowBytes * static_cast<std::size_t>(rgba->h));
+        const auto* const pixels = static_cast<const std::uint8_t*>(rgba->pixels);
+        for (int y = 0; y < rgba->h; ++y) {
+            std::memcpy(image.rgba.data() + static_cast<std::size_t>(y) * rowBytes,
+                pixels + static_cast<std::size_t>(y) * static_cast<std::size_t>(rgba->pitch),
+                rowBytes);
+        }
+        SDL_DestroySurface(rgba);
+        return image;
+    }
+    return std::nullopt;
+}
+
+bool referencePainted(const std::uint8_t material)
+{
+    return material == 0U;
+}
+
+wkc::core::Vec3 referenceMaterialColor(
+    const EnemyVisualRole role, const std::uint8_t material)
+{
+    constexpr std::array<std::array<wkc::core::Vec3, 6U>, 5U> colors{{
+        {{{0.85F, 0.39F, 0.10F}, {0.20F, 0.22F, 0.24F},
+            {0.48F, 0.50F, 0.52F}, {1.0F, 0.32F, 0.03F},
+            {0.09F, 0.10F, 0.11F}, {0.62F, 0.39F, 0.08F}}},
+        {{{0.72F, 0.69F, 0.56F}, {0.19F, 0.20F, 0.19F},
+            {0.48F, 0.48F, 0.44F}, {1.0F, 0.32F, 0.03F},
+            {0.10F, 0.10F, 0.10F}, {0.34F, 0.37F, 0.28F}}},
+        {{{0.38F, 0.13F, 0.19F}, {0.18F, 0.20F, 0.28F},
+            {0.45F, 0.47F, 0.50F}, {1.0F, 0.32F, 0.03F},
+            {0.09F, 0.10F, 0.12F}, {0.24F, 0.26F, 0.31F}}},
+        {{{0.19F, 0.51F, 0.51F}, {0.83F, 0.36F, 0.10F},
+            {0.48F, 0.50F, 0.51F}, {1.0F, 0.32F, 0.03F},
+            {0.09F, 0.11F, 0.12F}, {0.25F, 0.32F, 0.33F}}},
+        {{{0.85F, 0.39F, 0.10F}, {0.18F, 0.20F, 0.23F},
+            {0.48F, 0.50F, 0.52F}, {1.0F, 0.32F, 0.03F},
+            {0.09F, 0.10F, 0.12F}, {0.55F, 0.23F, 0.08F}}},
+    }};
+    const auto roleIndex = static_cast<std::size_t>(role);
+    if (roleIndex >= colors.size() || material >= colors[0].size()) {
+        return {1.0F, 1.0F, 1.0F};
+    }
+    return colors[roleIndex][material];
+}
 
 wkc::render::MeshData makeRoundedMesh(
     const std::uint32_t slices, const std::uint32_t stacks)
@@ -211,6 +290,8 @@ uniform float uAmbientIntensity;
 uniform vec2 uUvScale;
 uniform vec2 uUvOffset;
 uniform float uEmissiveStrength;
+uniform float uWorkerPaintWear;
+uniform int uEyeHalo;
 uniform int uDetailedMaterial;
 uniform int uDetailedMaterialsEnabled;
 uniform int uUseEmissionMap;
@@ -293,6 +374,19 @@ void main()
     vec2 materialUv = (vUv * uUvScale) + uUvOffset;
     vec3 normal = normalize(vNormal);
     vec3 albedo = texture(uAlbedo, materialUv).rgb * uTint;
+    if (uWorkerPaintWear > 0.0) {
+        // Exposed steel is concentrated along painted armor edges. The chip
+        // pattern is stable in UV space and applies only to Worker paint.
+        vec2 edgeDistance = min(vUv, vec2(1.0) - vUv);
+        float edge = 1.0 - smoothstep(0.012, 0.13,
+            min(edgeDistance.x, edgeDistance.y));
+        float chipNoise = fract(sin(dot(floor(vUv * 64.0),
+            vec2(127.1, 311.7))) * 43758.5453);
+        float chips = smoothstep(0.37, 0.76, chipNoise);
+        albedo *= 1.0 - edge * 0.32;
+        float exposed = edge * chips * uWorkerPaintWear;
+        albedo = mix(albedo, vec3(0.38, 0.41, 0.43), exposed);
+    }
     float roughness = 0.72;
     float metalness = 0.0;
     float ambientOcclusion = 1.0;
@@ -380,8 +474,11 @@ void main()
         ? smoothstep(0.05, 0.75, max(dot(normal, viewDirection), 0.0))
         : 1.0;
     vec3 litColor = result + (albedo * emissiveMask * uEmissiveStrength);
+    float haloOpacity = uEyeHalo != 0
+        ? 1.0 - smoothstep(0.05, 0.5, length(vUv - vec2(0.5)))
+        : 1.0;
     fragmentColor = vec4(mix(litColor, uTint, uUnlitMix),
-        uOpacity * edgeOpacity);
+        uOpacity * edgeOpacity * haloOpacity);
 }
 )glsl";
 
@@ -690,6 +787,53 @@ bool GdpRenderer::initialize(const int width, const int height)
     }
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
         return false;
+    }
+    const auto workerPaint = loadWorkerImage("worker_painted_steel_v2.png");
+    if (!workerPaint || !workerPaintTexture_.upload(
+            gl_, *workerPaint, wkc::render::TextureSampling::Trilinear)) {
+        wkc::core::log(wkc::core::LogLevel::Error,
+            "Missing or invalid Worker painted-steel texture");
+        return false;
+    }
+    const auto workerPanel = loadWorkerImage("worker_front_panel_source_v2.png");
+    if (!workerPanel || !workerFrontPanelTexture_.upload(
+            gl_, *workerPanel, wkc::render::TextureSampling::Trilinear)) {
+        wkc::core::log(wkc::core::LogLevel::Error,
+            "Missing or invalid Worker front-panel source image");
+        return false;
+    }
+    if (referenceEnemyModelsEnabled()) {
+        wkc::render::ImageData white;
+        white.width = 1;
+        white.height = 1;
+        white.rgba = {255U, 255U, 255U, 255U};
+        if (!referenceWhiteTexture_.upload(gl_, white)) return false;
+        wkc::render::ImageData neutralPaint = *workerPaint;
+        for (std::size_t pixel = 0U; pixel + 3U < neutralPaint.rgba.size(); pixel += 4U) {
+            const float luminance = 0.2126F * neutralPaint.rgba[pixel]
+                + 0.7152F * neutralPaint.rgba[pixel + 1U]
+                + 0.0722F * neutralPaint.rgba[pixel + 2U];
+            const auto value = static_cast<std::uint8_t>(
+                std::clamp(170.0F + (luminance - 115.0F) * 1.15F, 36.0F, 245.0F));
+            neutralPaint.rgba[pixel] = value;
+            neutralPaint.rgba[pixel + 1U] = value;
+            neutralPaint.rgba[pixel + 2U] = value;
+        }
+        if (!referenceNeutralPaintTexture_.upload(
+                gl_, neutralPaint, wkc::render::TextureSampling::Trilinear)) {
+            return false;
+        }
+        constexpr std::array roleNames{"worker", "guard", "officer", "engineer", "robot"};
+        for (std::size_t index = 0U; index < roleNames.size(); ++index) {
+            const std::string fileName = std::string{"models/"} + roleNames[index]
+                + "_reference/" + roleNames[index] + "_paint_albedo.png";
+            const auto paint = loadWorkerImage(fileName);
+            if (paint) {
+                referencePaintReady_[index] = referencePaintTextures_[index].upload(
+                    gl_, *paint, wkc::render::TextureSampling::Trilinear);
+                if (!referencePaintReady_[index]) return false;
+            }
+        }
     }
     const gdp::game::CeilingFixtureMaterialImages fixtureImages
         = gdp::game::makeCeilingFixtureMaterialImages();
@@ -1076,6 +1220,9 @@ bool GdpRenderer::prepareWorkerVisual(const wkc::core::Seed visualSeed)
     if (!initialized_) {
         return false;
     }
+    if (tryPrepareEnemyReferenceVisual("worker", 0U, workerVisuals_)) {
+        return true;
+    }
     if (workerVisuals_.contains(visualSeed)) {
         return true;
     }
@@ -1091,6 +1238,67 @@ bool GdpRenderer::prepareWorkerVisual(const wkc::core::Seed visualSeed)
             visual.meshRecipe, visual.textureRecipe, gpuVisual)) {
         return false;
     }
+    for (std::size_t index = 0; index < visual.partTints.size(); ++index) {
+        gpuVisual.parts[index].tint = visual.partTints[index];
+        const auto tint = visual.partTints[index];
+        gpuVisual.parts[index].workerPaint = tint.x > tint.y * 1.45F
+            && tint.x > tint.z * 1.65F;
+    }
+    gpuVisual.parts.reserve(gpuVisual.parts.size() + visual.details.size());
+    for (std::size_t detailIndex = 0; detailIndex < visual.details.size(); ++detailIndex) {
+        const WorkerDetailRecipe& detail = visual.details[detailIndex];
+        const auto meshData = meshCache_.acquire(
+            wkc::procedural::meshRecipeHash(detail.meshRecipe),
+            [&detail] {
+                return std::move(
+                    wkc::procedural::generateMesh(detail.meshRecipe)->mesh);
+            });
+        EnemyGpuPart gpuPart;
+        if (!gpuPart.mesh.upload(gl_, *meshData)) {
+            return false;
+        }
+        gpuPart.index = detail.parentPartIndex;
+        gpuPart.pivot = gpuVisual.parts[detail.parentPartIndex].pivot;
+        gpuPart.tint = detail.tint;
+        gpuPart.workerPaint
+            = detail.meshRecipe.primitives.front().semantic
+                    != wkc::procedural::SemanticRegion::Lens
+                && detail.tint.x > detail.tint.y * 1.45F
+                && detail.tint.x > detail.tint.z * 1.65F;
+        // The second detail is the flat front panel, whose exact painted
+        // surface is sampled from the approved concept image.
+        gpuPart.workerFrontPanel = detailIndex == 1U;
+        gpuPart.workerEyeCore = detailIndex == 3U;
+        // The final Worker detail is a circular blade mounted on the tool.
+        // Its first primitive locates the axle in assembled Worker space.
+        gpuPart.workerSawBlade = detailIndex == 13U;
+        if (gpuPart.workerSawBlade) {
+            gpuPart.workerSawCenter
+                = detail.meshRecipe.primitives.front().localTransform.position;
+        }
+        gpuVisual.parts.push_back(std::move(gpuPart));
+    }
+    // A soft billboard-like plane sits just ahead of the visor core. It uses
+    // the same head pivot, so it follows every Worker pose without gameplay
+    // or hitbox changes.
+    const auto& eye = visual.details[3].meshRecipe.primitives.front();
+    wkc::procedural::MeshRecipe haloRecipe;
+    haloRecipe.version = 1U;
+    haloRecipe.seed = visualSeed;
+    haloRecipe.primitives.push_back({wkc::procedural::PrimitiveType::Box,
+        {.position = eye.localTransform.position
+            + wkc::core::Vec3{0.0F, 0.0F, 0.025F}},
+        {eye.dimensions.x * 2.35F, eye.dimensions.y * 4.0F, 0.003F},
+        wkc::procedural::MaterialSlot::Emissive,
+        wkc::procedural::SemanticRegion::Lens});
+    const auto haloMesh = wkc::procedural::generateMesh(haloRecipe);
+    EnemyGpuPart haloPart;
+    if (!haloMesh || !haloPart.mesh.upload(gl_, haloMesh->mesh)) return false;
+    haloPart.index = 1U;
+    haloPart.pivot = gpuVisual.parts[1].pivot;
+    haloPart.tint = {1.0F, 0.58F, 0.10F};
+    haloPart.workerEyeHalo = true;
+    gpuVisual.parts.push_back(std::move(haloPart));
     workerVisuals_.emplace(visualSeed, std::move(gpuVisual));
     return true;
 }
@@ -1099,6 +1307,9 @@ bool GdpRenderer::prepareGuardVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
+    }
+    if (tryPrepareEnemyReferenceVisual("guard", 1U, guardVisuals_)) {
+        return true;
     }
     if (guardVisuals_.contains(visualSeed)) {
         return true;
@@ -1124,6 +1335,9 @@ bool GdpRenderer::prepareOfficerVisual(const wkc::core::Seed visualSeed)
     if (!initialized_) {
         return false;
     }
+    if (tryPrepareEnemyReferenceVisual("officer", 2U, officerVisuals_)) {
+        return true;
+    }
     if (officerVisuals_.contains(visualSeed)) {
         return true;
     }
@@ -1147,6 +1361,9 @@ bool GdpRenderer::prepareEngineerVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
+    }
+    if (tryPrepareEnemyReferenceVisual("engineer", 3U, engineerVisuals_)) {
+        return true;
     }
     if (engineerVisuals_.contains(visualSeed)) {
         return true;
@@ -1172,6 +1389,9 @@ bool GdpRenderer::prepareIndustrialRobotVisual(const wkc::core::Seed visualSeed)
 {
     if (!initialized_) {
         return false;
+    }
+    if (tryPrepareEnemyReferenceVisual("robot", 4U, industrialRobotVisuals_)) {
+        return true;
     }
     if (industrialRobotVisuals_.contains(visualSeed)) {
         return true;
@@ -1227,7 +1447,77 @@ bool GdpRenderer::uploadEnemyGpuVisual(
         return false;
     }
     gpuVisual.emissiveStrength = textureRecipe.emissiveAmount;
+    gpuVisual.wearAmount = textureRecipe.wearAmount;
+    gpuVisual.basePartCount = static_cast<std::uint32_t>(rigidParts.size());
     return true;
+}
+
+bool GdpRenderer::uploadEnemyReferenceVisual(
+    const EnemyModelAsset& asset, const std::string_view roleName,
+    EnemyGpuVisual& gpuVisual)
+{
+    wkc::core::Vec3 toolPivot{};
+    for (const EnemyModelSubmesh& submesh : asset.submeshes) {
+        if (submesh.partId == 7U) {
+            toolPivot = submesh.pivot;
+            break;
+        }
+    }
+    gpuVisual.parts.reserve(asset.submeshes.size());
+    for (const EnemyModelSubmesh& submesh : asset.submeshes) {
+        EnemyGpuPart part;
+        if (!part.mesh.upload(gl_, submesh.mesh)) return false;
+        part.workerSawBlade = roleName == "worker" && submesh.partId == 8U;
+        part.index = part.workerSawBlade ? 7U : submesh.partId;
+        part.pivot = part.workerSawBlade ? toolPivot : submesh.pivot;
+        if (part.workerSawBlade) part.workerSawCenter = submesh.pivot;
+        part.referenceMaterialId = static_cast<std::uint8_t>(submesh.materialId);
+        gpuVisual.parts.push_back(std::move(part));
+    }
+    wkc::render::ImageData white;
+    white.width = 1;
+    white.height = 1;
+    white.rgba = {255U, 255U, 255U, 255U};
+    if (!gpuVisual.texture.upload(gl_, white)) return false;
+    gpuVisual.basePartCount = roleName == "guard" ? 10U : 8U;
+    return true;
+}
+
+bool GdpRenderer::tryPrepareEnemyReferenceVisual(
+    const std::string_view roleName, const std::size_t roleIndex,
+    std::unordered_map<wkc::core::Seed, EnemyGpuVisual>& visuals)
+{
+    if (!referenceEnemyModelsEnabled()) return false;
+    if (referenceModelReady_[roleIndex]) return true;
+    const std::string fileName = std::string{"models/"} + std::string{roleName}
+        + "_reference/" + std::string{roleName} + "_reference.isemesh";
+    const char* const basePath = SDL_GetBasePath();
+    const std::filesystem::path base = basePath != nullptr
+        ? std::filesystem::path{basePath} : std::filesystem::path{};
+    const std::array candidates{
+        base / "visual" / fileName,
+        base / "../Resources/visual" / fileName,
+        std::filesystem::path{"assets/visual"} / fileName,
+    };
+    for (const auto& path : candidates) {
+        std::error_code error;
+        if (!std::filesystem::exists(path, error)) continue;
+        std::string reason;
+        const auto asset = loadEnemyModelAsset(path, &reason);
+        if (!asset) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Invalid enemy reference model " + path.string() + ": " + reason);
+            return false;
+        }
+        EnemyGpuVisual gpuVisual;
+        if (!uploadEnemyReferenceVisual(*asset, roleName, gpuVisual)) return false;
+        visuals.emplace(0U, std::move(gpuVisual));
+        referenceModelReady_[roleIndex] = true;
+        wkc::core::log(wkc::core::LogLevel::Info,
+            "Loaded enemy reference model " + path.string());
+        return true;
+    }
+    return false;
 }
 
 void GdpRenderer::drawMesh(const wkc::render::Mesh& mesh) noexcept
@@ -2154,8 +2444,7 @@ bool GdpRenderer::render(
         const float visibleHitStrength
             = hit ? hitStrength * transitionBlend : hitStrength;
         const float deathBlend = !enemy.alive ? transitionBlend : 0.0F;
-        shader.setVec3(
-            gl_, "uTint", !enemy.alive
+        const wkc::core::Vec3 enemyTint = !enemy.alive
                 ? wkc::core::Vec3{
                     1.0F - (deathBlend * 0.70F),
                     1.0F - (deathBlend * 0.76F),
@@ -2166,50 +2455,156 @@ bool GdpRenderer::render(
                     1.0F - (visibleHitStrength * 0.32F)}
                 : enemy.active
                 ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-                : wkc::core::Vec3{0.68F, 0.72F, 0.78F});
+                : wkc::core::Vec3{0.68F, 0.72F, 0.78F};
         shader.setInt(gl_, "uDetailedMaterial", 0);
         shader.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
         shader.setVec2(gl_, "uUvOffset", {});
-        shader.setFloat(gl_, "uEmissiveStrength",
+        const float enemyEmissiveStrength =
             enemy.alive
                 ? visual->second.emissiveStrength
                     * (hit ? 1.0F + (visibleHitStrength * 0.15F)
                            : enemy.active ? 1.0F : 0.25F)
-                : visual->second.emissiveStrength * (1.0F - deathBlend));
+                : visual->second.emissiveStrength * (1.0F - deathBlend);
         for (const EnemyGpuPart& part : visual->second.parts) {
-            const EnemyPartPose currentPartPose = sampleEnemyPartPose(
-                currentAnimationState,
-                enemy.animationTick, enemy.visualSeed, part.index,
-                static_cast<std::uint32_t>(visual->second.parts.size()),
-                hitStrength, enemy.active, enemy.role);
-            const EnemyPartPose previousPartPose = sampleEnemyPartPose(
-                enemy.previousAnimationState,
-                enemy.animationTick, enemy.visualSeed, part.index,
-                static_cast<std::uint32_t>(visual->second.parts.size()),
-                hitStrength, enemy.active, enemy.role);
-            const EnemyPartPose partPose
-                = currentAnimationState == EnemyAnimationState::Dead
-                ? sampleEnemyRagdollPartPose(
-                    previousPartPose, enemy.visualSeed, enemy.role, part.index,
-                    static_cast<std::uint32_t>(visual->second.parts.size()),
-                    transitionBlend)
-                : blendEnemyPartPoses(
-                    previousPartPose, currentPartPose, transitionBlend);
-            const wkc::core::Vec3 pivot = part.pivot + partPose.offset;
-            const wkc::core::Mat4 partModel
-                = wkc::core::translationMatrix(pivot)
-                * wkc::core::rotationXMatrix(
-                    partPose.rotationDegrees.x * degreesToRadians)
-                * wkc::core::rotationYMatrix(
-                    partPose.rotationDegrees.y * degreesToRadians)
-                * wkc::core::rotationZMatrix(
-                    partPose.rotationDegrees.z * degreesToRadians)
-                * wkc::core::translationMatrix(
-                    {-part.pivot.x, -part.pivot.y, -part.pivot.z});
-            shader.setMat4(gl_, "uModel", rootModel * partModel);
+            const bool referencePart = part.referenceMaterialId <= 5U;
+            const auto roleIndex = static_cast<std::size_t>(enemy.role);
+            const bool paintedReference = referencePart
+                && referencePainted(part.referenceMaterialId);
+            if (referencePart) {
+                if (paintedReference && referencePaintReady_[roleIndex]) {
+                    referencePaintTextures_[roleIndex].bind(gl_, textureBindings_);
+                } else if (paintedReference) {
+                    referenceNeutralPaintTexture_.bind(gl_, textureBindings_);
+                } else {
+                    referenceWhiteTexture_.bind(gl_, textureBindings_);
+                }
+                shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+                shader.setVec2(gl_, "uUvOffset", {});
+            } else if (enemy.role == EnemyVisualRole::Worker && part.workerFrontPanel) {
+                workerFrontPanelTexture_.bind(gl_, textureBindings_);
+                shader.setVec2(gl_, "uUvScale", {0.095F, -0.126F});
+                shader.setVec2(gl_, "uUvOffset", {0.453F, 0.698F});
+            } else if (enemy.role == EnemyVisualRole::Worker && part.workerPaint) {
+                workerPaintTexture_.bind(gl_, textureBindings_);
+                shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+                shader.setVec2(gl_, "uUvOffset", {});
+            } else {
+                visual->second.texture.bind(gl_, textureBindings_);
+                shader.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
+                shader.setVec2(gl_, "uUvOffset", {});
+            }
+            shader.setFloat(gl_, "uWorkerPaintWear",
+                !referencePart && enemy.role == EnemyVisualRole::Worker && part.workerPaint
+                    ? std::clamp(0.32F + visual->second.wearAmount * 0.46F,
+                        0.32F, 0.62F)
+                    : 0.0F);
+            shader.setFloat(gl_, "uEmissiveStrength",
+                referencePart && part.referenceMaterialId == 3U
+                    ? (enemy.alive ? (enemy.active ? 1.15F : 0.24F) : 0.0F)
+                : part.workerEyeCore && enemy.alive
+                    ? (enemy.active ? 1.45F : 0.35F) : enemyEmissiveStrength);
+            shader.setInt(gl_, "uEyeHalo", part.workerEyeHalo ? 1 : 0);
+            const wkc::core::Vec3 materialTint
+                = referencePart
+                ? paintedReference && referencePaintReady_[roleIndex]
+                    ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+                    : referenceMaterialColor(enemy.role, part.referenceMaterialId)
+                : enemy.role == EnemyVisualRole::Worker && part.workerPaint
+                ? part.workerFrontPanel
+                    ? wkc::core::Vec3{0.68F, 0.68F, 0.68F}
+                    : wkc::core::Vec3{0.77F, 0.76F, 0.75F}
+                : part.tint;
+            shader.setVec3(gl_, "uTint", {
+                enemyTint.x * materialTint.x,
+                enemyTint.y * materialTint.y,
+                enemyTint.z * materialTint.z,
+            });
+            const auto blendedPoseFor = [&](const std::uint32_t partIndex) {
+                const EnemyPartPose currentLimbPose = sampleEnemyPartPose(
+                    currentAnimationState,
+                    enemy.animationTick, enemy.visualSeed, partIndex,
+                    visual->second.basePartCount,
+                    hitStrength, enemy.active, enemy.role,
+                    enemy.attackVisualKind, enemy.attackPulse);
+                const EnemyPartPose previousLimbPose = sampleEnemyPartPose(
+                    enemy.previousAnimationState,
+                    enemy.animationTick, enemy.visualSeed, partIndex,
+                    visual->second.basePartCount,
+                    hitStrength, enemy.active, enemy.role,
+                    enemy.attackVisualKind, enemy.attackPulse);
+                return currentAnimationState == EnemyAnimationState::Dead
+                    ? sampleEnemyRagdollPartPose(
+                        previousLimbPose, enemy.visualSeed, enemy.role, partIndex,
+                        visual->second.basePartCount, transitionBlend)
+                    : blendEnemyPartPoses(
+                        previousLimbPose, currentLimbPose, transitionBlend);
+            };
+            const auto posedModel = [&](const wkc::core::Vec3 partPivot,
+                                         const EnemyPartPose limbPose) {
+                return wkc::core::translationMatrix(partPivot + limbPose.offset)
+                    * wkc::core::rotationXMatrix(
+                        limbPose.rotationDegrees.x * degreesToRadians)
+                    * wkc::core::rotationYMatrix(
+                        limbPose.rotationDegrees.y * degreesToRadians)
+                    * wkc::core::rotationZMatrix(
+                        limbPose.rotationDegrees.z * degreesToRadians)
+                    * wkc::core::translationMatrix(partPivot * -1.0F);
+            };
+            const EnemyPartPose partPose = blendedPoseFor(part.index);
+            wkc::core::Mat4 partModel = posedModel(part.pivot, partPose);
+            if (referencePart && enemy.role == EnemyVisualRole::Guard
+                && (part.index == 8U || part.index == 9U)) {
+                // The separate forearm follows its shoulder before bending
+                // around the elbow. This keeps both joints connected while
+                // the hands move to different grips on the rifle.
+                constexpr float modelScale = 1.8F / 5.35F;
+                const float side = part.index == 8U ? 1.0F : -1.0F;
+                const wkc::core::Vec3 shoulderPivot{
+                    side * 0.95F * modelScale,
+                    4.08F * modelScale, 0.01F * modelScale};
+                const EnemyPartPose shoulderPose = blendedPoseFor(
+                    part.index == 8U ? 2U : 3U);
+                partModel = posedModel(shoulderPivot, shoulderPose) * partModel;
+            }
+            wkc::core::Mat4 detailModel = partModel;
+            if (part.workerSawBlade && enemy.alive && enemy.active) {
+                // Rotation about the blade axle is visual only. The tool's
+                // existing pose still carries the whole saw with the hand.
+                constexpr std::uint64_t spinPeriod = 360U;
+                const float spinRadians
+                    = static_cast<float>(enemy.animationTick % spinPeriod)
+                        * 17.0F * degreesToRadians;
+                detailModel = detailModel
+                    * wkc::core::translationMatrix(part.workerSawCenter)
+                    * wkc::core::rotationXMatrix(spinRadians)
+                    * wkc::core::translationMatrix({
+                        -part.workerSawCenter.x,
+                        -part.workerSawCenter.y,
+                        -part.workerSawCenter.z});
+            }
+            shader.setMat4(gl_, "uModel", rootModel * detailModel);
+            if (part.workerEyeHalo) {
+                shader.setFloat(gl_, "uOpacity",
+                    enemy.alive ? (enemy.active ? 0.28F : 0.08F) : 0.0F);
+                shader.setFloat(gl_, "uUnlitMix", 1.0F);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+                glDepthMask(GL_FALSE);
+            }
             drawMesh(part.mesh);
+            if (part.workerEyeHalo) {
+                glDepthMask(GL_TRUE);
+                glDisable(GL_BLEND);
+                shader.setFloat(gl_, "uOpacity", 1.0F);
+                shader.setFloat(gl_, "uUnlitMix", 0.0F);
+            }
         }
     }
+    shader.setFloat(gl_, "uWorkerPaintWear", 0.0F);
+    shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+    shader.setInt(gl_, "uEyeHalo", 0);
+    shader.setVec2(gl_, "uUvScale", {4.0F, 4.0F});
+    shader.setVec2(gl_, "uUvOffset", {});
 
     fallbackTexture_.bind(gl_, textureBindings_);
     for (const PickupRenderData& pickup : pickups) {
@@ -2459,8 +2854,12 @@ bool GdpRenderer::render(
         glDisable(GL_BLEND);
     }
 
-    const HudWeaponRole viewmodelRole = weaponViewmodel.role;
-    if (weaponViewmodel.visible && scopeStrength < 0.95F
+    const WeaponEquipPresentation equipPresentation
+        = sampleWeaponEquipPresentation(weaponViewmodel);
+    const auto& presentedWeapon = equipPresentation.weapon;
+    const HudWeaponRole viewmodelRole = presentedWeapon.role;
+    if (presentedWeapon.visible && scopeStrength < 0.95F
+        && equipPresentation.visible
         && static_cast<std::size_t>(viewmodelRole) < weaponRoleCount) {
         glClear(GL_DEPTH_BUFFER_BIT);
         // The world FOV belongs to the player's camera, not to the weapon.
@@ -2489,11 +2888,11 @@ bool GdpRenderer::render(
             wkc::core::normalized((up * 0.82F) - (right * 0.34F)
                 - (forward * 0.44F)));
         const WeaponReloadPose reloadPose = sampleWeaponReloadPose(
-            weaponViewmodel.role, weaponViewmodel.reloadProgress, weaponViewmodel.reloadRoundCount);
-        const bool carbine = weaponViewmodel.role != HudWeaponRole::Pistol
-            && weaponViewmodel.role != HudWeaponRole::Knife;
-        const bool knife = weaponViewmodel.role == HudWeaponRole::Knife;
-        auto presentationWeapon = weaponViewmodel;
+            presentedWeapon.role, presentedWeapon.reloadProgress, presentedWeapon.reloadRoundCount);
+        const bool carbine = presentedWeapon.role != HudWeaponRole::Pistol
+            && presentedWeapon.role != HudWeaponRole::Knife;
+        const bool knife = presentedWeapon.role == HudWeaponRole::Knife;
+        auto presentationWeapon = presentedWeapon;
         // Modal UI gates scope separately from the raw DTO. The shared hand
         // frame must use that same gate, not retain a hidden zoom-lowered root.
         if (scopeStrength == 0.0F) presentationWeapon.aimStrength = 0.0F;
@@ -2504,13 +2903,13 @@ bool GdpRenderer::render(
             * basisMatrix(right, up, forward)
             * sampleWeaponPresentationTransform(presentationWeapon);
         const float seedTone = static_cast<float>(
-            (weaponViewmodel.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
+            (presentedWeapon.visualSeed >> 9U) & 0x0fU) / 15.0F * 0.025F;
         const std::array materialColors{
             wkc::core::Vec3{0.45F + seedTone, 0.48F + seedTone, 0.50F + seedTone},
             wkc::core::Vec3{0.64F, 0.67F, 0.68F},
             wkc::core::Vec3{0.23F, 0.24F, 0.24F},
             wkc::core::Vec3{0.075F, 0.085F, 0.09F},
-            weaponViewmodel.overdrive
+            presentedWeapon.overdrive
                 ? wkc::core::Vec3{0.96F, 0.18F, 0.52F}
                 : wkc::core::Vec3{0.12F, 0.72F, 0.80F},
         };
@@ -2519,7 +2918,7 @@ bool GdpRenderer::render(
         const std::size_t weaponIndex = static_cast<std::size_t>(viewmodelRole);
         // One extra magazine pass exists only while the discarded instance falls.
         for (std::size_t pass = 0;
-             !weaponViewmodel.grenadeSelected && pass < weaponPartCount + 1U;
+             !presentedWeapon.grenadeSelected && pass < weaponPartCount + 1U;
              ++pass) {
             const bool discarded = pass == weaponPartCount;
             const std::size_t part = discarded
@@ -2559,10 +2958,13 @@ bool GdpRenderer::render(
             }
         }
 
-        if (weaponViewmodel.handsVisible && !hud.mainMenu
+        if (presentedWeapon.handsVisible && !hud.mainMenu
             && hud.objective != ObjectiveRenderState::Victory
             && hud.objective != ObjectiveRenderState::Defeat) {
             const auto hands = samplePlayerHandsPose(presentationWeapon);
+            const bool singleHandCarry = presentedWeapon.carryMotion > 0.12F
+                && (knife || presentedWeapon.grenadeSelected
+                    || viewmodelRole == HudWeaponRole::Pistol);
             shader.setInt(gl_, "uPlayerSkinning", 2);
             shader.setMat4(gl_, "uModel", root);
             constexpr std::array<const char*, playerHandsBoneCount> uniforms{
@@ -2585,7 +2987,7 @@ bool GdpRenderer::render(
                 gpu.albedo.bind(gl_, textureBindings_, 0U);
                 gpu.normal.bind(gl_, textureBindings_, 1U);
                 gpu.properties.bind(gl_, textureBindings_, 2U);
-                drawMesh(knife && !weaponViewmodel.grenadeSelected
+                drawMesh((knife && !presentedWeapon.grenadeSelected) || singleHandCarry
                     ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
             }
             shader.setInt(gl_, "uPlayerSkinning", 0);
@@ -2612,7 +3014,7 @@ bool GdpRenderer::render(
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
-        if (weaponViewmodel.grenadeSelected && weaponViewmodel.grenadeVisible) {
+        if (presentedWeapon.grenadeSelected && presentedWeapon.grenadeVisible) {
             const GrenadeViewmodelPose grenadePose
                 = sampleGrenadeViewmodelPose(presentationWeapon);
             drawGrenadeModel(root, grenadePose.bodyCenter);
@@ -2642,11 +3044,11 @@ bool GdpRenderer::render(
             : viewmodelRole == HudWeaponRole::SubmachineGun ? 0.005F : 0.0F;
 
         const float flash = std::clamp(
-            std::isfinite(weaponViewmodel.muzzleFlashStrength)
-                ? weaponViewmodel.muzzleFlashStrength : 0.0F,
+            std::isfinite(presentedWeapon.muzzleFlashStrength)
+                ? presentedWeapon.muzzleFlashStrength : 0.0F,
             0.0F, 1.0F);
-        if (flash > 0.0F && !weaponViewmodel.grenadeSelected
-            && weaponViewmodel.role != HudWeaponRole::Knife) {
+        if (flash > 0.0F && !presentedWeapon.grenadeSelected
+            && presentedWeapon.role != HudWeaponRole::Knife) {
             const wkc::core::Vec3 flashColor{1.0F, 0.56F, 0.10F};
             drawWeaponPiece({0.0F, muzzleHeight, muzzlePosition + (0.07F * flash)},
                 {0.07F + (0.08F * flash), 0.07F + (0.08F * flash),

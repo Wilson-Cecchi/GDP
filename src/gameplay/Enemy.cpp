@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <span>
@@ -18,6 +19,69 @@ namespace gdp::gameplay {
 namespace {
 
 constexpr std::uint32_t rangedMagazineCapacity = 8U;
+constexpr std::uint32_t robotMagazineCapacity = 12U;
+constexpr float robotReloadSeconds = 2.4F;
+constexpr float robotOpeningShotInterval = 0.70F;
+constexpr float robotFinalShotInterval = 0.16F;
+// Twelve 8.5 HP rounds over one ramp and reload average about 14 HP/s.
+constexpr float robotShotDamageRatio = 8.5F / 18.0F;
+constexpr float attackVisualDuration = 0.28F;
+
+float robotShotInterval(const gdp::entities::EnemyData& enemy) noexcept
+{
+    const std::uint32_t shotsBeforeNext = robotMagazineCapacity
+        - std::min(enemy.magazineAmmo, robotMagazineCapacity);
+    const float ramp = static_cast<float>(std::min(
+        shotsBeforeNext > 0U ? shotsBeforeNext - 1U : 0U,
+        robotMagazineCapacity - 2U));
+    return robotOpeningShotInterval
+        + (robotFinalShotInterval - robotOpeningShotInterval)
+            * (ramp / static_cast<float>(robotMagazineCapacity - 2U));
+}
+
+float rangedAttackInterval(const gdp::entities::EnemyData& enemy,
+    const float otherInterval) noexcept
+{
+    return enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot
+        ? robotShotInterval(enemy) : otherInterval;
+}
+
+void markEnemyAttack(gdp::entities::EnemyData& enemy,
+    const std::uint8_t kind) noexcept
+{
+    enemy.lastAttackKind = kind;
+    enemy.attackVisualTime = attackVisualDuration;
+}
+
+void advanceEnemyAttackVisual(gdp::entities::EnemyData& enemy,
+    const float step) noexcept
+{
+    enemy.attackVisualTime = std::max(0.0F, enemy.attackVisualTime - step);
+    if (enemy.attackVisualTime == 0.0F) enemy.lastAttackKind = 0U;
+}
+
+bool referenceEnemyModelsEnabled() noexcept
+{
+    // The accepted meshes and matching combat geometry are the release
+    // default. Keep an explicit opt-out for comparing the legacy appearance.
+    const char* const value = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+    return value == nullptr || value[0] != '0' || value[1] != '\0';
+}
+
+wkc::core::Vec3 referenceMuzzleOffset(
+    const gdp::entities::EnemyArchetype archetype) noexcept
+{
+    using gdp::entities::EnemyArchetype;
+    switch (archetype) {
+    // These sockets use the weapon's aimed pose in GdpRenderData.cpp.
+    case EnemyArchetype::Guard: return {-0.176F, 1.403F, 1.140F};
+    case EnemyArchetype::Officer: return {-0.431F, 1.267F, 0.889F};
+    case EnemyArchetype::Engineer: return {-0.404F, 1.329F, 1.063F};
+    case EnemyArchetype::IndustrialRobot: return {-0.679F, 0.998F, 0.699F};
+    case EnemyArchetype::Worker: break;
+    }
+    return {0.0F, 1.2F, 0.45F};
+}
 
 struct EnemyFireContext {
     gdp::entities::EntityManager& manager;
@@ -40,6 +104,11 @@ void advanceEnemyReload(gdp::entities::EnemyData& enemy, const float step) noexc
     }
     enemy.reloadRemaining = std::max(0.0F, enemy.reloadRemaining - step);
     if (enemy.reloadRemaining == 0.0F) {
+        if (enemy.archetype == gdp::entities::EnemyArchetype::IndustrialRobot) {
+            // Boss ammunition is cyclic so a long encounter cannot exhaust it.
+            enemy.magazineAmmo = robotMagazineCapacity;
+            return;
+        }
         const std::uint32_t rounds = std::min(
             rangedMagazineCapacity - enemy.magazineAmmo, enemy.reserveAmmo);
         enemy.magazineAmmo += rounds;
@@ -50,12 +119,21 @@ void advanceEnemyReload(gdp::entities::EnemyData& enemy, const float step) noexc
 bool startEnemyReload(gdp::entities::EnemyData& enemy,
     const gdp::entities::EnemyArchetype archetype) noexcept
 {
-    if (enemy.reloadRemaining > 0.0F || enemy.magazineAmmo >= rangedMagazineCapacity
+    if (archetype == gdp::entities::EnemyArchetype::IndustrialRobot) {
+        // The neural reload output cannot cut the telegraphed volley short.
+        if (enemy.reloadRemaining > 0.0F
+            || enemy.magazineAmmo != 0U) {
+            return false;
+        }
+        enemy.reloadRemaining = robotReloadSeconds;
+        return true;
+    }
+    if (enemy.reloadRemaining > 0.0F
+        || enemy.magazineAmmo >= rangedMagazineCapacity
         || enemy.reserveAmmo == 0U) {
         return false;
     }
-    enemy.reloadRemaining = archetype
-            == gdp::entities::EnemyArchetype::IndustrialRobot ? 1.5F : 1.15F;
+    enemy.reloadRemaining = 1.15F;
     return true;
 }
 
@@ -65,31 +143,61 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
     const bool neural, EnemyUpdateSummary& summary,
     const EnemyFireContext context)
 {
-    if (perception.projectiles == nullptr) {
-        player.applyDamage(damage);
-        ++summary.attacksLanded;
-        return true;
-    }
-    if (enemy.reloadRemaining > 0.0F) {
+    const bool robot = enemy.archetype
+        == gdp::entities::EnemyArchetype::IndustrialRobot;
+    if ((perception.projectiles != nullptr || robot)
+        && enemy.reloadRemaining > 0.0F) {
         return false;
     }
-    if (enemy.magazineAmmo == 0U) {
+    if ((perception.projectiles != nullptr || robot)
+        && enemy.magazineAmmo == 0U) {
         if (startEnemyReload(enemy, enemy.archetype)) {
             ++summary.reloadsStarted;
         }
         return false;
     }
+    const float shotDamage = robot ? damage * robotShotDamageRatio : damage;
+    if (perception.projectiles == nullptr) {
+        player.applyDamage(shotDamage);
+        ++summary.attacksLanded;
+        if (robot) {
+            --enemy.magazineAmmo;
+            if (enemy.magazineAmmo == 0U
+                && startEnemyReload(enemy, enemy.archetype)) {
+                ++summary.reloadsStarted;
+            }
+        }
+        markEnemyAttack(enemy, 1U);
+        return true;
+    }
     constexpr float radiansPerDegree = 0.01745329251994329577F;
     const float yaw = entity.transform.rotationDegrees.y * radiansPerDegree;
-    const wkc::core::Vec3 horizontal{std::sin(yaw), 0.0F, std::cos(yaw)};
+    const bool referenceModels = referenceEnemyModelsEnabled();
+    const wkc::core::Vec3 socket = referenceModels
+        ? referenceMuzzleOffset(enemy.archetype)
+        : wkc::core::Vec3{0.0F, 1.2F, 0.45F};
     const wkc::core::Vec3 muzzle = entity.transform.position
-        + wkc::core::Vec3{0.0F, 1.2F, 0.0F} + horizontal * 0.45F;
+        + wkc::core::Vec3{
+            std::cos(yaw) * socket.x + std::sin(yaw) * socket.z,
+            socket.y,
+            -std::sin(yaw) * socket.x + std::cos(yaw) * socket.z};
     const wkc::core::Vec3 target = player.cameraPosition()
         - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
     const float horizontalDistance = std::max(0.1F, std::hypot(
         target.x - muzzle.x, target.z - muzzle.z));
+    // Compensate for an off-centre barrel without removing the AI's yaw error.
+    const float centerTargetYaw = std::atan2(
+        target.x - entity.transform.position.x,
+        target.z - entity.transform.position.z);
+    const float muzzleTargetYaw = std::atan2(
+        target.x - muzzle.x, target.z - muzzle.z);
+    const float shotYaw = referenceModels
+        ? muzzleTargetYaw + std::remainder(
+            yaw - centerTargetYaw, 6.28318530717958647692F)
+        : yaw;
     const wkc::core::Vec3 direction = wkc::core::normalized({
-        horizontal.x, (target.y - muzzle.y) / horizontalDistance, horizontal.z});
+        std::sin(shotYaw), (target.y - muzzle.y) / horizontalDistance,
+        std::cos(shotYaw)});
     const float targetDistance = wkc::core::length(target - muzzle);
     if (allyInEnemyFireLane(context.manager, id, muzzle, direction,
             targetDistance)) {
@@ -106,10 +214,15 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
     const float missDistance = wkc::core::length(
         (target - muzzle) - direction * along);
     perception.projectiles->push_back({muzzle, direction * speed, id,
-        entity.roomId, damage, 2.0F, neural,
+        entity.roomId, shotDamage, 2.0F, neural,
         along > 0.0F && missDistance <= 0.5F, along, 0.0F});
     --enemy.magazineAmmo;
+    if (robot && enemy.magazineAmmo == 0U
+        && startEnemyReload(enemy, enemy.archetype)) {
+        ++summary.reloadsStarted;
+    }
     ++summary.shotsFired;
+    markEnemyAttack(enemy, 1U);
     return true;
 }
 
@@ -861,6 +974,23 @@ float investigationWindow(
         estimatedSeconds - duration, 0.0F, maximumBonus);
 }
 
+void advanceEnemyKnowledge(gdp::entities::EnemyData& enemy,
+    const float step) noexcept
+{
+    if (enemy.knowledgeSource != gdp::entities::EnemyKnowledgeSource::None) {
+        enemy.knowledgeAgeSeconds = std::min(
+            enemy.knowledgeAgeSeconds + std::max(step, 0.0F), 3600.0F);
+    }
+}
+
+bool noteDirectSight(gdp::entities::EnemyData& enemy,
+    const bool visible) noexcept
+{
+    const bool newlySeen = visible && !enemy.directSightPreviousUpdate;
+    enemy.directSightPreviousUpdate = visible;
+    return newlySeen;
+}
+
 void rememberVisiblePlayer(
     gdp::entities::EnemyData& enemy,
     const Player& player,
@@ -869,6 +999,8 @@ void rememberVisiblePlayer(
     const float moveSpeed) noexcept
 {
     enemy.lastKnownPlayerPosition = player.state().position;
+    enemy.knowledgeSource = gdp::entities::EnemyKnowledgeSource::DirectSight;
+    enemy.knowledgeAgeSeconds = 0.0F;
     enemy.investigationTime = investigationWindow(
         config, planarDistance, moveSpeed);
     enemy.recoverTime = 0.0F;
@@ -887,6 +1019,13 @@ void shareVisiblePlayerWithAllies(
     }
     const float range = difficulty == Difficulty::Hard ? 12.0F : 7.0F;
     const float memory = difficulty == Difficulty::Hard ? 3.0F : 1.5F;
+    // A report is a coarse observation sent once per visual acquisition.
+    // Recipients must never get a frame-by-frame feed of the Player position.
+    constexpr float reportGrid = 2.0F;
+    const wkc::core::Vec3 reportedPosition{
+        std::round(player.state().position.x / reportGrid) * reportGrid,
+        player.state().position.y,
+        std::round(player.state().position.z / reportGrid) * reportGrid};
     for (const gdp::entities::EntityId id : enemyIds) {
         if (id == observerId) {
             continue;
@@ -901,7 +1040,14 @@ void shareVisiblePlayerWithAllies(
                 observer.transform.position) > range * range) {
             continue;
         }
-        ally->lastKnownPlayerPosition = player.state().position;
+        if (ally->knowledgeSource
+                == gdp::entities::EnemyKnowledgeSource::DirectSight
+            && ally->investigationTime > 0.0F) {
+            continue;
+        }
+        ally->lastKnownPlayerPosition = reportedPosition;
+        ally->knowledgeSource = gdp::entities::EnemyKnowledgeSource::AllyReport;
+        ally->knowledgeAgeSeconds = 0.0F;
         ally->investigationTime = std::max(ally->investigationTime, memory);
         ally->recoverTime = 0.0F;
     }
@@ -960,6 +1106,8 @@ bool updateEnemyRecover(
     if (enemy.recoverTime <= 0.0F || config.recoverDuration <= 0.0F) {
         enemy.recoverTime = 0.0F;
         enemy.lastKnownPlayerPosition = {};
+        enemy.knowledgeSource = gdp::entities::EnemyKnowledgeSource::None;
+        enemy.knowledgeAgeSeconds = 0.0F;
         return false;
     }
 
@@ -1115,6 +1263,9 @@ void updateUnseenEnemy(
     using gdp::entities::EnemyBehaviorState;
     if (!playerAlive) {
         enemy.lastKnownPlayerPosition = {};
+        enemy.knowledgeSource = gdp::entities::EnemyKnowledgeSource::None;
+        enemy.knowledgeAgeSeconds = 0.0F;
+        enemy.directSightPreviousUpdate = false;
         enemy.investigationTime = 0.0F;
         enemy.recoverTime = 0.0F;
         enemy.behavior = EnemyBehaviorState::Idle;
@@ -1141,6 +1292,8 @@ void updateUnseenEnemy(
             return;
         }
         enemy.lastKnownPlayerPosition = {};
+        enemy.knowledgeSource = gdp::entities::EnemyKnowledgeSource::None;
+        enemy.knowledgeAgeSeconds = 0.0F;
     }
     if (updateEnemyRecover(
             manager, enemyIds, collisionWorld, id, roomId, enemy, entity,
@@ -1351,6 +1504,8 @@ bool updateNeuralEnemy(
         && (*outputs)[3] > 0.65F;
     if (tactical && enemy.archetype
             != gdp::entities::EnemyArchetype::Worker
+        && enemy.archetype
+            != gdp::entities::EnemyArchetype::IndustrialRobot
         && perception.projectiles != nullptr && (*outputs)[4] > 0.65F
         && startEnemyReload(enemy, enemy.archetype)) {
         ++summary.reloadsStarted;
@@ -1379,22 +1534,32 @@ bool updateNeuralEnemy(
         enemy.behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
         if (enemy.attackCooldown <= 0.0F) {
-            if (enemy.archetype == gdp::entities::EnemyArchetype::Worker) {
+            if (enemy.archetype == gdp::entities::EnemyArchetype::Worker
+                || (enemy.archetype
+                        == gdp::entities::EnemyArchetype::IndustrialRobot
+                    && referenceEnemyModelsEnabled()
+                    && attackDistance <= 2.25F)) {
                 player.applyDamage(attackDamage);
                 enemy.attackCooldown = attackInterval;
                 ++summary.attacksLanded;
+                markEnemyAttack(enemy, 2U);
             } else if (fireRangedEnemy(entity, enemy, id, player,
                     attackDamage, perception, true, summary,
                     {manager, enemyIds, collisionWorld, step, moveSpeed,
                         collider})) {
-                enemy.attackCooldown = attackInterval;
+                enemy.attackCooldown = rangedAttackInterval(enemy,
+                    attackInterval);
             }
         }
     } else if (requestedSpeed > 0.05F) {
         enemy.behavior = lineOfSight
-            ? EnemyBehaviorState::Chase : EnemyBehaviorState::Patrol;
+            ? EnemyBehaviorState::Chase
+            : cooperative && enemy.investigationTime > 0.0F
+                ? EnemyBehaviorState::Investigate : EnemyBehaviorState::Patrol;
         if (lineOfSight) {
             ++summary.chasing;
+        } else if (enemy.behavior == EnemyBehaviorState::Investigate) {
+            ++summary.investigating;
         } else {
             ++summary.patrolling;
         }
@@ -1536,6 +1701,8 @@ std::size_t alertEnemiesToNoise(
         const bool newlyAlerted = enemy->investigationTime <= 0.0F
             && enemy->alertTime <= 0.0F && enemy->recoverTime <= 0.0F;
         enemy->lastKnownPlayerPosition = stimulus.position;
+        enemy->knowledgeSource = gdp::entities::EnemyKnowledgeSource::Noise;
+        enemy->knowledgeAgeSeconds = 0.0F;
         enemy->investigationTime = investigationWindow(
             investigation, std::sqrt(distanceSquared), moveSpeed);
         enemy->recoverTime = 0.0F;
@@ -1589,6 +1756,8 @@ EnemyUpdateSummary updateWorkers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        advanceEnemyAttackVisual(*enemy, step);
+        advanceEnemyKnowledge(*enemy, step);
         const wkc::core::Vec3 offset = player.state().position - entity->transform.position;
         const wkc::core::Vec3 planarOffset{offset.x, 0.0F, offset.z};
         const float distance = wkc::core::length(planarOffset);
@@ -1596,11 +1765,14 @@ EnemyUpdateSummary updateWorkers(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.0F,
             collisionWorld, perception);
+        const bool newlySeen = noteDirectSight(*enemy, lineOfSight);
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
-            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
-                player, perception.difficulty);
+            if (newlySeen) {
+                shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                    player, perception.difficulty);
+            }
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1638,6 +1810,7 @@ EnemyUpdateSummary updateWorkers(
                 player.applyDamage(config.attackDamage);
                 enemy->attackCooldown = config.attackInterval;
                 ++summary.attacksLanded;
+                markEnemyAttack(*enemy, 2U);
             }
             continue;
         }
@@ -1696,6 +1869,8 @@ EnemyUpdateSummary updateGuards(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        advanceEnemyAttackVisual(*enemy, step);
+        advanceEnemyKnowledge(*enemy, step);
         if (perception.projectiles != nullptr) {
             advanceEnemyReload(*enemy, step);
         }
@@ -1706,11 +1881,14 @@ EnemyUpdateSummary updateGuards(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.35F,
             collisionWorld, perception);
+        const bool newlySeen = noteDirectSight(*enemy, lineOfSight);
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
-            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
-                player, perception.difficulty);
+            if (newlySeen) {
+                shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                    player, perception.difficulty);
+            }
         }
         if (updateNeuralEnemy(manager, enemyIds, id, roomId, *entity, *enemy,
                 player, collisionWorld, step, lineOfSight,
@@ -1830,6 +2008,8 @@ EnemyUpdateSummary updateOfficers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        advanceEnemyAttackVisual(*enemy, step);
+        advanceEnemyKnowledge(*enemy, step);
         if (perception.projectiles != nullptr) {
             advanceEnemyReload(*enemy, step);
         }
@@ -1841,11 +2021,14 @@ EnemyUpdateSummary updateOfficers(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.4F,
             collisionWorld, perception);
+        const bool newlySeen = noteDirectSight(*enemy, lineOfSight);
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
-            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
-                player, perception.difficulty);
+            if (newlySeen) {
+                shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                    player, perception.difficulty);
+            }
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -2002,6 +2185,8 @@ EnemyUpdateSummary updateEngineers(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
+        advanceEnemyAttackVisual(*enemy, step);
+        advanceEnemyKnowledge(*enemy, step);
         if (perception.projectiles != nullptr) {
             advanceEnemyReload(*enemy, step);
         }
@@ -2014,11 +2199,14 @@ EnemyUpdateSummary updateEngineers(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.25F,
             collisionWorld, perception);
+        const bool newlySeen = noteDirectSight(*enemy, lineOfSight);
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, config.moveSpeed);
-            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
-                player, perception.difficulty);
+            if (newlySeen) {
+                shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                    player, perception.difficulty);
+            }
         }
         if (updateEnemyAlert(
                 manager, enemyIds, collisionWorld, id, roomId, *enemy, *entity,
@@ -2249,9 +2437,9 @@ EnemyUpdateSummary updateIndustrialRobots(
         }
 
         enemy->attackCooldown = std::max(0.0F, enemy->attackCooldown - step);
-        if (perception.projectiles != nullptr) {
-            advanceEnemyReload(*enemy, step);
-        }
+        advanceEnemyAttackVisual(*enemy, step);
+        advanceEnemyKnowledge(*enemy, step);
+        advanceEnemyReload(*enemy, step);
         const IndustrialRobotPhase phase
             = industrialRobotPhase(enemy->health, enemy->maximumHealth, config);
         float minimumRange = 0.0F;
@@ -2292,12 +2480,15 @@ EnemyUpdateSummary updateIndustrialRobots(
             *entity, player, distance, config.detectionRange,
             config.investigation.visionHalfAngleDegrees, 1.45F,
             collisionWorld, perception);
+        const bool newlySeen = noteDirectSight(*enemy, lineOfSight);
         const bool firstSight = enemy->investigationTime <= 0.0F;
         if (lineOfSight) {
             rememberVisiblePlayer(
                 *enemy, player, config.investigation, distance, moveSpeed);
-            shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
-                player, perception.difficulty);
+            if (newlySeen) {
+                shareVisiblePlayerWithAllies(manager, enemyIds, id, *entity,
+                    player, perception.difficulty);
+            }
             // Give the player a short reaction window on first sight. The
             // cannon covers the arena while the robot closes to phase range.
             if (firstSight) {
@@ -2321,7 +2512,7 @@ EnemyUpdateSummary updateIndustrialRobots(
                         config.longRangeDamage, perception, false, summary,
                         {manager, enemyIds, collisionWorld, step,
                             moveSpeed, {.radius = 0.52F, .height = 1.9F}})) {
-                    enemy->attackCooldown = config.longRangeAttackInterval;
+                    enemy->attackCooldown = robotShotInterval(*enemy);
                 }
             }
         }
@@ -2384,11 +2575,18 @@ EnemyUpdateSummary updateIndustrialRobots(
             *entity, player.state().position - entity->transform.position,
             step, targetTurnRateDegreesPerSecond);
         if (perception.allowAttacks && enemy->attackCooldown <= 0.0F) {
-            if (fireRangedEnemy(*entity, *enemy, id, player,
+            if (referenceEnemyModelsEnabled()
+                && phase == IndustrialRobotPhase::Pursuit
+                && distance <= config.pursuitAttackRange) {
+                player.applyDamage(attackDamage);
+                enemy->attackCooldown = attackInterval;
+                ++summary.attacksLanded;
+                markEnemyAttack(*enemy, 2U);
+            } else if (fireRangedEnemy(*entity, *enemy, id, player,
                     attackDamage, perception, false, summary,
                     {manager, enemyIds, collisionWorld, step,
                         moveSpeed, {.radius = 0.52F, .height = 1.9F}})) {
-                enemy->attackCooldown = attackInterval;
+                enemy->attackCooldown = robotShotInterval(*enemy);
             }
         }
     }

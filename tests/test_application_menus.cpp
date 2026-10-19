@@ -555,6 +555,41 @@ struct ApplicationMenuTestAccess {
         expect(app.session_.state().mode == gameplay::RunMode::TestMode && app.world_ && app.world_->rooms.size() == 1U
             && app.entities_.query(entities::EntityKind::Enemy).size() == 5U, "Test Mode creates dedicated arena with all enemy types");
         expect(app.weapon_.ownsWeapon(gameplay::WeaponArchetype::Carbine), "arena starts with firearms and knife available");
+        expect(app.equipSequenceRemaining_ > 0.0F
+                && !app.equipOutgoingVisible_
+                && app.presentedWeapon_ == gameplay::WeaponArchetype::Carbine,
+            "arena starts by drawing its Carbine from the primary mount");
+        auto finishEquip = [&] {
+            release();
+            for (unsigned tick = 0U;
+                 tick < 90U && app.equipSequenceRemaining_ > 0.0F; ++tick)
+                app.fixedUpdate(1.0 / 60.0);
+            expect(app.equipSequenceRemaining_ == 0.0F,
+                "equipment presentation finishes in bounded time");
+        };
+        finishEquip();
+        key(Key::Digit2); release(); app.fixedUpdate(1.0 / 60.0);
+        expect(app.weapon_.definition().archetype == gameplay::WeaponArchetype::Pistol
+                && app.equipOutgoingWeapon_ == gameplay::WeaponArchetype::Carbine
+                && app.equipOutgoingVisible_,
+            "switching to pistol first stows the owned primary");
+        const auto pistolAmmoDuringDraw = app.weapon_.magazineAmmo();
+        app.firePending_ = true; release(); app.fixedUpdate(1.0 / 60.0);
+        expect(app.weapon_.magazineAmmo() == pistolAmmoDuringDraw
+                && app.equipSequenceRemaining_ > 0.0F,
+            "trigger during pistol draw cannot fire before the grip is ready");
+        finishEquip();
+        app.grenadeSelected_ = true;
+        release(); app.fixedUpdate(1.0 / 60.0);
+        expect(app.equipOutgoingWeapon_ == gameplay::WeaponArchetype::Pistol
+                && app.presentedGrenade_ && app.equipOutgoingVisible_,
+            "grenade selection first moves the pistol to the right hip");
+        app.firePending_ = true; release(); app.fixedUpdate(1.0 / 60.0);
+        expect(!app.grenadeCook_.active(),
+            "grenade pin stays in place while the grenade is being drawn");
+        app.grenadeSelected_ = false;
+        release(); app.fixedUpdate(1.0 / 60.0);
+        finishEquip();
         unsigned practiceTargets = 0U;
         entities::EntityId nearPracticeTarget{};
         for (const auto id : app.entities_.query(entities::EntityKind::Prop)) {
@@ -617,6 +652,7 @@ struct ApplicationMenuTestAccess {
             key(Key::Digit1); release(); app.fixedUpdate(1.0 / 60.0); app.render();
             expect(app.weapon_.definition().archetype == type && !app.fatalError_,
                 "live primary key and rendering support each new firearm after selecting Knife");
+            finishEquip();
             // Live reload state feeds the new hands, without a second visual clock.
             app.weapon_.fixedUpdate(1.0F);
             expect(app.weapon_.tryFire()==gameplay::FireReadiness::Fired, "primary can fire before hands reload fixture");
@@ -677,6 +713,8 @@ struct ApplicationMenuTestAccess {
                     && app.weapon_.definition().archetype == gameplay::WeaponArchetype::Pistol,
                     "switching away cannot carry scope to the pistol");
                 (void)app.weapon_.switchTo(type); app.weapon_.fixedUpdate(1.0F);
+                release(); app.fixedUpdate(1.0 / 60.0);
+                finishEquip();
                 app.aimBlend_ = 1.0F; app.dropPending_ = true;
                 app.fixedUpdate(1.0 / 60.0);
                 expect(app.aimBlend_ == 0.0F && !app.weapon_.ownsWeapon(type),

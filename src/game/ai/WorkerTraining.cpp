@@ -37,6 +37,8 @@ constexpr std::uint64_t trainingScenarioDomain = 0x41495343454E4554ULL;
 constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
 constexpr std::uint64_t hardCaseScenarioDomain = 0x4149484152444331ULL;
 constexpr std::uint64_t hardCaseScenarioV2Domain = 0x4149484152444332ULL;
+constexpr std::uint64_t perceptionScenarioDomain = 0x4149504552434550ULL;
+constexpr std::uint64_t bossBurstScenarioDomain = 0x4149424F53534252ULL;
 constexpr std::uint64_t cooperativeWorldRetryDomain = 0x4149574F524C4432ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
 constexpr int episodeSteps = 480;
@@ -407,12 +409,17 @@ WorkerFitnessMetrics simulateEpisode(
     const gameplay::EnemyBrainContract contract
         = gameplay::EnemyBrainContract::Tactical,
     const bool hardCase = false,
-    const bool hardCaseV2 = false)
+    const bool hardCaseV2 = false,
+    const bool perceptionEpisode = false)
 {
     const TrainingProfile profile = profileFor(archetype, contract);
     const bool cooperative = contract == gameplay::EnemyBrainContract::Cooperative;
     const TrainingStage stage = static_cast<TrainingStage>(scenario + 1U);
     TrainingScenario plan = scenarioFor(archetype, scenario);
+    if (perceptionEpisode) {
+        plan.player = PlayerPattern::Peek;
+        plan.facingOffsetDegrees = 0.0F;
+    }
     if (hardCase && archetype == EnemyArchetype::Guard
         && stage == TrainingStage::Positioning) {
         plan.player = PlayerPattern::Peek;
@@ -456,7 +463,10 @@ WorkerFitnessMetrics simulateEpisode(
     std::optional<world::World> generatedWorld;
     std::optional<wkc::core::Aabb> realRoomBounds;
     const std::vector<wkc::core::Aabb> stageObstacles
-        = stage == TrainingStage::Locomotion
+        = perceptionEpisode
+            ? std::vector<wkc::core::Aabb>{{{-1.5F, 0.0F, -0.6F},
+                {1.5F, 2.4F, 0.6F}}}
+        : stage == TrainingStage::Locomotion
             ? std::vector<wkc::core::Aabb>{{{-0.75F, 0.0F, 1.4F},
                 {0.75F, 0.75F, 2.3F}}}
         : stage == TrainingStage::Dodge
@@ -533,6 +543,12 @@ WorkerFitnessMetrics simulateEpisode(
     entities::EntityManager manager;
     wkc::core::Vec3 enemyStart = arenaOrigin
         + wkc::core::Vec3{workerX, 0.0F, workerZ};
+    if (perceptionEpisode) {
+        // Begin in view, hide behind an actual occluder, then reappear on the
+        // other side. The policy receives only runtime sight and memory inputs.
+        arenaOrigin = {4.5F, 0.0F, -5.0F};
+        enemyStart = {0.0F, 0.0F, 5.0F};
+    }
     bool corridorSpawn = false;
     std::optional<TrainingEncounter> encounter;
     if (generatedWorld && diverseMaps && (mapVariant > 0U || cooperative)) {
@@ -726,6 +742,9 @@ WorkerFitnessMetrics simulateEpisode(
     float previousStrafeIntent = 0.0F;
     float totalTacticalProgress = 0.0F;
     bool previousNeuralDecision = false;
+    bool previouslyVisible = false;
+    std::optional<wkc::core::Vec3> rememberedTarget;
+    float rememberedDistance = 0.0F;
     const int steps = archetype == EnemyArchetype::IndustrialRobot
         ? bossEpisodeSteps : episodeSteps;
     for (int tick = 0; tick < steps; ++tick) {
@@ -764,6 +783,16 @@ WorkerFitnessMetrics simulateEpisode(
                     ? aimStagePlayerPosition(time, direction)
                     : playerPosition(playerPattern, time, direction,
                         sweep, phase)) + arenaOrigin;
+            if (perceptionEpisode) {
+                // Cross each 4.5 m flank in 0.8 s, below the player's sprint
+                // speed, rather than teleporting through the sight line.
+                const float flank = time < 1.5F ? 4.5F
+                    : time < 2.3F ? 4.5F * (2.3F - time) / 0.8F
+                    : time < 4.5F ? 0.0F
+                    : time < 5.3F ? -4.5F * (time - 4.5F) / 0.8F
+                    : -4.5F;
+                nextPlayerPosition = {flank, 0.0F, -5.0F};
+            }
             if (encounter) {
                 nextPlayerPosition = arenaOrigin;
                 nextPlayerPosition.x += hardCaseV2
@@ -884,6 +913,30 @@ WorkerFitnessMetrics simulateEpisode(
         const bool exposedAfter = gameplay::hasLineOfSight(
             player.cameraPosition(), entity->transform.position
                 + wkc::core::Vec3{0.0F, 1.0F, 0.0F}, arena);
+        if (perceptionEpisode) {
+            const bool visible = gameplay::hasLineOfSight(
+                entity->transform.position + wkc::core::Vec3{0.0F, 1.0F, 0.0F},
+                player.cameraPosition(), arena);
+            if (previouslyVisible && !visible) {
+                ++metrics.sightLostTransitions;
+                rememberedTarget = enemy->lastKnownPlayerPosition;
+                rememberedDistance = planarDistance(
+                    entity->transform.position, *rememberedTarget);
+            }
+            if (!visible && enemy->investigationTime > 0.0F) {
+                ++metrics.hiddenMemoryTicks;
+                if (rememberedTarget) {
+                    metrics.memoryApproachMeters = std::max(
+                        metrics.memoryApproachMeters,
+                        rememberedDistance - planarDistance(
+                            entity->transform.position, *rememberedTarget));
+                }
+            }
+            if (!visible && controlled) {
+                metrics.hiddenShots += static_cast<std::uint32_t>(summary.shotsFired);
+            }
+            previouslyVisible = visible;
+        }
         metrics.exposedSeconds += exposedAfter ? fixedStep : 0.0F;
         metrics.coverSeconds += exposedAfter ? 0.0F : fixedStep;
         metrics.rangeErrorSeconds += rangeError(distance, currentProfile)
@@ -1095,6 +1148,16 @@ struct WorkerEvaluation {
     float hardCaseScore{0.0F};
     float hardCaseDamage{0.0F};
     float hardCaseFriendlyDamage{0.0F};
+    std::uint32_t perceptionEpisodes{0U};
+    std::uint32_t perceptionSightLost{0U};
+    std::uint32_t perceptionMemoryTicks{0U};
+    std::uint32_t perceptionHiddenShots{0U};
+    std::uint32_t bossBurstEpisodes{0U};
+    std::uint32_t bossBurstShots{0U};
+    std::uint32_t bossBurstReloads{0U};
+    float perceptionApproachMeters{0.0F};
+    float perceptionScore{0.0F};
+    float perceptionFriendlyDamage{0.0F};
     bool combatCompetent{true};
 };
 
@@ -1179,6 +1242,10 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.friendlyHits += sample.friendlyHits;
     total.friendlyFireHolds += sample.friendlyFireHolds;
     total.friendlyDamage += sample.friendlyDamage;
+    total.sightLostTransitions += sample.sightLostTransitions;
+    total.hiddenMemoryTicks += sample.hiddenMemoryTicks;
+    total.hiddenShots += sample.hiddenShots;
+    total.memoryApproachMeters += sample.memoryApproachMeters;
 }
 
 WorkerEvaluation evaluateGenome(
@@ -1192,7 +1259,8 @@ WorkerEvaluation evaluateGenome(
     const gameplay::EnemyBrainContract contract
         = gameplay::EnemyBrainContract::Tactical,
     const bool hardCaseCurriculum = false,
-    const bool hardCaseCurriculumV2 = false)
+    const bool hardCaseCurriculumV2 = false,
+    const bool perceptionCurriculum = false)
 {
     WorkerEvaluation evaluation;
     float worst = std::numeric_limits<float>::infinity();
@@ -1303,6 +1371,52 @@ WorkerEvaluation evaluateGenome(
                 + 0.25F * evaluation.hardCaseScore;
             evaluation.worstScenario = std::min(worst, hardCaseWorst);
         }
+    }
+    if (perceptionCurriculum && !holdout
+        && count == scenarioCount) {
+        // The extra episodes have dedicated seed domains. Keep standard
+        // holdout unchanged so it remains a diagnostic, not a selection gate.
+        const WorkerFitnessMetrics lostSight = simulateEpisode(genome,
+            wkc::core::deriveSeed(scenarioSeed, perceptionScenarioDomain, 0U),
+            5U, archetype, false, 0U, 0U, contract,
+            false, false, true);
+        const float memoryCredit = lostSight.sightLostTransitions > 0U
+            && lostSight.hiddenMemoryTicks > 0U
+            ? std::clamp(lostSight.memoryApproachMeters, 0.0F, 1.0F) * 0.4F
+            : 0.0F;
+        const float lostSightScore = scoreCooperativeTrainingStage(lostSight,
+            archetype, TrainingStage::Positioning)
+            + memoryCredit
+            - 0.2F * static_cast<float>(std::min(
+                lostSight.hiddenShots, 3U));
+        evaluation.perceptionEpisodes = 1U;
+        evaluation.perceptionSightLost = lostSight.sightLostTransitions;
+        evaluation.perceptionMemoryTicks = lostSight.hiddenMemoryTicks;
+        evaluation.perceptionHiddenShots = lostSight.hiddenShots;
+        evaluation.perceptionApproachMeters = lostSight.memoryApproachMeters;
+        evaluation.perceptionFriendlyDamage = lostSight.friendlyDamage;
+        evaluation.perceptionScore = lostSightScore;
+        addMetrics(evaluation.metrics, lostSight);
+        if (archetype == EnemyArchetype::IndustrialRobot) {
+            // Full-health Boss, long open lane, two aides, current magazine and
+            // reload behavior. This is an extra stress case, not a new brain
+            // input or a promise that a reload occurs before the episode ends.
+            const WorkerFitnessMetrics burst = simulateEpisode(genome,
+                wkc::core::deriveSeed(scenarioSeed, bossBurstScenarioDomain, 0U),
+                6U, archetype, true, 0U, 0U, contract);
+            const float burstScore = scoreCooperativeTrainingStage(burst,
+                archetype, TrainingStage::RealMaps);
+            evaluation.bossBurstEpisodes = 1U;
+            evaluation.bossBurstShots = burst.shotsFired;
+            evaluation.bossBurstReloads = burst.reloadsStarted;
+            evaluation.perceptionScore = (lostSightScore + burstScore) * 0.5F;
+            evaluation.perceptionFriendlyDamage += burst.friendlyDamage;
+            addMetrics(evaluation.metrics, burst);
+        }
+        evaluation.score = 0.75F * evaluation.score
+            + 0.25F * evaluation.perceptionScore;
+        evaluation.worstScenario = std::min(
+            evaluation.worstScenario, evaluation.perceptionScore);
     }
     // A melee attacker or Engineer that never participates in a representative
     // share of the combat stages must not beat a risky but useful policy by
@@ -1499,6 +1613,14 @@ WorkerTrainingResult runEnemyTraining(
             "--all-scenarios and --diverse-maps, without v1";
         return result;
     }
+    if (options.perceptionCurriculum
+        && (options.hardCaseCurriculum || options.hardCaseCurriculumV2
+            || options.brainContract != gameplay::EnemyBrainContract::Cooperative
+            || !options.trainAllScenarios || !options.diverseMaps)) {
+        result.error = "perception curriculum requires cooperative brain, "
+            "--all-scenarios and --diverse-maps, without hard-case flags";
+        return result;
+    }
     try {
         wkc::core::Seed seed = options.seed;
         std::optional<persistence::EnemyBrainRecord> resume;
@@ -1506,7 +1628,8 @@ WorkerTrainingResult runEnemyTraining(
         std::uint32_t firstGeneration = 1U;
         const bool cooperative
             = options.brainContract == gameplay::EnemyBrainContract::Cooperative;
-        const std::uint32_t curriculum = options.hardCaseCurriculumV2 ? 21U
+        const std::uint32_t curriculum = options.perceptionCurriculum ? 22U
+            : options.hardCaseCurriculumV2 ? 21U
             : options.hardCaseCurriculum ? 20U
             : cooperative
                 ? (options.diverseMaps
@@ -1624,6 +1747,7 @@ WorkerTrainingResult runEnemyTraining(
                << " curriculum=" << curriculum
                << " hard_case_curriculum=" << options.hardCaseCurriculum
                << " hard_case_curriculum_v2=" << options.hardCaseCurriculumV2
+               << " perception_curriculum=" << options.perceptionCurriculum
                << " resume_population=" << static_cast<bool>(fullResume)
                << " stage_immigrants=2"
                << " runtime_control_all=1"
@@ -1679,7 +1803,8 @@ WorkerTrainingResult runEnemyTraining(
                     false, options.trainAllScenarios, unlockedStages,
                     options.diverseMaps, options.brainContract,
                     options.hardCaseCurriculum,
-                    options.hardCaseCurriculumV2).score;
+                    options.hardCaseCurriculumV2,
+                    options.perceptionCurriculum).score;
                 total += genome.fitness;
             }
             std::sort(population.begin(), population.end(),
@@ -1699,7 +1824,8 @@ WorkerTrainingResult runEnemyTraining(
                     options.archetype, false, options.trainAllScenarios, scenarioCount,
                     options.diverseMaps, options.brainContract,
                     options.hardCaseCurriculum,
-                    options.hardCaseCurriculumV2);
+                    options.hardCaseCurriculumV2,
+                    options.perceptionCurriculum);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
                    << " scenario_seed=" << generationScenarios
@@ -1796,6 +1922,26 @@ WorkerTrainingResult runEnemyTraining(
                    << " hard_case_score=" << bestEvaluation.hardCaseScore
                    << " hard_case_friendly_damage="
                    << bestEvaluation.hardCaseFriendlyDamage;
+            output << " perception_episodes="
+                   << bestEvaluation.perceptionEpisodes
+                   << " perception_sight_lost="
+                   << bestEvaluation.perceptionSightLost
+                   << " perception_memory_ticks="
+                   << bestEvaluation.perceptionMemoryTicks
+                   << " perception_hidden_shots="
+                   << bestEvaluation.perceptionHiddenShots
+                   << " perception_approach_m="
+                   << bestEvaluation.perceptionApproachMeters
+                   << " perception_friendly_damage="
+                   << bestEvaluation.perceptionFriendlyDamage
+                   << " perception_score="
+                   << bestEvaluation.perceptionScore
+                   << " boss_burst_episodes="
+                   << bestEvaluation.bossBurstEpisodes
+                   << " boss_burst_shots="
+                   << bestEvaluation.bossBurstShots
+                   << " boss_burst_reloads="
+                   << bestEvaluation.bossBurstReloads;
             output << '\n';
             if (options.saveDirectory) {
                 const std::filesystem::path path

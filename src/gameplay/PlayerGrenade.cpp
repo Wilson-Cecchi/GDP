@@ -4,6 +4,7 @@
 #include "gameplay/Props.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 
@@ -83,6 +84,45 @@ std::optional<EnemyContact> sweptEnemyContact(
     return EnemyContact{entry, normal};
 }
 
+std::optional<EnemyContact> sweptReferenceEnemyContact(
+    const wkc::core::Vec3 start, const wkc::core::Vec3 end,
+    const entities::Entity& entity,
+    const entities::EnemyData& enemy) noexcept
+{
+    const wkc::core::Vec3 movement = end - start;
+    const float distance = wkc::core::length(movement);
+    if (distance <= 1.0e-6F
+        || referenceEnemyBodyContainsPoint(start, entity, enemy, grenadeRadius)) {
+        return std::nullopt;
+    }
+    const int samples = std::max(1, static_cast<int>(
+        std::ceil(distance / 0.04F)));
+    float previous = 0.0F;
+    for (int sample = 1; sample <= samples; ++sample) {
+        const float fraction = static_cast<float>(sample)
+            / static_cast<float>(samples);
+        if (referenceEnemyBodyContainsPoint(start + movement * fraction,
+                entity, enemy, grenadeRadius)) {
+            float outside = previous;
+            float inside = fraction;
+            for (int iteration = 0; iteration < 6; ++iteration) {
+                const float midpoint = (outside + inside) * 0.5F;
+                if (referenceEnemyBodyContainsPoint(start + movement * midpoint,
+                        entity, enemy, grenadeRadius)) {
+                    inside = midpoint;
+                } else {
+                    outside = midpoint;
+                }
+            }
+            // A swept contact has a defined incoming direction. Reversing that
+            // direction gives a stable approximate normal on segmented bodies.
+            return EnemyContact{inside, movement * (-1.0F / distance)};
+        }
+        previous = fraction;
+    }
+    return std::nullopt;
+}
+
 std::optional<EnemyContact> firstEnemyContact(
     const PlayerGrenade& grenade, const wkc::core::Vec3 start,
     const wkc::core::Vec3 end, const entities::EntityManager& entities)
@@ -94,11 +134,16 @@ std::optional<EnemyContact> firstEnemyContact(
         if (!entity || !enemy || !enemy->active || enemy->health <= 0.0F
             || enemy->behavior == entities::EnemyBehaviorState::Dead
             || !allowedRoom(grenade, entity->roomId)) continue;
-        const bool robot = enemy->archetype
-            == entities::EnemyArchetype::IndustrialRobot;
-        const auto contact = sweptEnemyContact(start, end,
-            entity->transform.position, robot ? 0.52F : 0.35F,
-            robot ? 1.9F : 1.8F);
+        std::optional<EnemyContact> contact;
+        if (referenceEnemyHitboxesEnabled()) {
+            contact = sweptReferenceEnemyContact(start, end, *entity, *enemy);
+        } else {
+            const bool robot = enemy->archetype
+                == entities::EnemyArchetype::IndustrialRobot;
+            contact = sweptEnemyContact(start, end,
+                entity->transform.position, robot ? 0.52F : 0.35F,
+                robot ? 1.9F : 1.8F);
+        }
         if (contact && (!nearest || contact->fraction < nearest->fraction))
             nearest = contact;
     }
@@ -110,6 +155,36 @@ float blastDamage(const wkc::core::Vec3 origin,
 {
     const float distance = wkc::core::length(target - origin);
     return maximum * std::clamp(1.0F - distance / grenadeBlastRadius, 0.0F, 1.0F);
+}
+
+float referenceEnemyBlastDamage(const wkc::core::Vec3 origin,
+    const entities::Entity& entity, const entities::EnemyData& enemy,
+    const CollisionWorld& collision) noexcept
+{
+    const bool robot = enemy.archetype
+        == entities::EnemyArchetype::IndustrialRobot;
+    const std::array<wkc::core::Vec3, 4> bodySamples{{
+        {0.0F, robot ? 1.20F : 1.05F, 0.10F},
+        {0.0F, robot ? 2.03F : 1.65F, 0.12F},
+        {-0.18F, 0.45F, 0.05F},
+        {0.18F, 0.45F, 0.05F},
+    }};
+    const float yaw = entity.transform.rotationDegrees.y
+        * 0.01745329251994329577F;
+    const float cosine = std::cos(yaw);
+    const float sine = std::sin(yaw);
+    float damage = 0.0F;
+    for (const auto local : bodySamples) {
+        const wkc::core::Vec3 point = entity.transform.position
+            + wkc::core::Vec3{
+                cosine * local.x + sine * local.z, local.y,
+                -sine * local.x + cosine * local.z};
+        if (referenceEnemyBodyContainsPoint(point, entity, enemy)
+            && hasLineOfSight(origin, point, collision)) {
+            damage = std::max(damage, blastDamage(origin, point, 100.0F));
+        }
+    }
+    return damage;
 }
 
 } // namespace
@@ -270,10 +345,17 @@ GrenadeBlastResult resolveGrenadeBlast(
         if (!entity || !enemy || !enemy->active
             || enemy->behavior == entities::EnemyBehaviorState::Dead
             || !allowedRoom(blast, entity->roomId)) continue;
-        const auto target = entity->transform.position
-            + wkc::core::Vec3{0.0F, 0.9F, 0.0F};
-        const float damage = blastDamage(origin, target, 100.0F);
-        if (damage <= 0.0F || !hasLineOfSight(origin, target, blast.collision)) continue;
+        float damage = 0.0F;
+        if (referenceEnemyHitboxesEnabled()) {
+            damage = referenceEnemyBlastDamage(origin, *entity, *enemy,
+                blast.collision);
+        } else {
+            const auto target = entity->transform.position
+                + wkc::core::Vec3{0.0F, 0.9F, 0.0F};
+            damage = blastDamage(origin, target, 100.0F);
+            if (!hasLineOfSight(origin, target, blast.collision)) continue;
+        }
+        if (damage <= 0.0F) continue;
         const auto outcome = applyDamage(entities, id, damage);
         if (outcome != DamageOutcome::Ignored)
             result.hits.push_back({id, outcome == DamageOutcome::Killed, false, {}});

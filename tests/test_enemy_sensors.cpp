@@ -1,15 +1,18 @@
 #include "gameplay/Enemy.hpp"
 #include "gameplay/EnemySensors.hpp"
 #include "gameplay/EnemyProjectile.hpp"
+#include "gameplay/PlayerGrenade.hpp"
 
 #include <algorithm>
 #include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -23,6 +26,41 @@ void expect(const bool condition, const std::string_view message)
         ++failures;
     }
 }
+
+class ReferenceModelsForTest {
+public:
+    ReferenceModelsForTest()
+    {
+        const char* current = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+        hadPrevious_ = current != nullptr;
+        if (current != nullptr) previous_ = current;
+#if defined(_WIN32)
+        expect(_putenv_s("GDP_ENEMY_REFERENCE_MODELS", "1") == 0,
+            "reference models can be enabled for tests");
+#else
+        expect(setenv("GDP_ENEMY_REFERENCE_MODELS", "1", 1) == 0,
+            "reference models can be enabled for tests");
+#endif
+    }
+
+    ~ReferenceModelsForTest()
+    {
+#if defined(_WIN32)
+        expect(_putenv_s("GDP_ENEMY_REFERENCE_MODELS",
+                   hadPrevious_ ? previous_.c_str() : "") == 0,
+            "reference model environment restores after tests");
+#else
+        expect((hadPrevious_
+                    ? setenv("GDP_ENEMY_REFERENCE_MODELS", previous_.c_str(), 1)
+                    : unsetenv("GDP_ENEMY_REFERENCE_MODELS")) == 0,
+            "reference model environment restores after tests");
+#endif
+    }
+
+private:
+    std::string previous_{};
+    bool hadPrevious_{false};
+};
 
 float sensor(
     const gdp::gameplay::EnemySensorValues& values,
@@ -861,6 +899,289 @@ void testRangedEnemyFiresDelayedProjectile()
         "enemy shot damages only after traveling to the player");
 }
 
+void testBossProjectileBreaksCover()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F},
+        {8.0F, 4.0F, 8.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId boss = manager.createEnemy({
+        .transform = {.position = {4.0F, 0.0F, 4.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::IndustrialRobot});
+    const EntityId guard = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 4.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EntityId crate = manager.createProp({
+        .transform = {.position = {0.0F, 0.0F, 2.0F}},
+        .roomId = 1U, .type = PropType::Crate, .solid = true,
+        .health = 10.0F, .maximumHealth = 10.0F,
+        .dropType = ItemType::Ammo, .dropQuantity = 1U});
+    const auto fire = [&](const EntityId source, const CollisionWorld& world) {
+        const EnemyProjectile shot{{0.0F, 1.0F, 4.0F},
+            {0.0F, 0.0F, -20.0F}, source, 1U, 6.0F, 1.0F,
+            false, false, 4.0F};
+        EnemyProjectileSystem projectiles;
+        projectiles.spawn(std::span{&shot, 1U});
+        return projectiles.update(0.25F, player, world, manager);
+    };
+    const auto guardImpact = fire(guard, room);
+    expect(guardImpact.size() == 1U && guardImpact[0].hitProp == crate
+            && manager.findData<PropData>(crate)->health == 10.0F,
+        "ordinary enemy bullets stop at cover without breaking it");
+    manager.find(guard)->transform.position.x = 4.0F;
+    manager.find(boss)->transform.position.x = 0.0F;
+    const EntityId ally = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 3.3F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    const auto allyImpact = fire(boss, room);
+    expect(allyImpact.size() == 1U && allyImpact[0].hitEnemy == ally
+            && manager.findData<PropData>(crate)->health == 10.0F,
+        "an ally between Boss and cover takes the physical projectile first");
+    manager.find(ally)->transform.position.x = 4.0F;
+    const CollisionWorld wallBeforeCrate{{{-8.0F, 0.0F, -8.0F},
+        {8.0F, 4.0F, 8.0F}},
+        {{{-1.0F, 0.0F, 3.0F}, {1.0F, 2.0F, 3.2F}}}};
+    const auto wallImpact = fire(boss, wallBeforeCrate);
+    expect(wallImpact.size() == 1U && wallImpact[0].blocked
+            && !wallImpact[0].hitProp.isValid()
+            && manager.findData<PropData>(crate)->health == 10.0F,
+        "a wall protects the crate from the Boss projectile");
+    const auto first = fire(boss, room);
+    const auto second = fire(boss, room);
+    expect(first.size() == 1U && first[0].hitProp == crate
+            && !first[0].destroyedProp
+            && second.size() == 1U && second[0].hitProp == crate
+            && second[0].destroyedProp && second[0].spawnedDrop.isValid()
+            && manager.findData<PropData>(crate)->state == PropState::Destroyed,
+        "two Boss bullets damage then destroy the crate and produce one drop");
+    const auto afterDestruction = fire(boss, room);
+    expect(afterDestruction.size() == 1U && afterDestruction[0].hitPlayer
+            && manager.query(EntityKind::Item).size() == 1U,
+        "the next bullet passes destroyed cover without duplicating its drop");
+    const EntityId terminal = manager.createProp({
+        .transform = {.position = {0.0F, 0.0F, 2.0F}},
+        .roomId = 1U, .type = PropType::Terminal, .solid = true,
+        .maximumHealth = 0.0F});
+    const auto protectedImpact = fire(boss, room);
+    expect(protectedImpact.size() == 1U
+            && protectedImpact[0].hitProp == terminal
+            && !protectedImpact[0].destroyedProp
+            && manager.findData<PropData>(terminal)->state != PropState::Destroyed,
+        "protected terminal absorbs Boss bullets without being destroyed");
+
+    EntityManager adjacent;
+    const EntityId distantBoss = adjacent.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 8.0F}},
+        .roomId = 2U, .archetype = EnemyArchetype::IndustrialRobot});
+    const EntityId distantCrate = adjacent.createProp({
+        .transform = {.position = {0.0F, 0.0F, 6.0F}},
+        .roomId = 2U, .type = PropType::Crate, .solid = true,
+        .health = 10.0F, .maximumHealth = 10.0F});
+    const CollisionWorld openRooms = CollisionWorld::fromWalkableVolumes({
+        {{-8.0F, 0.0F, -4.0F}, {8.0F, 4.0F, 4.0F}},
+        {{-8.0F, 0.0F, 4.0F}, {8.0F, 4.0F, 10.0F}}});
+    const EnemyProjectile acrossDoor{{0.0F, 1.0F, 8.0F},
+        {0.0F, 0.0F, -20.0F}, distantBoss, 2U, 6.0F, 1.0F,
+        false, false, 8.0F};
+    EnemyProjectileSystem across;
+    across.spawn(std::span{&acrossDoor, 1U});
+    const auto openImpact = across.update(0.25F, player, openRooms, adjacent);
+    expect(openImpact.size() == 1U && openImpact[0].hitProp == distantCrate
+            && adjacent.findData<PropData>(distantCrate)->health == 4.0F,
+        "Boss bullet can damage cover in its adjacent source room");
+    const CollisionWorld shutDoor = CollisionWorld::fromWalkableVolumes({
+        {{-8.0F, 0.0F, -4.0F}, {8.0F, 4.0F, 4.0F}},
+        {{-8.0F, 0.0F, 4.0F}, {8.0F, 4.0F, 10.0F}}},
+        {{{-1.0F, 0.0F, 7.0F}, {1.0F, 3.0F, 7.2F}}});
+    across.spawn(std::span{&acrossDoor, 1U});
+    const auto closedImpact = across.update(0.25F, player, shutDoor, adjacent);
+    expect(closedImpact.size() == 1U && closedImpact[0].blocked
+            && !closedImpact[0].hitProp.isValid()
+            && adjacent.findData<PropData>(distantCrate)->health == 4.0F,
+        "closed door stops a Boss bullet before adjacent-room cover");
+}
+
+void testReferenceProjectileBodiesAndGrenade()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    ReferenceModelsForTest preview;
+    const CollisionWorld arena{{{-10.0F, 0.0F, -10.0F},
+        {10.0F, 5.0F, 10.0F}}};
+    Player player;
+    player.spawn({5.0F, 0.0F, 5.0F});
+    EntityManager manager;
+    const EntityId shooter = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 4.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    const EntityId boss = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 2.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 1000.0F});
+    const EnemyProjectile headShot{{0.0F, 2.05F, 4.0F},
+        {0.0F, 0.0F, -20.0F}, shooter, 1U, 8.0F, 0.8F,
+        false, false, 4.0F};
+    expect(allyInEnemyFireLane(manager, shooter, headShot.position,
+            headShot.velocity, 4.0F),
+        "visible Boss head blocks an ally's firing lane");
+    EnemyProjectileSystem shots;
+    shots.spawn(std::span{&headShot, 1U});
+    std::vector<EnemyProjectileEvent> events;
+    for (int tick = 0; tick < 30 && events.empty(); ++tick)
+        events = shots.update(1.0F / 60.0F, player, arena, manager);
+    expect(events.size() == 1U && events[0].hitEnemy == boss
+            && manager.findData<EnemyData>(boss)->health == 992.0F,
+        "enemy projectile hits Boss head above legacy collider height");
+
+    const EnemyProjectile gearMiss{{0.0F, 2.36F, 4.0F},
+        {0.0F, 0.0F, -20.0F}, shooter, 1U, 8.0F, 0.8F,
+        false, false, 4.0F};
+    expect(!allyInEnemyFireLane(manager, shooter, gearMiss.position,
+            gearMiss.velocity, 4.0F),
+        "rear equipment above Boss head does not block a firing lane");
+    shots.spawn(std::span{&gearMiss, 1U});
+    for (int tick = 0; tick < 30; ++tick)
+        (void)shots.update(1.0F / 60.0F, player, arena, manager);
+    expect(manager.findData<EnemyData>(boss)->health == 992.0F,
+        "enemy projectile through upper rear equipment does not deal damage");
+
+    manager.find(boss)->transform.rotationDegrees.y = 90.0F;
+    const EnemyProjectile sideHead{{3.0F, 2.05F, 2.0F},
+        {-20.0F, 0.0F, 0.0F}, shooter, 1U, 8.0F, 0.8F,
+        false, false, 4.0F};
+    shots.spawn(std::span{&sideHead, 1U});
+    events.clear();
+    for (int tick = 0; tick < 30 && events.empty(); ++tick)
+        events = shots.update(1.0F / 60.0F, player, arena, manager);
+    expect(events.size() == 1U && events[0].hitEnemy == boss,
+        "projectile collision follows Boss head when yaw is 90 degrees");
+
+    manager.find(boss)->transform.rotationDegrees.y = 0.0F;
+    manager.find(boss)->transform.position = {0.0F, 0.0F, 1.0F};
+    PlayerGrenadeSystem grenades;
+    expect(grenades.throwGrenade({0.0F, 2.05F, 0.0F},
+            {0.0F, 0.0F, 1.0F}, grenadeMaximumChargeSeconds,
+            1U, arena), "grenade can be thrown toward Boss visible head");
+    (void)grenades.update(0.05F, manager);
+    expect(!grenades.grenades().empty()
+            && grenades.grenades().front().velocity.z < 0.0F,
+        "thrown grenade bounces off the visible Boss head");
+
+    Player blastTarget;
+    blastTarget.spawn({5.0F, 0.0F, 5.0F});
+    const float beforeBlast = manager.findData<EnemyData>(boss)->health;
+    const auto blast = resolveGrenadeBlast(
+        {{0.0F, 1.95F, 0.0F}, 1U, arena, {}}, blastTarget, manager);
+    expect(!blast.hits.empty()
+            && manager.findData<EnemyData>(boss)->health < beforeBlast,
+        "grenade explosion damages visible Boss body above legacy height");
+}
+
+void testReferenceMuzzlesAndMeleeHands()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    ReferenceModelsForTest preview;
+    const CollisionWorld arena{{{-20.0F, 0.0F, -20.0F},
+        {20.0F, 5.0F, 20.0F}}};
+    struct MuzzleCase {
+        EnemyArchetype role;
+        wkc::core::Vec3 local;
+        float distance;
+    };
+    constexpr std::array<MuzzleCase, 4> muzzles{{
+        {EnemyArchetype::Guard, {-.176F, 1.403F, 1.140F}, 6.0F},
+        {EnemyArchetype::Officer, {-.431F, 1.267F, .889F}, 8.0F},
+        {EnemyArchetype::Engineer, {-.404F, 1.329F, 1.063F}, 5.0F},
+        {EnemyArchetype::IndustrialRobot, {-.679F, .998F, .699F}, 10.0F},
+    }};
+    for (const auto muzzle : muzzles) {
+        for (const float yaw : {0.0F, 90.0F, 180.0F}) {
+            EntityManager manager;
+            Player player;
+            const float radians = yaw * 0.01745329251994329577F;
+            player.spawn({std::sin(radians) * muzzle.distance, 0.0F,
+                std::cos(radians) * muzzle.distance});
+            const EntityId id = manager.createEnemy({
+                .transform = {.position = {0.0F, 0.0F, 0.0F},
+                    .rotationDegrees = {0.0F, yaw, 0.0F}},
+                .roomId = 1U, .archetype = muzzle.role,
+                .health = 1000.0F});
+            std::vector<EnemyProjectile> projectiles;
+            const EnemyPerception perception{.projectiles = &projectiles};
+            for (int tick = 0; tick < 150 && projectiles.empty(); ++tick) {
+                switch (muzzle.role) {
+                case EnemyArchetype::Guard:
+                    (void)updateGuards(manager, player, 1U, arena,
+                        1.0F / 60.0F, {}, perception);
+                    break;
+                case EnemyArchetype::Officer:
+                    (void)updateOfficers(manager, player, 1U, arena,
+                        1.0F / 60.0F, {}, perception);
+                    break;
+                case EnemyArchetype::Engineer:
+                    (void)updateEngineers(manager, player, 1U, arena,
+                        1.0F / 60.0F, {}, perception);
+                    break;
+                case EnemyArchetype::IndustrialRobot:
+                    (void)updateIndustrialRobots(manager, player, 1U, arena,
+                        1.0F / 60.0F, {}, perception);
+                    break;
+                case EnemyArchetype::Worker: break;
+                }
+            }
+            expect(projectiles.size() == 1U,
+                "each armed enemy fires a projectile in the reference preview");
+            if (projectiles.empty()) continue;
+            const auto& transform = manager.find(id)->transform;
+            const float finalYaw = transform.rotationDegrees.y
+                * 0.01745329251994329577F;
+            const auto expected = transform.position + wkc::core::Vec3{
+                std::cos(finalYaw) * muzzle.local.x
+                    + std::sin(finalYaw) * muzzle.local.z,
+                muzzle.local.y,
+                -std::sin(finalYaw) * muzzle.local.x
+                    + std::cos(finalYaw) * muzzle.local.z};
+            expect(wkc::core::length(projectiles.front().position - expected)
+                    < 0.001F
+                    && manager.findData<EnemyData>(id)->lastAttackKind == 1U,
+                "ranged shot starts at its weapon socket after yaw rotation");
+        }
+    }
+
+    EntityManager bossManager;
+    Player nearby;
+    nearby.spawn({0.0F, 0.0F, 1.8F});
+    const EntityId boss = bossManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::IndustrialRobot,
+        .health = 1000.0F});
+    bossManager.findData<EnemyData>(boss)->health = 200.0F;
+    std::vector<EnemyProjectile> shots;
+    IndustrialRobotConfig closeConfig;
+    closeConfig.cannonReadySeconds = 0.0F;
+    (void)updateIndustrialRobots(bossManager, nearby, 1U, arena,
+        0.1F, closeConfig, {.projectiles = &shots});
+    expect(nearby.state().health < 100.0F && shots.empty()
+            && bossManager.findData<EnemyData>(boss)->lastAttackKind == 2U,
+        "Boss in Pursuit strikes with its hand at close range");
+
+    EntityManager workerManager;
+    Player victim;
+    victim.spawn({0.0F, 0.0F, 0.0F});
+    const EntityId worker = workerManager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 1.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Worker});
+    (void)updateWorkers(workerManager, victim, 1U, arena, 0.1F);
+    expect(victim.state().health < 100.0F
+            && workerManager.findData<EnemyData>(worker)->lastAttackKind == 2U,
+        "Worker contact attack is marked as a hand strike");
+}
+
 // Manual profile only. Both simulations use identical geometry and tick counts;
 // the single noise stimulus is the only difference at their starting state.
 void profileGrenadeAlert()
@@ -1033,5 +1354,8 @@ int main(const int argc, char* argv[])
     testEnemyFriendlyFire();
     testDifficultyAndFireDiscipline();
     testRangedEnemyFiresDelayedProjectile();
+    testBossProjectileBreaksCover();
+    testReferenceProjectileBodiesAndGrenade();
+    testReferenceMuzzlesAndMeleeHands();
     return failures == 0 ? 0 : 1;
 }

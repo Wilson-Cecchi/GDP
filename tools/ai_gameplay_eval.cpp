@@ -51,6 +51,10 @@ struct EvaluationOptions {
     std::uint32_t frames{360U};
     bool duel{false};
     bool team{false};
+    bool teamAttributed{false};
+    bool investigation{false};
+    std::size_t investigationRole{1U}; // Guard is the default smoke fixture.
+    bool investigationRoleSpecified{false};
 };
 
 struct ScenarioResult {
@@ -94,6 +98,9 @@ struct TeamResult {
         std::size_t shots{0U};
         std::size_t playerHits{0U};
         std::size_t fireHolds{0U};
+        std::size_t friendlyHits{0U};
+        std::size_t friendlyKills{0U};
+        float friendlyDamage{0.0F};
     };
 
     std::string_view outcome{"timeout"};
@@ -124,6 +131,31 @@ struct TeamResult {
     std::array<RoleTelemetry, 3> roles{};
 };
 
+struct InvestigationResult {
+    std::uint32_t elapsedFrames{0U};
+    std::uint32_t firstObserverSightFrame{0U};
+    std::uint32_t firstAllyReportFrame{0U};
+    std::size_t observerSightFrames{0U};
+    std::size_t allySightFrames{0U};
+    std::size_t observerInvestigateFrames{0U};
+    std::size_t allyInvestigateFrames{0U};
+    std::size_t observerRecoverFrames{0U};
+    std::size_t allyRecoverFrames{0U};
+    float observerTravel{0.0F};
+    float allyTravel{0.0F};
+    gdp::entities::EnemyKnowledgeSource allySourceAtReport{
+        gdp::entities::EnemyKnowledgeSource::None};
+    gdp::entities::EnemyKnowledgeSource allySourceFinal{
+        gdp::entities::EnemyKnowledgeSource::None};
+    float maxAllyKnowledgeAgeSeconds{0.0F};
+    float allyReportError{0.0F};
+    float allyHiddenPlayerError{0.0F};
+    std::size_t reportRefreshesWithoutReacquisition{0U};
+    std::size_t unseenTargetUpdates{0U};
+    std::size_t hiddenVisualContacts{0U};
+    std::uint64_t neuralTicks{0U};
+};
+
 // Projectile events retain the firing entity, including after that enemy dies.
 // Team fixtures have one entity per role, so the source is unambiguous.
 template <std::size_t Count>
@@ -131,24 +163,34 @@ void attributeTeamProjectileHit(TeamResult& result,
     const std::array<EntityId, Count>& ids,
     const gdp::gameplay::EnemyProjectileEvent& event)
 {
-    if (!event.hitPlayer) {
-        return;
-    }
     const auto source = std::find(ids.begin(), ids.end(), event.source);
     if (source != ids.end()) {
-        ++result.roles[static_cast<std::size_t>(source - ids.begin())].playerHits;
+        auto& role = result.roles[static_cast<std::size_t>(source - ids.begin())];
+        if (event.hitPlayer) {
+            ++role.playerHits;
+        }
+        if (event.hitEnemy.isValid()) {
+            ++role.friendlyHits;
+            role.friendlyKills += event.killedEnemy ? 1U : 0U;
+            role.friendlyDamage += event.damageApplied;
+        }
     }
 }
 
 void printUsage()
 {
     std::cout << "Usage: gdp_ai_gameplay_eval [--brain-dir DIR]"
-                 " [--brain TYPE=FILE] [--seed N] [--frames N] [--duel|--team]\n"
+                 " [--brain TYPE=FILE] [--seed N] [--frames N]"
+                 " [--duel|--team|--team-attributed|--investigation"
+                 " [--investigation-role TYPE]]\n"
                  "Compares scripted and trained enemy AI in deterministic combat"
                  " fixtures built inside generated Start/Boss rooms.\n"
                  "--duel adds player hitscan and physics-based ground/Bhop movement.\n"
                  "--team evaluates mixed-role fights and friendly-fire telemetry,"
-                 " including a protocol-2 Boss/helper arena fixture.\n";
+                 " including a protocol-2 Boss/helper arena fixture.\n"
+                 "--team-attributed adds protocol-3 per-shooter friendly-fire telemetry.\n"
+                 "--investigation evaluates a sighting, ally report and"
+                 " occluded search for one TYPE in a separate CSV schema.\n";
 }
 
 std::optional<std::uint64_t> parseUnsigned(const std::string_view text)
@@ -189,6 +231,15 @@ std::optional<EvaluationOptions> parseOptions(const int argc, char* argv[])
             options.team = true;
             continue;
         }
+        if (argument == "--team-attributed") {
+            options.team = true;
+            options.teamAttributed = true;
+            continue;
+        }
+        if (argument == "--investigation") {
+            options.investigation = true;
+            continue;
+        }
         if (index + 1 >= argc) {
             std::cerr << "Missing value for " << argument << '\n';
             return std::nullopt;
@@ -196,6 +247,14 @@ std::optional<EvaluationOptions> parseOptions(const int argc, char* argv[])
         const std::string_view value{argv[++index]};
         if (argument == "--brain-dir") {
             options.brainDirectory = value;
+        } else if (argument == "--investigation-role") {
+            const auto type = archetypeIndex(value);
+            if (!type || options.investigationRoleSpecified) {
+                std::cerr << "Expected one --investigation-role TYPE\n";
+                return std::nullopt;
+            }
+            options.investigationRole = *type;
+            options.investigationRoleSpecified = true;
         } else if (argument == "--brain") {
             const std::size_t separator = value.find('=');
             const auto type = archetypeIndex(value.substr(0U, separator));
@@ -224,8 +283,14 @@ std::optional<EvaluationOptions> parseOptions(const int argc, char* argv[])
             return std::nullopt;
         }
     }
-    if (options.duel && options.team) {
-        std::cerr << "Choose --duel or --team, not both\n";
+    if (static_cast<unsigned>(options.duel)
+            + static_cast<unsigned>(options.team)
+            + static_cast<unsigned>(options.investigation) > 1U) {
+        std::cerr << "Choose --duel, --team or --investigation\n";
+        return std::nullopt;
+    }
+    if (options.investigationRoleSpecified && !options.investigation) {
+        std::cerr << "--investigation-role requires --investigation\n";
         return std::nullopt;
     }
     return options;
@@ -987,13 +1052,218 @@ std::optional<TeamResult> runTeamScenario(
     return result;
 }
 
+std::optional<InvestigationResult> runInvestigationScenario(
+    const gdp::world::World& world,
+    const EnemyArchetype archetype,
+    const bool neural,
+    const gdp::persistence::EnemyBrainRecord& record,
+    const std::uint32_t frames)
+{
+    using namespace gdp;
+    const world::RoomInstance* const room = roomFor(
+        world, EnemyArchetype::IndustrialRobot);
+    if (room == nullptr) {
+        return std::nullopt;
+    }
+    const Vec3 center = (room->worldBounds.minimum
+        + room->worldBounds.maximum) * 0.5F;
+    const float floor = room->worldBounds.minimum.y;
+    const Vec3 sighting{center.x - 3.5F, floor, center.z - 1.0F};
+    const Vec3 hidden{center.x - 2.0F, floor, center.z - 5.0F};
+    const std::array<Vec3, 2> starts{{
+        {center.x - 2.0F, floor, center.z + 3.0F},
+        {center.x + 2.0F, floor, center.z + 3.0F},
+    }};
+    // One wall prevents the recipient from directly seeing the sighting.
+    // A second wall keeps the escape route occluded throughout long runs.
+    const CollisionWorld collision{room->worldBounds, {
+        {{center.x - 0.45F, floor, center.z - 2.5F},
+            {center.x + 0.45F, floor + 2.7F, center.z + 8.0F}},
+        {{room->worldBounds.minimum.x - 1.0F, floor, center.z - 3.5F},
+            {room->worldBounds.maximum.x + 1.0F, floor + 2.7F,
+                center.z - 2.5F}},
+    }};
+    if (!collision.canOccupy(sighting) || !collision.canOccupy(hidden)
+        || !collision.canOccupy(starts[0])
+        || !collision.canOccupy(starts[1])
+        || !gameplay::hasLineOfSight(
+            starts[0] + Vec3{0.0F, 1.35F, 0.0F},
+            sighting + Vec3{0.0F, 1.6F, 0.0F}, collision)
+        || gameplay::hasLineOfSight(
+            starts[1] + Vec3{0.0F, 1.35F, 0.0F},
+            sighting + Vec3{0.0F, 1.6F, 0.0F}, collision)) {
+        return std::nullopt;
+    }
+
+    gameplay::Player player;
+    player.spawn(sighting);
+    entities::EntityManager manager;
+    std::array<EntityId, 2> ids{};
+    for (std::size_t index = 0U; index < ids.size(); ++index) {
+        ids[index] = manager.createEnemy({
+            .transform = {.position = starts[index],
+                .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+            .roomId = room->id,
+            .archetype = archetype,
+            .health = enemyHealth(archetype),
+            .visualSeed = world.masterSeed + index + 1U,
+        });
+    }
+    std::optional<gameplay::NeuralEnemyExperiment> brain;
+    if (neural) {
+        brain.emplace(world.masterSeed, archetype, record.contract);
+        brain->genome = record.genome;
+        brain->controlAll = true;
+        brain->logSelection = false;
+    }
+
+    InvestigationResult result;
+    Vec3 reportPosition{};
+    constexpr std::uint32_t sightingFrames = 30U;
+    for (std::uint32_t frame = 1U; frame <= frames; ++frame) {
+        if (frame <= sightingFrames) {
+            // A short visible strafe reveals repeated reports: a single
+            // acquisition should leave the recipient's report aging.
+            const Vec3 visiblePosition{sighting.x
+                + 1.5F * static_cast<float>(frame) / sightingFrames,
+                floor, sighting.z};
+            if (!player.relocate(visiblePosition, 90.0F)) {
+                return std::nullopt;
+            }
+        } else if (frame == sightingFrames + 1U
+            && !player.relocate(hidden, 90.0F)) {
+            return std::nullopt;
+        }
+        const std::array<Vec3, 2> before{{
+            manager.find(ids[0])->transform.position,
+            manager.find(ids[1])->transform.position,
+        }};
+        const auto* previousAlly = manager.findData<entities::EnemyData>(ids[1]);
+        const Vec3 previousKnowledge = previousAlly->lastKnownPlayerPosition;
+        const float previousAge = previousAlly->knowledgeAgeSeconds;
+        const auto previousSource = previousAlly->knowledgeSource;
+        // Keep the exercise about knowledge and search rather than damage.
+        // Normal difficulty permits local reports to an ally in this room.
+        std::vector<gameplay::EnemyProjectile> shots;
+        (void)updateEnemy(archetype, manager, player, room->id,
+            collision, brain ? &*brain : nullptr, shots, false);
+        const auto* observer = manager.findData<entities::EnemyData>(ids[0]);
+        const auto* ally = manager.findData<entities::EnemyData>(ids[1]);
+        if (observer == nullptr || ally == nullptr) {
+            return std::nullopt;
+        }
+        if (observer->directSightPreviousUpdate) {
+            ++result.observerSightFrames;
+            if (result.firstObserverSightFrame == 0U) {
+                result.firstObserverSightFrame = frame;
+            }
+        }
+        if (ally->directSightPreviousUpdate) {
+            ++result.allySightFrames;
+        }
+        if (frame > 1U && frame <= sightingFrames
+            && observer->directSightPreviousUpdate
+            && !ally->directSightPreviousUpdate
+            && previousSource == entities::EnemyKnowledgeSource::AllyReport
+            && ally->knowledgeSource == entities::EnemyKnowledgeSource::AllyReport
+            && ally->knowledgeAgeSeconds + 1.0e-4F
+                < previousAge + fixedStep * 0.5F) {
+            ++result.reportRefreshesWithoutReacquisition;
+        }
+        if (ally->knowledgeSource == entities::EnemyKnowledgeSource::AllyReport
+            && result.firstAllyReportFrame == 0U) {
+            result.firstAllyReportFrame = frame;
+            result.allySourceAtReport = ally->knowledgeSource;
+            reportPosition = ally->lastKnownPlayerPosition;
+            result.allyReportError = planarDistance(reportPosition, sighting);
+            result.allyHiddenPlayerError = planarDistance(reportPosition, hidden);
+        }
+        result.maxAllyKnowledgeAgeSeconds = std::max(
+            result.maxAllyKnowledgeAgeSeconds, ally->knowledgeAgeSeconds);
+        if (frame > sightingFrames) {
+            if (observer->behavior == entities::EnemyBehaviorState::Investigate) {
+                ++result.observerInvestigateFrames;
+            }
+            if (ally->behavior == entities::EnemyBehaviorState::Investigate) {
+                ++result.allyInvestigateFrames;
+            }
+            if (observer->behavior == entities::EnemyBehaviorState::Recover) {
+                ++result.observerRecoverFrames;
+            }
+            if (ally->behavior == entities::EnemyBehaviorState::Recover) {
+                ++result.allyRecoverFrames;
+            }
+            result.hiddenVisualContacts += observer->directSightPreviousUpdate
+                + ally->directSightPreviousUpdate;
+            if (!observer->directSightPreviousUpdate
+                && !ally->directSightPreviousUpdate
+                && ally->knowledgeSource
+                    != entities::EnemyKnowledgeSource::None
+                && planarDistance(previousKnowledge,
+                    ally->lastKnownPlayerPosition) > 0.05F) {
+                ++result.unseenTargetUpdates;
+            }
+        }
+        result.observerTravel += planarDistance(before[0],
+            manager.find(ids[0])->transform.position);
+        result.allyTravel += planarDistance(before[1],
+            manager.find(ids[1])->transform.position);
+        result.elapsedFrames = frame;
+    }
+    const auto* ally = manager.findData<entities::EnemyData>(ids[1]);
+    result.allySourceFinal = ally->knowledgeSource;
+    result.neuralTicks = brain ? brain->controlledTicks : 0U;
+    return result;
+}
+
+std::string_view knowledgeSourceName(
+    const gdp::entities::EnemyKnowledgeSource source) noexcept
+{
+    using gdp::entities::EnemyKnowledgeSource;
+    switch (source) {
+    case EnemyKnowledgeSource::None: return "none";
+    case EnemyKnowledgeSource::DirectSight: return "direct_sight";
+    case EnemyKnowledgeSource::Noise: return "noise";
+    case EnemyKnowledgeSource::AllyReport: return "ally_report";
+    }
+    return "none";
+}
+
+void printInvestigationRow(const std::string_view policy,
+    const std::string_view archetype,
+    const std::uint64_t seed,
+    const std::uint32_t brainGeneration,
+    const InvestigationResult& result)
+{
+    std::cout << policy << ",lost_sight," << archetype << ',' << seed << ','
+              << brainGeneration << ',' << result.elapsedFrames << ','
+              << result.firstObserverSightFrame << ','
+              << result.firstAllyReportFrame << ','
+              << result.observerSightFrames << ',' << result.allySightFrames
+              << ',' << result.observerInvestigateFrames << ','
+              << result.allyInvestigateFrames << ','
+              << result.observerRecoverFrames << ','
+              << result.allyRecoverFrames << ',' << result.observerTravel
+              << ',' << result.allyTravel << ','
+              << knowledgeSourceName(result.allySourceAtReport) << ','
+              << knowledgeSourceName(result.allySourceFinal) << ','
+              << result.maxAllyKnowledgeAgeSeconds << ','
+              << result.allyReportError << ','
+              << result.allyHiddenPlayerError << ','
+              << result.reportRefreshesWithoutReacquisition << ','
+              << result.unseenTargetUpdates << ','
+              << result.hiddenVisualContacts << ','
+              << result.neuralTicks << '\n';
+}
+
 void printTeamRow(const std::string_view policy,
     const std::string_view scenario,
     const std::uint64_t seed,
     const EnemyArchetype primary,
     const EnemyArchetype ally,
     const gdp::game::ai::ActiveEnemyBrainCatalog& records,
-    const TeamResult& result)
+    const TeamResult& result,
+    const bool attributed)
 {
     const auto generation = [&](const EnemyArchetype type) {
         const auto& record = records[static_cast<std::size_t>(type)];
@@ -1010,7 +1280,7 @@ void printTeamRow(const std::string_view policy,
               << result.friendlyHits << ',' << result.friendlyKills << ','
               << result.friendlyDamage << ',' << result.fireHolds << ','
               << result.supportActions << ',' << result.neuralTicks << ','
-              << 2 << ','
+              << (attributed ? 3 : 2) << ','
               << (scenario == "boss_helpers" ? "guard" : "") << ','
               << (scenario == "boss_helpers"
                     ? generation(EnemyArchetype::Guard) : 0U) << ','
@@ -1029,7 +1299,19 @@ void printTeamRow(const std::string_view policy,
               << result.roles[2].playerHits << ','
               << result.roles[0].fireHolds << ','
               << result.roles[1].fireHolds << ','
-              << result.roles[2].fireHolds << '\n';
+              << result.roles[2].fireHolds;
+    if (attributed) {
+        for (const auto& role : result.roles) {
+            std::cout << ',' << role.friendlyHits;
+        }
+        for (const auto& role : result.roles) {
+            std::cout << ',' << role.friendlyKills;
+        }
+        for (const auto& role : result.roles) {
+            std::cout << ',' << role.friendlyDamage;
+        }
+    }
+    std::cout << '\n';
 }
 
 void printDuelRow(const std::string_view policy,
@@ -1081,6 +1363,10 @@ int main(const int argc, char* argv[])
     if (!options) {
         return 2;
     }
+    if (options->investigation && options->frames <= 30U) {
+        std::cerr << "--investigation requires at least 31 frames\n";
+        return 2;
+    }
     auto brains = gdp::game::ai::loadActiveEnemyBrains(options->brainDirectory);
     for (std::size_t index = 0U; index < brains.size(); ++index) {
         if (options->overrides[index]) {
@@ -1101,6 +1387,35 @@ int main(const int argc, char* argv[])
         return 1;
     }
     std::cout << std::fixed << std::setprecision(3);
+    if (options->investigation) {
+        std::cout << "policy,scenario,archetype,seed,brain_generation,"
+                     "elapsed_frames,first_observer_sight_frame,"
+                     "first_ally_report_frame,observer_sight_frames,"
+                     "ally_sight_frames,observer_investigate_frames,"
+                     "ally_investigate_frames,observer_recover_frames,"
+                     "ally_recover_frames,observer_travel,ally_travel,"
+                     "ally_source_at_report,ally_source_final,"
+                     "max_ally_knowledge_age_seconds,ally_report_error,"
+                     "ally_hidden_player_error,"
+                     "report_refreshes_without_reacquisition,"
+                     "unseen_target_updates,"
+                     "hidden_visual_contacts,neural_ticks\n";
+        const std::size_t role = options->investigationRole;
+        for (const bool neural : {false, true}) {
+            const auto result = runInvestigationScenario(*generated.world,
+                static_cast<EnemyArchetype>(role), neural,
+                *brains[role], options->frames);
+            if (!result) {
+                std::cerr << "Invalid investigation fixture\n";
+                return 1;
+            }
+            printInvestigationRow(neural ? "neural" : "scripted",
+                archetypeNames[role],
+                options->seed,
+                neural ? brains[role]->genome.generation : 0U, *result);
+        }
+        return 0;
+    }
     if (options->team) {
         std::cout << "policy,scenario,seed,primary,ally,primary_generation,"
                      "ally_generation,outcome,elapsed_frames,player_damage,"
@@ -1114,7 +1429,15 @@ int main(const int argc, char* argv[])
                      "helpers_player_damage,primary_shots,ally_shots,"
                      "third_shots,primary_player_hits,ally_player_hits,"
                      "third_player_hits,primary_fire_holds,ally_fire_holds,"
-                     "third_fire_holds\n";
+                     "third_fire_holds";
+        if (options->teamAttributed) {
+            std::cout << ",primary_friendly_hits,ally_friendly_hits,"
+                         "third_friendly_hits,primary_friendly_kills,"
+                         "ally_friendly_kills,third_friendly_kills,"
+                         "primary_friendly_damage,ally_friendly_damage,"
+                         "third_friendly_damage";
+        }
+        std::cout << '\n';
         for (std::size_t scenario = 0U; scenario < teamScenarioNames.size(); ++scenario) {
             for (const bool neural : {false, true}) {
                 const auto result = runTeamScenario(*generated.world,
@@ -1126,7 +1449,8 @@ int main(const int argc, char* argv[])
                 }
                 printTeamRow(neural ? "neural" : "scripted",
                     teamScenarioNames[scenario], options->seed,
-                    teamPairs[scenario][0], teamPairs[scenario][1], brains, *result);
+                    teamPairs[scenario][0], teamPairs[scenario][1], brains,
+                    *result, options->teamAttributed);
             }
         }
         return 0;

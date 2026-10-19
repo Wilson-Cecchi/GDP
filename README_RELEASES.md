@@ -35,6 +35,28 @@ cérebros ativos permanecem os mesmos da 0.1.5: os candidatos documentados em
 [`05_enemies/ai_evaluation_2026-10-13.md`](05_enemies/ai_evaluation_2026-10-13.md)
 não foram aprovados para promoção.
 
+### Versão 0.1.7
+
+O pacote reúne as cinco reconstruções visuais de inimigos (Worker,
+Guard, Officer, Engineer e IndustrialRobot/Boss), com animações de ataque e
+zonas de dano alinhadas aos modelos. O responsável pelo jogo aprovou os
+visuais e a gameplay da prévia em partida em 19/10/2026. A integração ativou
+esses modelos e as hitboxes correspondentes por padrão; definir
+`GDP_ENEMY_REFERENCE_MODELS=0` recupera a aparência e a geometria de combate
+anteriores para comparação. A aprovação refere-se às reconstruções testadas, que
+ainda têm diferenças de acabamento perante as pranchas.
+
+Somente o cérebro Worker da geração 280 substitui um cérebro ativo. Guard,
+Officer, Engineer e Robot mantêm os cérebros da 0.1.6, pois seus candidatos
+ainda apresentaram regressões. A comparação e a decisão de playtest estão em
+[`05_enemies/ai_release_worker280_2026-10-19.md`](05_enemies/ai_release_worker280_2026-10-19.md).
+O corpo/cinto v4 do Player ainda aguarda aprovação da prancha, e as animações
+de guardar e sacar armas permanecem em validação visual; esta aprovação dos
+inimigos não se estende a esses itens.
+
+O Download público só muda após CI do SHA exato da `main`, builds das quatro
+plataformas e conclusão do workflow de release.
+
 ## Preparação única
 
 Configure no repositório do código-fonte o secret de Actions
@@ -61,8 +83,8 @@ do Git e instale o secret de Actions sem imprimir seu conteúdo em logs ou chat.
 
    ```bash
    git fetch origin main
-   git tag public-v0.1.6 origin/main
-   git push origin public-v0.1.6
+   git tag public-v0.1.7 origin/main
+   git push origin public-v0.1.7
    ```
 
 3. O workflow `Portable downloads` verifica que a tag aponta para a `main`

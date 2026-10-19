@@ -236,8 +236,10 @@ void testHitscanPropPriority()
     const CollisionWorld base{{{-8.0F, 0.0F, -8.0F}, {8.0F, 4.0F, 8.0F}}};
     CollisionWorld collision = collisionWorldWithProps(base, manager, 7);
     Weapon weapon({.damage = 70.0F, .fireInterval = 0.0F, .range = 10.0F});
+    // Aim through the crate and a visible leg, rather than the gap between
+    // the segmented legs of the accepted enemy model.
     const ShotResult first = fireHitscan(
-        weapon, {0.0F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, collision, manager);
+        weapon, {0.2F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, collision, manager);
     expect(first.outcome == ShotOutcome::Destroyed && first.hit
             && first.hit->target == crate && first.spawnedItem.isValid()
             && first.impact
@@ -248,7 +250,7 @@ void testHitscanPropPriority()
 
     collision = collisionWorldWithProps(base, manager, 7);
     const ShotResult second = fireHitscan(
-        weapon, {0.0F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, collision, manager);
+        weapon, {0.2F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, collision, manager);
     expect(second.outcome == ShotOutcome::Hit && second.hit
             && second.hit->target == enemy,
         "destroyed prop no longer blocks the following hitscan");

@@ -11,6 +11,7 @@
 #include <iostream>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -109,6 +110,43 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         const auto armed = frame({},weapon);
         passed &= armed != standing;
         save("armed",armed);
+        weapon.gaitPhase = std::numbers::pi_v<float> * 0.5F;
+        weapon.gaitWeight = 1.0F;
+        const auto armedStep = frame({},weapon);
+        passed &= armedStep != armed;
+        save("armed_step",armedStep);
+        weapon.gaitPhase = weapon.gaitWeight = 0.0F;
+        WeaponViewmodelRenderData exchange{
+            .visible = true, .role = HudWeaponRole::Carbine,
+            .equipTransitionActive = true,
+            .equipOutgoingRole = HudWeaponRole::Pistol,
+            .equipTransitionProgress = 0.20F,
+        };
+        const auto stowingPistol = frame({},exchange);
+        exchange.equipTransitionProgress = 0.50F;
+        const auto storedPistol = frame({},exchange);
+        exchange.equipTransitionProgress = 0.80F;
+        const auto drawingCarbine = frame({},exchange);
+        passed &= stowingPistol != storedPistol
+            && drawingCarbine != storedPistol
+            && stowingPistol != drawingCarbine;
+        if (capture && width == 1280 && !potato && fov == 60.0F) {
+            save("equip_stow_pistol",stowingPistol);
+            save("equip_exchange",storedPistol);
+            save("equip_draw_carbine",drawingCarbine);
+            for (const auto& [name, role] : std::array{
+                     std::pair{"draw_pistol", HudWeaponRole::Pistol},
+                     std::pair{"draw_knife", HudWeaponRole::Knife},
+                     std::pair{"draw_sniper", HudWeaponRole::Sniper}}) {
+                WeaponViewmodelRenderData drawn{
+                    .visible = true, .role = role, .carryMotion = 0.55F};
+                save(name,frame({},drawn));
+            }
+            WeaponViewmodelRenderData drawnGrenade{
+                .visible = true, .grenadeSelected = true,
+                .role = HudWeaponRole::Knife, .carryMotion = 0.55F};
+            save("draw_grenade",frame({},drawnGrenade));
+        }
         weapon.role = HudWeaponRole::Sniper; weapon.aimStrength = 1;
         passed &= frame({},weapon) != armed;
         hud.mainMenu = true;

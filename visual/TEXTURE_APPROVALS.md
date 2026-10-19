@@ -157,6 +157,42 @@ aceitação provisória da revisão posterior, não da implementação rejeitada
 `88c5f87`. Texturas e identidade das armas não mudaram; torso/cinto seguem
 fora desta aprovação. Testes técnicos isolados não constituem aprovação visual.
 
+### Player presentation/Torso + Belt — v4
+
+```text
+unidade visual: torso, cintura, cinto e suportes do Player
+versão: v4 — uniforme grafite e locais de saque, incluindo granada no cinto esquerdo dianteiro
+data: 2026-10-18
+prancha: visual/proposals/player_body_proposal_v4.png
+contrato: visual/proposals/player_body_proposal_v4.md
+decisão do usuário sobre a prancha v4: pendente
+implementação: nenhuma; a build mantém o corpo v1
+estado: AGUARDANDO APROVAÇÃO
+```
+
+O pedido de animação definiu locais de guarda e saque. A aparência exata do
+torso, cinto e suportes desta prancha continua pendente de aprovação antes da
+modelagem na build. As animações podem usar pontos de ancoragem fora do quadro
+sem criar esses novos materiais ou peças.
+
+### Player presentation/Torso + Belt — v3 (histórico)
+
+```text
+unidade visual: torso, cintura, cinto e continuidade do uniforme do Player
+versão: v3 — silhueta humana e uniforme grafite com mangas até as luvas
+data: 2026-10-18
+prancha: visual/proposals/player_body_proposal_v3_sleeved.png
+contrato: visual/proposals/player_body_proposal_v3.md
+decisão do usuário sobre a prancha v3: pendente
+implementação: nenhuma; a build mantém o corpo v1
+estado: SUBSTITUÍDA PELA V4 ANTES DA APROVAÇÃO
+```
+
+A prancha v3 é conceito, não captura nativa nem mesh. A aprovação anterior dos
+inimigos não se estende ao Player. Animações do corpo inferior sem mudança de
+receita visual podem ser verificadas em paralelo; modelagem e materiais desta
+v3 exigem aprovação explícita da prancha identificada acima.
+
 ### Player presentation/Torso + Belt — v2
 
 ```text
@@ -587,6 +623,104 @@ resultado final: IMPLEMENTADA EM VALIDAÇÃO; aceitação no jogo pendente
 A aprovação cobre proporções e variação dos membros do Worker. Outros papéis,
 materiais e texturas exigem propostas próprias.
 
+## Worker — modelo e materiais v2
+
+```text
+unidade visual: Worker/modelo e família de materiais v2
+versão da proposta: v2
+contrato/pranchas: visual/proposals/worker_model_material_v2.md;
+                  visual/proposals/worker_model_material_v2_*.png
+variantes conceituais: segurança industrial (laranja), manutenção de campo
+                      (azul petróleo), unidade recuperada (marfim/vermelho)
+feedback do usuário: modelo conceitual considerado bonito; cores livres
+decisão para implementação: APROVADA PARA IMPLEMENTAÇÃO — variante A laranja
+                             ("gostei desse laranja no final das contas,
+                              pode implementar", 16/10/2026)
+assets carregados: assets/visual/worker_painted_steel_v2.png;
+                  assets/visual/worker_front_panel_source_v2.png
+capturas técnicas: visual/validation/worker_model_material_v2_review/
+                   visual/validation/worker_eye_glow_clear/
+                   visual/validation/worker_eye_glow_dark/
+capturas em partida: test_arena_native.png e test_arena_worker_native.png
+                     (Worker distante/oculto; insuficientes para aceitação)
+feedback em partida: usuário testou o Worker e disse "até o momento esse ai
+                    esta muito bom"; centro emissivo/halo ainda sem aprovação
+                    visual específica em partida
+estado: IMPLEMENTADA EM VALIDAÇÃO — Worker bem recebido; olho pendente em jogo
+```
+
+As pranchas v2 são edições geradas a partir de uma captura offscreen e **não**
+representam o renderer atual. A geração modificou a geometria apesar da
+referência; a aprovação de 16/10 cobre esse modelo e a paleta A, mantendo a
+variação de membros v1. As paletas B/C e outros papéis não foram aprovados.
+Após a primeira captura técnica, o usuário apontou divergência com a prancha
+e exigiu textura, sombras entre peças, parafusos e desgaste nas bordas. A
+implementação foi refeita com chapa frontal amostrada da própria prancha,
+textura de aço laranja, juntas grafite, fixadores escuros e desgaste nas
+arestas. Capturas offscreen e testes não constituem aceitação em partida.
+O centro âmbar do visor recebeu emissão própria e um halo discreto, verificados
+em capturas técnicas com luz normal e baixa na Quadro K2100M. O feedback positivo
+do usuário sobre o Worker não é uma validação específica desse novo brilho.
+
+## Worker — serra circular visual v3
+
+```text
+unidade visual: Worker/ferramenta-serra v3
+referência: visual/Proposta_visual_separada/Worker.md e Worker.png
+decisão: usuário gostou da ideia de trocar a ferramenta pela serra
+implementação: disco dentado de aço escuro, carcaça laranja, giro no eixo X
+capturas técnicas: visual/validation/worker_saw_v2/ (frente e lateral,
+                   MEDIUM e POTATO, seeds 101, 202 e 303)
+estado: PROTÓTIPO TÉCNICO — não corresponde à prancha aprovada
+```
+
+A prancha propõe também golpes e efeitos de faísca; esta etapa altera apenas a
+ferramenta visual e seu giro. Alcance, dano, colisão e comportamento permanecem
+iguais. A comparação das capturas com a prancha mostrou diferenças grandes na
+silhueta, na integração com o braço e nos detalhes mecânicos. O usuário
+esclareceu que deseja seguir exatamente as propostas visuais. Esta serra
+procedural não é uma entrega visual aprovada nem deve ser integrada a um
+download como representação final da proposta.
+
+## Referências visuais individuais dos cinco inimigos
+
+```text
+unidades: Worker, Guard, Officer, Engineer e IndustrialRobot
+artefatos: visual/Proposta_visual_separada/{Worker,Guard,Officer,
+           Engineer,IndustrialRobot}.{md,png}
+decisão: usuário quer seguir exatamente as propostas visuais
+estado: ACEITAS NO JOGO em 19/10/2026 para as cinco reconstruções testadas
+```
+
+Cada PNG mostra frente, lados e costas. São referências de forma, peças,
+equipamentos, cor, desgaste e luz. Não há arquivos 3D originais nem texturas
+separadas; as superfícies entre vistas exigem reconstrução. Existem capturas
+técnicas das quatro vistas, e o usuário testou a prévia em partida antes de
+aprovar as reconstruções atuais. As sugestões de habilidades e IA nos arquivos
+Markdown não estão aprovadas como mudanças de gameplay por esta decisão visual.
+
+Em 17/10/2026, foram preparadas reconstruções editáveis em
+`assets/visual/models/` e capturas técnicas em
+`visual/validation/enemy_reference_game/`. O preview original exigia
+`GDP_ENEMY_REFERENCE_MODELS=1`. Na integração da candidata 0.1.7, as
+reconstruções e as hitboxes correspondentes passaram a ser padrão;
+`GDP_ENEMY_REFERENCE_MODELS=0` recupera o conjunto anterior para comparação.
+As geometrias e texturas ainda divergem das
+pranchas em densidade de peças, desgaste localizado e detalhes das armas. O
+usuário aprovou em partida as reconstruções atuais, sem declarar equivalência
+exata com as pranchas. A revisão das hitboxes está em
+`visual/validation/enemy_hitbox_alignment.md`.
+
+Em 18/10/2026, a pedido do usuário, o preview recebeu zonas de dano alinhadas
+às cinco reconstruções: o sensor alto do Boss agora integra a cabeça fraca.
+Guard, Officer, Engineer e Boss disparam a partir das armas; o Worker usa a
+mão livre no ataque próximo, e o Boss usa a garra na fase de perseguição quando
+alcança o jogador. As poses de mira, recuo e golpe têm capturas técnicas em
+`visual/validation/enemy_attack_game/`. A mudança é específica deste preview;
+em 19/10/2026, após testar a prévia com Worker280, o usuário aprovou os
+visuais dos cinco inimigos e a gameplay. Essa decisão cobre a aparência e as
+colisões do preview, separadamente dos testes de distribuição ainda necessários.
+
 ## Inventário inicial de ambientes
 
 Todas as superfícies abaixo começam como `NÃO REVISADA`.
@@ -608,8 +742,10 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 |---|---|
 | Door/Frame | Não revisada |
 | Door/Panel | Não revisada |
-| Worker/silhueta dos membros | V1 implementada em validação; aceitação no jogo pendente |
-| Worker/material families | Não revisada |
+| Worker/silhueta dos membros | Reconstrução atual aceita em partida em 19/10/2026; variação v1 é histórico separado |
+| Worker/modelo e material v2 | Histórico da direção laranja; a reconstrução individual atual foi aceita em jogo em 19/10/2026 |
+| Cinco referências individuais de inimigos | Reconstruções atuais dos cinco papéis aceitas em partida em 19/10/2026 e ativadas por padrão na candidata 0.1.7 |
+| Worker/material families adicionais | Não revisada |
 | Guard/material families | Não revisada |
 | Officer/material families | Não revisada |
 | Engineer/material families | Não revisada |

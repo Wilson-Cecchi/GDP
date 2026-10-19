@@ -1,6 +1,7 @@
 #include "gameplay/EnemyProjectile.hpp"
 
 #include "gameplay/Combat.hpp"
+#include "gameplay/Props.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -44,6 +45,9 @@ bool projectileHitsEnemy(const wkc::core::Vec3 point,
     const entities::Entity& entity,
     const entities::EnemyData& enemy) noexcept
 {
+    if (referenceEnemyHitboxesEnabled()) {
+        return referenceEnemyBodyContainsPoint(point, entity, enemy, 0.10F);
+    }
     const float radius = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
         ? 0.52F : 0.35F;
     const float height = enemy.archetype == entities::EnemyArchetype::IndustrialRobot
@@ -58,6 +62,36 @@ bool allyOnSegment(const wkc::core::Vec3 origin,
     const entities::Entity& entity,
     const entities::EnemyData& enemy, const float clearance) noexcept
 {
+    if (referenceEnemyHitboxesEnabled()) {
+        // Restrict sampling to the ally's neighbourhood. The same six body
+        // zones are used by real projectiles; a small margin avoids a firing
+        // lane that is clear only because a ray grazes the sampled edge.
+        const wkc::core::Vec3 center = entity.transform.position
+            + wkc::core::Vec3{0.0F, 1.05F, 0.0F};
+        const float along = wkc::core::dot(center - origin, direction);
+        const float nearestAlong = std::clamp(along, 0.0F, distance);
+        const float maximumRadius = enemy.archetype
+                == entities::EnemyArchetype::IndustrialRobot ? 1.9F : 1.5F;
+        if (wkc::core::length(origin + direction * nearestAlong - center)
+            > maximumRadius + clearance) {
+            return false;
+        }
+        const float first = std::max(0.0F, along - 1.8F);
+        const float last = std::min(distance, along + 1.8F);
+        if (first >= last) return false;
+        const int samples = std::max(1, static_cast<int>(
+            std::ceil((last - first) / 0.04F)));
+        for (int sample = 0; sample <= samples; ++sample) {
+            const float t = first + (last - first)
+                * static_cast<float>(sample) / static_cast<float>(samples);
+            if (referenceEnemyBodyContainsPoint(
+                    origin + direction * t, entity, enemy,
+                    0.10F + clearance)) {
+                return true;
+            }
+        }
+        return false;
+    }
     const wkc::core::Vec3 center = entity.transform.position
         + wkc::core::Vec3{0.0F,
             enemy.archetype == entities::EnemyArchetype::IndustrialRobot
@@ -75,6 +109,11 @@ bool allyOnSegment(const wkc::core::Vec3 origin,
         && nearest.y >= entity.transform.position.y + 0.10F
         && nearest.y <= entity.transform.position.y + 1.9F;
 }
+
+struct ProjectilePropBounds {
+    entities::EntityId id{};
+    wkc::core::Aabb bounds{};
+};
 
 } // namespace
 
@@ -131,10 +170,28 @@ std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
     if (!std::isfinite(step) || step <= 0.0F) {
         return events;
     }
+    if (projectiles_.empty()) return events;
     std::vector<EnemyProjectile> remaining;
     remaining.reserve(projectiles_.size());
     const std::vector<entities::EntityId> enemyIds
         = enemies.query(entities::EntityKind::Enemy);
+    // The CollisionWorld supplied here contains architecture and doors.
+    // Dynamic props are resolved separately so the Boss can damage the prop
+    // actually hit, while a wall in front of it still stops the shot.
+    const std::vector<entities::EntityId> propIds
+        = enemies.query(entities::EntityKind::Prop);
+    std::vector<ProjectilePropBounds> propBounds;
+    propBounds.reserve(propIds.size());
+    for (const entities::EntityId id : propIds) {
+        const entities::Entity* entity = enemies.find(id);
+        const entities::PropData* prop = enemies.findData<entities::PropData>(id);
+        if (entity != nullptr && prop != nullptr
+            && prop->state != entities::PropState::Destroyed
+            && (prop->solid
+                || prop->type == entities::PropType::CeilingFixture)) {
+            propBounds.push_back({id, propCollisionBounds(*entity, *prop)});
+        }
+    }
     for (EnemyProjectile shot : projectiles_) {
         const wkc::core::Vec3 displacement = shot.velocity * step;
         const float distance = wkc::core::length(displacement);
@@ -151,6 +208,35 @@ std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
             }
             shot.position = next;
             shot.traveledDistance += distance / static_cast<float>(samples);
+            for (const ProjectilePropBounds& candidate : propBounds) {
+                if (!containsPoint(candidate.bounds, next)) continue;
+                const entities::EntityId id = candidate.id;
+                const entities::PropData* prop
+                    = enemies.findData<entities::PropData>(id);
+                if (prop == nullptr || prop->state == entities::PropState::Destroyed) {
+                    continue;
+                }
+                const bool bossShot = [&] {
+                    const entities::EnemyData* source
+                        = enemies.findData<entities::EnemyData>(shot.source);
+                    return source != nullptr && source->archetype
+                        == entities::EnemyArchetype::IndustrialRobot;
+                }();
+                const float healthBefore = prop->health;
+                const PropDamageResult damage = bossShot
+                    ? damageProp(enemies, id, shot.damage) : PropDamageResult{};
+                const entities::PropData* damagedProp
+                    = enemies.findData<entities::PropData>(id);
+                const float healthAfter
+                    = damagedProp != nullptr ? damagedProp->health : healthBefore;
+                events.push_back({shot.source, shot.neural, false, true, false,
+                    healthBefore - healthAfter, {}, false, id,
+                    damage.outcome == PropDamageOutcome::Destroyed,
+                    damage.spawnedDrop});
+                finished = true;
+                break;
+            }
+            if (finished) break;
             for (const entities::EntityId id : enemyIds) {
                 if (id == shot.source) {
                     continue;

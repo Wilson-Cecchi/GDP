@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/visual/EnemyGenerator.hpp"
+#include "game/visual/EnemyModelAsset.hpp"
 #include "game/visual/GdpRenderData.hpp"
 #include "game/visual/RoomMaterialGenerator.hpp"
 #include "game/visual/WeaponViewmodelAssets.hpp"
@@ -219,6 +220,14 @@ private:
     struct EnemyGpuPart {
         wkc::render::Mesh mesh;
         wkc::core::Vec3 pivot{};
+        wkc::core::Vec3 tint{1.0F, 1.0F, 1.0F};
+        bool workerPaint{false};
+        bool workerFrontPanel{false};
+        bool workerEyeCore{false};
+        bool workerEyeHalo{false};
+        bool workerSawBlade{false};
+        wkc::core::Vec3 workerSawCenter{};
+        std::uint8_t referenceMaterialId{255U};
         std::uint32_t index{0};
     };
 
@@ -226,12 +235,20 @@ private:
         std::vector<EnemyGpuPart> parts;
         wkc::render::Texture texture;
         float emissiveStrength{0.0F};
+        float wearAmount{0.0F};
+        std::uint32_t basePartCount{0U};
     };
 
     [[nodiscard]] bool uploadEnemyGpuVisual(
         const wkc::procedural::MeshRecipe& meshRecipe,
         const wkc::procedural::TextureRecipe& textureRecipe,
         EnemyGpuVisual& gpuVisual);
+    [[nodiscard]] bool uploadEnemyReferenceVisual(
+        const EnemyModelAsset& asset, std::string_view roleName,
+        EnemyGpuVisual& gpuVisual);
+    [[nodiscard]] bool tryPrepareEnemyReferenceVisual(
+        std::string_view roleName, std::size_t roleIndex,
+        std::unordered_map<wkc::core::Seed, EnemyGpuVisual>& visuals);
 
     struct IndustrialWallGpuMaterial {
         wkc::render::Texture albedo;
@@ -290,6 +307,13 @@ private:
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};
+    wkc::render::Texture workerPaintTexture_{};
+    wkc::render::Texture workerFrontPanelTexture_{};
+    wkc::render::Texture referenceWhiteTexture_{};
+    wkc::render::Texture referenceNeutralPaintTexture_{};
+    std::array<wkc::render::Texture, 5U> referencePaintTextures_{};
+    std::array<bool, 5U> referencePaintReady_{};
+    std::array<bool, 5U> referenceModelReady_{};
     wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
     wkc::resources::AssetCache<wkc::render::MeshData> meshCache_{};

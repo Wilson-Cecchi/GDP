@@ -5,6 +5,7 @@
 #include "procedural/AssetRecipe.hpp"
 
 #include <cstdint>
+#include <array>
 #include <span>
 #include <vector>
 
@@ -104,6 +105,14 @@ struct WorkerMaterialSet {
     wkc::core::Vec3 secondaryColor{0.34F, 0.20F, 0.10F};
 };
 
+struct WorkerDetailRecipe {
+    std::uint32_t parentPartIndex{0};
+    wkc::procedural::MeshRecipe meshRecipe;
+    wkc::core::Vec3 tint{1.0F, 1.0F, 1.0F};
+
+    bool operator==(const WorkerDetailRecipe&) const noexcept = default;
+};
+
 inline constexpr std::uint32_t workerLimbRecipeVersion = 1;
 
 struct WorkerLimbShape {
@@ -139,6 +148,8 @@ struct WorkerVisual {
     WearProfile wear;
     wkc::procedural::MeshRecipe meshRecipe;
     wkc::procedural::TextureRecipe textureRecipe;
+    std::array<wkc::core::Vec3, 8> partTints{};
+    std::vector<WorkerDetailRecipe> details;
     std::uint32_t fallbackCount{0};
 };
 
@@ -162,6 +173,8 @@ enum class WorkerVisualValidationError : std::uint8_t {
     InvalidLimbVariation,
     InvalidBounds,
     InvalidVisualHash,
+    InvalidPartTint,
+    InvalidDetails,
 };
 
 struct WorkerVisualValidationResult {

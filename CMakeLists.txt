@@ -261,6 +261,7 @@ gdp_enable_sanitizers(wkc_forge_procedural)
 add_library(
     gdp_visual_content
     STATIC
+    src/game/visual/EnemyModelAsset.cpp
     src/game/visual/EnemyGenerator.cpp
     src/game/visual/RoomMaterialGenerator.cpp
     src/game/visual/VisualAssets.cpp
@@ -398,6 +399,38 @@ target_link_libraries(
 )
 gdp_enable_warnings(gdp)
 gdp_enable_sanitizers(gdp)
+function(gdp_copy_enemy_visual_assets target_name)
+    set_property(TARGET ${target_name} APPEND PROPERTY LINK_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/worker_painted_steel_v2.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/worker_front_panel_source_v2.png")
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:${target_name}>/visual"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/worker_painted_steel_v2.png"
+            "$<TARGET_FILE_DIR:${target_name}>/visual/worker_painted_steel_v2.png"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/worker_front_panel_source_v2.png"
+            "$<TARGET_FILE_DIR:${target_name}>/visual/worker_front_panel_source_v2.png"
+        VERBATIM)
+    file(GLOB_RECURSE enemy_model_assets CONFIGURE_DEPENDS
+        RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.png")
+    foreach(relative_asset IN LISTS enemy_model_assets)
+        get_filename_component(relative_dir "${relative_asset}" DIRECTORY)
+        set_property(TARGET ${target_name} APPEND PROPERTY LINK_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/${relative_asset}")
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:${target_name}>/visual/${relative_dir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/${relative_asset}"
+                "$<TARGET_FILE_DIR:${target_name}>/visual/${relative_asset}"
+            VERBATIM)
+    endforeach()
+endfunction()
+gdp_copy_enemy_visual_assets(gdp)
 if(APPLE)
     set_target_properties(gdp PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -462,6 +495,8 @@ if(WIN32)
     install(TARGETS gdp RUNTIME DESTINATION .)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
     install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
+    install(DIRECTORY assets/visual/ DESTINATION visual FILES_MATCHING
+        PATTERN "*.png" PATTERN "*.isemesh")
 
     set(GDP_SDL_SHARED_TARGET "")
     if(TARGET SDL3::SDL3-shared)
@@ -509,6 +544,8 @@ if(UNIX AND NOT APPLE AND GDP_PORTABLE_PACKAGE)
         CONTENT "${GDP_RELEASE_VERSION}\n")
     install(TARGETS gdp RUNTIME DESTINATION bin)
     install(DIRECTORY assets/ai/ DESTINATION bin/ai FILES_MATCHING PATTERN "*.brain")
+    install(DIRECTORY assets/visual/ DESTINATION bin/visual FILES_MATCHING
+        PATTERN "*.png" PATTERN "*.isemesh")
     install(PROGRAMS packaging/linux/gdp packaging/linux/updater.py DESTINATION .)
     install(FILES packaging/linux/release-signing-public.pem DESTINATION .)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
@@ -525,6 +562,8 @@ endif()
 
 if(APPLE AND GDP_PORTABLE_PACKAGE)
     install(TARGETS gdp BUNDLE DESTINATION .)
+    install(DIRECTORY assets/visual/ DESTINATION IronSeed.app/Contents/Resources/visual
+        FILES_MATCHING PATTERN "*.png" PATTERN "*.isemesh")
     install(FILES README_MACOS.md DESTINATION .)
     install(FILES assets/fonts/LICENSE-DejaVu.txt
         DESTINATION IronSeed.app/Contents/Resources/licenses)
@@ -591,7 +630,7 @@ if(GDP_BUILD_TESTS)
     # ASan/UBSan runs arena simulation much slower. Keep independent cases in
     # separate CTest invocations so each 600-second limit covers one case.
     foreach(group fitness cooperative persistence other-archetypes
-            population-encounters curriculum-v20 curriculum-v21)
+            population-encounters curriculum-v20 curriculum-v21 curriculum-v22)
         string(REPLACE "-" "_" test_suffix "${group}")
         add_test(NAME worker_training_${test_suffix}
             COMMAND gdp_worker_training_tests --${group})
@@ -750,6 +789,21 @@ if(GDP_BUILD_TESTS)
 
     add_test(NAME enemy_generation_systems COMMAND gdp_enemy_generation_tests)
     set_tests_properties(enemy_generation_systems PROPERTIES TIMEOUT 60)
+
+    add_executable(gdp_enemy_model_asset_tests tests/test_enemy_model_asset.cpp)
+    target_link_libraries(gdp_enemy_model_asset_tests PRIVATE gdp_visual_content)
+    gdp_enable_warnings(gdp_enemy_model_asset_tests)
+    gdp_enable_sanitizers(gdp_enemy_model_asset_tests)
+
+    add_test(NAME enemy_model_asset_systems COMMAND gdp_enemy_model_asset_tests)
+    set_tests_properties(enemy_model_asset_systems PROPERTIES TIMEOUT 10)
+    add_test(NAME enemy_reference_model_assets COMMAND gdp_enemy_model_asset_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/worker_reference/worker_reference.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/guard_reference/guard_reference.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/officer_reference/officer_reference.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/engineer_reference/engineer_reference.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/robot_reference/robot_reference.isemesh")
+    set_tests_properties(enemy_reference_model_assets PROPERTIES TIMEOUT 10)
 
     add_executable(gdp_room_material_tests tests/test_room_materials.cpp)
     target_link_libraries(gdp_room_material_tests PRIVATE gdp_visual_content)
@@ -1008,6 +1062,7 @@ if(GDP_BUILD_TESTS)
         target_link_libraries(gdp_renderer_gl_tests PRIVATE gdp_visual_renderer gdp_gameplay)
         gdp_enable_warnings(gdp_renderer_gl_tests)
         gdp_enable_sanitizers(gdp_renderer_gl_tests)
+        gdp_copy_enemy_visual_assets(gdp_renderer_gl_tests)
 
         add_executable(
             wkc_forge_instancing_gl_tests

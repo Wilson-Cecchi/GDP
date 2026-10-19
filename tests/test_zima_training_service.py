@@ -84,6 +84,30 @@ class TrainingServiceTests(unittest.TestCase):
                                      service.population_metadata(population, 'robot', 2)
                                      is not None)
 
+    def test_perception_population_is_isolated_from_prior_curricula(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            population = root / 'guard_generation_000002.population'
+            population.mkdir()
+            for curriculum in (19, 20, 21, 22):
+                body = ('GDP_TRAINING_POPULATION 2\narchetype 1\nseed 42\n'
+                        'generation 2\npopulation 2\nreward_rules 6\ncontract 3\n'
+                        f'curriculum {curriculum}\nwarmup_start 1\n'
+                        'warmup_generations 2\n')
+                checksum = 14695981039346656037
+                for byte in body.encode():
+                    checksum = ((checksum ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+                (population / 'state.txt').write_text(body + f'checksum {checksum}\n')
+                for identity in range(2):
+                    write_brain(population / f'member-{identity:03d}.brain', 2,
+                                role='guard', identity=identity, cooperative=True)
+                for protocol in (3, 4):
+                    with patch.object(service, 'COOPERATIVE', True), \
+                         patch.object(service, 'TRAIN_PROTOCOL', protocol):
+                        self.assertEqual(curriculum == 22,
+                                         service.population_metadata(population, 'guard', 2)
+                                         is not None)
+
     def test_resume_uses_newest_valid_checkpoint(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -179,6 +203,32 @@ class TrainingServiceTests(unittest.TestCase):
                     service.run(["trainer"], Path(directory) / "run.log",
                                 "worker", "training", 80, 70)
                 launch.assert_not_called()
+
+    def test_protocol_four_uses_attributed_team_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'evaluation').mkdir()
+            report = {'generation': 280, 'eligible': True,
+                      'regressions': [], 'score': 1.1}
+            with patch.object(service, 'COOPERATIVE', True), \
+                 patch.object(service, 'TRAIN_PROTOCOL', 4), \
+                 patch.object(service, 'STOP', False), \
+                 patch.object(service, 'run', return_value=0) as evaluate, \
+                 patch.object(service, 'summarize', return_value={}), \
+                 patch.object(service, 'summarize_team', return_value={}) as team, \
+                 patch.object(service, 'summarize_investigation', return_value={}), \
+                 patch.object(service, 'combine_perception', return_value=report) as combine, \
+                 patch.object(service, 'archive_candidate', return_value=False):
+                result = service.evaluate_candidate('worker', root / 'worker.brain',
+                    root / 'evaluation', (152201,), 480, 'revision', 80, 70, 'label')
+            self.assertEqual(report, result)
+            self.assertEqual(3, team.call_args.kwargs['protocol_version'])
+            self.assertEqual(3, combine.call_args.kwargs['team_protocol'])
+            commands = [call.args[0] for call in evaluate.call_args_list]
+            self.assertEqual(8, len(commands))
+            self.assertEqual(2, sum('--team-attributed' in command
+                                    for command in commands))
+            self.assertFalse(any('--team' in command for command in commands))
 
 
 if __name__ == "__main__":

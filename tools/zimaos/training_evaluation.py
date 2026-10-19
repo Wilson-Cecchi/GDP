@@ -92,7 +92,7 @@ def summarize(directory, role, seeds, frames, source_revision):
 
 def summarize_team(directory, role, seeds, frames, source_revision, protocol_version=1):
     """Compare identical mixed-role fights and reject allied damage regressions."""
-    if protocol_version not in (1, 2):
+    if protocol_version not in (1, 2, 3):
         raise ValueError('unsupported team evaluation protocol')
     participants = TEAM_PAIRS if protocol_version == 1 else TEAM_PARTICIPANTS_V2
     scenarios = {name for name, pair in participants.items() if role in pair}
@@ -115,22 +115,42 @@ def summarize_team(directory, role, seeds, frames, source_revision, protocol_ver
                         or (row['primary'], row['ally']) != participants[scenario][:2]
                         or not 1 <= int(row['elapsed_frames']) <= frames):
                     raise ValueError(f'invalid team fixture: {path}')
-                if protocol_version == 2:
-                    if (row.get('protocol') != '2'
+                if protocol_version >= 2:
+                    if (row.get('protocol') != str(protocol_version)
                             or row.get('third') != (participants[scenario][2]
                                 if len(participants[scenario]) == 3 else '')):
                         raise ValueError(f'invalid team protocol or third role: {path}')
+                attribution = {}
+                if protocol_version == 3:
+                    attribution_keys = [f'{slot}_friendly_{metric}'
+                                        for metric in ('hits', 'kills', 'damage')
+                                        for slot in ('primary', 'ally', 'third')]
+                    try:
+                        attribution = {key: float(row[key]) for key in attribution_keys}
+                    except (KeyError, TypeError, ValueError) as error:
+                        raise ValueError(f'invalid friendly-fire attribution: {path}') from error
+                    if (not all(math.isfinite(value) and value >= 0
+                                for value in attribution.values())
+                            or any(attribution[key] != int(attribution[key])
+                                   for key in attribution_keys if key.endswith(('_hits', '_kills')))
+                            or any(attribution[f'{slot}_friendly_kills']
+                                   > attribution[f'{slot}_friendly_hits']
+                                   for slot in ('primary', 'ally', 'third'))
+                            or (len(participants[scenario]) == 2
+                                and any(attribution[f'third_friendly_{metric}'] != 0
+                                        for metric in ('hits', 'kills', 'damage')))):
+                        raise ValueError(f'invalid friendly-fire attribution: {path}')
                 if scenario not in scenarios:
                     continue
-                generation_key = ('primary_generation' if row['primary'] == role
-                                  else 'ally_generation' if row['ally'] == role
-                                  else 'third_generation')
+                role_slot = ('primary' if row['primary'] == role
+                             else 'ally' if row['ally'] == role else 'third')
+                generation_key = f'{role_slot}_generation'
                 generation = int(row[generation_key])
                 if policy == 'candidate':
                     generations.add(generation)
                 metric_keys = ['player_damage', 'friendly_damage', 'friendly_hits',
                                'friendly_kills']
-                if protocol_version == 2:
+                if protocol_version >= 2:
                     metric_keys += ['enemy_shots', 'enemy_hits', 'fire_holds',
                                     'robot_player_damage', 'helpers_player_damage',
                                     'enemies_alive', 'boss_health_remaining',
@@ -138,10 +158,15 @@ def summarize_team(directory, role, seeds, frames, source_revision, protocol_ver
                                     'boss_distance_minimum', 'boss_distance_final',
                                     'boss_long_range', 'boss_pressure', 'boss_pursuit']
                 values = {key: float(row[key]) for key in metric_keys}
+                if protocol_version == 3:
+                    values.update(attribution)
+                    for metric in ('hits', 'kills', 'damage'):
+                        values[f'role_friendly_{metric}'] = attribution[
+                            f'{role_slot}_friendly_{metric}']
                 if (not all(math.isfinite(v) and v >= 0 for v in values.values())
                         or any(values[key] != int(values[key]) for key in
                                ('friendly_hits', 'friendly_kills'))
-                        or (protocol_version == 2 and
+                        or (protocol_version >= 2 and
                             (abs(values['robot_player_damage']
                                  + values['helpers_player_damage']
                                  - values['player_damage']) > 0.02
@@ -153,6 +178,14 @@ def summarize_team(directory, role, seeds, frames, source_revision, protocol_ver
                              or values['first_player_hit_frame']
                                 > int(row['elapsed_frames'])))):
                     raise ValueError(f'invalid team metric: {path}')
+                if protocol_version == 3:
+                    if (any(abs(sum(attribution[f'{slot}_friendly_{metric}']
+                                     for slot in ('primary', 'ally', 'third'))
+                                - values[f'friendly_{metric}'])
+                            > (0.02 if metric == 'damage' else 0)
+                            for metric in ('hits', 'kills', 'damage'))
+                            or values['friendly_kills'] > values['friendly_hits']):
+                        raise ValueError(f'friendly-fire attribution total mismatch: {path}')
                 samples[scenario, seed, policy] = values
     if len(generations) != 1 or next(iter(generations)) <= 0:
         raise ValueError('candidate generation changed during team evaluation')
@@ -184,12 +217,26 @@ def summarize_team(directory, role, seeds, frames, source_revision, protocol_ver
                                     'metric': 'friendly_damage',
                                     'active': active['friendly_damage'],
                                     'candidate': candidate['friendly_damage']})
-            if candidate['friendly_kills'] > 0:
+            if ((protocol_version < 3 and candidate['friendly_kills'] > 0)
+                    or (protocol_version == 3
+                        and candidate['friendly_kills'] > active['friendly_kills'])):
                 regressions.append({'scenario': scenario, 'seed': seed,
                                     'metric': 'friendly_kills',
                                     'active': active['friendly_kills'],
                                     'candidate': candidate['friendly_kills']})
-            if protocol_version == 2 and scenario == 'boss_helpers' and role == 'robot':
+            if protocol_version == 3:
+                if candidate['role_friendly_kills'] > 0:
+                    regressions.append({'scenario': scenario, 'seed': seed,
+                                        'metric': 'role_friendly_kills',
+                                        'active': active['role_friendly_kills'],
+                                        'candidate': candidate['role_friendly_kills']})
+                if (candidate['role_friendly_damage']
+                        > active['role_friendly_damage'] + 0.001):
+                    regressions.append({'scenario': scenario, 'seed': seed,
+                                        'metric': 'role_friendly_damage',
+                                        'active': active['role_friendly_damage'],
+                                        'candidate': candidate['role_friendly_damage']})
+            if protocol_version >= 2 and scenario == 'boss_helpers' and role == 'robot':
                 active_robot = active['robot_player_damage']
                 candidate_robot = candidate['robot_player_damage']
                 if candidate_robot < active_robot - max(HALF_HIT[role], active_robot * 0.10):
@@ -199,7 +246,7 @@ def summarize_team(directory, role, seeds, frames, source_revision, protocol_ver
                                         'candidate': candidate_robot})
     score = ((summary['candidate']['player_damage'] + HALF_HIT[role])
              / (summary['active']['player_damage'] + HALF_HIT[role]))
-    if (protocol_version == 2 and role == 'robot'
+    if (protocol_version >= 2 and role == 'robot'
             and summary['candidate']['robot_player_damage'] == 0):
         regressions.append({'scenario': 'boss_helpers', 'metric':
                             'robot_player_damage_missing', 'active':
@@ -233,6 +280,131 @@ def combine_new_mechanics(solo, team):
             'role': solo['role'], 'generation': solo['generation'],
             'summary': {'solo': solo['summary'], 'team': team['summary']},
             'scenarios': {'solo': solo['scenarios'], 'team': team['scenarios']},
+            'regressions': regressions, 'score': score,
+            'eligible': not regressions and score > 1.0001}
+
+
+def summarize_investigation(directory, role, seeds, frames, source_revision):
+    """Check paired lost-sight behavior and reject continuous or hidden tracking."""
+    metrics = ('observer_investigate_frames', 'ally_investigate_frames',
+               'observer_recover_frames', 'ally_recover_frames',
+               'observer_travel', 'ally_travel', 'max_ally_knowledge_age_seconds',
+               'ally_report_error', 'ally_hidden_player_error',
+               'report_refreshes_without_reacquisition', 'unseen_target_updates',
+               'hidden_visual_contacts')
+    samples, generations, regressions = {}, set(), []
+    for seed in seeds:
+        for policy in ('active', 'candidate'):
+            path = Path(directory) / f'{seed}-investigation-{policy}.csv'
+            with path.open() as source:
+                rows = [row for row in csv.DictReader(source)
+                        if row.get('policy') == 'neural']
+            if (len(rows) != 1 or rows[0].get('scenario') != 'lost_sight'
+                    or rows[0].get('archetype') != role
+                    or int(rows[0]['seed']) != seed):
+                raise ValueError(f'invalid investigation fixture: {path}')
+            row = rows[0]
+            generation = int(row['brain_generation'])
+            if policy == 'candidate':
+                generations.add(generation)
+            values = {key: float(row[key]) for key in metrics}
+            if not all(math.isfinite(value) and value >= 0 for value in values.values()):
+                raise ValueError(f'invalid investigation metric: {path}')
+            elapsed = int(row['elapsed_frames'])
+            if (not 31 <= elapsed <= frames
+                    or any(values[key] != int(values[key]) for key in metrics[:4]
+                           + metrics[-3:])):
+                raise ValueError(f'incomplete investigation: {path}')
+            contract = {
+                'first_observer_sight_frame': int(row['first_observer_sight_frame']),
+                'first_ally_report_frame': int(row['first_ally_report_frame']),
+                'observer_sight_frames': int(row['observer_sight_frames']),
+                'ally_sight_frames': int(row['ally_sight_frames']),
+                'ally_source_at_report': row['ally_source_at_report'],
+                'ally_source_final': row['ally_source_final'],
+                'max_ally_knowledge_age_seconds': values['max_ally_knowledge_age_seconds'],
+                'ally_hidden_player_error': values['ally_hidden_player_error'],
+            }
+            violations = {}
+            for key, valid in (
+                    ('first_observer_sight_frame', contract['first_observer_sight_frame'] >= 1),
+                    ('first_ally_report_frame', contract['first_ally_report_frame'] >= 1),
+                    ('observer_sight_frames', contract['observer_sight_frames'] >= 30),
+                    ('ally_sight_frames', contract['ally_sight_frames'] == 0),
+                    ('ally_source_at_report', contract['ally_source_at_report'] == 'ally_report'),
+                    ('ally_source_final', contract['ally_source_final'] == 'none'),
+                    ('max_ally_knowledge_age_seconds', contract['max_ally_knowledge_age_seconds'] >= 1.0),
+                    ('ally_hidden_player_error', contract['ally_hidden_player_error'] >= 1.0)):
+                if not valid:
+                    violations[key] = contract[key]
+            if violations:
+                if policy == 'active':
+                    raise ValueError(f'incomplete investigation: {path}')
+                regressions.append({'seed': seed, 'metric': 'investigation_contract',
+                                    'values': violations})
+            if any(values[key] != 0 for key in metrics[-3:]):
+                regressions.append({'seed': seed, 'policy': policy,
+                                    'metric': 'information_leak',
+                                    'values': {key: values[key] for key in metrics[-3:]}})
+            samples[seed, policy] = values
+    if len(generations) != 1 or next(iter(generations)) <= 0:
+        raise ValueError('candidate generation changed during investigation')
+    for seed in seeds:
+        active, candidate = samples[seed, 'active'], samples[seed, 'candidate']
+        for key in ('observer_investigate_frames', 'ally_investigate_frames'):
+            if active[key] < 10:
+                raise ValueError(f'active investigation fixture did not exercise {key}')
+            if candidate[key] < max(10.0, active[key] * 0.5):
+                regressions.append({'seed': seed, 'metric': key,
+                                    'active': active[key], 'candidate': candidate[key]})
+        for key in ('observer_travel', 'ally_travel'):
+            if candidate[key] < max(0.5, active[key] * 0.5):
+                regressions.append({'seed': seed, 'metric': key,
+                                    'active': active[key], 'candidate': candidate[key]})
+    summary = {policy: {key: sum(samples[seed, policy][key] for seed in seeds) / len(seeds)
+                        for key in metrics}
+               for policy in ('active', 'candidate')}
+    score = ((summary['candidate']['observer_travel'] + summary['candidate']['ally_travel'])
+             / max(0.001, summary['active']['observer_travel']
+                   + summary['active']['ally_travel']))
+    return {'protocol': {'seeds': list(seeds), 'frames': frames,
+                         'source_revision': source_revision,
+                         'gate': 'paired-lost-sight-information-v3'},
+            'role': role, 'generation': generations.pop(), 'summary': summary,
+            'scenarios': {'lost_sight': {str(seed):
+                {policy: samples[seed, policy] for policy in ('active', 'candidate')}
+                for seed in seeds}}, 'regressions': regressions,
+            'score': score, 'eligible': not regressions}
+
+
+def combine_perception(solo, team, investigation, *, team_protocol=2):
+    """Keep protocol 3 evaluation distinct from old candidate archives."""
+    if team_protocol not in (2, 3):
+        raise ValueError('unsupported combined team protocol')
+    for report in (team, investigation):
+        for key in ('role', 'generation'):
+            if solo[key] != report[key]:
+                raise ValueError(f'candidate {key} changed across evaluation modes')
+        for key in ('seeds', 'frames', 'source_revision'):
+            if solo['protocol'][key] != report['protocol'][key]:
+                raise ValueError(f'evaluation {key} changed across modes')
+    if (team['protocol']['gate'] != f'paired-team-damage-friendly-v{team_protocol}'
+            or investigation['protocol']['gate'] != 'paired-lost-sight-information-v3'):
+        raise ValueError('perception evaluation requires matching team and investigation gates')
+    regressions = ([{'mode': 'solo', **row} for row in solo['regressions']]
+                   + [{'mode': 'team', **row} for row in team['regressions']]
+                   + [{'mode': 'investigation', **row}
+                      for row in investigation['regressions']])
+    score = (solo['score'] + team['score']) / 2.0
+    return {'protocol': {**{key: solo['protocol'][key]
+                            for key in ('seeds', 'frames', 'source_revision')},
+                         'gate': ('paired-solo-team-perception-v3' if team_protocol == 2
+                                  else 'paired-solo-team-perception-attributed-v4')},
+            'role': solo['role'], 'generation': solo['generation'],
+            'summary': {'solo': solo['summary'], 'team': team['summary'],
+                        'investigation': investigation['summary']},
+            'scenarios': {'solo': solo['scenarios'], 'team': team['scenarios'],
+                          'investigation': investigation['scenarios']},
             'regressions': regressions, 'score': score,
             'eligible': not regressions and score > 1.0001}
 

@@ -40,6 +40,53 @@ foreach(row
     endif()
 endforeach()
 
+# Every candidate role uses the same perceptual probe and its own brain.
+foreach(role worker guard officer engineer robot)
+    execute_process(
+        COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+            --seed 12345 --frames 120 --investigation
+            --investigation-role "${role}"
+        RESULT_VARIABLE role_result
+        OUTPUT_VARIABLE role_output
+        ERROR_VARIABLE role_error)
+    execute_process(
+        COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+            --brain "${role}=${GDP_BRAIN_DIR}/${role}.brain"
+            --seed 12345 --frames 120 --investigation
+            --investigation-role "${role}"
+        RESULT_VARIABLE role_same_result
+        OUTPUT_VARIABLE role_same_output
+        ERROR_VARIABLE role_same_error)
+    if(NOT role_result EQUAL 0 OR NOT role_same_result EQUAL 0
+        OR NOT role_output STREQUAL role_same_output)
+        message(FATAL_ERROR "Investigation active/active mismatch for ${role}: "
+            "${role_error} ${role_same_error}")
+    endif()
+    foreach(policy scripted neural)
+        string(REGEX MATCH "${policy},lost_sight,${role},12345,[^\n]*"
+            role_row "${role_output}")
+        if(role_row STREQUAL "")
+            message(FATAL_ERROR "Investigation lacks ${role}/${policy}")
+        endif()
+        string(REPLACE "," ";" role_fields "${role_row}")
+        list(GET role_fields 6 role_sight)
+        list(GET role_fields 7 role_report)
+        list(GET role_fields 10 observer_investigating)
+        list(GET role_fields 11 ally_investigating)
+        list(GET role_fields 16 role_source)
+        list(GET role_fields 21 role_unearned_refreshes)
+        list(GET role_fields 22 role_unseen_updates)
+        list(GET role_fields 23 role_hidden_contacts)
+        if(NOT role_sight EQUAL 1 OR NOT role_report EQUAL 1
+            OR observer_investigating LESS 10 OR ally_investigating LESS 10
+            OR NOT role_source STREQUAL "ally_report"
+            OR role_unearned_refreshes GREATER 0
+            OR role_unseen_updates GREATER 0 OR role_hidden_contacts GREATER 0)
+            message(FATAL_ERROR "Investigation fixture failed for ${role}: ${role_row}")
+        endif()
+    endforeach()
+endforeach()
+
 execute_process(
     COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
         --seed 42 --frames 90
@@ -258,6 +305,66 @@ if(friendly_hits LESS 1 OR fire_holds LESS 1
     message(FATAL_ERROR "Firing-lane fixture did not exercise friendly fire: ${firing_lane_row}")
 endif()
 
+# Protocol 3 reports the shooter of every allied hit, kill and point of damage.
+# Keep the protocol-2 CSV above byte-compatible for the active training service.
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 12345 --frames 360 --team-attributed
+    RESULT_VARIABLE attributed_result
+    OUTPUT_VARIABLE attributed_output
+    ERROR_VARIABLE attributed_error)
+if(NOT attributed_result EQUAL 0)
+    message(FATAL_ERROR "Attributed team evaluation failed: ${attributed_error}")
+endif()
+string(REGEX MATCH "^[^\n]*" attributed_header "${attributed_output}")
+string(REPLACE "," ";" attributed_header_fields "${attributed_header}")
+list(LENGTH attributed_header_fields attributed_header_count)
+if(NOT attributed_header_count EQUAL 53)
+    message(FATAL_ERROR "Expected 53 attributed team fields, got ${attributed_header_count}")
+endif()
+set(attribution_columns primary_friendly_hits ally_friendly_hits
+    third_friendly_hits primary_friendly_kills ally_friendly_kills
+    third_friendly_kills primary_friendly_damage ally_friendly_damage
+    third_friendly_damage)
+foreach(index RANGE 44 52)
+    math(EXPR role_index "${index} - 44")
+    list(GET attributed_header_fields ${index} actual_column)
+    list(GET attribution_columns ${role_index} expected_column)
+    if(NOT actual_column STREQUAL expected_column)
+        message(FATAL_ERROR "Attribution column ${index} is ${actual_column}, expected ${expected_column}")
+    endif()
+endforeach()
+string(REGEX MATCHALL "(scripted|neural),[^\n]*" attributed_rows
+    "${attributed_output}")
+foreach(row IN LISTS attributed_rows)
+    string(REPLACE "," ";" fields "${row}")
+    list(LENGTH fields field_count)
+    if(NOT field_count EQUAL 53)
+        message(FATAL_ERROR "Attributed team row has ${field_count} fields: ${row}")
+    endif()
+    list(GET fields 21 protocol)
+    list(GET fields 15 friendly_hits)
+    list(GET fields 16 friendly_kills)
+    foreach(index RANGE 44 49)
+        list(GET fields ${index} role_count)
+        if(role_count LESS 0)
+            message(FATAL_ERROR "Negative attributed count: ${row}")
+        endif()
+    endforeach()
+    list(GET fields 44 primary_friendly_hits)
+    list(GET fields 45 ally_friendly_hits)
+    list(GET fields 46 third_friendly_hits)
+    list(GET fields 47 primary_friendly_kills)
+    list(GET fields 48 ally_friendly_kills)
+    list(GET fields 49 third_friendly_kills)
+    math(EXPR attributed_hits "${primary_friendly_hits} + ${ally_friendly_hits} + ${third_friendly_hits}")
+    math(EXPR attributed_kills "${primary_friendly_kills} + ${ally_friendly_kills} + ${third_friendly_kills}")
+    if(NOT protocol EQUAL 3 OR NOT attributed_hits EQUAL friendly_hits
+        OR NOT attributed_kills EQUAL friendly_kills)
+        message(FATAL_ERROR "Friendly-fire attribution does not sum to totals: ${row}")
+    endif()
+endforeach()
+
 # The long Boss fixture must expose Robot damage after the room-entry grace,
 # while keeping the same scripted setup for both policies.
 execute_process(
@@ -306,3 +413,66 @@ list(GET third_role_fields 40 guard_hits)
 if(guard_shots LESS 1 OR guard_hits LESS 1)
     message(FATAL_ERROR "Boss third role did not fire and hit: ${third_role_row}")
 endif()
+
+# Investigation has its own CSV contract; legacy maps, duel and team rows
+# remain unchanged. The same active Guard used as an override must reproduce
+# the baseline byte for byte before candidates can be compared here.
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --seed 12345 --frames 120 --investigation
+    RESULT_VARIABLE investigation_result
+    OUTPUT_VARIABLE investigation_output
+    ERROR_VARIABLE investigation_error)
+execute_process(
+    COMMAND "${GDP_AI_EVAL}" --brain-dir "${GDP_BRAIN_DIR}"
+        --brain "guard=${GDP_BRAIN_DIR}/guard.brain"
+        --seed 12345 --frames 120 --investigation
+    RESULT_VARIABLE same_brain_result
+    OUTPUT_VARIABLE same_brain_output
+    ERROR_VARIABLE same_brain_error)
+if(NOT investigation_result EQUAL 0 OR NOT same_brain_result EQUAL 0
+    OR NOT investigation_output STREQUAL same_brain_output)
+    message(FATAL_ERROR "Investigation active/active pair differs:\n"
+        "baseline=${investigation_result}: ${investigation_error}\n"
+        "override=${same_brain_result}: ${same_brain_error}")
+endif()
+string(REGEX MATCH "^[^\n]*" investigation_header "${investigation_output}")
+string(REPLACE "," ";" investigation_header_fields "${investigation_header}")
+list(LENGTH investigation_header_fields investigation_field_count)
+if(NOT investigation_field_count EQUAL 25)
+    message(FATAL_ERROR "Investigation CSV has wrong field count")
+endif()
+string(REGEX MATCHALL "\n(scripted|neural)," investigation_rows
+    "${investigation_output}")
+list(LENGTH investigation_rows investigation_row_count)
+if(NOT investigation_row_count EQUAL 2)
+    message(FATAL_ERROR "Expected scripted and neural investigation rows")
+endif()
+foreach(policy scripted neural)
+    string(REGEX MATCH "${policy},lost_sight,guard,12345,[^\n]*"
+        investigation_row "${investigation_output}")
+    string(REPLACE "," ";" fields "${investigation_row}")
+    list(LENGTH fields field_count)
+    if(NOT field_count EQUAL 25)
+        message(FATAL_ERROR "Investigation row has wrong field count: ${investigation_row}")
+    endif()
+    list(GET fields 6 first_sight)
+    list(GET fields 7 first_report)
+    list(GET fields 9 ally_sight)
+    list(GET fields 10 observer_investigate)
+    list(GET fields 11 ally_investigate)
+    list(GET fields 16 source_at_report)
+    list(GET fields 18 knowledge_age)
+    list(GET fields 19 report_error)
+    list(GET fields 21 unearned_refreshes)
+    list(GET fields 22 unseen_updates)
+    list(GET fields 23 hidden_contacts)
+    if(NOT first_sight EQUAL 1 OR NOT first_report EQUAL 1
+        OR NOT ally_sight EQUAL 0 OR observer_investigate LESS 1
+        OR ally_investigate LESS 1 OR NOT source_at_report STREQUAL "ally_report"
+        OR knowledge_age LESS_EQUAL 0 OR report_error GREATER 1.5
+        OR unearned_refreshes GREATER 0 OR unseen_updates GREATER 0
+        OR hidden_contacts GREATER 0)
+        message(FATAL_ERROR "Investigation fixture missed visual report or leaked hidden position: ${investigation_row}")
+    endif()
+endforeach()

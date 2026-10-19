@@ -35,6 +35,9 @@ struct EnemyProjectileEvent {
     float damageApplied{0.0F};
     entities::EntityId hitEnemy{};
     bool killedEnemy{false};
+    entities::EntityId hitProp{};
+    bool destroyedProp{false};
+    entities::EntityId spawnedDrop{};
 };
 
 // Predict whether a living ally obstructs a shot. Physical projectile
@@ -49,6 +52,8 @@ struct EnemyProjectileEvent {
 class EnemyProjectileSystem {
 public:
     void spawn(std::span<const EnemyProjectile> shots);
+    // world contains architecture and doors; this system resolves dynamic
+    // props from entities so destructible cover can change between bullets.
     [[nodiscard]] std::vector<EnemyProjectileEvent> update(
         float step, Player& player, const CollisionWorld& world,
         entities::EntityManager& enemies);

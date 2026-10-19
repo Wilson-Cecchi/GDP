@@ -33,6 +33,7 @@ void printUsage(const std::string_view executable)
                  " [--seed N] [--all-scenarios] [--cooldown-ms N]"
                  " [--diverse-maps] [--hard-case-curriculum]"
                  " [--hard-case-curriculum-v2]"
+                 " [--perception-curriculum]"
                  " [--curriculum-generations N]"
                  " [--cooperative-brain]"
                  " [--save-dir DIR] [--resume FILE | --resume-population DIR]\n"
@@ -59,6 +60,7 @@ void printUsage(const std::string_view executable)
               << "  --diverse-maps      Train varied cover, peek, height and boss-phase encounters.\n"
               << "  --hard-case-curriculum  Pilot extra cooperative cover and team encounters.\n"
               << "  --hard-case-curriculum-v2  Revised isolated hard-case pilot.\n"
+              << "  --perception-curriculum  Train finite-age ally reports and lost-vision investigation.\n"
               << "  --cooperative-brain  Train a versioned brain with ally and firing-lane inputs.\n"
               << "  --curriculum-generations N  Initial curriculum length, preserved on full resume.\n"
               << "  --help               Show this message.\n"
@@ -257,12 +259,15 @@ int main(const int argc, char* argv[])
 
         if (argument == "--all-scenarios" || argument == "--diverse-maps"
             || argument == "--hard-case-curriculum"
-            || argument == "--hard-case-curriculum-v2") {
+            || argument == "--hard-case-curriculum-v2"
+            || argument == "--perception-curriculum") {
             if (argument == "--all-scenarios") trainingOptions.trainAllScenarios = true;
             else if (argument == "--diverse-maps") trainingOptions.diverseMaps = true;
             else if (argument == "--hard-case-curriculum")
                 trainingOptions.hardCaseCurriculum = true;
-            else trainingOptions.hardCaseCurriculumV2 = true;
+            else if (argument == "--hard-case-curriculum-v2")
+                trainingOptions.hardCaseCurriculumV2 = true;
+            else trainingOptions.perceptionCurriculum = true;
             trainingOnlyArgumentSeen = true;
             continue;
         }

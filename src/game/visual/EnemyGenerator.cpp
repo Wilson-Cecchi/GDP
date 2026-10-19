@@ -9,6 +9,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <numbers>
 #include <optional>
 
 namespace gdp::game::visual {
@@ -702,26 +703,14 @@ WearProfile generateWear(const wkc::core::Seed seed)
 
 WorkerMaterialSet generateMaterials(const wkc::core::Seed seed)
 {
-    constexpr std::array families{
-        MaterialFamily::PaintedSteel,
-        MaterialFamily::BareSteel,
-        MaterialFamily::Aluminum,
-    };
-    constexpr std::array primaryColors{
-        wkc::core::Vec3{0.72F, 0.38F, 0.12F},
-        wkc::core::Vec3{0.18F, 0.48F, 0.46F},
-        wkc::core::Vec3{0.72F, 0.58F, 0.12F},
-        wkc::core::Vec3{0.52F, 0.16F, 0.12F},
-    };
     wkc::core::RandomStream random{wkc::core::deriveSeed(
         seed, gdp::game::SeedDomain::EnemyMaterial, 0)};
     WorkerMaterialSet materials;
-    materials.family = families[static_cast<std::size_t>(random.rangeInt(
-        0, static_cast<int>(families.size() - 1U)))];
-    materials.primaryColor = primaryColors[static_cast<std::size_t>(random.rangeInt(
-        0, static_cast<int>(primaryColors.size() - 1U)))];
-    const float secondaryScale = random.rangeFloat(0.42F, 0.64F);
-    materials.secondaryColor = materials.primaryColor * secondaryScale;
+    materials.family = MaterialFamily::PaintedSteel;
+    const float variation = random.rangeFloat(0.94F, 1.06F);
+    materials.primaryColor = {0.63F * variation, 0.28F * variation,
+        0.08F * variation};
+    materials.secondaryColor = {0.18F, 0.20F, 0.23F};
     return materials;
 }
 
@@ -1082,6 +1071,31 @@ std::array<WorkerLimbShape, 4> workerLimbShapes(const wkc::core::Seed seed) noex
     return shapes;
 }
 
+WorkerDetailRecipe makeWorkerDetail(
+    const wkc::core::Seed seed, const std::uint32_t index,
+    const std::uint32_t parent, const wkc::core::Vec3 position,
+    const wkc::core::Vec3 dimensions, const wkc::core::Vec3 tint,
+    const SemanticRegion semantic)
+{
+    WorkerDetailRecipe detail;
+    detail.parentPartIndex = parent;
+    detail.meshRecipe.version = 1U;
+    detail.meshRecipe.seed = wkc::core::deriveSeed(
+        seed, gdp::game::SeedDomain::EnemyParts, 500U + index);
+    detail.meshRecipe.primitives.push_back({
+        PrimitiveType::Box, {.position = position}, dimensions,
+        MaterialSlot::Primary, semantic});
+    detail.tint = tint;
+    return detail;
+}
+
+bool validWorkerTint(const wkc::core::Vec3 tint) noexcept
+{
+    return std::isfinite(tint.x) && std::isfinite(tint.y) && std::isfinite(tint.z)
+        && tint.x >= 0.0F && tint.y >= 0.0F && tint.z >= 0.0F
+        && tint.x <= 1.5F && tint.y <= 1.5F && tint.z <= 1.5F;
+}
+
 } // namespace
 
 std::vector<EnemyRigidPartRecipe> splitEnemyRigidParts(
@@ -1194,8 +1208,8 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     const float legHeight = height * visual.body.legLength;
     const float headHeight = height * visual.body.headScale;
     const float torsoHeight = height - legHeight - headHeight;
-    const float torsoWidth = height * visual.body.torsoWidth;
-    const float torsoDepth = height * visual.body.torsoDepth;
+    const float torsoWidth = height * visual.body.torsoWidth * 1.12F;
+    const float torsoDepth = height * visual.body.torsoDepth * 0.94F;
     const float armHeight = height * visual.body.armLength;
     const float armWidth = height * 0.13F;
     const float legWidth = torsoWidth * 0.34F;
@@ -1228,7 +1242,7 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
     const SocketDefinition* backSocket = findSocket(visual.body, SocketType::Back);
     const SocketDefinition* toolSocket = findSocket(visual.body, SocketType::Tool);
 
-    visual.meshRecipe.version = 2U;
+    visual.meshRecipe.version = 4U;
     visual.meshRecipe.seed = visualSeed;
     visual.meshRecipe.primitives = {
         makePrimitive(*torso, {0.0F, torsoVisualCenter, 0.0F},
@@ -1257,18 +1271,220 @@ WorkerVisual generateWorkerVisual(const wkc::core::Seed visualSeed)
             {height, height, height},
             {0.0F, 0.0F, -8.0F}),
     };
+    // Preserve the eight animation pivots and part IDs. The v2 silhouette uses
+    // a cylindrical head and cuboid armor, limbs, back and tool for every seed.
+    for (std::size_t index = 0; index < visual.meshRecipe.primitives.size(); ++index) {
+        visual.meshRecipe.primitives[index].type
+            = index == 1U ? PrimitiveType::Cylinder : PrimitiveType::Box;
+    }
+    // This is the powered forearm and saw mount, still attached to the same
+    // hand socket and within the existing visual envelope.
+    auto& toolPrimitive = visual.meshRecipe.primitives[7];
+    toolPrimitive.dimensions.x = std::max(toolPrimitive.dimensions.x, height * 0.14F);
+    toolPrimitive.dimensions.y = std::max(toolPrimitive.dimensions.y, height * 0.24F);
+    toolPrimitive.dimensions.z = std::max(toolPrimitive.dimensions.z, height * 0.13F);
+    auto& headPrimitive = visual.meshRecipe.primitives[1];
+    headPrimitive.dimensions.x *= 1.30F;
+    headPrimitive.dimensions.y *= 1.10F;
+    headPrimitive.dimensions.z *= 1.08F;
 
     visual.materials = generateMaterials(visualSeed);
     visual.wear = generateWear(visualSeed);
+    const float paintAge = visual.wear.condition == WearCondition::Clean ? 1.0F
+        : visual.wear.condition == WearCondition::Used ? 0.94F
+        : visual.wear.condition == WearCondition::Worn ? 0.86F : 0.78F;
+    const wkc::core::Vec3 paint = visual.materials.primaryColor * paintAge;
+    const wkc::core::Vec3 graphite{0.19F, 0.22F, 0.25F};
+    visual.partTints = {
+        paint * 0.92F, paint, graphite, graphite, graphite, graphite,
+        graphite, graphite * 0.70F};
+    const auto& assembled = visual.meshRecipe.primitives;
+    const auto half = [](const PrimitiveRecipe& part) {
+        return wkc::core::Vec3{part.dimensions.x * part.localTransform.scale.x * 0.5F,
+            part.dimensions.y * part.localTransform.scale.y * 0.5F,
+            part.dimensions.z * part.localTransform.scale.z * 0.5F};
+    };
+    const auto torsoHalf = half(assembled[0]);
+    const auto headHalf = half(assembled[1]);
+    visual.details.reserve(14U);
+    const auto chestCenter = assembled[0].localTransform.position;
+    const float chestFront = chestCenter.z + torsoHalf.z;
+    const float borderX = torsoHalf.x * 0.90F;
+    const float borderY = torsoHalf.y * 0.80F;
+    auto border = makeWorkerDetail(visualSeed, 0U, 0U,
+        chestCenter + wkc::core::Vec3{0.0F, borderY, torsoHalf.z + 0.025F},
+        {torsoHalf.x * 1.82F, 0.018F, 0.017F},
+        {0.26F, 0.29F, 0.32F}, SemanticRegion::ArmorPlate);
+    const auto addBorderPiece = [&](const wkc::core::Vec3 position,
+                                  const wkc::core::Vec3 size) {
+        border.meshRecipe.primitives.push_back({PrimitiveType::Box,
+            {.position = position}, size, MaterialSlot::Primary,
+            SemanticRegion::ArmorPlate});
+    };
+    addBorderPiece(chestCenter + wkc::core::Vec3{0.0F, -borderY,
+        torsoHalf.z + 0.025F}, {torsoHalf.x * 1.82F, 0.018F, 0.017F});
+    for (const float side : {-1.0F, 1.0F}) {
+        addBorderPiece(chestCenter + wkc::core::Vec3{side * borderX, 0.0F,
+            torsoHalf.z + 0.025F}, {0.018F, torsoHalf.y * 1.62F, 0.017F});
+        for (const float vertical : {-1.0F, 1.0F}) {
+            addBorderPiece(chestCenter + wkc::core::Vec3{
+                side * torsoHalf.x * 0.76F,
+                vertical * torsoHalf.y * 0.67F,
+                torsoHalf.z + 0.024F}, {0.020F, 0.020F, 0.012F});
+        }
+    }
+    // Neck and waist seams are carried by the torso, while the dark limb
+    // cores expose the moving shoulder, elbow, hip and knee connections.
+    addBorderPiece({0.0F, torsoUpper - 0.008F, chestFront + 0.004F},
+        {headHalf.x * 1.82F, 0.027F, 0.029F});
+    addBorderPiece({0.0F, torsoLower + 0.040F, chestFront + 0.004F},
+        {torsoHalf.x * 1.70F, 0.025F, 0.029F});
+    visual.details.push_back(std::move(border));
+    visual.details.push_back(makeWorkerDetail(visualSeed, 1U, 0U,
+        {chestCenter.x, chestCenter.y, chestFront + 0.008F},
+        {torsoHalf.x * 1.80F, torsoHalf.y * 1.60F, 0.024F},
+        paint * 1.10F, SemanticRegion::ArmorPlate));
+    visual.details.push_back(makeWorkerDetail(visualSeed, 2U, 1U,
+        assembled[1].localTransform.position
+            + wkc::core::Vec3{0.0F, headHalf.y * 0.04F, 0.0F},
+        {headHalf.x * 2.025F, headHalf.y * 0.60F, headHalf.z * 2.025F},
+        {0.07F, 0.10F, 0.12F}, SemanticRegion::Lens));
+    visual.details.back().meshRecipe.primitives.front().type = PrimitiveType::Cylinder;
+    visual.details.push_back(makeWorkerDetail(visualSeed, 3U, 1U,
+        assembled[1].localTransform.position
+            + wkc::core::Vec3{0.0F, headHalf.y * 0.04F,
+                headHalf.z * 1.01F + 0.002F},
+        {headHalf.x * 0.55F, headHalf.y * 0.12F, 0.019F},
+        {1.08F, 0.63F, 0.12F}, SemanticRegion::Lens));
+    for (std::uint32_t index = 2U; index <= 5U; ++index) {
+        const auto& limb = assembled[index];
+        const auto limbHalf = half(limb);
+        const bool arm = index <= 3U;
+        if (arm) {
+            auto armShell = makeWorkerDetail(visualSeed, index + 2U, index,
+                limb.localTransform.position
+                    + wkc::core::Vec3{0.0F, limbHalf.y * 0.35F, 0.0F},
+                {limbHalf.x * 2.14F, limbHalf.y * 1.00F,
+                    limbHalf.z * 2.15F}, paint, SemanticRegion::ArmorPlate);
+            armShell.meshRecipe.primitives.front().localTransform.rotationDegrees.z
+                = index == 2U ? 8.0F : -8.0F;
+            armShell.meshRecipe.primitives.push_back({PrimitiveType::Box,
+                {.position = limb.localTransform.position
+                    + wkc::core::Vec3{0.0F, -limbHalf.y * 0.82F, 0.0F}},
+                {limbHalf.x * 2.17F, limbHalf.y * 0.36F,
+                    limbHalf.z * 2.18F}, MaterialSlot::Primary,
+                SemanticRegion::HandContact});
+            visual.details.push_back(std::move(armShell));
+        } else {
+            auto legShell = makeWorkerDetail(visualSeed, index + 2U, index,
+                limb.localTransform.position
+                    + wkc::core::Vec3{0.0F, -limbHalf.y * 0.32F, 0.0F},
+                {limbHalf.x * 2.10F, limbHalf.y * 1.12F,
+                    limbHalf.z * 2.12F}, paint, SemanticRegion::ArmorPlate);
+            const float bootHeight = std::min(limbHalf.y * 0.34F, 0.14F);
+            legShell.meshRecipe.primitives.push_back({PrimitiveType::Box,
+                {.position = limb.localTransform.position
+                    + wkc::core::Vec3{0.0F, -limbHalf.y + bootHeight * 0.5F,
+                        0.035F}},
+                {limbHalf.x * 2.28F, bootHeight, limbHalf.z * 2.36F},
+                MaterialSlot::Primary, SemanticRegion::FootContact});
+            visual.details.push_back(std::move(legShell));
+        }
+    }
+    // One metallic draw per moving limb carries three large, readable
+    // fasteners: two on the main plate and one on the glove or boot.
+    for (std::uint32_t index = 2U; index <= 5U; ++index) {
+        const auto& limb = assembled[index];
+        const auto limbHalf = half(limb);
+        const bool arm = index <= 3U;
+        const auto& shells = visual.details[index + 2U].meshRecipe.primitives;
+        const auto& main = shells[0];
+        const auto& end = shells[1];
+        const float mainFront = main.localTransform.position.z
+            + main.dimensions.z * 0.5F;
+        const float endFront = end.localTransform.position.z
+            + end.dimensions.z * 0.5F;
+        const float plateBoltY = limb.localTransform.position.y
+            + limbHalf.y * (arm ? 0.61F : 0.07F);
+        const float boltX = limbHalf.x * (arm ? 0.47F : 0.43F);
+        auto fasteners = makeWorkerDetail(visualSeed, index + 6U, index,
+            {limb.localTransform.position.x - boltX, plateBoltY,
+                mainFront - 0.002F},
+            {0.028F, 0.012F, 0.028F},
+            {0.13F, 0.15F, 0.17F}, SemanticRegion::Joint);
+        auto& firstScrew = fasteners.meshRecipe.primitives.front();
+        firstScrew.type = PrimitiveType::Cylinder;
+        firstScrew.localTransform.rotationDegrees.x = 90.0F;
+        fasteners.meshRecipe.primitives.push_back({PrimitiveType::Cylinder,
+            {.position = {limb.localTransform.position.x + boltX,
+                plateBoltY, mainFront - 0.002F},
+                .rotationDegrees = {90.0F, 0.0F, 0.0F}},
+            {0.028F, 0.012F, 0.028F}, MaterialSlot::Primary,
+            SemanticRegion::Joint});
+        fasteners.meshRecipe.primitives.push_back({PrimitiveType::Cylinder,
+            {.position = {end.localTransform.position.x,
+                end.localTransform.position.y, endFront - 0.002F},
+                .rotationDegrees = {90.0F, 0.0F, 0.0F}},
+            {0.030F, 0.012F, 0.030F}, MaterialSlot::Primary,
+            SemanticRegion::Joint});
+        visual.details.push_back(std::move(fasteners));
+    }
+    // The right-hand tool remains the eighth animated part. Its housing and
+    // blade are separate details so the renderer can spin only the blade.
+    const auto& toolBody = assembled[7];
+    const auto toolHalf = half(toolBody);
+    const auto toolCenter = toolBody.localTransform.position;
+    const float bladeRadius = std::min(0.16F * height, 0.29F);
+    const wkc::core::Vec3 bladeCenter{
+        std::min(toolCenter.x + toolHalf.x + 0.038F, 0.95F),
+        std::max(toolCenter.y - 0.075F, bladeRadius * 1.09F + 0.008F),
+        toolCenter.z + toolHalf.z * 0.46F};
+    auto sawHousing = makeWorkerDetail(visualSeed, 12U, 7U,
+        toolCenter + wkc::core::Vec3{toolHalf.x * 0.36F, 0.045F,
+            toolHalf.z * 0.46F},
+        {toolHalf.x * 1.48F, toolHalf.y * 0.94F, toolHalf.z * 1.24F},
+        paint * 0.91F, SemanticRegion::Tool);
+    sawHousing.meshRecipe.primitives.push_back({PrimitiveType::Cylinder,
+        {.position = bladeCenter, .rotationDegrees = {0.0F, 0.0F, -90.0F}},
+        {0.105F, 0.052F, 0.105F}, MaterialSlot::Primary,
+        SemanticRegion::Joint});
+    visual.details.push_back(std::move(sawHousing));
+
+    auto sawBlade = makeWorkerDetail(visualSeed, 13U, 7U,
+        bladeCenter, {bladeRadius * 2.0F, 0.065F,
+            bladeRadius * 2.0F},
+        {0.34F, 0.37F, 0.39F}, SemanticRegion::Weapon);
+    sawBlade.meshRecipe.primitives.front().type = PrimitiveType::Cylinder;
+    sawBlade.meshRecipe.primitives.front().localTransform.rotationDegrees.z = -90.0F;
+    constexpr std::uint32_t toothCount = 12U;
+    constexpr float toothDegrees = 360.0F / static_cast<float>(toothCount);
+    constexpr float toRadians = std::numbers::pi_v<float> / 180.0F;
+    for (std::uint32_t tooth = 0; tooth < toothCount; ++tooth) {
+        const float angle = static_cast<float>(tooth) * toothDegrees;
+        const float radians = angle * toRadians;
+        sawBlade.meshRecipe.primitives.push_back({PrimitiveType::Box,
+            {.position = bladeCenter + wkc::core::Vec3{0.0F,
+                std::cos(radians) * bladeRadius * 0.96F,
+                std::sin(radians) * bladeRadius * 0.96F},
+             .rotationDegrees = {angle, 0.0F, 0.0F}},
+            {0.075F, bladeRadius * 0.25F, bladeRadius * 0.16F},
+            MaterialSlot::Primary, SemanticRegion::Weapon});
+    }
+    sawBlade.meshRecipe.primitives.push_back({PrimitiveType::Cylinder,
+        {.position = bladeCenter + wkc::core::Vec3{0.027F, 0.0F, 0.0F},
+         .rotationDegrees = {0.0F, 0.0F, -90.0F}},
+        {bladeRadius * 0.30F, 0.014F, bladeRadius * 0.30F},
+        MaterialSlot::Primary, SemanticRegion::Joint});
+    visual.details.push_back(std::move(sawBlade));
     visual.textureRecipe = {
-        .version = 1,
+        .version = 2,
         .seed = wkc::core::deriveSeed(
             visualSeed, gdp::game::SeedDomain::EnemyMaterial, 1),
         .family = visual.materials.family,
-        .baseColor = visual.materials.primaryColor,
-        .secondaryColor = visual.materials.secondaryColor,
-        .macroVariation = 0.24F,
-        .microVariation = 0.16F,
+        .baseColor = {0.93F, 0.93F, 0.93F},
+        .secondaryColor = {0.79F, 0.79F, 0.79F},
+        .macroVariation = 0.12F,
+        .microVariation = 0.07F,
         .wearAmount = visual.wear.wear,
         .dirtAmount = visual.wear.dirt,
         .scratchAmount = visual.wear.scratch,
@@ -1318,7 +1534,7 @@ WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual)
         || visual.genome.rightArmShape != expectedShapes[1]
         || visual.genome.leftLegShape != expectedShapes[2]
         || visual.genome.rightLegShape != expectedShapes[3]
-        || visual.meshRecipe.version != 2U) {
+        || visual.meshRecipe.version != 4U) {
         result.errors.push_back(WorkerVisualValidationError::InvalidLimbVariation);
     }
     if (!validateMeshRecipe(visual.meshRecipe).isValid()) {
@@ -1326,6 +1542,152 @@ WorkerVisualValidationResult validateWorkerVisual(const WorkerVisual& visual)
     }
     if (!validateTextureRecipe(visual.textureRecipe).isValid()) {
         result.errors.push_back(WorkerVisualValidationError::InvalidTextureRecipe);
+    }
+    for (const auto tint : visual.partTints) {
+        if (!validWorkerTint(tint)) {
+            result.errors.push_back(WorkerVisualValidationError::InvalidPartTint);
+            break;
+        }
+    }
+    constexpr std::array<std::uint32_t, 14> detailParents{
+        0U, 0U, 1U, 1U, 2U, 3U, 4U, 5U, 2U, 3U, 4U, 5U, 7U, 7U};
+    constexpr std::array<std::size_t, 14> detailPrimitiveCounts{
+        10U, 1U, 1U, 1U, 2U, 2U, 2U, 2U, 3U, 3U, 3U, 3U, 2U, 14U};
+    bool validDetails = visual.details.size() == detailParents.size();
+    if (validDetails && visual.meshRecipe.primitives.size() == 8U) {
+        for (std::size_t index = 0; index < visual.details.size(); ++index) {
+            const auto& detail = visual.details[index];
+            const auto& parent = visual.meshRecipe.primitives[detailParents[index]];
+            const auto parentHalf = wkc::core::Vec3{
+                parent.dimensions.x * parent.localTransform.scale.x * 0.5F,
+                parent.dimensions.y * parent.localTransform.scale.y * 0.5F,
+                parent.dimensions.z * parent.localTransform.scale.z * 0.5F};
+            validDetails = validDetails && detail.parentPartIndex == detailParents[index]
+                && detail.meshRecipe.seed == wkc::core::deriveSeed(
+                    visual.genome.seed, gdp::game::SeedDomain::EnemyParts, 500U + index)
+                && detail.meshRecipe.primitives.size() == detailPrimitiveCounts[index]
+                && validateMeshRecipe(detail.meshRecipe).isValid()
+                && validWorkerTint(detail.tint);
+            if (!validDetails) break;
+            if (index == 12U) {
+                const auto& housing = detail.meshRecipe.primitives;
+                validDetails = housing[0].type == PrimitiveType::Box
+                    && housing[1].type == PrimitiveType::Cylinder
+                    && housing[1].localTransform.rotationDegrees.z == -90.0F;
+                const auto& mount = housing[0].localTransform.position;
+                const auto& motor = housing[1].localTransform.position;
+                validDetails = validDetails
+                    && std::abs(mount.x - parent.localTransform.position.x)
+                        <= parentHalf.x + 0.05F
+                    && std::abs(mount.y - parent.localTransform.position.y)
+                        <= parentHalf.y + 0.05F
+                    && std::abs(motor.x - mount.x) <= parentHalf.x + 0.10F
+                    && std::abs(motor.y - mount.y) <= parentHalf.y + 0.05F;
+            } else if (index == 13U) {
+                const auto& blade = detail.meshRecipe.primitives;
+                const auto& disk = blade[0];
+                const auto& center = disk.localTransform.position;
+                const float radius = disk.dimensions.x * 0.5F;
+                validDetails = disk.type == PrimitiveType::Cylinder
+                    && disk.localTransform.rotationDegrees.z == -90.0F
+                    && disk.dimensions.x == disk.dimensions.z
+                    && disk.dimensions.y == 0.065F
+                    && radius >= 0.20F && radius <= 0.29F
+                    && center == visual.details[12].meshRecipe.primitives[1]
+                        .localTransform.position
+                    && center.x + disk.dimensions.y * 0.5F
+                        > visual.details[12].meshRecipe.primitives[0]
+                              .localTransform.position.x
+                            + visual.details[12].meshRecipe.primitives[0]
+                                  .dimensions.x * 0.5F + 0.02F
+                    && center.y < parent.localTransform.position.y;
+                for (std::uint32_t tooth = 0U; validDetails && tooth < 12U; ++tooth) {
+                    const auto& point = blade[tooth + 1U];
+                    const float angle = static_cast<float>(tooth) * 30.0F;
+                    const float radians = angle * std::numbers::pi_v<float> / 180.0F;
+                    validDetails = point.type == PrimitiveType::Box
+                        && point.localTransform.rotationDegrees.x == angle
+                        && point.dimensions.x == 0.075F
+                        && std::abs(point.localTransform.position.x - center.x) < 0.0001F
+                        && std::abs(point.localTransform.position.y
+                            - center.y - std::cos(radians) * radius * 0.96F) < 0.0001F
+                        && std::abs(point.localTransform.position.z
+                            - center.z - std::sin(radians) * radius * 0.96F) < 0.0001F;
+                }
+                const auto& hub = blade[13];
+                validDetails = validDetails && hub.type == PrimitiveType::Cylinder
+                    && hub.localTransform.rotationDegrees.z == -90.0F
+                    && std::abs(hub.localTransform.position.x - center.x - 0.027F)
+                        < 0.0001F
+                    && hub.localTransform.position.y == center.y
+                    && hub.localTransform.position.z == center.z;
+            }
+            if (index >= 12U) {
+                const auto mesh = generateMesh(detail.meshRecipe);
+                validDetails = validDetails && mesh
+                    && mesh->mesh.bounds.minimum.y >= -0.001F
+                    && mesh->mesh.bounds.maximum.y <= 2.05F
+                    && mesh->mesh.bounds.minimum.x >= -1.0F
+                    && mesh->mesh.bounds.maximum.x <= 1.0F
+                    && mesh->mesh.bounds.minimum.z >= -1.0F
+                    && mesh->mesh.bounds.maximum.z <= 1.0F;
+                if (!validDetails) break;
+                continue;
+            }
+            const auto overlaps = [](const PrimitiveRecipe& a,
+                                      const PrimitiveRecipe& b) {
+                const auto axis = [](const float aPos, const float aSize,
+                                      const float bPos, const float bSize) {
+                    return std::abs(aPos - bPos) + 0.001F
+                        < (aSize + bSize) * 0.5F;
+                };
+                return axis(a.localTransform.position.x, a.dimensions.x,
+                           b.localTransform.position.x, b.dimensions.x)
+                    && axis(a.localTransform.position.y, a.dimensions.y,
+                            b.localTransform.position.y, b.dimensions.y)
+                    && axis(a.localTransform.position.z, a.dimensions.z,
+                            b.localTransform.position.z, b.dimensions.z);
+            };
+            for (std::size_t primitiveIndex = 0;
+                 primitiveIndex < detail.meshRecipe.primitives.size();
+                 ++primitiveIndex) {
+                const auto& primitive = detail.meshRecipe.primitives[primitiveIndex];
+                const auto& anchor = index == 0U && primitiveIndex < 8U
+                    ? visual.details[1].meshRecipe.primitives.front()
+                    : index == 3U
+                    ? visual.details[2].meshRecipe.primitives.front()
+                    : index >= 8U
+                    ? visual.details[index - 4U].meshRecipe.primitives[
+                        primitiveIndex == 2U ? 1U : 0U]
+                    : parent;
+                const auto& position = primitive.localTransform.position;
+                const auto& center = parent.localTransform.position;
+                validDetails = validDetails
+                    && primitive.type == (index == 2U || index >= 8U
+                        ? PrimitiveType::Cylinder : PrimitiveType::Box)
+                    && (index < 8U
+                        || primitive.localTransform.rotationDegrees.x == 90.0F)
+                    && std::abs(position.x - center.x) <= parentHalf.x + 0.05F
+                    && std::abs(position.y - center.y) <= parentHalf.y + 0.05F
+                    && std::abs(position.z - center.z)
+                        <= parentHalf.z + (index >= 8U ? 0.12F : 0.05F)
+                    && overlaps(primitive, anchor);
+                if (!validDetails) break;
+            }
+            if (!validDetails) break;
+            const auto mesh = generateMesh(detail.meshRecipe);
+            validDetails = validDetails && mesh
+                && mesh->mesh.bounds.minimum.y >= -0.001F
+                && mesh->mesh.bounds.maximum.y <= 2.05F
+                && mesh->mesh.bounds.minimum.x >= -1.0F
+                && mesh->mesh.bounds.maximum.x <= 1.0F
+                && mesh->mesh.bounds.minimum.z >= -1.0F
+                && mesh->mesh.bounds.maximum.z <= 1.0F;
+            if (!validDetails) break;
+        }
+    }
+    if (!validDetails) {
+        result.errors.push_back(WorkerVisualValidationError::InvalidDetails);
     }
     if (visual.meshRecipe.primitives.size() == 8U) {
         const auto& primitives = visual.meshRecipe.primitives;
@@ -1406,7 +1768,17 @@ std::uint64_t workerVisualHash(const WorkerVisual& visual) noexcept
     hash = addFloat(hash, visual.wear.scratch);
     hash = addFloat(hash, visual.wear.oxidation);
     hash = wkc::core::hashCombine(hash, meshRecipeHash(visual.meshRecipe));
-    return wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    hash = wkc::core::hashCombine(hash, textureRecipeHash(visual.textureRecipe));
+    for (const auto tint : visual.partTints) {
+        hash = addFloat(addFloat(addFloat(hash, tint.x), tint.y), tint.z);
+    }
+    hash = wkc::core::hashCombine(hash, visual.details.size());
+    for (const auto& detail : visual.details) {
+        hash = wkc::core::hashCombine(hash, detail.parentPartIndex);
+        hash = wkc::core::hashCombine(hash, meshRecipeHash(detail.meshRecipe));
+        hash = addFloat(addFloat(addFloat(hash, detail.tint.x), detail.tint.y), detail.tint.z);
+    }
+    return hash;
 }
 
 std::span<const GuardPartDefinition> guardPartLibrary() noexcept

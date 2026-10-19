@@ -80,6 +80,10 @@ struct WorkerFitnessMetrics {
     std::uint32_t friendlyHits{0};
     std::uint32_t friendlyFireHolds{0};
     float friendlyDamage{0.0F};
+    std::uint32_t sightLostTransitions{0};
+    std::uint32_t hiddenMemoryTicks{0};
+    std::uint32_t hiddenShots{0};
+    float memoryApproachMeters{0.0F};
 };
 
 struct DirectionalCredit {
@@ -116,6 +120,7 @@ struct WorkerTrainingOptions {
     bool diverseMaps{false};
     bool hardCaseCurriculum{false}; // Isolated cooperative Guard/Robot pilot.
     bool hardCaseCurriculumV2{false}; // Revised, incompatible pilot.
+    bool perceptionCurriculum{false}; // Isolated cooperative curriculum 22.
     gameplay::EnemyBrainContract brainContract{
         gameplay::EnemyBrainContract::Tactical};
     std::uint32_t curriculumGenerations{0U}; // Zero uses first run length.

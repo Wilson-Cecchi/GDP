@@ -124,6 +124,26 @@ jobs:
           foreach ($type in @("worker", "guard", "officer", "engineer", "robot")) {
             $brain = Join-Path $executable.DirectoryName "ai/$type.brain"
             if (-not (Test-Path $brain)) { throw "Missing brain: $brain" }
+            $sourceBrain = "assets/ai/$type.brain"
+            if ((Get-FileHash $brain).Hash -ne (Get-FileHash $sourceBrain).Hash) {
+              throw "Packaged brain differs from source: $type"
+            }
+            foreach ($asset in @("${type}_reference.isemesh", "${type}_paint_albedo.png")) {
+              $relative = "models/${type}_reference/$asset"
+              $packaged = Join-Path $executable.DirectoryName "visual/$relative"
+              $source = "assets/visual/$relative"
+              if (-not (Test-Path $packaged)) { throw "Missing enemy model asset: $packaged" }
+              if ((Get-FileHash $packaged).Hash -ne (Get-FileHash $source).Hash) {
+                throw "Packaged enemy model asset differs from source: $relative"
+              }
+            }
+          }
+          foreach ($asset in @("worker_painted_steel_v2.png", "worker_front_panel_source_v2.png")) {
+            $packaged = Join-Path $executable.DirectoryName "visual/$asset"
+            if (-not (Test-Path $packaged)) { throw "Missing Worker texture: $packaged" }
+            if ((Get-FileHash $packaged).Hash -ne (Get-FileHash "assets/visual/$asset").Hash) {
+              throw "Packaged Worker texture differs from source: $asset"
+            }
           }
           $smoke = Start-Process -FilePath $executable.FullName -ArgumentList @('--headless', '--frames', '3') -Wait -PassThru
           if ($smoke.ExitCode -ne 0) { throw "Windows smoke test failed: $($smoke.ExitCode)" }
@@ -181,6 +201,14 @@ jobs:
           test -s "$package/release-signing-public.pem"
           for type in worker guard officer engineer robot; do
             test -s "$package/bin/ai/$type.brain"
+            cmp "assets/ai/$type.brain" "$package/bin/ai/$type.brain"
+            for asset in "${type}_reference.isemesh" "${type}_paint_albedo.png"; do
+              relative="models/${type}_reference/$asset"
+              cmp "assets/visual/$relative" "$package/bin/visual/$relative"
+            done
+          done
+          for asset in worker_painted_steel_v2.png worker_front_panel_source_v2.png; do
+            cmp "assets/visual/$asset" "$package/bin/visual/$asset"
           done
           if ldd "$package/bin/gdp" | grep -q libSDL3; then
             echo "SDL3 must be linked into the portable binary" >&2
@@ -236,6 +264,14 @@ jobs:
           test -x "$app/Contents/MacOS/IronSeed"
           for type in worker guard officer engineer robot; do
             test -s "$app/Contents/Resources/ai/$type.brain"
+            cmp "assets/ai/$type.brain" "$app/Contents/Resources/ai/$type.brain"
+            for asset in "${type}_reference.isemesh" "${type}_paint_albedo.png"; do
+              relative="models/${type}_reference/$asset"
+              cmp "assets/visual/$relative" "$app/Contents/Resources/visual/$relative"
+            done
+          done
+          for asset in worker_painted_steel_v2.png worker_front_panel_source_v2.png; do
+            cmp "assets/visual/$asset" "$app/Contents/Resources/visual/$asset"
           done
           test "$(lipo -archs "$app/Contents/MacOS/IronSeed")" = "${{ matrix.arch }}"
           codesign --force --deep --sign - "$app"

@@ -129,6 +129,105 @@ EnemyMotionProfile motionProfileFor(const EnemyVisualRole role) noexcept
     return {};
 }
 
+EnemyPartPose attackEventPose(const EnemyVisualRole role,
+    const EnemyAttackVisualKind kind, const std::uint32_t partIndex,
+    const float attackPulse, const bool aiming) noexcept
+{
+    const float pulse = std::isfinite(attackPulse)
+        ? std::clamp(attackPulse, 0.0F, 1.0F) : 0.0F;
+    // Ease the short post-impact motion to rest without a snap at the end.
+    const float strength = pulse * pulse * (3.0F - 2.0F * pulse);
+    if (kind == EnemyAttackVisualKind::Melee) {
+        if (partIndex == 2U && role == EnemyVisualRole::Worker) {
+            // Part 2 is the free hand; the saw is on the opposite arm.
+            return {{0.0F, 0.0F, 0.10F * strength},
+                {-52.0F * strength, 0.0F, -7.0F * strength}};
+        }
+        if (partIndex == 2U && role == EnemyVisualRole::IndustrialRobot) {
+            // The heavy claw strikes while the cannon arm stays steady.
+            return {{0.0F, 0.0F, 0.08F * strength},
+                {-35.0F * strength, 0.0F, -4.0F * strength}};
+        }
+        return {};
+    }
+    if (kind != EnemyAttackVisualKind::Ranged) {
+        return {};
+    }
+    switch (role) {
+    case EnemyVisualRole::Worker:
+        return {};
+    case EnemyVisualRole::Guard:
+        if (partIndex == 2U) {
+            // The left arm reaches across to the receiver's forward support.
+            return {{}, {aiming ? -68.7F + 19.94F * strength : 0.0F,
+                0.0F, aiming ? -53.2F - 1.79F * strength : 0.0F}};
+        }
+        if (partIndex == 3U) {
+            // Keep the right elbow outside the torso while the trigger hand
+            // folds back toward the grip.
+            return {{}, {aiming ? -33.0F : 0.0F, 0.0F,
+                aiming ? -24.0F : 0.0F}};
+        }
+        if (partIndex == 8U) {
+            return {{}, {aiming ? 26.6F - 11.88F * strength : 0.0F,
+                0.0F, aiming ? 14.3F - 25.13F * strength : 0.0F}};
+        }
+        if (partIndex == 9U) {
+            return {{}, {aiming ? -92.5F - 13.5F * strength : 0.0F,
+                aiming ? 19.0F - 7.4F * strength : 0.0F,
+                aiming ? 18.7F + 1.4F * strength : 0.0F}};
+        }
+        if (partIndex == 7U) {
+            // The barrel rests in front of the right shoulder while both
+            // hands have room to contact different grips on the rifle.
+            return {{aiming ? -0.14F : 0.0F,
+                (aiming ? 0.27F : 0.0F) + 0.012F * strength,
+                (aiming ? 0.10F : 0.0F) - 0.085F * strength},
+                {(aiming ? -24.0F : 0.0F) + 2.5F * strength,
+                    aiming ? -68.0F : 0.0F, 0.0F}};
+        }
+        return {};
+    case EnemyVisualRole::Officer:
+        if (partIndex == 3U) {
+            return {{}, {(aiming ? -70.0F : 0.0F)
+                + 8.0F * strength, 0.0F, 0.0F}};
+        }
+        if (partIndex == 7U) {
+            // The compact gun hangs below the hand in the idle model.
+            return {{0.0F, (aiming ? 0.60F : 0.0F) + 0.008F * strength,
+                (aiming ? 0.50F : 0.0F) - 0.065F * strength},
+                {(aiming ? -90.0F : 0.0F) + 4.0F * strength,
+                    0.0F, 0.0F}};
+        }
+        return {};
+    case EnemyVisualRole::Engineer:
+        // The rifle is built into arm 3; part 7 is the repair tool.
+        if (partIndex == 3U) {
+            return {{0.0F, 0.0F, -0.035F * strength},
+                {(aiming ? -80.0F : 0.0F) + 7.0F * strength,
+                    0.0F, 0.0F}};
+        }
+        return {};
+    case EnemyVisualRole::IndustrialRobot:
+        if (partIndex == 3U) {
+            return {{}, {4.0F * strength, 0.0F, 0.0F}};
+        }
+        if (partIndex == 7U) {
+            return {{0.0F, 0.0F, -0.12F * strength},
+                {2.0F * strength, 0.0F, 0.0F}};
+        }
+        return {};
+    }
+    return {};
+}
+
+EnemyPartPose addEnemyPartPoses(
+    const EnemyPartPose& base, const EnemyPartPose& event) noexcept
+{
+    return {base.offset + event.offset,
+        base.rotationDegrees + event.rotationDegrees};
+}
+
 float alertReadinessScale(const EnemyVisualRole role) noexcept
 {
     switch (role) {
@@ -204,8 +303,17 @@ EnemyFallFrame enemyFallFrame(
     };
 }
 
+bool isToolPart(const EnemyVisualRole role,
+    const std::uint32_t partIndex,
+    const std::uint32_t partCount) noexcept
+{
+    return role == EnemyVisualRole::Guard && partCount == 10U
+        ? partIndex == 7U : partIndex + 1U == partCount;
+}
+
 EnemyPartDeathTiming partDeathTiming(
     const wkc::core::Seed visualSeed,
+    const EnemyVisualRole role,
     const std::uint32_t partIndex,
     const std::uint32_t partCount) noexcept
 {
@@ -222,7 +330,7 @@ EnemyPartDeathTiming partDeathTiming(
         timing = {0.18F, 0.77F, 0.97F};
     } else if (partIndex == 3U) {
         timing = {0.22F, 0.79F, 0.98F};
-    } else if (partIndex + 1U == partCount) {
+    } else if (isToolPart(role, partIndex, partCount)) {
         timing = {0.24F, 0.81F, 1.00F};
     } else {
         timing = {0.24F, 0.80F, 0.96F};
@@ -308,7 +416,7 @@ EnemyPartPose terminalDeathPartPose(
             0.0F,
             fall.handedness * (13.0F - (variation * 4.0F)) * articulation}};
     }
-    if (partIndex + 1U == partCount) {
+    if (isToolPart(role, partIndex, partCount)) {
         return {{0.0F, -0.012F * articulation, 0.0F}, {
             (32.0F + (variation * 12.0F)) * articulation,
             variation * 9.0F * articulation,
@@ -478,7 +586,7 @@ EnemyPartPose sampleEnemyRagdollPartPose(
     const float safeProgress = std::isfinite(progress)
         ? std::clamp(progress, 0.0F, 1.0F) : 1.0F;
     const EnemyPartDeathTiming timing = partDeathTiming(
-        visualSeed, partIndex, partCount);
+        visualSeed, role, partIndex, partCount);
     const float variation = seededSignedUnit(visualSeed, partIndex + 19U);
     const float localProgress = smoothProgress(
         (safeProgress - timing.delay)
@@ -599,7 +707,9 @@ EnemyPartPose sampleEnemyPartPose(
     const std::uint32_t partCount,
     const float hitReactionStrength,
     const bool active,
-    const EnemyVisualRole role) noexcept
+    const EnemyVisualRole role,
+    const EnemyAttackVisualKind attackKind,
+    const float attackPulse) noexcept
 {
     if (partIndex >= partCount || partCount == 0U) {
         return {};
@@ -609,6 +719,40 @@ EnemyPartPose sampleEnemyPartPose(
     }
     if (!active) {
         return {};
+    }
+    if (role == EnemyVisualRole::Guard
+        && (partIndex == 8U || partIndex == 9U)) {
+        // Guard forearms are children of parts 2/3 in the reference rig.
+        // Their own pose only bends the elbow; the renderer carries them
+        // through walk, hit and alert motions with their upper arms.
+        return state != EnemyAnimationState::Hit
+                && attackKind == EnemyAttackVisualKind::Ranged
+            ? attackEventPose(role, attackKind, partIndex, attackPulse,
+                state == EnemyAnimationState::Attack
+                    || (std::isfinite(attackPulse) && attackPulse > 0.0F))
+            : EnemyPartPose{};
+    }
+
+    if (state != EnemyAnimationState::Hit
+        && attackKind != EnemyAttackVisualKind::None) {
+        const EnemyPartPose event = attackEventPose(
+            role, attackKind, partIndex, attackPulse,
+            state == EnemyAnimationState::Attack
+                || (std::isfinite(attackPulse) && attackPulse > 0.0F));
+        if (state == EnemyAnimationState::Attack
+            || (role == EnemyVisualRole::Guard
+                && (partIndex == 2U || partIndex == 3U)
+                && std::isfinite(attackPulse) && attackPulse > 0.0F)) {
+            // Attack means the enemy is in range, even while reloading or
+            // holding for an ally. During a Guard's recoil, keep the upper
+            // arm out of its walk cycle so the hand stays on the rifle.
+            return event;
+        }
+        if (event != EnemyPartPose{}) {
+            return addEnemyPartPoses(sampleEnemyPartPose(state,
+                animationTick, visualSeed, partIndex, partCount,
+                hitReactionStrength, active, role), event);
+        }
     }
 
     const float safeHitStrength = std::isfinite(hitReactionStrength)
@@ -625,7 +769,7 @@ EnemyPartPose sampleEnemyPartPose(
         if (partIndex == 2U || partIndex == 3U) {
             return {{}, {profile.hitArmPitch * safeHitStrength, 0.0F, 0.0F}};
         }
-        if (partIndex + 1U == partCount) {
+        if (isToolPart(role, partIndex, partCount)) {
             return {{0.0F, 0.0F,
                 profile.hitToolTravel * safeHitStrength}, {}};
         }
@@ -642,7 +786,7 @@ EnemyPartPose sampleEnemyPartPose(
         if (partIndex == 2U || partIndex == 3U) {
             return {{}, {-8.0F * readiness, 0.0F, 0.0F}};
         }
-        if (partIndex + 1U == partCount) {
+        if (isToolPart(role, partIndex, partCount)) {
             return {{0.0F, 0.0F,
                 profile.attackToolTravel * 0.35F * readiness}, {}};
         }
@@ -675,7 +819,7 @@ EnemyPartPose sampleEnemyPartPose(
         if (partIndex == 2U || partIndex == 3U) {
             return {{}, {-2.0F * readiness, 0.0F, 0.0F}};
         }
-        if (partIndex + 1U == partCount) {
+        if (isToolPart(role, partIndex, partCount)) {
             return {{0.0F, 0.0F,
                 profile.attackToolTravel * 0.10F * readiness}, {}};
         }
@@ -702,7 +846,7 @@ EnemyPartPose sampleEnemyPartPose(
         if (partIndex == 2U || partIndex == 3U) {
             return {{}, {profile.attackArmPitch * impulse, 0.0F, 0.0F}};
         }
-        if (partIndex + 1U == partCount) {
+        if (isToolPart(role, partIndex, partCount)) {
             return {{0.0F, 0.0F, profile.attackToolTravel * impulse}, {}};
         }
         return {};
@@ -1429,6 +1573,36 @@ WeaponReloadPose sampleWeaponReloadPose(
     return pose;
 }
 
+WeaponEquipPresentation sampleWeaponEquipPresentation(
+    const WeaponViewmodelRenderData& weapon) noexcept
+{
+    WeaponEquipPresentation result{weapon, true};
+    if (!weapon.equipTransitionActive) return result;
+    const float progress = std::clamp(
+        std::isfinite(weapon.equipTransitionProgress)
+            ? weapon.equipTransitionProgress : 1.0F, 0.0F, 1.0F);
+    const bool stowing = progress < 0.5F;
+    const float halfProgress = stowing ? progress * 2.0F
+        : (progress - 0.5F) * 2.0F;
+    const float eased = halfProgress * halfProgress * (3.0F - 2.0F * halfProgress);
+    result.weapon.carryMotion = stowing ? eased : 1.0F - eased;
+    if (stowing) {
+        result.weapon.role = weapon.equipOutgoingRole;
+        result.weapon.grenadeSelected = weapon.equipOutgoingGrenade;
+        result.weapon.grenadeVisible = true;
+    }
+    result.weapon.reloadProgress = 0.0F;
+    result.weapon.equipStrength = 0.0F;
+    result.weapon.recoilStrength = 0.0F;
+    result.weapon.meleeStrength = 0.0F;
+    result.weapon.muzzleFlashStrength = 0.0F;
+    result.weapon.aimStrength = 0.0F;
+    result.weapon.gaitWeight = 0.0F;
+    result.visible = (!stowing || weapon.equipOutgoingVisible)
+        && result.weapon.carryMotion < 0.98F;
+    return result;
+}
+
 float sniperScopeStrength(const WeaponViewmodelRenderData& weapon) noexcept
 {
     if (!weapon.visible || weapon.role != HudWeaponRole::Sniper
@@ -1453,6 +1627,33 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
     const float melee = sanitized(weapon.meleeStrength);
     const float crouch = sanitized(weapon.crouchStrength);
     const float airborne = sanitized(weapon.airborneStrength);
+    const float aim = sanitized(weapon.aimStrength);
+    const float gaitWeight = sanitized(weapon.gaitWeight) * (1.0F - airborne)
+        * (1.0F - 0.65F * crouch) * (1.0F - 0.88F * aim);
+    const float phase = std::isfinite(weapon.gaitPhase)
+        ? std::remainder(weapon.gaitPhase, 2.0F * std::numbers::pi_v<float>) : 0.0F;
+    // The near-pass root is shared by weapon, magazine and both hands.
+    // Synchronize a restrained step response without breaking their contacts.
+    const float stepSide = std::sin(phase) * gaitWeight;
+    const float stepLift = (1.0F - std::cos(2.0F * phase)) * 0.5F * gaitWeight;
+    const float carry = sanitized(weapon.carryMotion);
+    const float mountTravel = carry * carry;
+    // These four exits line up with the planned back and belt mounts. The
+    // outgoing item reaches its mount before the incoming one leaves it.
+    const wkc::core::Vec3 carryOffset = weapon.grenadeSelected
+        ? wkc::core::Vec3{-0.73F, -0.75F, -0.10F}
+        : weapon.role == HudWeaponRole::Knife
+            ? wkc::core::Vec3{-0.82F, -0.86F, -0.23F}
+        : weapon.role == HudWeaponRole::Pistol
+            ? wkc::core::Vec3{0.43F, -0.91F, -0.28F}
+            : wkc::core::Vec3{0.33F, 0.72F, -0.55F};
+    const wkc::core::Vec3 carryRotation = weapon.grenadeSelected
+        ? wkc::core::Vec3{12.0F, -18.0F, 68.0F}
+        : weapon.role == HudWeaponRole::Knife
+            ? wkc::core::Vec3{8.0F, -15.0F, 75.0F}
+        : weapon.role == HudWeaponRole::Pistol
+            ? wkc::core::Vec3{12.0F, 18.0F, -62.0F}
+            : wkc::core::Vec3{-27.0F, 42.0F, 48.0F};
     const WeaponReloadPose reloadPose = sampleWeaponReloadPose(
         weapon.role, reload, weapon.reloadRoundCount);
     const float meleeArc = melee > 0.0F
@@ -1462,18 +1663,23 @@ WeaponViewmodelPose sampleWeaponViewmodelPose(
         && weapon.role != HudWeaponRole::Knife ? 0.72F : 1.0F;
     return {
         .offset = {
-            reloadPose.weapon.offset.x - (0.18F * meleeArc),
+            reloadPose.weapon.offset.x - (0.18F * meleeArc) + (0.012F * stepSide)
+                + carryOffset.x * mountTravel,
             (-0.34F * equip) + reloadPose.weapon.offset.y + (0.025F * recoil)
-                - (0.045F * crouch) - (0.025F * airborne),
+                - (0.045F * crouch) - (0.025F * airborne) + (0.009F * stepLift)
+                + carryOffset.y * mountTravel,
             (-0.12F * recoil * mass) + reloadPose.weapon.offset.z
-                + (0.20F * meleeArc) - (0.035F * airborne),
+                + (0.20F * meleeArc) - (0.035F * airborne)
+                + carryOffset.z * mountTravel,
         },
         .rotationDegrees = {
             (-8.0F * recoil * mass) + reloadPose.weapon.rotationDegrees.x
                 - (22.0F * meleeArc) + (3.0F * crouch)
-                + (4.0F * airborne),
-            reloadPose.weapon.rotationDegrees.y + (16.0F * meleeArc),
-            reloadPose.weapon.rotationDegrees.z - (58.0F * meleeArc),
+                + (4.0F * airborne) + carryRotation.x * mountTravel,
+            reloadPose.weapon.rotationDegrees.y + (16.0F * meleeArc)
+                + carryRotation.y * mountTravel,
+            reloadPose.weapon.rotationDegrees.z - (58.0F * meleeArc)
+                + (0.9F * stepSide) + carryRotation.z * mountTravel,
         },
     };
 }

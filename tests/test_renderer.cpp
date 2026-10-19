@@ -1050,7 +1050,7 @@ void testEnemyRootAnimation()
         return true;
     };
     expect(everyPartSettles(EnemyVisualRole::Worker, 8U)
-            && everyPartSettles(EnemyVisualRole::Guard, 8U)
+            && everyPartSettles(EnemyVisualRole::Guard, 10U)
             && everyPartSettles(EnemyVisualRole::Officer, 8U)
             && everyPartSettles(EnemyVisualRole::Engineer, 8U)
             && everyPartSettles(EnemyVisualRole::IndustrialRobot, 9U),
@@ -1223,6 +1223,233 @@ void testEnemyRootAnimation()
         "Attack produces a distinct axial impulse at its peak");
 }
 
+void testEnemyAttackEventPoses()
+{
+    using namespace gdp::game::visual;
+    const auto pose = [](const EnemyVisualRole role,
+                          const EnemyAttackVisualKind kind,
+                          const std::uint32_t part, const float pulse,
+                          const EnemyAnimationState state = EnemyAnimationState::Attack) {
+        return sampleEnemyPartPose(state, 6U, 0U, part,
+            role == EnemyVisualRole::Guard ? 10U : 8U,
+            0.0F, true, role, kind, pulse);
+    };
+
+    const EnemyPartPose workerHand = pose(
+        EnemyVisualRole::Worker, EnemyAttackVisualKind::Melee, 2U, 1.0F);
+    expect(workerHand.rotationDegrees.x < -50.0F
+            && workerHand.offset.z > 0.09F
+            && pose(EnemyVisualRole::Worker,
+                EnemyAttackVisualKind::Melee, 3U, 1.0F) == EnemyPartPose{}
+            && pose(EnemyVisualRole::Worker,
+                EnemyAttackVisualKind::Melee, 7U, 1.0F) == EnemyPartPose{},
+        "Worker punches with the free hand, without thrusting the saw");
+
+    const EnemyPartPose bossClaw = pose(EnemyVisualRole::IndustrialRobot,
+        EnemyAttackVisualKind::Melee, 2U, 1.0F);
+    expect(bossClaw.rotationDegrees.x < -30.0F
+            && bossClaw.rotationDegrees.x > workerHand.rotationDegrees.x
+            && pose(EnemyVisualRole::IndustrialRobot,
+                EnemyAttackVisualKind::Melee, 3U, 1.0F) == EnemyPartPose{}
+            && pose(EnemyVisualRole::IndustrialRobot,
+                EnemyAttackVisualKind::Melee, 7U, 1.0F) == EnemyPartPose{},
+        "Boss strikes with the heavy claw while the cannon stays still");
+
+    for (const EnemyVisualRole role : {EnemyVisualRole::Officer,
+             EnemyVisualRole::IndustrialRobot}) {
+        expect(pose(role, EnemyAttackVisualKind::Ranged, 7U, 1.0F).offset.z
+                < pose(role, EnemyAttackVisualKind::Ranged, 7U, 0.0F).offset.z
+                && pose(role, EnemyAttackVisualKind::Ranged, 3U, 1.0F)
+                    .rotationDegrees.x
+                    > pose(role, EnemyAttackVisualKind::Ranged, 3U, 0.0F)
+                        .rotationDegrees.x,
+            "ranged weapons and their carrying arms recoil together");
+    }
+    expect(pose(EnemyVisualRole::Guard,
+               EnemyAttackVisualKind::Ranged, 7U, 1.0F).offset.z
+                < pose(EnemyVisualRole::Guard,
+                    EnemyAttackVisualKind::Ranged, 7U, 0.0F).offset.z
+            && pose(EnemyVisualRole::Guard,
+                EnemyAttackVisualKind::Ranged, 9U, 1.0F).rotationDegrees.x
+                < pose(EnemyVisualRole::Guard,
+                    EnemyAttackVisualKind::Ranged, 9U, 0.0F).rotationDegrees.x,
+        "Guard's rifle and right trigger forearm recoil together");
+    expect(pose(EnemyVisualRole::Guard,
+               EnemyAttackVisualKind::Ranged, 2U, 1.0F).rotationDegrees.x
+                > pose(EnemyVisualRole::Guard,
+                    EnemyAttackVisualKind::Ranged, 2U, 0.0F)
+                    .rotationDegrees.x
+            && pose(EnemyVisualRole::Officer,
+                EnemyAttackVisualKind::Ranged, 2U, 1.0F) == EnemyPartPose{},
+        "Guard's supporting hand follows the rifle; Officer's free hand does not fire");
+    expect(pose(EnemyVisualRole::Engineer,
+               EnemyAttackVisualKind::Ranged, 3U, 1.0F).offset.z < 0.0F
+            && pose(EnemyVisualRole::Engineer,
+                EnemyAttackVisualKind::Ranged, 2U, 1.0F) == EnemyPartPose{}
+            && pose(EnemyVisualRole::Engineer,
+                EnemyAttackVisualKind::Ranged, 7U, 1.0F) == EnemyPartPose{},
+        "Engineer recoils the rifle arm, leaving the repair tool still");
+
+    const EnemyPartPose full = pose(EnemyVisualRole::IndustrialRobot,
+        EnemyAttackVisualKind::Ranged, 7U, 1.0F);
+    const EnemyPartPose half = pose(EnemyVisualRole::IndustrialRobot,
+        EnemyAttackVisualKind::Ranged, 7U, 0.5F);
+    expect(half.offset.z < 0.0F && half.offset.z > full.offset.z
+            && pose(EnemyVisualRole::IndustrialRobot,
+                EnemyAttackVisualKind::Ranged, 7U, 0.0F) == EnemyPartPose{}
+            && pose(EnemyVisualRole::IndustrialRobot,
+                EnemyAttackVisualKind::Ranged, 7U,
+                std::numeric_limits<float>::quiet_NaN()) == EnemyPartPose{},
+        "shot recoil fades smoothly and invalid pulses return to rest");
+    expect(pose(EnemyVisualRole::Guard,
+               EnemyAttackVisualKind::Ranged, 7U, 1.0F,
+               EnemyAnimationState::Dead)
+                == sampleEnemyPartPose(EnemyAnimationState::Dead,
+                    6U, 0U, 7U, 10U, 0.0F, true, EnemyVisualRole::Guard)
+            && pose(EnemyVisualRole::Guard,
+                EnemyAttackVisualKind::Ranged, 7U, 1.0F,
+                EnemyAnimationState::Hit)
+                == sampleEnemyPartPose(EnemyAnimationState::Hit,
+                    6U, 0U, 7U, 10U, 0.0F, true, EnemyVisualRole::Guard),
+        "death and hit reactions override an outstanding attack pulse");
+    const EnemyPartPose walkingBase = sampleEnemyPartPose(
+        EnemyAnimationState::Walk, 6U, 0U, 3U, 8U, 0.0F, true,
+        EnemyVisualRole::Engineer);
+    const EnemyPartPose walkingShot = pose(EnemyVisualRole::Engineer,
+        EnemyAttackVisualKind::Ranged, 3U, 1.0F,
+        EnemyAnimationState::Walk);
+    expect(walkingShot.rotationDegrees.x < walkingBase.rotationDegrees.x - 60.0F
+            && walkingShot.offset.z < walkingBase.offset.z,
+        "a real shot remains visible while the enemy changes movement state");
+    for (const std::uint32_t part : {2U, 3U, 7U, 8U, 9U}) {
+        expect(pose(EnemyVisualRole::Guard,
+                   EnemyAttackVisualKind::Ranged, part, 0.5F,
+                   EnemyAnimationState::Walk)
+                == pose(EnemyVisualRole::Guard,
+                    EnemyAttackVisualKind::Ranged, part, 0.5F),
+            "Guard's grip stays fixed while a shot changes movement state");
+    }
+
+    // These endpoints and pivots come from the ISEMESH1 reference exports.
+    // Test the same transform order as the renderer: T(pivot + offset)
+    // * Rx * Ry * Rz * T(-pivot).
+    const auto posedPoint = [](const wkc::core::Vec3 point,
+                               const wkc::core::Vec3 pivot,
+                               const EnemyPartPose partPose) {
+        constexpr float radians = std::numbers::pi_v<float> / 180.0F;
+        const wkc::core::Mat4 model
+            = wkc::core::translationMatrix(pivot + partPose.offset)
+            * wkc::core::rotationXMatrix(
+                partPose.rotationDegrees.x * radians)
+            * wkc::core::rotationYMatrix(
+                partPose.rotationDegrees.y * radians)
+            * wkc::core::rotationZMatrix(
+                partPose.rotationDegrees.z * radians)
+            * wkc::core::translationMatrix(pivot * -1.0F);
+        return wkc::core::Vec3{
+            model.elements[0] * point.x + model.elements[4] * point.y
+                + model.elements[8] * point.z + model.elements[12],
+            model.elements[1] * point.x + model.elements[5] * point.y
+                + model.elements[9] * point.z + model.elements[13],
+            model.elements[2] * point.x + model.elements[6] * point.y
+                + model.elements[10] * point.z + model.elements[14],
+        };
+    };
+    const auto forwardAligned = [](const wkc::core::Vec3 rear,
+                                   const wkc::core::Vec3 muzzle) {
+        const wkc::core::Vec3 direction
+            = wkc::core::normalized(muzzle - rear);
+        return std::abs(direction.x) < 0.08F
+            && std::abs(direction.y) < 0.20F && direction.z > 0.97F;
+    };
+
+    const EnemyPartPose guardAim = pose(EnemyVisualRole::Guard,
+        EnemyAttackVisualKind::Ranged, 7U, 0.0F);
+    const wkc::core::Vec3 guardPivot{0.0F, 1.073F, 0.246F};
+    const wkc::core::Vec3 guardMuzzle = posedPoint(
+        {0.682F, 0.805F, 0.560F}, guardPivot, guardAim);
+    const wkc::core::Vec3 guardRear = posedPoint(
+        {0.259F, 1.005F, 0.391F}, guardPivot, guardAim);
+    expect(forwardAligned(guardRear, guardMuzzle)
+            && guardMuzzle.x < -0.15F && guardMuzzle.x > -0.21F
+            && guardMuzzle.y > 1.37F && guardMuzzle.y < 1.44F
+            && guardMuzzle.z > 1.09F && guardMuzzle.z < 1.18F,
+        "Guard aims the rifle beside its right shoulder at shoulder height");
+    // Weapon contacts come from the exported rifle grip (t=0.78) and
+    // forward receiver support (t=1.30). Each hand is now on a forearm
+    // child, so both shoulder and elbow transforms must be applied.
+    const auto guardGripErrorsAt = [&](const float pulse) {
+        const EnemyPartPose riflePose = pose(EnemyVisualRole::Guard,
+            EnemyAttackVisualKind::Ranged, 7U, pulse);
+        const wkc::core::Vec3 triggerGrip = posedPoint(
+            {-0.130076F, 1.084548F, 0.250912F}, guardPivot, riflePose);
+        const wkc::core::Vec3 forwardSupport = posedPoint(
+            {0.038764F, 1.056857F, 0.310524F}, guardPivot, riflePose);
+        const wkc::core::Vec3 leftHand = posedPoint(posedPoint(
+            {0.269159F, 0.851215F, 0.262430F},
+            {0.376822F, 1.059813F, 0.003364F},
+            pose(EnemyVisualRole::Guard, EnemyAttackVisualKind::Ranged, 8U, pulse)),
+            {0.319626F, 1.372710F, 0.003364F},
+            pose(EnemyVisualRole::Guard, EnemyAttackVisualKind::Ranged, 2U, pulse));
+        const wkc::core::Vec3 rightHand = posedPoint(posedPoint(
+            {-0.269159F, 0.851215F, 0.262430F},
+            {-0.376822F, 1.059813F, 0.003364F},
+            pose(EnemyVisualRole::Guard, EnemyAttackVisualKind::Ranged, 9U, pulse)),
+            {-0.319626F, 1.372710F, 0.003364F},
+            pose(EnemyVisualRole::Guard, EnemyAttackVisualKind::Ranged, 3U, pulse));
+        return std::array{wkc::core::length(leftHand - forwardSupport),
+            wkc::core::length(rightHand - triggerGrip)};
+    };
+    for (const float pulse : {0.0F, 0.5F, 1.0F}) {
+        const auto errors = guardGripErrorsAt(pulse);
+        expect(errors[0] < 0.015F && errors[1] < 0.015F,
+            "Guard's left support and right trigger hand stay on the rifle during recoil");
+    }
+
+    const EnemyPartPose officerAim = pose(EnemyVisualRole::Officer,
+        EnemyAttackVisualKind::Ranged, 7U, 0.0F);
+    const wkc::core::Vec3 officerPivot{-0.380F, 0.653F, 0.121F};
+    const wkc::core::Vec3 officerMuzzle = posedPoint(
+        {-0.431F, 0.385F, 0.135F}, officerPivot, officerAim);
+    const wkc::core::Vec3 officerRear = posedPoint(
+        {-0.431F, 0.595F, 0.135F}, officerPivot, officerAim);
+    expect(forwardAligned(officerRear, officerMuzzle)
+            && officerMuzzle.y > 1.20F && officerMuzzle.z > 0.82F,
+        "Officer raises its sidearm and points the barrel forward");
+    const wkc::core::Vec3 officerHand = posedPoint(
+        {-0.340F, 0.774F, 0.044F}, {-0.336F, 1.366F, 0.0F},
+        pose(EnemyVisualRole::Officer, EnemyAttackVisualKind::Ranged, 3U, 0.0F));
+    const wkc::core::Vec3 officerGrip = posedPoint(
+        {-0.343F, 0.767F, 0.047F}, officerPivot, officerAim);
+    expect(wkc::core::length(officerHand - officerGrip) < 0.17F,
+        "Officer's raised hand remains near the sidearm grip");
+
+    const EnemyPartPose engineerAim = pose(EnemyVisualRole::Engineer,
+        EnemyAttackVisualKind::Ranged, 3U, 0.0F);
+    const wkc::core::Vec3 engineerPivot{-0.343F, 1.390F, 0.0F};
+    const wkc::core::Vec3 engineerMuzzle = posedPoint(
+        {-0.404F, 0.333F, 0.124F}, engineerPivot, engineerAim);
+    const wkc::core::Vec3 engineerRear = posedPoint(
+        {-0.404F, 0.626F, 0.124F}, engineerPivot, engineerAim);
+    expect(forwardAligned(engineerRear, engineerMuzzle)
+            && engineerMuzzle.y > 1.27F && engineerMuzzle.z > 1.0F,
+        "Engineer raises its integrated rifle while the repair tool stays low");
+
+    const EnemyPartPose bossAim = pose(EnemyVisualRole::IndustrialRobot,
+        EnemyAttackVisualKind::Ranged, 7U, 0.0F);
+    const wkc::core::Vec3 bossPivot{-0.671F, 1.068F, 0.225F};
+    expect(forwardAligned(posedPoint(
+               {-0.679F, 0.998F, 0.400F}, bossPivot, bossAim),
+               posedPoint({-0.679F, 0.998F, 0.699F}, bossPivot, bossAim)),
+        "Boss cannon retains its forward barrel while aiming");
+    expect(pose(EnemyVisualRole::Guard,
+               EnemyAttackVisualKind::Ranged, 7U, 0.0F,
+               EnemyAnimationState::Idle)
+                == sampleEnemyPartPose(EnemyAnimationState::Idle,
+                    6U, 0U, 7U, 8U, 0.0F, true, EnemyVisualRole::Guard),
+        "weapon raise is absent from idle and only appears during combat");
+}
+
 void testImpactVisualData()
 {
     using namespace gdp::game::visual;
@@ -1297,6 +1524,59 @@ void testWeaponViewmodelPose()
     expect(equip.offset.y < -0.3F,
         "equip animation introduces the weapon from below the frame");
 
+    WeaponViewmodelRenderData exchange{
+        .visible = true, .role = HudWeaponRole::Carbine,
+        .equipTransitionActive = true,
+        .equipOutgoingRole = HudWeaponRole::Pistol,
+        .equipTransitionProgress = 0.0F,
+    };
+    const auto oldGrip = sampleWeaponEquipPresentation(exchange);
+    exchange.equipTransitionProgress = 0.25F;
+    const auto holstering = sampleWeaponEquipPresentation(exchange);
+    exchange.equipTransitionProgress = 0.5F;
+    const auto exchangePoint = sampleWeaponEquipPresentation(exchange);
+    exchange.equipTransitionProgress = 0.75F;
+    const auto drawing = sampleWeaponEquipPresentation(exchange);
+    exchange.equipTransitionProgress = 1.0F;
+    const auto newGrip = sampleWeaponEquipPresentation(exchange);
+    expect(oldGrip.weapon.role == HudWeaponRole::Pistol
+            && holstering.weapon.role == HudWeaponRole::Pistol
+            && holstering.weapon.carryMotion > 0.0F
+            && exchangePoint.weapon.role == HudWeaponRole::Carbine
+            && !exchangePoint.visible
+            && drawing.weapon.role == HudWeaponRole::Carbine
+            && drawing.weapon.carryMotion > 0.0F
+            && newGrip.visible && newGrip.weapon.carryMotion == 0.0F,
+        "the old gun reaches its holster before the new gun leaves its mount");
+    exchange.equipOutgoingVisible = false;
+    exchange.equipTransitionProgress = 0.25F;
+    expect(!sampleWeaponEquipPresentation(exchange).visible,
+        "dropping a gun does not draw a ghost gun during its outgoing phase");
+    exchange = {.visible = true, .grenadeSelected = true,
+        .role = HudWeaponRole::Knife, .equipTransitionActive = true,
+        .equipOutgoingRole = HudWeaponRole::Pistol,
+        .equipTransitionProgress = 0.25F};
+    expect(!sampleWeaponEquipPresentation(exchange).weapon.grenadeSelected,
+        "the pistol remains in hand while moving toward the right hip");
+    exchange.equipTransitionProgress = 0.75F;
+    expect(sampleWeaponEquipPresentation(exchange).weapon.grenadeSelected,
+        "the grenade leaves the front-left belt only after the pistol is stowed");
+    const auto pistolMount = sampleWeaponViewmodelPose({
+        .role = HudWeaponRole::Pistol, .carryMotion = 1.0F});
+    const auto knifeMount = sampleWeaponViewmodelPose({
+        .role = HudWeaponRole::Knife, .carryMotion = 1.0F});
+    const auto primaryMount = sampleWeaponViewmodelPose({
+        .role = HudWeaponRole::Carbine, .carryMotion = 1.0F});
+    const auto grenadeMount = sampleWeaponViewmodelPose({
+        .grenadeSelected = true, .role = HudWeaponRole::Knife,
+        .carryMotion = 1.0F});
+    expect(pistolMount.offset.x > 0.35F && pistolMount.offset.y < -0.8F
+            && knifeMount.offset.x < -0.7F && knifeMount.offset.y < -0.8F
+            && primaryMount.offset.y > 0.6F
+            && grenadeMount.offset.x < -0.6F
+            && grenadeMount.offset.y < -0.7F,
+        "carry trajectories reach back, right hip, left hip and front-left belt");
+
     const WeaponViewmodelPose knifeSwing = sampleWeaponViewmodelPose({
         .visible = true,
         .role = HudWeaponRole::Knife,
@@ -1317,6 +1597,24 @@ void testWeaponViewmodelPose()
             && movementPose.rotationDegrees.x > 6.0F,
         "crouch and airborne movement keep a restrained first-person weapon response");
 
+    const WeaponViewmodelPose step = sampleWeaponViewmodelPose({
+        .visible = true, .gaitPhase = 1.57079632679F, .gaitWeight = 1.0F,
+    });
+    const WeaponViewmodelPose aimedStep = sampleWeaponViewmodelPose({
+        .visible = true, .gaitPhase = 1.57079632679F, .gaitWeight = 1.0F,
+        .aimStrength = 1.0F,
+    });
+    const WeaponViewmodelPose airborneStep = sampleWeaponViewmodelPose({
+        .visible = true, .airborneStrength = 1.0F,
+        .gaitPhase = 1.57079632679F, .gaitWeight = 1.0F,
+    });
+    expect(step.offset.x > idle.offset.x && step.offset.y > idle.offset.y,
+        "walking moves the shared weapon and hand frame with the body gait");
+    expect(std::abs(aimedStep.offset.x) < std::abs(step.offset.x) * 0.2F,
+        "aiming quiets the step response without changing the firing ray");
+    expect(nearlyEqual(airborneStep.offset.x, 0.0F, 1.0e-5F),
+        "airborne pose does not keep a walking sway");
+
     const WeaponViewmodelPose invalid = sampleWeaponViewmodelPose({
         .visible = true,
         .recoilStrength = std::numeric_limits<float>::quiet_NaN(),
@@ -1325,6 +1623,8 @@ void testWeaponViewmodelPose()
         .meleeStrength = std::numeric_limits<float>::quiet_NaN(),
         .crouchStrength = std::numeric_limits<float>::infinity(),
         .airborneStrength = -2.0F,
+        .gaitPhase = std::numeric_limits<float>::quiet_NaN(),
+        .gaitWeight = std::numeric_limits<float>::infinity(),
     });
     expect(invalid == idle,
         "weapon pose sanitizes non-finite and out-of-range animation input");
@@ -2135,6 +2435,7 @@ void testPlayerBody()
 {
     using namespace gdp::game::visual;
     using namespace wkc::core;
+    constexpr float pi = std::numbers::pi_v<float>;
     PlayerBodyMotion motion;
     updatePlayerBodyMotion(motion,{0,0,0},{0,0,-.1F},-90,true,true,1.0F/60);
     expect(motion.phaseRadians > 0 && motion.forward > .1F,
@@ -2150,6 +2451,20 @@ void testPlayerBody()
     for (int i = 0; i < 10; ++i)
         updatePlayerBodyMotion(motion,{0,0,0},{.1F,0,0},-90,true,true,1.0F/60);
     expect(motion.right > .99F,"strafe gait uses yaw-local direction");
+    PlayerBodyMotion slowMotion, briskMotion;
+    for (int i = 0; i < 20; ++i) {
+        updatePlayerBodyMotion(slowMotion,{0,0,0},{0,0,-.003F},-90,true,true,1.0F/60);
+        updatePlayerBodyMotion(briskMotion,{0,0,0},{0,0,-.03F},-90,true,true,1.0F/60);
+    }
+    expect(slowMotion.weight > .09F && slowMotion.weight < .11F
+            && briskMotion.weight > .99F,
+        "near-still post-collision motion gives a short step while walking gives a full step");
+    const float beforeStopWeight = briskMotion.weight;
+    const float beforeStopPhase = briskMotion.phaseRadians;
+    updatePlayerBodyMotion(briskMotion,{},{},-90,true,true,1.0F/60);
+    expect(briskMotion.phaseRadians == beforeStopPhase
+            && briskMotion.weight < beforeStopWeight && briskMotion.weight > 0.0F,
+        "blocked walking fades the planted pose without a phase jump");
     const auto beforeAir = motion.phaseRadians;
     for (int i = 0; i < 20; ++i)
         updatePlayerBodyMotion(motion,{0,0,0},{.02F,.02F,0},-90,false,true,1.0F/60);
@@ -2175,6 +2490,37 @@ void testPlayerBody()
     }
     expect(triangles <= 2200U,"body stays within the four-draw 2200-triangle budget");
     std::cout << "Player body triangles=" << triangles << " materials=4 bones=7\n";
+    const auto stance = samplePlayerBodyPose({.visible=true,.gaitPhase=pi/2,
+        .gaitWeight=1,.forwardMovement=1});
+    const auto reverse = samplePlayerBodyPose({.visible=true,.gaitPhase=pi/2,
+        .gaitWeight=1,.forwardMovement=-1});
+    const auto strafe = samplePlayerBodyPose({.visible=true,.gaitPhase=pi/2,
+        .gaitWeight=1,.rightMovement=1});
+    expect(stance.ankles[0].z < reverse.ankles[0].z-.2F
+            && strafe.ankles[0].x > stance.ankles[0].x+.08F,
+        "forward, reverse and strafe place the swinging foot in travel direction");
+    const auto crouched = samplePlayerBodyPose({.visible=true,.crouchAmount=1});
+    const auto airborne = samplePlayerBodyPose({.visible=true,.airborneStrength=1});
+    const auto standing = samplePlayerBodyPose({.visible=true});
+    expect(crouched.hips[0].y < standing.hips[0].y-.45F
+            && airborne.ankles[0].y > standing.ankles[0].y+.1F,
+        "crouch lowers the pelvis and jump tucks the feet");
+    // Sample neighboring points across swing, stance, stop, and landing; a
+    // frame-sized change must not teleport either ankle or the pelvis.
+    const auto nearPose = [](const PlayerBodyRenderData a,
+                             const PlayerBodyRenderData b) {
+        const auto first = samplePlayerBodyPose(a);
+        const auto second = samplePlayerBodyPose(b);
+        return length(first.hips[0]-second.hips[0]) < .08F
+            && length(first.ankles[0]-second.ankles[0]) < .08F
+            && length(first.ankles[1]-second.ankles[1]) < .08F;
+    };
+    expect(nearPose({.gaitPhase=pi-.02F,.gaitWeight=1,.forwardMovement=1},
+                    {.gaitPhase=pi+.02F,.gaitWeight=1,.forwardMovement=1})
+            && nearPose({.gaitPhase=1,.gaitWeight=1,.forwardMovement=1},
+                        {.gaitPhase=1,.gaitWeight=.88F,.forwardMovement=1})
+            && nearPose({.airborneStrength=1}, {.airborneStrength=.87F}),
+        "swing-to-stance, blocked stop and landing poses blend continuously");
     for (float crouch : {0.0F,.5F,1.0F}) for (float air : {0.0F,1.0F})
     for (float direction : {-1.0F,0.0F,1.0F}) for (float gait : {0.0F,1.1F,3.3F}) {
         const PlayerBodyRenderData body{.visible=true,.crouchAmount=crouch,
@@ -2234,6 +2580,7 @@ int main()
     testExitConfirmationLayout();
     testRunTimeFormatting();
     testEnemyRootAnimation();
+    testEnemyAttackEventPoses();
     testImpactVisualData();
     testWeaponViewmodelPose();
     testSniperScopePresentation();

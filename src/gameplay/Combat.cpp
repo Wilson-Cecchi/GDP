@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <numbers>
+#include <string_view>
 #include <vector>
 
 namespace gdp::gameplay {
@@ -81,6 +83,110 @@ wkc::core::Aabb enemyWeakPointBounds(
     };
 }
 
+// Use the accepted mesh-aligned hit profile by default. An explicit zero keeps
+// the legacy geometry available for comparison and diagnosis.
+bool referenceEnemyHitboxesEnabledImpl() noexcept
+{
+    const char* const value = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
+    return value == nullptr || std::string_view{value} != "0";
+}
+
+using EnemyZones = std::array<wkc::core::Aabb, 6>;
+
+// Assembled-space bounds of parts 0..5 (torso, head, arms, legs), expanded by
+// a few centimetres for movement. Parts 6+ are backpacks, weapons and tools.
+const EnemyZones& referenceEnemyZones(
+    const gdp::entities::EnemyArchetype archetype) noexcept
+{
+    using B = wkc::core::Aabb;
+    static const EnemyZones worker{{
+        B{{-.43F, .76F, -.20F}, {.43F, 1.47F, .33F}},
+        B{{-.20F, 1.47F, -.13F}, {.20F, 1.86F, .25F}},
+        B{{.30F, .44F, -.17F}, {.61F, 1.54F, .23F}},
+        B{{-.61F, .72F, -.17F}, {-.34F, 1.54F, .23F}},
+        B{{.06F, 0.F, -.24F}, {.41F, .98F, .37F}},
+        B{{-.41F, 0.F, -.24F}, {-.06F, .98F, .37F}},
+    }};
+    static const EnemyZones guard{{
+        B{{-.39F, .79F, -.17F}, {.39F, 1.46F, .31F}},
+        B{{-.21F, 1.46F, -.13F}, {.21F, 1.81F, .24F}},
+        B{{.18F, .79F, -.15F}, {.51F, 1.53F, .33F}},
+        B{{-.51F, .79F, -.15F}, {-.18F, 1.53F, .33F}},
+        B{{.03F, 0.F, -.17F}, {.38F, .99F, .33F}},
+        B{{-.38F, 0.F, -.17F}, {-.03F, .99F, .33F}},
+    }};
+    static const EnemyZones officer{{
+        B{{-.29F, .79F, -.17F}, {.29F, 1.49F, .27F}},
+        B{{-.22F, 1.49F, -.14F}, {.22F, 1.82F, .25F}},
+        B{{.24F, .66F, -.17F}, {.55F, 1.53F, .21F}},
+        B{{-.55F, .66F, -.17F}, {-.24F, 1.53F, .21F}},
+        B{{.02F, 0.F, -.18F}, {.36F, .99F, .33F}},
+        B{{-.36F, 0.F, -.18F}, {-.02F, .99F, .33F}},
+    }};
+    static const EnemyZones engineer{{
+        B{{-.34F, .80F, -.16F}, {.34F, 1.46F, .29F}},
+        B{{-.23F, 1.46F, -.12F}, {.23F, 1.88F, .23F}},
+        B{{.25F, .72F, -.15F}, {.52F, 1.54F, .21F}},
+        B{{-.52F, .27F, -.15F}, {-.25F, 1.54F, .27F}},
+        B{{.03F, 0.F, -.19F}, {.34F, 1.00F, .35F}},
+        B{{-.34F, 0.F, -.19F}, {-.03F, 1.00F, .35F}},
+    }};
+    static const EnemyZones robot{{
+        B{{-.49F, .94F, -.30F}, {.49F, 1.90F, .39F}},
+        B{{-.26F, 1.90F, -.13F}, {.26F, 2.18F, .33F}},
+        B{{.36F, .47F, -.21F}, {.90F, 1.99F, .36F}},
+        B{{-.83F, 1.06F, -.21F}, {-.36F, 1.99F, .31F}},
+        B{{.04F, 0.F, -.26F}, {.51F, 1.26F, .49F}},
+        B{{-.51F, 0.F, -.26F}, {-.04F, 1.26F, .49F}},
+    }};
+    using gdp::entities::EnemyArchetype;
+    switch (archetype) {
+    case EnemyArchetype::Worker: return worker;
+    case EnemyArchetype::Guard: return guard;
+    case EnemyArchetype::Officer: return officer;
+    case EnemyArchetype::Engineer: return engineer;
+    case EnemyArchetype::IndustrialRobot: return robot;
+    }
+    return worker;
+}
+
+struct EnemyZoneHit {
+    float distance{0.0F};
+    HitZone zone{HitZone::Standard};
+};
+
+std::optional<EnemyZoneHit> referenceEnemyHit(
+    const wkc::core::Vec3 origin, const wkc::core::Vec3 direction,
+    const float maximumDistance, const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy) noexcept
+{
+    const wkc::core::Vec3 relative = origin - entity.transform.position;
+    const float radians = entity.transform.rotationDegrees.y
+        * (std::numbers::pi_v<float> / 180.0F);
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    const auto toLocal = [cosine, sine](const wkc::core::Vec3 value) {
+        return wkc::core::Vec3{
+            cosine * value.x - sine * value.z,
+            value.y,
+            sine * value.x + cosine * value.z,
+        };
+    };
+    const wkc::core::Vec3 localOrigin = toLocal(relative);
+    const wkc::core::Vec3 localDirection = toLocal(direction);
+    std::optional<EnemyZoneHit> nearest;
+    const EnemyZones& zones = referenceEnemyZones(enemy.archetype);
+    for (std::size_t part = 0; part < zones.size(); ++part) {
+        const auto interval = rayAabbInterval(
+            localOrigin, localDirection, zones[part], maximumDistance);
+        if (interval && (!nearest || interval->nearDistance < nearest->distance)) {
+            nearest = EnemyZoneHit{interval->nearDistance,
+                part == 1U ? HitZone::WeakPoint : HitZone::Standard};
+        }
+    }
+    return nearest;
+}
+
 float firstWorldDistance(
     const wkc::core::Vec3 origin,
     const wkc::core::Vec3 direction,
@@ -148,6 +254,40 @@ ImpactMaterial propImpactMaterial(
 }
 
 } // namespace
+
+bool referenceEnemyHitboxesEnabled() noexcept
+{
+    return referenceEnemyHitboxesEnabledImpl();
+}
+
+bool referenceEnemyBodyContainsPoint(
+    const wkc::core::Vec3 point,
+    const gdp::entities::Entity& entity,
+    const gdp::entities::EnemyData& enemy,
+    const float padding) noexcept
+{
+    const float radians = entity.transform.rotationDegrees.y
+        * (std::numbers::pi_v<float> / 180.0F);
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    const wkc::core::Vec3 relative = point - entity.transform.position;
+    const wkc::core::Vec3 local{
+        cosine * relative.x - sine * relative.z,
+        relative.y,
+        sine * relative.x + cosine * relative.z};
+    const float margin = std::max(0.0F, padding);
+    for (const wkc::core::Aabb& zone : referenceEnemyZones(enemy.archetype)) {
+        if (local.x >= zone.minimum.x - margin
+            && local.x <= zone.maximum.x + margin
+            && local.y >= zone.minimum.y - margin
+            && local.y <= zone.maximum.y + margin
+            && local.z >= zone.minimum.z - margin
+            && local.z <= zone.maximum.z + margin) {
+            return true;
+        }
+    }
+    return false;
+}
 
 wkc::core::Vec3 applyDeterministicWeaponSpread(
     wkc::core::Vec3 direction,
@@ -247,6 +387,9 @@ DamageOutcome applyDamage(
     enemy->avoidanceSide = 0;
     enemy->hitReactionTime = 0.0F;
     enemy->lastKnownPlayerPosition = {};
+    enemy->knowledgeSource = gdp::entities::EnemyKnowledgeSource::None;
+    enemy->knowledgeAgeSeconds = 0.0F;
+    enemy->directSightPreviousUpdate = false;
     enemy->investigationTime = 0.0F;
     enemy->alertTime = 0.0F;
     enemy->recoverTime = 0.0F;
@@ -353,14 +496,24 @@ static ShotContact traceHitscan(
             || enemy->behavior == gdp::entities::EnemyBehaviorState::Dead) {
             continue;
         }
-        const auto interval = rayAabbInterval(origin, direction, enemyBounds(*entity), range);
-        if (!interval) {
-            continue;
+        float hitDistance = 0.0F;
+        HitZone hitZone = HitZone::Standard;
+        if (referenceEnemyHitboxesEnabled()) {
+            const auto hit = referenceEnemyHit(
+                origin, direction, range, *entity, *enemy);
+            if (!hit) continue;
+            hitDistance = hit->distance;
+            hitZone = hit->zone;
+        } else {
+            const auto interval = rayAabbInterval(
+                origin, direction, enemyBounds(*entity), range);
+            if (!interval) continue;
+            const auto weakPointInterval = rayAabbInterval(
+                origin, direction, enemyWeakPointBounds(*entity, *enemy), range);
+            hitDistance = weakPointInterval
+                ? weakPointInterval->nearDistance : interval->nearDistance;
+            hitZone = weakPointInterval ? HitZone::WeakPoint : HitZone::Standard;
         }
-        const auto weakPointInterval = rayAabbInterval(
-            origin, direction, enemyWeakPointBounds(*entity, *enemy), range);
-        const float hitDistance = weakPointInterval
-            ? weakPointInterval->nearDistance : interval->nearDistance;
         if (hitDistance >= worldDistance
             || (nearestHit && hitDistance >= nearestHit->distance)) {
             continue;
@@ -369,7 +522,7 @@ static ShotContact traceHitscan(
             id,
             origin + (direction * hitDistance),
             hitDistance,
-            weakPointInterval ? HitZone::WeakPoint : HitZone::Standard,
+            hitZone,
         };
     }
 

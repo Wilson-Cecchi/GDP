@@ -100,13 +100,16 @@ andar, essa interação mostra a vitória.
 O encontro inclui o IndustrialRobot e seus ajudantes. Um ajudante que sair da
 sala durante a perseguição continua pertencendo ao encontro; um inimigo de
 outra sala que entrar não passa a fazer parte dele. O robô detecta
-até 34 m e pode disparar o canhão até 32 m enquanto
+até 34 m e pode disparar sua metralhadora até 32 m enquanto
 avança, inclusive nas fases de pressão e perseguição. O primeiro disparo após
 avistar o jogador tem preparo de 0,45 s; o projétil viaja a 30 m/s e a
-cobertura sólida bloqueia a linha de visão ou o tiro. Em Normal, os danos por
-acerto das três fases são 18/15/20 HP, com intervalos de 1,25/0,85/0,65 s,
-antes dos modificadores de dificuldade e armadura. Esses números são uma
-candidata de balanceamento e exigem playtest com o cérebro ativo empacotado.
+cobertura sólida bloqueia a linha de visão ou o tiro. Em Normal, cada bala
+causa 8,5/7,08/9,44 HP nas três fases: a cadência acelera de 0,70 s a 0,16 s
+entre disparos, com 12 balas por carregador e recarga de 2,4 s. O ataque
+corpo a corpo da fase final mantém seu dano próprio. Objetos quebráveis
+interceptados pelos projéteis do Boss recebem dano. Os números e o fluxo
+completo estão em [Boss — rajada progressiva](boss_machinegun_2026-10-18.md)
+e exigem playtest com o cérebro ativo empacotado.
 
 Ao abrir uma porta para uma sala ainda não visitada, os inimigos dessa sala
 recebem uma janela de reação de 1,25 s sem disparar. A primeira entrada renova

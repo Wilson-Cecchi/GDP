@@ -116,8 +116,11 @@ void updatePlayerBodyMotion(PlayerBodyMotion& motion, const Vec3 previousFeet,
     if (!std::isfinite(distance) || distance > 0.50F || std::abs(delta.y) > 0.50F || !alive) {
         motion = {}; return;
     }
-    const bool walking = grounded && distance > 1.0e-5F;
-    motion.weight = approach(safe(motion.weight,0,1),walking ? 1.0F : 0.0F,7.0F*seconds);
+    const float speed = distance / seconds;
+    const bool walking = grounded && speed > 0.05F;
+    // Small post-collision movements must not produce a full-length stride.
+    const float strideStrength = walking ? std::clamp(speed / 1.8F, 0.0F, 1.0F) : 0.0F;
+    motion.weight = approach(safe(motion.weight,0,1),strideStrength,7.0F*seconds);
     motion.airborne = approach(safe(motion.airborne,0,1),grounded ? 0.0F : 1.0F,8.0F*seconds);
     if (!walking) return;
     motion.phaseRadians = std::fmod(motion.phaseRadians + distance/3.20F*2.0F*pi,2.0F*pi);
@@ -140,14 +143,20 @@ PlayerBodyPose samplePlayerBodyPose(const PlayerBodyRenderData& body) noexcept
     const float forward = safe(body.forwardMovement,-1,1), right = safe(body.rightMovement,-1,1);
     // Eyes naturally sit ahead of the waist. Keep the upper body behind them,
     // instead of covering the legs with an artificial waist disk looking down.
-    const Vec3 pelvisOffset{0,-0.02F-0.50F*crouch-0.07F*air,0.17F+0.11F*crouch};
+    // Two shallow rises per gait cycle make the torso settle over each planted
+    // foot. The same smoothed gait weight also fades the motion on a stop.
+    const float gaitBob = 0.012F*weight*(1.0F-std::cos(2.0F*phase))*0.5F;
+    const Vec3 pelvisOffset{0,-0.02F-0.50F*crouch-0.07F*air+gaitBob,
+        0.17F+0.11F*crouch};
     pose.skin[0] = translationMatrix(pelvisOffset);
     for (unsigned int leg = 0U; leg < 2U; ++leg) {
         const float x = leg == 0U ? -0.15F : 0.15F;
-        const float step = std::sin(phase+static_cast<float>(leg)*pi)*weight;
+        const float cycle = std::sin(phase+static_cast<float>(leg)*pi);
+        const float step = cycle*weight;
+        const float swing = std::max(0.0F,cycle);
         const Vec3 bindHip{x,1.0F,0}, bindKnee{x,0.56F,0}, bindAnkle{x,0.13F,0};
         const Vec3 hip = bindHip + pelvisOffset;
-        Vec3 ankle{x+step*0.12F*right,0.13F+0.18F*air+std::max(0.0F,step)*0.10F,
+        Vec3 ankle{x+step*0.12F*right,0.13F+0.18F*air+swing*swing*weight*0.10F,
             -step*0.18F*forward-0.06F*air};
         const Vec3 direction = normalized(ankle - hip);
         const float distance = std::clamp(length(ankle-hip),0.15F,thighLength+calfLength-0.005F);
@@ -160,7 +169,10 @@ PlayerBodyPose samplePlayerBodyPose(const PlayerBodyRenderData& body) noexcept
         const unsigned int first = leg == 0U ? 1U : 4U;
         pose.skin[first] = bone(bindHip,hip,knee);
         pose.skin[first+1U] = bone(bindKnee,knee,ankle);
-        pose.skin[first+2U] = translationMatrix(ankle-bindAnkle);
+        // Toes clear the floor during swing and settle flat for stance.
+        const float toePitch = 0.12F*swing*weight*(1.0F-air)+0.07F*air;
+        pose.skin[first+2U] = translationMatrix(ankle)
+            * rotationXMatrix(toePitch) * translationMatrix(bindAnkle*-1.0F);
     }
     return pose;
 }

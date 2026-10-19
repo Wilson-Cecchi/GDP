@@ -64,6 +64,31 @@ constexpr float weaponRecoilDuration = 0.12F;
 constexpr float weaponMeleeDuration = 0.28F;
 constexpr float weaponMuzzleFlashDuration = 0.055F;
 constexpr float weaponEquipDuration = 0.48F;
+constexpr float grenadeEquipDuration = 0.66F;
+
+float equipPresentationDuration(const gameplay::WeaponArchetype archetype) noexcept
+{
+    switch (archetype) {
+    case gameplay::WeaponArchetype::Sniper: return 0.82F;
+    case gameplay::WeaponArchetype::Shotgun: return 0.75F;
+    case gameplay::WeaponArchetype::SubmachineGun: return 0.68F;
+    case gameplay::WeaponArchetype::Carbine: return 0.72F;
+    case gameplay::WeaponArchetype::Knife: return 0.55F;
+    default: return 0.60F;
+    }
+}
+
+visual::HudWeaponRole viewmodelRole(const gameplay::WeaponArchetype archetype) noexcept
+{
+    switch (archetype) {
+    case gameplay::WeaponArchetype::Carbine: return visual::HudWeaponRole::Carbine;
+    case gameplay::WeaponArchetype::Sniper: return visual::HudWeaponRole::Sniper;
+    case gameplay::WeaponArchetype::Shotgun: return visual::HudWeaponRole::Shotgun;
+    case gameplay::WeaponArchetype::SubmachineGun: return visual::HudWeaponRole::SubmachineGun;
+    case gameplay::WeaponArchetype::Knife: return visual::HudWeaponRole::Knife;
+    default: return visual::HudWeaponRole::Pistol;
+    }
+}
 
 visual::ObjectiveRenderState campaignMissionObjective(
     const gameplay::CampaignMissionState& mission) noexcept
@@ -917,6 +942,10 @@ bool Application::initializeRun()
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = weaponEquipDuration;
+    presentedWeapon_ = weapon_.definition().archetype;
+    equipOutgoingWeapon_ = presentedWeapon_;
+    presentedGrenade_ = equipOutgoingGrenade_ = equipOutgoingVisible_ = false;
+    equipSequenceRemaining_ = equipSequenceDuration_ = 0.0F;
     latestSpeedrunRecordResult_ = gameplay::SpeedrunRecordResult::Ineligible;
     runDifficulty_ = session_.state().mode == gameplay::RunMode::Campaign
         ? gameplay::campaignDifficultyMultiplier(session_.state().campaignFloor, session_.state().difficulty)
@@ -1205,6 +1234,14 @@ bool Application::initializeRun()
         log(LogLevel::Warning,
             "Campaign started without a persistent floor checkpoint");
     }
+    // The first equipped item also enters from its mount, including the
+    // Carbine granted by the development arena after the initial reset.
+    presentedWeapon_ = weapon_.definition().archetype;
+    equipOutgoingWeapon_ = presentedWeapon_;
+    presentedGrenade_ = equipOutgoingGrenade_ = equipOutgoingVisible_ = false;
+    equipSequenceDuration_ = equipPresentationDuration(presentedWeapon_);
+    equipSequenceRemaining_ = equipSequenceDuration_ * 0.5F;
+    weaponEquipRemaining_ = 0.0F;
     gameplay::closeMainMenu(mainMenu_);
     controlsMenuActive_ = false;
     input_ = Input{};
@@ -1860,6 +1897,10 @@ bool Application::returnToMainMenu()
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
+    presentedWeapon_ = weapon_.definition().archetype;
+    equipOutgoingWeapon_ = presentedWeapon_;
+    presentedGrenade_ = equipOutgoingGrenade_ = equipOutgoingVisible_ = false;
+    equipSequenceRemaining_ = equipSequenceDuration_ = 0.0F;
     restartRequested_ = false;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
@@ -2248,10 +2289,12 @@ void Application::fixedUpdate(const double fixedStep)
         && weapon_.definition().archetype != gameplay::WeaponArchetype::Knife
         && gameplay::controlDown(runtimeSettings_.controls, runtimeSettings_.gamepadControls, gameplay::ControlAction::Aim, input_);
     const bool scopeBlocked = weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper
-        && (weapon_.reloading() || weapon_.switching() || weaponEquipRemaining_ > 0.0F);
+        && (weapon_.reloading() || weapon_.switching()
+            || weaponEquipRemaining_ > 0.0F || equipSequenceRemaining_ > 0.0F);
     aimBlend_ = gameplay::advanceWeaponAimBlend(aimBlend_, step,
         weapon_.definition().archetype, aimRequested,
-        scopeBlocked || grenadeSelected_ || !player_.state().alive
+        scopeBlocked || grenadeSelected_ || equipSequenceRemaining_ > 0.0F
+            || !player_.state().alive
             || session_.state().phase != gameplay::SessionPhase::Playing);
     weaponRecoilRemaining_
         = std::max(0.0F, weaponRecoilRemaining_ - step);
@@ -2261,6 +2304,8 @@ void Application::fixedUpdate(const double fixedStep)
         = std::max(0.0F, weaponMuzzleFlashRemaining_ - step);
     weaponEquipRemaining_
         = std::max(0.0F, weaponEquipRemaining_ - step);
+    equipSequenceRemaining_
+        = std::max(0.0F, equipSequenceRemaining_ - step);
     if (grenadeThrowRemaining_ > 0.0F) {
         grenadeThrowRemaining_ = std::max(0.0F, grenadeThrowRemaining_ - step);
         if (grenadeThrowRemaining_ == 0.0F) {
@@ -2291,7 +2336,8 @@ void Application::fixedUpdate(const double fixedStep)
     }
     if (!player_.state().alive) {
         weapon_.cancelQueuedShotgunFire();
-    } else if (firePending_ && !grenadeSelected_ && !quickMeleePending_) {
+    } else if (firePending_ && equipSequenceRemaining_ <= 0.0F
+        && !grenadeSelected_ && !quickMeleePending_) {
         (void)weapon_.queueShotgunFireDuringReload();
     }
     weapon_.fixedUpdate(step);
@@ -2325,6 +2371,34 @@ void Application::fixedUpdate(const double fixedStep)
                     weapon_.definition().archetype));
     }
     weaponSwitchPending_.reset();
+    const auto syncEquipVisual = [this] {
+        const gameplay::WeaponArchetype selectedWeapon
+            = weapon_.definition().archetype;
+        if (selectedWeapon == presentedWeapon_
+            && grenadeSelected_ == presentedGrenade_) return;
+        const bool earlierItemStillShown = equipSequenceRemaining_ > 0.0F
+            && equipSequenceDuration_ > 0.0F
+            && equipSequenceRemaining_ > equipSequenceDuration_ * 0.5F;
+        const gameplay::WeaponArchetype sourceWeapon = earlierItemStillShown
+            ? equipOutgoingWeapon_ : presentedWeapon_;
+        const bool sourceGrenade = earlierItemStillShown
+            ? equipOutgoingGrenade_ : presentedGrenade_;
+        equipOutgoingWeapon_ = sourceWeapon;
+        equipOutgoingGrenade_ = sourceGrenade;
+        equipOutgoingVisible_ = sourceGrenade
+            ? grenadeThrowRemaining_ <= 0.0F && player_.state().grenades > 0U
+            : weapon_.ownsWeapon(sourceWeapon);
+        presentedWeapon_ = selectedWeapon;
+        presentedGrenade_ = grenadeSelected_;
+        equipSequenceDuration_ = grenadeSelected_ ? grenadeEquipDuration
+            : equipPresentationDuration(selectedWeapon);
+        equipSequenceRemaining_ = equipSequenceDuration_
+            * (equipOutgoingVisible_ ? 1.0F : 0.5F);
+        aimBlend_ = 0.0F;
+        reloadPending_ = dropPending_ = firePending_ = quickMeleePending_ = false;
+        fireHeld_ = false;
+    };
+    syncEquipVisual();
     entities::Entity* playerEntity = entities_.find(player_.entity());
     std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
     const auto awardProgress = [this](
@@ -2551,7 +2625,11 @@ void Application::fixedUpdate(const double fixedStep)
         }
     }
 
-    if (dropPending_) {
+    if (equipSequenceRemaining_ > 0.0F) {
+        dropPending_ = false;
+        reloadPending_ = false;
+    }
+    if (dropPending_ && equipSequenceRemaining_ <= 0.0F) {
         if (playerEntity != nullptr && world_) {
             const auto room = std::find_if(world_->rooms.begin(), world_->rooms.end(),
                 [playerRoom](const world::RoomInstance& candidate) {
@@ -2643,7 +2721,8 @@ void Application::fixedUpdate(const double fixedStep)
         awardProgress(gameplay::ProgressionEvent::LootCollected,
             static_cast<std::uint32_t>(loot.rewardableCollected));
     }
-    if (reloadPending_ && player_.state().alive) {
+    if (reloadPending_ && equipSequenceRemaining_ <= 0.0F
+        && player_.state().alive) {
         if (weapon_.reload()) {
             if (weapon_.definition().archetype == gameplay::WeaponArchetype::Sniper)
                 aimBlend_ = 0.0F;
@@ -2679,7 +2758,8 @@ void Application::fixedUpdate(const double fixedStep)
     float grenadeThrowChargeSeconds = 0.0F;
     float grenadeThrowFuseSeconds = gameplay::grenadeFuseSeconds;
     if (grenadeSelected_ && player_.state().alive) {
-        if (firePending_ && !grenadeCook_.active()
+        if (firePending_ && equipSequenceRemaining_ <= 0.0F
+            && !grenadeCook_.active()
             && grenadeThrowRemaining_ <= 0.0F) {
             if (player_.state().grenades > 0U) {
                 if (grenadeCook_.begin()) (void)player_.useGrenade();
@@ -2705,8 +2785,10 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
     }
-    const bool quickMelee = quickMeleePending_;
-    const bool fireRequested = quickMelee || (!grenadeSelected_
+    const bool quickMelee = quickMeleePending_
+        && equipSequenceRemaining_ <= 0.0F;
+    const bool fireRequested = quickMelee || (equipSequenceRemaining_ <= 0.0F
+        && !grenadeSelected_
         && gameplay::weaponFireRequested(
             weapon_, firePending_, fireHeld_));
     if (fireRequested && player_.state().alive) {
@@ -3054,16 +3136,79 @@ void Application::fixedUpdate(const double fixedStep)
             entities_, player_, enemyRoom, enemyCollision, step,
             difficultyConfigs.engineer, roomPerception,
             brainFor(entities::EnemyArchetype::Engineer)).attacksLanded;
-        attacksLanded += gameplay::updateIndustrialRobots(
+        const gameplay::EnemyUpdateSummary bossUpdate
+            = gameplay::updateIndustrialRobots(
             entities_, player_, enemyRoom, enemyCollision, step,
             difficultyConfigs.industrialRobot, roomPerception,
-            brainFor(entities::EnemyArchetype::IndustrialRobot)).attacksLanded;
+            brainFor(entities::EnemyArchetype::IndustrialRobot));
+        attacksLanded += bossUpdate.attacksLanded;
+        if (audio_ && bossUpdate.reloadsStarted > 0U) {
+            for (const entities::EntityId id
+                 : entities_.query(entities::EntityKind::Enemy)) {
+                const entities::Entity* entity = entities_.find(id);
+                const entities::EnemyData* enemy
+                    = entities_.findData<entities::EnemyData>(id);
+                if (entity != nullptr && enemy != nullptr
+                    && entity->roomId == enemyRoom
+                    && enemy->archetype == entities::EnemyArchetype::IndustrialRobot
+                    && enemy->reloadRemaining > 0.0F) {
+                    audio_->playAt(gdp::audio::AudioEventKind::Reload,
+                        config_.worldSeed, 0xB0550004ULL,
+                        entity->transform.position,
+                        player_.cameraPosition(), player_.forwardDirection());
+                }
+            }
+        }
+    }
+    if (audio_) {
+        // Repeat four procedural variants instead of caching a new PCM clip
+        // for every round of a long Boss encounter.
+        for (const gameplay::EnemyProjectile& shot : spawnedProjectiles) {
+            const entities::EnemyData* shooter
+                = entities_.findData<entities::EnemyData>(shot.source);
+            if (shooter != nullptr && shooter->archetype
+                == entities::EnemyArchetype::IndustrialRobot) {
+                audio_->playAt(gdp::audio::AudioEventKind::WeaponFire,
+                    config_.worldSeed,
+                    0xB0550000ULL | (audioEventCounter_++ & 3ULL),
+                    shot.position,
+                    player_.cameraPosition(), player_.forwardDirection());
+            }
+        }
     }
     enemyProjectiles_.spawn(spawnedProjectiles);
+    bool propsDestroyedByEnemies = false;
     for (const gameplay::EnemyProjectileEvent& event
-         : enemyProjectiles_.update(step, player_, collisionWorld_, entities_)) {
+         : enemyProjectiles_.update(step, player_, baseCollisionWorld_, entities_)) {
         if (event.hitPlayer) {
             ++attacksLanded;
+        }
+        if (event.hitProp.isValid()) {
+            const entities::Entity* propEntity = entities_.find(event.hitProp);
+            if (event.destroyedProp) {
+                propsDestroyedByEnemies = true;
+                if (event.spawnedDrop.isValid() && world_) {
+                    const entities::Entity* item = entities_.find(event.spawnedDrop);
+                    if (item != nullptr) {
+                        const auto room = std::find_if(
+                            world_->rooms.begin(), world_->rooms.end(),
+                            [item](const world::RoomInstance& candidate) {
+                                return candidate.id == item->roomId;
+                            });
+                        if (room != world_->rooms.end())
+                            room->entities.push_back(event.spawnedDrop);
+                    }
+                }
+            }
+            if (propEntity != nullptr && audio_) {
+                audio_->playAt(event.destroyedProp
+                        ? gdp::audio::AudioEventKind::PropDestroyed
+                        : gdp::audio::AudioEventKind::PropImpact,
+                    config_.worldSeed,
+                    0xB0550010ULL | (audioEventCounter_++ & 3ULL),
+                    propEntity->transform.position,
+                    player_.cameraPosition(), player_.forwardDirection());
+            }
         }
         if (event.hitEnemy.isValid() && audio_) {
             if (const entities::Entity* target = entities_.find(event.hitEnemy)) {
@@ -3076,6 +3221,10 @@ void Application::fixedUpdate(const double fixedStep)
                     player_.cameraPosition(), player_.forwardDirection());
             }
         }
+    }
+    if (propsDestroyedByEnemies) {
+        collisionWorld_ = gameplay::collisionWorldWithProps(
+            baseCollisionWorld_, entities_, playerRoom);
     }
     if (world_) {
         gameplay::updateEnemyRoomMembership(*world_, entities_);
@@ -3403,6 +3552,7 @@ void Application::fixedUpdate(const double fixedStep)
         audio_->update(step);
     }
     updateEnemyAnimationTransitions(false);
+    syncEquipVisual();
     ++enemyAnimationTicks_;
     ++fixedUpdates_;
 }
@@ -3593,6 +3743,7 @@ void Application::render()
         return std::find(visibleRoomIds.begin(), visibleRoomIds.end(), roomId)
             != visibleRoomIds.end();
     };
+    const bool referenceEnemyModels = gameplay::referenceEnemyHitboxesEnabled();
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
@@ -3632,6 +3783,18 @@ void Application::render()
                     0.0F, 1.0F),
                 previousAnimationState,
                 animationTransitionBlend,
+                !referenceEnemyModels
+                    ? visual::EnemyAttackVisualKind::None
+                    : enemy->lastAttackKind == 2U
+                    ? visual::EnemyAttackVisualKind::Melee
+                    : enemy->lastAttackKind == 1U
+                    ? visual::EnemyAttackVisualKind::Ranged
+                    : enemy->archetype == entities::EnemyArchetype::Worker
+                    ? visual::EnemyAttackVisualKind::Melee
+                    : visual::EnemyAttackVisualKind::Ranged,
+                referenceEnemyModels
+                    ? std::clamp(enemy->attackVisualTime / 0.28F, 0.0F, 1.0F)
+                    : 0.0F,
             });
         }
     }
@@ -4329,6 +4492,7 @@ void Application::render()
         }
         if (hud.prompt == visual::HudPrompt::None && !grenadeSelected_
             && !weapon_.reloading() && !weapon_.switching()
+            && equipSequenceRemaining_ <= 0.0F
             && weapon_.magazineAmmo() == 0U
             && weapon_.reserveAmmo() > 0U) {
             hud.prompt = visual::HudPrompt::Reload;
@@ -4377,9 +4541,9 @@ void Application::render()
             ? visual::HudWeaponRole::Knife : hud.weapon,
         .recoilStrength = weaponRecoilRemaining_ / weaponRecoilDuration,
         .reloadProgress = grenadeSelected_ ? 0.0F : weapon_.reloadProgress(),
-        .equipStrength = std::max(
-            weaponEquipRemaining_ / weaponEquipDuration,
-            weapon_.switchStrength()),
+        .equipStrength = equipSequenceRemaining_ > 0.0F ? 0.0F
+            : std::max(weaponEquipRemaining_ / weaponEquipDuration,
+                weapon_.switchStrength()),
         .meleeStrength = weaponMeleeRemaining_ / weaponMeleeDuration,
         .crouchStrength = player_.state().crouchAmount,
         .airborneStrength = player_.state().grounded ? 0.0F
@@ -4388,6 +4552,14 @@ void Application::render()
                 0.0F, 1.0F),
         .muzzleFlashStrength
             = weaponMuzzleFlashRemaining_ / weaponMuzzleFlashDuration,
+        .gaitPhase = playerBodyMotion_.phaseRadians,
+        .gaitWeight = playerBodyMotion_.weight,
+        .equipTransitionActive = equipSequenceRemaining_ > 0.0F,
+        .equipOutgoingRole = viewmodelRole(equipOutgoingWeapon_),
+        .equipOutgoingGrenade = equipOutgoingGrenade_ && equipOutgoingVisible_,
+        .equipOutgoingVisible = equipOutgoingVisible_,
+        .equipTransitionProgress = equipSequenceDuration_ > 0.0F
+            ? 1.0F - equipSequenceRemaining_ / equipSequenceDuration_ : 1.0F,
         .overdrive = weapon_.overdriveActive(),
         .visualSeed = wkc::core::hashCombine(
             config_.worldSeed,
@@ -4398,6 +4570,7 @@ void Application::render()
         .reloadRoundCount = weapon_.reloadRoundCount(),
         .aimStrength = !grenadeSelected_ && !pauseMenu_.paused && !controlsMenuActive_
                 && !weapon_.reloading() && !weapon_.switching()
+                && equipSequenceRemaining_ <= 0.0F
             ? aimBlend_ : 0.0F,
     };
     currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
@@ -4485,6 +4658,10 @@ void Application::shutdown()
     weaponMeleeRemaining_ = 0.0F;
     weaponMuzzleFlashRemaining_ = 0.0F;
     weaponEquipRemaining_ = 0.0F;
+    presentedWeapon_ = weapon_.definition().archetype;
+    equipOutgoingWeapon_ = presentedWeapon_;
+    presentedGrenade_ = equipOutgoingGrenade_ = equipOutgoingVisible_ = false;
+    equipSequenceRemaining_ = equipSequenceDuration_ = 0.0F;
     audioEventCounter_ = 0U;
     uiAudioEventCounter_ = 0U;
     impactVisualCounter_ = 0U;
