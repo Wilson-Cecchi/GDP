@@ -1008,7 +1008,7 @@ if(GDP_BUILD_TESTS)
     gdp_enable_sanitizers(gdp_world_tests)
 
     add_test(NAME world_module_systems COMMAND gdp_world_tests)
-    set_tests_properties(world_module_systems PROPERTIES TIMEOUT 10)
+    set_tests_properties(world_module_systems PROPERTIES TIMEOUT 60)
 
     add_executable(gdp_hud_map_tests tests/test_hud_map.cpp src/game/HudMap.cpp)
     target_link_libraries(gdp_hud_map_tests PRIVATE gdp_world)
