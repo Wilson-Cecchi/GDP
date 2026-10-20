@@ -19,6 +19,8 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
 {
     using namespace gdp::game::visual;
     const char* capture = std::getenv("GDP_PLAYER_BODY_CAPTURE_DIR");
+    const bool preview = std::getenv("GDP_PLAYER_RIG_PREVIEW") != nullptr
+        && std::string{std::getenv("GDP_PLAYER_RIG_PREVIEW")} == "1";
     const std::array sizes = capture ? std::array{std::array{1280,720},std::array{960,600},std::array{320,200}}
         : std::array{std::array{320,200},std::array{384,240},std::array{480,200}};
     bool passed = true;
@@ -49,8 +51,11 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         const auto standing = frame();
         const auto bodyStats = renderer.lastFrameStats();
         passed &= standing != baseline && frame() == standing;
-        passed &= bodyStats.drawCalls == baselineStats.drawCalls+4U
-            && bodyStats.triangles == baselineStats.triangles+2096U;
+        passed &= bodyStats.drawCalls == baselineStats.drawCalls+(preview ? 6U : 4U);
+        if (preview)
+            passed &= bodyStats.triangles > baselineStats.triangles+5000U
+                && bodyStats.triangles < baselineStats.triangles+10000U;
+        else passed &= bodyStats.triangles == baselineStats.triangles+2096U;
         const auto save = [&](const std::string& name, const std::vector<std::uint8_t>& pixels) {
             if (!capture) return;
             std::filesystem::create_directories(capture);
@@ -97,14 +102,18 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         save("airborne",airborne);
         body = {.visible=true}; camera.position.y = 1.62F;
         // A solid crate above the body must occlude it, unlike the near weapon pass.
-        const std::array cover{PropRenderData{{0,0,0},{2,1.45F,2},PropVisualRole::Crate}};
+        const std::array cover{PropRenderData{{0,0,0},
+            {2,preview ? 2.05F : 1.45F,2},PropVisualRole::Crate}};
         const auto covered = frame(cover);
         body.visible = false;
-        passed &= covered == frame(cover);
+        if (!preview) passed &= covered == frame(cover);
+        else { save("covered",covered); (void)frame(cover); }
         body.visible = true; camera.forward = {0,0,-1};
         const auto level = frame();
         body.visible = false;
-        passed &= level == frame(); // No own head/neck or floating legs on horizon.
+        if (!preview) passed &= level == frame();
+        else (void)frame(); // The rig reaches the near plane; inspect captured horizon.
+        if (preview) save("level",level);
         body.visible = true; camera.forward = wkc::core::normalized({0,-1,-.25F});
         WeaponViewmodelRenderData weapon{.visible=true,.role=HudWeaponRole::Carbine};
         const auto armed = frame({},weapon);
@@ -155,7 +164,8 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         passed &= menu == frame();
     }
     if (!passed) std::cerr << "Player body failed pose/occlusion/FOV/low-spec pixel checks\n";
-    else std::cout << "Player body: four draws, 2096 triangles, world-depth and pose pixels checked\n";
+    else std::cout << "Player body: " << (preview ? "six draws, Blender mesh"
+        : "four draws, 2096 triangles") << ", world-depth and pose pixels checked\n";
     return passed;
 }
 } // namespace

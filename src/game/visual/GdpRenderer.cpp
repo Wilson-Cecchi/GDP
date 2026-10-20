@@ -774,6 +774,47 @@ bool GdpRenderer::initialize(const int width, const int height)
             || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
             || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
     }
+    playerRigPreview_ = std::getenv("GDP_PLAYER_RIG_PREVIEW") != nullptr
+        && std::string_view{std::getenv("GDP_PLAYER_RIG_PREVIEW")} == "1";
+    if (playerRigPreview_) {
+        const char* const basePath = SDL_GetBasePath();
+        const std::filesystem::path base = basePath != nullptr
+            ? std::filesystem::path{basePath} : std::filesystem::path{};
+        constexpr std::string_view relative = "models/player_rig/player_rig.isplayer";
+        const std::array candidates{
+            base / "visual" / relative,
+            base / "../Resources/visual" / relative,
+            std::filesystem::path{"assets/visual"} / relative,
+        };
+        std::string reason = "file not found";
+        for (const auto& path : candidates) {
+            std::error_code error;
+            if (!std::filesystem::exists(path,error)) continue;
+            playerRigAsset_ = loadPlayerRigAsset(path,&reason);
+            if (playerRigAsset_) {
+                wkc::core::log(wkc::core::LogLevel::Info,
+                    "Loaded Player Blender preview " + path.string());
+            }
+            break;
+        }
+        if (!playerRigAsset_) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Cannot load Player Blender preview: " + reason);
+            return false;
+        }
+        constexpr std::array<std::array<std::uint8_t,3U>,playerRigMaterialCount> colors{{
+            {100U,105U,110U}, {119U,121U,124U}, {78U,82U,86U},
+            {63U,67U,72U}, {130U,135U,140U}, {43U,47U,52U},
+        }};
+        for (std::size_t material = 0; material < playerRigMaterialCount; ++material) {
+            wkc::render::ImageData albedo;
+            albedo.width = albedo.height = 1;
+            albedo.rgba = {colors[material][0],colors[material][1],
+                colors[material][2],255U};
+            if (!playerRigMeshes_[material].upload(gl_,playerRigAsset_->meshes[material])
+                || !playerRigAlbedo_[material].upload(gl_,albedo)) return false;
+        }
+    }
     const auto handsMeshes = makePlayerHandsMeshes();
     const auto singleHandMeshes = makePlayerHandsMeshes(false);
     for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
@@ -2750,6 +2791,33 @@ bool GdpRenderer::render(
         && hud.objective != ObjectiveRenderState::Victory
         && hud.objective != ObjectiveRenderState::Defeat) {
         const auto pose = samplePlayerBodyPose(playerBody);
+        if (playerRigPreview_ && playerRigAsset_) {
+            const auto palette = samplePlayerRigPalette(
+                *playerRigAsset_,playerBody,weaponViewmodel);
+            constexpr std::array<const char*,playerRigBoneCount> boneUniforms{
+                "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]",
+                "uPlayerBones[3]", "uPlayerBones[4]", "uPlayerBones[5]",
+                "uPlayerBones[6]", "uPlayerBones[7]", "uPlayerBones[8]",
+                "uPlayerBones[9]", "uPlayerBones[10]", "uPlayerBones[11]",
+                "uPlayerBones[12]", "uPlayerBones[13]", "uPlayerBones[14]",
+                "uPlayerBones[15]", "uPlayerBones[16]", "uPlayerBones[17]",
+                "uPlayerBones[18]"};
+            shader.setInt(gl_,"uPlayerSkinning",1);
+            shader.setMat4(gl_,"uModel",pose.root);
+            for (std::size_t i = 0; i < playerRigBoneCount; ++i)
+                shader.setMat4(gl_,boneUniforms[i],palette[i]);
+            shader.setVec3(gl_,"uTint",{1,1,1});
+            shader.setVec2(gl_,"uUvScale",{1,1});
+            shader.setVec2(gl_,"uUvOffset",{});
+            shader.setInt(gl_,"uUseEmissionMap",0);
+            shader.setInt(gl_,"uDetailedMaterial",0);
+            shader.setFloat(gl_,"uEmissiveStrength",0.0F);
+            for (std::size_t material = 0; material < playerRigMaterialCount; ++material) {
+                playerRigAlbedo_[material].bind(gl_,textureBindings_,0U);
+                drawMesh(playerRigMeshes_[material]);
+            }
+            shader.setInt(gl_,"uPlayerSkinning",0);
+        } else {
         constexpr std::array<const char*, playerBodyBoneCount> boneUniforms{
             "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]", "uPlayerBones[3]",
             "uPlayerBones[4]", "uPlayerBones[5]", "uPlayerBones[6]"};
@@ -2771,6 +2839,7 @@ bool GdpRenderer::render(
             drawMesh(playerBodyMeshes_[material]);
         }
         shader.setInt(gl_, "uPlayerSkinning", 0);
+        }
     }
 
     // Draw translucent blast volumes after opaque world geometry, so walls

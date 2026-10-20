@@ -166,14 +166,16 @@ data: 2026-10-18
 prancha: visual/proposals/player_body_proposal_v4.png
 contrato: visual/proposals/player_body_proposal_v4.md
 decisão do usuário sobre a prancha v4: usar como referência para modelagem no Blender em 2026-10-20
-implementação: blockout Blender criado em assets/visual/models/player_rig.blend; a build mantém o corpo v1
+implementação: blockout Blender criado; prévia opt-in GDP_PLAYER_RIG_PREVIEW=1 na build local; corpo v1 permanece padrão
 estado: REFERÊNCIA DE MODELAGEM APROVADA; VALIDAÇÃO VISUAL EM JOGO PENDENTE
 ```
 
 O pedido de animação definiu locais de guarda e saque. O usuário autorizou a
 prancha v4 como referência para o modelo e rig em Blender. O relatório técnico
 está em `visual/validation/player_blender_rig/REPORT.md`. A integração na build
-e a aceitação da aparência animada em partida serão validadas separadamente.
+está disponível como prévia de teste, com capturas em
+`visual/validation/player_blender_game/`. A aceitação da aparência animada em
+partida continua pendente; esta prévia não promove a v4 como visual padrão.
 
 ### Player presentation/Torso + Belt — v3 (histórico)
 

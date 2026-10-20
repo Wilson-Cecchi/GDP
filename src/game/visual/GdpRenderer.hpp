@@ -7,6 +7,7 @@
 #include "game/visual/WeaponViewmodelAssets.hpp"
 #include "game/visual/PlayerHandsAssets.hpp"
 #include "game/visual/PlayerBodyAssets.hpp"
+#include "game/visual/PlayerRigAsset.hpp"
 #include "resources/AssetCache.hpp"
 #include "render/Camera.hpp"
 #include "render/Framebuffer.hpp"
@@ -301,6 +302,10 @@ private:
     std::array<WeaponGpuMaterial, weaponMaterialCount> weaponMaterials_{};
     std::array<wkc::render::Mesh, playerBodyMaterialCount> playerBodyMeshes_{};
     std::array<WeaponGpuMaterial, playerBodyMaterialCount> playerBodyMaterials_{};
+    bool playerRigPreview_{false};
+    std::optional<PlayerRigAsset> playerRigAsset_{};
+    std::array<wkc::render::Mesh, playerRigMaterialCount> playerRigMeshes_{};
+    std::array<wkc::render::Texture, playerRigMaterialCount> playerRigAlbedo_{};
     std::array<wkc::render::Mesh, playerHandsMaterialCount> playerHandsMeshes_{};
     std::array<wkc::render::Mesh, playerHandsMaterialCount> playerSingleHandMeshes_{};
     std::array<WeaponGpuMaterial, playerHandsMaterialCount> playerHandsMaterials_{};

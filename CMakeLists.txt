@@ -285,6 +285,7 @@ add_library(
     src/game/Localization.cpp
     src/game/visual/WeaponViewmodelAssets.cpp
     src/game/visual/PlayerBodyAssets.cpp
+    src/game/visual/PlayerRigAsset.cpp
     src/game/visual/PlayerHandsAssets.cpp
 )
 
@@ -416,6 +417,7 @@ function(gdp_copy_enemy_visual_assets target_name)
     file(GLOB_RECURSE enemy_model_assets CONFIGURE_DEPENDS
         RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.isemesh"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.isplayer"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.png")
     foreach(relative_asset IN LISTS enemy_model_assets)
         get_filename_component(relative_dir "${relative_asset}" DIRECTORY)
@@ -496,7 +498,7 @@ if(WIN32)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
     install(DIRECTORY assets/ai/ DESTINATION ai FILES_MATCHING PATTERN "*.brain")
     install(DIRECTORY assets/visual/ DESTINATION visual FILES_MATCHING
-        PATTERN "*.png" PATTERN "*.isemesh")
+        PATTERN "*.png" PATTERN "*.isemesh" PATTERN "*.isplayer")
 
     set(GDP_SDL_SHARED_TARGET "")
     if(TARGET SDL3::SDL3-shared)
@@ -545,7 +547,7 @@ if(UNIX AND NOT APPLE AND GDP_PORTABLE_PACKAGE)
     install(TARGETS gdp RUNTIME DESTINATION bin)
     install(DIRECTORY assets/ai/ DESTINATION bin/ai FILES_MATCHING PATTERN "*.brain")
     install(DIRECTORY assets/visual/ DESTINATION bin/visual FILES_MATCHING
-        PATTERN "*.png" PATTERN "*.isemesh")
+        PATTERN "*.png" PATTERN "*.isemesh" PATTERN "*.isplayer")
     install(PROGRAMS packaging/linux/gdp packaging/linux/updater.py DESTINATION .)
     install(FILES packaging/linux/release-signing-public.pem DESTINATION .)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/version.txt" DESTINATION .)
@@ -563,7 +565,7 @@ endif()
 if(APPLE AND GDP_PORTABLE_PACKAGE)
     install(TARGETS gdp BUNDLE DESTINATION .)
     install(DIRECTORY assets/visual/ DESTINATION IronSeed.app/Contents/Resources/visual
-        FILES_MATCHING PATTERN "*.png" PATTERN "*.isemesh")
+        FILES_MATCHING PATTERN "*.png" PATTERN "*.isemesh" PATTERN "*.isplayer")
     install(FILES README_MACOS.md DESTINATION .)
     install(FILES assets/fonts/LICENSE-DejaVu.txt
         DESTINATION IronSeed.app/Contents/Resources/licenses)
@@ -573,6 +575,14 @@ if(APPLE AND GDP_PORTABLE_PACKAGE)
 endif()
 
 if(GDP_BUILD_TESTS)
+    add_executable(gdp_player_rig_asset_tests tests/test_player_rig_asset.cpp)
+    target_link_libraries(gdp_player_rig_asset_tests PRIVATE gdp_visual_renderer)
+    gdp_enable_warnings(gdp_player_rig_asset_tests)
+    gdp_enable_sanitizers(gdp_player_rig_asset_tests)
+    add_test(NAME player_rig_asset COMMAND gdp_player_rig_asset_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/player_rig/player_rig.isplayer")
+    set_tests_properties(player_rig_asset PROPERTIES TIMEOUT 15)
+
     add_executable(gdp_frontend_tests tests/test_frontend.cpp src/game/MenuFlow.cpp src/game/PlayerFeedback.cpp)
     target_link_libraries(gdp_frontend_tests PRIVATE gdp_gameplay gdp_persistence gdp_visual_renderer)
     gdp_enable_warnings(gdp_frontend_tests)
@@ -1076,6 +1086,9 @@ if(GDP_BUILD_TESTS)
         add_test(NAME renderer_opengl_pixels COMMAND gdp_renderer_gl_tests)
         add_test(NAME weapon_reload_opengl COMMAND gdp_renderer_gl_tests --reload-only)
         add_test(NAME player_hands_opengl COMMAND gdp_renderer_gl_tests --player-hands-only)
+        add_test(NAME player_rig_preview_opengl COMMAND gdp_renderer_gl_tests --player-body-only)
+        set_tests_properties(player_rig_preview_opengl PROPERTIES
+            ENVIRONMENT "GDP_PLAYER_RIG_PREVIEW=1" TIMEOUT 90)
         set_tests_properties(player_hands_opengl PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=offscreen" TIMEOUT 30)
         set_tests_properties(weapon_reload_opengl PROPERTIES
