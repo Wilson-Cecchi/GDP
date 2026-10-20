@@ -1,6 +1,7 @@
 # Player — uniforme, cinto e locais de saque v4
 
-Estado: **AGUARDANDO APROVAÇÃO**. Data: 2026-10-18.
+Estado: **APROVADA COMO REFERÊNCIA PARA MODELAGEM NO BLENDER** em 2026-10-20;
+aprovação visual do modelo no jogo ainda pendente. Data da prancha: 2026-10-18.
 Unidade: `Player presentation/Torso + Belt`.
 Prancha: [player_body_proposal_v4.png](player_body_proposal_v4.png).
 SHA-256: `51a70823ec5d0fefd33576dc39e22de2838c2ba77a22c41db7a32ceb32c08d88`.

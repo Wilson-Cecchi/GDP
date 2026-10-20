@@ -165,15 +165,15 @@ versão: v4 — uniforme grafite e locais de saque, incluindo granada no cinto e
 data: 2026-10-18
 prancha: visual/proposals/player_body_proposal_v4.png
 contrato: visual/proposals/player_body_proposal_v4.md
-decisão do usuário sobre a prancha v4: pendente
-implementação: nenhuma; a build mantém o corpo v1
-estado: AGUARDANDO APROVAÇÃO
+decisão do usuário sobre a prancha v4: usar como referência para modelagem no Blender em 2026-10-20
+implementação: blockout Blender criado em assets/visual/models/player_rig.blend; a build mantém o corpo v1
+estado: REFERÊNCIA DE MODELAGEM APROVADA; VALIDAÇÃO VISUAL EM JOGO PENDENTE
 ```
 
-O pedido de animação definiu locais de guarda e saque. A aparência exata do
-torso, cinto e suportes desta prancha continua pendente de aprovação antes da
-modelagem na build. As animações podem usar pontos de ancoragem fora do quadro
-sem criar esses novos materiais ou peças.
+O pedido de animação definiu locais de guarda e saque. O usuário autorizou a
+prancha v4 como referência para o modelo e rig em Blender. O relatório técnico
+está em `visual/validation/player_blender_rig/REPORT.md`. A integração na build
+e a aceitação da aparência animada em partida serão validadas separadamente.
 
 ### Player presentation/Torso + Belt — v3 (histórico)
 
