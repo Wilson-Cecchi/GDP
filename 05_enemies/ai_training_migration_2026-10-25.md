@@ -39,9 +39,10 @@ Worker e Robot ficam arquivados para uma fase futura.
 
 O manifesto com os caminhos completos está em
 `/DATA/AppData/gdp-perception-v4-r3/migration.json`. O primeiro lote novo
-retomou `guard_generation_021140.population` e avançou até a geração 21145
-durante a verificação inicial. Isso demonstra retomada real, sem reinício da
-população. Ainda não representa um candidato aprovado.
+retomou `guard_generation_021140.population` e concluiu a geração 21210, sem
+reiniciar a população. A bateria rápida v4 terminou com score 0,672 e 14
+regressões; esse Guard foi reprovado e o serviço passou ao Officer, retomando
+sua população 20160. O resultado reprovado não alterou os cérebros ativos.
 
 ## Validação e avaliação
 
@@ -61,7 +62,7 @@ promovido automaticamente a `assets/ai/` ou ao Download.
 ## Acompanhar
 
 ```sh
-ssh zima 'cd /DATA/AppData/gdp-perception-v4-r3 && docker compose -f compose.perception-v4-r3.yaml ps && cat data/status.json && tail -n 3 data/logs/guard/batch-b77xn3kf.log'
+ssh zima 'cd /DATA/AppData/gdp-perception-v4-r3 && docker compose -f compose.perception-v4-r3.yaml ps && cat data/status.json && docker compose -f compose.perception-v4-r3.yaml logs --tail 8'
 ```
 
 O log de um lote muda a cada rotação; depois dele, consulte o caminho `log` em
