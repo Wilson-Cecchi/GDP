@@ -2,12 +2,14 @@
 
 ## Estado e decisão
 
-O serviço `gdp-perception-v4-r2` continua treinando no ZimaOS. Seus índices
+O serviço `gdp-perception-v4-r2` foi a fonte dos candidatos. Seus índices
 `best.json` continham candidatos amplos para Worker 1820 e Robot 2030, apenas
 um candidato rápido para Officer 17850 e nenhum candidato elegível para Guard
 ou Engineer na consulta deste dia. O responsável aprovou a prévia Worker/Boss
 em partida; Worker 1820 e Robot 2030 foram promovidos a `assets/ai/` nesta
-fase. O Download público continua separado desta mudança.
+fase. O Download público continua separado desta mudança. A retomada do treino
+para os três papéis pendentes está em
+[ai_training_migration_2026-10-25.md](ai_training_migration_2026-10-25.md).
 
 | Papel | Candidato | SHA-256 do cérebro | Avaliação final local | Decisão |
 | --- | ---: | --- | --- | --- |
