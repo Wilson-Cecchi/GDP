@@ -4131,6 +4131,20 @@ void testAllyReportsAreCoarseAndEventDriven()
             == wkc::core::Vec3{0.0F, 0.0F, -2.0F}
             && near(allyData->knowledgeAgeSeconds, 0.0F),
         "reacquiring sight sends a new, time-stamped approximate report");
+
+    update(sightBlocked, 0.0F);
+    allyData->knowledgeSource = EnemyKnowledgeSource::DirectSight;
+    allyData->lastKnownPlayerPosition = {5.0F, 0.0F, 5.0F};
+    allyData->knowledgeAgeSeconds = 1.0F;
+    allyData->investigationTime = 2.0F;
+    allyData->directSightPreviousUpdate = false;
+    (void)player.relocate({0.3F, 0.0F, -4.2F}, 0.0F);
+    update(room, 0.0F);
+    expect(allyData->knowledgeSource == EnemyKnowledgeSource::AllyReport
+            && allyData->lastKnownPlayerPosition
+                == wkc::core::Vec3{0.0F, 0.0F, -4.0F}
+            && near(allyData->knowledgeAgeSeconds, 0.0F),
+        "a fresh ally report replaces an older direct-sight memory");
 }
 
 } // namespace

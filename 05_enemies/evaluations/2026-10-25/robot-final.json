@@ -1,0 +1,524 @@
+{
+  "protocol": {
+    "seeds": [
+      10007,
+      11003,
+      13001,
+      17011,
+      19001,
+      23003,
+      29009,
+      31013
+    ],
+    "frames": 1800,
+    "source_revision": "6bbf81a+ai-runtime-fixes-20261025",
+    "gate": "paired-solo-team-perception-attributed-v4"
+  },
+  "role": "robot",
+  "generation": 2030,
+  "summary": {
+    "solo": {
+      "maps_active": {
+        "damage": 97.5,
+        "travel": 3.628075
+      },
+      "maps_candidate": {
+        "damage": 100.0,
+        "travel": 6.9858
+      },
+      "duel_active": {
+        "damage": 100.0,
+        "travel": 4.6611875
+      },
+      "duel_candidate": {
+        "damage": 100.0,
+        "travel": 7.152625
+      }
+    },
+    "team": {
+      "active": {
+        "player_damage": 57.375,
+        "friendly_damage": 0.0,
+        "friendly_hits": 0.0,
+        "friendly_kills": 0.0,
+        "enemy_shots": 13.625,
+        "enemy_hits": 6.75,
+        "fire_holds": 0.0,
+        "robot_player_damage": 57.375,
+        "helpers_player_damage": 0.0,
+        "enemies_alive": 0.0,
+        "boss_health_remaining": 0.0,
+        "first_player_hit_frame": 143.25,
+        "boss_distance_initial": 13.627375,
+        "boss_distance_minimum": 7.53675,
+        "boss_distance_final": 7.537125,
+        "boss_long_range": 195.0,
+        "boss_pressure": 260.0,
+        "boss_pursuit": 135.0,
+        "primary_friendly_hits": 0.0,
+        "ally_friendly_hits": 0.0,
+        "third_friendly_hits": 0.0,
+        "primary_friendly_kills": 0.0,
+        "ally_friendly_kills": 0.0,
+        "third_friendly_kills": 0.0,
+        "primary_friendly_damage": 0.0,
+        "ally_friendly_damage": 0.0,
+        "third_friendly_damage": 0.0,
+        "role_friendly_hits": 0.0,
+        "role_friendly_kills": 0.0,
+        "role_friendly_damage": 0.0
+      },
+      "candidate": {
+        "player_damage": 88.1875,
+        "friendly_damage": 0.0,
+        "friendly_hits": 0.0,
+        "friendly_kills": 0.0,
+        "enemy_shots": 13.0,
+        "enemy_hits": 10.375,
+        "fire_holds": 0.0,
+        "robot_player_damage": 88.1875,
+        "helpers_player_damage": 0.0,
+        "enemies_alive": 0.0,
+        "boss_health_remaining": 0.0,
+        "first_player_hit_frame": 143.875,
+        "boss_distance_initial": 13.627375,
+        "boss_distance_minimum": 8.512625,
+        "boss_distance_final": 8.547375,
+        "boss_long_range": 195.0,
+        "boss_pressure": 150.0,
+        "boss_pursuit": 185.0,
+        "primary_friendly_hits": 0.0,
+        "ally_friendly_hits": 0.0,
+        "third_friendly_hits": 0.0,
+        "primary_friendly_kills": 0.0,
+        "ally_friendly_kills": 0.0,
+        "third_friendly_kills": 0.0,
+        "primary_friendly_damage": 0.0,
+        "ally_friendly_damage": 0.0,
+        "third_friendly_damage": 0.0,
+        "role_friendly_hits": 0.0,
+        "role_friendly_kills": 0.0,
+        "role_friendly_damage": 0.0
+      }
+    },
+    "investigation": {
+      "active": {
+        "observer_investigate_frames": 493.75,
+        "ally_investigate_frames": 60.0,
+        "observer_recover_frames": 241.0,
+        "ally_recover_frames": 241.0,
+        "observer_travel": 8.126875,
+        "ally_travel": 6.319125,
+        "max_ally_knowledge_age_seconds": 5.517,
+        "ally_report_error": 0.552125,
+        "ally_hidden_player_error": 4.1705,
+        "report_refreshes_without_reacquisition": 0.0,
+        "unseen_target_updates": 0.0,
+        "hidden_visual_contacts": 0.0
+      },
+      "candidate": {
+        "observer_investigate_frames": 349.25,
+        "ally_investigate_frames": 60.0,
+        "observer_recover_frames": 241.0,
+        "ally_recover_frames": 0.0,
+        "observer_travel": 8.972999999999999,
+        "ally_travel": 6.194125,
+        "max_ally_knowledge_age_seconds": 1.5,
+        "ally_report_error": 0.552125,
+        "ally_hidden_player_error": 4.1705,
+        "report_refreshes_without_reacquisition": 0.0,
+        "unseen_target_updates": 0.0,
+        "hidden_visual_contacts": 0.0
+      }
+    }
+  },
+  "scenarios": {
+    "solo": {
+      "maps:boss_cover": {
+        "active": {
+          "damage": 87.5,
+          "travel": 8.805875
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 10.068875
+        }
+      },
+      "maps:center_cover": {
+        "active": {
+          "damage": 100.0,
+          "travel": 3.659625
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 9.766375
+        }
+      },
+      "maps:elevated": {
+        "active": {
+          "damage": 100.0,
+          "travel": 1.42225
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 3.26825
+        }
+      },
+      "maps:group": {
+        "active": {
+          "damage": 100.0,
+          "travel": 2.703375
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 6.92725
+        }
+      },
+      "maps:open": {
+        "active": {
+          "damage": 100.0,
+          "travel": 1.54925
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 4.89825
+        }
+      },
+      "duel:bhop": {
+        "active": {
+          "damage": 100.0,
+          "travel": 2.218
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 7.565125
+        }
+      },
+      "duel:ground_strafe": {
+        "active": {
+          "damage": 100.0,
+          "travel": 7.104375
+        },
+        "candidate": {
+          "damage": 100.0,
+          "travel": 6.740125
+        }
+      }
+    },
+    "team": {
+      "boss_helpers": {
+        "active": {
+          "player_damage": 57.375,
+          "friendly_damage": 0.0,
+          "friendly_hits": 0.0,
+          "friendly_kills": 0.0,
+          "enemy_shots": 13.625,
+          "enemy_hits": 6.75,
+          "fire_holds": 0.0,
+          "robot_player_damage": 57.375,
+          "helpers_player_damage": 0.0,
+          "enemies_alive": 0.0,
+          "boss_health_remaining": 0.0,
+          "first_player_hit_frame": 143.25,
+          "boss_distance_initial": 13.627375,
+          "boss_distance_minimum": 7.53675,
+          "boss_distance_final": 7.537125,
+          "boss_long_range": 195.0,
+          "boss_pressure": 260.0,
+          "boss_pursuit": 135.0,
+          "primary_friendly_hits": 0.0,
+          "ally_friendly_hits": 0.0,
+          "third_friendly_hits": 0.0,
+          "primary_friendly_kills": 0.0,
+          "ally_friendly_kills": 0.0,
+          "third_friendly_kills": 0.0,
+          "primary_friendly_damage": 0.0,
+          "ally_friendly_damage": 0.0,
+          "third_friendly_damage": 0.0,
+          "role_friendly_hits": 0.0,
+          "role_friendly_kills": 0.0,
+          "role_friendly_damage": 0.0
+        },
+        "candidate": {
+          "player_damage": 88.1875,
+          "friendly_damage": 0.0,
+          "friendly_hits": 0.0,
+          "friendly_kills": 0.0,
+          "enemy_shots": 13.0,
+          "enemy_hits": 10.375,
+          "fire_holds": 0.0,
+          "robot_player_damage": 88.1875,
+          "helpers_player_damage": 0.0,
+          "enemies_alive": 0.0,
+          "boss_health_remaining": 0.0,
+          "first_player_hit_frame": 143.875,
+          "boss_distance_initial": 13.627375,
+          "boss_distance_minimum": 8.512625,
+          "boss_distance_final": 8.547375,
+          "boss_long_range": 195.0,
+          "boss_pressure": 150.0,
+          "boss_pursuit": 185.0,
+          "primary_friendly_hits": 0.0,
+          "ally_friendly_hits": 0.0,
+          "third_friendly_hits": 0.0,
+          "primary_friendly_kills": 0.0,
+          "ally_friendly_kills": 0.0,
+          "third_friendly_kills": 0.0,
+          "primary_friendly_damage": 0.0,
+          "ally_friendly_damage": 0.0,
+          "third_friendly_damage": 0.0,
+          "role_friendly_hits": 0.0,
+          "role_friendly_kills": 0.0,
+          "role_friendly_damage": 0.0
+        }
+      }
+    },
+    "investigation": {
+      "lost_sight": {
+        "10007": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.129,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.721,
+            "ally_hidden_player_error": 3.895,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.973,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.721,
+            "ally_hidden_player_error": 3.895,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "11003": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.128,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.849,
+            "ally_hidden_player_error": 3.517,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.972,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.849,
+            "ally_hidden_player_error": 3.517,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "13001": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.128,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.566,
+            "ally_hidden_player_error": 4.071,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.972,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.566,
+            "ally_hidden_player_error": 4.071,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "17011": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.13,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.5,
+            "ally_hidden_player_error": 4.701,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.972,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.5,
+            "ally_hidden_player_error": 4.701,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "19001": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.128,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.412,
+            "ally_hidden_player_error": 3.863,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.972,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.412,
+            "ally_hidden_player_error": 3.863,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "23003": {
+          "active": {
+            "observer_investigate_frames": 493.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.122,
+            "ally_travel": 6.32,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.424,
+            "ally_hidden_player_error": 4.464,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 350.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.975,
+            "ally_travel": 6.195,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.424,
+            "ally_hidden_player_error": 4.464,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "29009": {
+          "active": {
+            "observer_investigate_frames": 494.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.128,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.721,
+            "ally_hidden_player_error": 4.73,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 349.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.972,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.721,
+            "ally_hidden_player_error": 4.73,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        },
+        "31013": {
+          "active": {
+            "observer_investigate_frames": 493.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 241.0,
+            "observer_travel": 8.122,
+            "ally_travel": 6.319,
+            "max_ally_knowledge_age_seconds": 5.517,
+            "ally_report_error": 0.224,
+            "ally_hidden_player_error": 4.123,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          },
+          "candidate": {
+            "observer_investigate_frames": 350.0,
+            "ally_investigate_frames": 60.0,
+            "observer_recover_frames": 241.0,
+            "ally_recover_frames": 0.0,
+            "observer_travel": 8.976,
+            "ally_travel": 6.194,
+            "max_ally_knowledge_age_seconds": 1.5,
+            "ally_report_error": 0.224,
+            "ally_hidden_player_error": 4.123,
+            "report_refreshes_without_reacquisition": 0.0,
+            "unseen_target_updates": 0.0,
+            "hidden_visual_contacts": 0.0
+          }
+        }
+      }
+    }
+  },
+  "regressions": [],
+  "score": 1.262638670004017,
+  "eligible": true
+}

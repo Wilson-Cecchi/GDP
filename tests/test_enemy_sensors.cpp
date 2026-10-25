@@ -1,4 +1,5 @@
 #include "gameplay/Enemy.hpp"
+#include "gameplay/EnemyFireGeometry.hpp"
 #include "gameplay/EnemySensors.hpp"
 #include "gameplay/EnemyProjectile.hpp"
 #include "gameplay/PlayerGrenade.hpp"
@@ -208,6 +209,79 @@ void testCooperativeSensorsAndMemory()
     const auto second = pursueMemory({2.0F, 0.0F, 8.0F});
     expect(first == second && first.z < 3.0F,
         "hidden-target movement follows remembered position, not actual player");
+}
+
+void testCooperativeFireLaneMatchesShot()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const ReferenceModelsForTest referenceModels;
+    const CollisionWorld arena{{{-12.0F, 0.0F, -12.0F},
+        {12.0F, 4.0F, 12.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    const std::array archetypes{EnemyArchetype::Guard,
+        EnemyArchetype::Officer, EnemyArchetype::Engineer,
+        EnemyArchetype::IndustrialRobot};
+    bool differsFromSimplifiedRay = false;
+    for (const EnemyArchetype archetype : archetypes) {
+        for (const float yawDegrees : {180.0F, 165.0F}) {
+            EntityManager manager;
+            const EntityId shooter = manager.createEnemy({
+                .transform = {.position = {0.0F, 0.0F, 5.0F},
+                    .rotationDegrees = {0.0F, yawDegrees, 0.0F}},
+                .roomId = 1U, .archetype = archetype});
+            const EntityId ally = manager.createEnemy({
+                .transform = {.position = {0.0F, 0.0F, 3.0F}},
+                .roomId = 1U, .archetype = EnemyArchetype::Worker});
+            const Entity* shooterEntity = manager.find(shooter);
+            const EnemyData* shooterData = manager.findData<EnemyData>(shooter);
+            const EnemyShotRay shot = enemyShotRay(
+                *shooterEntity, *shooterData, player);
+            const float yaw = yawDegrees * 0.01745329251994329577F;
+            const wkc::core::Vec3 forward{
+                std::sin(yaw), 0.0F, std::cos(yaw)};
+            const wkc::core::Vec3 simpleMuzzle = shooterEntity->transform.position
+                + wkc::core::Vec3{0.0F, 1.2F, 0.0F} + forward * 0.45F;
+            const wkc::core::Vec3 target = player.cameraPosition()
+                - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
+            const float simpleHorizontal = std::max(0.1F,
+                std::hypot(target.x - simpleMuzzle.x,
+                    target.z - simpleMuzzle.z));
+            const wkc::core::Vec3 simpleDirection = wkc::core::normalized({
+                forward.x, (target.y - simpleMuzzle.y) / simpleHorizontal,
+                forward.z});
+            bool sawBlocked = false;
+            bool sawClear = false;
+            bool allMatch = true;
+            for (int x = -20; x <= 20; ++x) {
+                for (int z = 8; z <= 22; ++z) {
+                    manager.find(ally)->transform.position = {
+                        static_cast<float>(x) * 0.1F, 0.0F,
+                        static_cast<float>(z) * 0.2F};
+                    const bool blocked = allyInEnemyFireLane(manager,
+                        shooter, shot.muzzle, shot.direction,
+                        shot.targetDistance);
+                    const auto values = sampleCooperativeEnemySensors(
+                        manager, *shooterEntity, *shooterData, player,
+                        arena, true, 16.0F);
+                    const bool sensed = values[static_cast<std::size_t>(
+                        CooperativeEnemySensor::FireLaneBlocked)] > 0.0F;
+                    allMatch &= sensed == blocked;
+                    sawBlocked |= blocked;
+                    sawClear |= !blocked;
+                    differsFromSimplifiedRay |= blocked
+                        != allyInEnemyFireLane(manager, shooter, simpleMuzzle,
+                            simpleDirection,
+                            wkc::core::length(target - simpleMuzzle));
+                }
+            }
+            expect(allMatch && sawBlocked && sawClear,
+                "cooperative firing-lane sensor matches the actual shot for each ranged archetype and yaw");
+        }
+    }
+    expect(differsFromSimplifiedRay,
+        "offset weapon sockets produce firing lanes missed by a simplified central ray");
 }
 
 void testTacticalMovement()
@@ -662,6 +736,35 @@ void testActiveWorkerMaintainsMeleeThreat()
     expect(inactive.controlledTicks < 180U
             && stalledManager.find(stalled)->transform.position.z < 2.5F,
         "unproductive active brain yields temporarily to scripted pursuit");
+}
+
+void testEmptyRangedBrainYieldsToScriptedRecovery()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld room{{{-8.0F, 0.0F, -8.0F},
+        {8.0F, 4.0F, 8.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.0F});
+    EntityManager manager;
+    const EntityId id = manager.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 5.0F},
+            .rotationDegrees = {0.0F, 180.0F, 0.0F}},
+        .roomId = 1U, .archetype = EnemyArchetype::Guard});
+    EnemyData* enemy = manager.findData<EnemyData>(id);
+    enemy->magazineAmmo = 0U;
+    enemy->reserveAmmo = 0U;
+    NeuralEnemyExperiment brain{42U, EnemyArchetype::Guard};
+    forceAttack(brain);
+    brain.controlAll = true;
+    brain.logSelection = false;
+    std::vector<EnemyProjectile> shots;
+    for (int tick = 0; tick < 180; ++tick) {
+        (void)updateGuards(manager, player, 1U, room, 1.0F / 60.0F,
+            GuardConfig{}, {.projectiles = &shots}, &brain);
+    }
+    expect(shots.empty() && brain.controlledTicks < 180U,
+        "an empty ranged brain cannot count aiming as a successful attack forever");
 }
 
 void testEnemyProjectiles()
@@ -1341,6 +1444,7 @@ int main(const int argc, char* argv[])
     }
     testSensors();
     testCooperativeSensorsAndMemory();
+    testCooperativeFireLaneMatchesShot();
     testTacticalMovement();
     testExperimentalWorker();
     testNeuralWorkerRemembersVisiblePlayer();
@@ -1350,6 +1454,7 @@ int main(const int argc, char* argv[])
     testNeuralBossNavigatesCover();
     testNeuralBrainControlsEveryEnemyIndependently();
     testActiveWorkerMaintainsMeleeThreat();
+    testEmptyRangedBrainYieldsToScriptedRecovery();
     testEnemyProjectiles();
     testEnemyFriendlyFire();
     testDifficultyAndFireDiscipline();

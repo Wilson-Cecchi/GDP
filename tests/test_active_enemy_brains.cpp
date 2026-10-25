@@ -57,9 +57,9 @@ int main()
     const fs::path bundled = fs::path{GDP_SOURCE_DIRECTORY} / "assets" / "ai";
     const auto brains = gdp::game::ai::loadActiveEnemyBrains(bundled);
     constexpr std::array<std::uint32_t, 5> expectedGenerations{
-        280U, 200U, 200U, 200U, 200U};
+        1820U, 200U, 200U, 200U, 2030U};
     constexpr std::array<std::uint32_t, 5> expectedSeeds{
-        20261019U, 42U, 42U, 42U, 42U};
+        20261019U, 42U, 42U, 42U, 20261019U};
     for (std::size_t index = 0U; index < brains.size(); ++index) {
         expect(brains[index]
                 && static_cast<std::size_t>(brains[index]->archetype) == index

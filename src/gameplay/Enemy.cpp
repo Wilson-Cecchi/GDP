@@ -3,13 +3,13 @@
 #include "core/Hash.hpp"
 #include "core/Log.hpp"
 #include "gameplay/Combat.hpp"
+#include "gameplay/EnemyFireGeometry.hpp"
 #include "gameplay/EnemySensors.hpp"
 #include "gameplay/Props.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <span>
@@ -58,29 +58,6 @@ void advanceEnemyAttackVisual(gdp::entities::EnemyData& enemy,
 {
     enemy.attackVisualTime = std::max(0.0F, enemy.attackVisualTime - step);
     if (enemy.attackVisualTime == 0.0F) enemy.lastAttackKind = 0U;
-}
-
-bool referenceEnemyModelsEnabled() noexcept
-{
-    // The accepted meshes and matching combat geometry are the release
-    // default. Keep an explicit opt-out for comparing the legacy appearance.
-    const char* const value = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
-    return value == nullptr || value[0] != '0' || value[1] != '\0';
-}
-
-wkc::core::Vec3 referenceMuzzleOffset(
-    const gdp::entities::EnemyArchetype archetype) noexcept
-{
-    using gdp::entities::EnemyArchetype;
-    switch (archetype) {
-    // These sockets use the weapon's aimed pose in GdpRenderData.cpp.
-    case EnemyArchetype::Guard: return {-0.176F, 1.403F, 1.140F};
-    case EnemyArchetype::Officer: return {-0.431F, 1.267F, 0.889F};
-    case EnemyArchetype::Engineer: return {-0.404F, 1.329F, 1.063F};
-    case EnemyArchetype::IndustrialRobot: return {-0.679F, 0.998F, 0.699F};
-    case EnemyArchetype::Worker: break;
-    }
-    return {0.0F, 1.2F, 0.45F};
 }
 
 struct EnemyFireContext {
@@ -170,37 +147,9 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
         markEnemyAttack(enemy, 1U);
         return true;
     }
-    constexpr float radiansPerDegree = 0.01745329251994329577F;
-    const float yaw = entity.transform.rotationDegrees.y * radiansPerDegree;
-    const bool referenceModels = referenceEnemyModelsEnabled();
-    const wkc::core::Vec3 socket = referenceModels
-        ? referenceMuzzleOffset(enemy.archetype)
-        : wkc::core::Vec3{0.0F, 1.2F, 0.45F};
-    const wkc::core::Vec3 muzzle = entity.transform.position
-        + wkc::core::Vec3{
-            std::cos(yaw) * socket.x + std::sin(yaw) * socket.z,
-            socket.y,
-            -std::sin(yaw) * socket.x + std::cos(yaw) * socket.z};
-    const wkc::core::Vec3 target = player.cameraPosition()
-        - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
-    const float horizontalDistance = std::max(0.1F, std::hypot(
-        target.x - muzzle.x, target.z - muzzle.z));
-    // Compensate for an off-centre barrel without removing the AI's yaw error.
-    const float centerTargetYaw = std::atan2(
-        target.x - entity.transform.position.x,
-        target.z - entity.transform.position.z);
-    const float muzzleTargetYaw = std::atan2(
-        target.x - muzzle.x, target.z - muzzle.z);
-    const float shotYaw = referenceModels
-        ? muzzleTargetYaw + std::remainder(
-            yaw - centerTargetYaw, 6.28318530717958647692F)
-        : yaw;
-    const wkc::core::Vec3 direction = wkc::core::normalized({
-        std::sin(shotYaw), (target.y - muzzle.y) / horizontalDistance,
-        std::cos(shotYaw)});
-    const float targetDistance = wkc::core::length(target - muzzle);
-    if (allyInEnemyFireLane(context.manager, id, muzzle, direction,
-            targetDistance)) {
+    const EnemyShotRay ray = enemyShotRay(entity, enemy, player);
+    if (allyInEnemyFireLane(context.manager, id, ray.muzzle, ray.direction,
+            ray.targetDistance)) {
         ++summary.friendlyFireHolds;
         sidestepBlockedShot(context, entity, enemy, id, player,
             perception.difficulty);
@@ -210,10 +159,12 @@ bool fireRangedEnemy(gdp::entities::Entity& entity,
             == gdp::entities::EnemyArchetype::IndustrialRobot ? 30.0F
         : enemy.archetype == gdp::entities::EnemyArchetype::Officer ? 13.0F
         : 16.0F;
-    const float along = wkc::core::dot(target - muzzle, direction);
+    const wkc::core::Vec3 target = player.cameraPosition()
+        - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
+    const float along = wkc::core::dot(target - ray.muzzle, ray.direction);
     const float missDistance = wkc::core::length(
-        (target - muzzle) - direction * along);
-    perception.projectiles->push_back({muzzle, direction * speed, id,
+        (target - ray.muzzle) - ray.direction * along);
+    perception.projectiles->push_back({ray.muzzle, ray.direction * speed, id,
         entity.roomId, shotDamage, 2.0F, neural,
         along > 0.0F && missDistance <= 0.5F, along, 0.0F});
     --enemy.magazineAmmo;
@@ -1042,7 +993,8 @@ void shareVisiblePlayerWithAllies(
         }
         if (ally->knowledgeSource
                 == gdp::entities::EnemyKnowledgeSource::DirectSight
-            && ally->investigationTime > 0.0F) {
+            && ally->directSightPreviousUpdate
+            && ally->knowledgeAgeSeconds <= 0.25F) {
             continue;
         }
         ally->lastKnownPlayerPosition = reportedPosition;
@@ -1530,6 +1482,7 @@ bool updateNeuralEnemy(
         && aimAligned
         && playerVisibleToEnemy(entity, player, attackDistance, detectionRange,
             visionHalfAngleDegrees, eyeHeight, collisionWorld, perception);
+    bool attackExecuted = false;
     if (attackVisible) {
         enemy.behavior = EnemyBehaviorState::Attack;
         ++summary.attacking;
@@ -1540,15 +1493,19 @@ bool updateNeuralEnemy(
                     && referenceEnemyModelsEnabled()
                     && attackDistance <= 2.25F)) {
                 player.applyDamage(attackDamage);
+                attackExecuted = true;
                 enemy.attackCooldown = attackInterval;
                 ++summary.attacksLanded;
                 markEnemyAttack(enemy, 2U);
-            } else if (fireRangedEnemy(entity, enemy, id, player,
+            } else {
+                attackExecuted = fireRangedEnemy(entity, enemy, id, player,
                     attackDamage, perception, true, summary,
                     {manager, enemyIds, collisionWorld, step, moveSpeed,
-                        collider})) {
-                enemy.attackCooldown = rangedAttackInterval(enemy,
-                    attackInterval);
+                        collider});
+                if (attackExecuted) {
+                    enemy.attackCooldown = rangedAttackInterval(enemy,
+                        attackInterval);
+                }
             }
         }
     } else if (requestedSpeed > 0.05F) {
@@ -1573,7 +1530,10 @@ bool updateNeuralEnemy(
         // recover briefly when neither damage nor approach is happening.
         const bool approaching = distanceBeforeMovement > attackRange
             && attackDistance + 0.001F < distanceBeforeMovement;
-        motor->ineffectiveSeconds = attackVisible || approaching
+        const bool waitingForNextShot = enemy.attackCooldown > 0.0F
+            || enemy.reloadRemaining > 0.0F;
+        motor->ineffectiveSeconds = attackExecuted || approaching
+            || waitingForNextShot
             ? 0.0F : motor->ineffectiveSeconds + step;
         if (motor->ineffectiveSeconds >= 2.0F) {
             motor->scriptedSecondsRemaining = 1.5F;

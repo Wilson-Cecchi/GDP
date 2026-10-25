@@ -1,5 +1,6 @@
 #include "gameplay/EnemySensors.hpp"
 
+#include "gameplay/EnemyFireGeometry.hpp"
 #include "gameplay/EnemyProjectile.hpp"
 
 #include <algorithm>
@@ -186,17 +187,10 @@ CooperativeEnemySensorValues sampleCooperativeEnemySensors(
                 / nearestData->maximumHealth, 0.0F, 1.0F) - 1.0F : -1.0F;
     }
     if (playerVisible && player.state().alive) {
-        const wkc::core::Vec3 muzzle = entity.transform.position
-            + wkc::core::Vec3{0.0F, 1.2F, 0.0F} + forward * 0.45F;
-        const wkc::core::Vec3 target = player.cameraPosition()
-            - wkc::core::Vec3{0.0F, 0.22F, 0.0F};
-        const float horizontalDistance = std::max(0.1F,
-            std::hypot(target.x - muzzle.x, target.z - muzzle.z));
-        const wkc::core::Vec3 direction = wkc::core::normalized({
-            forward.x, (target.y - muzzle.y) / horizontalDistance, forward.z});
+        const EnemyShotRay ray = enemyShotRay(entity, enemy, player);
         values[static_cast<std::size_t>(CooperativeEnemySensor::FireLaneBlocked)]
-            = allyInEnemyFireLane(manager, entity.id, muzzle, direction,
-                wkc::core::length(target - muzzle)) ? 1.0F : -1.0F;
+            = allyInEnemyFireLane(manager, entity.id, ray.muzzle,
+                ray.direction, ray.targetDistance) ? 1.0F : -1.0F;
     } else if (enemy.investigationTime > 0.0F) {
         const wkc::core::Vec3 delta = enemy.lastKnownPlayerPosition
             - entity.transform.position;
