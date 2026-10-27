@@ -31,16 +31,21 @@ com sub-seeds independentes e respeitam zonas reservadas/connectors.
 `generateIndustrialRoomMaterials(roomSeed)` seleciona deterministicamente
 `Maintained`, `Used` ou `Worn` e deriva sub-receitas independentes para:
 
-- **Wall:** PaintedSteel, grade de 2–4 × 2 placas, juntas/rims e rodapé
-  amarelo/preto restrito aos 4 pixels inferiores da textura 64×64;
+- **Wall:** a receita procedural conserva a grade de placas e a variação por
+  sala, mas o renderer usa a parede v2 HD aprovada: painéis de aço pintado,
+  juntas recuadas, fixadores, desgaste localizado e sinalização âmbar/preta
+  somente na base. Os mapas compartilhados de albedo, normal e propriedades
+  têm 1024×1024 px para cada condição;
 - **Floor:** BareSteel, grade 2/4 × 4, detalhes antiderrapantes, bordas mais
   escuras e centro de tráfego discretamente polido;
 - **Ceiling:** Aluminum, grade 2 × 2–4 e sequência regular de luminárias lineares
   com intensidade emissiva própria.
 
 Wear/dirt vêm da condição global, mas cada canal usa sua própria stream. O
-conjunto e cada receita possuem hashes canônicos usados pelo cache. A sala START
-fixa usa atualmente esse perfil visual do Industrial Corridor.
+conjunto e cada receita possuem hashes canônicos usados pelo cache. A sala
+inicial e as salas com tema Industrial ou Office usam este perfil no jogo.
+A descrição das oito paredes e o formato para enviar novas referências estão
+em [walls_current_reference.md](walls_current_reference.md).
 
 ## Validação visual
 

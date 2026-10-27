@@ -9,6 +9,9 @@
 > **Gate visual:** os oito perfis atuais são baseline técnico, não arte final
 > aprovada. Toda revisão segue `visual/TEXTURE_APPROVALS.md`; nenhuma receita
 > revisada é implementada antes da aprovação explícita da sua prancha.
+> A parede Industrial Corridor v2 HD tem aprovação visual própria; consulte
+> [walls_current_reference.md](walls_current_reference.md) para o inventário
+> atual das paredes e para preparar novas referências.
 
 ## Regra principal
 

@@ -40,9 +40,9 @@ e deriva receitas independentes pelos IDs locais 301–303; a condição usa 300
 
 Cada perfil preserva mais base clara e limpa que Storage sem eliminar marcas de
 uso humano. Receitas e conjunto possuem hashes canônicos próprios; o renderer
-os prepara e cacheia antes do draw por `prepareCafeteriaRoomMaterials`. Como a
-cena navegável ainda mostra somente a START industrial, a Cafeteria é exercitada
-pela regressão OpenGL offscreen.
+os prepara e cacheia antes do draw por `prepareCafeteriaRoomMaterials`. Salas
+com tema Cafeteria usam este perfil no jogo; a regressão OpenGL offscreen
+também verifica a saída visual.
 
 ## Validação visual
 

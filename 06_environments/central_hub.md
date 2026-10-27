@@ -43,8 +43,9 @@ ID local 700; Wall/Floor/Ceiling usam 701–703:
 mas deriva cada superfície por sub-seed independente. Validação rejeita
 parâmetros pertencentes à superfície errada, acento amarelo, divergência de eixo
 e corrupção do hash canônico. O renderer prepara/cacheia o conjunto com
-`prepareCentralHubRoomMaterials`. Como a cena navegável permanece na START
-industrial, o perfil é exercitado offscreen.
+`prepareCentralHubRoomMaterials`. Salas com papel Hub usam este perfil no
+jogo, independentemente do tema do módulo; a regressão OpenGL offscreen
+também verifica a saída visual.
 
 ## Validação visual
 

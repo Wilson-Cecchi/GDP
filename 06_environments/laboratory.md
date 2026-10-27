@@ -40,8 +40,8 @@ ou `Contained`. A condição usa o ID local 400; Wall/Floor/Ceiling usam 401–4
 
 O perfil evita ferrugem, óleo, redes caóticas e indicadores excessivos. Receitas
 e conjunto possuem hashes canônicos isolados e são preparados pelo renderer via
-`prepareLaboratoryRoomMaterials`. Enquanto a cena navegável permanece na START
-industrial, a variante é exercitada pela regressão OpenGL offscreen.
+`prepareLaboratoryRoomMaterials`. Salas com tema Laboratory usam este perfil
+no jogo; a regressão OpenGL offscreen também verifica a saída visual.
 
 ## Validação visual
 

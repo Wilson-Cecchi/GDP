@@ -5,7 +5,10 @@
 > Ela não representa o estado atual da nova engine C++/SDL3/OpenGL.
 > O estado corrente de Industrial Corridor, Storage, Combat Room, Cafeteria,
 > Laboratory, Technical Area, Security e Central Hub está nos documentos
-> específicos de ambiente e em `RoomMaterialGenerator`.
+> específicos de ambiente, no resumo
+> [walls_current_reference.md](walls_current_reference.md) e em
+> `RoomMaterialGenerator`. As resoluções citadas abaixo são convenções da
+> proposta histórica, não uma exigência para novas referências.
 > Desde a Fase 49, esse gerador pertence a `gdp::game::visual` e mantém os
 > contratos procedurais genéricos explicitamente separados.
 > Na Fase 50, esses contratos passaram para `wkc::procedural`, sem alterar os

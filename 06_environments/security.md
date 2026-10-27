@@ -40,9 +40,9 @@ com sub-seeds independentes e respeitam zonas reservadas/connectors.
 
 Vermelho aparece somente dentro do console na condição `Alert`; o gate verifica
 essa posição pixel a pixel. Receitas e conjunto possuem hashes canônicos e o
-renderer prepara/cacheia o perfil via `prepareSecurityRoomMaterials`. A cena
-navegável permanece na START industrial, portanto Security é exercitado
-offscreen.
+renderer prepara/cacheia o perfil via `prepareSecurityRoomMaterials`. Salas
+com tema Security usam este perfil no jogo; a regressão OpenGL offscreen
+também verifica a saída visual.
 
 ## Validação visual
 

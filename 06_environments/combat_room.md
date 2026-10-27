@@ -41,10 +41,9 @@ com sub-seeds independentes e respeitam zonas reservadas/connectors.
 Condição, desgaste e impactos variam por seed sem transformar a arena em espaço
 abandonado. IDs locais 200–203 do domínio `RoomMaterial` isolam o perfil dos
 outros ambientes. Cada receita e o conjunto completo possuem hashes canônicos,
-usados pelo cache do renderer antes do draw. A API `prepareCombatRoomMaterials`
-deixa o perfil pronto para a futura seleção da sala ativa; enquanto a navegação
-renderizada permanece limitada à START industrial, a variante é exercitada
-pela regressão OpenGL offscreen.
+usados pelo cache do renderer antes do draw. Salas com papel Arena ou Boss
+selecionam este perfil no jogo, independentemente do tema do módulo; a
+regressão OpenGL offscreen também verifica a saída visual.
 
 ## Validação visual
 

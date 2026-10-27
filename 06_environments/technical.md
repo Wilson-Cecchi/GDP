@@ -40,8 +40,9 @@ com sub-seeds independentes e respeitam zonas reservadas/connectors.
 
 Wear, dirt e oil crescem com carga sem transformar todas as superfícies em
 detalhe. Receitas e conjunto usam hashes próprios e substreams 500–503. O
-renderer prepara/cacheia o perfil via `prepareTechnicalRoomMaterials`; enquanto
-a cena navegável permanece na START industrial, ele é exercitado offscreen.
+renderer prepara/cacheia o perfil via `prepareTechnicalRoomMaterials`. Salas
+com tema Maintenance usam este perfil no jogo; ele também é exercitado pela
+regressão OpenGL offscreen.
 
 ## Validação visual
 
