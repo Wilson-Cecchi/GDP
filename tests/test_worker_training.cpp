@@ -303,6 +303,109 @@ void testFitness()
                 == scoreTrainingStage(careless,
                     gdp::entities::EnemyArchetype::Guard, TrainingStage::Aim),
         "cooperative combat penalizes allied damage and prolonged fire holds");
+    WorkerFitnessMetrics combatPressure = baseline;
+    combatPressure.damageDealt += 24.0F;
+    combatPressure.attacksLanded += 2U;
+    expect(scoreCooperativeCombatPressureStage(combatPressure,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            > scoreCooperativeCombatPressureStage(baseline,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+        && scoreCooperativeCombatPressureStage(combatPressure,
+            gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+            > scoreCooperativeCombatPressureStage(baseline,
+                gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+        && scoreCooperativeCombatPressureStage(combatPressure,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::Aim)
+            == scoreCooperativeTrainingStage(combatPressure,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::Aim),
+        "v23 pressure rewards authored attacks only after combat unlocks");
+    WorkerFitnessMetrics pressureWaste = baseline;
+    pressureWaste.prematureReloads = 2U;
+    pressureWaste.shotsBlocked = 2U;
+    expect(scoreCooperativeCombatPressureStage(pressureWaste,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            < scoreCooperativeCombatPressureStage(baseline,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl),
+        "v23 pressure rejects premature reloads and blocked shots");
+    WorkerFitnessMetrics unsafePressure = combatPressure;
+    unsafePressure.friendlyHits = 1U;
+    unsafePressure.friendlyDamage = 8.0F;
+    expect(scoreCooperativeCombatPressureStage(unsafePressure,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            < scoreCooperativeTrainingStage(unsafePressure,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+                    - 2.7F
+        && scoreCooperativeCombatPressureStage(unsafePressure,
+            gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+            == scoreCooperativeTrainingStage(unsafePressure,
+                gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+        && scoreCooperativeCombatPressureStage(combatPressure,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl)
+            > scoreCooperativeTrainingStage(combatPressure,
+                gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl),
+        "v23 grants extra combat credit only in episodes without allied hits");
+    WorkerFitnessMetrics blockedLane = combatPressure;
+    blockedLane.friendlyFireHolds = 240U;
+    const float openLaneBonus = scoreCooperativeCombatPressureStage(
+        combatPressure, gdp::entities::EnemyArchetype::Guard,
+        TrainingStage::FireControl)
+        - scoreCooperativeTrainingStage(combatPressure,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl);
+    const float blockedLaneBonus = scoreCooperativeCombatPressureStage(
+        blockedLane, gdp::entities::EnemyArchetype::Guard,
+        TrainingStage::FireControl)
+        - scoreCooperativeTrainingStage(blockedLane,
+            gdp::entities::EnemyArchetype::Guard, TrainingStage::FireControl);
+    expect(blockedLaneBonus < openLaneBonus,
+        "v23 Guard loses extra reward for a prolonged blocked firing lane");
+    WorkerFitnessMetrics allyPressure = combatPressure;
+    allyPressure.groupEpisodes = 1U;
+    allyPressure.neuralTicks = 10U;
+    allyPressure.allyDamageDealt = 40.0F;
+    WorkerFitnessMetrics noAllyPressure = allyPressure;
+    noAllyPressure.allyDamageDealt = 0.0F;
+    expect(scoreCooperativeCombatPressureStage(allyPressure,
+            gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+            == scoreCooperativeCombatPressureStage(noAllyPressure,
+                gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+        && scoreCooperativeCombatPressureStage(allyPressure,
+            gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+            == scoreCooperativeTrainingStage(allyPressure,
+                gdp::entities::EnemyArchetype::Engineer, TrainingStage::Positioning)
+                + std::min(allyPressure.damageDealt / 40.0F, 1.0F) * 1.6F
+                + static_cast<float>(
+                    std::min(allyPressure.attacksLanded, 4U)) * 0.55F,
+        "v23 Engineer keeps v23b score; allied damage is diagnostic only");
+    const gdp::entities::EntityId controlled{1U, 1U};
+    const gdp::entities::EntityId ally{2U, 1U};
+    const gdp::entities::EntityId other{3U, 1U};
+    gdp::gameplay::EnemyProjectileEvent hit;
+    hit.source = ally;
+    hit.hitPlayer = true;
+    hit.damageApplied = 8.0F;
+    expect(creditedTrainingAllyDamage(hit, controlled, ally, std::nullopt)
+            == 8.0F,
+        "training attributes a confirmed Player hit to the listed ally");
+    hit.source = controlled;
+    expect(creditedTrainingAllyDamage(hit, controlled, ally, std::nullopt)
+            == 0.0F,
+        "training does not count own shot as allied damage");
+    hit.source = other;
+    expect(creditedTrainingAllyDamage(hit, controlled, ally, std::nullopt)
+            == 0.0F,
+        "training excludes unlisted shooters from allied damage");
+    hit.source = ally;
+    hit.hitPlayer = false;
+    hit.hitEnemy = other;
+    expect(creditedTrainingAllyDamage(hit, controlled, ally, std::nullopt)
+            == 0.0F,
+        "training does not reward an allied hit against an enemy");
+    hit.source = other;
+    hit.hitPlayer = true;
+    hit.hitEnemy = {};
+    expect(creditedTrainingAllyDamage(hit, controlled, ally, other)
+            == 8.0F,
+        "training attributes the second listed ally independently");
 }
 
 void testCooperativeTraining()
@@ -740,6 +843,108 @@ void testPerceptionCurriculum()
         "v22 is exclusive of the hard-case curricula");
     fs::remove_all(root, error);
     expect(!error, "v22 temporary checkpoints are cleaned up");
+}
+
+void testCombatPressureCurriculum()
+{
+    namespace fs = std::filesystem;
+    using namespace gdp::game::ai;
+    const fs::path root = fs::temp_directory_path()
+        / ("gdp_combat_pressure_test_" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::error_code error;
+    if (!fs::create_directory(root, error) || error) {
+        expect(false, "v23 test owns a unique output directory");
+        return;
+    }
+    WorkerTrainingOptions options{
+        .archetype = gdp::entities::EnemyArchetype::Guard,
+        .seed = 20261026U,
+        .seedExplicit = true,
+        .trainAllScenarios = true,
+        .diverseMaps = true,
+        .combatPressureCurriculum = true,
+        .brainContract = gdp::gameplay::EnemyBrainContract::Cooperative,
+        .curriculumGenerations = 1U,
+        .population = 2U,
+        .generations = 2U,
+        .saveDirectory = root / "guard-first",
+        .resumeBrain = std::nullopt,
+        .resumePopulation = std::nullopt,
+    };
+    std::ostringstream firstLog;
+    const auto first = runEnemyTraining(options, firstLog);
+    const auto population = first.lastPopulation
+        ? loadTrainingPopulation(*first.lastPopulation) : std::nullopt;
+    expect(first.succeeded && population && population->curriculum == 23U
+            && reportedMetric(firstLog.str(), "hard_case_episodes=") == 2.0F
+            && reportedMetric(firstLog.str(), "hard_case_group_episodes=") > 0.0F
+            && reportedMetric(firstLog.str(), "perception_episodes=") == 1.0F
+            && reportedMetric(firstLog.str(), "perception_sight_lost=") > 0.0F
+            && firstLog.str().find("combat_pressure_curriculum=1")
+                != std::string::npos,
+        "v23 Guard trains team combat and perception in distinct fixtures");
+    if (population) {
+        options.resumePopulation = first.lastPopulation;
+        options.saveDirectory = root / "guard-resumed";
+        options.generations = 1U;
+        std::ostringstream resumedLog;
+        const auto resumed = runEnemyTraining(options, resumedLog);
+        options.resumePopulation.reset();
+        options.saveDirectory = root / "guard-continuous";
+        options.generations = 3U;
+        std::ostringstream continuousLog;
+        const auto continuous = runEnemyTraining(options, continuousLog);
+        expect(resumed.succeeded && continuous.succeeded
+                && resumed.lastGeneration == 3U
+                && resumed.finalBest == continuous.finalBest
+                && resumed.holdoutFitness == continuous.holdoutFitness
+                && resumed.champion && continuous.champion
+                && std::equal(resumed.champion->network.parameters().begin(),
+                    resumed.champion->network.parameters().end(),
+                    continuous.champion->network.parameters().begin()),
+            "v23 full population resume matches uninterrupted Guard training");
+        options.resumePopulation = first.lastPopulation;
+        options.combatPressureCurriculum = false;
+        options.perceptionCurriculum = true;
+        options.saveDirectory.reset();
+        std::ostringstream incompatibleLog;
+        const auto incompatible = runEnemyTraining(options, incompatibleLog);
+        expect(!incompatible.succeeded
+                && incompatible.error.find("incompatible training population")
+                    != std::string::npos,
+            "v22 cannot resume a v23 population");
+    }
+    options.resumePopulation.reset();
+    options.perceptionCurriculum = false;
+    options.combatPressureCurriculum = true;
+    options.archetype = gdp::entities::EnemyArchetype::Engineer;
+    options.saveDirectory = root / "engineer";
+    options.generations = 1U;
+    std::ostringstream engineerLog;
+    const auto engineer = runEnemyTraining(options, engineerLog);
+    const auto engineerPopulation = engineer.lastPopulation
+        ? loadTrainingPopulation(*engineer.lastPopulation) : std::nullopt;
+    expect(engineer.succeeded && engineerPopulation
+            && engineerPopulation->curriculum == 23U
+            && reportedMetric(engineerLog.str(), "hard_case_episodes=") == 2.0F
+            && reportedMetric(engineerLog.str(), "hard_case_player_jumps=") > 0.0F,
+        "v23 Engineer exercises team combat against jumping player");
+    options.saveDirectory.reset();
+    options.archetype = gdp::entities::EnemyArchetype::Officer;
+    std::ostringstream invalidLog;
+    expect(!runEnemyTraining(options, invalidLog).succeeded,
+        "v23 refuses Officer role");
+    options.archetype = gdp::entities::EnemyArchetype::Guard;
+    options.perceptionCurriculum = true;
+    expect(!runEnemyTraining(options, invalidLog).succeeded,
+        "v23 refuses simultaneous v22 selection");
+    options.perceptionCurriculum = false;
+    options.brainContract = gdp::gameplay::EnemyBrainContract::Tactical;
+    expect(!runEnemyTraining(options, invalidLog).succeeded,
+        "v23 refuses tactical brain contract");
+    fs::remove_all(root, error);
+    expect(!error, "v23 temporary checkpoints are cleaned up");
 }
 
 void testTrainingAndPersistence()
@@ -1183,7 +1388,8 @@ int main(const int argc, char* argv[])
         && selection != "--population-encounters"
         && selection != "--curriculum-v20"
         && selection != "--curriculum-v21"
-        && selection != "--curriculum-v22") {
+        && selection != "--curriculum-v22"
+        && selection != "--curriculum-v23") {
         std::cerr << "Unknown worker-training test group\n";
         return 2;
     }
@@ -1202,5 +1408,7 @@ int main(const int argc, char* argv[])
         testHardCaseCurriculumV2();
     if (selection == "--all" || selection == "--curriculum-v22")
         testPerceptionCurriculum();
+    if (selection == "--all" || selection == "--curriculum-v23")
+        testCombatPressureCurriculum();
     return failures == 0 ? 0 : 1;
 }

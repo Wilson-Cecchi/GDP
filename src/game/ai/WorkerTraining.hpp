@@ -3,6 +3,7 @@
 #include "ai/Genome.hpp"
 #include "entities/EntityManager.hpp"
 #include "gameplay/EnemyBrainContract.hpp"
+#include "gameplay/EnemyProjectile.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -26,6 +27,7 @@ struct WorkerFitnessMetrics {
     float damageDealt{0.0F};
     float damageReceived{0.0F};
     float fallbackDamageDealt{0.0F};
+    float allyDamageDealt{0.0F};
     float fallbackDamageReceived{0.0F};
     float survivalSeconds{0.0F};
     float tacticalProgressMeters{0.0F};
@@ -104,8 +106,17 @@ struct DirectionalCredit {
     const WorkerFitnessMetrics& metrics,
     gdp::entities::EnemyArchetype archetype,
     TrainingStage stage) noexcept;
+[[nodiscard]] float scoreCooperativeCombatPressureStage(
+    const WorkerFitnessMetrics& metrics,
+    gdp::entities::EnemyArchetype archetype,
+    TrainingStage stage) noexcept;
 [[nodiscard]] float creditedTacticalProgress(
     float neuralProgress, float totalProgress) noexcept;
+[[nodiscard]] float creditedTrainingAllyDamage(
+    const gameplay::EnemyProjectileEvent& event,
+    gdp::entities::EntityId controlled,
+    std::optional<gdp::entities::EntityId> firstAlly,
+    std::optional<gdp::entities::EntityId> secondAlly) noexcept;
 [[nodiscard]] DirectionalCredit directionalMovementCredit(
     float forward, float strafe, float durationSeconds) noexcept;
 [[nodiscard]] float evaluateWorkerGenome(
@@ -121,6 +132,7 @@ struct WorkerTrainingOptions {
     bool hardCaseCurriculum{false}; // Isolated cooperative Guard/Robot pilot.
     bool hardCaseCurriculumV2{false}; // Revised, incompatible pilot.
     bool perceptionCurriculum{false}; // Isolated cooperative curriculum 22.
+    bool combatPressureCurriculum{false}; // Isolated Guard/Engineer curriculum 23.
     gameplay::EnemyBrainContract brainContract{
         gameplay::EnemyBrainContract::Tactical};
     std::uint32_t curriculumGenerations{0U}; // Zero uses first run length.

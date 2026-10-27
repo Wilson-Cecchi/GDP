@@ -38,6 +38,7 @@ constexpr std::uint64_t holdoutScenarioDomain = 0x41495343454E4548ULL;
 constexpr std::uint64_t hardCaseScenarioDomain = 0x4149484152444331ULL;
 constexpr std::uint64_t hardCaseScenarioV2Domain = 0x4149484152444332ULL;
 constexpr std::uint64_t perceptionScenarioDomain = 0x4149504552434550ULL;
+constexpr std::uint64_t combatPressureScenarioDomain = 0x4149434F4D424154ULL;
 constexpr std::uint64_t bossBurstScenarioDomain = 0x4149424F53534252ULL;
 constexpr std::uint64_t cooperativeWorldRetryDomain = 0x4149574F524C4432ULL;
 constexpr float fixedStep = 1.0F / 60.0F;
@@ -420,7 +421,8 @@ WorkerFitnessMetrics simulateEpisode(
         plan.player = PlayerPattern::Peek;
         plan.facingOffsetDegrees = 0.0F;
     }
-    if (hardCase && archetype == EnemyArchetype::Guard
+    if (hardCase && (archetype == EnemyArchetype::Guard
+            || archetype == EnemyArchetype::Engineer)
         && stage == TrainingStage::Positioning) {
         plan.player = PlayerPattern::Peek;
     }
@@ -581,7 +583,8 @@ WorkerFitnessMetrics simulateEpisode(
         plan.player = encounter->peekWidth > 0.0F ? PlayerPattern::Peek : PlayerPattern::Sweep;
     }
     if (hardCase && stage == TrainingStage::RealMaps
-        && archetype == EnemyArchetype::Guard) {
+        && (archetype == EnemyArchetype::Guard
+            || archetype == EnemyArchetype::Engineer)) {
         plan.player = PlayerPattern::Bhop;
     }
     if (generatedWorld && !encounter) {
@@ -874,6 +877,8 @@ WorkerFitnessMetrics simulateEpisode(
         bool neuralProjectileElimination = false;
         for (const auto& event : projectileEvents) {
             if (cooperative && event.source != worker) {
+                metrics.allyDamageDealt += creditedTrainingAllyDamage(
+                    event, worker, supportAlly, secondSupportAlly);
                 continue;
             }
             if (event.hitEnemy.isValid()) {
@@ -1187,6 +1192,7 @@ void addMetrics(WorkerFitnessMetrics& total, const WorkerFitnessMetrics& sample)
     total.damageDealt += sample.damageDealt;
     total.damageReceived += sample.damageReceived;
     total.fallbackDamageDealt += sample.fallbackDamageDealt;
+    total.allyDamageDealt += sample.allyDamageDealt;
     total.fallbackDamageReceived += sample.fallbackDamageReceived;
     total.survivalSeconds += sample.survivalSeconds;
     total.tacticalProgressMeters += sample.tacticalProgressMeters;
@@ -1260,7 +1266,8 @@ WorkerEvaluation evaluateGenome(
         = gameplay::EnemyBrainContract::Tactical,
     const bool hardCaseCurriculum = false,
     const bool hardCaseCurriculumV2 = false,
-    const bool perceptionCurriculum = false)
+    const bool perceptionCurriculum = false,
+    const bool combatPressureCurriculum = false)
 {
     WorkerEvaluation evaluation;
     float worst = std::numeric_limits<float>::infinity();
@@ -1281,8 +1288,10 @@ WorkerEvaluation evaluateGenome(
                 contract);
             const TrainingStage evaluatedStage
                 = static_cast<TrainingStage>(scenario + 1U);
-            const float scenarioScore
-                = contract == gameplay::EnemyBrainContract::Cooperative
+            const float scenarioScore = combatPressureCurriculum
+                ? scoreCooperativeCombatPressureStage(metrics, archetype,
+                    evaluatedStage)
+                : contract == gameplay::EnemyBrainContract::Cooperative
                     ? scoreCooperativeTrainingStage(metrics, archetype,
                         evaluatedStage)
                     : scoreTrainingStage(metrics, archetype, evaluatedStage);
@@ -1306,7 +1315,8 @@ WorkerEvaluation evaluateGenome(
         * (evaluation.score
             / static_cast<float>(count * repetitions))
         + 0.25F * worst;
-    if ((hardCaseCurriculum || hardCaseCurriculumV2) && !holdout) {
+    if ((hardCaseCurriculum || hardCaseCurriculumV2
+            || combatPressureCurriculum) && !holdout) {
         // Development fixtures use a separate seed domain. The final paired
         // evaluator seeds never enter training, and the standard holdout stays
         // comparable with curriculum 19.
@@ -1319,17 +1329,22 @@ WorkerEvaluation evaluateGenome(
             if (scenario >= count) continue;
             const WorkerFitnessMetrics metrics = simulateEpisode(genome,
                 wkc::core::deriveSeed(scenarioSeed,
-                    hardCaseCurriculumV2
-                        ? hardCaseScenarioV2Domain : hardCaseScenarioDomain,
+                    combatPressureCurriculum ? combatPressureScenarioDomain
+                        : hardCaseCurriculumV2 ? hardCaseScenarioV2Domain
+                        : hardCaseScenarioDomain,
                     scenario), scenario, archetype, diverseMaps,
                 archetype == EnemyArchetype::IndustrialRobot ? 1U : 5U,
-                0U, contract, true, hardCaseCurriculumV2);
+                0U, contract, true,
+                hardCaseCurriculumV2 || combatPressureCurriculum);
             const TrainingStage scoreStage
                 = archetype == EnemyArchetype::IndustrialRobot && scenario == 3U
                     ? TrainingStage::Duel
                     : static_cast<TrainingStage>(scenario + 1U);
-            float score = scoreCooperativeTrainingStage(metrics,
-                archetype, scoreStage);
+            float score = combatPressureCurriculum
+                ? scoreCooperativeCombatPressureStage(metrics,
+                    archetype, scoreStage)
+                : scoreCooperativeTrainingStage(metrics,
+                    archetype, scoreStage);
             if (hardCaseCurriculumV2) {
                 // A neural shot that threatened the player at launch but was
                 // dodged supplies a small gradient before a direct hit. An
@@ -1367,12 +1382,14 @@ WorkerEvaluation evaluateGenome(
                 evaluation.hardCaseScore
                     = std::min(evaluation.hardCaseScore, -2.0F);
             }
-            evaluation.score = 0.75F * evaluation.score
-                + 0.25F * evaluation.hardCaseScore;
+            evaluation.score = (combatPressureCurriculum ? 0.55F : 0.75F)
+                * evaluation.score
+                + (combatPressureCurriculum ? 0.45F : 0.25F)
+                    * evaluation.hardCaseScore;
             evaluation.worstScenario = std::min(worst, hardCaseWorst);
         }
     }
-    if (perceptionCurriculum && !holdout
+    if ((perceptionCurriculum || combatPressureCurriculum) && !holdout
         && count == scenarioCount) {
         // The extra episodes have dedicated seed domains. Keep standard
         // holdout unchanged so it remains a diagnostic, not a selection gate.
@@ -1422,7 +1439,17 @@ WorkerEvaluation evaluateGenome(
     // share of the combat stages must not beat a risky but useful policy by
     // merely avoiding the terminal death penalty. Early curriculum stages
     // remain unconstrained so they can learn movement and aim first.
-    if (count == scenarioCount
+    if (combatPressureCurriculum && count == scenarioCount) {
+        const std::uint32_t usefulEpisodes = evaluation.combatEpisodesWithHit
+            + evaluation.hardCaseHitEpisodes;
+        const std::uint32_t missingEpisodes = usefulEpisodes < repetitions
+            ? static_cast<std::uint32_t>(repetitions) - usefulEpisodes : 0U;
+        evaluation.combatCompetent = missingEpisodes == 0U;
+        // Keep a gradient between poor policies while making a genuine hit
+        // worth more than safe movement alone.
+        evaluation.score -= static_cast<float>(missingEpisodes) * 1.2F;
+    }
+    if (!combatPressureCurriculum && count == scenarioCount
         && (archetype == EnemyArchetype::Worker
             || archetype == EnemyArchetype::Engineer)
         && evaluation.combatEpisodesWithHit < repetitions) {
@@ -1558,6 +1585,18 @@ bool prepareOutputDirectory(const std::filesystem::path& directory)
 
 } // namespace
 
+float creditedTrainingAllyDamage(
+    const gameplay::EnemyProjectileEvent& event,
+    const gdp::entities::EntityId controlled,
+    const std::optional<gdp::entities::EntityId> firstAlly,
+    const std::optional<gdp::entities::EntityId> secondAlly) noexcept
+{
+    const bool fromAlly = (firstAlly && event.source == *firstAlly)
+        || (secondAlly && event.source == *secondAlly);
+    return event.hitPlayer && event.source != controlled && fromAlly
+        ? std::max(event.damageApplied, 0.0F) : 0.0F;
+}
+
 float evaluateWorkerGenome(
     const wkc::ai::Genome& genome,
     const wkc::core::Seed scenarioSeed)
@@ -1615,10 +1654,22 @@ WorkerTrainingResult runEnemyTraining(
     }
     if (options.perceptionCurriculum
         && (options.hardCaseCurriculum || options.hardCaseCurriculumV2
+            || options.combatPressureCurriculum
             || options.brainContract != gameplay::EnemyBrainContract::Cooperative
             || !options.trainAllScenarios || !options.diverseMaps)) {
         result.error = "perception curriculum requires cooperative brain, "
-            "--all-scenarios and --diverse-maps, without hard-case flags";
+            "--all-scenarios and --diverse-maps, without other curricula";
+        return result;
+    }
+    if (options.combatPressureCurriculum
+        && (options.hardCaseCurriculum || options.hardCaseCurriculumV2
+            || options.perceptionCurriculum
+            || options.brainContract != gameplay::EnemyBrainContract::Cooperative
+            || !options.trainAllScenarios || !options.diverseMaps
+            || (options.archetype != EnemyArchetype::Guard
+                && options.archetype != EnemyArchetype::Engineer))) {
+        result.error = "combat-pressure curriculum requires cooperative Guard or Engineer, "
+            "--all-scenarios and --diverse-maps, without other curricula";
         return result;
     }
     try {
@@ -1628,7 +1679,8 @@ WorkerTrainingResult runEnemyTraining(
         std::uint32_t firstGeneration = 1U;
         const bool cooperative
             = options.brainContract == gameplay::EnemyBrainContract::Cooperative;
-        const std::uint32_t curriculum = options.perceptionCurriculum ? 22U
+        const std::uint32_t curriculum = options.combatPressureCurriculum ? 23U
+            : options.perceptionCurriculum ? 22U
             : options.hardCaseCurriculumV2 ? 21U
             : options.hardCaseCurriculum ? 20U
             : cooperative
@@ -1748,6 +1800,8 @@ WorkerTrainingResult runEnemyTraining(
                << " hard_case_curriculum=" << options.hardCaseCurriculum
                << " hard_case_curriculum_v2=" << options.hardCaseCurriculumV2
                << " perception_curriculum=" << options.perceptionCurriculum
+               << " combat_pressure_curriculum="
+               << options.combatPressureCurriculum
                << " resume_population=" << static_cast<bool>(fullResume)
                << " stage_immigrants=2"
                << " runtime_control_all=1"
@@ -1804,7 +1858,8 @@ WorkerTrainingResult runEnemyTraining(
                     options.diverseMaps, options.brainContract,
                     options.hardCaseCurriculum,
                     options.hardCaseCurriculumV2,
-                    options.perceptionCurriculum).score;
+                    options.perceptionCurriculum,
+                    options.combatPressureCurriculum).score;
                 total += genome.fitness;
             }
             std::sort(population.begin(), population.end(),
@@ -1825,7 +1880,8 @@ WorkerTrainingResult runEnemyTraining(
                     options.diverseMaps, options.brainContract,
                     options.hardCaseCurriculum,
                     options.hardCaseCurriculumV2,
-                    options.perceptionCurriculum);
+                    options.perceptionCurriculum,
+                    options.combatPressureCurriculum);
             const WorkerFitnessMetrics& bestMetrics = bestEvaluation.metrics;
             output << "AI_GENERATION number=" << generation
                    << " scenario_seed=" << generationScenarios
@@ -1841,6 +1897,7 @@ WorkerTrainingResult runEnemyTraining(
             appendStageDiagnostics(output, bestEvaluation);
             output << " damage_received=" << bestMetrics.damageReceived
                    << " fallback_damage_dealt=" << bestMetrics.fallbackDamageDealt
+                   << " ally_damage_dealt=" << bestMetrics.allyDamageDealt
                    << " fallback_damage_received=" << bestMetrics.fallbackDamageReceived
                    << " hits=" << bestMetrics.attacksLanded
                    << " shots=" << bestMetrics.shotsFired
@@ -1999,6 +2056,7 @@ WorkerTrainingResult runEnemyTraining(
                << holdout.combatEpisodesWithHit
                << " holdout_combat_competent=" << holdout.combatCompetent
                << " holdout_hits=" << holdout.metrics.attacksLanded
+               << " holdout_ally_damage=" << holdout.metrics.allyDamageDealt
                << " holdout_premature_reloads="
                << holdout.metrics.prematureReloads
                << " holdout_dodges=" << holdout.metrics.dodgesSucceeded

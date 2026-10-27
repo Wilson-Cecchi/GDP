@@ -207,4 +207,45 @@ float scoreCooperativeTrainingStage(const WorkerFitnessMetrics& metrics,
         holdPenalty + hitPenalty + damagePenalty);
 }
 
+float scoreCooperativeCombatPressureStage(const WorkerFitnessMetrics& metrics,
+    const gdp::entities::EnemyArchetype archetype,
+    const TrainingStage stage) noexcept
+{
+    const float base = scoreCooperativeTrainingStage(metrics, archetype, stage);
+    if (stage < TrainingStage::FireControl) {
+        return base;
+    }
+    // Credit only neural-authored pressure. A blocked shot or premature reload
+    // cannot stand in for a hit.
+    // The new pressure bonus must not compensate an allied hit in the same
+    // episode. Keep the regular cooperative penalty and full pressure credit
+    // in clean episodes, without changing the earlier curricula.
+    const bool cleanFire = metrics.friendlyHits == 0U
+        && metrics.friendlyDamage == 0.0F;
+    const float damage = cleanFire
+        ? std::min(metrics.damageDealt / 40.0F, 1.0F) * 1.6F : 0.0F;
+    const float hits = cleanFire
+        ? static_cast<float>(std::min(metrics.attacksLanded, 4U)) * 0.55F
+        : 0.0F;
+    // Keep the Engineer's tested v23b objective. Allied projectile damage is
+    // recorded for diagnosis, but the attempted team bonus regressed gameplay.
+    if (archetype == gdp::entities::EnemyArchetype::Engineer) {
+        return base + damage + hits;
+    }
+    const float threatenedShots = cleanFire
+        ? static_cast<float>(std::min(metrics.shotsDodged, 3U)) * 0.2F
+        : 0.0F;
+    const float reloadAndBlockPenalty
+        = -static_cast<float>(std::min(metrics.prematureReloads, 3U)) * 0.25F
+        - static_cast<float>(std::min(metrics.shotsBlocked, 3U)) * 0.15F;
+    const float alliedHitPenalty = static_cast<float>(
+        std::min(metrics.friendlyHits, 4U)) * 2.0F
+        + std::min(metrics.friendlyDamage / 8.0F, 4.0F) * 0.75F;
+    const float blockedLanePenalty = std::min(
+        std::max(static_cast<float>(metrics.friendlyFireHolds) - 60.0F,
+            0.0F) / 60.0F, 3.0F) * 0.3F;
+    return base + damage + hits + threatenedShots
+        + reloadAndBlockPenalty - alliedHitPenalty - blockedLanePenalty;
+}
+
 } // namespace gdp::game::ai

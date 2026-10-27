@@ -640,7 +640,8 @@ if(GDP_BUILD_TESTS)
     # ASan/UBSan runs arena simulation much slower. Keep independent cases in
     # separate CTest invocations so each 600-second limit covers one case.
     foreach(group fitness cooperative persistence other-archetypes
-            population-encounters curriculum-v20 curriculum-v21 curriculum-v22)
+            population-encounters curriculum-v20 curriculum-v21 curriculum-v22
+            curriculum-v23)
         string(REPLACE "-" "_" test_suffix "${group}")
         add_test(NAME worker_training_${test_suffix}
             COMMAND gdp_worker_training_tests --${group})
