@@ -1549,6 +1549,11 @@ Elementos:
 - grandes tubos funcionais;
 - estruturas de porta.
 
+Colunas estruturais passam a ser peças físicas anexadas às paredes das salas,
+com a mesma caixa para desenho e colisão. A geração ignora posições que
+obstruiriam portas, zonas reservadas ou móveis arquitetônicos. A superfície da
+parede não deve desenhar uma faixa para simular a coluna no mesmo local.
+
 Cobertura recomendada:
 
 - aproximadamente **15% a 30%** da área visual.

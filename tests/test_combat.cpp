@@ -5,6 +5,7 @@
 #include "gameplay/Player.hpp"
 #include "gameplay/PlayerGrenade.hpp"
 #include "gameplay/Weapon.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <array>
@@ -271,6 +272,55 @@ void testGrenadeCookingAndBlast()
             && !blast.hits.empty()
             && enemies.findData<EnemyData>(nearby)->health < 100.0F,
         "an in-hand blast damages the player and a nearby exposed enemy");
+}
+
+void testStrongerGrenadeBlast()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld open{{{-10.0F, 0.0F, -10.0F}, {10.0F, 5.0F, 10.0F}}};
+    Player player;
+    player.spawn({0.0F, 0.0F, 0.3F});
+    EntityManager entities;
+    const EntityId enemy = entities.createEnemy({
+        .transform = {.position = {0.0F, 0.0F, 0.4F}},
+        .roomId = 1U, .health = 150.0F});
+    const EntityId crate = entities.createProp({
+        .transform = {.position = {1.0F, 0.0F, 0.0F},
+            .scale = {0.8F, 1.0F, 0.8F}},
+        .roomId = 1U, .type = PropType::Crate, .solid = true,
+        .health = 120.0F, .maximumHealth = 120.0F});
+    const GrenadeBlastResult blast = resolveGrenadeBlast(
+        {{0.0F, 0.9F, 0.0F}, 1U, open, {}}, player, entities);
+    const auto* enemyData = entities.findData<EnemyData>(enemy);
+    const auto* crateData = entities.findData<PropData>(crate);
+    expect(blast.playerDamaged && !player.state().alive
+            && enemyData && enemyData->health <= 0.0F
+            && crateData && crateData->state == PropState::Destroyed
+            && !crateData->solid,
+        "stronger close grenade blast defeats a 150 HP enemy, breaks 120 HP cover and can kill its owner");
+}
+
+void testGrenadeSevenMeterReach()
+{
+    using namespace gdp::gameplay;
+    using namespace gdp::entities;
+    const CollisionWorld open{{{-12.0F, 0.0F, -12.0F}, {12.0F, 5.0F, 12.0F}}};
+    Player nearPlayer;
+    nearPlayer.spawn({6.0F, 0.0F, 0.0F});
+    EntityManager entities;
+    const EntityId nearEnemy = entities.createEnemy({
+        .transform = {.position = {6.0F, 0.0F, 0.0F}},
+        .roomId = 1U, .health = 100.0F});
+    const EntityId farEnemy = entities.createEnemy({
+        .transform = {.position = {8.0F, 0.0F, 0.0F}},
+        .roomId = 1U, .health = 100.0F});
+    const GrenadeBlastResult nearBlast = resolveGrenadeBlast(
+        {{0.0F, 0.8F, 0.0F}, 1U, open, {}}, nearPlayer, entities);
+    expect(nearBlast.playerDamaged && nearPlayer.state().health < 100.0F
+            && entities.findData<EnemyData>(nearEnemy)->health < 100.0F
+            && entities.findData<EnemyData>(farEnemy)->health == 100.0F,
+        "grenade reaches exposed targets six meters away but not eight meters away");
 }
 
 void testFourSecondGrenadeCook()
@@ -1450,8 +1500,16 @@ void testHitscanSelectionAndBlocking()
     expect(blocked.outcome == ShotOutcome::ImpactWorld && blocked.impact
             && blocked.impact->material == ImpactMaterial::Metal
             && near(blocked.impact->point.z, -1.5F)
+            && blocked.impact->normal == wkc::core::Vec3{0.0F, 0.0F, 1.0F}
             && blockedManager.findData<EnemyData>(blockedEnemy)->health == 50.0F,
         "solid geometry stops a shot and reports its exact surface impact");
+    Weapon angledWeapon({.fireInterval = 0.0F, .range = 20.0F});
+    const ShotResult angled = fireHitscan(
+        angledWeapon, {0.0F, 1.0F, 0.0F}, {0.25F, 0.0F, -1.0F},
+        1, blockedRoom, blockedManager, 0.0F);
+    expect(angled.outcome == ShotOutcome::ImpactWorld && angled.impact
+            && angled.impact->normal == wkc::core::Vec3{0.0F, 0.0F, 1.0F},
+        "oblique world impacts use the actual wall normal for attached marks");
     const CombatSignalBatch blockedSignals = combatSignalsForShot(blocked);
     expect(blockedSignals.count == 2U
             && blockedSignals.signals[1].kind == CombatSignalKind::ImpactWorld
@@ -4147,6 +4205,75 @@ void testAllyReportsAreCoarseAndEventDriven()
         "a fresh ally report replaces an older direct-sight memory");
 }
 
+void testShapedRoomWallsStopShots()
+{
+    using namespace gdp;
+    using namespace gdp::gameplay;
+    const CollisionWorld room = CollisionWorld::fromWalkableVolumes(
+        {{{-8.0F, 0.0F, -10.0F}, {8.0F, 5.5F, 10.0F}}},
+        {}, world::technicalLPreviewFootprint());
+    entities::EntityManager manager;
+    Weapon weapon({.fireInterval = 0.0F, .range = 30.0F});
+    const ShotResult shot = fireHitscan(weapon, {0.0F, 1.0F, 0.0F},
+        wkc::core::normalized({1.0F, 0.0F, -1.0F}), 1U, room, manager);
+    expect(shot.outcome == ShotOutcome::ImpactWorld && shot.impact
+            && near(shot.impact->point.x, 2.0F)
+            && near(shot.impact->point.z, -2.0F),
+        "shots hit the L room's inner wall instead of the old rectangle");
+    expect(!hasLineOfSight({0.0F, 1.0F, 0.0F}, {4.0F, 1.0F, -4.0F}, room)
+            && hasLineOfSight({0.0F, 1.0F, 0.0F}, {-4.0F, 1.0F, -4.0F}, room),
+        "shaped walls block sight only across the removed corner");
+
+    const CollisionWorld angledRoom = CollisionWorld::fromWalkableVolumes(
+        {{{-2.0F, 0.0F, -2.0F}, {2.0F, 3.0F, 2.0F}}}, {},
+        {{-2.0F, 0.0F}, {0.0F, -2.0F}, {2.0F, 0.0F}, {0.0F, 2.0F}});
+    Weapon angledWeapon({.fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult angled = fireHitscan(angledWeapon,
+        {0.0F, 1.0F, 0.0F}, {1.0F, 0.0F, -0.3F},
+        1U, angledRoom, manager, 0.0F);
+    expect(angled.outcome == ShotOutcome::ImpactWorld && angled.impact
+            && std::abs(angled.impact->normal.x + 0.7071068F) < 0.01F
+            && std::abs(angled.impact->normal.z - 0.7071068F) < 0.01F,
+        "marks follow a diagonal wall instead of facing the shot ray");
+}
+
+void testCentralHubShaftShotCollision()
+{
+    using namespace gdp::gameplay;
+    const wkc::core::Aabb shaft{{-1.2F, 0.35F, -1.2F},
+        {1.2F, 5.55F, 1.2F}};
+    const CollisionWorld room = CollisionWorld::fromWalkableVolumes(
+        {{{-10.0F, 0.0F, -10.0F}, {10.0F, 7.0F, 10.0F}}},
+        {shaft}, {}, {}, {shaft});
+    gdp::entities::EntityManager manager;
+    Weapon cornerWeapon({.fireInterval = 0.0F, .range = 0.7F});
+    const ShotResult corner = fireHitscan(cornerWeapon,
+        {0.9F, 2.0F, 1.4F}, {1.0F, 0.0F, -1.0F},
+        1U, room, manager);
+    expect(corner.outcome == ShotOutcome::Miss && !corner.impact
+            && !room.projectileSolidContains({1.1F, 2.0F, 1.1F}),
+        "a shot grazing the empty corner of the hub shaft passes through");
+
+    Weapon bevelWeapon({.fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult bevel = fireHitscan(bevelWeapon,
+        {1.0F, 2.0F, 3.0F}, {0.0F, 0.0F, -1.0F},
+        1U, room, manager);
+    expect(bevel.outcome == ShotOutcome::ImpactWorld && bevel.impact
+            && std::abs(bevel.impact->point.z - 0.697056F) < 0.001F
+            && std::abs(bevel.impact->normal.x - 0.707107F) < 0.001F
+            && std::abs(bevel.impact->normal.z - 0.707107F) < 0.001F
+            && room.projectileSolidContains({1.0F, 2.0F, 0.6F}),
+        "a real bevel hit reports the visible face and diagonal normal");
+
+    Weapon frontWeapon({.fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult front = fireHitscan(frontWeapon,
+        {0.0F, 2.0F, 3.0F}, {0.0F, 0.0F, -1.0F},
+        1U, room, manager);
+    expect(front.outcome == ShotOutcome::ImpactWorld && front.impact
+            && near(front.impact->point.z, 1.2F),
+        "the front of the hub shaft still stops shots");
+}
+
 } // namespace
 
 int main()
@@ -4154,6 +4281,8 @@ int main()
     testCombatSignalBatch();
     testChargedGrenadeThrow();
     testGrenadeCookingAndBlast();
+    testStrongerGrenadeBlast();
+    testGrenadeSevenMeterReach();
     testFourSecondGrenadeCook();
     testGrenadeCollidesWithEnemies();
     testGrenadeBlastRespectsCover();
@@ -4183,6 +4312,8 @@ int main()
     testReferenceEnemyHitboxes();
     testWalkableUnionBlocksShotsAcrossDisconnectedSpace();
     testShotsThroughOpenCorridor();
+    testShapedRoomWallsStopShots();
+    testCentralHubShaftShotCollision();
     testWorkerBehavior();
     testWorkerLineOfSight();
     testDirectionalEnemyVision();

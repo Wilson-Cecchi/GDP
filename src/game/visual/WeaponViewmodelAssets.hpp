@@ -16,6 +16,7 @@ enum class WeaponMaterial : std::size_t {
     Polymer,
     Recess,
     Sight,
+    AccentPaint,
     Count,
 };
 

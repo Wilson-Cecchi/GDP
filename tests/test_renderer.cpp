@@ -1472,6 +1472,68 @@ void testImpactVisualData()
         "impact color sanitizes non-finite lifetime strength");
 }
 
+void testBulletMarksFollowDoorPanels()
+{
+    using namespace gdp::game::visual;
+    const ImpactRenderData mark{.position = {0.25F, 1.30F, 0.0F},
+        .kind = ImpactVisualKind::BulletMark};
+    const DoorRenderData closed{{0.0F, 0.0F, 0.0F},
+        {0.0F, 0.0F, 1.0F}, 2.0F, 2.2F, false, 0.0F};
+    DoorRenderData open = closed;
+    open.openFraction = 1.0F;
+    const auto closedMark = bulletMarkOnDoor(mark, closed, 0.25F);
+    const auto openMark = bulletMarkOnDoor(mark, open, 0.25F);
+    expect(wkc::core::nearlyEqual(closedMark.position.x, 0.25F)
+            && wkc::core::nearlyEqual(closedMark.position.z, -0.173F)
+            && wkc::core::nearlyEqual(closedMark.position.y, 1.30F),
+        "closed-door bullet mark lies on the panel face at its impact height");
+    expect(wkc::core::nearlyEqual(openMark.position.x - closedMark.position.x,
+            0.98F)
+            && openMark.normal == wkc::core::Vec3{0.0F, 0.0F, -1.0F},
+        "bullet mark moves with the right door panel when it opens");
+    DoorRenderData rotated = open;
+    rotated.outwardNormal = {1.0F, 0.0F, 0.0F};
+    const auto leftMark = bulletMarkOnDoor(mark, rotated, -0.25F);
+    expect(wkc::core::nearlyEqual(leftMark.position.z, -1.23F)
+            && wkc::core::nearlyEqual(leftMark.position.x, -0.173F),
+        "left panel bullet mark follows a rotated doorway");
+}
+
+void testSecurityIndicatorSequence()
+{
+    using namespace gdp::game::visual;
+    const auto nominal = sampleSecurityIndicator(
+        SecurityIndicatorPhase::Nominal, 0.0F);
+    const auto alarmOn = sampleSecurityIndicator(
+        SecurityIndicatorPhase::Alarm, 0.0F);
+    const auto alarmOff = sampleSecurityIndicator(
+        SecurityIndicatorPhase::Alarm, 1.0F);
+    expect(nominal.color != alarmOn.color
+            && alarmOn.emissiveStrength > 0.0F
+            && alarmOff.emissiveStrength == 0.0F
+            && sampleSecurityIndicator(SecurityIndicatorPhase::Alarm, 0.99F)
+                == alarmOn
+            && sampleSecurityIndicator(SecurityIndicatorPhase::Alarm, 1.99F)
+                == alarmOff
+            && sampleSecurityIndicator(SecurityIndicatorPhase::Alarm, 2.0F)
+                == alarmOn,
+        "security alarm indicators alternate one second on and one second off");
+    const auto rebooting = sampleSecurityIndicator(
+        SecurityIndicatorPhase::Recovery, 0.0F);
+    const auto ready = sampleSecurityIndicator(
+        SecurityIndicatorPhase::Recovery, 3.0F);
+    expect(rebooting.color != ready.color
+            && rebooting.emissiveStrength > 0.0F
+            && sampleSecurityIndicator(SecurityIndicatorPhase::Recovery, 2.99F)
+                == rebooting
+            && sampleSecurityIndicator(SecurityIndicatorPhase::Recovery, 6.0F)
+                == ready,
+        "security indicators reboot in yellow for three seconds then stay green");
+    expect(sampleSecurityIndicator(SecurityIndicatorPhase::Alarm,
+               std::numeric_limits<float>::quiet_NaN()) == alarmOn,
+        "invalid alarm time starts from a finite lit state");
+}
+
 void testWeaponViewmodelPose()
 {
     using namespace gdp::game::visual;
@@ -2117,8 +2179,17 @@ void testPlayerHands()
             model.reloadProgress=role==HudWeaponRole::Pistol ? .87F : role==HudWeaponRole::SubmachineGun ? .80F : .87F;
             const auto operating=samplePlayerHandsPose(model);
             const auto part=sampleWeaponReloadPose(role,model.reloadProgress);
-            expect(surfaceDistance(weaponParts[static_cast<std::size_t>(WeaponPart::Mechanism)],
-                operating.contactPoints[1],part.mechanismOffset)<.020F,
+            const float mechanismGap = surfaceDistance(
+                weaponParts[static_cast<std::size_t>(WeaponPart::Mechanism)],
+                operating.contactPoints[1],part.mechanismOffset);
+            if (mechanismGap >= .020F) {
+                const auto c = operating.contactPoints[1];
+                std::cerr << "Mechanism contact role=" << static_cast<int>(role)
+                    << " gap=" << mechanismGap << " at=" << c.x << ',' << c.y << ',' << c.z
+                    << " offset=" << part.mechanismOffset.x << ','
+                    << part.mechanismOffset.y << ',' << part.mechanismOffset.z << '\n';
+            }
+            expect(mechanismGap < .020F,
                 "operating palm holds the actual moving slide or charging handle surface");
         }
         model.reloadProgress=0;
@@ -2275,15 +2346,17 @@ void testOptimizedShadowBudget()
             12.0F,
         };
     }
-    std::array<ShadowOccluderRenderData, 11U> candidates{};
+    std::array<ShadowOccluderRenderData, 12U> candidates{};
     for (std::size_t index = 0U; index < 9U; ++index) {
         const float x = static_cast<float>(index) * 0.4F;
         candidates[index].bounds = {
             {x, 0.0F, -0.3F}, {x + 0.25F, 1.0F, 0.3F}};
     }
-    candidates[9].bounds = {
-        {100.0F, 0.0F, 100.0F}, {101.0F, 1.0F, 101.0F}};
+    candidates[9] = {{{5.0F, 0.0F, -0.3F},
+        {5.25F, 1.0F, 0.3F}}, true};
     candidates[10].bounds = {
+        {100.0F, 0.0F, 100.0F}, {101.0F, 1.0F, 101.0F}};
+    candidates[11].bounds = {
         {std::numeric_limits<float>::quiet_NaN(), 0.0F, 0.0F},
         {1.0F, 1.0F, 1.0F}};
 
@@ -2305,6 +2378,8 @@ void testOptimizedShadowBudget()
     expect(result == repeatedResult
             && lighting.shadowOccluders == repeated.shadowOccluders,
         "shadow budget selection is deterministic for identical snapshots");
+    expect(lighting.shadowOccluders[0] == candidates[9],
+        "structural column keeps a shadow slot when nearby props fill the budget");
 
     for (std::size_t index = 0U; index < lighting.lightCount; ++index) {
         lighting.lights[index].intensity = 0.0F;
@@ -2315,6 +2390,48 @@ void testOptimizedShadowBudget()
             && lighting.shadowLightCount == 0U
             && lighting.shadowOccluderCount == 0U,
         "fully dark lighting bypasses every shadow intersection");
+}
+
+void testFixtureDrivenAmbient()
+{
+    using namespace gdp::game::visual;
+    RoomLightingRenderData lighting;
+    lighting.lightCount = 4U;
+    constexpr float planned = 0.23F;
+    const float allOn = fixtureDrivenAmbientIntensity(lighting, planned);
+    lighting.lights[0].fixtureEmissionScale = 0.0F;
+    lighting.lights[1].fixtureEmissionScale = 0.0F;
+    const float halfOn = fixtureDrivenAmbientIntensity(lighting, planned);
+    lighting.lights[2].fixtureEmissionScale = 0.45F;
+    const float oneDamaged = fixtureDrivenAmbientIntensity(lighting, planned);
+    lighting.lights[2].fixtureEmissionScale = 0.0F;
+    lighting.lights[3].fixtureEmissionScale = 0.0F;
+    const float allOff = fixtureDrivenAmbientIntensity(lighting, planned);
+    expect(wkc::core::nearlyEqual(allOn, planned, 0.0001F)
+            && halfOn < planned * 0.30F
+            && oneDamaged < halfOn
+            && wkc::core::nearlyEqual(allOff, 0.006F, 0.0001F),
+        "room fill follows intact, damaged and destroyed ceiling fixtures");
+
+    lighting.lightCount = 5U;
+    for (std::size_t index = 0U; index < 4U; ++index) {
+        lighting.lights[index].fixtureEmissionScale = 1.0F;
+    }
+    lighting.lights[4].ambientWeight = 0.55F;
+    lighting.lights[4].fixtureEmissionScale = 1.0F;
+    lighting.lights[0].fixtureEmissionScale = 0.0F;
+    const float mainBroken = fixtureDrivenAmbientIntensity(lighting, planned);
+    lighting.lights[0].fixtureEmissionScale = 1.0F;
+    lighting.lights[4].fixtureEmissionScale = 0.0F;
+    const float fillBroken = fixtureDrivenAmbientIntensity(lighting, planned);
+    for (std::size_t index = 0U; index < 4U; ++index) {
+        lighting.lights[index].fixtureEmissionScale = 0.0F;
+    }
+    const float fiveOff = fixtureDrivenAmbientIntensity(lighting, planned);
+    expect(fillBroken > mainBroken && fillBroken < planned,
+        "weak fill fixture changes room ambient less than a main fixture");
+    expect(wkc::core::nearlyEqual(fiveOff, 0.006F, 0.0001F),
+        "five destroyed fixtures leave only the room's unlit floor");
 }
 
 void testIndustrialUiTheme()
@@ -2359,7 +2476,12 @@ void testWeaponViewmodelAssets()
         }
         expect(materialCount >= 3U && materialCount <= weaponMaterialCount,
             "weapon viewmodel groups physical materials into few draws");
-        expect(triangles > 100U && triangles < 1600U,
+        const std::size_t budget = role == HudWeaponRole::Sniper
+                || role == HudWeaponRole::Shotgun ? 4000U
+            : role == HudWeaponRole::Carbine ? 3500U
+            : role == HudWeaponRole::Pistol
+                || role == HudWeaponRole::SubmachineGun ? 3200U : 1600U;
+        expect(triangles > 100U && triangles < budget,
             "weapon viewmodel stays within its triangle budget");
         if (role != HudWeaponRole::Knife) {
             const auto& grip = meshes[static_cast<std::size_t>(
@@ -2392,7 +2514,7 @@ void testWeaponViewmodelAssets()
                     ++lowerCount;
                 }
             }
-            expect(gripVertices == 24U && upperCount > 0U && lowerCount > 0U
+            expect(gripVertices >= 24U && upperCount > 0U && lowerCount > 0U
                     && lowerZ / static_cast<float>(lowerCount)
                         < upperZ / static_cast<float>(upperCount),
                 "firearm grip base rakes toward the rear, not the muzzle");
@@ -2582,11 +2704,14 @@ int main()
     testEnemyRootAnimation();
     testEnemyAttackEventPoses();
     testImpactVisualData();
+    testBulletMarksFollowDoorPanels();
+    testSecurityIndicatorSequence();
     testWeaponViewmodelPose();
     testSniperScopePresentation();
     testWeaponReloadProfiles();
     testDroppedWeaponPose();
     testOptimizedShadowBudget();
+    testFixtureDrivenAmbient();
     testIndustrialUiTheme();
     testWeaponViewmodelAssets();
     testPlayerHands();

@@ -231,6 +231,7 @@ add_library(
     src/render/Mesh.cpp
     src/render/RasterState.cpp
     src/render/Shader.cpp
+    src/render/ShadowCubeMap.cpp
     src/render/Texture.cpp
 )
 
@@ -313,6 +314,7 @@ add_library(
     src/world/LootGenerator.cpp
     src/world/MapGraph.cpp
     src/world/PropGenerator.cpp
+    src/world/RoomArchitecture.cpp
     src/world/RoomModule.cpp
     src/world/World.cpp
     src/world/WorldEntities.cpp
@@ -327,6 +329,7 @@ gdp_enable_warnings(gdp_world)
 gdp_enable_sanitizers(gdp_world)
 
 target_link_libraries(gdp_gameplay PUBLIC gdp_world)
+target_link_libraries(gdp_visual_renderer PUBLIC gdp_world)
 
 add_library(
     gdp_persistence
@@ -418,7 +421,8 @@ function(gdp_copy_enemy_visual_assets target_name)
         RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.isemesh"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.isplayer"
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.png")
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/*.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/rooms/*.png")
     foreach(relative_asset IN LISTS enemy_model_assets)
         get_filename_component(relative_dir "${relative_asset}" DIRECTORY)
         set_property(TARGET ${target_name} APPEND PROPERTY LINK_DEPENDS
@@ -582,6 +586,9 @@ if(GDP_BUILD_TESTS)
     add_test(NAME player_rig_asset COMMAND gdp_player_rig_asset_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/player_rig/player_rig.isplayer")
     set_tests_properties(player_rig_asset PROPERTIES TIMEOUT 15)
+    add_test(NAME player_exosuit_asset COMMAND gdp_player_rig_asset_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/visual/models/player_exosuit/player_exosuit.isplayer")
+    set_tests_properties(player_exosuit_asset PROPERTIES TIMEOUT 15)
 
     add_executable(gdp_frontend_tests tests/test_frontend.cpp src/game/MenuFlow.cpp src/game/PlayerFeedback.cpp)
     target_link_libraries(gdp_frontend_tests PRIVATE gdp_gameplay gdp_persistence gdp_visual_renderer)
@@ -1089,7 +1096,10 @@ if(GDP_BUILD_TESTS)
         add_test(NAME player_hands_opengl COMMAND gdp_renderer_gl_tests --player-hands-only)
         add_test(NAME player_rig_preview_opengl COMMAND gdp_renderer_gl_tests --player-body-only)
         set_tests_properties(player_rig_preview_opengl PROPERTIES
-            ENVIRONMENT "GDP_PLAYER_RIG_PREVIEW=1" TIMEOUT 90)
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen;GDP_PLAYER_RIG_PREVIEW=1" TIMEOUT 90)
+        add_test(NAME player_exosuit_preview_opengl COMMAND gdp_renderer_gl_tests --player-body-only)
+        set_tests_properties(player_exosuit_preview_opengl PROPERTIES
+            ENVIRONMENT "SDL_VIDEODRIVER=offscreen;GDP_PLAYER_EXOSUIT_PREVIEW=1" TIMEOUT 90)
         set_tests_properties(player_hands_opengl PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=offscreen" TIMEOUT 30)
         set_tests_properties(weapon_reload_opengl PROPERTIES

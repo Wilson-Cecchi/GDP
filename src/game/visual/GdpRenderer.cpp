@@ -11,17 +11,21 @@
 #include "gameplay/PlayerGrenade.hpp"
 #include "procedural/MeshGenerator.hpp"
 #include "procedural/TextureGenerator.hpp"
+#include "world/Corridor.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <numbers>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -30,13 +34,260 @@
 namespace gdp::game::visual {
 namespace {
 
+wkc::render::MeshData makePlanterLeafMesh()
+{
+    struct LeafRow { float height; float halfWidth; float bend; };
+    constexpr std::array rows{
+        LeafRow{0.0F, 0.018F, 0.0F},
+        LeafRow{0.18F, 0.10F, 0.06F},
+        LeafRow{0.48F, 0.17F, 0.18F},
+        LeafRow{0.76F, 0.13F, 0.36F},
+        LeafRow{1.0F, 0.008F, 0.56F},
+    };
+    wkc::render::MeshData mesh;
+    const auto addFacet = [&](const wkc::core::Vec3 a,
+        const wkc::core::Vec3 b, const wkc::core::Vec3 c) {
+        const wkc::core::Vec3 normal = wkc::core::normalized(
+            wkc::core::cross(b - a, c - a));
+        const std::uint32_t first = static_cast<std::uint32_t>(
+            mesh.vertices.size());
+        mesh.vertices.push_back({a, normal, {0.0F, 0.0F}, 0U});
+        mesh.vertices.push_back({b, normal, {0.5F, 1.0F}, 0U});
+        mesh.vertices.push_back({c, normal, {1.0F, 0.0F}, 0U});
+        mesh.indices.insert(mesh.indices.end(),
+            {first, first + 1U, first + 2U});
+    };
+    for (std::size_t index = 0; index + 1U < rows.size(); ++index) {
+        const auto& low = rows[index];
+        const auto& high = rows[index + 1U];
+        const wkc::core::Vec3 lowLeft{
+            -low.halfWidth, low.height, low.bend};
+        const wkc::core::Vec3 lowMiddle{
+            0.0F, low.height, low.bend + 0.025F};
+        const wkc::core::Vec3 lowRight{
+            low.halfWidth, low.height, low.bend};
+        const wkc::core::Vec3 highLeft{
+            -high.halfWidth, high.height, high.bend};
+        const wkc::core::Vec3 highMiddle{
+            0.0F, high.height, high.bend + 0.025F};
+        const wkc::core::Vec3 highRight{
+            high.halfWidth, high.height, high.bend};
+        for (const std::array triangle : {
+                 std::array{lowLeft, highLeft, highMiddle},
+                 std::array{lowLeft, highMiddle, lowMiddle},
+                 std::array{lowMiddle, highMiddle, highRight},
+                 std::array{lowMiddle, highRight, lowRight}}) {
+            addFacet(triangle[0], triangle[1], triangle[2]);
+            addFacet(triangle[2], triangle[1], triangle[0]);
+        }
+    }
+    mesh.bounds = {{-0.17F, 0.0F, 0.0F},
+        {0.17F, 1.0F, 0.585F}};
+    mesh.backfaceCullingSafe = true;
+    return mesh;
+}
+
+wkc::render::MeshData makeGlassTestDomeMesh()
+{
+    constexpr std::uint32_t slices = 24U;
+    constexpr std::uint32_t stacks = 8U;
+    constexpr float pi = std::numbers::pi_v<float>;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve((slices + 1U) * (stacks + 1U));
+    mesh.indices.reserve(slices * stacks * 6U);
+    for (std::uint32_t row = 0U; row <= stacks; ++row) {
+        const float latitude = 0.5F * pi * static_cast<float>(row) / stacks;
+        const float radius = std::cos(latitude);
+        const float height = std::sin(latitude);
+        for (std::uint32_t column = 0U; column <= slices; ++column) {
+            const float longitude = 2.0F * pi * static_cast<float>(column)
+                / slices;
+            const wkc::core::Vec3 normal{
+                radius * std::cos(longitude), height,
+                radius * std::sin(longitude)};
+            mesh.vertices.push_back({normal, normal,
+                {static_cast<float>(column) / slices,
+                    static_cast<float>(row) / stacks}, 0U});
+        }
+    }
+    for (std::uint32_t row = 0U; row < stacks; ++row) {
+        for (std::uint32_t column = 0U; column < slices; ++column) {
+            const std::uint32_t first = row * (slices + 1U) + column;
+            const std::uint32_t next = first + slices + 1U;
+            mesh.indices.insert(mesh.indices.end(),
+                {first, first + 1U, next,
+                    first + 1U, next + 1U, next});
+        }
+    }
+    mesh.bounds = {{-1.0F, 0.0F, -1.0F}, {1.0F, 1.0F, 1.0F}};
+    mesh.backfaceCullingSafe = false;
+    return mesh;
+}
+
+enum class FootprintSurface : std::uint8_t { Floor, Ceiling, Wall };
+
+std::uint64_t footprintMeshKey(const std::span<const wkc::core::Vec2> outline,
+    const wkc::core::Aabb bounds, const FootprintSurface surface,
+    const std::span<const DoorRenderData> doors) noexcept
+{
+    std::uint64_t hash = wkc::core::hashCombine(
+        0x524F4F4D5348454CULL, static_cast<std::uint64_t>(surface));
+    const auto add = [&hash](const float value) {
+        hash = wkc::core::hashCombine(hash, std::bit_cast<std::uint32_t>(value));
+    };
+    add(bounds.minimum.y);
+    add(bounds.maximum.y);
+    for (const auto point : outline) { add(point.x); add(point.y); }
+    if (surface == FootprintSurface::Wall) {
+        for (const auto& door : doors) {
+            add(door.position.x); add(door.position.z);
+            add(door.outwardNormal.x); add(door.outwardNormal.z);
+            add(door.width); add(door.height);
+        }
+    }
+    return hash;
+}
+
+float footprintCross(const wkc::core::Vec2 a, const wkc::core::Vec2 b,
+    const wkc::core::Vec2 c) noexcept
+{
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+std::optional<wkc::render::MeshData> makeFootprintMesh(
+    const std::span<const wkc::core::Vec2> outline,
+    const wkc::core::Aabb bounds, const FootprintSurface surface,
+    const std::span<const DoorRenderData> doors)
+{
+    if (outline.size() < 3U) return std::nullopt;
+    wkc::render::MeshData mesh;
+    mesh.backfaceCullingSafe = false;
+    const float floor = bounds.minimum.y - 0.02F;
+    const float ceiling = bounds.maximum.y + 0.02F;
+    mesh.bounds = {{bounds.minimum.x, floor, bounds.minimum.z},
+        {bounds.maximum.x, ceiling, bounds.maximum.z}};
+    float signedArea = 0.0F;
+    for (std::size_t i = 0U; i < outline.size(); ++i) {
+        const auto a = outline[i];
+        const auto b = outline[(i + 1U) % outline.size()];
+        signedArea += a.x * b.y - b.x * a.y;
+    }
+    const float orientation = signedArea >= 0.0F ? 1.0F : -1.0F;
+    if (std::abs(signedArea) < 1.0e-4F) return std::nullopt;
+    if (surface == FootprintSurface::Wall) {
+        float distance = 0.0F;
+        for (std::size_t i = 0U; i < outline.size(); ++i) {
+            const auto a = outline[i];
+            const auto b = outline[(i + 1U) % outline.size()];
+            const float dx = b.x - a.x;
+            const float dz = b.y - a.y;
+            const float length = std::sqrt(dx * dx + dz * dz);
+            if (length < 1.0e-4F) return std::nullopt;
+            const wkc::core::Vec3 inward{
+                -orientation * dz / length, 0.0F,
+                orientation * dx / length};
+            const auto addSpan = [&](const float start, const float end,
+                                     const float bottom, const float top) {
+                if (end - start < 1.0e-4F || top - bottom < 1.0e-4F) return;
+                const auto point = [&](const float along, const float y) {
+                    return wkc::core::Vec3{a.x + dx * along / length,
+                        y, a.y + dz * along / length};
+                };
+                const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
+                mesh.vertices.insert(mesh.vertices.end(), {
+                    {point(start, bottom), inward,
+                        {(distance + start) / 4.0F, (bottom - floor) / 4.0F}, 0U},
+                    {point(end, bottom), inward,
+                        {(distance + end) / 4.0F, (bottom - floor) / 4.0F}, 0U},
+                    {point(end, top), inward,
+                        {(distance + end) / 4.0F, (top - floor) / 4.0F}, 0U},
+                    {point(start, top), inward,
+                        {(distance + start) / 4.0F, (top - floor) / 4.0F}, 0U},
+                });
+                mesh.indices.insert(mesh.indices.end(), {
+                    base, base + 1U, base + 2U,
+                    base, base + 2U, base + 3U,
+                });
+            };
+            const auto door = std::find_if(doors.begin(), doors.end(),
+                [&](const DoorRenderData& candidate) {
+                    const float along = ((candidate.position.x - a.x) * dx
+                        + (candidate.position.z - a.y) * dz) / length;
+                    const float offsetX = candidate.position.x
+                        - (a.x + dx * along / length);
+                    const float offsetZ = candidate.position.z
+                        - (a.y + dz * along / length);
+                    return wkc::core::dot(candidate.outwardNormal, inward) < -0.9F
+                        && offsetX * offsetX + offsetZ * offsetZ < 0.04F
+                        && along - candidate.width * 0.5F >= -1.0e-3F
+                        && along + candidate.width * 0.5F <= length + 1.0e-3F;
+                });
+            if (door == doors.end()) {
+                addSpan(0.0F, length, floor, ceiling);
+            } else {
+                const float along = ((door->position.x - a.x) * dx
+                    + (door->position.z - a.y) * dz) / length;
+                const float left = along - door->width * 0.5F;
+                const float right = along + door->width * 0.5F;
+                addSpan(0.0F, left, floor, ceiling);
+                addSpan(left, right,
+                    std::min(floor + door->height, ceiling), ceiling);
+                addSpan(right, length, floor, ceiling);
+            }
+            distance += length;
+        }
+        return mesh;
+    }
+    const float y = surface == FootprintSurface::Floor ? floor : ceiling;
+    const wkc::core::Vec3 normal = surface == FootprintSurface::Floor
+        ? wkc::core::Vec3{0.0F, 1.0F, 0.0F}
+        : wkc::core::Vec3{0.0F, -1.0F, 0.0F};
+    for (const auto point : outline) {
+        mesh.vertices.push_back({{point.x, y, point.y}, normal,
+            {point.x / 4.0F, point.y / 4.0F}, 0U});
+    }
+    std::vector<std::uint32_t> remaining(outline.size());
+    for (std::uint32_t i = 0U; i < remaining.size(); ++i) remaining[i] = i;
+    while (remaining.size() > 2U) {
+        bool clipped = false;
+        for (std::size_t i = 0U; i < remaining.size(); ++i) {
+            const auto prev = remaining[(i + remaining.size() - 1U) % remaining.size()];
+            const auto curr = remaining[i];
+            const auto next = remaining[(i + 1U) % remaining.size()];
+            if (footprintCross(outline[prev], outline[curr], outline[next])
+                    * orientation <= 1.0e-5F) continue;
+            bool containsOther = false;
+            for (const auto candidate : remaining) {
+                if (candidate == prev || candidate == curr || candidate == next) continue;
+                const auto p = outline[candidate];
+                if (footprintCross(outline[prev], outline[curr], p) * orientation
+                        >= -1.0e-5F
+                    && footprintCross(outline[curr], outline[next], p) * orientation
+                        >= -1.0e-5F
+                    && footprintCross(outline[next], outline[prev], p) * orientation
+                        >= -1.0e-5F) {
+                    containsOther = true;
+                    break;
+                }
+            }
+            if (containsOther) continue;
+            mesh.indices.insert(mesh.indices.end(), {prev, curr, next});
+            remaining.erase(remaining.begin() + static_cast<std::ptrdiff_t>(i));
+            clipped = true;
+            break;
+        }
+        if (!clipped) return std::nullopt;
+    }
+    return mesh;
+}
+
 bool referenceEnemyModelsEnabled() noexcept
 {
     const char* const value = std::getenv("GDP_ENEMY_REFERENCE_MODELS");
     return value == nullptr || std::string_view{value} != "0";
 }
 
-std::optional<wkc::render::ImageData> loadWorkerImage(
+std::optional<wkc::render::ImageData> loadVisualImage(
     const std::string_view fileName)
 {
     const char* const basePath = SDL_GetBasePath();
@@ -142,6 +393,166 @@ wkc::render::MeshData makeRoundedMesh(
     return mesh;
 }
 
+wkc::render::MeshData makeCentralHubColumnShaftMesh()
+{
+    // A regular octagon inside the existing square collision shaft. Its
+    // square plinth remains wider than every bevel at player height.
+    constexpr float pi = std::numbers::pi_v<float>;
+    constexpr float radius = 0.5F / std::cos(pi / 8.0F);
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve(32U);
+    mesh.indices.reserve(48U);
+    for (std::uint32_t side = 0U; side < 8U; ++side) {
+        const float angleA = pi / 8.0F + static_cast<float>(side) * pi / 4.0F;
+        const float angleB = angleA + pi / 4.0F;
+        const float faceAngle = (angleA + angleB) * 0.5F;
+        const wkc::core::Vec3 normal{
+            std::cos(faceAngle), 0.0F, std::sin(faceAngle)};
+        const wkc::core::Vec3 a{radius * std::cos(angleA), 0.0F,
+            radius * std::sin(angleA)};
+        const wkc::core::Vec3 b{radius * std::cos(angleB), 0.0F,
+            radius * std::sin(angleB)};
+        const std::uint32_t first = static_cast<std::uint32_t>(mesh.vertices.size());
+        const float tileU = std::hypot(b.x - a.x, b.z - a.z) * 2.4F;
+        mesh.vertices.push_back({{a.x, -0.5F, a.z}, normal, {0.0F, 0.0F}, 0U});
+        mesh.vertices.push_back({{a.x, 0.5F, a.z}, normal, {0.0F, 5.2F}, 0U});
+        mesh.vertices.push_back({{b.x, -0.5F, b.z}, normal, {tileU, 0.0F}, 0U});
+        mesh.vertices.push_back({{b.x, 0.5F, b.z}, normal, {tileU, 5.2F}, 0U});
+        mesh.indices.insert(mesh.indices.end(), {
+            first, first + 1U, first + 2U,
+            first + 1U, first + 3U, first + 2U});
+    }
+    mesh.bounds = {{-0.55F, -0.5F, -0.55F}, {0.55F, 0.5F, 0.55F}};
+    mesh.backfaceCullingSafe = true;
+    return mesh;
+}
+
+wkc::render::MeshData makeGrenadeArmorMesh()
+{
+    // Sixteen separate curved plates leave the dark housing visible at their
+    // seams. One uploaded mesh keeps the in-flight grenade inexpensive.
+    constexpr float pi = std::numbers::pi_v<float>;
+    constexpr std::uint32_t platesAround = 8U;
+    constexpr std::uint32_t subdivisions = 4U;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve(2U * platesAround
+        * (subdivisions + 1U) * (subdivisions + 1U));
+    mesh.indices.reserve(2U * platesAround
+        * subdivisions * subdivisions * 6U);
+    for (std::uint32_t band = 0U; band < 2U; ++band) {
+        const float top = band == 0U ? 0.34F : 1.60F;
+        const float bottom = band == 0U ? 1.54F : 2.80F;
+        for (std::uint32_t plate = 0U; plate < platesAround; ++plate) {
+            const std::uint32_t first = static_cast<std::uint32_t>(mesh.vertices.size());
+            for (std::uint32_t row = 0U; row <= subdivisions; ++row) {
+                const float v = static_cast<float>(row) / subdivisions;
+                const float latitude = top + (bottom - top) * v;
+                const float edgeInset = (row == 0U || row == subdivisions)
+                    ? 0.065F : 0.0F;
+                for (std::uint32_t column = 0U; column <= subdivisions; ++column) {
+                    const float u = static_cast<float>(column) / subdivisions;
+                    const float longitude = (2.0F * pi / platesAround)
+                        * (static_cast<float>(plate) + 0.04F + edgeInset
+                            + u * (0.92F - 2.0F * edgeInset));
+                    const wkc::core::Vec3 normal{
+                        std::sin(latitude) * std::cos(longitude),
+                        std::cos(latitude),
+                        std::sin(latitude) * std::sin(longitude)};
+                    mesh.vertices.push_back({normal * 0.525F, normal,
+                        {u, v}, 0U});
+                }
+            }
+            for (std::uint32_t row = 0U; row < subdivisions; ++row) {
+                for (std::uint32_t column = 0U; column < subdivisions; ++column) {
+                    const std::uint32_t a = first
+                        + row * (subdivisions + 1U) + column;
+                    const std::uint32_t b = a + subdivisions + 1U;
+                    mesh.indices.insert(mesh.indices.end(), {
+                        a, b, a + 1U, a + 1U, b, b + 1U});
+                }
+            }
+        }
+    }
+    mesh.bounds = {{-0.525F, -0.525F, -0.525F},
+        {0.525F, 0.525F, 0.525F}};
+    // The first-person basis mirrors one axis relative to the world pass.
+    // Two-sided panels keep the same mesh visible in both presentations.
+    mesh.backfaceCullingSafe = false;
+    return mesh;
+}
+
+wkc::render::MeshData makeGrenadeLightSlotsMesh()
+{
+    constexpr float pi = std::numbers::pi_v<float>;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve(8U * 4U);
+    mesh.indices.reserve(8U * 6U);
+    for (std::uint32_t slot = 0U; slot < 8U; ++slot) {
+        const std::uint32_t first = static_cast<std::uint32_t>(mesh.vertices.size());
+        const float center = 2.0F * pi * static_cast<float>(slot) / 8.0F;
+        for (std::uint32_t row = 0U; row < 2U; ++row) {
+            const float latitude = row == 0U ? 1.50F : 1.64F;
+            for (std::uint32_t column = 0U; column < 2U; ++column) {
+                const float longitude = center + (column == 0U ? -0.034F : 0.034F);
+                const wkc::core::Vec3 normal{
+                    std::sin(latitude) * std::cos(longitude),
+                    std::cos(latitude),
+                    std::sin(latitude) * std::sin(longitude)};
+                mesh.vertices.push_back({normal * 0.528F, normal,
+                    {static_cast<float>(column), static_cast<float>(row)}, 0U});
+            }
+        }
+        mesh.indices.insert(mesh.indices.end(), {
+            first, first + 2U, first + 1U,
+            first + 1U, first + 2U, first + 3U});
+    }
+    mesh.bounds = {{-0.53F, -0.53F, -0.53F},
+        {0.53F, 0.53F, 0.53F}};
+    mesh.backfaceCullingSafe = false;
+    return mesh;
+}
+
+wkc::render::MeshData makeGrenadeRingMesh()
+{
+    constexpr float pi = std::numbers::pi_v<float>;
+    constexpr std::uint32_t segments = 24U;
+    constexpr std::uint32_t tubeSides = 6U;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve((segments + 1U) * (tubeSides + 1U));
+    mesh.indices.reserve(segments * tubeSides * 6U);
+    for (std::uint32_t segment = 0U; segment <= segments; ++segment) {
+        const float around = 2.0F * pi * static_cast<float>(segment) / segments;
+        const float radialX = std::cos(around);
+        const float radialZ = std::sin(around);
+        for (std::uint32_t side = 0U; side <= tubeSides; ++side) {
+            const float cross = 2.0F * pi * static_cast<float>(side) / tubeSides;
+            const float tubeRadius = 0.038F;
+            const float ringRadius = 0.52F + tubeRadius * std::cos(cross);
+            const wkc::core::Vec3 normal{
+                radialX * std::cos(cross), std::sin(cross),
+                radialZ * std::cos(cross)};
+            mesh.vertices.push_back({
+                {radialX * ringRadius, tubeRadius * std::sin(cross),
+                    radialZ * ringRadius},
+                normal,
+                {static_cast<float>(segment) / segments,
+                    static_cast<float>(side) / tubeSides}, 0U});
+        }
+    }
+    for (std::uint32_t segment = 0U; segment < segments; ++segment) {
+        for (std::uint32_t side = 0U; side < tubeSides; ++side) {
+            const std::uint32_t a = segment * (tubeSides + 1U) + side;
+            const std::uint32_t b = a + tubeSides + 1U;
+            mesh.indices.insert(mesh.indices.end(), {
+                a, b, a + 1U, a + 1U, b, b + 1U});
+        }
+    }
+    mesh.bounds = {{-0.56F, -0.04F, -0.56F},
+        {0.56F, 0.04F, 0.56F}};
+    mesh.backfaceCullingSafe = true;
+    return mesh;
+}
+
 constexpr std::string_view uiVertexShader = R"glsl(#version 330 core
 layout(location = 0) in vec3 aPosition;
 uniform vec2 uViewport;
@@ -200,6 +611,7 @@ uniform mat4 uProjection;
 out vec3 vWorldPosition;
 out vec3 vNormal;
 out vec2 vUv;
+out vec3 vSurfaceSize;
 
 void main()
 {
@@ -240,7 +652,33 @@ void main()
     vec4 worldPosition = model * position;
     vWorldPosition = worldPosition.xyz;
     vNormal = normalize(mat3(model) * normal);
+    vSurfaceSize = vec3(length(model[0].xyz), length(model[1].xyz),
+        length(model[2].xyz));
     gl_Position = uProjection * uView * worldPosition;
+}
+)glsl";
+
+constexpr std::string_view shadowDepthVertexShader = R"glsl(#version 330 core
+layout(location = 0) in vec3 aPosition;
+layout(location = 4) in mat4 aInstanceModel;
+uniform mat4 uModel;
+uniform int uInstanced;
+uniform mat4 uView;
+uniform mat4 uProjection;
+out vec3 vWorldPosition;
+void main() {
+    mat4 model = uInstanced != 0 ? aInstanceModel : uModel;
+    vec4 world = model * vec4(aPosition, 1.0);
+    vWorldPosition = world.xyz;
+    gl_Position = uProjection * uView * world;
+}
+)glsl";
+constexpr std::string_view shadowDepthFragmentShader = R"glsl(#version 330 core
+in vec3 vWorldPosition;
+uniform vec3 uLightPosition;
+uniform float uFarPlane;
+void main() {
+    gl_FragDepth = length(vWorldPosition - uLightPosition) / uFarPlane;
 }
 )glsl";
 
@@ -252,6 +690,7 @@ constexpr std::string_view fragmentShaderSource = R"glsl(#version 330 core
 in vec3 vWorldPosition;
 in vec3 vNormal;
 in vec2 vUv;
+in vec3 vSurfaceSize;
 
 uniform sampler2D uAlbedo;
 uniform sampler2D uNormalMap;
@@ -259,8 +698,11 @@ uniform sampler2D uMaterialMap;
 uniform sampler2D uEmissionMap;
 uniform vec3 uTint;
 uniform float uOpacity;
+uniform int uPlayerBodyFade;
+uniform float uBodyViewportHeight;
 uniform int uSoftEdges;
 uniform float uUnlitMix;
+uniform float uMaterialUnlitMix;
 uniform vec3 uCameraPosition;
 #if GDP_LOW_SPEC
 const int MAX_LIGHTS = 4;
@@ -275,20 +717,45 @@ uniform vec3 uLightPositions[MAX_LIGHTS];
 uniform vec3 uLightColors[MAX_LIGHTS];
 uniform float uLightIntensities[MAX_LIGHTS];
 uniform float uLightRanges[MAX_LIGHTS];
+uniform vec3 uLightRoomMinima[MAX_LIGHTS];
+uniform vec3 uLightRoomMaxima[MAX_LIGHTS];
+uniform int uLightBoundedToRoom[MAX_LIGHTS];
 uniform int uFlashlightEnabled;
 uniform vec3 uFlashlightPosition;
 uniform vec3 uFlashlightDirection;
 const int MAX_SHADOW_OCCLUDERS = GDP_MAX_SHADOW_OCCLUDERS;
 #if !GDP_LOW_SPEC
 uniform int uShadowLightCount;
+uniform samplerCube uShadowCubes[8];
+uniform int uShadowCubeCount;
+uniform vec3 uShadowCubeLightPositions[8];
+uniform float uShadowCubeFarPlane;
 uniform int uShadowOccluderCount;
 uniform vec3 uShadowOccluderMinima[MAX_SHADOW_OCCLUDERS];
 uniform vec3 uShadowOccluderMaxima[MAX_SHADOW_OCCLUDERS];
+uniform int uShadowOccluderOctagonal[MAX_SHADOW_OCCLUDERS];
 #endif
 uniform vec3 uAmbientColor;
 uniform float uAmbientIntensity;
+const int MAX_AMBIENT_REGIONS = 16;
+uniform int uAmbientRegionCount;
+uniform vec3 uAmbientRegionMinima[MAX_AMBIENT_REGIONS];
+uniform vec3 uAmbientRegionMaxima[MAX_AMBIENT_REGIONS];
+uniform vec3 uAmbientRegionColors[MAX_AMBIENT_REGIONS];
+uniform float uAmbientRegionIntensities[MAX_AMBIENT_REGIONS];
 uniform vec2 uUvScale;
 uniform vec2 uUvOffset;
+uniform float uSurfaceTileMetres;
+uniform int uMirrorSurfaceTile;
+uniform int uRackPart;
+uniform int uFurniturePart;
+uniform float uPropIndirectFill;
+uniform int uHubWallMaterial;
+uniform int uHubFloorMaterial;
+uniform int uHubPlinthContactShadow;
+uniform vec3 uHubPlinthFootprint;
+uniform int uSecurityFloorVariation;
+uniform float uSecurityFloorSeed;
 uniform float uEmissiveStrength;
 uniform float uWorkerPaintWear;
 uniform int uEyeHalo;
@@ -315,12 +782,30 @@ mat3 cotangentFrame(vec3 normal, vec3 position, vec2 uv)
 }
 
 #if !GDP_LOW_SPEC
+bool clipShadowDiagonal(
+    float origin,
+    float direction,
+    float limit,
+    inout float nearDistance,
+    inout float farDistance)
+{
+    if (abs(direction) < 0.0001) {
+        return abs(origin) <= limit;
+    }
+    float first = (-limit - origin) / direction;
+    float second = (limit - origin) / direction;
+    nearDistance = max(nearDistance, min(first, second));
+    farDistance = min(farDistance, max(first, second));
+    return farDistance >= nearDistance;
+}
+
 bool segmentIntersectsShadowBox(
     vec3 origin,
     vec3 direction,
     float maximumDistance,
     vec3 boundsMinimum,
-    vec3 boundsMaximum)
+    vec3 boundsMaximum,
+    bool octagonal)
 {
     vec3 safeDirection = vec3(
         abs(direction.x) < 0.0001 ? (direction.x < 0.0 ? -0.0001 : 0.0001)
@@ -335,6 +820,26 @@ bool segmentIntersectsShadowBox(
     vec3 farAxes = max(first, second);
     float nearDistance = max(max(nearAxes.x, nearAxes.y), nearAxes.z);
     float farDistance = min(min(farAxes.x, farAxes.y), farAxes.z);
+    if (farDistance < max(nearDistance, 0.0)
+        || nearDistance >= maximumDistance - 0.025) {
+        return false;
+    }
+    if (octagonal) {
+        // The Hub shaft has four bevels. Its collision box must not cast a
+        // square shadow across the open corners of the octagonal mesh.
+        vec2 center = (boundsMinimum.xz + boundsMaximum.xz) * 0.5;
+        vec2 halfSize = (boundsMaximum.xz - boundsMinimum.xz) * 0.5;
+        vec2 localOrigin = origin.xz - center;
+        float diagonalLimit = (halfSize.x + halfSize.y) * 0.70710678;
+        if (!clipShadowDiagonal(localOrigin.x + localOrigin.y,
+                direction.x + direction.z, diagonalLimit,
+                nearDistance, farDistance)
+            || !clipShadowDiagonal(localOrigin.x - localOrigin.y,
+                direction.x - direction.z, diagonalLimit,
+                nearDistance, farDistance)) {
+            return false;
+        }
+    }
     return farDistance >= max(nearDistance, 0.0)
         && nearDistance > 0.025
         && nearDistance < maximumDistance - 0.025;
@@ -346,6 +851,32 @@ float directLightVisibility(
     vec3 lightPosition,
     int lightIndex)
 {
+    for (int mapIndex = 0; mapIndex < uShadowCubeCount; ++mapIndex) {
+        if (distance(lightPosition, uShadowCubeLightPositions[mapIndex]) >= 0.08) {
+            continue;
+        }
+        vec3 fromLight = position - uShadowCubeLightPositions[mapIndex];
+        float distanceToLight = length(fromLight);
+        if (distanceToLight < 0.08 || distanceToLight >= uShadowCubeFarPlane) {
+            return 1.0;
+        }
+        // The slope component reduces acne on the bevelled shaft and posed limbs.
+        float bias = max(0.045, 0.12 * (1.0 - dot(normalize(normal),
+            normalize(-fromLight))));
+        // GLSL 3.30 requires a constant sampler-array index. The branches
+        // select the map belonging to this light without a dynamic index.
+        float nearest = 1.0;
+        if (mapIndex == 0) nearest = texture(uShadowCubes[0], fromLight).r;
+        else if (mapIndex == 1) nearest = texture(uShadowCubes[1], fromLight).r;
+        else if (mapIndex == 2) nearest = texture(uShadowCubes[2], fromLight).r;
+        else if (mapIndex == 3) nearest = texture(uShadowCubes[3], fromLight).r;
+        else if (mapIndex == 4) nearest = texture(uShadowCubes[4], fromLight).r;
+        else if (mapIndex == 5) nearest = texture(uShadowCubes[5], fromLight).r;
+        else if (mapIndex == 6) nearest = texture(uShadowCubes[6], fromLight).r;
+        else if (mapIndex == 7) nearest = texture(uShadowCubes[7], fromLight).r;
+        nearest *= uShadowCubeFarPlane;
+        return distanceToLight - bias > nearest ? 0.16 : 1.0;
+    }
     if (lightIndex >= uShadowLightCount || uShadowOccluderCount <= 0) {
         return 1.0;
     }
@@ -361,7 +892,8 @@ float directLightVisibility(
             break;
         }
         if (segmentIntersectsShadowBox(origin, direction, maximumDistance,
-                uShadowOccluderMinima[index], uShadowOccluderMaxima[index])) {
+                uShadowOccluderMinima[index], uShadowOccluderMaxima[index],
+                uShadowOccluderOctagonal[index] != 0)) {
             return 0.16;
         }
     }
@@ -373,7 +905,130 @@ void main()
 {
     vec2 materialUv = (vUv * uUvScale) + uUvOffset;
     vec3 normal = normalize(vNormal);
-    vec3 albedo = texture(uAlbedo, materialUv).rgb * uTint;
+    if (uSurfaceTileMetres > 0.0) {
+        // Static architecture uses a physical tile size. This preserves
+        // texel density on long counters and narrow posts alike.
+        vec2 physicalUv = abs(normal.y) > 0.5
+            ? vWorldPosition.xz / uSurfaceTileMetres
+            : abs(normal.z) > 0.5
+                ? vWorldPosition.xy / uSurfaceTileMetres
+                : vWorldPosition.zy / uSurfaceTileMetres;
+        // Mirroring is reserved for albedos whose opposite edges do not
+        // meet exactly. Seamless tiles use GL_REPEAT directly: keeping the
+        // unwrapped coordinates preserves derivatives and mipmap selection
+        // across tile boundaries.
+        materialUv = uMirrorSurfaceTile != 0
+            ? clamp(1.0 - abs(mod(physicalUv, 2.0) - 1.0),
+                vec2(0.002), vec2(0.998))
+            : physicalUv;
+    } else if (uMirrorSurfaceTile != 0) {
+        // Shaped-room shell UVs already follow true edge length, including
+        // diagonal faces. Mirror the panel at its borders without changing
+        // that physical scale or restarting around a doorway.
+        materialUv = clamp(1.0 - abs(mod(materialUv, 2.0) - 1.0),
+            vec2(0.002), vec2(0.998));
+    }
+    vec3 albedo;
+    if (uSecurityFloorVariation != 0) {
+        // The 2 m base panel keeps its physical size. Mirroring scatters its
+        // wear marks while preserving the direction of its panel seams.
+        vec2 cell = floor(vWorldPosition.xz / 2.0);
+        float choice = fract(sin(dot(cell, vec2(127.1, 311.7))
+            + uSecurityFloorSeed) * 43758.5453);
+        int orientation = min(int(choice * 4.0), 3);
+        vec2 localUv = fract(materialUv);
+        vec2 gradientX = dFdx(materialUv);
+        vec2 gradientY = dFdy(materialUv);
+        if ((orientation & 1) != 0) {
+            localUv.x = 1.0 - localUv.x;
+            gradientX.x = -gradientX.x;
+            gradientY.x = -gradientY.x;
+        }
+        if ((orientation & 2) != 0) {
+            localUv.y = 1.0 - localUv.y;
+            gradientX.y = -gradientX.y;
+            gradientY.y = -gradientY.y;
+        }
+        albedo = textureGrad(uAlbedo, localUv, gradientX, gradientY).rgb
+            * uTint * (0.975 + choice * 0.05);
+        // Localized wear is placed in larger world-space cells, independent
+        // of the repeating panel bitmap. Sparse cells stay clear.
+        vec2 wearGrid = vWorldPosition.xz / 3.7;
+        vec2 wearCell = floor(wearGrid);
+        float wearChoice = fract(sin(dot(wearCell, vec2(46.37, 92.11))
+            + uSecurityFloorSeed * 0.031) * 17329.43);
+        if (wearChoice > 0.57) {
+            vec2 wearCenter = vec2(0.34 + fract(wearChoice * 7.3) * 0.32,
+                0.34 + fract(wearChoice * 11.7) * 0.32);
+            vec2 wearOffset = fract(wearGrid) - wearCenter;
+            if (wearChoice > 0.79) wearOffset = wearOffset.yx;
+            float wearRadius = length(wearOffset / vec2(0.17, 0.085));
+            float wearFade = 1.0 - smoothstep(0.18, 1.0, wearRadius);
+            float scratches = 0.56 + 0.44 * sin(dot(vWorldPosition.xz,
+                vec2(54.0, 17.0)) + wearChoice * 25.0);
+            albedo += vec3(0.055) * wearFade * scratches;
+        }
+    } else {
+        albedo = texture(uAlbedo, materialUv).rgb * uTint;
+    }
+    if (uFurniturePart == 4 && abs(normal.y) < 0.5) {
+        // Cabinet joints and inset pulls are sized in metres. They remain
+        // aligned on a long counter while its albedo repeats independently.
+        float along = abs(normal.x) > 0.5
+            ? vWorldPosition.z : vWorldPosition.x;
+        float panel = fract(along / 0.86);
+        float seamDistance = min(panel, 1.0 - panel);
+        float seam = 1.0 - smoothstep(0.0, 0.012, seamDistance);
+        albedo *= 1.0 - seam * 0.25;
+        float handleHeight = min(abs(vWorldPosition.y - 0.86),
+            abs(vWorldPosition.y - 1.94));
+        float handle = (1.0 - smoothstep(0.012, 0.045,
+                abs(panel - 0.76)))
+            * (1.0 - smoothstep(0.012, 0.040, handleHeight));
+        albedo = mix(albedo, vec3(0.12, 0.12, 0.11), handle * 0.68);
+    }
+    if (uRackPart == 1) {
+        // Match Storage uprights to the graphite-green baseboard while
+        // retaining scratches, recesses and wear from the approved texture.
+        float paintValue = dot(albedo, vec3(0.30, 0.59, 0.11));
+        albedo = vec3(0.35, 0.40, 0.35)
+            * clamp(paintValue / 0.46, 0.08, 1.45);
+    }
+    if (uRackPart == 1 && abs(normal.y) < 0.5) {
+        // Upright corners lose paint first. Keep chips in physical-space
+        // bands so the damage reads on a narrow post without stretching.
+        float corner = 1.0 - smoothstep(0.02, 0.25,
+            min(vUv.x, 1.0 - vUv.x));
+        float chipCell = floor(vWorldPosition.y * 12.0);
+        float postCell = floor((vWorldPosition.x + vWorldPosition.z) * 9.0);
+        float chipNoise = fract(sin(dot(vec2(chipCell, postCell),
+            vec2(127.1, 311.7))) * 43758.5453);
+        float exposedEdge = corner * smoothstep(0.45, 0.82, chipNoise);
+        albedo *= 1.0 - corner * 0.055;
+        albedo = mix(albedo, vec3(0.29, 0.28, 0.25),
+            exposedEdge * 0.45);
+        // These are shaded adjustment recesses, not marks baked into a
+        // stretched bitmap. Whole rows fit between the post's end caps.
+        float rows = max(1.0, floor(vSurfaceSize.y / 0.18 + 0.05));
+        vec2 cell = abs(fract(vec2(vUv.x, vUv.y * rows)) - 0.5);
+        float edge = max(cell.x / 0.18, cell.y / 0.17);
+        float aa = max(fwidth(edge), 0.015);
+        float recess = 1.0 - smoothstep(0.96 - aa, 1.04 + aa, edge);
+        float rim = (1.0 - smoothstep(1.10 - aa, 1.24 + aa, edge))
+            * (1.0 - recess);
+        albedo = mix(albedo, vec3(0.035, 0.039, 0.038), recess * 0.92);
+        albedo += rim * vec3(0.075, 0.047, 0.027);
+    } else if (uRackPart == 2 && normal.y > 0.5) {
+        float ribs = max(1.0, floor(vSurfaceSize.z / 0.18 + 0.05));
+        float ribUv = vUv.y * ribs;
+        float phase = fract(ribUv);
+        float ridge = smoothstep(0.08, 0.23, phase)
+            * (1.0 - smoothstep(0.77, 0.92, phase));
+        float visibility = 1.0 - smoothstep(0.22, 0.7, fwidth(ribUv));
+        albedo *= 1.0 - (1.0 - ridge) * visibility * 0.20;
+        normal = normalize(normal + vec3(0.0, 0.0,
+            cos(phase * 6.2831853) * visibility * 0.16));
+    }
     if (uWorkerPaintWear > 0.0) {
         // Exposed steel is concentrated along painted armor edges. The chip
         // pattern is stable in UV space and applies only to Worker paint.
@@ -390,6 +1045,25 @@ void main()
     float roughness = 0.72;
     float metalness = 0.0;
     float ambientOcclusion = 1.0;
+    if (uRackPart != 0) {
+        roughness = 0.58;
+        metalness = 0.12;
+    } else if (uFurniturePart != 0) {
+        // Bare brushed steel reflects the room lamps most strongly. Painted
+        // metal retains a wider, weaker sheen instead of looking like plastic.
+        roughness = uFurniturePart == 1 ? 0.38
+            : uFurniturePart == 2 ? 0.59 : 0.65;
+        metalness = uFurniturePart == 1 ? 0.52
+            : uFurniturePart == 2 ? 0.12 : 0.18;
+    } else if (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0) {
+        roughness = 0.58;
+        metalness = 0.16;
+    } else if (uHubFloorMaterial != 0) {
+        // The Hub floor is brushed steel. Its highlight follows live lamps;
+        // the broad low-spec lobe avoids extra material-map fetches.
+        roughness = uDetailedMaterialsEnabled != 0 ? 0.34 : 0.54;
+        metalness = uDetailedMaterialsEnabled != 0 ? 0.28 : 0.16;
+    }
 #if !GDP_LOW_SPEC
     if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
         vec3 tangentNormal = texture(uNormalMap, materialUv).xyz * 2.0 - 1.0;
@@ -400,14 +1074,51 @@ void main()
         ambientOcclusion = clamp(material.b, 0.0, 1.0);
     }
 #endif
-    vec3 result = albedo * uAmbientColor * uAmbientIntensity * ambientOcclusion;
+    vec3 roomAmbientColor = uAmbientColor;
+    float roomAmbientIntensity = uAmbientIntensity;
+    if (uViewmodel == 0) {
+        for (int index = 0; index < MAX_AMBIENT_REGIONS; ++index) {
+            if (index >= uAmbientRegionCount) {
+                break;
+            }
+            if (vWorldPosition.x >= uAmbientRegionMinima[index].x
+                && vWorldPosition.x <= uAmbientRegionMaxima[index].x
+                && vWorldPosition.z >= uAmbientRegionMinima[index].z
+                && vWorldPosition.z <= uAmbientRegionMaxima[index].z) {
+                roomAmbientColor = uAmbientRegionColors[index];
+                roomAmbientIntensity = uAmbientRegionIntensities[index];
+                break;
+            }
+        }
+    }
+    vec3 result = albedo * roomAmbientColor * roomAmbientIntensity
+        * ambientOcclusion;
     vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
+    if (uFurniturePart == 1) {
+        // The room has no reflection probe. A broad ceiling-coloured response
+        // keeps brushed steel readable between point lights without making it
+        // emissive; the sharper reflections below still track live lights.
+        float grazing = 1.0 - max(dot(normal, viewDirection), 0.0);
+        result += albedo * roomAmbientColor * roomAmbientIntensity
+            * (0.15 + 0.65 * grazing * grazing);
+    }
     for (int index = 0; index < MAX_LIGHTS; ++index) {
         if (index >= uLightCount) {
             break;
         }
         if (uLightIntensities[index] <= 0.0001) {
             continue;
+        }
+        float roomReach = 1.0;
+        if (uViewmodel == 0 && uLightBoundedToRoom[index] != 0) {
+            // Neighbouring fixtures light their own room and the first part
+            // of a doorway, not surfaces deep behind another room's wall.
+            vec2 outside = max(max(uLightRoomMinima[index].xz - vWorldPosition.xz,
+                vWorldPosition.xz - uLightRoomMaxima[index].xz), vec2(0.0));
+            roomReach = 1.0 - smoothstep(0.0, 1.2, length(outside));
+            if (roomReach <= 0.0001) {
+                continue;
+            }
         }
         vec3 toLight = uLightPositions[index] - vWorldPosition;
         float distanceToLight = length(toLight);
@@ -416,7 +1127,7 @@ void main()
         float normalizedDistance = distanceToLight / max(uLightRanges[index], 0.001);
         float attenuation = 1.0 / (1.0 + 2.2 * normalizedDistance * normalizedDistance);
         vec3 radiance = uLightColors[index] * attenuation
-            * uLightIntensities[index] * 1.9;
+            * uLightIntensities[index] * roomReach * 1.9;
         float visibility = 1.0;
 #if !GDP_LOW_SPEC
         visibility = diffuse > 0.0
@@ -425,17 +1136,44 @@ void main()
             : 1.0;
 #endif
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
-#if !GDP_LOW_SPEC
-        if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0
+        if (uPropIndirectFill > 0.0 && uViewmodel == 0) {
+            // Approximate nearby floor/wall bounce on vertical prop faces.
+            // Every surviving fixture contributes independently.
+            float sideFace = 1.0 - abs(normal.y);
+            float bounce = uPropIndirectFill * sideFace * (1.0 - diffuse);
+            result += albedo * (1.0 - metalness) * radiance * bounce;
+        }
+#if GDP_LOW_SPEC
+        if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+                || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
             && diffuse > 0.0) {
+#else
+        if (((uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0)
+                || uFurniturePart != 0 || uHubFloorMaterial != 0
+                || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+            && diffuse > 0.0) {
+#endif
             vec3 halfway = normalize(lightDirection + viewDirection);
-            float exponent = mix(96.0, 8.0, roughness);
+            float exponent = uHubFloorMaterial != 0
+                ? mix(11.0, 3.0, roughness)
+                : (uFurniturePart != 0
+                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                    ? mix(44.0, 7.0, roughness)
+                    : mix(96.0, 8.0, roughness);
+            // POTATO keeps one broad reflection per room lamp. Use the same
+            // lobe when a shadow occluder selects the full shader path.
+            if (uDetailedMaterialsEnabled == 0) exponent *= 0.65;
+            float highlightStrength = uHubFloorMaterial != 0
+                ? mix(2.8, 0.50, roughness)
+                : (uFurniturePart != 0
+                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                    ? mix(2.0, 0.20, roughness)
+                    : mix(0.90, 0.12, roughness);
             float highlight = pow(max(dot(normal, halfway), 0.0), exponent)
-                * mix(0.90, 0.12, roughness);
+                * highlightStrength;
             vec3 reflectance = mix(vec3(0.035), albedo, metalness);
             result += reflectance * highlight * diffuse * radiance * visibility;
         }
-#endif
     }
     if (uFlashlightEnabled != 0 && uViewmodel == 0) {
         vec3 beam = vWorldPosition - uFlashlightPosition;
@@ -449,7 +1187,23 @@ void main()
             float rangeFade = 1.0 - smoothstep(11.0, 14.0, beamDistance);
             result += albedo * vec3(0.90, 0.95, 1.0)
                 * cone * incidence * falloff * rangeFade * 5.5;
+            if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                && incidence > 0.0) {
+                vec3 halfway = normalize(-beamDirection + viewDirection);
+                float highlight = pow(max(dot(normal, halfway), 0.0),
+                    mix(38.0, 7.0, roughness));
+                result += mix(vec3(0.035), albedo, metalness)
+                    * highlight * cone * incidence * falloff * rangeFade * 2.0;
+            }
         }
+    }
+    if (uHubFloorMaterial != 0 && uHubPlinthContactShadow != 0
+        && normal.y > 0.7) {
+        vec2 outside = max(abs(vWorldPosition.xz - uHubPlinthFootprint.xz)
+            - vec2(uHubPlinthFootprint.y), vec2(0.0));
+        float contact = 1.0 - smoothstep(0.0, 0.55, length(outside));
+        result *= 1.0 - (0.38 * contact);
     }
     if (uViewmodel != 0) {
         // A restrained camera-space reflection keeps steel readable when the
@@ -477,8 +1231,12 @@ void main()
     float haloOpacity = uEyeHalo != 0
         ? 1.0 - smoothstep(0.05, 0.5, length(vUv - vec2(0.5)))
         : 1.0;
-    fragmentColor = vec4(mix(litColor, uTint, uUnlitMix),
-        uOpacity * edgeOpacity * haloOpacity);
+    float bodyOpacity = uPlayerBodyFade != 0
+        ? 1.0 - smoothstep(0.23, 0.54, gl_FragCoord.y / uBodyViewportHeight)
+        : 1.0;
+    fragmentColor = vec4(mix(litColor,
+        mix(uTint, albedo, uMaterialUnlitMix), uUnlitMix),
+        uOpacity * edgeOpacity * haloOpacity * bodyOpacity);
 }
 )glsl";
 
@@ -502,7 +1260,14 @@ std::string makeShadowBudgetFragmentShaderSource(const std::uint32_t capacity)
 enum class RoomMaterialChannel : std::uint8_t {
     Wall,
     Floor,
+    HubFloorDetail,
     Ceiling,
+    StorageRack,
+    CafeteriaFurniture,
+    LaboratoryFurniture,
+    SecurityFurniture,
+    StructuralColumn,
+    SolidColor,
     Generic,
 };
 
@@ -726,11 +1491,19 @@ bool GdpRenderer::initialize(const int width, const int height)
         || !shadow6Shader_.compile(gl_, vertexShaderSource,
             makeShadowBudgetFragmentShaderSource(6U))
         || !lowSpecShader_.compile(
-            gl_, vertexShaderSource, makeLowSpecFragmentShaderSource())) {
+            gl_, vertexShaderSource, makeLowSpecFragmentShaderSource())
+        || !shadowDepthShader_.compile(gl_, shadowDepthVertexShader,
+            shadowDepthFragmentShader)) {
         return false;
     }
     if (!box_.upload(gl_, wkc::render::makeBoxMesh())
+        || !centralHubColumnShaft_.upload(gl_, makeCentralHubColumnShaftMesh())
+        || !planterLeafMesh_.upload(gl_, makePlanterLeafMesh())
+        || !glassTestDome_.upload(gl_, makeGlassTestDomeMesh())
         || !grenadeBody_.upload(gl_, makeRoundedMesh(24U, 16U))
+        || !grenadeArmor_.upload(gl_, makeGrenadeArmorMesh())
+        || !grenadeLights_.upload(gl_, makeGrenadeLightSlotsMesh())
+        || !grenadeRing_.upload(gl_, makeGrenadeRingMesh())
         || !smokePuff_.upload(gl_, makeRoundedMesh(12U, 8U))) {
         return false;
     }
@@ -756,13 +1529,61 @@ bool GdpRenderer::initialize(const int width, const int height)
         const WeaponMaterialImages images = makeUsedWeaponMaterialImages(
             static_cast<WeaponMaterial>(material));
         WeaponGpuMaterial& gpuMaterial = weaponMaterials_[material];
-        if (!gpuMaterial.albedo.upload(
-                gl_, images.albedo, wkc::render::TextureSampling::Trilinear)
+        const auto sharedPaint = material == static_cast<std::size_t>(WeaponMaterial::AccentPaint)
+            ? loadVisualImage("models/worker_reference/worker_paint_albedo.png")
+            : std::nullopt;
+        if (!gpuMaterial.albedo.upload(gl_, sharedPaint ? *sharedPaint : images.albedo,
+                wkc::render::TextureSampling::Trilinear)
             || !gpuMaterial.normal.upload(
                 gl_, images.normal, wkc::render::TextureSampling::Trilinear)
             || !gpuMaterial.properties.upload(
                 gl_, images.properties, wkc::render::TextureSampling::Trilinear)) {
             return false;
+        }
+    }
+    {
+        constexpr std::string_view relative =
+            "models/player_weapons/grenade/player_grenade.isemesh";
+        const char* const basePath = SDL_GetBasePath();
+        const std::filesystem::path base = basePath != nullptr
+            ? std::filesystem::path{basePath} : std::filesystem::path{};
+        const std::array candidates{
+            base / "visual" / relative,
+            base / "../Resources/visual" / relative,
+            std::filesystem::path{"assets/visual"} / relative,
+        };
+        for (const auto& path : candidates) {
+            std::error_code error;
+            if (!std::filesystem::exists(path, error)) continue;
+            std::string reason;
+            const auto asset = loadEnemyModelAsset(path, &reason);
+            if (!asset) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Invalid player grenade model " + path.string() + ": " + reason);
+                break;
+            }
+            bool valid = true;
+            for (const EnemyModelSubmesh& part : asset->submeshes) {
+                if (part.partId > 1U || part.materialId >= weaponMaterialCount) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Invalid player grenade part or material ID: " + path.string());
+                break;
+            }
+            for (const EnemyModelSubmesh& part : asset->submeshes) {
+                GrenadeGpuPart gpu;
+                gpu.partId = part.partId;
+                gpu.materialId = part.materialId;
+                if (!gpu.mesh.upload(gl_, part.mesh)) return false;
+                grenadeModelParts_.push_back(std::move(gpu));
+            }
+            wkc::core::log(wkc::core::LogLevel::Info,
+                "Loaded player Blender grenade " + path.string());
+            break;
         }
     }
     const auto playerMeshes = makePlayerBodyMeshes();
@@ -774,13 +1595,19 @@ bool GdpRenderer::initialize(const int width, const int height)
             || !gpu.normal.upload(gl_, images.normal, wkc::render::TextureSampling::Trilinear)
             || !gpu.properties.upload(gl_, images.properties, wkc::render::TextureSampling::Trilinear)) return false;
     }
-    playerRigPreview_ = std::getenv("GDP_PLAYER_RIG_PREVIEW") != nullptr
-        && std::string_view{std::getenv("GDP_PLAYER_RIG_PREVIEW")} == "1";
+    const char* const exosuitPreview = std::getenv("GDP_PLAYER_EXOSUIT_PREVIEW");
+    const char* const legacyRigPreview = std::getenv("GDP_PLAYER_RIG_PREVIEW");
+    const bool useExosuit = exosuitPreview != nullptr
+        && std::string_view{exosuitPreview} == "1";
+    playerRigPreview_ = useExosuit || (legacyRigPreview != nullptr
+        && std::string_view{legacyRigPreview} == "1");
     if (playerRigPreview_) {
         const char* const basePath = SDL_GetBasePath();
         const std::filesystem::path base = basePath != nullptr
             ? std::filesystem::path{basePath} : std::filesystem::path{};
-        constexpr std::string_view relative = "models/player_rig/player_rig.isplayer";
+        const std::filesystem::path relative = useExosuit
+            ? "models/player_exosuit/player_exosuit.isplayer"
+            : "models/player_rig/player_rig.isplayer";
         const std::array candidates{
             base / "visual" / relative,
             base / "../Resources/visual" / relative,
@@ -802,17 +1629,32 @@ bool GdpRenderer::initialize(const int width, const int height)
                 "Cannot load Player Blender preview: " + reason);
             return false;
         }
-        constexpr std::array<std::array<std::uint8_t,3U>,playerRigMaterialCount> colors{{
+        constexpr std::array<std::array<std::uint8_t,3U>,playerExosuitMaterialCount> colors{{
             {100U,105U,110U}, {119U,121U,124U}, {78U,82U,86U},
             {63U,67U,72U}, {130U,135U,140U}, {43U,47U,52U},
+            {214U,87U,16U}, {14U,174U,238U},
         }};
-        for (std::size_t material = 0; material < playerRigMaterialCount; ++material) {
+        for (std::size_t material = 0; material < playerRigAsset_->materialCount; ++material) {
             wkc::render::ImageData albedo;
-            albedo.width = albedo.height = 1;
-            albedo.rgba = {colors[material][0],colors[material][1],
-                colors[material][2],255U};
-            if (!playerRigMeshes_[material].upload(gl_,playerRigAsset_->meshes[material])
-                || !playerRigAlbedo_[material].upload(gl_,albedo)) return false;
+            if (useExosuit && material == 6U) {
+                const auto paint = loadVisualImage(
+                    "models/worker_reference/worker_paint_albedo.png");
+                if (!paint) return false;
+                albedo = *paint;
+            } else {
+                albedo.width = albedo.height = 1;
+                albedo.rgba = {colors[material][0],colors[material][1],
+                    colors[material][2],255U};
+            }
+            if (!playerRigAlbedo_[material].upload(gl_,albedo)) return false;
+        }
+        for (std::size_t part = 0; part < playerRigAsset_->partCount; ++part) {
+            for (std::size_t material = 0; material < playerRigAsset_->materialCount; ++material) {
+                const auto meshIndex = part*playerRigAsset_->materialCount+material;
+                if (playerRigAsset_->meshes[meshIndex].indices.empty()) continue;
+                if (!playerRigMeshes_[meshIndex].upload(gl_,
+                        playerRigAsset_->meshes[meshIndex])) return false;
+            }
         }
     }
     const auto handsMeshes = makePlayerHandsMeshes();
@@ -829,14 +1671,32 @@ bool GdpRenderer::initialize(const int width, const int height)
     if (!fallbackTexture_.upload(gl_, gdp::game::makeIndustrialCheckerImage())) {
         return false;
     }
-    const auto workerPaint = loadWorkerImage("worker_painted_steel_v2.png");
+    wkc::render::ImageData solidWhite;
+    solidWhite.width = 1;
+    solidWhite.height = 1;
+    solidWhite.rgba = {255U, 255U, 255U, 255U};
+    if (!solidColorTexture_.upload(gl_, solidWhite)) return false;
+    constexpr std::array<std::string_view, 2> storageBoxFiles{
+        "rooms/storage/box_olive_v1.png",
+        "rooms/storage/box_charcoal_v1.png",
+    };
+    for (std::size_t index = 0; index < storageBoxFiles.size(); ++index) {
+        const auto image = loadVisualImage(storageBoxFiles[index]);
+        if (!image || !storageBoxTextures_[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Storage shelf box texture is missing or invalid");
+            return false;
+        }
+    }
+    const auto workerPaint = loadVisualImage("worker_painted_steel_v2.png");
     if (!workerPaint || !workerPaintTexture_.upload(
             gl_, *workerPaint, wkc::render::TextureSampling::Trilinear)) {
         wkc::core::log(wkc::core::LogLevel::Error,
             "Missing or invalid Worker painted-steel texture");
         return false;
     }
-    const auto workerPanel = loadWorkerImage("worker_front_panel_source_v2.png");
+    const auto workerPanel = loadVisualImage("worker_front_panel_source_v2.png");
     if (!workerPanel || !workerFrontPanelTexture_.upload(
             gl_, *workerPanel, wkc::render::TextureSampling::Trilinear)) {
         wkc::core::log(wkc::core::LogLevel::Error,
@@ -868,13 +1728,37 @@ bool GdpRenderer::initialize(const int width, const int height)
         for (std::size_t index = 0U; index < roleNames.size(); ++index) {
             const std::string fileName = std::string{"models/"} + roleNames[index]
                 + "_reference/" + roleNames[index] + "_paint_albedo.png";
-            const auto paint = loadWorkerImage(fileName);
+            const auto paint = loadVisualImage(fileName);
             if (paint) {
                 referencePaintReady_[index] = referencePaintTextures_[index].upload(
                     gl_, *paint, wkc::render::TextureSampling::Trilinear);
                 if (!referencePaintReady_[index]) return false;
             }
         }
+    }
+    constexpr std::array structuralColumnFiles{
+        "rooms/columns/structural_maintained.png",
+        "rooms/columns/structural_used.png",
+        "rooms/columns/structural_worn.png",
+    };
+    for (std::size_t index = 0; index < structuralColumnFiles.size(); ++index) {
+        const auto image = loadVisualImage(structuralColumnFiles[index]);
+        if (!image || !structuralColumnTextures_[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+            return false;
+        }
+    }
+    const auto hubColumn = loadVisualImage(
+        "rooms/central_hub/column_plate_v1.png");
+    if (!hubColumn || !centralHubColumnTexture_.upload(
+            gl_, *hubColumn, wkc::render::TextureSampling::Trilinear)) {
+        return false;
+    }
+    const auto hubFloorDetail = loadVisualImage(
+        "rooms/central_hub/floor_detail_metal_v1.png");
+    if (!hubFloorDetail || !centralHubFloorDetailTexture_.upload(
+            gl_, *hubFloorDetail, wkc::render::TextureSampling::Trilinear)) {
+        return false;
     }
     const gdp::game::CeilingFixtureMaterialImages fixtureImages
         = gdp::game::makeCeilingFixtureMaterialImages();
@@ -887,6 +1771,49 @@ bool GdpRenderer::initialize(const int width, const int height)
         || !ceilingFixtureMaterial_.emission.upload(
             gl_, fixtureImages.emission, wkc::render::TextureSampling::Trilinear)) {
         return false;
+    }
+    constexpr std::array fixtureFiles{
+        "industrial.isemesh", "storage.isemesh", "maintenance.isemesh",
+        "laboratory.isemesh", "cafeteria.isemesh", "security.isemesh",
+        "office.isemesh", "boss_arena.isemesh", "central_hub.isemesh",
+    };
+    const char* const basePath = SDL_GetBasePath();
+    const std::filesystem::path base = basePath != nullptr
+        ? std::filesystem::path{basePath} : std::filesystem::path{};
+    for (std::size_t variant = 0U; variant < fixtureFiles.size(); ++variant) {
+        const std::filesystem::path relative
+            = std::filesystem::path{"models/ceiling_fixture_family_v2"}
+                / fixtureFiles[variant];
+        const std::array candidates{
+            base / "visual" / relative,
+            base / "../Resources/visual" / relative,
+            std::filesystem::path{"assets/visual"} / relative,
+        };
+        for (const auto& path : candidates) {
+            std::error_code error;
+            if (!std::filesystem::exists(path, error)) continue;
+            std::string reason;
+            const auto asset = loadEnemyModelAsset(path, &reason);
+            if (!asset) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Invalid ceiling fixture " + path.string() + ": " + reason);
+                return false;
+            }
+            for (const EnemyModelSubmesh& submesh : asset->submeshes) {
+                if (submesh.partId != 0U || submesh.materialId > 4U) {
+                    wkc::core::log(wkc::core::LogLevel::Error,
+                        "Invalid ceiling fixture material: " + path.string());
+                    return false;
+                }
+                CeilingFixtureGpuPart part;
+                part.materialId = submesh.materialId;
+                if (!part.mesh.upload(gl_, submesh.mesh)) return false;
+                ceilingFixtureModels_[variant].push_back(std::move(part));
+            }
+            wkc::core::log(wkc::core::LogLevel::Info,
+                "Loaded ceiling fixture " + path.string());
+            break;
+        }
     }
     if (!framebuffer_.resize(gl_, width, height)) {
         return false;
@@ -977,6 +1904,7 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
     gpuMaterials.industrialWallCondition = materials.condition;
     gpuMaterials.industrialCeilingCondition = materials.condition;
     gpuMaterials.wallUvOffset = {
@@ -1018,7 +1946,9 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
     return true;
 }
 
-bool GdpRenderer::prepareStorageRoomMaterials(const wkc::core::Seed roomSeed)
+bool GdpRenderer::prepareStorageRoomMaterials(
+    const wkc::core::Seed roomSeed,
+    const bool approvedHallMaterials)
 {
     if (!initialized_) {
         return false;
@@ -1030,13 +1960,99 @@ bool GdpRenderer::prepareStorageRoomMaterials(const wkc::core::Seed roomSeed)
             wkc::core::LogLevel::Error, "Storage room material generation failed validation");
         return false;
     }
-    if (roomMaterials_.contains(materials.materialHash)) {
-        activeRoomMaterialKey_ = materials.materialHash;
+    const std::uint64_t materialKey = approvedHallMaterials
+        ? wkc::core::hashCombine(materials.materialHash, 0x53544F5241575633ULL)
+        : materials.materialHash;
+    if (roomMaterials_.contains(materialKey)) {
+        activeRoomMaterialKey_ = materialKey;
         return true;
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
+    gpuMaterials.storageHallV1 = approvedHallMaterials;
+    gpuMaterials.storageHallSeed = roomSeed;
+    gpuMaterials.storageRackCondition = materials.condition;
+    constexpr std::array<std::string_view, 3> rackUprightFiles{
+        "rooms/storage/rack_v3_upright_orderly.png",
+        "rooms/storage/rack_v3_upright_dusty.png",
+        "rooms/storage/rack_v3_upright_neglected.png",
+    };
+    constexpr std::array<std::string_view, 3> rackShelfFiles{
+        "rooms/storage/rack_v3_shelf_orderly.png",
+        "rooms/storage/rack_v3_shelf_dusty.png",
+        "rooms/storage/rack_v3_shelf_neglected.png",
+    };
+    for (std::size_t index = 0; index < rackUprightFiles.size(); ++index) {
+        if (!storageRackUprightTextures_[index].isValid()) {
+            const auto image = loadVisualImage(rackUprightFiles[index]);
+            if (!image || !storageRackUprightTextures_[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Storage rack upright texture is missing or invalid");
+                return false;
+            }
+        }
+        if (!storageRackShelfTextures_[index].isValid()) {
+            const auto image = loadVisualImage(rackShelfFiles[index]);
+            if (!image || !storageRackShelfTextures_[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Storage rack shelf texture is missing or invalid");
+                return false;
+            }
+        }
+    }
+    if (approvedHallMaterials) {
+        constexpr std::array<std::string_view, 6> wallFiles{
+            "rooms/storage/wall_orderly_plain_v1.png",
+            "rooms/storage/wall_orderly_marked_v1.png",
+            "rooms/storage/wall_dusty_plain_v1.png",
+            "rooms/storage/wall_dusty_v1.png",
+            "rooms/storage/wall_neglected_plain_v1.png",
+            "rooms/storage/wall_neglected_marked_v1.png",
+        };
+        constexpr std::array<std::string_view, 3> floorFiles{
+            "rooms/storage/floor_orderly_v1.png",
+            "rooms/storage/floor_dusty_v1.png",
+            "rooms/storage/floor_neglected_v1.png",
+        };
+        constexpr std::array<std::string_view, 3> ceilingFiles{
+            "rooms/storage/ceiling_orderly_v1.png",
+            "rooms/storage/ceiling_dusty_v1.png",
+            "rooms/storage/ceiling_neglected_v1.png",
+        };
+        const auto loadVariants = [this](auto& textures, const auto& files,
+                                      const wkc::render::TextureSampling sampling,
+                                      const std::string_view errorMessage) {
+            for (std::size_t index = 0; index < files.size(); ++index) {
+                if (textures[index].isValid()) {
+                    continue;
+                }
+                const auto image = loadVisualImage(files[index]);
+                if (!image || !textures[index].upload(gl_, *image, sampling)) {
+                    wkc::core::log(wkc::core::LogLevel::Error, errorMessage);
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (!loadVariants(storageWallTextures_, wallFiles,
+                wkc::render::TextureSampling::Pixelated,
+                "Storage wall variant is missing or invalid")
+            || !loadVariants(storageFloorTextures_, floorFiles,
+                wkc::render::TextureSampling::Trilinear,
+                "Storage floor variant is missing or invalid")
+            || !loadVariants(storageCeilingTextures_, ceilingFiles,
+                wkc::render::TextureSampling::Trilinear,
+                "Storage ceiling variant is missing or invalid")) {
+            return false;
+        }
+    }
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
+        if (approvedHallMaterials) {
+            continue;
+        }
         const StorageSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
             storageSurfaceRecipeHash(recipe),
@@ -1047,8 +2063,8 @@ bool GdpRenderer::prepareStorageRoomMaterials(const wkc::core::Seed roomSeed)
             return false;
         }
     }
-    roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
-    activeRoomMaterialKey_ = materials.materialHash;
+    roomMaterials_.emplace(materialKey, std::move(gpuMaterials));
+    activeRoomMaterialKey_ = materialKey;
     return true;
 }
 
@@ -1070,6 +2086,7 @@ bool GdpRenderer::prepareCombatRoomMaterials(const wkc::core::Seed roomSeed)
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const CombatSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
@@ -1098,29 +2115,83 @@ bool GdpRenderer::prepareCafeteriaRoomMaterials(const wkc::core::Seed roomSeed)
             wkc::core::LogLevel::Error, "Cafeteria room material generation failed validation");
         return false;
     }
-    if (roomMaterials_.contains(materials.materialHash)) {
-        activeRoomMaterialKey_ = materials.materialHash;
+    const std::uint64_t materialKey = wkc::core::hashCombine(
+        materials.materialHash, 0x434146455F563100ULL);
+    if (roomMaterials_.contains(materialKey)) {
+        activeRoomMaterialKey_ = materialKey;
         return true;
     }
 
     RoomGpuMaterials gpuMaterials;
-    for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const CafeteriaSurfaceRecipe& recipe = materials.surfaces[index];
-        const auto textureData = textureCache_.acquire(
-            cafeteriaSurfaceRecipeHash(recipe),
-            [&recipe] {
-                return std::move(*generateCafeteriaSurfaceAlbedo(recipe));
-            });
-        if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
+    gpuMaterials.cafeteriaV1 = true;
+    gpuMaterials.cafeteriaCondition
+        = static_cast<std::uint8_t>(materials.condition);
+    constexpr std::array<std::string_view, 3> wallFiles{
+        "rooms/cafeteria/wall_clean.png",
+        "rooms/cafeteria/wall_inuse.png",
+        "rooms/cafeteria/wall_faded.png",
+    };
+    constexpr std::array<std::string_view, 3> floorFiles{
+        "rooms/cafeteria/floor_clean.png",
+        "rooms/cafeteria/floor_inuse.png",
+        "rooms/cafeteria/floor_faded.png",
+    };
+    constexpr std::array<std::string_view, 3> ceilingFiles{
+        "rooms/cafeteria/ceiling_clean.png",
+        "rooms/cafeteria/ceiling_inuse.png",
+        "rooms/cafeteria/ceiling_faded.png",
+    };
+    const auto loadVariants = [this](auto& textures, const auto& files,
+                                  const std::string_view errorMessage) {
+        for (std::size_t index = 0; index < files.size(); ++index) {
+            if (textures[index].isValid()) {
+                continue;
+            }
+            const auto image = loadVisualImage(files[index]);
+            if (!image || !textures[index].upload(
+                    gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+                wkc::core::log(wkc::core::LogLevel::Error, errorMessage);
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!loadVariants(cafeteriaWallTextures_, wallFiles,
+            "Cafeteria wall variant is missing or invalid")
+        || !loadVariants(cafeteriaFloorTextures_, floorFiles,
+            "Cafeteria floor variant is missing or invalid")
+        || !loadVariants(cafeteriaCeilingTextures_, ceilingFiles,
+            "Cafeteria ceiling variant is missing or invalid")) {
+        return false;
+    }
+    constexpr std::array<std::array<std::string_view, 3>, 4> furnitureFiles{{
+        {"rooms/cafeteria/furniture_steel_clean.png",
+            "rooms/cafeteria/furniture_steel_inuse.png",
+            "rooms/cafeteria/furniture_steel_faded.png"},
+        {"rooms/cafeteria/furniture_seat_clean.png",
+            "rooms/cafeteria/furniture_seat_inuse.png",
+            "rooms/cafeteria/furniture_seat_faded.png"},
+        {"rooms/cafeteria/furniture_support_clean.png",
+            "rooms/cafeteria/furniture_support_inuse.png",
+            "rooms/cafeteria/furniture_support_faded.png"},
+        {"rooms/cafeteria/furniture_cabinet_clean.png",
+            "rooms/cafeteria/furniture_cabinet_inuse.png",
+            "rooms/cafeteria/furniture_cabinet_faded.png"},
+    }};
+    for (std::size_t part = 0; part < furnitureFiles.size(); ++part) {
+        if (!loadVariants(cafeteriaFurnitureTextures_[part], furnitureFiles[part],
+                "Cafeteria furniture variant is missing or invalid")) {
             return false;
         }
     }
-    roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
-    activeRoomMaterialKey_ = materials.materialHash;
+    roomMaterials_.emplace(materialKey, std::move(gpuMaterials));
+    activeRoomMaterialKey_ = materialKey;
     return true;
 }
 
-bool GdpRenderer::prepareLaboratoryRoomMaterials(const wkc::core::Seed roomSeed)
+bool GdpRenderer::prepareLaboratoryRoomMaterials(
+    const wkc::core::Seed roomSeed, const bool approvedPreviewMaterials)
 {
     if (!initialized_) {
         return false;
@@ -1132,25 +2203,55 @@ bool GdpRenderer::prepareLaboratoryRoomMaterials(const wkc::core::Seed roomSeed)
             wkc::core::LogLevel::Error, "Laboratory room material generation failed validation");
         return false;
     }
-    if (roomMaterials_.contains(materials.materialHash)) {
-        activeRoomMaterialKey_ = materials.materialHash;
+    const std::uint64_t materialKey = approvedPreviewMaterials
+        ? wkc::core::hashCombine(materials.materialHash, 0x4C41425F50525631ULL)
+        : materials.materialHash;
+    if (roomMaterials_.contains(materialKey)) {
+        activeRoomMaterialKey_ = materialKey;
         return true;
     }
 
     RoomGpuMaterials gpuMaterials;
-    for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const LaboratorySurfaceRecipe& recipe = materials.surfaces[index];
-        const auto textureData = textureCache_.acquire(
-            laboratorySurfaceRecipeHash(recipe),
-            [&recipe] {
-                return std::move(*generateLaboratorySurfaceAlbedo(recipe));
-            });
-        if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
+    gpuMaterials.laboratoryPreviewV1 = approvedPreviewMaterials;
+    if (approvedPreviewMaterials && !laboratoryFurnitureTexture_.isValid()) {
+        const auto image = loadVisualImage(
+            "rooms/laboratory/furniture_enamel_v1.png");
+        if (!image || !laboratoryFurnitureTexture_.upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Laboratory furniture texture is missing or invalid");
             return false;
         }
     }
-    roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
-    activeRoomMaterialKey_ = materials.materialHash;
+    for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
+        if (approvedPreviewMaterials) {
+            constexpr std::array<std::string_view, 3> files{
+                "rooms/laboratory/wall_operational_v2.png",
+                "rooms/laboratory/floor_operational_v1.png",
+                "rooms/laboratory/ceiling_operational_v1.png",
+            };
+            const auto image = loadVisualImage(files[index]);
+            if (!image || !gpuMaterials.textures[index].upload(
+                    gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    "Laboratory preview texture is missing or invalid");
+                return false;
+            }
+        } else {
+            const LaboratorySurfaceRecipe& recipe = materials.surfaces[index];
+            const auto textureData = textureCache_.acquire(
+                laboratorySurfaceRecipeHash(recipe),
+                [&recipe] {
+                    return std::move(*generateLaboratorySurfaceAlbedo(recipe));
+                });
+            if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
+                return false;
+            }
+        }
+    }
+    roomMaterials_.emplace(materialKey, std::move(gpuMaterials));
+    activeRoomMaterialKey_ = materialKey;
     return true;
 }
 
@@ -1172,6 +2273,7 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const wkc::core::Seed roomSeed)
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const TechnicalSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
@@ -1200,25 +2302,50 @@ bool GdpRenderer::prepareSecurityRoomMaterials(const wkc::core::Seed roomSeed)
             wkc::core::LogLevel::Error, "Security room material generation failed validation");
         return false;
     }
-    if (roomMaterials_.contains(materials.materialHash)) {
-        activeRoomMaterialKey_ = materials.materialHash;
+    const std::uint64_t materialKey = wkc::core::hashCombine(
+        materials.materialHash, 0x5345435552495459ULL);
+    if (roomMaterials_.contains(materialKey)) {
+        activeRoomMaterialKey_ = materialKey;
         return true;
     }
 
     RoomGpuMaterials gpuMaterials;
-    for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const SecuritySurfaceRecipe& recipe = materials.surfaces[index];
-        const auto textureData = textureCache_.acquire(
-            securitySurfaceRecipeHash(recipe),
-            [&recipe] {
-                return std::move(*generateSecuritySurfaceAlbedo(recipe));
-            });
-        if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
+    gpuMaterials.securityV1 = true;
+    gpuMaterials.securityFloorSeed = static_cast<float>(roomSeed % 65521U);
+    gpuMaterials.securityFloorTone = materials.condition == SecurityCondition::Secured
+        ? 1.02F : materials.condition == SecurityCondition::Alert ? 0.96F : 1.0F;
+    if (!securityFurnitureTexture_.isValid()) {
+        const auto furniture = loadVisualImage(
+            "rooms/security/furniture_graphite_v1.png");
+        if (!furniture || !securityFurnitureTexture_.upload(
+                gl_, *furniture, wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Security furniture texture is missing or invalid");
             return false;
         }
     }
-    roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
-    activeRoomMaterialKey_ = materials.materialHash;
+    constexpr std::array<std::array<std::string_view, 3>, 3> files{{
+        {"rooms/security/wall_secured.png", "rooms/security/wall_monitored.png",
+            "rooms/security/wall_alert.png"},
+        {"rooms/security/floor_neutral_v2.png",
+            "rooms/security/floor_neutral_v2.png",
+            "rooms/security/floor_neutral_v2.png"},
+        {"rooms/security/ceiling_secured.png", "rooms/security/ceiling_monitored.png",
+            "rooms/security/ceiling_alert.png"},
+    }};
+    const std::size_t condition = static_cast<std::size_t>(materials.condition);
+    for (std::size_t index = 0; index < files.size(); ++index) {
+        const auto image = loadVisualImage(files[index][condition]);
+        if (!image || !gpuMaterials.textures[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Security room texture is missing or invalid");
+            return false;
+        }
+    }
+    roomMaterials_.emplace(materialKey, std::move(gpuMaterials));
+    activeRoomMaterialKey_ = materialKey;
     return true;
 }
 
@@ -1240,7 +2367,28 @@ bool GdpRenderer::prepareCentralHubRoomMaterials(const wkc::core::Seed roomSeed)
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.centralHubWallCondition = materials.condition;
+    gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
+        if (index == static_cast<std::size_t>(RoomSurface::Wall)
+            || index == static_cast<std::size_t>(RoomSurface::Floor)
+            || index == static_cast<std::size_t>(RoomSurface::Ceiling)) {
+            const bool wall = index == static_cast<std::size_t>(RoomSurface::Wall);
+            const bool floor = index == static_cast<std::size_t>(RoomSurface::Floor);
+            const auto image = loadVisualImage(
+                wall ? "rooms/central_hub/wall_plate_v1.png"
+                     : floor ? "rooms/central_hub/floor_plate_v1.png"
+                             : "rooms/central_hub/ceiling_plate_v1.png");
+            if (!image || !gpuMaterials.textures[index].upload(
+                    gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+                wkc::core::log(wkc::core::LogLevel::Error,
+                    wall ? "Central Hub wall texture is missing or invalid"
+                         : floor ? "Central Hub floor texture is missing or invalid"
+                                 : "Central Hub ceiling texture is missing or invalid");
+                return false;
+            }
+            continue;
+        }
         const CentralHubSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
             centralHubSurfaceRecipeHash(recipe),
@@ -1649,8 +2797,12 @@ bool GdpRenderer::render(
         lighting.shadowOccluderCount,
         static_cast<std::uint32_t>(maxActiveShadowOccluders),
         static_cast<std::uint32_t>(maxShadowOccluders)});
+    const bool geometryShadowsActive = geometryShadowsEnabled_
+        && !hud.mainMenu
+        && hud.geometryShadowLightBudget > 0U
+        && hud.graphicsQuality >= HudGraphicsQuality::Medium;
     activeShaderPath_ = selectRendererShaderPath(
-        hud.detailedMaterials, lightCount,
+        hud.detailedMaterials || geometryShadowsActive, lightCount,
         shadowLightCount, shadowOccluderCount);
     if (!shadowShaderSpecializationEnabled_
         && activeShaderPath_ != RendererShaderPath::LowSpec) {
@@ -1666,6 +2818,18 @@ bool GdpRenderer::render(
     lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
     if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
         return false;
+    }
+    if (geometryShadowsActive) {
+        const int shadowSize = hud.graphicsQuality == HudGraphicsQuality::Medium
+            ? 256 : 512;
+        const std::uint32_t requestedMaps = std::min<std::uint32_t>(
+            hud.geometryShadowLightBudget,
+            static_cast<std::uint32_t>(maxRenderedRoomLights));
+        for (std::uint32_t index = 0U; index < requestedMaps; ++index) {
+            if (!shadowCubes_[index].resize(gl_, shadowSize)) return false;
+        }
+    } else {
+        shadowCubeCount_ = 0U;
     }
     textureBindings_.beginFrame();
     meshBindings_.beginFrame();
@@ -1692,14 +2856,43 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uEmissionMap", 3);
     shader.setInt(gl_, "uUseEmissionMap", 0);
     shader.setInt(gl_, "uViewmodel", 0);
+    shader.setFloat(gl_, "uPropIndirectFill", 0.0F);
     shader.setFloat(gl_, "uOpacity", 1.0F);
+    shader.setInt(gl_, "uPlayerBodyFade", 0);
+    shader.setFloat(gl_, "uBodyViewportHeight", static_cast<float>(renderHeight));
     shader.setInt(gl_, "uSoftEdges", 0);
     shader.setFloat(gl_, "uUnlitMix", 0.0F);
+    shader.setFloat(gl_, "uMaterialUnlitMix", 0.0F);
     shader.setInt(gl_, "uInstanced", 0);
     shader.setInt(gl_, "uPlayerSkinning", 0);
     shader.setInt(gl_, "uDetailedMaterialsEnabled",
         hud.detailedMaterials ? 1 : 0);
     shader.setVec3(gl_, "uCameraPosition", camera.position);
+    shader.setInt(gl_, "uHubPlinthContactShadow", 0);
+    const auto setHubPlinthShadow
+        = [&shader, this](const RoomRenderData& renderedRoom) {
+              for (const world::RoomArchitecturePart& part
+                  : renderedRoom.architectureParts) {
+                  if (part.decoration
+                      != world::RoomDecorationPart::CentralHubColumnPlinth) {
+                      continue;
+                  }
+                  const wkc::core::Vec3 center
+                      = (part.bounds.minimum + part.bounds.maximum) * 0.5F;
+                  const float halfExtent
+                      = (part.bounds.maximum.x - part.bounds.minimum.x) * 0.5F;
+                  shader.setInt(gl_, "uHubPlinthContactShadow", 1);
+                  shader.setVec3(gl_, "uHubPlinthFootprint",
+                      {center.x, halfExtent, center.z});
+                  return true;
+              }
+              return false;
+          };
+    if (!setHubPlinthShadow(room)) {
+        for (const RoomRenderData& connectedRoom : connectedRooms) {
+            if (setHubPlinthShadow(connectedRoom)) break;
+        }
+    }
     shader.setMat4(gl_, "uView", camera_.viewMatrix());
     shader.setMat4(
         gl_,
@@ -1716,14 +2909,72 @@ bool GdpRenderer::render(
     shader.setVec3(gl_, "uFlashlightPosition", lighting.flashlightPosition);
     shader.setVec3(gl_, "uFlashlightDirection", lighting.flashlightDirection);
     shader.setVec3(gl_, "uAmbientColor", ambientColor);
-    shader.setFloat(gl_, "uAmbientIntensity",
-        lighting.alert ? std::max(lighting.ambientIntensity, 0.16F)
-                       : lighting.ambientIntensity);
+    shader.setFloat(gl_, "uAmbientIntensity", lighting.ambientIntensity);
+    static_assert(maxRenderedAmbientRegions == 16U);
+    const std::uint32_t ambientRegionCount = std::min<std::uint32_t>(
+        lighting.ambientRegionCount,
+        static_cast<std::uint32_t>(maxRenderedAmbientRegions));
+    shader.setInt(gl_, "uAmbientRegionCount",
+        static_cast<int>(ambientRegionCount));
+    static const auto ambientRegionUniforms = [] {
+        std::array<std::array<std::string, maxRenderedAmbientRegions>, 4> names;
+        constexpr std::array prefixes{
+            "uAmbientRegionMinima[", "uAmbientRegionMaxima[",
+            "uAmbientRegionColors[", "uAmbientRegionIntensities[",
+        };
+        for (std::size_t field = 0U; field < names.size(); ++field) {
+            for (std::size_t index = 0U; index < maxRenderedAmbientRegions;
+                 ++index) {
+                names[field][index] = std::string{prefixes[field]}
+                    + std::to_string(index) + ']';
+            }
+        }
+        return names;
+    }();
+    for (std::size_t index = 0U; index < ambientRegionCount; ++index) {
+        const AmbientRegionRenderData& region = lighting.ambientRegions[index];
+        const wkc::core::Vec3 color = lighting.alert && index == 0U
+            ? (region.color * 0.28F) + (alertColor * 0.72F)
+            : region.color;
+        shader.setVec3(gl_, ambientRegionUniforms[0][index].c_str(),
+            region.bounds.minimum);
+        shader.setVec3(gl_, ambientRegionUniforms[1][index].c_str(),
+            region.bounds.maximum);
+        shader.setVec3(gl_, ambientRegionUniforms[2][index].c_str(), color);
+        shader.setFloat(gl_, ambientRegionUniforms[3][index].c_str(),
+            region.intensity);
+    }
     if (!lowSpecShaderActive_) {
         shader.setInt(gl_, "uShadowLightCount",
-            static_cast<int>(shadowLightCount));
+            geometryShadowsActive ? 0 : static_cast<int>(shadowLightCount));
         shader.setInt(gl_, "uShadowOccluderCount",
-            static_cast<int>(shadowOccluderCount));
+            geometryShadowsActive ? 0 : static_cast<int>(shadowOccluderCount));
+        const std::uint32_t readyMapCount = geometryShadowsActive
+            ? shadowCubeCount_ : 0U;
+        shader.setInt(gl_, "uShadowCubeCount",
+            static_cast<int>(readyMapCount));
+        shader.setFloat(gl_, "uShadowCubeFarPlane", 22.0F);
+        // Even an inactive sampler must not alias the 2D material samplers
+        // on unit 0. Mesa validates sampler types before the draw call.
+        for (std::uint32_t index = 0U;
+             index < static_cast<std::uint32_t>(maxRenderedRoomLights);
+             ++index) {
+            const std::string mapUniform = "uShadowCubes["
+                + std::to_string(index) + ']';
+            shader.setInt(gl_, mapUniform.c_str(), static_cast<int>(4U + index));
+            if (index >= readyMapCount) continue;
+            const std::string positionUniform = "uShadowCubeLightPositions["
+                + std::to_string(index) + ']';
+            shader.setVec3(gl_, positionUniform.c_str(),
+                shadowCubeLightPositions_[index]);
+            const auto binding = textureBindings_.prepare(
+                4U + index, shadowCubes_[index].texture());
+            if (binding.activateUnit) gl_.activeTexture(GL_TEXTURE0 + 4U + index);
+            if (binding.bindTexture) {
+                glBindTexture(GL_TEXTURE_CUBE_MAP,
+                    shadowCubes_[index].texture());
+            }
+        }
     }
     constexpr std::array positionUniforms{
         "uLightPositions[0]", "uLightPositions[1]",
@@ -1749,6 +3000,24 @@ bool GdpRenderer::render(
         "uLightRanges[4]", "uLightRanges[5]",
         "uLightRanges[6]", "uLightRanges[7]",
     };
+    constexpr std::array roomMinimumUniforms{
+        "uLightRoomMinima[0]", "uLightRoomMinima[1]",
+        "uLightRoomMinima[2]", "uLightRoomMinima[3]",
+        "uLightRoomMinima[4]", "uLightRoomMinima[5]",
+        "uLightRoomMinima[6]", "uLightRoomMinima[7]",
+    };
+    constexpr std::array roomMaximumUniforms{
+        "uLightRoomMaxima[0]", "uLightRoomMaxima[1]",
+        "uLightRoomMaxima[2]", "uLightRoomMaxima[3]",
+        "uLightRoomMaxima[4]", "uLightRoomMaxima[5]",
+        "uLightRoomMaxima[6]", "uLightRoomMaxima[7]",
+    };
+    constexpr std::array boundedUniforms{
+        "uLightBoundedToRoom[0]", "uLightBoundedToRoom[1]",
+        "uLightBoundedToRoom[2]", "uLightBoundedToRoom[3]",
+        "uLightBoundedToRoom[4]", "uLightBoundedToRoom[5]",
+        "uLightBoundedToRoom[6]", "uLightBoundedToRoom[7]",
+    };
     constexpr std::array shadowMinimumUniforms{
         "uShadowOccluderMinima[0]", "uShadowOccluderMinima[1]",
         "uShadowOccluderMinima[2]", "uShadowOccluderMinima[3]",
@@ -1769,6 +3038,16 @@ bool GdpRenderer::render(
         "uShadowOccluderMaxima[12]", "uShadowOccluderMaxima[13]",
         "uShadowOccluderMaxima[14]", "uShadowOccluderMaxima[15]",
     };
+    constexpr std::array shadowOctagonalUniforms{
+        "uShadowOccluderOctagonal[0]", "uShadowOccluderOctagonal[1]",
+        "uShadowOccluderOctagonal[2]", "uShadowOccluderOctagonal[3]",
+        "uShadowOccluderOctagonal[4]", "uShadowOccluderOctagonal[5]",
+        "uShadowOccluderOctagonal[6]", "uShadowOccluderOctagonal[7]",
+        "uShadowOccluderOctagonal[8]", "uShadowOccluderOctagonal[9]",
+        "uShadowOccluderOctagonal[10]", "uShadowOccluderOctagonal[11]",
+        "uShadowOccluderOctagonal[12]", "uShadowOccluderOctagonal[13]",
+        "uShadowOccluderOctagonal[14]", "uShadowOccluderOctagonal[15]",
+    };
     for (std::size_t index = 0; index < lightCount; ++index) {
         const PointLightRenderData& light = lighting.lights[index];
         const wkc::core::Vec3 lightColor = lighting.alert
@@ -1779,12 +3058,21 @@ bool GdpRenderer::render(
         shader.setFloat(gl_, intensityUniforms[index],
             lighting.alert ? light.intensity * 1.08F : light.intensity);
         shader.setFloat(gl_, rangeUniforms[index], light.range);
+        shader.setInt(gl_, boundedUniforms[index], light.boundedToRoom ? 1 : 0);
+        if (light.boundedToRoom) {
+            shader.setVec3(gl_, roomMinimumUniforms[index],
+                light.sourceRoomBounds.minimum);
+            shader.setVec3(gl_, roomMaximumUniforms[index],
+                light.sourceRoomBounds.maximum);
+        }
     }
     for (std::size_t index = 0; index < shadowOccluderCount; ++index) {
         shader.setVec3(gl_, shadowMinimumUniforms[index],
             lighting.shadowOccluders[index].bounds.minimum);
         shader.setVec3(gl_, shadowMaximumUniforms[index],
             lighting.shadowOccluders[index].bounds.maximum);
+        shader.setInt(gl_, shadowOctagonalUniforms[index],
+            lighting.shadowOccluders[index].octagonalPrism ? 1 : 0);
     }
 
     const auto fallbackMaterials = roomMaterials_.find(fallbackRoomMaterialKey_);
@@ -1805,16 +3093,35 @@ bool GdpRenderer::render(
         wkc::core::Vec3 tint{1.0F, 1.0F, 1.0F};
         wkc::core::Vec2 uvScale{1.0F, 1.0F};
         wkc::core::Vec2 uvOffset{};
+        float surfaceTileMetres{0.0F};
+        float emissiveStrength{0.0F};
+        float unlitMix{0.0F};
+        bool hubColumnPlate{false};
+        bool mirrorSurfaceTile{false};
         bool detailedMaterial{false};
+        std::uint8_t surfaceVariant{0};
+        world::StorageRackPart rackPart{world::StorageRackPart::None};
+        world::CafeteriaFurniturePart furniturePart{
+            world::CafeteriaFurniturePart::None};
 
         constexpr bool operator==(const SurfaceStyle&) const noexcept = default;
     };
     struct SurfaceCommand {
         SurfaceStyle style{};
         wkc::core::Mat4 model{wkc::core::Mat4::identity()};
+        const wkc::render::Mesh* mesh{nullptr};
+        bool castsShadow{false};
     };
     std::vector<SurfaceCommand> surfaceCommands;
-    const auto queueSurface = [this, &surfaceCommands](
+    bool architectureCastsShadow = false;
+    struct ShadowCaster {
+        const wkc::render::Mesh* mesh;
+        wkc::core::Mat4 model;
+    };
+    std::vector<ShadowCaster> shadowCasters;
+    bool footprintShellReady = true;
+    const auto queueSurface = [this, &surfaceCommands,
+                                  &architectureCastsShadow](
         const RoomGpuMaterials& roomMaterials,
         const wkc::core::Vec3 position,
         const wkc::core::Vec3 scale,
@@ -1822,7 +3129,12 @@ bool GdpRenderer::render(
         const float uvScale = 1.0F,
         const wkc::core::Vec3 tint = {1.0F, 1.0F, 1.0F},
         const wkc::core::Vec2 detailedUvScale = {},
-        const wkc::core::Vec2 detailedUvOffset = {}) {
+        const wkc::core::Vec2 detailedUvOffset = {},
+        const std::uint8_t surfaceVariant = 0,
+        const world::StorageRackPart rackPart
+            = world::StorageRackPart::None,
+        const world::CafeteriaFurniturePart furniturePart
+            = world::CafeteriaFurniturePart::None) {
         SurfaceStyle style;
         style.roomMaterials = &roomMaterials;
         style.material = material;
@@ -1831,6 +3143,13 @@ bool GdpRenderer::render(
         wkc::core::Vec2 materialUvOffset{};
         switch (material) {
         case RoomMaterialChannel::Wall:
+            if (roomMaterials.laboratoryPreviewV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.centralHubWallCondition) {
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.industrialWallCondition) {
                 const std::size_t conditionIndex = static_cast<std::size_t>(
                     *roomMaterials.industrialWallCondition);
@@ -1843,8 +3162,30 @@ bool GdpRenderer::render(
             }
             break;
         case RoomMaterialChannel::Floor:
+            if (roomMaterials.centralHubWallCondition) {
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.laboratoryPreviewV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.securityV1) {
+                resolvedTint = tint * roomMaterials.securityFloorTone;
+            }
+            break;
+        case RoomMaterialChannel::HubFloorDetail:
+            // The fine brushed metal repeats by distance on hatches, frames
+            // and slats instead of stretching once across each box.
+            style.surfaceTileMetres = 0.75F;
             break;
         case RoomMaterialChannel::Ceiling:
+            if (roomMaterials.centralHubWallCondition) {
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.laboratoryPreviewV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.industrialCeilingCondition) {
                 const std::size_t conditionIndex = static_cast<std::size_t>(
                     *roomMaterials.industrialCeilingCondition);
@@ -1856,13 +3197,40 @@ bool GdpRenderer::render(
                 }
             }
             break;
+        case RoomMaterialChannel::StorageRack:
+            style.surfaceTileMetres = 0.8F;
+            style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::CafeteriaFurniture:
+            style.surfaceTileMetres = 0.75F;
+            break;
+        case RoomMaterialChannel::LaboratoryFurniture:
+            style.surfaceTileMetres = 0.75F;
+            style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::SecurityFurniture:
+            style.surfaceTileMetres = 0.75F;
+            style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::StructuralColumn:
+            style.surfaceTileMetres = 0.8F;
+            break;
+        case RoomMaterialChannel::SolidColor:
+            break;
         case RoomMaterialChannel::Generic:
             break;
         }
-        const bool customUv = detailedMaterial
-            && detailedUvScale.x > 0.0F && detailedUvScale.y > 0.0F;
+        const bool customUv = (detailedMaterial || roomMaterials.storageHallV1
+            || roomMaterials.cafeteriaV1 || roomMaterials.securityV1)
+            && detailedUvScale.x > 0.0F
+            && std::abs(detailedUvScale.y) > 1.0e-6F;
         style.tint = resolvedTint;
         style.detailedMaterial = detailedMaterial;
+        style.surfaceVariant = material == RoomMaterialChannel::StructuralColumn
+            ? roomMaterials.columnCondition : surfaceVariant;
+        style.rackPart = rackPart;
+        style.furniturePart = material == RoomMaterialChannel::SecurityFurniture
+            ? world::CafeteriaFurniturePart::Steel : furniturePart;
         style.uvScale = customUv
             ? detailedUvScale : wkc::core::Vec2{uvScale, uvScale};
         style.uvOffset = customUv
@@ -1872,36 +3240,143 @@ bool GdpRenderer::render(
             wkc::core::translationMatrix(position)
                 * wkc::core::scaleMatrix(scale),
         });
+        // Walls close the light volume at room boundaries. The footprint
+        // wall mesh already contains the door opening. Floor and ceiling
+        // tiles stay receivers: casting from their coplanar seams creates
+        // dark stripes around ceiling fixtures.
+        surfaceCommands.back().castsShadow = architectureCastsShadow
+            || material == RoomMaterialChannel::Wall;
     };
 
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
         const wkc::core::Aabb bounds = renderedRoom.worldBounds;
+        if (!renderedRoom.walkableOutline.empty()) {
+            constexpr std::array surfaces{FootprintSurface::Floor,
+                FootprintSurface::Ceiling, FootprintSurface::Wall};
+            for (const FootprintSurface surface : surfaces) {
+                const auto key = footprintMeshKey(
+                    renderedRoom.walkableOutline, bounds, surface, doors);
+                auto mesh = footprintMeshes_.find(key);
+                if (mesh == footprintMeshes_.end()) {
+                    const auto data = makeFootprintMesh(
+                        renderedRoom.walkableOutline, bounds, surface, doors);
+                    if (!data) { footprintShellReady = false; return; }
+                    auto inserted = footprintMeshes_.try_emplace(key).first;
+                    if (!inserted->second.upload(gl_, *data)) {
+                        footprintMeshes_.erase(inserted);
+                        footprintShellReady = false;
+                        return;
+                    }
+                    mesh = inserted;
+                }
+                const auto material = surface == FootprintSurface::Floor
+                    ? RoomMaterialChannel::Floor
+                    : surface == FootprintSurface::Ceiling
+                        ? RoomMaterialChannel::Ceiling
+                        : RoomMaterialChannel::Wall;
+                // Footprint mesh UVs are measured in 4 m; the Security
+                // albedo uses a 2 m physical tile on every shell surface.
+                queueSurface(roomMaterials, {}, {1.0F, 1.0F, 1.0F},
+                    material, roomMaterials.securityV1
+                        || ((material == RoomMaterialChannel::Wall
+                                || material == RoomMaterialChannel::Floor
+                                || material == RoomMaterialChannel::Ceiling)
+                            && roomMaterials.centralHubWallCondition)
+                        ? 2.0F : 1.0F);
+                surfaceCommands.back().model = wkc::core::Mat4::identity();
+                surfaceCommands.back().mesh = &mesh->second;
+            }
+            return;
+        }
         const float roomWidth = bounds.maximum.x - bounds.minimum.x;
         const float roomDepth = bounds.maximum.z - bounds.minimum.z;
         const float roomHeight = bounds.maximum.y - bounds.minimum.y;
+        const bool approvedTiledRoom = roomMaterials.storageHallV1
+            || roomMaterials.cafeteriaV1 || roomMaterials.securityV1;
+        const wkc::core::Vec3 floorTint = roomMaterials.cafeteriaV1
+            ? wkc::core::Vec3{0.57F, 0.57F, 0.57F}
+            : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
+        const wkc::core::Vec3 wallTint = roomMaterials.cafeteriaV1
+            ? wkc::core::Vec3{0.54F, 0.54F, 0.54F}
+            : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
         const wkc::core::Vec3 roomCenter{
             (bounds.minimum.x + bounds.maximum.x) * 0.5F,
             bounds.minimum.y,
             (bounds.minimum.z + bounds.maximum.z) * 0.5F,
         };
         constexpr float shellThickness = 0.20F;
-        queueSurface(roomMaterials,
-            roomCenter + wkc::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
-            {roomWidth + shellThickness, shellThickness,
-                roomDepth + shellThickness},
-            RoomMaterialChannel::Floor, 4.0F);
-        queueSurface(roomMaterials,
-            roomCenter
-                + wkc::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
-            {roomWidth + shellThickness, shellThickness,
-                roomDepth + shellThickness},
-            RoomMaterialChannel::Ceiling, 1.0F, {1.0F, 1.0F, 1.0F},
-            {roomWidth / 4.0F, roomDepth / 4.0F},
-            {bounds.minimum.x / 4.0F, bounds.minimum.z / 4.0F});
+        if (approvedTiledRoom) {
+            const float materialTileMetres = roomMaterials.securityV1
+                ? 2.0F : 6.0F;
+            const std::size_t tileCountX = static_cast<std::size_t>(
+                std::ceil(roomWidth / materialTileMetres));
+            const std::size_t tileCountZ = static_cast<std::size_t>(
+                std::ceil(roomDepth / materialTileMetres));
+            for (std::size_t tileX = 0; tileX < tileCountX; ++tileX) {
+                const float minimumX = bounds.minimum.x
+                    + static_cast<float>(tileX) * materialTileMetres;
+                const float maximumX = std::min(
+                    minimumX + materialTileMetres, bounds.maximum.x);
+                for (std::size_t tileZ = 0; tileZ < tileCountZ; ++tileZ) {
+                    const float minimumZ = bounds.minimum.z
+                        + static_cast<float>(tileZ) * materialTileMetres;
+                    const float maximumZ = std::min(
+                        minimumZ + materialTileMetres, bounds.maximum.z);
+                    const float tileWidth = maximumX - minimumX;
+                    const float tileDepth = maximumZ - minimumZ;
+                    const wkc::core::Vec3 tileCenter{
+                        (minimumX + maximumX) * 0.5F,
+                        bounds.minimum.y,
+                        (minimumZ + maximumZ) * 0.5F,
+                    };
+                    const wkc::core::Vec2 tileUvScale{
+                        tileWidth / materialTileMetres,
+                        tileDepth / materialTileMetres,
+                    };
+                    const std::uint8_t floorVariant = roomMaterials.cafeteriaV1
+                        ? roomMaterials.cafeteriaCondition
+                        : static_cast<std::uint8_t>(
+                            (roomMaterials.storageHallSeed + tileX + 2U * tileZ) % 3U);
+                    const std::uint8_t ceilingVariant = roomMaterials.cafeteriaV1
+                        ? roomMaterials.cafeteriaCondition
+                        : static_cast<std::uint8_t>(
+                            (roomMaterials.storageHallSeed + 2U * tileX + tileZ + 1U) % 3U);
+                    queueSurface(roomMaterials,
+                        tileCenter + wkc::core::Vec3{
+                            0.0F, -shellThickness * 0.5F, 0.0F},
+                        {tileWidth, shellThickness, tileDepth},
+                        RoomMaterialChannel::Floor, 1.0F,
+                        floorTint, tileUvScale, {}, floorVariant);
+                    queueSurface(roomMaterials,
+                        tileCenter + wkc::core::Vec3{
+                            0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
+                        {tileWidth, shellThickness, tileDepth},
+                        RoomMaterialChannel::Ceiling, 1.0F,
+                        {1.0F, 1.0F, 1.0F}, tileUvScale, {}, ceilingVariant);
+                }
+            }
+        } else {
+            queueSurface(roomMaterials,
+                roomCenter + wkc::core::Vec3{0.0F, -shellThickness * 0.5F, 0.0F},
+                {roomWidth + shellThickness, shellThickness,
+                    roomDepth + shellThickness},
+                RoomMaterialChannel::Floor, 4.0F);
+            queueSurface(roomMaterials,
+                roomCenter
+                    + wkc::core::Vec3{0.0F, roomHeight + shellThickness * 0.5F, 0.0F},
+                {roomWidth + shellThickness, shellThickness,
+                    roomDepth + shellThickness},
+                RoomMaterialChannel::Ceiling, 1.0F, {1.0F, 1.0F, 1.0F},
+                {roomWidth / 4.0F, roomDepth / 4.0F},
+                {bounds.minimum.x / 4.0F, bounds.minimum.z / 4.0F});
+        }
 
         const auto drawWall = [&](const wkc::core::Vec3 normal) {
             const bool facesX = std::abs(normal.x) > 0.5F;
+            const std::size_t wallIndex = facesX
+                ? (normal.x > 0.0F ? 0U : 1U)
+                : (normal.z > 0.0F ? 2U : 3U);
             const float wallCenter = facesX
                 ? (normal.x > 0.0F ? bounds.maximum.x : bounds.minimum.x)
                 : (normal.z > 0.0F ? bounds.maximum.z : bounds.minimum.z);
@@ -1922,8 +3397,33 @@ bool GdpRenderer::render(
                         && candidateTransverse >= transverseMinimum - 0.01F
                         && candidateTransverse <= transverseMaximum + 0.01F;
                 });
+            const float tileMetres = roomMaterials.securityV1
+                ? 2.0F : approvedTiledRoom ? roomHeight : 4.0F;
+            const std::size_t tileCount = approvedTiledRoom
+                ? std::max<std::size_t>(1U, static_cast<std::size_t>(
+                    std::ceil((transverseMaximum - transverseMinimum) / tileMetres)))
+                : 1U;
+            std::size_t markedTile = static_cast<std::size_t>(
+                (roomMaterials.storageHallSeed + wallIndex) % tileCount);
+            if (roomMaterials.storageHallV1 && door != doors.end()) {
+                const float doorCenter = facesX ? door->position.z : door->position.x;
+                const float doorMinimum = doorCenter - (door->width * 0.5F);
+                const float doorMaximum = doorCenter + (door->width * 0.5F);
+                for (std::size_t step = 0; step < tileCount; ++step) {
+                    const std::size_t candidate = (markedTile + step) % tileCount;
+                    const float tileMinimum = transverseMinimum
+                        + static_cast<float>(candidate) * tileMetres;
+                    const float tileMaximum = std::min(
+                        tileMinimum + tileMetres, transverseMaximum);
+                    if (tileMaximum <= doorMinimum || tileMinimum >= doorMaximum) {
+                        markedTile = candidate;
+                        break;
+                    }
+                }
+            }
             const auto drawWallSpan = [&](const float minimum, const float maximum,
-                                          const float bottom, const float top) {
+                                          const float bottom, const float top,
+                                          const std::size_t tileIndex) {
                 if (maximum - minimum <= 1.0e-4F || top - bottom <= 1.0e-4F) {
                     return;
                 }
@@ -1940,26 +3440,55 @@ bool GdpRenderer::render(
                         shellThickness, top - bottom, maximum - minimum}
                     : wkc::core::Vec3{
                         maximum - minimum, top - bottom, shellThickness};
+                const std::uint8_t wallVariant = roomMaterials.storageHallV1
+                    ? static_cast<std::uint8_t>(
+                        2U * ((roomMaterials.storageHallSeed + wallIndex + tileIndex) % 3U)
+                        + (tileIndex == markedTile ? 1U : 0U))
+                    : roomMaterials.cafeteriaV1
+                        ? roomMaterials.cafeteriaCondition : 0U;
                 queueSurface(roomMaterials, position, scale, RoomMaterialChannel::Wall,
-                    1.0F, {1.0F, 1.0F, 1.0F},
-                    {(maximum - minimum) / 4.0F, (top - bottom) / roomHeight},
-                    {minimum / 4.0F, bottom / roomHeight});
+                    1.0F, wallTint,
+                    {(maximum - minimum) / tileMetres,
+                        approvedTiledRoom
+                            ? -(top - bottom) / tileMetres
+                            : (top - bottom) / tileMetres},
+                    {approvedTiledRoom
+                            ? ((wallIndex == 0U || wallIndex == 3U)
+                                ? (transverseMinimum
+                                    + static_cast<float>(tileIndex + 1U) * tileMetres
+                                    - maximum) / tileMetres
+                                : (minimum - transverseMinimum
+                                    - static_cast<float>(tileIndex) * tileMetres)
+                                    / tileMetres)
+                            : minimum / tileMetres,
+                        approvedTiledRoom
+                            ? 1.0F - (bottom / tileMetres)
+                            : bottom / tileMetres},
+                    wallVariant);
             };
-            if (door == doors.end()) {
-                drawWallSpan(transverseMinimum, transverseMaximum, 0.0F, roomHeight);
-                return;
+            for (std::size_t tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+                const float tileMinimum = approvedTiledRoom
+                    ? transverseMinimum + static_cast<float>(tileIndex) * tileMetres
+                    : transverseMinimum;
+                const float tileMaximum = approvedTiledRoom
+                    ? std::min(tileMinimum + tileMetres, transverseMaximum)
+                    : transverseMaximum;
+                if (door == doors.end()) {
+                    drawWallSpan(tileMinimum, tileMaximum, 0.0F, roomHeight, tileIndex);
+                    continue;
+                }
+                const float doorCenter = facesX ? door->position.z : door->position.x;
+                const float openingMinimum = std::clamp(
+                    doorCenter - (door->width * 0.5F), tileMinimum, tileMaximum);
+                const float openingMaximum = std::clamp(
+                    doorCenter + (door->width * 0.5F), tileMinimum, tileMaximum);
+                drawWallSpan(tileMinimum, openingMinimum,
+                    0.0F, roomHeight, tileIndex);
+                drawWallSpan(openingMaximum, tileMaximum,
+                    0.0F, roomHeight, tileIndex);
+                drawWallSpan(openingMinimum, openingMaximum,
+                    std::min(door->height, roomHeight), roomHeight, tileIndex);
             }
-            const float doorCenter = facesX ? door->position.z : door->position.x;
-            const float openingMinimum = std::clamp(
-                doorCenter - (door->width * 0.5F),
-                transverseMinimum, transverseMaximum);
-            const float openingMaximum = std::clamp(
-                doorCenter + (door->width * 0.5F),
-                transverseMinimum, transverseMaximum);
-            drawWallSpan(transverseMinimum, openingMinimum, 0.0F, roomHeight);
-            drawWallSpan(openingMaximum, transverseMaximum, 0.0F, roomHeight);
-            drawWallSpan(openingMinimum, openingMaximum,
-                std::min(door->height, roomHeight), roomHeight);
         };
         drawWall({1.0F, 0.0F, 0.0F});
         drawWall({-1.0F, 0.0F, 0.0F});
@@ -1967,8 +3496,692 @@ bool GdpRenderer::render(
         drawWall({0.0F, 0.0F, -1.0F});
     };
     drawRoomShell(room);
-    for (const RoomRenderData connectedRoom : connectedRooms) {
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
         drawRoomShell(connectedRoom);
+    }
+    if (!footprintShellReady) return false;
+
+    const auto drawSecurityFloorDetails = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.securityV1) return;
+        const wkc::core::Aabb bounds = renderedRoom.worldBounds;
+        const float floorY = bounds.minimum.y;
+        std::uint64_t roomKey = wkc::core::hashCombine(renderedRoom.materialKey,
+            std::bit_cast<std::uint32_t>(bounds.minimum.x));
+        roomKey = wkc::core::hashCombine(roomKey,
+            std::bit_cast<std::uint32_t>(bounds.minimum.z));
+        for (float z = bounds.minimum.z + 2.0F; z <= bounds.maximum.z - 2.0F;
+             z += 4.0F) {
+            for (float x = bounds.minimum.x + 2.0F; x <= bounds.maximum.x - 2.0F;
+                 x += 4.0F) {
+                std::uint64_t detailKey = wkc::core::hashCombine(roomKey,
+                    std::bit_cast<std::uint32_t>(x));
+                detailKey = wkc::core::hashCombine(detailKey,
+                    std::bit_cast<std::uint32_t>(z));
+                if (detailKey % 5U >= 2U) continue;
+                const float offsetX = (static_cast<float>((detailKey >> 8U) & 255U)
+                    / 255.0F - 0.5F) * 1.7F;
+                const float offsetZ = (static_cast<float>((detailKey >> 16U) & 255U)
+                    / 255.0F - 0.5F) * 1.7F;
+                const wkc::core::Vec3 center{x + offsetX, floorY, z + offsetZ};
+                if (!renderedRoom.walkableOutline.empty()
+                    && !world::footprintContainsDisk(
+                        renderedRoom.walkableOutline, center, 1.05F)) {
+                    continue;
+                }
+                const bool nearDoor = std::any_of(doors.begin(), doors.end(),
+                    [&](const DoorRenderData& door) {
+                        return std::abs(door.position.x - center.x) < 1.75F
+                            && std::abs(door.position.z - center.z) < 1.75F;
+                    });
+                if (nearDoor) continue;
+                const bool nearFurniture = std::any_of(
+                    renderedRoom.architectureParts.begin(),
+                    renderedRoom.architectureParts.end(),
+                    [&](const world::RoomArchitecturePart& part) {
+                        return part.bounds.minimum.y < floorY + 1.2F
+                            && part.bounds.maximum.y > floorY - 0.02F
+                            && part.bounds.minimum.x < center.x + 1.0F
+                            && part.bounds.maximum.x > center.x - 1.0F
+                            && part.bounds.minimum.z < center.z + 1.0F
+                            && part.bounds.maximum.z > center.z - 1.0F;
+                    });
+                if (nearFurniture) continue;
+
+                const bool quarterTurn = ((detailKey >> 24U) & 1U) != 0U;
+                const auto addPlate = [&](const float dx, const float dz,
+                    const float plateWidth, const float plateDepth,
+                    const float plateHeight,
+                    const wkc::core::Vec3 tint,
+                    const RoomMaterialChannel material
+                        = RoomMaterialChannel::Floor) {
+                    const float localX = quarterTurn ? dz : dx;
+                    const float localZ = quarterTurn ? dx : dz;
+                    const float spanX = quarterTurn ? plateDepth : plateWidth;
+                    const float spanZ = quarterTurn ? plateWidth : plateDepth;
+                    queueSurface(materials,
+                        {center.x + localX, floorY + plateHeight * 0.5F,
+                            center.z + localZ},
+                        {spanX, plateHeight, spanZ}, material,
+                        1.0F, tint, {spanX / 2.0F, spanZ / 2.0F});
+                };
+                const std::uint64_t detailType = (detailKey >> 28U) % 3U;
+                if (detailType == 0U) {
+                    // Service hatch: a muted inset, raised perimeter and
+                    // four fasteners. It is decorative and has no collision.
+                    addPlate(0.0F, 0.0F, 1.25F, 0.85F, 0.014F,
+                        {0.55F, 0.60F, 0.61F});
+                    for (const float side : {-1.0F, 1.0F}) {
+                        addPlate(0.0F, side * 0.42F, 1.32F, 0.045F,
+                            0.024F, {0.35F, 0.40F, 0.42F});
+                        addPlate(side * 0.62F, 0.0F, 0.045F, 0.82F,
+                            0.024F, {0.35F, 0.40F, 0.42F});
+                        for (const float end : {-1.0F, 1.0F}) {
+                            addPlate(side * 0.53F, end * 0.33F,
+                                0.045F, 0.045F, 0.029F,
+                                {0.76F, 0.69F, 0.52F});
+                        }
+                    }
+                } else if (detailType == 1U) {
+                    // Dark cavity, raised frame and slats read as a physical
+                    // vent instead of a slightly tinted floor decal.
+                    addPlate(0.0F, 0.0F, 1.35F, 0.55F, 0.009F,
+                        {0.025F, 0.035F, 0.038F},
+                        RoomMaterialChannel::SolidColor);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        addPlate(0.0F, side * 0.30F, 1.46F, 0.055F,
+                            0.052F, {0.43F, 0.49F, 0.50F},
+                            RoomMaterialChannel::StructuralColumn);
+                        addPlate(side * 0.70F, 0.0F, 0.055F, 0.56F,
+                            0.052F, {0.43F, 0.49F, 0.50F},
+                            RoomMaterialChannel::StructuralColumn);
+                    }
+                    for (int slat = -2; slat <= 2; ++slat) {
+                        addPlate(static_cast<float>(slat) * 0.24F, 0.0F,
+                            0.10F, 0.52F, 0.043F,
+                            {0.51F, 0.57F, 0.58F},
+                            RoomMaterialChannel::StructuralColumn);
+                    }
+                } else {
+                    // A small repaired seam with restrained amber inspection
+                    // paint breaks the large-area floor rhythm.
+                    addPlate(0.0F, 0.0F, 1.05F, 0.66F, 0.012F,
+                        {0.68F, 0.69F, 0.65F});
+                    addPlate(0.0F, -0.31F, 1.04F, 0.035F, 0.019F,
+                        {0.83F, 0.50F, 0.21F});
+                    addPlate(0.0F, 0.31F, 1.04F, 0.035F, 0.019F,
+                        {0.37F, 0.42F, 0.44F});
+                }
+            }
+        }
+    };
+    drawSecurityFloorDetails(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawSecurityFloorDetails(connectedRoom);
+    }
+
+    const auto drawRoomWallTrim = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (materials.centralHubWallCondition
+            && renderedRoom.walkableOutline.size() == 8U) {
+            const auto outline = std::span{renderedRoom.walkableOutline};
+            float signedArea = 0.0F;
+            for (std::size_t index = 0; index < outline.size(); ++index) {
+                const auto& first = outline[index];
+                const auto& second = outline[(index + 1U) % outline.size()];
+                signedArea += first.x * second.y - second.x * first.y;
+            }
+            const float interiorSign = signedArea >= 0.0F ? 1.0F : -1.0F;
+            const float floorY = renderedRoom.worldBounds.minimum.y;
+            const auto addOriented = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 dimensions,
+                const wkc::core::Vec3 tint, const float yaw,
+                const RoomMaterialChannel channel
+                    = RoomMaterialChannel::SolidColor) {
+                queueSurface(materials, center, dimensions,
+                    channel, 1.0F, tint);
+                surfaceCommands.back().model = wkc::core::translationMatrix(center)
+                    * wkc::core::rotationYMatrix(yaw)
+                    * wkc::core::scaleMatrix(dimensions);
+            };
+            for (std::size_t index = 0; index < outline.size(); ++index) {
+                const auto& first = outline[index];
+                const auto& second = outline[(index + 1U) % outline.size()];
+                const float deltaX = second.x - first.x;
+                const float deltaZ = second.y - first.y;
+                const float length = std::hypot(deltaX, deltaZ);
+                if (length < 0.3F) continue;
+                const float directionX = deltaX / length;
+                const float directionZ = deltaZ / length;
+                const float inwardX = -directionZ * interiorSign;
+                const float inwardZ = directionX * interiorSign;
+                const float yaw = -std::atan2(directionZ, directionX);
+                queueSurface(materials,
+                    {first.x + inwardX * 0.10F, floorY + 2.82F,
+                        first.y + inwardZ * 0.10F},
+                    {0.26F, 5.64F, 0.26F},
+                    RoomMaterialChannel::SolidColor, 1.0F,
+                    {0.20F, 0.22F, 0.23F});
+                addOriented({(first.x + second.x) * 0.5F + inwardX * 0.05F,
+                        floorY + 5.63F,
+                        (first.y + second.y) * 0.5F + inwardZ * 0.05F},
+                    {length, 0.18F, 0.10F},
+                    {0.20F, 0.22F, 0.22F}, yaw);
+                std::vector<std::pair<float, float>> spans{{0.0F, length}};
+                for (const DoorRenderData& door : doors) {
+                    const float relativeX = door.position.x - first.x;
+                    const float relativeZ = door.position.z - first.y;
+                    const float distance = std::abs(relativeX * inwardX
+                        + relativeZ * inwardZ);
+                    const float along = relativeX * directionX
+                        + relativeZ * directionZ;
+                    if (distance > 0.25F || along < -door.width
+                        || along > length + door.width) continue;
+                    const float openingStart = along - door.width * 0.5F - 0.15F;
+                    const float openingEnd = along + door.width * 0.5F + 0.15F;
+                    std::vector<std::pair<float, float>> remaining;
+                    for (const auto& [start, end] : spans) {
+                        if (openingEnd <= start || openingStart >= end) {
+                            remaining.emplace_back(start, end);
+                        } else {
+                            if (openingStart > start + 0.02F)
+                                remaining.emplace_back(start,
+                                    std::min(end, openingStart));
+                            if (openingEnd < end - 0.02F)
+                                remaining.emplace_back(
+                                    std::max(start, openingEnd), end);
+                        }
+                    }
+                    spans = std::move(remaining);
+                }
+                for (const auto& [start, end] : spans) {
+                    const float segmentLength = end - start;
+                    if (segmentLength < 0.10F) continue;
+                    const float middle = (start + end) * 0.5F;
+                    const float x = first.x + directionX * middle;
+                    const float z = first.y + directionZ * middle;
+                    const auto at = [&](const float y, const float inset) {
+                        return wkc::core::Vec3{x + inwardX * inset,
+                            floorY + y, z + inwardZ * inset};
+                    };
+                    addOriented(at(0.49F, 0.030F),
+                        {segmentLength, 0.98F, 0.060F},
+                        {0.18F, 0.20F, 0.21F}, yaw);
+                    addOriented(at(0.17F, 0.070F),
+                        {segmentLength, 0.25F, 0.080F},
+                        {0.12F, 0.14F, 0.15F}, yaw);
+                    addOriented(at(0.99F, 0.071F),
+                        {segmentLength, 0.055F, 0.052F},
+                        {0.11F, 0.44F, 0.50F}, yaw);
+                    addOriented(at(1.04F, 0.062F),
+                        {segmentLength, 0.023F, 0.045F},
+                        {0.30F, 0.32F, 0.31F}, yaw);
+                    for (float along = std::ceil(start / 2.0F) * 2.0F;
+                         along < end - 0.12F; along += 2.0F) {
+                        if (along < start + 0.12F) continue;
+                        const float boltX = first.x + directionX * along;
+                        const float boltZ = first.y + directionZ * along;
+                        addOriented({boltX + inwardX * 0.107F,
+                                floorY + 0.49F,
+                                boltZ + inwardZ * 0.107F},
+                            {0.024F, 0.77F, 0.028F},
+                            {0.10F, 0.12F, 0.13F}, yaw);
+                        for (const float y : {0.19F, 0.83F}) {
+                            addOriented({boltX + inwardX * 0.126F,
+                                    floorY + y,
+                                    boltZ + inwardZ * 0.126F},
+                                {0.070F, 0.070F, 0.025F},
+                                {0.53F, 0.55F, 0.53F}, yaw);
+                        }
+                    }
+                }
+                // Conduits stay on diagonal faces and above the player.
+                // Their condition is room-wide; no cable is baked into the tile.
+                const bool rerouted = *materials.centralHubWallCondition
+                    == CentralHubCondition::Rerouted;
+                const bool active = *materials.centralHubWallCondition
+                    == CentralHubCondition::Active;
+                if ((index & 1U) != 0U
+                    && ((active && (index == 1U || index == 5U))
+                        || (rerouted && index != 7U))) {
+                    const float cx = (first.x + second.x) * 0.5F;
+                    const float cz = (first.y + second.y) * 0.5F;
+                    const wkc::core::Vec3 center{
+                        cx + inwardX * 0.12F, floorY + 3.65F,
+                        cz + inwardZ * 0.12F};
+                    addOriented(center, {2.20F, 0.065F, 0.075F},
+                        {0.25F, 0.27F, 0.27F}, yaw);
+                    addOriented(center + wkc::core::Vec3{
+                            directionX * 0.62F, -0.50F,
+                            directionZ * 0.62F},
+                        {0.065F, 1.00F, 0.075F},
+                        {0.25F, 0.27F, 0.27F}, yaw);
+                    addOriented(center + wkc::core::Vec3{
+                            directionX * 0.62F, -0.83F,
+                            directionZ * 0.62F},
+                        {0.15F, 0.12F, 0.10F},
+                        {0.14F, 0.18F, 0.20F}, yaw);
+                    addOriented(center + wkc::core::Vec3{
+                            -directionX * 0.80F, -0.15F,
+                            -directionZ * 0.80F},
+                        {0.42F, 0.38F, 0.12F},
+                        {0.32F, 0.34F, 0.33F}, yaw);
+                }
+                if ((index & 1U) != 0U) {
+                    // Service ducts follow the diagonal ceiling perimeter.
+                    // They are well above the player and clear of cardinal
+                    // doors and the four central light fixtures.
+                    const wkc::core::Vec3 ductCenter{
+                        (first.x + second.x) * 0.5F + inwardX * 0.48F,
+                        floorY + 5.75F,
+                        (first.y + second.y) * 0.5F + inwardZ * 0.48F};
+                    addOriented(ductCenter,
+                        {length - 0.72F, 0.20F, 0.28F},
+                        {0.36F, 0.39F, 0.40F}, yaw,
+                        RoomMaterialChannel::StructuralColumn);
+                    addOriented(ductCenter + wkc::core::Vec3{0.0F, -0.113F, 0.0F},
+                        {length - 0.82F, 0.026F, 0.30F},
+                        {0.12F, 0.15F, 0.17F}, yaw);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        const wkc::core::Vec3 collarCenter = ductCenter
+                            + wkc::core::Vec3{
+                                directionX * side * (length * 0.30F), 0.0F,
+                                directionZ * side * (length * 0.30F)};
+                        addOriented(collarCenter, {0.10F, 0.25F, 0.34F},
+                            {0.16F, 0.19F, 0.20F}, yaw);
+                        addOriented(collarCenter
+                                + wkc::core::Vec3{0.0F, 0.175F, 0.0F},
+                            {0.055F, 0.16F, 0.075F},
+                            {0.24F, 0.27F, 0.28F}, yaw);
+                    }
+                    // Shallow wall-mounted service pieces occupy only the
+                    // diagonal faces. Cardinal doorways stay unobstructed.
+                    const float detailX = (first.x + second.x) * 0.5F;
+                    const float detailZ = (first.y + second.y) * 0.5F;
+                    const auto wallDetail = [&](const float along,
+                        const float wallY, const float inset) {
+                        return wkc::core::Vec3{
+                            detailX + directionX * along + inwardX * inset,
+                            floorY + wallY,
+                            detailZ + directionZ * along + inwardZ * inset};
+                    };
+                    const bool servicePanel = index == 1U || index == 5U;
+                    addOriented(wallDetail(0.0F, 2.18F, 0.055F),
+                        {1.46F, 1.30F, 0.065F},
+                        {0.09F, 0.12F, 0.14F}, yaw);
+                    addOriented(wallDetail(0.0F, 2.18F, 0.098F),
+                        {1.31F, 1.14F, 0.035F},
+                        servicePanel ? wkc::core::Vec3{0.31F, 0.35F, 0.36F}
+                                     : wkc::core::Vec3{0.12F, 0.16F, 0.18F},
+                        yaw, servicePanel
+                            ? RoomMaterialChannel::StructuralColumn
+                            : RoomMaterialChannel::SolidColor);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        for (const float boltY : {1.67F, 2.69F}) {
+                            addOriented(wallDetail(side * 0.63F,
+                                    boltY, 0.124F),
+                                {0.055F, 0.055F, 0.025F},
+                                {0.57F, 0.60F, 0.59F}, yaw);
+                        }
+                    }
+                    if (servicePanel) {
+                        addOriented(wallDetail(0.0F, 2.69F, 0.124F),
+                            {1.18F, 0.035F, 0.025F},
+                            {0.12F, 0.15F, 0.16F}, yaw);
+                        addOriented(wallDetail(0.47F, 2.15F, 0.126F),
+                            {0.11F, 0.39F, 0.032F},
+                            {0.08F, 0.11F, 0.12F}, yaw);
+                        addOriented(wallDetail(0.47F, 2.15F, 0.148F),
+                            {0.045F, 0.17F, 0.020F},
+                            {0.51F, 0.55F, 0.54F}, yaw);
+                        addOriented(wallDetail(-0.43F, 1.80F, 0.126F),
+                            {0.21F, 0.045F, 0.022F},
+                            {0.12F, 0.42F, 0.47F}, yaw);
+                    } else {
+                        for (int slat = 0; slat < 8; ++slat) {
+                            addOriented(wallDetail(0.0F,
+                                    1.74F + static_cast<float>(slat) * 0.12F,
+                                    0.133F),
+                                {1.17F, 0.052F, 0.030F},
+                                {0.35F, 0.39F, 0.40F}, yaw);
+                        }
+                        addOriented(wallDetail(0.0F, 1.64F, 0.125F),
+                            {1.16F, 0.033F, 0.025F},
+                            {0.10F, 0.37F, 0.43F}, yaw);
+                    }
+                }
+            }
+            // One maintenance hatch and one vent occupy opposite diagonal
+            // quadrants. Their highest parts sit under 4 cm above the floor; both
+            // remain walkable and avoid the four cardinal navigation routes.
+            const wkc::core::Vec3 hubCenter{
+                (renderedRoom.worldBounds.minimum.x
+                    + renderedRoom.worldBounds.maximum.x) * 0.5F,
+                floorY,
+                (renderedRoom.worldBounds.minimum.z
+                    + renderedRoom.worldBounds.maximum.z) * 0.5F};
+            // Navigation traces are localized geometry. The repeatable metal
+            // plate contains no cyan stripe that would recur on every tile.
+            for (const float direction : {-1.0F, 1.0F}) {
+                for (const bool alongX : {false, true}) {
+                    const wkc::core::Vec3 traceCenter = hubCenter
+                        + wkc::core::Vec3{
+                            alongX ? direction * 5.30F : 0.0F,
+                            0.012F,
+                            alongX ? 0.0F : direction * 5.30F};
+                    addOriented(traceCenter,
+                        alongX ? wkc::core::Vec3{7.40F, 0.016F, 0.075F}
+                               : wkc::core::Vec3{0.075F, 0.016F, 7.40F},
+                        {0.035F, 0.065F, 0.070F}, 0.0F);
+                    addOriented(traceCenter + wkc::core::Vec3{0.0F, 0.012F, 0.0F},
+                        alongX ? wkc::core::Vec3{7.40F, 0.008F, 0.024F}
+                               : wkc::core::Vec3{0.024F, 0.008F, 7.40F},
+                        {0.10F, 0.47F, 0.52F}, 0.0F);
+                }
+            }
+            const auto floorPosition = [&](const float x, const float z) {
+                return hubCenter + wkc::core::rotateQuarterTurns(
+                    {x, 0.0F, z}, renderedRoom.rotation);
+            };
+            const auto floorDetailOffset = [&](const float x, const float z) {
+                constexpr float diagonal = 0.70710678F;
+                return wkc::core::rotateQuarterTurns(
+                    {(x + z) * diagonal, 0.0F, (z - x) * diagonal},
+                    renderedRoom.rotation);
+            };
+            const float floorYaw = std::numbers::pi_v<float> * 0.25F
+                + static_cast<float>(renderedRoom.rotation)
+                    * std::numbers::pi_v<float> * 0.5F;
+            const wkc::core::Vec3 hatch = floorPosition(-4.4F, 4.0F);
+            addOriented(hatch + wkc::core::Vec3{0.0F, 0.008F, 0.0F},
+                {1.72F, 0.016F, 1.10F},
+                {0.11F, 0.14F, 0.16F}, floorYaw);
+            addOriented(hatch + wkc::core::Vec3{0.0F, 0.019F, 0.0F},
+                {1.56F, 0.012F, 0.94F},
+                {0.70F, 0.78F, 0.82F}, floorYaw,
+                RoomMaterialChannel::HubFloorDetail);
+            for (const float side : {-1.0F, 1.0F}) {
+                addOriented(hatch + wkc::core::Vec3{0.0F, 0.029F, 0.0F}
+                        + floorDetailOffset(side * 0.73F, 0.0F),
+                    {0.055F, 0.010F, 0.94F},
+                    {0.58F, 0.63F, 0.65F}, floorYaw,
+                    RoomMaterialChannel::HubFloorDetail);
+            }
+            for (const float x : {-0.66F, 0.66F}) {
+                for (const float z : {-0.39F, 0.39F}) {
+                    addOriented(hatch
+                            + wkc::core::Vec3{0.0F, 0.030F, 0.0F}
+                            + floorDetailOffset(x, z),
+                        {0.045F, 0.010F, 0.045F},
+                        {0.55F, 0.59F, 0.58F}, floorYaw);
+                }
+            }
+            addOriented(hatch + wkc::core::Vec3{0.0F, 0.029F, 0.0F}
+                    + floorDetailOffset(0.42F, 0.0F),
+                {0.25F, 0.012F, 0.055F},
+                {0.08F, 0.11F, 0.12F}, floorYaw);
+            const wkc::core::Vec3 vent = floorPosition(4.2F, -4.1F);
+            addOriented(vent + wkc::core::Vec3{0.0F, 0.008F, 0.0F},
+                {1.60F, 0.016F, 0.88F},
+                {0.035F, 0.050F, 0.060F}, floorYaw);
+            for (const float side : {-1.0F, 1.0F}) {
+                addOriented(vent + wkc::core::Vec3{0.0F, 0.026F, 0.0F}
+                        + floorDetailOffset(0.0F, side * 0.40F),
+                    {1.60F, 0.020F, 0.07F},
+                    {0.72F, 0.80F, 0.84F}, floorYaw,
+                    RoomMaterialChannel::HubFloorDetail);
+            }
+            for (int slat = -3; slat <= 3; ++slat) {
+                addOriented(vent + wkc::core::Vec3{0.0F, 0.024F, 0.0F}
+                        + floorDetailOffset(static_cast<float>(slat) * 0.19F, 0.0F),
+                    {0.075F, 0.018F, 0.76F},
+                    {0.74F, 0.82F, 0.86F}, floorYaw,
+                    RoomMaterialChannel::HubFloorDetail);
+            }
+            for (const wkc::core::Vec3 local
+                 : {wkc::core::Vec3{-3.0F, 0.0F, -3.8F},
+                    wkc::core::Vec3{3.0F, 0.0F, 3.8F}}) {
+                const wkc::core::Vec3 grille = floorPosition(local.x, local.z);
+                addOriented(grille + wkc::core::Vec3{0.0F, 5.978F, 0.0F},
+                    {1.46F, 0.044F, 0.88F},
+                    {0.54F, 0.59F, 0.61F}, floorYaw,
+                    RoomMaterialChannel::HubFloorDetail);
+                addOriented(grille + wkc::core::Vec3{0.0F, 5.946F, 0.0F},
+                    {1.34F, 0.014F, 0.76F},
+                    {0.025F, 0.040F, 0.050F}, floorYaw);
+                for (const float side : {-1.0F, 1.0F}) {
+                    addOriented(grille
+                            + wkc::core::Vec3{0.0F, 5.928F, 0.0F}
+                            + floorDetailOffset(0.0F, side * 0.40F),
+                        {1.46F, 0.035F, 0.060F},
+                        {0.74F, 0.78F, 0.80F}, floorYaw,
+                        RoomMaterialChannel::HubFloorDetail);
+                }
+                for (int slat = -3; slat <= 3; ++slat) {
+                    addOriented(grille
+                            + wkc::core::Vec3{0.0F, 5.930F, 0.0F}
+                            + floorDetailOffset(
+                                static_cast<float>(slat) * 0.19F, 0.0F),
+                        {0.050F, 0.036F, 0.70F},
+                        {0.76F, 0.81F, 0.83F}, floorYaw,
+                        RoomMaterialChannel::HubFloorDetail);
+                }
+            }
+            return;
+        }
+        const wkc::core::Vec3 span = renderedRoom.worldBounds.maximum
+            - renderedRoom.worldBounds.minimum;
+        const bool storageHall = materials.storageHallV1
+            && std::min(span.x, span.z) >= 17.5F
+            && std::max(span.x, span.z) >= 19.5F && span.y >= 5.8F;
+        const bool longCafeteria = materials.cafeteriaV1
+            && std::min(span.x, span.z) >= 17.5F
+            && std::max(span.x, span.z) >= 23.5F && span.y >= 5.8F;
+        if (!materials.securityV1 && !storageHall && !longCafeteria
+            && !materials.laboratoryPreviewV1) return;
+        const auto& bounds = renderedRoom.worldBounds;
+        const std::array<wkc::core::Vec2, 4> rectangularOutline{{
+            {bounds.minimum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.maximum.z},
+            {bounds.minimum.x, bounds.maximum.z},
+        }};
+        const std::span<const wkc::core::Vec2> outline
+            = renderedRoom.walkableOutline.empty()
+                ? std::span<const wkc::core::Vec2>{rectangularOutline}
+                : renderedRoom.walkableOutline;
+        if (outline.size() < 3U) return;
+        const wkc::core::Vec3 trimTint = storageHall
+            ? wkc::core::Vec3{0.30F, 0.35F, 0.30F}
+            : longCafeteria ? wkc::core::Vec3{0.46F, 0.43F, 0.39F}
+            : materials.laboratoryPreviewV1
+                ? wkc::core::Vec3{0.52F, 0.65F, 0.68F}
+                             : wkc::core::Vec3{0.40F, 0.46F, 0.48F};
+        const wkc::core::Vec3 capTint = storageHall
+            ? wkc::core::Vec3{0.43F, 0.40F, 0.29F}
+            : longCafeteria ? wkc::core::Vec3{0.53F, 0.43F, 0.39F}
+            : materials.laboratoryPreviewV1
+                ? wkc::core::Vec3{0.71F, 0.78F, 0.77F}
+                             : wkc::core::Vec3{0.47F, 0.46F, 0.40F};
+
+        float signedArea = 0.0F;
+        for (std::size_t index = 0; index < outline.size(); ++index) {
+            const auto& first = outline[index];
+            const auto& second = outline[(index + 1U) % outline.size()];
+            signedArea += first.x * second.y - second.x * first.y;
+        }
+        const float interiorSign = signedArea >= 0.0F ? 1.0F : -1.0F;
+        const float floorY = renderedRoom.worldBounds.minimum.y;
+        for (std::size_t index = 0; index < outline.size(); ++index) {
+            const auto& first = outline[index];
+            const auto& second = outline[(index + 1U) % outline.size()];
+            const float deltaX = second.x - first.x;
+            const float deltaZ = second.y - first.y;
+            const float length = std::sqrt(deltaX * deltaX + deltaZ * deltaZ);
+            if (length < 0.3F) continue;
+            const float directionX = deltaX / length;
+            const float directionZ = deltaZ / length;
+            const float inwardX = -directionZ * interiorSign;
+            const float inwardZ = directionX * interiorSign;
+            const bool alongX = std::abs(deltaX) >= std::abs(deltaZ);
+
+            const auto& previous = outline[
+                (index + outline.size() - 1U) % outline.size()];
+            const float previousX = first.x - previous.x;
+            const float previousZ = first.y - previous.y;
+            const float previousLength = std::hypot(previousX, previousZ);
+            if (previousLength > 0.3F) {
+                const float cornerX = first.x + 0.055F
+                    * (inwardX - previousZ / previousLength * interiorSign);
+                const float cornerZ = first.y + 0.055F
+                    * (inwardZ + previousX / previousLength * interiorSign);
+                // Adjacent trims sit on different inset axes. A small joint
+                // block closes their visible gap at convex and concave turns.
+                queueSurface(materials, {cornerX, floorY + 0.105F, cornerZ},
+                    {0.14F, 0.21F, 0.14F},
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    trimTint);
+                queueSurface(materials, {cornerX, floorY + 0.222F, cornerZ},
+                    {0.15F, 0.024F, 0.15F},
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    capTint);
+            }
+
+            std::vector<std::pair<float, float>> spans{{0.0F, length}};
+            for (const DoorRenderData& door : doors) {
+                const float relativeX = door.position.x - first.x;
+                const float relativeZ = door.position.z - first.y;
+                const float distanceFromWall = std::abs(
+                    relativeX * inwardX + relativeZ * inwardZ);
+                const float along = relativeX * directionX + relativeZ * directionZ;
+                if (distanceFromWall > 0.25F || along < -door.width
+                    || along > length + door.width) {
+                    continue;
+                }
+                const float openingStart = along - door.width * 0.5F - 0.12F;
+                const float openingEnd = along + door.width * 0.5F + 0.12F;
+                std::vector<std::pair<float, float>> remaining;
+                for (const auto& [start, end] : spans) {
+                    if (openingEnd <= start || openingStart >= end) {
+                        remaining.emplace_back(start, end);
+                        continue;
+                    }
+                    if (openingStart > start + 0.02F) {
+                        remaining.emplace_back(start, std::min(end, openingStart));
+                    }
+                    if (openingEnd < end - 0.02F) {
+                        remaining.emplace_back(std::max(start, openingEnd), end);
+                    }
+                }
+                spans = std::move(remaining);
+            }
+
+            for (const auto& [start, end] : spans) {
+                const float spanLength = end - start;
+                if (spanLength < 0.08F) continue;
+                const float middle = (start + end) * 0.5F;
+                const float x = first.x + directionX * middle + inwardX * 0.055F;
+                const float z = first.y + directionZ * middle + inwardZ * 0.055F;
+                const auto dimensions = [&](const float thickness,
+                    const float trimHeight) {
+                    return alongX
+                        ? wkc::core::Vec3{spanLength, trimHeight, thickness}
+                        : wkc::core::Vec3{thickness, trimHeight, spanLength};
+                };
+                // Textured physical trim and a narrow worn cap sit against the
+                // wall. Their shallow projection leaves the walkable area open.
+                queueSurface(materials, {x, floorY + 0.105F, z},
+                    dimensions(0.11F, 0.21F),
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    trimTint);
+                queueSurface(materials, {x + inwardX * 0.015F,
+                        floorY + 0.222F, z + inwardZ * 0.015F},
+                    dimensions(0.13F, 0.024F),
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    capTint);
+
+                const float firstFastener = std::ceil(start / 2.0F) * 2.0F;
+                for (float along = firstFastener; along < end - 0.12F;
+                     along += 2.0F) {
+                    if (along < start + 0.12F) continue;
+                    const float boltX = first.x + directionX * along
+                        + inwardX * 0.125F;
+                    const float boltZ = first.y + directionZ * along
+                        + inwardZ * 0.125F;
+                    queueSurface(materials,
+                        {boltX, floorY + 0.115F, boltZ},
+                        alongX ? wkc::core::Vec3{0.045F, 0.045F, 0.027F}
+                               : wkc::core::Vec3{0.027F, 0.045F, 0.045F},
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.63F, 0.66F, 0.61F});
+                }
+
+                // A few shallow service panels interrupt the wall field.
+                // Skip occupied stretches so consoles remain unobstructed.
+                if (materials.securityV1 && spanLength >= 4.0F) {
+                    const float along = start + spanLength
+                        * (index % 2U == 0U ? 0.38F : 0.62F);
+                    const float panelX = first.x + directionX * along;
+                    const float panelZ = first.y + directionZ * along;
+                    const bool blocked = std::any_of(
+                        renderedRoom.architectureParts.begin(),
+                        renderedRoom.architectureParts.end(),
+                        [&](const world::RoomArchitecturePart& part) {
+                            return part.bounds.minimum.y < floorY + 2.1F
+                                && part.bounds.maximum.y > floorY + 1.3F
+                                && part.bounds.minimum.x < panelX + 0.5F
+                                && part.bounds.maximum.x > panelX - 0.5F
+                                && part.bounds.minimum.z < panelZ + 0.5F
+                                && part.bounds.maximum.z > panelZ - 0.5F;
+                        });
+                    if (blocked) continue;
+                    const auto panelSize = [&](const float alongSpan,
+                        const float depth, const float panelHeight) {
+                        return alongX
+                            ? wkc::core::Vec3{alongSpan, panelHeight, depth}
+                            : wkc::core::Vec3{depth, panelHeight, alongSpan};
+                    };
+                    const wkc::core::Vec3 panelCenter{
+                        panelX + inwardX * 0.055F,
+                        floorY + 1.78F,
+                        panelZ + inwardZ * 0.055F};
+                    queueSurface(materials, panelCenter,
+                        panelSize(0.82F, 0.095F, 0.56F),
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.27F, 0.34F, 0.36F});
+                    queueSurface(materials,
+                        panelCenter + wkc::core::Vec3{
+                            inwardX * 0.055F, 0.0F, inwardZ * 0.055F},
+                        panelSize(0.66F, 0.012F, 0.40F),
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.37F, 0.43F, 0.42F});
+                    queueSurface(materials,
+                        panelCenter + wkc::core::Vec3{
+                            inwardX * 0.067F, -0.14F, inwardZ * 0.067F},
+                        panelSize(0.50F, 0.009F, 0.025F),
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.54F, 0.43F, 0.29F});
+                    for (const float side : {-1.0F, 1.0F}) {
+                        for (const float row : {-1.0F, 1.0F}) {
+                            queueSurface(materials,
+                                panelCenter + wkc::core::Vec3{
+                                    directionX * side * 0.34F
+                                        + inwardX * 0.07F,
+                                    row * 0.21F,
+                                    directionZ * side * 0.34F
+                                        + inwardZ * 0.07F},
+                                panelSize(0.035F, 0.018F, 0.035F),
+                                RoomMaterialChannel::StructuralColumn, 1.0F,
+                                {0.71F, 0.73F, 0.66F});
+                        }
+                    }
+                }
+            }
+        }
+    };
+    drawRoomWallTrim(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawRoomWallTrim(connectedRoom);
     }
 
     constexpr float corridorShellThickness = 0.12F;
@@ -2068,21 +4281,784 @@ bool GdpRenderer::render(
                              : std::min(wallStart.z, wallEnd.z)) / 4.0F, 0.0F});
             }
         }
+        for (const wkc::core::Aabb& column : world::makeCorridorWallColumns(
+                 corridor.points, corridor.width, corridor.height)) {
+            queueSurface(roomMaterials,
+                (column.minimum + column.maximum) * 0.5F,
+                column.maximum - column.minimum,
+                RoomMaterialChannel::StructuralColumn, 2.0F,
+                {0.34F, 0.36F, 0.38F});
+            surfaceCommands.back().castsShadow = true;
+        }
     }
 
+    struct GlassTestDome {
+        wkc::core::Vec3 center{};
+        float radius{0.0F};
+        float height{0.0F};
+    };
+    std::vector<GlassTestDome> glassTestDomes;
     const auto drawRoomParts = [&](const RoomRenderData& renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
-        for (const RoomPart& part : roomParts) {
-            const wkc::core::Vec3 position = renderedRoom.origin
-                + wkc::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
-            wkc::core::Vec3 scale = part.scale;
-            if (renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
-                || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
-                std::swap(scale.x, scale.z);
+        if (!renderedRoom.customArchitecture) {
+            for (const RoomPart& part : roomParts) {
+                const wkc::core::Vec3 position = renderedRoom.origin
+                    + wkc::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
+                wkc::core::Vec3 scale = part.scale;
+                if (renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
+                    || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
+                    std::swap(scale.x, scale.z);
+                }
+                queueSurface(roomMaterials, position, scale, part.material,
+                    part.uvScale, part.tint);
+                surfaceCommands.back().castsShadow = true;
             }
-            queueSurface(roomMaterials, position, scale, part.material,
-                part.uvScale, part.tint);
         }
+        for (const world::RoomArchitecturePart& part
+            : renderedRoom.architectureParts) {
+            architectureCastsShadow = part.solid || part.structuralColumn;
+            if (part.breakable) continue;
+            const wkc::core::Vec3 position
+                = (part.bounds.minimum + part.bounds.maximum) * 0.5F;
+            const wkc::core::Vec3 scale
+                = part.bounds.maximum - part.bounds.minimum;
+            if (part.decoration
+                == world::RoomDecorationPart::CentralHubRouteDisplay) {
+                // These four solid collision pads remain authored in the
+                // world; the screen geometry is drawn with the shaft below.
+                continue;
+            }
+            if (part.decoration
+                == world::RoomDecorationPart::CentralHubColumnShaft) {
+                const wkc::core::Vec3 base{
+                    position.x, renderedRoom.worldBounds.minimum.y, position.z};
+                queueSurface(roomMaterials, position, scale,
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    {0.96F, 0.93F, 0.88F});
+                surfaceCommands.back().mesh = &centralHubColumnShaft_;
+                surfaceCommands.back().style.hubColumnPlate = true;
+                const auto piece = [&](const wkc::core::Vec3 offset,
+                    const wkc::core::Vec3 size, const float angle,
+                    const wkc::core::Vec3 tint, const float emission = 0.0F,
+                    const RoomMaterialChannel channel
+                        = RoomMaterialChannel::SolidColor) {
+                    queueSurface(roomMaterials, base, size, channel, 1.0F, tint);
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(base)
+                            * wkc::core::rotationYMatrix(angle)
+                            * wkc::core::translationMatrix(offset)
+                            * wkc::core::scaleMatrix(size);
+                    surfaceCommands.back().style.emissiveStrength = emission;
+                };
+                const auto angledPiece = [&](const wkc::core::Vec3 offset,
+                    const wkc::core::Vec3 size, const float angle,
+                    const float roll, const wkc::core::Vec3 tint,
+                    const float emission) {
+                    piece(offset, size, angle, tint, emission);
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(base)
+                            * wkc::core::rotationYMatrix(angle)
+                            * wkc::core::translationMatrix(offset)
+                            * wkc::core::rotationZMatrix(roll)
+                            * wkc::core::scaleMatrix(size);
+                };
+                constexpr float pi = std::numbers::pi_v<float>;
+                const wkc::core::Vec3 seam{0.13F, 0.15F, 0.16F};
+                const wkc::core::Vec3 bolt{0.65F, 0.63F, 0.56F};
+                const wkc::core::Vec3 cyan{0.10F, 0.78F, 0.86F};
+                for (int face = 0; face < 8; ++face) {
+                    const float angle = static_cast<float>(face) * pi / 4.0F;
+                    for (const float level : {0.35F, 1.35F, 3.35F, 5.35F}) {
+                        piece({0.0F, level, 1.212F},
+                            {0.98F, 0.025F, 0.035F}, angle, seam);
+                    }
+                    for (const float x : {-0.43F, 0.43F}) {
+                        for (const float level : {0.70F, 1.55F, 3.75F, 5.04F}) {
+                            piece({x, level, 1.226F},
+                                {0.055F, 0.055F, 0.028F}, angle, bolt);
+                        }
+                    }
+                    if ((face & 1) != 0) {
+                        // Four diagonal bevels carry integrated light slots.
+                        piece({0.0F, 2.70F, 1.222F},
+                            {0.115F, 3.42F, 0.055F}, angle, seam);
+                        piece({0.0F, 2.70F, 1.256F},
+                            {0.070F, 3.22F, 0.025F}, angle,
+                            {0.92F, 0.81F, 0.65F}, 1.15F);
+                    }
+                }
+                for (int face = 0; face < 4; ++face) {
+                    const float angle = static_cast<float>(face) * pi / 2.0F;
+                    piece({0.0F, 2.48F, 1.235F},
+                        {0.87F, 1.25F, 0.075F}, angle, seam);
+                    piece({0.0F, 2.48F, 1.280F},
+                        {0.73F, 1.10F, 0.020F}, angle,
+                        {0.025F, 0.065F, 0.075F});
+                    piece({0.0F, 2.48F, 1.298F},
+                        {0.63F, 0.98F, 0.008F}, angle,
+                        {0.010F, 0.045F, 0.055F});
+                    for (const float x : {-0.39F, 0.39F}) {
+                        for (const float y : {1.92F, 3.04F}) {
+                            piece({x, y, 1.288F},
+                                {0.043F, 0.043F, 0.026F}, angle, bolt);
+                        }
+                    }
+                    const bool horizontal = face == 1 || face == 3;
+                    piece({0.0F, 2.37F, 1.306F},
+                        horizontal
+                            ? wkc::core::Vec3{0.43F, 0.018F, 0.012F}
+                            : wkc::core::Vec3{0.018F, 0.43F, 0.012F},
+                        angle, cyan, 0.75F);
+                    for (int node = -1; node <= 1; ++node) {
+                        piece({horizontal ? static_cast<float>(node) * 0.20F : 0.0F,
+                                horizontal ? 2.37F
+                                    : 2.37F + static_cast<float>(node) * 0.20F,
+                                1.317F},
+                            {0.055F, 0.055F, 0.014F}, angle, cyan, 0.90F);
+                    }
+                    if (horizontal) {
+                        const float direction = face == 1 ? 1.0F : -1.0F;
+                        piece({direction * 0.04F, 2.78F, 1.308F},
+                            {0.28F, 0.044F, 0.016F}, angle, cyan, 0.95F);
+                        for (const float side : {-1.0F, 1.0F}) {
+                            angledPiece({direction * 0.23F,
+                                2.78F + side * 0.075F, 1.308F},
+                                {0.16F, 0.035F, 0.016F}, angle,
+                                direction * side * pi / 4.0F,
+                                cyan, 0.95F);
+                        }
+                    } else {
+                        piece({0.0F, 2.78F, 1.308F},
+                            {0.044F, 0.22F, 0.016F}, angle, cyan, 0.95F);
+                        for (const float side : {-1.0F, 1.0F}) {
+                            angledPiece({side * 0.066F, 2.89F, 1.308F},
+                                {0.16F, 0.035F, 0.016F}, angle,
+                                -side * pi / 4.0F, cyan, 0.95F);
+                        }
+                    }
+                }
+                // Two power leads terminate inside the square plinth, so
+                // the visible equipment never widens its collision footprint.
+                piece({0.0F, 0.78F, 1.264F},
+                    {0.55F, 0.29F, 0.15F}, 0.0F, seam);
+                for (const float x : {-0.16F, 0.16F}) {
+                    piece({x, 0.47F, 1.37F},
+                        {0.075F, 0.45F, 0.075F}, 0.0F,
+                        {0.14F, 0.16F, 0.17F});
+                    piece({x, 0.80F, 1.351F},
+                        {0.12F, 0.12F, 0.08F}, 0.0F, bolt);
+                }
+                continue;
+            }
+            if (part.decoration
+                == world::RoomDecorationPart::LaboratoryColumnIndicator) {
+                queueSurface(roomMaterials, position, scale,
+                    RoomMaterialChannel::SolidColor, 1.0F, part.tint);
+                surfaceCommands.back().style.emissiveStrength = 1.6F;
+                continue;
+            }
+            if (part.decoration == world::RoomDecorationPart::GlassTestPlanter
+                || part.decoration
+                    == world::RoomDecorationPart::SmallGlassTestPlanter) {
+                const bool small = part.decoration
+                    == world::RoomDecorationPart::SmallGlassTestPlanter;
+                const float top = part.bounds.maximum.y;
+                queueSurface(roomMaterials, position, scale,
+                    RoomMaterialChannel::LaboratoryFurniture, 1.0F,
+                    {0.55F, 0.69F, 0.70F});
+                queueSurface(roomMaterials,
+                    {position.x, top + 0.007F, position.z},
+                    {scale.x - (small ? 0.08F : 0.12F), 0.014F,
+                        scale.z - (small ? 0.08F : 0.12F)},
+                    RoomMaterialChannel::SolidColor, 1.0F,
+                    {0.045F, 0.075F, 0.070F});
+                for (int leaf = 0; leaf < 7; ++leaf) {
+                    const float angle = static_cast<float>(leaf)
+                        * (2.0F * std::numbers::pi_v<float> / 7.0F);
+                    const wkc::core::Vec3 leafBase{
+                        position.x + std::cos(angle) * (small ? 0.01F : 0.025F),
+                        top + 0.01F,
+                        position.z + std::sin(angle) * (small ? 0.01F : 0.025F)};
+                    const wkc::core::Vec3 leafScale = small
+                        ? wkc::core::Vec3{0.20F,
+                            0.17F + 0.015F * static_cast<float>(leaf % 3), 0.20F}
+                        : wkc::core::Vec3{0.56F,
+                            0.44F + 0.035F * static_cast<float>(leaf % 3), 0.56F};
+                    queueSurface(roomMaterials, leafBase, leafScale,
+                        RoomMaterialChannel::SolidColor, 1.0F,
+                        leaf % 2 == 0
+                            ? wkc::core::Vec3{0.24F, 0.52F, 0.38F}
+                            : wkc::core::Vec3{0.16F, 0.39F, 0.31F});
+                    surfaceCommands.back().mesh = &planterLeafMesh_;
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(leafBase)
+                        * wkc::core::rotationYMatrix(angle)
+                        * wkc::core::scaleMatrix(leafScale);
+                }
+                // The rim and crown make the transparent shell readable even
+                // with low graphics settings and without a bright room light.
+                queueSurface(roomMaterials,
+                    {position.x, top + (small ? 0.012F : 0.025F), position.z},
+                    small ? wkc::core::Vec3{0.38F, 0.025F, 0.38F}
+                          : wkc::core::Vec3{1.04F, 0.045F, 1.04F},
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    {0.57F, 0.72F, 0.75F});
+                surfaceCommands.back().mesh = &grenadeRing_;
+                queueSurface(roomMaterials,
+                    {position.x, top + (small ? 0.255F : 0.60F), position.z},
+                    small ? wkc::core::Vec3{0.07F, 0.035F, 0.07F}
+                          : wkc::core::Vec3{0.14F, 0.055F, 0.14F},
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    {0.69F, 0.79F, 0.79F});
+                glassTestDomes.push_back({
+                    {position.x, top + (small ? 0.012F : 0.025F), position.z},
+                    small ? 0.20F : 0.54F,
+                    small ? 0.24F : 0.57F});
+                continue;
+            }
+            if (part.decoration == world::RoomDecorationPart::Planter
+                || part.decoration == world::RoomDecorationPart::BroadleafPlanter) {
+                const bool broadleaf = part.decoration
+                    == world::RoomDecorationPart::BroadleafPlanter;
+                const float top = part.bounds.maximum.y;
+                queueSurface(roomMaterials, position, scale,
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    broadleaf ? wkc::core::Vec3{0.50F, 0.37F, 0.33F}
+                              : wkc::core::Vec3{0.38F, 0.43F, 0.43F});
+                queueSurface(roomMaterials,
+                    {position.x, top + 0.012F, position.z},
+                    {scale.x - 0.11F, 0.025F, scale.z - 0.11F},
+                    RoomMaterialChannel::SolidColor, 1.0F,
+                    {0.065F, 0.085F, 0.065F});
+                for (const float side : {-1.0F, 1.0F}) {
+                    queueSurface(roomMaterials,
+                        {position.x + side * (scale.x * 0.5F - 0.035F),
+                            top, position.z},
+                        {0.07F, 0.075F, scale.z},
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.52F, 0.56F, 0.53F});
+                    queueSurface(roomMaterials,
+                        {position.x, top,
+                            position.z + side * (scale.z * 0.5F - 0.035F)},
+                        {scale.x, 0.075F, 0.07F},
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.52F, 0.56F, 0.53F});
+                }
+                const int leafCount = broadleaf ? 7 : 9;
+                for (int leaf = 0; leaf < leafCount; ++leaf) {
+                    const float angle = static_cast<float>(leaf)
+                        * (2.0F * std::numbers::pi_v<float>
+                            / static_cast<float>(leafCount));
+                    const float leafHeight = broadleaf
+                        ? 0.48F + 0.07F * static_cast<float>(leaf % 3)
+                        : leaf == 8 ? 0.92F
+                                    : 0.76F + 0.10F * static_cast<float>(leaf % 3);
+                    const float leafSpread = broadleaf
+                        ? 1.00F + 0.12F * static_cast<float>(leaf % 2)
+                        : leaf == 8 ? 0.55F
+                                    : 0.78F + 0.08F * static_cast<float>(leaf % 2);
+                    const wkc::core::Vec3 leafBase{
+                        position.x + std::cos(angle) * 0.055F,
+                        top + 0.005F,
+                        position.z + std::sin(angle) * 0.055F};
+                    const wkc::core::Vec3 leafScale{
+                        leafSpread, leafHeight, leafSpread};
+                    const wkc::core::Vec3 foliageTint = broadleaf
+                        ? (leaf % 2 == 0
+                            ? wkc::core::Vec3{0.30F, 0.46F, 0.27F}
+                            : wkc::core::Vec3{0.22F, 0.36F, 0.21F})
+                        : (leaf % 2 == 0
+                            ? wkc::core::Vec3{0.26F, 0.47F, 0.25F}
+                            : wkc::core::Vec3{0.18F, 0.35F, 0.23F});
+                    queueSurface(roomMaterials, leafBase, leafScale,
+                        RoomMaterialChannel::SolidColor, 1.0F, foliageTint);
+                    surfaceCommands.back().mesh = &planterLeafMesh_;
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(leafBase)
+                        * wkc::core::rotationYMatrix(angle)
+                        * wkc::core::scaleMatrix(leafScale);
+                }
+                continue;
+            }
+            if (part.decoration == world::RoomDecorationPart::CeilingDuct) {
+                const bool alongX = scale.x >= scale.z;
+                const float length = alongX ? scale.x : scale.z;
+                const float ductWidth = alongX ? scale.z : scale.x;
+                queueSurface(roomMaterials, position, scale,
+                    RoomMaterialChannel::StructuralColumn, 1.0F,
+                    {0.39F, 0.45F, 0.47F});
+                const float hangerGap = renderedRoom.worldBounds.maximum.y
+                    - part.bounds.maximum.y;
+                if (hangerGap > 0.08F) {
+                    for (float offset = 2.0F; offset < length - 1.0F;
+                         offset += 4.0F) {
+                        const float along = -length * 0.5F + offset;
+                        for (const float side : {-1.0F, 1.0F}) {
+                            const wkc::core::Vec3 hangerCenter = alongX
+                                ? wkc::core::Vec3{
+                                    position.x + along,
+                                    part.bounds.maximum.y + hangerGap * 0.5F,
+                                    position.z + side * ductWidth * 0.29F}
+                                : wkc::core::Vec3{
+                                    position.x + side * ductWidth * 0.29F,
+                                    part.bounds.maximum.y + hangerGap * 0.5F,
+                                    position.z + along};
+                            queueSurface(roomMaterials, hangerCenter,
+                                {0.035F, hangerGap, 0.035F},
+                                RoomMaterialChannel::SolidColor, 1.0F,
+                                {0.28F, 0.31F, 0.31F});
+                            queueSurface(roomMaterials,
+                                {hangerCenter.x,
+                                    renderedRoom.worldBounds.maximum.y - 0.016F,
+                                    hangerCenter.z},
+                                {0.15F, 0.032F, 0.15F},
+                                RoomMaterialChannel::StructuralColumn, 1.0F,
+                                {0.48F, 0.52F, 0.50F});
+                        }
+                    }
+                }
+                for (float offset = 1.5F; offset < length - 0.6F;
+                     offset += 2.4F) {
+                    const float along = -length * 0.5F + offset;
+                    const wkc::core::Vec3 bandCenter = alongX
+                        ? wkc::core::Vec3{position.x + along,
+                            position.y, position.z}
+                        : wkc::core::Vec3{position.x,
+                            position.y, position.z + along};
+                    queueSurface(roomMaterials, bandCenter,
+                        alongX
+                            ? wkc::core::Vec3{0.095F, scale.y + 0.04F,
+                                ductWidth + 0.05F}
+                            : wkc::core::Vec3{ductWidth + 0.05F,
+                                scale.y + 0.04F, 0.095F},
+                        RoomMaterialChannel::StructuralColumn, 1.0F,
+                        {0.56F, 0.59F, 0.56F});
+                }
+                for (float offset = 2.8F; offset < length - 1.0F;
+                     offset += 4.3F) {
+                    const float along = -length * 0.5F + offset;
+                    const wkc::core::Vec3 ventCenter = alongX
+                        ? wkc::core::Vec3{position.x + along,
+                            part.bounds.minimum.y - 0.007F, position.z}
+                        : wkc::core::Vec3{position.x,
+                            part.bounds.minimum.y - 0.007F,
+                            position.z + along};
+                    queueSurface(roomMaterials, ventCenter,
+                        alongX
+                            ? wkc::core::Vec3{1.10F, 0.016F, ductWidth * 0.64F}
+                            : wkc::core::Vec3{ductWidth * 0.64F, 0.016F, 1.10F},
+                        RoomMaterialChannel::SolidColor, 1.0F,
+                        {0.035F, 0.045F, 0.050F});
+                    for (int slat = -2; slat <= 2; ++slat) {
+                        const float slatOffset = static_cast<float>(slat) * 0.17F;
+                        queueSurface(roomMaterials,
+                            ventCenter + (alongX
+                                ? wkc::core::Vec3{slatOffset,
+                                    -0.012F, 0.0F}
+                                : wkc::core::Vec3{0.0F,
+                                    -0.012F, slatOffset}),
+                            alongX
+                                ? wkc::core::Vec3{0.06F, 0.022F, ductWidth * 0.64F}
+                                : wkc::core::Vec3{ductWidth * 0.64F,
+                                    0.022F, 0.06F},
+                            RoomMaterialChannel::StructuralColumn, 1.0F,
+                            {0.59F, 0.62F, 0.61F});
+                    }
+                }
+                continue;
+            }
+            const bool texturedRack = part.storageRack
+                && roomMaterials.storageRackCondition.has_value();
+            const bool texturedFurniture = roomMaterials.cafeteriaV1
+                && part.cafeteriaFurniturePart
+                    != world::CafeteriaFurniturePart::None;
+            const bool securityFurniture = roomMaterials.securityV1
+                && part.securityFurniturePart
+                    != world::SecurityFurniturePart::None;
+            const bool laboratoryFurniture = roomMaterials.laboratoryPreviewV1
+                && part.laboratoryFurniturePart
+                    != world::LaboratoryFurniturePart::None;
+            const float securityTone = roomMaterials.columnCondition == 0U
+                ? 1.18F : roomMaterials.columnCondition == 2U ? 0.94F : 1.05F;
+            queueSurface(roomMaterials, position, scale,
+                part.structuralColumn ? RoomMaterialChannel::StructuralColumn
+                    : texturedRack ? RoomMaterialChannel::StorageRack
+                    : texturedFurniture ? RoomMaterialChannel::CafeteriaFurniture
+                    : laboratoryFurniture
+                        ? (part.laboratoryFurniturePart
+                                == world::LaboratoryFurniturePart::StatusStrip
+                            ? RoomMaterialChannel::SolidColor
+                            : RoomMaterialChannel::LaboratoryFurniture)
+                    : securityFurniture ? RoomMaterialChannel::SecurityFurniture
+                    : RoomMaterialChannel::Generic,
+                texturedRack ? 3.0F : 2.0F,
+                texturedRack
+                    ? (part.storageRackPart
+                            == world::StorageRackPart::Upright
+                        ? wkc::core::Vec3{0.88F, 1.16F, 1.05F}
+                        : wkc::core::Vec3{1.35F, 1.35F, 1.35F})
+                    : texturedFurniture ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+                    : securityFurniture ? wkc::core::Vec3{
+                        securityTone, securityTone, securityTone}
+                    : part.tint,
+                {}, {}, texturedRack
+                    ? static_cast<std::uint8_t>(
+                        *roomMaterials.storageRackCondition)
+                    : texturedFurniture ? roomMaterials.cafeteriaCondition : 0U,
+                texturedRack ? part.storageRackPart
+                    : world::StorageRackPart::None,
+                texturedFurniture ? part.cafeteriaFurniturePart
+                    : world::CafeteriaFurniturePart::None);
+            if (laboratoryFurniture) {
+                const wkc::core::Vec3 min = part.bounds.minimum;
+                const wkc::core::Vec3 max = part.bounds.maximum;
+                const auto solid = [&](const wkc::core::Vec3 center,
+                    const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
+                    queueSurface(roomMaterials, center, size,
+                        RoomMaterialChannel::SolidColor, 1.0F, tint);
+                };
+                const auto lit = [&](const wkc::core::Vec3 center,
+                    const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
+                    solid(center, size, tint);
+                    surfaceCommands.back().style.emissiveStrength = 1.3F;
+                };
+                const wkc::core::Vec3 navy{0.12F, 0.20F, 0.26F};
+                const wkc::core::Vec3 brushed{0.48F, 0.56F, 0.59F};
+                const wkc::core::Vec3 pale{0.72F, 0.78F, 0.79F};
+                const float facing = position.x > 0.0F ? -1.0F : 1.0F;
+                const float faceX = facing < 0.0F ? min.x : max.x;
+                switch (part.laboratoryFurniturePart) {
+                case world::LaboratoryFurniturePart::BenchBase: {
+                    for (int door = 0; door < 2; ++door) {
+                        const float length = (scale.z - 0.18F) * 0.5F;
+                        const float doorZ = min.z + 0.09F
+                            + (static_cast<float>(door) + 0.5F) * length;
+                        solid({faceX + facing * 0.014F, 0.43F, doorZ},
+                            {0.024F, 0.68F, length - 0.035F}, navy);
+                        solid({faceX + facing * 0.030F, 0.43F, doorZ},
+                            {0.025F, 0.62F, length - 0.10F}, pale);
+                        solid({faceX + facing * 0.054F, 0.44F,
+                                doorZ + length * 0.25F},
+                            {0.024F, 0.17F, 0.035F}, brushed);
+                        for (const float y : {0.18F, 0.68F}) {
+                            solid({faceX + facing * 0.053F, y,
+                                    doorZ - length * 0.35F},
+                                {0.018F, 0.026F, 0.026F}, brushed);
+                        }
+                    }
+                    break;
+                }
+                case world::LaboratoryFurniturePart::BenchTop:
+                    for (const float x : {min.x + 0.025F, max.x - 0.025F}) {
+                        solid({x, max.y + 0.007F, position.z},
+                            {0.035F, 0.025F, scale.z}, brushed);
+                    }
+                    for (const float z : {min.z + 0.025F, max.z - 0.025F}) {
+                        solid({position.x, max.y + 0.007F, z},
+                            {scale.x - 0.09F, 0.025F, 0.035F}, brushed);
+                    }
+                    for (const float x : {min.x + 0.10F, max.x - 0.10F}) {
+                        for (const float z : {min.z + 0.11F, max.z - 0.11F}) {
+                            solid({x, max.y + 0.025F, z},
+                                {0.040F, 0.014F, 0.040F}, navy);
+                            solid({x, max.y + 0.036F, z},
+                                {0.020F, 0.008F, 0.020F}, brushed);
+                        }
+                    }
+                    break;
+                case world::LaboratoryFurniturePart::Instrument:
+                    solid({faceX + facing * 0.015F, 1.33F, position.z},
+                        {0.025F, 0.28F, scale.z - 0.22F}, navy);
+                    solid({faceX + facing * 0.032F, 1.34F, position.z},
+                        {0.020F, 0.21F, scale.z - 0.33F},
+                        {0.08F, 0.21F, 0.26F});
+                    for (int line = 0; line < 3; ++line) {
+                        lit({faceX + facing * 0.046F,
+                                1.28F + static_cast<float>(line) * 0.055F,
+                                position.z - 0.35F},
+                            {0.012F, 0.012F, 0.30F},
+                            {0.19F, 0.72F, 0.75F});
+                    }
+                    for (int vent = 0; vent < 4; ++vent) {
+                        solid({faceX + facing * 0.033F, 1.06F,
+                                position.z + 0.20F
+                                    + static_cast<float>(vent) * 0.10F},
+                            {0.018F, 0.030F, 0.035F}, navy);
+                    }
+                    break;
+                case world::LaboratoryFurniturePart::StatusStrip:
+                    surfaceCommands.back().style.emissiveStrength = 1.1F;
+                    break;
+                case world::LaboratoryFurniturePart::ContainmentBase:
+                    for (int vent = 0; vent < 6; ++vent) {
+                        solid({faceX + facing * 0.022F, 0.13F,
+                                min.z + 0.35F
+                                    + static_cast<float>(vent) * 0.39F},
+                            {0.020F, 0.045F, 0.15F}, navy);
+                    }
+                    break;
+                case world::LaboratoryFurniturePart::ContainmentBody:
+                    for (const float z : {min.z + 0.06F, max.z - 0.06F}) {
+                        solid({faceX + facing * 0.030F, position.y, z},
+                            {0.065F, scale.y, 0.10F}, brushed);
+                    }
+                    solid({faceX + facing * 0.030F, max.y - 0.06F, position.z},
+                        {0.065F, 0.10F, scale.z - 0.22F}, navy);
+                    break;
+                case world::LaboratoryFurniturePart::ContainmentPanel:
+                    solid({faceX + facing * 0.017F, position.y, position.z},
+                        {0.028F, scale.y - 0.06F, scale.z - 0.06F}, navy);
+                    solid({faceX + facing * 0.034F, position.y, position.z},
+                        {0.025F, scale.y - 0.17F, scale.z - 0.18F},
+                        {0.24F, 0.47F, 0.54F});
+                    for (const float z : {min.z + 0.04F, max.z - 0.04F}) {
+                        solid({faceX + facing * 0.052F, position.y, z},
+                            {0.030F, scale.y, 0.055F}, brushed);
+                        for (const float y : {min.y + 0.08F, max.y - 0.08F}) {
+                            solid({faceX + facing * 0.073F, y, z},
+                                {0.018F, 0.036F, 0.036F}, navy);
+                            solid({faceX + facing * 0.085F, y, z},
+                                {0.009F, 0.018F, 0.018F}, brushed);
+                        }
+                    }
+                    lit({faceX + facing * 0.051F, max.y - 0.08F, position.z},
+                        {0.025F, 0.025F, 0.30F},
+                        {0.18F, 0.78F, 0.72F});
+                    break;
+                case world::LaboratoryFurniturePart::CeilingRib:
+                case world::LaboratoryFurniturePart::None:
+                    break;
+                }
+            }
+            if (!securityFurniture) continue;
+
+            // Architecture bounds are already in world space. Build furniture
+            // details in the room's local frame, then rotate them with the
+            // room so their faces remain attached to the collision boxes.
+            const wkc::core::Vec3 roomOrigin{
+                (renderedRoom.worldBounds.minimum.x
+                    + renderedRoom.worldBounds.maximum.x) * 0.5F,
+                0.0F,
+                (renderedRoom.worldBounds.minimum.z
+                    + renderedRoom.worldBounds.maximum.z) * 0.5F};
+            const auto inverseRotation = static_cast<wkc::core::QuarterTurn>(
+                (4 - static_cast<int>(renderedRoom.rotation)) % 4);
+            const auto toWorld = [&](const wkc::core::Vec3 local) {
+                return roomOrigin + wkc::core::rotateQuarterTurns(
+                    local, renderedRoom.rotation);
+            };
+            const auto rotateSize = [&](wkc::core::Vec3 size) {
+                if (renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
+                    || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
+                    std::swap(size.x, size.z);
+                }
+                return size;
+            };
+            const wkc::core::Vec3 localPosition
+                = wkc::core::rotateQuarterTurns(position - roomOrigin,
+                    inverseRotation);
+            const wkc::core::Vec3 localScale = rotateSize(scale);
+            const wkc::core::Vec3 localMin = localPosition - localScale * 0.5F;
+            const wkc::core::Vec3 localMax = localPosition + localScale * 0.5F;
+            const auto metal = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
+                queueSurface(roomMaterials, toWorld(center), rotateSize(size),
+                    RoomMaterialChannel::SecurityFurniture, 1.0F, tint);
+            };
+            const auto solid = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
+                queueSurface(roomMaterials, toWorld(center), rotateSize(size),
+                    RoomMaterialChannel::SolidColor, 1.0F, tint);
+            };
+            const SecurityIndicatorVisual indicator = sampleSecurityIndicator(
+                renderedRoom.securityIndicatorPhase,
+                renderedRoom.securityIndicatorSeconds);
+            const auto light = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
+                solid(center, size, tint);
+                surfaceCommands.back().style.emissiveStrength
+                    = indicator.emissiveStrength;
+            };
+            const wkc::core::Vec3 edge{0.57F, 0.60F, 0.59F};
+            const wkc::core::Vec3 gasket{0.035F, 0.043F, 0.047F};
+            const auto bolt = [&](const wkc::core::Vec3 center,
+                const bool onXFace) {
+                solid(center, onXFace
+                    ? wkc::core::Vec3{0.025F, 0.055F, 0.055F}
+                    : wkc::core::Vec3{0.055F, 0.055F, 0.025F}, edge);
+            };
+            const wkc::core::Vec3& min = localMin;
+            const wkc::core::Vec3& max = localMax;
+            switch (part.securityFurniturePart) {
+            case world::SecurityFurniturePart::Cabinet: {
+                const float faceX = localPosition.x < 0.0F
+                    ? max.x + 0.022F : min.x - 0.022F;
+                metal({localPosition.x, max.y - 0.045F, localPosition.z},
+                    {localScale.x + 0.08F, 0.09F, localScale.z + 0.08F},
+                    {1.14F, 1.12F, 1.08F});
+                solid({faceX, 0.12F, localPosition.z},
+                    {0.045F, 0.18F, localScale.z - 0.08F}, gasket);
+                for (int bay = 0; bay < 3; ++bay) {
+                    const float z = min.z + 0.46F
+                        + static_cast<float>(bay) * 0.83F;
+                    solid({faceX, 1.15F, z}, {0.05F, 1.78F, 0.75F}, gasket);
+                    metal({faceX + (localPosition.x < 0.0F ? 0.027F : -0.027F),
+                            1.15F, z},
+                        {0.045F, 1.68F, 0.67F},
+                        {securityTone * 1.08F, securityTone * 1.08F,
+                            securityTone * 1.08F});
+                    for (const float y : {0.28F, 1.94F}) {
+                        for (const float offset : {-0.28F, 0.28F}) {
+                            bolt({faceX + (localPosition.x < 0.0F ? 0.058F : -0.058F),
+                                y, z + offset}, true);
+                        }
+                    }
+                    for (int slat = 0; slat < 4; ++slat) {
+                        solid({faceX + (localPosition.x < 0.0F ? 0.057F : -0.057F),
+                                0.42F + static_cast<float>(slat) * 0.065F, z},
+                            {0.015F, 0.023F, 0.39F}, gasket);
+                    }
+                    metal({faceX + (localPosition.x < 0.0F ? 0.085F : -0.085F),
+                            1.10F, z + 0.21F},
+                        {0.08F, 0.34F, 0.055F}, edge);
+                }
+                light({faceX + (localPosition.x < 0.0F ? 0.060F : -0.060F),
+                        2.05F, localPosition.z},
+                    {0.020F, 0.035F, 0.55F}, indicator.color);
+                break;
+            }
+            case world::SecurityFurniturePart::ConsoleBase: {
+                const float faceZ = min.z - 0.025F;
+                metal({localPosition.x, 0.10F, localPosition.z},
+                    {localScale.x + 0.08F, 0.20F, localScale.z + 0.08F},
+                    {0.75F, 0.77F, 0.77F});
+                for (int bay = 0; bay < 4; ++bay) {
+                    const float x = min.x + 0.53F
+                        + static_cast<float>(bay) * 1.02F;
+                    solid({x, 0.51F, faceZ},
+                        {0.94F, 0.63F, 0.035F}, gasket);
+                    metal({x, 0.51F, faceZ - 0.027F},
+                        {0.86F, 0.55F, 0.030F},
+                        {securityTone, securityTone, securityTone});
+                    solid({x + 0.30F, 0.51F, faceZ - 0.048F},
+                        {0.035F, 0.16F, 0.018F}, edge);
+                    for (const float dx : {-0.40F, 0.40F}) {
+                        bolt({x + dx, 0.23F, faceZ - 0.046F}, false);
+                        bolt({x + dx, 0.79F, faceZ - 0.046F}, false);
+                    }
+                }
+                break;
+            }
+            case world::SecurityFurniturePart::ConsoleTop: {
+                metal({localPosition.x, max.y + 0.014F, localPosition.z},
+                    {localScale.x + 0.12F, 0.028F, localScale.z + 0.06F},
+                    {1.12F, 1.10F, 1.05F});
+                for (int bank = 0; bank < 3; ++bank) {
+                    const float x = min.x + 0.78F
+                        + static_cast<float>(bank) * 1.29F;
+                    solid({x, max.y + 0.032F, min.z + 0.34F},
+                        {0.96F, 0.020F, 0.42F}, gasket);
+                    for (int button = 0; button < 4; ++button) {
+                        const float bx = x - 0.33F
+                            + static_cast<float>(button) * 0.22F;
+                        solid({bx, max.y + 0.050F, min.z + 0.23F},
+                            {0.10F, 0.025F, 0.075F}, edge);
+                        if (button % 2 == bank % 2) {
+                            light({bx, max.y + 0.068F, min.z + 0.23F},
+                                {0.045F, 0.008F, 0.035F}, indicator.color);
+                        }
+                    }
+                }
+                light({localPosition.x, max.y + 0.050F, max.z - 0.14F},
+                    {2.9F, 0.014F, 0.04F}, indicator.color);
+                break;
+            }
+            case world::SecurityFurniturePart::Monitor: {
+                const float faceZ = min.z - 0.028F;
+                metal({localPosition.x, max.y + 0.04F, localPosition.z},
+                    {localScale.x + 0.12F, 0.08F, localScale.z + 0.04F}, edge);
+                for (int screen = 0; screen < 3; ++screen) {
+                    const float x = min.x + (screen == 0 ? 0.44F
+                        : screen == 1 ? 1.25F : 2.06F);
+                    const float screenWidth = screen == 1 ? 0.86F : 0.62F;
+                    solid({x, 1.53F, faceZ},
+                        {screenWidth + 0.08F, 0.66F, 0.035F}, edge);
+                    solid({x, 1.53F, faceZ - 0.027F},
+                        {screenWidth, 0.58F, 0.020F}, gasket);
+                    for (int row = 0; row < 4; ++row) {
+                        light({x - screenWidth * 0.12F,
+                                1.36F + static_cast<float>(row) * 0.10F,
+                                faceZ - 0.042F},
+                            {screenWidth * (0.30F
+                                    + 0.08F * static_cast<float>(row % 3)),
+                                0.019F, 0.008F}, indicator.color);
+                    }
+                    bolt({x - screenWidth * 0.5F - 0.025F,
+                            1.84F, faceZ - 0.030F}, false);
+                    bolt({x + screenWidth * 0.5F + 0.025F,
+                            1.84F, faceZ - 0.030F}, false);
+                }
+                light({localPosition.x, max.y + 0.045F, faceZ - 0.035F},
+                    {localScale.x * 0.55F, 0.025F, 0.018F}, indicator.color);
+                break;
+            }
+            case world::SecurityFurniturePart::Barricade: {
+                for (const float side : {-1.0F, 1.0F}) {
+                    const float faceZ = side < 0.0F
+                        ? min.z - 0.030F : max.z + 0.030F;
+                    solid({localPosition.x, 0.62F, faceZ},
+                        {localScale.x - 0.22F, 0.70F, 0.025F}, gasket);
+                    metal({localPosition.x, 0.62F,
+                            faceZ + side * 0.025F},
+                        {localScale.x - 0.30F, 0.62F, 0.025F},
+                        {securityTone * 1.06F, securityTone * 1.06F,
+                            securityTone * 1.06F});
+                    for (int slat = 0; slat < 5; ++slat) {
+                        solid({localPosition.x,
+                                0.39F + static_cast<float>(slat) * 0.065F,
+                                faceZ + side * 0.043F},
+                            {0.66F, 0.018F, 0.015F}, gasket);
+                    }
+                    for (const float x : {min.x + 0.17F, max.x - 0.17F}) {
+                        for (const float y : {0.30F, 0.94F}) {
+                            bolt({x, y, faceZ + side * 0.048F}, false);
+                        }
+                    }
+                    for (int stripe = 0; stripe < 4; ++stripe) {
+                        const float x = min.x + 0.36F
+                            + static_cast<float>(stripe) * 0.29F;
+                        solid({x, 0.17F, faceZ + side * 0.060F},
+                            {0.12F, 0.055F, 0.018F},
+                            {0.78F, 0.48F, 0.09F});
+                        surfaceCommands.back().model
+                            = wkc::core::translationMatrix(
+                                toWorld({x, 0.17F, faceZ + side * 0.060F}))
+                            * wkc::core::rotationYMatrix(
+                                static_cast<float>(renderedRoom.rotation)
+                                    * std::numbers::pi_v<float> * 0.5F)
+                            * wkc::core::rotationZMatrix(-0.42F)
+                            * wkc::core::scaleMatrix({0.12F, 0.055F, 0.018F});
+                    }
+                }
+                // The brace projects beyond the collision box. Its side and
+                // top must not share a plane with the box faces: that caused
+                // the flickering stripes visible at close range.
+                for (const float x : {min.x + 0.04F, max.x - 0.04F}) {
+                    metal({x, 0.58F, localPosition.z},
+                        {0.18F, 1.16F, localScale.z + 0.06F},
+                        {0.82F, 0.84F, 0.83F});
+                }
+                for (const float xOffset : {-0.45F, 0.0F, 0.45F}) {
+                    light({localPosition.x + xOffset, 1.112F, min.z + 0.16F},
+                        {0.24F, 0.024F, 0.045F}, indicator.color);
+                }
+                break;
+            }
+            case world::SecurityFurniturePart::None:
+                break;
+            }
+        }
+        architectureCastsShadow = false;
     };
     drawRoomParts(room);
     for (const RoomRenderData& connectedRoom : connectedRooms) {
@@ -2110,13 +5086,32 @@ bool GdpRenderer::render(
                 material->normal.bind(gl_, textureBindings_, 1U);
                 material->properties.bind(gl_, textureBindings_, 2U);
             } else {
-                roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Wall)].bind(gl_, textureBindings_);
+                if (roomMaterials.storageHallV1) {
+                    storageWallTextures_[style.surfaceVariant]
+                        .bind(gl_, textureBindings_);
+                } else if (roomMaterials.cafeteriaV1) {
+                    cafeteriaWallTextures_[style.surfaceVariant]
+                        .bind(gl_, textureBindings_);
+                } else {
+                    roomMaterials.textures[static_cast<std::size_t>(
+                        IndustrialSurface::Wall)].bind(gl_, textureBindings_);
+                }
             }
             break;
         case RoomMaterialChannel::Floor:
-            roomMaterials.textures[static_cast<std::size_t>(
-                IndustrialSurface::Floor)].bind(gl_, textureBindings_);
+            if (roomMaterials.storageHallV1) {
+                storageFloorTextures_[style.surfaceVariant]
+                    .bind(gl_, textureBindings_);
+            } else if (roomMaterials.cafeteriaV1) {
+                cafeteriaFloorTextures_[style.surfaceVariant]
+                    .bind(gl_, textureBindings_);
+            } else {
+                roomMaterials.textures[static_cast<std::size_t>(
+                    IndustrialSurface::Floor)].bind(gl_, textureBindings_);
+            }
+            break;
+        case RoomMaterialChannel::HubFloorDetail:
+            centralHubFloorDetailTexture_.bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::Ceiling:
             if (style.detailedMaterial) {
@@ -2133,9 +5128,48 @@ bool GdpRenderer::render(
                 material->normal.bind(gl_, textureBindings_, 1U);
                 material->properties.bind(gl_, textureBindings_, 2U);
             } else {
-                roomMaterials.textures[static_cast<std::size_t>(
-                    IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
+                if (roomMaterials.storageHallV1) {
+                    storageCeilingTextures_[style.surfaceVariant]
+                        .bind(gl_, textureBindings_);
+                } else if (roomMaterials.cafeteriaV1) {
+                    cafeteriaCeilingTextures_[style.surfaceVariant]
+                        .bind(gl_, textureBindings_);
+                } else {
+                    roomMaterials.textures[static_cast<std::size_t>(
+                        IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
+                }
             }
+            break;
+        case RoomMaterialChannel::StorageRack:
+            if (style.rackPart == world::StorageRackPart::Upright) {
+                storageRackUprightTextures_[style.surfaceVariant]
+                    .bind(gl_, textureBindings_);
+            } else {
+                storageRackShelfTextures_[style.surfaceVariant]
+                    .bind(gl_, textureBindings_);
+            }
+            break;
+        case RoomMaterialChannel::CafeteriaFurniture:
+            cafeteriaFurnitureTextures_[static_cast<std::size_t>(
+                style.furniturePart) - 1U][style.surfaceVariant]
+                .bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::LaboratoryFurniture:
+            laboratoryFurnitureTexture_.bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::SecurityFurniture:
+            securityFurnitureTexture_.bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::StructuralColumn:
+            if (style.hubColumnPlate) {
+                centralHubColumnTexture_.bind(gl_, textureBindings_);
+            } else {
+                structuralColumnTextures_[style.surfaceVariant]
+                    .bind(gl_, textureBindings_);
+            }
+            break;
+        case RoomMaterialChannel::SolidColor:
+            solidColorTexture_.bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::Generic:
             fallbackTexture_.bind(gl_, textureBindings_);
@@ -2146,10 +5180,35 @@ bool GdpRenderer::render(
             style.detailedMaterial ? 1 : 0);
         shader.setVec2(gl_, "uUvScale", style.uvScale);
         shader.setVec2(gl_, "uUvOffset", style.uvOffset);
-        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        shader.setFloat(gl_, "uSurfaceTileMetres", style.surfaceTileMetres);
+        shader.setInt(gl_, "uMirrorSurfaceTile", style.mirrorSurfaceTile ? 1 : 0);
+        shader.setInt(gl_, "uRackPart", static_cast<int>(style.rackPart));
+        shader.setInt(gl_, "uFurniturePart", static_cast<int>(style.furniturePart));
+        shader.setInt(gl_, "uHubWallMaterial",
+            roomMaterials.centralHubWallCondition
+                && style.material == RoomMaterialChannel::Wall ? 1 : 0);
+        shader.setInt(gl_, "uHubFloorMaterial",
+            roomMaterials.centralHubWallCondition
+                && (style.material == RoomMaterialChannel::Floor
+                    || style.material == RoomMaterialChannel::HubFloorDetail)
+                ? 1 : 0);
+        shader.setInt(gl_, "uSecurityFloorVariation",
+            roomMaterials.securityV1
+                && style.material == RoomMaterialChannel::Floor ? 1 : 0);
+        shader.setFloat(gl_, "uSecurityFloorSeed", roomMaterials.securityFloorSeed);
+        shader.setFloat(gl_, "uEmissiveStrength", style.emissiveStrength);
+        shader.setFloat(gl_, "uUnlitMix", style.unlitMix);
         return true;
     };
 
+    if (geometryShadowsActive) {
+        for (const SurfaceCommand& command : surfaceCommands) {
+            if (command.castsShadow) {
+                shadowCasters.push_back({command.mesh ? command.mesh : &box_,
+                    command.model});
+            }
+        }
+    }
     if (!surfaceInstancingEnabled_) {
         shader.setInt(gl_, "uInstanced", 0);
         for (const SurfaceCommand& command : surfaceCommands) {
@@ -2157,7 +5216,7 @@ bool GdpRenderer::render(
                 return false;
             }
             shader.setMat4(gl_, "uModel", command.model);
-            drawMesh(box_);
+            drawMesh(command.mesh ? *command.mesh : box_);
         }
     } else {
         struct SurfaceBatch {
@@ -2167,6 +5226,13 @@ bool GdpRenderer::render(
         std::vector<SurfaceBatch> surfaceBatches;
         surfaceBatches.reserve(surfaceCommands.size());
         for (const SurfaceCommand& command : surfaceCommands) {
+            if (command.mesh) {
+                if (!bindSurfaceStyle(command.style)) return false;
+                shader.setInt(gl_, "uInstanced", 0);
+                shader.setMat4(gl_, "uModel", command.model);
+                drawMesh(*command.mesh);
+                continue;
+            }
             const auto batch = std::find_if(surfaceBatches.begin(),
                 surfaceBatches.end(), [&command](const SurfaceBatch& candidate) {
                     return candidate.style == command.style;
@@ -2196,7 +5262,49 @@ bool GdpRenderer::render(
         }
         shader.setInt(gl_, "uInstanced", 0);
     }
+    shader.setFloat(gl_, "uUnlitMix", 0.0F);
 
+    // Render the laboratory cloche after the opaque planter and furniture.
+    // Its low alpha reveals the specimen while the opaque base owns collision.
+    if (!glassTestDomes.empty()) {
+        solidColorTexture_.bind(gl_, textureBindings_);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setInt(gl_, "uInstanced", 0);
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
+        shader.setInt(gl_, "uMirrorSurfaceTile", 0);
+        shader.setInt(gl_, "uRackPart", 0);
+        shader.setInt(gl_, "uFurniturePart", 0);
+        shader.setInt(gl_, "uHubWallMaterial", 0);
+        shader.setInt(gl_, "uHubFloorMaterial", 0);
+        shader.setInt(gl_, "uSecurityFloorVariation", 0);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.10F);
+        shader.setFloat(gl_, "uOpacity", 0.19F);
+        shader.setVec3(gl_, "uTint", {0.49F, 0.80F, 0.88F});
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        for (const auto& dome : glassTestDomes) {
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(dome.center)
+                    * wkc::core::scaleMatrix(
+                        {dome.radius, dome.height, dome.radius}));
+            drawMesh(glassTestDome_);
+        }
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+        shader.setFloat(gl_, "uOpacity", 1.0F);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+    }
+
+    shader.setInt(gl_, "uRackPart", 0);
+    shader.setInt(gl_, "uFurniturePart", 0);
+    shader.setInt(gl_, "uHubWallMaterial", 0);
+    shader.setInt(gl_, "uHubFloorMaterial", 0);
+    shader.setInt(gl_, "uSecurityFloorVariation", 0);
+    shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
+    shader.setInt(gl_, "uMirrorSurfaceTile", 0);
     fallbackTexture_.bind(gl_, textureBindings_);
     for (const DoorRenderData& door : doors) {
         const bool facesX = std::abs(door.outwardNormal.x) > 0.5F;
@@ -2206,8 +5314,11 @@ bool GdpRenderer::render(
                                        const wkc::core::Vec3 scale,
                                        const wkc::core::Vec3 tint,
                                        const float emissive) {
-            shader.setMat4(gl_, "uModel", wkc::core::translationMatrix(position)
-                    * wkc::core::scaleMatrix(scale));
+            const wkc::core::Mat4 model
+                = wkc::core::translationMatrix(position)
+                    * wkc::core::scaleMatrix(scale);
+            shader.setMat4(gl_, "uModel", model);
+            if (geometryShadowsActive) shadowCasters.push_back({&box_, model});
             shader.setVec3(gl_, "uTint", tint);
             shader.setInt(gl_, "uDetailedMaterial", 0);
             shader.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
@@ -2265,6 +5376,37 @@ bool GdpRenderer::render(
     shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
     shader.setVec2(gl_, "uUvOffset", {});
     for (const ImpactRenderData& impact : impacts) {
+        if (impact.kind == ImpactVisualKind::BulletMark) {
+            const wkc::core::Vec3 normal = wkc::core::normalized(impact.normal);
+            const wkc::core::Vec3 reference = std::abs(normal.y) > 0.9F
+                ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
+                : wkc::core::Vec3{0.0F, 1.0F, 0.0F};
+            const wkc::core::Vec3 right = wkc::core::normalized(
+                wkc::core::cross(reference, normal));
+            const wkc::core::Mat4 orientation = basisMatrix(
+                right, normal, wkc::core::cross(right, normal));
+            const float variation = 0.85F + 0.30F * static_cast<float>(
+                wkc::core::mix64(impact.visualSeed) & 0xffU) / 255.0F;
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            shader.setVec3(gl_, "uTint", {0.025F, 0.027F, 0.029F});
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(
+                    impact.position + normal * 0.006F)
+                    * orientation
+                    * wkc::core::scaleMatrix(
+                        {0.105F * variation, 0.006F, 0.105F * variation}));
+            drawMesh(grenadeBody_);
+            shader.setVec3(gl_, "uTint", {0.78F, 0.75F, 0.68F});
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(
+                    impact.position + normal * 0.014F)
+                    * orientation
+                    * wkc::core::scaleMatrix(
+                        {0.077F * variation, 0.077F * variation,
+                            0.077F * variation}));
+            drawMesh(grenadeRing_);
+            continue;
+        }
         const float strength = std::clamp(
             std::isfinite(impact.strength) ? impact.strength : 0.0F,
             0.0F, 1.0F);
@@ -2313,7 +5455,8 @@ bool GdpRenderer::render(
     // The world projectile and first-person viewmodel use the same mesh,
     // proportions, tint and material. Only their transforms differ.
     const auto drawGrenadeModel = [&](const wkc::core::Mat4& root,
-                                      const wkc::core::Vec3 center) {
+                                      const wkc::core::Vec3 center,
+                                      const bool pinAttached) {
         const auto bindMaterial = [&](const WeaponMaterial material) {
             const auto& gpu = weaponMaterials_[static_cast<std::size_t>(material)];
             gpu.albedo.bind(gl_, textureBindings_, 0U);
@@ -2335,19 +5478,72 @@ bool GdpRenderer::render(
         shader.setInt(gl_, "uUseEmissionMap", 0);
         shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
         shader.setVec2(gl_, "uUvOffset", {});
+        if (!grenadeModelParts_.empty()) {
+            shader.setMat4(gl_, "uModel", root
+                * wkc::core::translationMatrix(center)
+                * wkc::core::scaleMatrix({0.205F, 0.225F, 0.205F}));
+            constexpr std::array materialTints{
+                wkc::core::Vec3{1.0F, 1.0F, 1.0F},
+                wkc::core::Vec3{0.20F, 0.22F, 0.24F},
+                wkc::core::Vec3{0.49F, 0.51F, 0.52F},
+                wkc::core::Vec3{0.13F, 0.69F, 0.80F},
+                wkc::core::Vec3{0.32F, 0.35F, 0.37F},
+                wkc::core::Vec3{0.075F, 0.085F, 0.09F},
+            };
+            constexpr std::array materialBindings{
+                WeaponMaterial::AccentPaint, WeaponMaterial::Polymer,
+                WeaponMaterial::BareSteel, WeaponMaterial::Sight,
+                WeaponMaterial::CoatedSteel, WeaponMaterial::Recess,
+            };
+            for (const GrenadeGpuPart& part : grenadeModelParts_) {
+                if (part.partId == 1U && !pinAttached) continue;
+                bindMaterial(materialBindings[part.materialId]);
+                shader.setVec3(gl_, "uTint", materialTints[part.materialId]);
+                shader.setFloat(gl_, "uEmissiveStrength",
+                    part.materialId == 3U ? 0.55F : 0.0F);
+                drawMesh(part.mesh);
+            }
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            return;
+        }
+        constexpr wkc::core::Vec3 bodyScale{0.205F, 0.225F, 0.205F};
         bindMaterial(WeaponMaterial::Polymer);
-        roundedPiece(center, {0.205F, 0.255F, 0.19F},
-            {0.48F, 0.55F, 0.35F});
+        roundedPiece(center, bodyScale, {0.20F, 0.22F, 0.24F});
+        bindMaterial(WeaponMaterial::AccentPaint);
+        shader.setMat4(gl_, "uModel", root
+            * wkc::core::translationMatrix(center)
+            * wkc::core::rotationYMatrix(std::numbers::pi_v<float> / 8.0F)
+            * wkc::core::scaleMatrix(bodyScale));
+        shader.setVec3(gl_, "uTint", {1.0F, 1.0F, 1.0F});
+        drawMesh(grenadeArmor_);
+        bindMaterial(WeaponMaterial::Sight);
+        shader.setMat4(gl_, "uModel", root
+            * wkc::core::translationMatrix(center)
+            * wkc::core::rotationYMatrix(std::numbers::pi_v<float> / 8.0F)
+            * wkc::core::scaleMatrix(bodyScale));
+        shader.setVec3(gl_, "uTint", {0.13F, 0.69F, 0.80F});
+        shader.setFloat(gl_, "uEmissiveStrength", 0.18F);
+        drawMesh(grenadeLights_);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
         bindMaterial(WeaponMaterial::CoatedSteel);
-        roundedPiece(center + wkc::core::Vec3{0.0F, 0.116F, 0.0F},
-            {0.105F, 0.052F, 0.105F}, {0.61F, 0.66F, 0.63F});
+        roundedPiece(center + wkc::core::Vec3{0.0F, 0.119F, 0.0F},
+            {0.104F, 0.052F, 0.104F}, {0.32F, 0.35F, 0.37F});
         shader.setMat4(gl_, "uModel", root
             * wkc::core::translationMatrix(center
-                + wkc::core::Vec3{-0.064F, 0.096F, 0.0F})
+                + wkc::core::Vec3{-0.067F, 0.103F, 0.0F})
             * wkc::core::rotationZMatrix(-15.0F * std::numbers::pi_v<float> / 180.0F)
             * wkc::core::scaleMatrix({0.014F, 0.116F, 0.040F}));
-        shader.setVec3(gl_, "uTint", {0.43F, 0.48F, 0.45F});
+        shader.setVec3(gl_, "uTint", {0.38F, 0.40F, 0.42F});
         drawMesh(box_);
+        if (pinAttached) {
+            shader.setMat4(gl_, "uModel", root
+                * wkc::core::translationMatrix(center
+                    + wkc::core::Vec3{-0.085F, 0.166F, 0.0F})
+                * wkc::core::rotationXMatrix(std::numbers::pi_v<float> * 0.5F)
+                * wkc::core::scaleMatrix({0.105F, 0.105F, 0.105F}));
+            shader.setVec3(gl_, "uTint", {0.70F, 0.73F, 0.75F});
+            drawMesh(grenadeRing_);
+        }
     };
 
     for (const EnemyProjectileRenderData& projectile : enemyProjectiles) {
@@ -2364,11 +5560,17 @@ bool GdpRenderer::render(
         shader.setFloat(gl_, "uEmissiveStrength", 2.0F);
         drawMesh(box_);
     }
-    shader.setFloat(gl_, "uUnlitMix", 0.25F);
+    // Preserve paint and exposed steel in the world instead of mixing toward
+    // the neutral shader tint. This also keeps the projectile readable away
+    // from the first-person viewmodel light.
+    shader.setFloat(gl_, "uMaterialUnlitMix",
+        grenadeModelParts_.empty() ? 0.0F : 1.0F);
+    shader.setFloat(gl_, "uUnlitMix", 0.35F);
     for (const GrenadeRenderData& grenade : grenades) {
-        drawGrenadeModel(wkc::core::translationMatrix(grenade.position), {});
+        drawGrenadeModel(wkc::core::translationMatrix(grenade.position), {}, false);
     }
     shader.setFloat(gl_, "uUnlitMix", 0.0F);
+    shader.setFloat(gl_, "uMaterialUnlitMix", 0.0F);
     shader.setInt(gl_, "uDetailedMaterial", 0);
     fallbackTexture_.bind(gl_, textureBindings_);
     shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
@@ -2380,8 +5582,31 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uDetailedMaterial", 1);
     shader.setInt(gl_, "uUseEmissionMap", 1);
     constexpr wkc::core::Vec3 fixtureAlertColor{0.84F, 0.29F, 0.23F};
-    for (std::size_t index = 0; index < lightCount; ++index) {
-        const PointLightRenderData& light = lighting.lights[index];
+    constexpr std::array fixturePaintColors{
+        wkc::core::Vec3{0.105F, 0.119F, 0.125F}, // Industrial
+        wkc::core::Vec3{0.18F, 0.20F, 0.19F},     // Storage
+        wkc::core::Vec3{0.15F, 0.17F, 0.175F},   // Maintenance
+        wkc::core::Vec3{0.49F, 0.54F, 0.55F},    // Laboratory
+        wkc::core::Vec3{0.47F, 0.45F, 0.40F},    // Cafeteria
+        wkc::core::Vec3{0.13F, 0.16F, 0.17F},    // Security
+        wkc::core::Vec3{0.39F, 0.43F, 0.44F},    // Office
+        wkc::core::Vec3{0.125F, 0.125F, 0.13F}, // Boss / Arena
+        wkc::core::Vec3{0.155F, 0.20F, 0.22F},  // Central Hub
+    };
+    const std::span<const PointLightRenderData> visibleFixtures
+        = lighting.visibleFixturesPopulated
+        ? std::span<const PointLightRenderData>{lighting.visibleFixtures}
+        : std::span<const PointLightRenderData>{lighting.lights.data(), lightCount};
+    for (const PointLightRenderData& light : visibleFixtures) {
+        const bool hubFixture
+            = light.fixtureVariant == CeilingFixtureVariant::CentralHub;
+        const wkc::core::Vec3 roomCenter
+            = (light.sourceRoomBounds.minimum
+                + light.sourceRoomBounds.maximum) * 0.5F;
+        const float fixtureYaw = hubFixture
+            && (light.position.x - roomCenter.x)
+                * (light.position.z - roomCenter.z) > 0.0F
+            ? std::numbers::pi_v<float> * 0.5F : 0.0F;
         const wkc::core::Vec3 fixtureColor = lighting.alert
             ? fixtureAlertColor : light.color;
         const float baseLensEmission = lighting.alert
@@ -2390,7 +5615,7 @@ bool GdpRenderer::render(
             = baseLensEmission * light.fixtureEmissionScale;
         const wkc::core::Vec3 lensTint = lensEmission > 0.01F
             ? fixtureColor : wkc::core::Vec3{0.42F, 0.44F, 0.43F};
-        const auto drawFixturePiece = [this, &light, &shader](
+        const auto drawFixturePiece = [this, &light, &shader, fixtureYaw](
             const wkc::core::Vec3 offset,
             const wkc::core::Vec3 scale,
             const wkc::core::Vec2 uvScale,
@@ -2398,7 +5623,9 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 tint,
             const float emissiveStrength) {
             shader.setMat4(gl_, "uModel",
-                wkc::core::translationMatrix(light.position + offset)
+                wkc::core::translationMatrix(light.position)
+                    * wkc::core::rotationYMatrix(fixtureYaw)
+                    * wkc::core::translationMatrix(offset)
                     * wkc::core::scaleMatrix(scale));
             shader.setVec3(gl_, "uTint", tint);
             shader.setVec2(gl_, "uUvScale", uvScale);
@@ -2412,6 +5639,63 @@ bool GdpRenderer::render(
             : light.fixtureState == PropVisualState::Damaged
                 ? wkc::core::Vec3{0.70F, 0.56F, 0.40F}
                 : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
+        const float suspensionLength = light.sourceRoomBounds.maximum.y
+            - light.position.y - 0.26F;
+        if (hubFixture && suspensionLength > 0.05F) {
+            const wkc::core::Vec2 metalUvScale{0.12F, 0.88F};
+            const wkc::core::Vec2 metalUvOffset{0.53F, 0.05F};
+            for (const float side : {-1.0F, 1.0F}) {
+                drawFixturePiece({side * 0.44F,
+                        0.18F + suspensionLength * 0.5F, 0.0F},
+                    {0.028F, suspensionLength, 0.028F},
+                    metalUvScale, metalUvOffset,
+                    housingTint * 0.72F, 0.0F);
+                drawFixturePiece({side * 0.44F,
+                        0.18F + suspensionLength + 0.025F, 0.0F},
+                    {0.15F, 0.05F, 0.15F},
+                    metalUvScale, metalUvOffset,
+                    housingTint * 0.78F, 0.0F);
+            }
+        }
+        const std::size_t variant = static_cast<std::size_t>(light.fixtureVariant);
+        if (variant < ceilingFixtureModels_.size()
+            && !ceilingFixtureModels_[variant].empty()) {
+            wkc::core::Vec3 paint = fixturePaintColors[variant];
+            if (light.fixtureCondition == CeilingFixtureCondition::Maintained) {
+                paint = paint * 1.10F;
+            } else if (light.fixtureCondition == CeilingFixtureCondition::Worn) {
+                paint = paint * 0.58F
+                    + wkc::core::Vec3{0.35F, 0.24F, 0.14F} * 0.42F;
+            }
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(light.position)
+                    * wkc::core::rotationYMatrix(fixtureYaw)
+                    * wkc::core::translationMatrix(
+                        {0.0F, 0.095F, 0.0F}));
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {0.0F, 0.0F});
+            for (const CeilingFixtureGpuPart& part : ceilingFixtureModels_[variant]) {
+                wkc::core::Vec3 tint{1.0F, 1.0F, 1.0F};
+                if (part.materialId == 0U) {
+                    // Atlas paint is deliberately neutral, allowing each room
+                    // to use the Blender proposal's own housing palette.
+                    tint = {paint.x / 0.19F * housingTint.x,
+                        paint.y / 0.19F * housingTint.y,
+                        paint.z / 0.19F * housingTint.z};
+                } else if (part.materialId == 1U || part.materialId == 3U) {
+                    tint = light.fixtureCondition == CeilingFixtureCondition::Worn
+                        ? wkc::core::Vec3{0.70F, 0.53F, 0.38F}
+                        : wkc::core::Vec3{0.72F, 0.76F, 0.76F};
+                } else if (part.materialId == 4U) {
+                    tint = lensTint;
+                }
+                shader.setVec3(gl_, "uTint", tint);
+                shader.setFloat(gl_, "uEmissiveStrength",
+                    part.materialId == 4U ? lensEmission : 0.0F);
+                drawMesh(part.mesh);
+            }
+            continue;
+        }
         drawFixturePiece({0.0F, 0.095F, 0.0F}, {1.20F, 0.12F, 0.28F},
             {0.46F, 0.96F}, {0.02F, 0.02F}, housingTint, 0.0F);
         drawFixturePiece({0.0F, 0.015F, 0.0F}, {1.17F, 0.055F, 0.255F},
@@ -2623,7 +5907,11 @@ bool GdpRenderer::render(
                         -part.workerSawCenter.y,
                         -part.workerSawCenter.z});
             }
-            shader.setMat4(gl_, "uModel", rootModel * detailModel);
+            const wkc::core::Mat4 posedPartModel = rootModel * detailModel;
+            shader.setMat4(gl_, "uModel", posedPartModel);
+            if (geometryShadowsActive && !part.workerEyeHalo) {
+                shadowCasters.push_back({&part.mesh, posedPartModel});
+            }
             if (part.workerEyeHalo) {
                 shader.setFloat(gl_, "uOpacity",
                     enemy.alive ? (enemy.active ? 0.28F : 0.08F) : 0.0F);
@@ -2708,6 +5996,7 @@ bool GdpRenderer::render(
                 wkc::core::Vec3{0.23F, 0.24F, 0.24F},
                 wkc::core::Vec3{0.075F, 0.085F, 0.09F},
                 wkc::core::Vec3{0.12F, 0.72F, 0.80F},
+                wkc::core::Vec3{1.0F, 1.0F, 1.0F},
             };
             const std::size_t weaponIndex = static_cast<std::size_t>(weaponRole);
             for (std::size_t material = 0; material < weaponMaterialCount; ++material) {
@@ -2754,15 +6043,20 @@ bool GdpRenderer::render(
         drawMesh(box_);
     }
 
+    shader.setFloat(gl_, "uPropIndirectFill", 0.28F);
     for (const PropRenderData& prop : props) {
+        const bool storageBox = prop.role == PropVisualRole::StorageBox;
         wkc::core::Vec3 tint{0.54F, 0.34F, 0.17F};
         if (prop.role == PropVisualRole::Canister) {
             tint = {0.68F, 0.18F, 0.10F};
         } else if (prop.role == PropVisualRole::Barricade) {
             tint = {0.24F, 0.34F, 0.40F};
+        } else if (storageBox) {
+            tint = {1.0F, 1.0F, 1.0F};
         }
-        const float seedVariation = static_cast<float>((prop.visualSeed >> 8U) & 0xFFU)
-            / 255.0F * 0.12F - 0.06F;
+        const float seedVariation = storageBox ? 0.0F
+            : static_cast<float>((prop.visualSeed >> 8U) & 0xFFU)
+                / 255.0F * 0.12F - 0.06F;
         tint.x = std::clamp(tint.x + seedVariation, 0.08F, 1.0F);
         tint.y = std::clamp(tint.y + seedVariation, 0.08F, 1.0F);
         tint.z = std::clamp(tint.z + seedVariation, 0.08F, 1.0F);
@@ -2779,12 +6073,149 @@ bool GdpRenderer::render(
             prop.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
             * wkc::core::scaleMatrix(scale);
         shader.setMat4(gl_, "uModel", model);
+        if (geometryShadowsActive) shadowCasters.push_back({&box_, model});
         shader.setVec3(gl_, "uTint", tint);
         shader.setInt(gl_, "uDetailedMaterial", 0);
-        shader.setVec2(gl_, "uUvScale", {3.0F, 3.0F});
+        shader.setVec2(gl_, "uUvScale", storageBox
+            ? wkc::core::Vec2{1.0F, 1.0F}
+            : wkc::core::Vec2{3.0F, 3.0F});
         shader.setVec2(gl_, "uUvOffset", {});
         shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        if (storageBox) {
+            storageBoxTextures_[(prop.visualSeed & 1ULL) != 0U ? 1U : 0U]
+                .bind(gl_, textureBindings_);
+        }
         drawMesh(box_);
+        if (storageBox) {
+            fallbackTexture_.bind(gl_, textureBindings_);
+        }
+    }
+    shader.setFloat(gl_, "uPropIndirectFill", 0.0F);
+
+    std::array<std::uint32_t, maxRenderedRoomLights> shadowLightIndices{};
+    std::uint32_t selectedShadowLightCount = 0U;
+    if (geometryShadowsActive && lightCount > 0U) {
+        std::array<std::pair<float, std::uint32_t>, maxRenderedRoomLights>
+            candidates{};
+        std::uint32_t candidateCount = 0U;
+        for (std::uint32_t index = 0U; index < lightCount; ++index) {
+            if (lighting.lights[index].intensity <= 0.05F) continue;
+            const wkc::core::Vec3 delta = lighting.lights[index].position
+                - camera.position;
+            candidates[candidateCount++] = {wkc::core::dot(delta, delta), index};
+        }
+        for (std::uint32_t index = 1U; index < candidateCount; ++index) {
+            const auto candidate = candidates[index];
+            std::uint32_t slot = index;
+            while (slot > 0U && candidate < candidates[slot - 1U]) {
+                candidates[slot] = candidates[slot - 1U];
+                --slot;
+            }
+            candidates[slot] = candidate;
+        }
+        const std::uint32_t budget = std::min<std::uint32_t>(
+            hud.geometryShadowLightBudget,
+            static_cast<std::uint32_t>(maxRenderedRoomLights));
+        selectedShadowLightCount = std::min(candidateCount, budget);
+        for (std::uint32_t slot = 0U; slot < selectedShadowLightCount; ++slot) {
+            shadowLightIndices[slot] = candidates[slot].second;
+        }
+        if (selectedShadowLightCount == 1U && shadowCubeCount_ > 0U) {
+            // Retain the existing map owner while it still lights the camera;
+            // MEDIUM should not switch shadows on every small movement.
+            for (std::uint32_t index = 0U; index < lightCount; ++index) {
+                const auto& previous = lighting.lights[index];
+                if (previous.intensity > 0.05F
+                    && wkc::core::length(previous.position
+                        - shadowCubeLightPositions_[0]) <= 0.08F
+                    && wkc::core::length(previous.position - camera.position)
+                        < previous.range * 0.9F) {
+                    shadowLightIndices[0] = index;
+                    break;
+                }
+            }
+        }
+    }
+    if (selectedShadowLightCount > 0U) {
+        // Reuse the exact matrices of the color pass. The maps are consumed
+        // by the following frame, avoiding a second pose evaluation.
+        std::vector<wkc::core::Mat4> boxShadowModels;
+        std::vector<const ShadowCaster*> meshShadowCasters;
+        boxShadowModels.reserve(shadowCasters.size());
+        meshShadowCasters.reserve(shadowCasters.size());
+        constexpr float farPlane = 22.0F;
+        constexpr std::array directions{
+            wkc::core::Vec3{1, 0, 0}, wkc::core::Vec3{-1, 0, 0},
+            wkc::core::Vec3{0, 1, 0}, wkc::core::Vec3{0, -1, 0},
+            wkc::core::Vec3{0, 0, 1}, wkc::core::Vec3{0, 0, -1}};
+        constexpr std::array upVectors{
+            wkc::core::Vec3{0, -1, 0}, wkc::core::Vec3{0, -1, 0},
+            wkc::core::Vec3{0, 0, 1}, wkc::core::Vec3{0, 0, -1},
+            wkc::core::Vec3{0, -1, 0}, wkc::core::Vec3{0, -1, 0}};
+        shadowDepthShader_.beginUniformFrame();
+        shadowDepthShader_.use(gl_);
+        shadowDepthShader_.setFloat(gl_, "uFarPlane", farPlane);
+        shadowDepthShader_.setInt(gl_, "uInstanced", 0);
+        shadowDepthShader_.setMat4(gl_, "uProjection",
+            wkc::core::perspectiveMatrix(std::numbers::pi_v<float> * 0.5F,
+                1.0F, 0.05F, farPlane));
+        glDepthMask(GL_TRUE);
+        for (std::uint32_t slot = 0U; slot < selectedShadowLightCount; ++slot) {
+            const auto& light = lighting.lights[shadowLightIndices[slot]];
+            const wkc::core::Vec3 lightPosition = light.position;
+            boxShadowModels.clear();
+            meshShadowCasters.clear();
+            for (const ShadowCaster& caster : shadowCasters) {
+                const auto& e = caster.model.elements;
+                const wkc::core::Vec3 center{e[12], e[13], e[14]};
+                const float radius = 0.5F * std::sqrt(
+                    e[0] * e[0] + e[1] * e[1] + e[2] * e[2]
+                    + e[4] * e[4] + e[5] * e[5] + e[6] * e[6]
+                    + e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
+                if (caster.mesh == &box_
+                    && wkc::core::length(center - lightPosition)
+                        > light.range + radius) {
+                    continue;
+                }
+                if (caster.mesh == &box_) {
+                    boxShadowModels.push_back(caster.model);
+                } else {
+                    meshShadowCasters.push_back(&caster);
+                }
+            }
+            if (!boxShadowModels.empty()
+                && !box_.uploadInstanceTransforms(gl_, boxShadowModels,
+                    meshBindings_)) {
+                return false;
+            }
+            shadowDepthShader_.setVec3(gl_, "uLightPosition", lightPosition);
+            glViewport(0, 0, shadowCubes_[slot].size(),
+                shadowCubes_[slot].size());
+            for (unsigned int face = 0; face < directions.size(); ++face) {
+                shadowCubes_[slot].bindFace(gl_, face);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                shadowDepthShader_.setMat4(gl_, "uView",
+                    wkc::core::lookAtMatrix(lightPosition,
+                        lightPosition + directions[face], upVectors[face]));
+                for (const ShadowCaster* caster : meshShadowCasters) {
+                    shadowDepthShader_.setMat4(gl_, "uModel", caster->model);
+                    drawMesh(*caster->mesh);
+                }
+                if (!boxShadowModels.empty()) {
+                    shadowDepthShader_.setInt(gl_, "uInstanced", 1);
+                    drawMeshInstanced(box_);
+                    shadowDepthShader_.setInt(gl_, "uInstanced", 0);
+                }
+            }
+            shadowCubeLightPositions_[slot] = lightPosition;
+        }
+        framebuffer_.bind(gl_);
+        glViewport(0, 0, renderWidth, renderHeight);
+        shader.use(gl_);
+        shadowCubeCount_ = selectedShadowLightCount;
+        lastFrameStats_.geometryShadowMaps = selectedShadowLightCount;
+    } else {
+        shadowCubeCount_ = 0U;
     }
 
     if (playerBody.visible && !hud.mainMenu
@@ -2803,7 +6234,8 @@ bool GdpRenderer::render(
                 "uPlayerBones[15]", "uPlayerBones[16]", "uPlayerBones[17]",
                 "uPlayerBones[18]"};
             shader.setInt(gl_,"uPlayerSkinning",1);
-            shader.setMat4(gl_,"uModel",pose.root);
+            shader.setMat4(gl_,"uModel",pose.root
+                * wkc::core::scaleMatrix({1.0F,0.90F,1.0F}));
             for (std::size_t i = 0; i < playerRigBoneCount; ++i)
                 shader.setMat4(gl_,boneUniforms[i],palette[i]);
             shader.setVec3(gl_,"uTint",{1,1,1});
@@ -2812,10 +6244,24 @@ bool GdpRenderer::render(
             shader.setInt(gl_,"uUseEmissionMap",0);
             shader.setInt(gl_,"uDetailedMaterial",0);
             shader.setFloat(gl_,"uEmissiveStrength",0.0F);
-            for (std::size_t material = 0; material < playerRigMaterialCount; ++material) {
+            for (std::size_t material = 0; material < playerRigAsset_->materialCount; ++material) {
+                shader.setFloat(gl_,"uEmissiveStrength",material == 7U ? 1.6F : 0.0F);
+                playerRigAlbedo_[material].bind(gl_,textureBindings_,0U);
+                drawMesh(playerRigMeshes_[playerRigAsset_->materialCount+material]);
+            }
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            shader.setInt(gl_,"uPlayerBodyFade",1);
+            for (std::size_t material = 0; material < playerRigAsset_->materialCount; ++material) {
+                shader.setFloat(gl_,"uEmissiveStrength",material == 7U ? 1.6F : 0.0F);
                 playerRigAlbedo_[material].bind(gl_,textureBindings_,0U);
                 drawMesh(playerRigMeshes_[material]);
             }
+            shader.setFloat(gl_,"uEmissiveStrength",0.0F);
+            shader.setInt(gl_,"uPlayerBodyFade",0);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
             shader.setInt(gl_,"uPlayerSkinning",0);
         } else {
         constexpr std::array<const char*, playerBodyBoneCount> boneUniforms{
@@ -2981,6 +6427,7 @@ bool GdpRenderer::render(
             presentedWeapon.overdrive
                 ? wkc::core::Vec3{0.96F, 0.18F, 0.52F}
                 : wkc::core::Vec3{0.12F, 0.72F, 0.80F},
+                wkc::core::Vec3{1.0F, 1.0F, 1.0F},
         };
         shader.setMat4(gl_, "uModel", root);
         shader.setInt(gl_, "uDetailedMaterial", 1);
@@ -3034,32 +6481,61 @@ bool GdpRenderer::render(
             const bool singleHandCarry = presentedWeapon.carryMotion > 0.12F
                 && (knife || presentedWeapon.grenadeSelected
                     || viewmodelRole == HudWeaponRole::Pistol);
-            shader.setInt(gl_, "uPlayerSkinning", 2);
-            shader.setMat4(gl_, "uModel", root);
-            constexpr std::array<const char*, playerHandsBoneCount> uniforms{
-                "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]", "uPlayerBones[3]",
-                "uPlayerBones[4]", "uPlayerBones[5]", "uPlayerBones[6]", "uPlayerBones[7]",
-                "uPlayerBones[8]", "uPlayerBones[9]", "uPlayerBones[10]", "uPlayerBones[11]",
-                "uPlayerBones[12]", "uPlayerBones[13]", "uPlayerBones[14]", "uPlayerBones[15]",
-                "uPlayerBones[16]", "uPlayerBones[17]", "uPlayerBones[18]", "uPlayerBones[19]",
-                "uPlayerBones[20]", "uPlayerBones[21]", "uPlayerBones[22]", "uPlayerBones[23]",
-                "uPlayerBones[24]", "uPlayerBones[25]", "uPlayerBones[26]", "uPlayerBones[27]",
-                "uPlayerBones[28]", "uPlayerBones[29]", "uPlayerBones[30]", "uPlayerBones[31]",
-                "uPlayerBones[32]", "uPlayerBones[33]", "uPlayerBones[34]", "uPlayerBones[35]"};
-            for (std::size_t i = 0; i < playerHandsBoneCount; ++i)
-                shader.setMat4(gl_, uniforms[i], hands.skin[i]);
-            shader.setVec3(gl_, "uTint", {1,1,1});
-            shader.setFloat(gl_, "uEmissiveStrength", 0);
-            for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
-                const auto& gpu = playerHandsMaterials_[i];
-                shader.setVec3(gl_, "uTint", {1.0F,1.0F,1.0F});
-                gpu.albedo.bind(gl_, textureBindings_, 0U);
-                gpu.normal.bind(gl_, textureBindings_, 1U);
-                gpu.properties.bind(gl_, textureBindings_, 2U);
-                drawMesh((knife && !presentedWeapon.grenadeSelected) || singleHandCarry
-                    ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
+            if (playerRigPreview_ && playerRigAsset_) {
+                constexpr std::array<const char*,playerRigBoneCount> uniforms{
+                    "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]",
+                    "uPlayerBones[3]", "uPlayerBones[4]", "uPlayerBones[5]",
+                    "uPlayerBones[6]", "uPlayerBones[7]", "uPlayerBones[8]",
+                    "uPlayerBones[9]", "uPlayerBones[10]", "uPlayerBones[11]",
+                    "uPlayerBones[12]", "uPlayerBones[13]", "uPlayerBones[14]",
+                    "uPlayerBones[15]", "uPlayerBones[16]", "uPlayerBones[17]",
+                    "uPlayerBones[18]"};
+                const auto palette = samplePlayerRigGripPalette(hands);
+                shader.setInt(gl_,"uPlayerSkinning",1);
+                shader.setInt(gl_,"uDetailedMaterial",0);
+                shader.setMat4(gl_,"uModel",root);
+                for (std::size_t bone = 0; bone < playerRigBoneCount; ++bone)
+                    shader.setMat4(gl_,uniforms[bone],palette[bone]);
+                shader.setVec3(gl_,"uTint",{1,1,1});
+                shader.setFloat(gl_,"uEmissiveStrength",0);
+                for (std::size_t part = 2U; part < (singleHandCarry ? 3U : 4U); ++part) {
+                    for (std::size_t material = 0; material < playerRigAsset_->materialCount; ++material) {
+                        const auto meshIndex = part*playerRigAsset_->materialCount+material;
+                        shader.setFloat(gl_,"uEmissiveStrength",material == 7U ? 1.6F : 0.0F);
+                        playerRigAlbedo_[material].bind(gl_,textureBindings_,0U);
+                        drawMesh(playerRigMeshes_[meshIndex]);
+                    }
+                }
+                shader.setFloat(gl_,"uEmissiveStrength",0.0F);
+                shader.setInt(gl_,"uPlayerSkinning",0);
+            } else {
+                shader.setInt(gl_, "uPlayerSkinning", 2);
+                shader.setMat4(gl_, "uModel", root);
+                constexpr std::array<const char*, playerHandsBoneCount> uniforms{
+                    "uPlayerBones[0]", "uPlayerBones[1]", "uPlayerBones[2]", "uPlayerBones[3]",
+                    "uPlayerBones[4]", "uPlayerBones[5]", "uPlayerBones[6]", "uPlayerBones[7]",
+                    "uPlayerBones[8]", "uPlayerBones[9]", "uPlayerBones[10]", "uPlayerBones[11]",
+                    "uPlayerBones[12]", "uPlayerBones[13]", "uPlayerBones[14]", "uPlayerBones[15]",
+                    "uPlayerBones[16]", "uPlayerBones[17]", "uPlayerBones[18]", "uPlayerBones[19]",
+                    "uPlayerBones[20]", "uPlayerBones[21]", "uPlayerBones[22]", "uPlayerBones[23]",
+                    "uPlayerBones[24]", "uPlayerBones[25]", "uPlayerBones[26]", "uPlayerBones[27]",
+                    "uPlayerBones[28]", "uPlayerBones[29]", "uPlayerBones[30]", "uPlayerBones[31]",
+                    "uPlayerBones[32]", "uPlayerBones[33]", "uPlayerBones[34]", "uPlayerBones[35]"};
+                for (std::size_t i = 0; i < playerHandsBoneCount; ++i)
+                    shader.setMat4(gl_, uniforms[i], hands.skin[i]);
+                shader.setVec3(gl_, "uTint", {1,1,1});
+                shader.setFloat(gl_, "uEmissiveStrength", 0);
+                for (std::size_t i = 0; i < playerHandsMaterialCount; ++i) {
+                    const auto& gpu = playerHandsMaterials_[i];
+                    shader.setVec3(gl_, "uTint", {1.0F,1.0F,1.0F});
+                    gpu.albedo.bind(gl_, textureBindings_, 0U);
+                    gpu.normal.bind(gl_, textureBindings_, 1U);
+                    gpu.properties.bind(gl_, textureBindings_, 2U);
+                    drawMesh((knife && !presentedWeapon.grenadeSelected) || singleHandCarry
+                        ? playerSingleHandMeshes_[i] : playerHandsMeshes_[i]);
+                }
+                shader.setInt(gl_, "uPlayerSkinning", 0);
             }
-            shader.setInt(gl_, "uPlayerSkinning", 0);
         }
 
         // The flash is transient and remains independent of the approved
@@ -3086,20 +6562,21 @@ bool GdpRenderer::render(
         if (presentedWeapon.grenadeSelected && presentedWeapon.grenadeVisible) {
             const GrenadeViewmodelPose grenadePose
                 = sampleGrenadeViewmodelPose(presentationWeapon);
-            drawGrenadeModel(root, grenadePose.bodyCenter);
-            if (grenadePose.pinVisible) {
-                constexpr std::uint32_t pinSegments = 12U;
-                constexpr float pi = std::numbers::pi_v<float>;
-                for (std::uint32_t segment = 0U; segment < pinSegments; ++segment) {
-                    const float angle = 2.0F * pi
-                        * static_cast<float>(segment) / static_cast<float>(pinSegments);
-                    drawWeaponPiece(grenadePose.pinCenter + wkc::core::Vec3{
-                            0.031F * std::cos(angle),
-                            0.031F * std::sin(angle), 0.0F},
-                        {0.010F, 0.020F, 0.011F},
-                        {0.0F, 0.0F, angle * 180.0F / pi},
-                        {0.74F, 0.78F, 0.75F});
-                }
+            const bool pinAttached = presentedWeapon.grenadePinProgress < 0.5F;
+            drawGrenadeModel(root, grenadePose.bodyCenter, pinAttached);
+            if (grenadePose.pinVisible && !pinAttached) {
+                shader.setInt(gl_, "uDetailedMaterial", 0);
+                fallbackTexture_.bind(gl_, textureBindings_);
+                shader.setMat4(gl_, "uModel", root
+                    * wkc::core::translationMatrix(grenadePose.pinCenter)
+                    * wkc::core::rotationXMatrix(std::numbers::pi_v<float> * 0.5F)
+                    * wkc::core::scaleMatrix(grenadeModelParts_.empty()
+                        ? wkc::core::Vec3{0.105F, 0.105F, 0.105F}
+                        : wkc::core::Vec3{0.07F, 0.07F, 0.07F}));
+                shader.setVec3(gl_, "uTint", {0.70F, 0.73F, 0.75F});
+                shader.setFloat(gl_, "uEmissiveStrength", 0.28F);
+                drawMesh(grenadeRing_);
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
             }
             shader.setInt(gl_, "uDetailedMaterial", 0);
             fallbackTexture_.bind(gl_, textureBindings_);
@@ -3486,6 +6963,10 @@ bool GdpRenderer::render(
                     break;
                 case HudGraphicsQuality::Ultra:
                     value = "ULTRA";
+                    break;
+                case HudGraphicsQuality::Custom:
+                    value = hud.language == gameplay::Language::PortugueseBrazil
+                        ? "PERSONALIZADO" : "CUSTOM";
                     break;
                 }
             } else if (index
@@ -4021,6 +7502,10 @@ bool GdpRenderer::render(
             break;
         case HudGraphicsQuality::Ultra:
             qualityName = "ULTRA";
+            break;
+        case HudGraphicsQuality::Custom:
+            qualityName = hud.language == gameplay::Language::PortugueseBrazil
+                ? "PERSONALIZADO" : "CUSTOM";
             break;
         }
         const std::string gpuTime = hud.gpuTimingAvailable

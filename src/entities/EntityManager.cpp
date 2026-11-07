@@ -14,6 +14,8 @@ float defaultPropHealth(const PropType type) noexcept
     switch (type) {
     case PropType::Crate:
         return 60.0F;
+    case PropType::StorageBox:
+        return 35.0F;
     case PropType::Canister:
         return 35.0F;
     case PropType::Barricade:

@@ -1,4 +1,5 @@
 #include "game/visual/PlayerRigAsset.hpp"
+#include "game/visual/PlayerHandsAssets.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -98,6 +99,53 @@ const PlayerRigClip& clip(const PlayerRigAsset& asset,
     return asset.clips[0]; // The loader requires all six names.
 }
 
+wkc::core::Mat4 basis(const wkc::core::Vec3 x,
+    const wkc::core::Vec3 y, const wkc::core::Vec3 z) noexcept
+{
+    return {{x.x,x.y,x.z,0,y.x,y.y,y.z,0,z.x,z.y,z.z,0,0,0,0,1}};
+}
+
+wkc::core::Mat4 transposeRotation(const wkc::core::Mat4& matrix) noexcept
+{
+    const auto& a = matrix.elements;
+    return {{a[0],a[4],a[8],0,a[1],a[5],a[9],0,
+        a[2],a[6],a[10],0,0,0,0,1}};
+}
+
+wkc::core::Vec3 column(const wkc::core::Mat4& matrix,
+    const std::size_t index) noexcept
+{
+    const auto& a = matrix.elements;
+    return {a[index*4U],a[index*4U+1U],a[index*4U+2U]};
+}
+
+wkc::core::Mat4 orientedBasis(const wkc::core::Vec3 direction,
+    const wkc::core::Vec3 referenceX) noexcept
+{
+    using namespace wkc::core;
+    const Vec3 y = normalized(direction);
+    Vec3 x = referenceX-y*dot(referenceX,y);
+    if (length(x) < 1.0e-4F) x = cross({0,0,1},y);
+    x = normalized(x);
+    return basis(x,y,cross(x,y));
+}
+
+wkc::core::Mat4 segmentSkin(const wkc::core::Vec3 bindStart,
+    const wkc::core::Vec3 bindEnd, const wkc::core::Vec3 targetStart,
+    const wkc::core::Vec3 targetEnd,
+    const wkc::core::Vec3 targetReferenceX) noexcept
+{
+    using namespace wkc::core;
+    const Vec3 bindVector = bindEnd-bindStart;
+    const Vec3 targetVector = targetEnd-targetStart;
+    const float scale = length(targetVector)/length(bindVector);
+    return translationMatrix(targetStart)
+        * orientedBasis(targetVector,targetReferenceX)
+        * scaleMatrix({scale,scale,scale})
+        * transposeRotation(orientedBasis(bindVector,{1,0,0}))
+        * translationMatrix(bindStart*-1.0F);
+}
+
 } // namespace
 
 std::optional<PlayerRigAsset> loadPlayerRigAsset(
@@ -118,24 +166,31 @@ std::optional<PlayerRigAsset> loadPlayerRigAsset(
     Reader reader(bytes);
     std::string magic;
     std::uint32_t boneCount{}, meshCount{}, clipCount{};
-    if (!reader.bytes(8U,magic) || magic != "ISPLYR01"
+    if (!reader.bytes(8U,magic)
         || !reader.u32(boneCount) || !reader.u32(meshCount) || !reader.u32(clipCount)
-        || boneCount != playerRigBoneCount || meshCount != playerRigMaterialCount
+        || boneCount != playerRigBoneCount
+        || !((magic == "ISPLYR03" && meshCount == playerRigMeshCount)
+            || (magic == "ISPLYR04" && meshCount == playerExosuitMeshCount))
         || clipCount != playerRigClipCount) {
         setReason(reason,"Player rig header or counts are invalid"); return std::nullopt;
     }
     PlayerRigAsset asset;
-    std::array<bool, playerRigMaterialCount> materials{};
+    asset.materialCount = magic == "ISPLYR04"
+        ? playerExosuitMaterialCount : playerRigMaterialCount;
+    asset.partCount = magic == "ISPLYR04"
+        ? playerExosuitPartCount : playerRigPartCount;
+    asset.meshes.resize(meshCount);
     for (std::uint32_t meshIndex = 0; meshIndex < meshCount; ++meshIndex) {
         std::uint32_t material{}, vertexCount{}, indexCount{};
         if (!reader.u32(material) || !reader.u32(vertexCount)
-            || !reader.u32(indexCount) || material >= playerRigMaterialCount
-            || materials[material] || vertexCount == 0U || vertexCount > 200000U
-            || indexCount == 0U || indexCount > 600000U || indexCount%3U != 0U) {
+            || !reader.u32(indexCount) || material != meshIndex%asset.materialCount
+            || vertexCount > 200000U
+            || indexCount > 600000U || indexCount%3U != 0U
+            || (vertexCount == 0U) != (indexCount == 0U)) {
             setReason(reason,"Player rig mesh header is invalid"); return std::nullopt;
         }
-        materials[material] = true;
-        auto& mesh = asset.meshes[material];
+        auto& mesh = asset.meshes[meshIndex];
+        if (vertexCount == 0U) continue;
         mesh.vertices.resize(vertexCount);
         wkc::core::Vec3 low{std::numeric_limits<float>::max(),
             std::numeric_limits<float>::max(),std::numeric_limits<float>::max()};
@@ -169,7 +224,7 @@ std::optional<PlayerRigAsset> loadPlayerRigAsset(
                 return std::nullopt;
             }
         mesh.bounds = {low,high};
-        mesh.backfaceCullingSafe = true;
+        mesh.backfaceCullingSafe = meshIndex >= asset.materialCount;
         if (!wkc::render::validateMeshData(mesh)) {
             setReason(reason,"Player rig mesh failed validation");
             return std::nullopt;
@@ -252,7 +307,48 @@ PlayerRigPalette samplePlayerRigPalette(const PlayerRigAsset& asset,
         && std::isfinite(weapon.equipTransitionProgress))
         result = blend(result,sample(clip(asset,"Draw_Primary_Back"),
             weapon.equipTransitionProgress),1.0F);
+    if (std::isfinite(body.pitchDegrees)) {
+        using namespace wkc::core;
+        const float pitch = std::clamp(body.pitchDegrees,-75.0F,75.0F)
+            * std::numbers::pi_v<float>/180.0F;
+        const Vec3 chestPivot{0.0F,1.36F,0.0F};
+        const Vec3 neckPivot{0.0F,1.53F,0.0F};
+        result[3] = translationMatrix(chestPivot)
+            * rotationXMatrix(pitch*.18F)
+            * translationMatrix(chestPivot*-1.0F) * result[3];
+        result[4] = translationMatrix(neckPivot)
+            * rotationXMatrix(pitch)
+            * translationMatrix(neckPivot*-1.0F) * result[4];
+    }
     return result;
+}
+
+PlayerRigPalette samplePlayerRigGripPalette(const PlayerHandsPose& hands) noexcept
+{
+    using namespace wkc::core;
+    PlayerRigPalette palette{};
+    palette.fill(Mat4::identity());
+    // The .blend rests with its hands at the hips. Retarget only its separated
+    // arm meshes to the same IK wrists and weapon contacts as the existing rig.
+    // The 19-bone body keeps its own walk, crouch and jump animation.
+    for (std::size_t side = 0; side < 2U; ++side) {
+        const float sign = side == 0U ? 1.0F : -1.0F;
+        const std::size_t first = side == 0U ? 6U : 13U;
+        const std::size_t handFirst = side*playerHandBonesPerSide;
+        const Vec3 bindShoulder{sign*.29F,1.48F,0.0F};
+        const Vec3 bindElbow{sign*.43F,1.17F,-.02F};
+        const Vec3 bindWrist{sign*.50F,.91F,-.12F};
+        const Vec3 handX = column(hands.skin[handFirst+2U],0U);
+        palette[first] = segmentSkin(bindShoulder,bindElbow,
+            hands.shoulders[side],hands.elbows[side],handX);
+        palette[first+1U] = segmentSkin(bindElbow,bindWrist,
+            hands.elbows[side],hands.wrists[side],handX);
+        palette[first+2U] = hands.skin[handFirst+2U]
+            * rotationXMatrix(std::numbers::pi_v<float>)
+            * scaleMatrix({1.6F,1.6F,1.6F})
+            * translationMatrix(bindWrist*-1.0F);
+    }
+    return palette;
 }
 
 } // namespace gdp::game::visual

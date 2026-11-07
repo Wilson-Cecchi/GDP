@@ -28,6 +28,16 @@ bool adjustPercent(
     return value != previous;
 }
 
+bool applyGraphicsAdjustment(
+    RuntimeSettings& settings,
+    const GraphicsQualitySettings& adjusted) noexcept
+{
+    if (adjusted == effectiveGraphicsQualitySettings(settings)) return false;
+    settings.customGraphics = adjusted;
+    settings.graphicsQuality = GraphicsQuality::Custom;
+    return true;
+}
+
 } // namespace
 
 void openSettingsMenu(
@@ -105,12 +115,45 @@ bool adjustRuntimeSetting(
             settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);
     case SettingsMenuOption::GraphicsQuality: {
         const GraphicsQuality previous = settings.graphicsQuality;
-        const int maximum = static_cast<int>(GraphicsQuality::Count) - 1;
+        const int maximum = static_cast<int>(GraphicsQuality::Ultra);
+        const int current = previous == GraphicsQuality::Custom
+            ? maximum : static_cast<int>(previous);
         const int adjusted = std::clamp(
-            static_cast<int>(previous) + (direction > 0 ? 1 : -1),
+            current + (direction > 0 ? 1 : -1),
             0, maximum);
         settings.graphicsQuality = static_cast<GraphicsQuality>(adjusted);
+        if (settings.graphicsQuality != previous)
+            settings.customGraphics = graphicsQualitySettings(settings.graphicsQuality);
         return settings.graphicsQuality != previous;
+    }
+    case SettingsMenuOption::Shadows: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        quality.shadowsEnabled = direction > 0;
+        if (quality.shadowsEnabled && quality.maximumShadowLights == 0U) {
+            quality.maximumShadowLights = 1U;
+            quality.maximumShadowOccluders = 3U;
+        }
+        return applyGraphicsAdjustment(settings, quality);
+    }
+    case SettingsMenuOption::DetailedMaterials: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        quality.detailedMaterials = direction > 0;
+        return applyGraphicsAdjustment(settings, quality);
+    }
+    case SettingsMenuOption::RenderScale: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        const auto current = static_cast<int>(quality.renderScalePercent);
+        const auto adjusted = direction > 0
+            ? std::min(100, ((current / 5) + 1) * 5)
+            : std::max(50, ((current - 1) / 5) * 5);
+        quality.renderScalePercent = static_cast<std::uint16_t>(adjusted);
+        return applyGraphicsAdjustment(settings, quality);
+    }
+    case SettingsMenuOption::MaximumLights: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        quality.maximumLights = static_cast<std::uint8_t>(std::clamp(
+            static_cast<int>(quality.maximumLights) + (direction > 0 ? 1 : -1), 2, 8));
+        return applyGraphicsAdjustment(settings, quality);
     }
     case SettingsMenuOption::WindowResolution: {
         const WindowResolution previous = settings.windowResolution;
@@ -215,19 +258,27 @@ GraphicsQualitySettings graphicsQualitySettings(
 {
     switch (quality) {
     case GraphicsQuality::Potato:
-        return {50U, 2U, 0U, 0U, 1U, false};
+        return {50U, 2U, 0U, 0U, 1U, false, false};
     case GraphicsQuality::Low:
-        return {67U, 4U, 0U, 0U, 1U, false};
+        return {67U, 4U, 0U, 0U, 1U, false, false};
     case GraphicsQuality::Medium:
         return {85U, 6U, 1U, 3U, 2U, true};
     case GraphicsQuality::High:
-        return {100U, 8U, 1U, 6U, 2U, true};
+        return {100U, 8U, 8U, 6U, 2U, true};
     case GraphicsQuality::Ultra:
-        return {100U, 8U, 2U, 8U, 2U, true};
+        return {100U, 8U, 8U, 8U, 2U, true};
+    case GraphicsQuality::Custom:
     case GraphicsQuality::Count:
         break;
     }
     return graphicsQualitySettings(GraphicsQuality::Medium);
+}
+
+GraphicsQualitySettings effectiveGraphicsQualitySettings(
+    const RuntimeSettings& settings) noexcept
+{
+    return settings.graphicsQuality == GraphicsQuality::Custom
+        ? settings.customGraphics : graphicsQualitySettings(settings.graphicsQuality);
 }
 
 std::string_view graphicsQualityName(const GraphicsQuality quality) noexcept
@@ -243,6 +294,8 @@ std::string_view graphicsQualityName(const GraphicsQuality quality) noexcept
         return "HIGH";
     case GraphicsQuality::Ultra:
         return "ULTRA";
+    case GraphicsQuality::Custom:
+        return "CUSTOM";
     case GraphicsQuality::Count:
         break;
     }
@@ -258,6 +311,7 @@ std::optional<GraphicsQuality> graphicsQualityForName(
         GraphicsQuality::Medium,
         GraphicsQuality::High,
         GraphicsQuality::Ultra,
+        GraphicsQuality::Custom,
     };
     for (const GraphicsQuality quality : qualities) {
         if (name == graphicsQualityName(quality)) {
@@ -283,6 +337,22 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
         settings.fieldOfViewDegrees, 60U, 100U);
     if (settings.graphicsQuality >= GraphicsQuality::Count) {
         settings.graphicsQuality = GraphicsQuality::Medium;
+    }
+    settings.customGraphics.renderScalePercent = std::clamp<std::uint16_t>(
+        settings.customGraphics.renderScalePercent, 50U, 100U);
+    settings.customGraphics.maximumLights = std::clamp<std::uint8_t>(
+        settings.customGraphics.maximumLights, 2U, 8U);
+    settings.customGraphics.maximumShadowLights = std::min<std::uint8_t>(
+        settings.customGraphics.maximumShadowLights, 8U);
+    settings.customGraphics.maximumShadowOccluders = std::min<std::uint8_t>(
+        settings.customGraphics.maximumShadowOccluders, 16U);
+    settings.customGraphics.visibleRoomDepth = std::clamp<std::uint8_t>(
+        settings.customGraphics.visibleRoomDepth, 1U, 4U);
+    if (settings.customGraphics.shadowsEnabled
+        && settings.customGraphics.maximumShadowLights == 0U) {
+        settings.customGraphics.maximumShadowLights = 1U;
+        settings.customGraphics.maximumShadowOccluders = std::max<std::uint8_t>(
+            settings.customGraphics.maximumShadowOccluders, 3U);
     }
     if (settings.windowResolution >= WindowResolution::Count) {
         settings.windowResolution = WindowResolution::R1280x720;

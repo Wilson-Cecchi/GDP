@@ -203,7 +203,7 @@ bool navigationSegmentClear(
     }
 
     // An eroded walkable AABB is convex. When the whole segment fits inside
-    // one such volume and its swept collider AABB misses every relevant solid,
+    // one such volume and its expanded segment misses every relevant solid,
     // all intermediate occupancy samples are guaranteed to be clear.
     if (std::isfinite(start.x) && std::isfinite(start.y)
         && std::isfinite(start.z) && std::isfinite(end.x)
@@ -230,6 +230,20 @@ bool navigationSegmentClear(
                     && maximumY + collider.height <= volume.maximum.y;
             });
         if (fitsOneVolume) {
+            const auto crossesExpandedAxis = [](
+                const float first, const float last, const float minimum,
+                const float maximum, float& entry, float& exit) {
+                const float delta = last - first;
+                if (std::abs(delta) <= 1.0e-7F) {
+                    return first >= minimum && first <= maximum;
+                }
+                const float inverse = 1.0F / delta;
+                const float near = (minimum - first) * inverse;
+                const float far = (maximum - first) * inverse;
+                entry = std::max(entry, std::min(near, far));
+                exit = std::min(exit, std::max(near, far));
+                return entry <= exit;
+            };
             const bool intersectsPossibleSolid = std::any_of(
                 collisionWorld.solids().begin(), collisionWorld.solids().end(),
                 [&](const wkc::core::Aabb& solid) {
@@ -237,10 +251,14 @@ bool navigationSegmentClear(
                         || minimumY >= solid.maximum.y) {
                         return false;
                     }
-                    return maximumX + radius >= solid.minimum.x
-                        && minimumX - radius <= solid.maximum.x
-                        && maximumZ + radius >= solid.minimum.z
-                        && minimumZ - radius <= solid.maximum.z;
+                    float entry = 0.0F;
+                    float exit = 1.0F;
+                    return crossesExpandedAxis(start.x, end.x,
+                               solid.minimum.x - radius,
+                               solid.maximum.x + radius, entry, exit)
+                        && crossesExpandedAxis(start.z, end.z,
+                               solid.minimum.z - radius,
+                               solid.maximum.z + radius, entry, exit);
                 });
             if (!intersectsPossibleSolid) {
                 return true;
@@ -294,86 +312,97 @@ std::optional<wkc::core::Vec3> navigationWaypoint(
         return target;
     }
 
-    std::vector<wkc::core::Vec3> nodes{start, target};
-    nodes.reserve(2U + (collisionWorld.solids().size() * 4U)
-        + (collisionWorld.walkableVolumes().size() * 4U));
-    // A robot must fit the 1.2 m corridors even at a bend: radius 0.52 m
-    // leaves only 0.08 m lateral clearance on each side.
-    const float clearance = std::max(collider.radius, 0.0F)
-        + (collider.radius >= 0.50F ? 0.04F : 0.10F);
-    for (const wkc::core::Aabb solid : collisionWorld.solids()) {
-        const float firstX = preferredSide < 0
-            ? solid.minimum.x - clearance : solid.maximum.x + clearance;
-        const float secondX = preferredSide < 0
-            ? solid.maximum.x + clearance : solid.minimum.x - clearance;
-        for (const float x : {firstX, secondX}) {
-            appendNavigationCorner(nodes, collisionWorld,
-                {x, start.y, solid.minimum.z - clearance}, collider);
-            appendNavigationCorner(nodes, collisionWorld,
-                {x, start.y, solid.maximum.z + clearance}, collider);
-        }
-    }
-    for (const wkc::core::Aabb volume : collisionWorld.walkableVolumes()) {
-        appendNavigationCorner(nodes, collisionWorld,
-            {volume.minimum.x + clearance, start.y,
-                volume.minimum.z + clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {volume.minimum.x + clearance, start.y,
-                volume.maximum.z - clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {volume.maximum.x - clearance, start.y,
-                volume.minimum.z + clearance}, collider);
-        appendNavigationCorner(nodes, collisionWorld,
-            {volume.maximum.x - clearance, start.y,
-                volume.maximum.z - clearance}, collider);
-    }
-
-    constexpr std::size_t noNode = std::numeric_limits<std::size_t>::max();
-    std::vector<float> distances(
-        nodes.size(), std::numeric_limits<float>::infinity());
-    std::vector<std::size_t> previous(nodes.size(), noNode);
-    std::vector<bool> visited(nodes.size(), false);
-    distances.front() = 0.0F;
-    for (std::size_t iteration = 0U; iteration < nodes.size(); ++iteration) {
-        std::size_t current = noNode;
-        for (std::size_t candidate = 0U; candidate < nodes.size(); ++candidate) {
-            if (!visited[candidate]
-                && (current == noNode
-                    || distances[candidate] < distances[current])) {
-                current = candidate;
-            }
-        }
-        if (current == noNode || !std::isfinite(distances[current])) {
-            break;
-        }
-        if (current == 1U) {
-            break;
-        }
-        visited[current] = true;
-        for (std::size_t next = 1U; next < nodes.size(); ++next) {
-            if (visited[next] || next == current
-                || !navigationSegmentClear(
-                    collisionWorld, nodes[current], nodes[next], collider)) {
+    // Most rooms have wall trim and columns that lie far outside the route.
+    // Search nearby obstacle corners first; retry with all corners if a wider
+    // detour is needed.
+    for (const float margin : {3.0F, std::numeric_limits<float>::infinity()}) {
+        std::vector<wkc::core::Vec3> nodes{start, target};
+        nodes.reserve(2U + (collisionWorld.solids().size() * 4U)
+            + (collisionWorld.walkableVolumes().size() * 4U));
+        // A robot must fit the 1.2 m corridors even at a bend: radius 0.52 m
+        // leaves only 0.08 m lateral clearance on each side.
+        const float clearance = std::max(collider.radius, 0.0F)
+            + (collider.radius >= 0.50F ? 0.04F : 0.10F);
+        for (const wkc::core::Aabb solid : collisionWorld.solids()) {
+            if (std::isfinite(margin)
+                && (solid.maximum.x < std::min(start.x, target.x) - margin
+                    || solid.minimum.x > std::max(start.x, target.x) + margin
+                    || solid.maximum.z < std::min(start.z, target.z) - margin
+                    || solid.minimum.z > std::max(start.z, target.z) + margin)) {
                 continue;
             }
-            const float edgeDistance = std::sqrt(
-                planarDistanceSquared(nodes[current], nodes[next]));
-            const float candidateDistance = distances[current] + edgeDistance;
-            if (candidateDistance + 1.0e-5F < distances[next]) {
-                distances[next] = candidateDistance;
-                previous[next] = current;
+            const float firstX = preferredSide < 0
+                ? solid.minimum.x - clearance : solid.maximum.x + clearance;
+            const float secondX = preferredSide < 0
+                ? solid.maximum.x + clearance : solid.minimum.x - clearance;
+            for (const float x : {firstX, secondX}) {
+                appendNavigationCorner(nodes, collisionWorld,
+                    {x, start.y, solid.minimum.z - clearance}, collider);
+                appendNavigationCorner(nodes, collisionWorld,
+                    {x, start.y, solid.maximum.z + clearance}, collider);
             }
         }
+        for (const wkc::core::Aabb volume : collisionWorld.walkableVolumes()) {
+            appendNavigationCorner(nodes, collisionWorld,
+                {volume.minimum.x + clearance, start.y,
+                    volume.minimum.z + clearance}, collider);
+            appendNavigationCorner(nodes, collisionWorld,
+                {volume.minimum.x + clearance, start.y,
+                    volume.maximum.z - clearance}, collider);
+            appendNavigationCorner(nodes, collisionWorld,
+                {volume.maximum.x - clearance, start.y,
+                    volume.minimum.z + clearance}, collider);
+            appendNavigationCorner(nodes, collisionWorld,
+                {volume.maximum.x - clearance, start.y,
+                    volume.maximum.z - clearance}, collider);
+        }
+
+        constexpr std::size_t noNode = std::numeric_limits<std::size_t>::max();
+        std::vector<float> distances(
+            nodes.size(), std::numeric_limits<float>::infinity());
+        std::vector<std::size_t> previous(nodes.size(), noNode);
+        std::vector<bool> visited(nodes.size(), false);
+        distances.front() = 0.0F;
+        for (std::size_t iteration = 0U; iteration < nodes.size(); ++iteration) {
+            std::size_t current = noNode;
+            for (std::size_t candidate = 0U; candidate < nodes.size(); ++candidate) {
+                if (!visited[candidate]
+                    && (current == noNode
+                        || distances[candidate] < distances[current])) {
+                    current = candidate;
+                }
+            }
+            if (current == noNode || !std::isfinite(distances[current])) {
+                break;
+            }
+            if (current == 1U) {
+                break;
+            }
+            visited[current] = true;
+            for (std::size_t next = 1U; next < nodes.size(); ++next) {
+                if (visited[next] || next == current
+                    || !navigationSegmentClear(
+                        collisionWorld, nodes[current], nodes[next], collider)) {
+                    continue;
+                }
+                const float edgeDistance = std::sqrt(
+                    planarDistanceSquared(nodes[current], nodes[next]));
+                const float candidateDistance = distances[current] + edgeDistance;
+                if (candidateDistance + 1.0e-5F < distances[next]) {
+                    distances[next] = candidateDistance;
+                    previous[next] = current;
+                }
+            }
+        }
+        if (previous[1U] == noNode) continue;
+        std::size_t waypoint = 1U;
+        while (previous[waypoint] != 0U && previous[waypoint] != noNode) {
+            waypoint = previous[waypoint];
+        }
+        return previous[waypoint] == 0U
+            ? std::optional<wkc::core::Vec3>{nodes[waypoint]} : std::nullopt;
     }
-    if (previous[1U] == noNode) {
-        return std::nullopt;
-    }
-    std::size_t waypoint = 1U;
-    while (previous[waypoint] != 0U && previous[waypoint] != noNode) {
-        waypoint = previous[waypoint];
-    }
-    return previous[waypoint] == 0U
-        ? std::optional<wkc::core::Vec3>{nodes[waypoint]} : std::nullopt;
+    return std::nullopt;
 }
 
 wkc::core::Vec3 navigationDirection(

@@ -13,6 +13,9 @@ namespace {
 
 constexpr CharacterCollider grenadeCollider{0.12F, 0.24F};
 constexpr float grenadeRadius = 0.12F;
+constexpr float grenadeEnemyMaximumDamage = 200.0F;
+constexpr float grenadePropMaximumDamage = 200.0F;
+constexpr float grenadePlayerMaximumDamage = 140.0F;
 
 bool allowedRoom(const GrenadeDetonation& blast, const std::uint32_t roomId)
 {
@@ -181,7 +184,8 @@ float referenceEnemyBlastDamage(const wkc::core::Vec3 origin,
                 -sine * local.x + cosine * local.z};
         if (referenceEnemyBodyContainsPoint(point, entity, enemy)
             && hasLineOfSight(origin, point, collision)) {
-            damage = std::max(damage, blastDamage(origin, point, 100.0F));
+            damage = std::max(damage, blastDamage(
+                origin, point, grenadeEnemyMaximumDamage));
         }
     }
     return damage;
@@ -352,7 +356,7 @@ GrenadeBlastResult resolveGrenadeBlast(
         } else {
             const auto target = entity->transform.position
                 + wkc::core::Vec3{0.0F, 0.9F, 0.0F};
-            damage = blastDamage(origin, target, 100.0F);
+            damage = blastDamage(origin, target, grenadeEnemyMaximumDamage);
             if (!hasLineOfSight(origin, target, blast.collision)) continue;
         }
         if (damage <= 0.0F) continue;
@@ -367,7 +371,7 @@ GrenadeBlastResult resolveGrenadeBlast(
             || prop->state == entities::PropState::Destroyed) continue;
         const auto bounds = propCollisionBounds(*entity, *prop);
         const auto target = (bounds.minimum + bounds.maximum) * 0.5F;
-        const float damage = blastDamage(origin, target, 100.0F);
+        const float damage = blastDamage(origin, target, grenadePropMaximumDamage);
         if (damage <= 0.0F || !hasLineOfSightToProp(origin, entities, id, blast.collision)) continue;
         const auto outcome = damageProp(entities, id, damage);
         if (outcome.outcome != PropDamageOutcome::Ignored) {
@@ -379,7 +383,7 @@ GrenadeBlastResult resolveGrenadeBlast(
     if (player.state().alive) {
         const auto target = player.state().position
             + wkc::core::Vec3{0.0F, player.collider().height * 0.5F, 0.0F};
-        const float damage = blastDamage(origin, target, 70.0F);
+        const float damage = blastDamage(origin, target, grenadePlayerMaximumDamage);
         if (damage > 0.0F && hasLineOfSight(origin, target, blast.collision)) {
             player.applyDamage(damage);
             result.playerDamaged = true;

@@ -105,18 +105,19 @@ void testRuntimeSettingsClamps()
         "graphics quality clamps at Ultra");
 
     expect(graphicsQualitySettings(GraphicsQuality::Potato)
-            == GraphicsQualitySettings{50U, 2U, 0U, 0U, 1U, false}
+            == GraphicsQualitySettings{50U, 2U, 0U, 0U, 1U, false, false}
             && graphicsQualitySettings(GraphicsQuality::Low)
-                == GraphicsQualitySettings{67U, 4U, 0U, 0U, 1U, false}
+                == GraphicsQualitySettings{67U, 4U, 0U, 0U, 1U, false, false}
             && graphicsQualitySettings(GraphicsQuality::Medium)
                 == GraphicsQualitySettings{85U, 6U, 1U, 3U, 2U, true}
             && graphicsQualitySettings(GraphicsQuality::High)
-                == GraphicsQualitySettings{100U, 8U, 1U, 6U, 2U, true}
+                == GraphicsQualitySettings{100U, 8U, 8U, 6U, 2U, true}
             && graphicsQualitySettings(GraphicsQuality::Ultra)
-                == GraphicsQualitySettings{100U, 8U, 2U, 8U, 2U, true},
+                == GraphicsQualitySettings{100U, 8U, 8U, 8U, 2U, true},
         "graphics profiles expose deterministic rendering budgets");
     expect(graphicsQualityName(GraphicsQuality::Potato) == "POTATO"
             && graphicsQualityForName("HIGH") == GraphicsQuality::High
+            && graphicsQualityForName("CUSTOM") == GraphicsQuality::Custom
             && !graphicsQualityForName("UNKNOWN"),
         "graphics profile names round-trip without accepting unknown values");
 
@@ -202,12 +203,48 @@ void testRuntimeSettingsClamps()
         "invalid video enums recover to their default presets");
 }
 
+void testCustomGraphics()
+{
+    using namespace gdp::gameplay;
+    RuntimeSettings settings;
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::Shadows, -1)
+            && settings.graphicsQuality == GraphicsQuality::Custom
+            && !effectiveGraphicsQualitySettings(settings).shadowsEnabled,
+        "individual shadow change selects Custom without changing other budgets");
+    expect(!adjustRuntimeSetting(settings, SettingsMenuOption::Shadows, -1),
+        "unchanged shadow toggle does not report a change");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::DetailedMaterials, -1)
+            && !settings.customGraphics.detailedMaterials
+            && settings.customGraphics.renderScalePercent == 85U,
+        "material toggle preserves the render scale");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::RenderScale, 1)
+            && settings.customGraphics.renderScalePercent == 90U,
+        "render scale adjusts in five percent steps");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::MaximumLights, 1)
+            && settings.customGraphics.maximumLights == 7U,
+        "light budget adjusts independently");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::GraphicsQuality, -1)
+            && settings.graphicsQuality == GraphicsQuality::High
+            && effectiveGraphicsQualitySettings(settings) == graphicsQualitySettings(GraphicsQuality::High),
+        "selecting a preset restores all of its values");
+    settings.graphicsQuality = GraphicsQuality::Low;
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::RenderScale, 1)
+            && settings.customGraphics.renderScalePercent == 70U,
+        "legacy 67 percent Low preset steps to the next five percent value");
+    settings.graphicsQuality = GraphicsQuality::Potato;
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::Shadows, 1)
+            && settings.customGraphics.shadowsEnabled
+            && settings.customGraphics.maximumShadowLights >= 1U,
+        "turning shadows on from Potato provisions a light");
+}
+
 } // namespace
 
 int main()
 {
     testSettingsNavigationAndReturn();
     testRuntimeSettingsClamps();
+    testCustomGraphics();
     if (failures != 0) {
         std::cerr << failures << " settings menu test(s) failed\n";
         return 1;

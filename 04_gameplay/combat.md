@@ -83,8 +83,15 @@ tiros entre salas. Disparos no corredor podem atingir a sala de destino, e o
 ruído alcança os inimigos das salas conectadas. O resultado distingue cooldown,
 vazio, miss, impacto no mundo, prop protegido, hit, kill e prop destruído. Todo
 resultado que realmente toca uma superfície inclui `ImpactResult`: posição do
-primeiro contato, normal oposta ao raio e material `Metal`, `Composite` ou
+primeiro contato, normal da superfície atingida no cenário (oposta ao raio nos alvos)
+e material `Metal`, `Composite` ou
 `Flesh`. Miss, cooldown e arma vazia não fabricam impacto.
+
+Disparos do jogador que acertam o cenário deixam uma marca circular escura com
+aro metálico no ponto atingido. A marca segue a normal real da parede, do piso,
+do teto ou do sólido; não altera colisão nem dano. A faísca continua transitória,
+enquanto até 48 marcas permanecem durante a partida; as mais antigas são
+descartadas ao atingir o limite. Reiniciar ou trocar de partida limpa as marcas.
 
 A IA também atualiza inimigos nas salas ligadas à sala atual por corredores com
 porta transitável. Visão, ataque e perseguição usam a colisão contínua dessas

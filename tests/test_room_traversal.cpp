@@ -1,5 +1,6 @@
 #include "core/Math.hpp"
 #include "gameplay/Collision.hpp"
+#include "gameplay/Campaign.hpp"
 #include "gameplay/Combat.hpp"
 #include "gameplay/Door.hpp"
 #include "gameplay/Enemy.hpp"
@@ -7,6 +8,8 @@
 #include "gameplay/Props.hpp"
 #include "gameplay/RoomTraversal.hpp"
 #include "gameplay/Session.hpp"
+#include "world/Corridor.hpp"
+#include "world/RoomArchitecture.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldGenerator.hpp"
 #include "world/WorldEntities.hpp"
@@ -263,6 +266,76 @@ void testRotatedRoomCollisionMatchesModuleBounds()
     }
 }
 
+void testWallColumnsShareNavigationCollision()
+{
+    using namespace gdp;
+    const world::RoomModule module = world::makeFixedRoomModule();
+    for (const wkc::core::QuarterTurn rotation : {
+             wkc::core::QuarterTurn::Degrees0,
+             wkc::core::QuarterTurn::Degrees90,
+             wkc::core::QuarterTurn::Degrees180,
+             wkc::core::QuarterTurn::Degrees270}) {
+        const auto room = world::instantiateRoom(module, 19U,
+            world::RoomRole::Normal, 20261031U,
+            {14.0F, 0.0F, -28.0F}, rotation);
+        expect(room.has_value(), "room instantiates for wall-column collision test");
+        if (!room) continue;
+        const auto columns = world::makeRoomWallColumns(*room);
+        expect(!columns.empty(), "normal room gains physical wall columns");
+        world::World generated;
+        generated.rooms.push_back(*room);
+        const gameplay::CollisionWorld navigation
+            = gameplay::makeRoomNavigationCollision(generated, room->id, true);
+        for (const world::RoomArchitecturePart& column : columns) {
+            expect(column.solid
+                    && std::find(navigation.solids().begin(),
+                        navigation.solids().end(), column.bounds)
+                        != navigation.solids().end(),
+                "each rendered wall column has matching navigation collision");
+        }
+    }
+}
+
+void testCorridorColumnsShareNavigationCollision()
+{
+    using namespace gdp;
+    const auto module = world::makeFixedRoomModule();
+    const auto first = world::instantiateRoom(module, 1U,
+        world::RoomRole::Start, 101U, {}, wkc::core::QuarterTurn::Degrees0);
+    const auto second = world::instantiateRoom(module, 2U,
+        world::RoomRole::Normal, 102U, {0.0F, 0.0F, -20.0F},
+        wkc::core::QuarterTurn::Degrees0);
+    expect(first && second, "corridor column fixture rooms instantiate");
+    if (!first || !second) return;
+
+    world::World generated;
+    generated.rooms = {*first, *second};
+    world::CorridorPath corridor;
+    corridor.edge = 1U;
+    corridor.firstRoom = first->id;
+    corridor.secondRoom = second->id;
+    corridor.width = 2.4F;
+    corridor.height = 2.8F;
+    corridor.points = {{0.0F, 0.0F, -4.85F},
+        {0.0F, 0.0F, -15.15F}};
+    generated.corridors.push_back(corridor);
+
+    const auto columns = world::makeCorridorWallColumns(
+        corridor.points, corridor.width, corridor.height);
+    expect(!columns.empty(), "wide corridor has physical columns");
+    const gameplay::CollisionWorld navigation
+        = gameplay::makeRoomNavigationCollision(generated, first->id, false);
+    for (const wkc::core::Aabb& column : columns) {
+        expect(std::find(navigation.solids().begin(),
+                navigation.solids().end(), column) != navigation.solids().end(),
+            "each rendered corridor column has identical navigation collision");
+    }
+    wkc::core::Vec3 position{0.0F, 0.0F, -3.5F};
+    expect(moveToWaypoint(navigation, position, {0.0F, 0.0F, -17.0F},
+            {.radius = 0.52F, .height = 2.0F}),
+        "largest enemy can traverse the column corridor on the center line");
+}
+
 void testDoorRuntimeOpensHoldsClosesAndLocks()
 {
     using namespace gdp;
@@ -440,6 +513,93 @@ void testOpenCorridorShotsReachNextRoom()
     }
     expect(allReachable,
         "shots from generated corridors reach enemies just inside the next room");
+}
+
+void testShapedCampaignDoorwaysPassShotsOnlyWhenOpen()
+{
+    using namespace gdp;
+    bool sawShapedDoor = false;
+    bool openPasses = true;
+    bool closedBlocks = true;
+    bool wallBesideDoorBlocks = true;
+    bool shotsHitAcrossDoor = true;
+    bool straightRoomToRoomPasses = true;
+    for (const wkc::core::Seed seed : {1793U, 3710U}) {
+        const auto layout = gameplay::campaignFloorLayout(seed, 1U);
+        const auto generated = world::generateWorld(seed,
+            {.roomCount = layout.roomCount, .loopBudget = layout.loopBudget});
+        expect(generated.world.has_value(),
+            "campaign doorway regression seed generates");
+        if (!generated.world) continue;
+        for (const auto& room : generated.world->rooms) {
+            if (room.walkableOutline.empty()) continue;
+            for (const auto& door : room.connectors) {
+                if (door.sealed || !door.edge) continue;
+                sawShapedDoor = true;
+                auto origin = door.worldPosition - door.worldNormal * 1.4F;
+                auto target = door.worldPosition + door.worldNormal * 1.4F;
+                origin.y = target.y = door.worldPosition.y + 1.3F;
+                const auto open = gameplay::makeRoomNavigationCollision(
+                    *generated.world, room.id, false);
+                const std::array blocked{*door.edge};
+                const auto closed = gameplay::makeRoomNavigationCollision(
+                    *generated.world, room.id, false, blocked);
+                openPasses &= gameplay::hasLineOfSight(origin, target, open);
+                closedBlocks &= !gameplay::hasLineOfSight(origin, target, closed);
+                const wkc::core::Vec3 alongWall{
+                    door.worldNormal.z, 0.0F, -door.worldNormal.x};
+                const auto offset = alongWall * (door.width * 0.5F + 0.8F);
+                wallBesideDoorBlocks &= !gameplay::hasLineOfSight(
+                    origin + offset, target + offset, open);
+
+                entities::EntityManager manager;
+                const auto enemy = manager.createEnemy({
+                    .transform = {.position = {target.x, door.worldPosition.y,
+                        target.z}},
+                    .roomId = room.id,
+                    .health = 100.0F,
+                });
+                gameplay::Weapon weapon({.fireInterval = 0.0F, .range = 20.0F});
+                const auto shot = gameplay::fireHitscan(weapon, origin,
+                    wkc::core::normalized(target - origin), room.id,
+                    open, manager);
+                shotsHitAcrossDoor &= shot.hit && shot.hit->target == enemy;
+            }
+        }
+        for (const auto& corridor : generated.world->corridors) {
+            if (corridor.shape != world::CorridorShape::Straight) continue;
+            const auto* source = findRoom(*generated.world, corridor.firstRoom);
+            const auto* destination = findRoom(*generated.world,
+                corridor.secondRoom);
+            const auto* exit = source == nullptr ? nullptr
+                : connectorForEdge(*source, corridor.edge);
+            const auto* entry = destination == nullptr ? nullptr
+                : connectorForEdge(*destination, corridor.edge);
+            if (exit == nullptr || entry == nullptr) {
+                straightRoomToRoomPasses = false;
+                continue;
+            }
+            auto origin = exit->worldPosition - exit->worldNormal * 0.75F;
+            auto target = entry->worldPosition - entry->worldNormal * 0.75F;
+            origin.y += 1.3F;
+            target.y += 1.3F;
+            const auto navigation = gameplay::makeRoomNavigationCollision(
+                *generated.world, source->id, false);
+            straightRoomToRoomPasses &= gameplay::hasLineOfSight(
+                origin, target, navigation);
+        }
+    }
+    expect(sawShapedDoor, "campaign samples contain shaped rooms with doors");
+    expect(openPasses,
+        "open shaped-room doorways let shots cross the wall outline");
+    expect(closedBlocks,
+        "closed shaped-room doorways still block shots");
+    expect(wallBesideDoorBlocks,
+        "the wall beside an open shaped-room doorway still blocks shots");
+    expect(shotsHitAcrossDoor,
+        "hitscan reaches an enemy beyond each open shaped-room doorway");
+    expect(straightRoomToRoomPasses,
+        "straight open corridors permit shots from one room into the next");
 }
 
 void testBossKillBeforeRoomEntryFinishesRun()
@@ -715,6 +875,8 @@ void testEnemiesUseOpenCorridorsButDoNotOpenClosedDoors()
     });
     gameplay::IndustrialRobotConfig bossAttackConfig;
     bossAttackConfig.investigation.visionHalfAngleDegrees = 180.0F;
+    bossAttackConfig.longRangeMinimum = 0.0F;
+    bossAttackConfig.longRangeMaximum = 4.0F;
     bool bossAttackedCorridor = false;
     for (int tick = 0; tick < 600 && bossTarget.state().alive; ++tick) {
         const auto update = gameplay::updateIndustrialRobots(
@@ -946,6 +1108,8 @@ void testBossFlankCoverAcrossRotations()
     bool lowCrouchCover = true;
     bool highStandingCover = true;
     bool longCentralSightline = true;
+    bool rightColumnsBlock = true;
+    bool rightFlankWalkable = true;
     std::array<bool, 4> rotations{};
     for (Seed seed = 0U; seed < 64U; ++seed) {
         auto generated = world::generateWorld(seed);
@@ -986,11 +1150,20 @@ void testBossFlankCoverAcrossRotations()
             highFeet + Vec3{0.0F, 1.62F, 0.0F}, collision);
         longCentralSightline &= gameplay::hasLineOfSight(robotEye,
             local({0.0F, 1.62F, -12.0F}), collision);
+        for (const float z : {-8.0F, 8.0F}) {
+            rightColumnsBlock &= !collision.canOccupy(local({7.0F, 0.0F, z}))
+                && !gameplay::hasLineOfSight(robotEye,
+                    local({10.0F, 1.62F, z * 1.5F}), collision);
+            rightFlankWalkable &= collision.canOccupy(local({10.5F, 0.0F, z}))
+                && collision.canOccupy(local({7.0F, 0.0F, z * 1.35F}));
+        }
     }
     expect(walkableFlank, "Boss left flank has walkable points behind both barricades");
     expect(lowCrouchCover && highStandingCover,
         "low barricade protects a crouched approach and tall barricade protects standing player");
     expect(longCentralSightline, "Boss central lane remains open for long-range shots");
+    expect(rightColumnsBlock && rightFlankWalkable,
+        "Boss right columns stop shots while both sides remain walkable");
     expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
         "Boss cover batch exercises all four rotations");
 }
@@ -1026,6 +1199,12 @@ void testCorridorRoofAndCornerWalls()
                 checkedRoof = true;
             }
             for (std::size_t index = 1U; index + 1U < corridor.points.size(); ++index) {
+                if (wkc::core::length(corridor.points[index] - corridor.points[index - 1U])
+                        <= corridor.width
+                    || wkc::core::length(corridor.points[index + 1U] - corridor.points[index])
+                        <= corridor.width) {
+                    continue;
+                }
                 const auto incoming = wkc::core::normalized(
                     corridor.points[index] - corridor.points[index - 1U]);
                 const auto outgoing = wkc::core::normalized(
@@ -1121,17 +1300,88 @@ void testDisconnectedWalkableVolumesCannotBeCrossedInOneStep()
         "a fast fixed step cannot tunnel through a corridor wall into another passage");
 }
 
+void testCampaignGalleryStairsAcrossRotations()
+{
+    using namespace gdp;
+    const auto library = world::makeDefaultRoomModuleLibrary();
+    const auto module = std::find_if(library.begin(), library.end(),
+        [](const world::RoomModule& candidate) {
+            return candidate.id == world::combatGalleryArenaModuleId;
+        });
+    expect(module != library.end(), "campaign gallery Arena module is available");
+    if (module == library.end()) return;
+    for (int rotation = 0; rotation < 4; ++rotation) {
+        const auto turn = static_cast<wkc::core::QuarterTurn>(rotation);
+        auto room = world::instantiateRoom(*module, 1U, world::RoomRole::Arena,
+            1793U, {0.0F, 0.0F, 0.0F}, turn);
+        expect(room.has_value(), "campaign gallery Arena instantiates rotated");
+        if (!room) continue;
+        world::World sample;
+        sample.rooms.push_back(*room);
+        const auto collision = gameplay::makeRoomNavigationCollision(
+            sample, room->id, false);
+        for (const float side : {-1.0F, 1.0F}) {
+            const auto localToWorld = [turn](const wkc::core::Vec3 local) {
+                return wkc::core::rotateQuarterTurns(local, turn);
+            };
+            auto feet = localToWorld({side * 9.1F, 0.0F, 9.35F});
+            const auto velocity = localToWorld({0.0F, -0.35F, -4.5F});
+            for (int update = 0; update < 102; ++update) {
+                feet = collision.moveCharacter(feet, velocity,
+                    1.0F / 60.0F, {}).position;
+            }
+            const auto localFeet = wkc::core::rotateQuarterTurns(feet,
+                static_cast<wkc::core::QuarterTurn>((4 - rotation) % 4));
+            expect(localFeet.z < 3.35F && localFeet.y >= 3.31F,
+                "both campaign stairs reach the gallery in every rotation");
+        }
+    }
+}
+
+void testCentralHubShotShapeSurvivesNavigationAndProps()
+{
+    for (const auto module : {gdp::world::centralHubPreviewModuleId,
+             gdp::world::centralHubModuleId}) {
+        gdp::world::RoomInstance hub;
+        hub.id = 1U;
+        hub.moduleId = module;
+        hub.worldBounds = {{-12.0F, 0.0F, -12.0F},
+            {12.0F, 7.0F, 12.0F}};
+        gdp::world::World world;
+        world.rooms.push_back(hub);
+        const auto navigation = gdp::gameplay::makeRoomNavigationCollision(
+            world, hub.id);
+        gdp::entities::EntityManager manager;
+        const auto withProps = gdp::gameplay::collisionWorldWithProps(
+            navigation, manager, hub.id);
+        expect(navigation.octagonalSolids().size() == 1U
+                && withProps.octagonalSolids() == navigation.octagonalSolids()
+                && !withProps.projectileSolidContains({1.1F, 2.0F, 1.1F})
+                && withProps.projectileSolidContains({0.0F, 2.0F, 1.0F}),
+            "the Central Hub shaft keeps its shot shape in preview and campaign");
+        gdp::gameplay::Weapon weapon({.fireInterval = 0.0F, .range = 0.7F});
+        const auto shot = gdp::gameplay::fireHitscan(weapon,
+            {0.9F, 2.0F, 1.4F}, {1.0F, 0.0F, -1.0F},
+            hub.id, withProps, manager);
+        expect(shot.outcome == gdp::gameplay::ShotOutcome::Miss,
+            "a shot passes the bevel in the assembled Central Hub room");
+    }
+}
+
 } // namespace
 
 int main()
 {
     testEveryGeneratedConnectionTraversesBothWays();
     testOpenCorridorShotsReachNextRoom();
+    testShapedCampaignDoorwaysPassShotsOnlyWhenOpen();
     testBossKillBeforeRoomEntryFinishesRun();
     testEnemiesUseOpenCorridorsButDoNotOpenClosedDoors();
     testRangeInvalidInputAndPlayerRelocation();
     testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();
+    testWallColumnsShareNavigationCollision();
+    testCorridorColumnsShareNavigationCollision();
     testDoorRuntimeOpensHoldsClosesAndLocks();
     testDoorPanelTravelMatchesPassability();
     testPreviouslyBrokenCorridorSeedsTraverseBothWays();
@@ -1144,6 +1394,8 @@ int main()
     testCorridorRoofAndCornerWalls();
     testGeneratedCorridorSideWalls();
     testDisconnectedWalkableVolumesCannotBeCrossedInOneStep();
+    testCampaignGalleryStairsAcrossRotations();
+    testCentralHubShotShapeSurvivesNavigationAndProps();
 
     if (failures != 0) {
         std::cerr << failures << " room traversal test(s) failed\n";

@@ -155,10 +155,17 @@ std::optional<wkc::core::Vec3> placementForNode(
         if (!clear(position)) {
             continue;
         }
+        const wkc::core::Aabb candidateBounds = translatedBounds(prototype.worldBounds, position);
         float score = 0.0F;
         for (const RoomInstance* neighbor : neighbors) {
-            score += std::abs(position.x - neighbor->transform.position.x)
-                + std::abs(position.z - neighbor->transform.position.z);
+            const auto axisGap = [](const float aMin, const float aMax,
+                                     const float bMin, const float bMax) {
+                return std::max({0.0F, bMin - aMax, aMin - bMax});
+            };
+            score += axisGap(candidateBounds.minimum.x, candidateBounds.maximum.x,
+                         neighbor->worldBounds.minimum.x, neighbor->worldBounds.maximum.x)
+                + axisGap(candidateBounds.minimum.z, candidateBounds.maximum.z,
+                         neighbor->worldBounds.minimum.z, neighbor->worldBounds.maximum.z);
         }
         if (!best || score < bestScore) {
             best = position;

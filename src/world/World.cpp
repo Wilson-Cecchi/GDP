@@ -48,6 +48,10 @@ std::uint64_t worldFingerprint(const World& world) noexcept
         hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(room.rotation));
         hash = addVec3(hash, room.worldBounds.minimum);
         hash = addVec3(hash, room.worldBounds.maximum);
+        for (const auto point : room.walkableOutline) {
+            hash = addFloat(hash, point.x);
+            hash = addFloat(hash, point.y);
+        }
         for (const ConnectorInstance& connector : room.connectors) {
             hash = wkc::core::hashCombine(hash, connector.definitionId);
             hash = addVec3(hash, connector.worldPosition);

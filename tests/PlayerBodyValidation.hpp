@@ -19,8 +19,12 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
 {
     using namespace gdp::game::visual;
     const char* capture = std::getenv("GDP_PLAYER_BODY_CAPTURE_DIR");
-    const bool preview = std::getenv("GDP_PLAYER_RIG_PREVIEW") != nullptr
-        && std::string{std::getenv("GDP_PLAYER_RIG_PREVIEW")} == "1";
+    const char* const rigPreview = std::getenv("GDP_PLAYER_RIG_PREVIEW");
+    const char* const exosuitPreview = std::getenv("GDP_PLAYER_EXOSUIT_PREVIEW");
+    const bool exosuit = exosuitPreview != nullptr
+        && std::string{exosuitPreview} == "1";
+    const bool preview = exosuit || (rigPreview != nullptr
+        && std::string{rigPreview} == "1");
     const std::array sizes = capture ? std::array{std::array{1280,720},std::array{960,600},std::array{320,200}}
         : std::array{std::array{320,200},std::array{384,240},std::array{480,200}};
     bool passed = true;
@@ -38,6 +42,9 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         PlayerBodyRenderData body{.visible=true};
         const auto frame = [&](const std::span<const PropRenderData> props = {},
                                const WeaponViewmodelRenderData weapon = {}) {
+            body.pitchDegrees = std::atan2(camera.forward.y,
+                std::hypot(camera.forward.x,camera.forward.z))
+                * 180.0F/std::numbers::pi_v<float>;
             passed &= renderer.render(width,height,camera,{},{},props,lighting,{},{},{},{},hud,{},weapon,{},body);
             passed &= glGetError() == GL_NO_ERROR;
             std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width*height*4));
@@ -51,11 +58,19 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         const auto standing = frame();
         const auto bodyStats = renderer.lastFrameStats();
         passed &= standing != baseline && frame() == standing;
-        passed &= bodyStats.drawCalls == baselineStats.drawCalls+(preview ? 6U : 4U);
-        if (preview)
-            passed &= bodyStats.triangles > baselineStats.triangles+5000U
-                && bodyStats.triangles < baselineStats.triangles+10000U;
-        else passed &= bodyStats.triangles == baselineStats.triangles+2096U;
+        if (exosuit) {
+            passed &= bodyStats.drawCalls >= baselineStats.drawCalls+6U
+                && bodyStats.drawCalls <= baselineStats.drawCalls+16U;
+            passed &= bodyStats.triangles > baselineStats.triangles+6000U
+                && bodyStats.triangles < baselineStats.triangles+20000U;
+        } else if (preview) {
+            passed &= bodyStats.drawCalls == baselineStats.drawCalls+7U;
+            passed &= bodyStats.triangles > baselineStats.triangles+4000U
+                && bodyStats.triangles < baselineStats.triangles+6000U;
+        } else {
+            passed &= bodyStats.drawCalls == baselineStats.drawCalls+4U;
+            passed &= bodyStats.triangles == baselineStats.triangles+2096U;
+        }
         const auto save = [&](const std::string& name, const std::vector<std::uint8_t>& pixels) {
             if (!capture) return;
             std::filesystem::create_directories(capture);
@@ -114,6 +129,13 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         if (!preview) passed &= level == frame();
         else (void)frame(); // The rig reaches the near plane; inspect captured horizon.
         if (preview) save("level",level);
+        body.visible = true;
+        camera.forward = wkc::core::normalized({0,-0.5F,-0.866F});
+        const auto lookMid = frame();
+        if (preview) {
+            passed &= lookMid != level && lookMid != standing;
+            save("look_mid",lookMid);
+        }
         body.visible = true; camera.forward = wkc::core::normalized({0,-1,-.25F});
         WeaponViewmodelRenderData weapon{.visible=true,.role=HudWeaponRole::Carbine};
         const auto armed = frame({},weapon);
@@ -164,7 +186,8 @@ bool validatePlayerBody(gdp::game::visual::GdpRenderer& renderer)
         passed &= menu == frame();
     }
     if (!passed) std::cerr << "Player body failed pose/occlusion/FOV/low-spec pixel checks\n";
-    else std::cout << "Player body: " << (preview ? "six draws, Blender mesh"
+    else std::cout << "Player body: " << (exosuit ? "exosuit preview"
+        : preview ? "seven draws, Blender torso and legs"
         : "four draws, 2096 triangles") << ", world-depth and pose pixels checked\n";
     return passed;
 }

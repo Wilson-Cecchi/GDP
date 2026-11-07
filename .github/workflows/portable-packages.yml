@@ -138,6 +138,8 @@ jobs:
               }
             }
           }
+          python tools/check_packaged_visual_assets.py assets/visual (Join-Path $executable.DirectoryName "visual")
+          if ($LASTEXITCODE -ne 0) { throw "Packaged visual assets differ from source" }
           foreach ($asset in @("worker_painted_steel_v2.png", "worker_front_panel_source_v2.png")) {
             $packaged = Join-Path $executable.DirectoryName "visual/$asset"
             if (-not (Test-Path $packaged)) { throw "Missing Worker texture: $packaged" }
@@ -207,6 +209,7 @@ jobs:
               cmp "assets/visual/$relative" "$package/bin/visual/$relative"
             done
           done
+          python3 tools/check_packaged_visual_assets.py assets/visual "$package/bin/visual"
           for asset in worker_painted_steel_v2.png worker_front_panel_source_v2.png; do
             cmp "assets/visual/$asset" "$package/bin/visual/$asset"
           done
@@ -270,6 +273,7 @@ jobs:
               cmp "assets/visual/$relative" "$app/Contents/Resources/visual/$relative"
             done
           done
+          python3 tools/check_packaged_visual_assets.py assets/visual "$app/Contents/Resources/visual"
           for asset in worker_painted_steel_v2.png worker_front_panel_source_v2.png; do
             cmp "assets/visual/$asset" "$app/Contents/Resources/visual/$asset"
           done

@@ -104,6 +104,11 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
         view.title = "DISPLAY";
         setting("FIELD OF VIEW", SettingsMenuOption::FieldOfView, std::to_string(settings.fieldOfViewDegrees));
         setting("GRAPHICS", SettingsMenuOption::GraphicsQuality, std::string{gameplay::graphicsQualityName(settings.graphicsQuality)});
+        const auto quality = gameplay::effectiveGraphicsQualitySettings(settings);
+        setting("SHADOWS", SettingsMenuOption::Shadows, quality.shadowsEnabled ? "ON" : "OFF");
+        setting("DETAILED MATERIALS", SettingsMenuOption::DetailedMaterials, quality.detailedMaterials ? "ON" : "OFF");
+        setting("RENDER SCALE", SettingsMenuOption::RenderScale, std::to_string(quality.renderScalePercent) + "%");
+        setting("LIGHTS", SettingsMenuOption::MaximumLights, std::to_string(quality.maximumLights));
         const auto size = gameplay::windowResolutionSize(settings.windowResolution);
         setting("RESOLUTION", SettingsMenuOption::WindowResolution, std::to_string(size.width) + "X" + std::to_string(size.height));
         setting("FULLSCREEN", SettingsMenuOption::Fullscreen, settings.fullscreen ? "ON" : "OFF");

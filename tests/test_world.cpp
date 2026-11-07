@@ -4,6 +4,7 @@
 #include "world/MapGraph.hpp"
 #include "world/LootGenerator.hpp"
 #include "world/PropGenerator.hpp"
+#include "world/RoomArchitecture.hpp"
 #include "world/RoomModule.hpp"
 #include "world/WorldEntities.hpp"
 #include "world/WorldGenerator.hpp"
@@ -16,6 +17,7 @@
 #include <iostream>
 #include <string_view>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -170,14 +172,1427 @@ void testDefaultModuleStructuralVariety()
                 "wide Normal variants add height without widening DeadEnds");
         }
     }
-    expect(bossModules == 3U && wideNormalModules == 7U,
-        "library contains three expanded Boss modules and a hall for each Normal theme");
+    expect(bossModules == 3U && wideNormalModules == 10U,
+        "library contains three expanded Boss modules and ten wide Normal variants");
     expect(library.size() >= 30U && sawCompact && sawMedium && sawLarge,
         "default library contains compact, medium and large structural families");
     expect(roleSizesValid,
         "Hub, Arena and Boss use large modules while Secret uses compact modules");
     expect(rotationsValid,
         "every default module keeps bounds and connectors valid in all four rotations");
+}
+
+void testCampaignRoomVariants()
+{
+    using namespace gdp::world;
+    using wkc::core::QuarterTurn;
+
+    const auto library = makeDefaultRoomModuleLibrary();
+    for (const auto& [id, role] : std::array{
+             std::pair{combatGalleryArenaModuleId, RoomRole::Arena},
+             std::pair{securityTModuleId, RoomRole::Terminal},
+             std::pair{cafeteriaLongModuleId, RoomRole::Normal},
+             std::pair{laboratoryHallModuleId, RoomRole::Normal},
+         }) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        expect(module != library.end(), "approved room variant exists in campaign library");
+        if (module == library.end()) continue;
+        expect(validateRoomModule(*module).isValid() && module->supportsRole(role),
+            "campaign room variant supports its intended encounter role");
+        for (int rotation = 0; rotation < 4; ++rotation) {
+            const auto room = instantiateRoom(*module, id, role, 0xA55AU,
+                {24.0F, 0.0F, -18.0F}, static_cast<QuarterTurn>(rotation));
+            expect(room.has_value(), "campaign room variant instantiates in every rotation");
+            if (!room) continue;
+            const auto parts = makeRoomArchitecture(*room);
+            expect(!parts.empty() && validateRoomArchitecture(*room, parts),
+                "campaign room architecture clears encounters and doorways");
+        }
+        for (std::uint32_t seed = 0; seed < 32U; ++seed) {
+            const auto room = instantiateRoom(*module, id, role, seed,
+                {0.0F, 0.0F, 0.0F}, QuarterTurn::Degrees0);
+            if (!room) continue;
+            const auto loot = generateLootLayout(room->seed, role, room->theme,
+                3U, room->lootZones, 1.0F, true);
+            const auto props = generatePropLayout(room->seed, role, room->theme,
+                3U, room->propZones, 1.0F);
+            expect(validateLootLayout(loot, room->lootZones).isValid()
+                    && validatePropLayout(props, room->propZones).isValid(),
+                "campaign room drops and props validate across room seeds");
+        }
+    }
+}
+
+void testRoomWallColumns()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb a, const Aabb b) {
+        return a.minimum.x < b.maximum.x && a.maximum.x > b.minimum.x
+            && a.minimum.y < b.maximum.y && a.maximum.y > b.minimum.y
+            && a.minimum.z < b.maximum.z && a.maximum.z > b.minimum.z;
+    };
+    const auto library = makeDefaultRoomModuleLibrary();
+    for (const RoomModuleId moduleId : {101U, 204U, 303U,
+             505U, 605U, 703U}) {
+        const auto found = std::find_if(library.begin(), library.end(),
+            [=](const RoomModule& module) { return module.id == moduleId; });
+        expect(found != library.end(), "wall column fixture module exists");
+        if (found == library.end()) {
+            continue;
+        }
+        std::vector<RoomArchitecturePart> unrotated;
+        for (const QuarterTurn rotation : rotations) {
+            const auto room = instantiateRoom(*found, moduleId,
+                RoomRole::Normal, 0xA55AU, {24.0F, 2.0F, -18.0F}, rotation);
+            expect(room.has_value(), "wall column fixture instantiates");
+            if (!room) {
+                continue;
+            }
+            const auto columns = makeRoomWallColumns(*room);
+            const auto authored = makeRoomArchitecture(*room);
+            expect(!columns.empty()
+                    && columns == makeRoomWallColumns(*room),
+                "wall columns exist and repeat exactly for the same seed");
+            bool safe = true;
+            for (const RoomArchitecturePart& column : columns) {
+                const Vec3 extent = column.bounds.maximum
+                    - column.bounds.minimum;
+                const bool xWall = nearlyEqual(
+                        column.bounds.minimum.x, room->worldBounds.minimum.x)
+                    || nearlyEqual(column.bounds.maximum.x,
+                        room->worldBounds.maximum.x);
+                const bool zWall = nearlyEqual(
+                        column.bounds.minimum.z, room->worldBounds.minimum.z)
+                    || nearlyEqual(column.bounds.maximum.z,
+                        room->worldBounds.maximum.z);
+                safe &= column.solid && !column.breakable
+                    && room->worldBounds.contains(column.bounds.minimum)
+                    && room->worldBounds.contains(column.bounds.maximum)
+                    && nearlyEqual(column.bounds.minimum.y,
+                        room->worldBounds.minimum.y)
+                    && nearlyEqual(column.bounds.maximum.y,
+                        room->worldBounds.maximum.y)
+                    && ((xWall && nearlyEqual(extent.x, 0.26F)
+                            && nearlyEqual(extent.z, 0.38F))
+                        || (zWall && nearlyEqual(extent.z, 0.26F)
+                            && nearlyEqual(extent.x, 0.38F)));
+                for (const RoomArchitecturePart& part : authored) {
+                    safe &= !overlapsOpen(column.bounds, part.bounds);
+                }
+                for (const SpawnZone& zone : room->enemyZones) {
+                    safe &= !overlapsOpen(column.bounds, zone.bounds);
+                }
+                for (const SpawnZone& zone : room->propZones) {
+                    safe &= !overlapsOpen(column.bounds, zone.bounds);
+                }
+                for (const SpawnZone& zone : room->lootZones) {
+                    safe &= !overlapsOpen(column.bounds, zone.bounds);
+                }
+                for (const ConnectorInstance& connector : room->connectors) {
+                    const Vec3 midpoint = (column.bounds.minimum
+                        + column.bounds.maximum) * 0.5F;
+                    const bool sameWall = std::abs(connector.worldNormal.x) > 0.5F
+                        ? std::abs(midpoint.x - connector.worldPosition.x) < 0.5F
+                        : std::abs(midpoint.z - connector.worldPosition.z) < 0.5F;
+                    const float along = std::abs(connector.worldNormal.x) > 0.5F
+                        ? std::abs(midpoint.z - connector.worldPosition.z)
+                        : std::abs(midpoint.x - connector.worldPosition.x);
+                    safe &= !sameWall || along >= connector.width * 0.5F
+                        + 0.30F + 0.19F - 1.0e-4F;
+                }
+            }
+            expect(safe,
+                "wall columns touch walls and clear doors, zones and authored geometry");
+            if (rotation == QuarterTurn::Degrees0) {
+                unrotated = columns;
+            } else {
+                bool rotated = columns.size() == unrotated.size();
+                if (rotated) {
+                    for (std::size_t index = 0; index < columns.size(); ++index) {
+                        const Vec3 original = (unrotated[index].bounds.minimum
+                            + unrotated[index].bounds.maximum) * 0.5F;
+                        const Vec3 actual = (columns[index].bounds.minimum
+                            + columns[index].bounds.maximum) * 0.5F;
+                        rotated &= nearlyEqual(actual,
+                            room->transform.position
+                                + rotateQuarterTurns(
+                                    original - room->transform.position,
+                                    rotation), 1.0e-3F);
+                    }
+                }
+                expect(rotated,
+                    "wall column positions follow all room quarter turns");
+            }
+        }
+    }
+
+    RoomInstance bare;
+    bare.theme = RoomTheme::Industrial;
+    bare.seed = 19U;
+    bare.worldBounds = {{-8.0F, 0.0F, -10.0F},
+        {8.0F, 6.0F, 10.0F}};
+    const auto originals = makeRoomWallColumns(bare);
+    expect(originals.size() >= 4U,
+        "large room has enough columns to test all reserved areas");
+    if (originals.size() >= 4U) {
+        bare.enemyZones.push_back({originals[0].bounds});
+        bare.propZones.push_back({originals[1].bounds});
+        bare.lootZones.push_back({originals[2].bounds});
+        ConnectorInstance connector;
+        const Vec3 midpoint = (originals[3].bounds.minimum
+            + originals[3].bounds.maximum) * 0.5F;
+        connector.worldPosition = {bare.worldBounds.minimum.x, 0.0F,
+            midpoint.z};
+        connector.worldNormal = {-1.0F, 0.0F, 0.0F};
+        connector.width = 0.5F;
+        bare.connectors.push_back(connector);
+        const auto filtered = makeRoomWallColumns(bare);
+        expect(filtered.size() == originals.size() - 4U,
+            "enemy, prop, loot and connector reservations remove four columns");
+    }
+    bare.seed = 20U;
+    bare.enemyZones.clear();
+    bare.propZones.clear();
+    bare.lootZones.clear();
+    bare.connectors.clear();
+    expect(makeRoomWallColumns(bare) != originals,
+        "different room seeds vary column positions");
+    bare.moduleId = centralHubPreviewModuleId;
+    expect(makeRoomWallColumns(bare).empty(),
+        "Central Hub keeps its existing authored wall pilasters only");
+}
+
+void testCentralHubPreviewArchitecture()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr Vec3 center{29.0F, 2.0F, -21.0F};
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb a, const Aabb b) {
+        return a.minimum.x < b.maximum.x && a.maximum.x > b.minimum.x
+            && a.minimum.y < b.maximum.y && a.maximum.y > b.minimum.y
+            && a.minimum.z < b.maximum.z && a.maximum.z > b.minimum.z;
+    };
+    std::vector<RoomArchitecturePart> unrotated;
+    for (const QuarterTurn rotation : rotations) {
+        const auto toWorld = [&](const Aabb local) {
+            Vec3 minimum{1000.0F, center.y + local.minimum.y, 1000.0F};
+            Vec3 maximum{-1000.0F, center.y + local.maximum.y, -1000.0F};
+            for (const float x : {local.minimum.x, local.maximum.x}) {
+                for (const float z : {local.minimum.z, local.maximum.z}) {
+                    const Vec3 point = center
+                        + rotateQuarterTurns(Vec3{x, 0.0F, z}, rotation);
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.z = std::min(minimum.z, point.z);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.z = std::max(maximum.z, point.z);
+                }
+            }
+            return Aabb{minimum, maximum};
+        };
+        RoomInstance room;
+        room.role = RoomRole::Hub;
+        room.theme = RoomTheme::Industrial;
+        room.moduleId = centralHubPreviewModuleId;
+        room.sizeClass = RoomSizeClass::Large;
+        room.rotation = rotation;
+        room.seed = 29U;
+        room.worldBounds = toWorld({{-10.0F, 0.0F, -10.0F},
+            {10.0F, 6.0F, 10.0F}});
+        for (const auto& [position, normal] : std::array{
+                 std::pair{Vec3{0.0F, 0.0F, -10.0F},
+                     Vec3{0.0F, 0.0F, -1.0F}},
+                 std::pair{Vec3{10.0F, 0.0F, 0.0F},
+                     Vec3{1.0F, 0.0F, 0.0F}},
+                 std::pair{Vec3{0.0F, 0.0F, 10.0F},
+                     Vec3{0.0F, 0.0F, 1.0F}},
+                 std::pair{Vec3{-10.0F, 0.0F, 0.0F},
+                     Vec3{-1.0F, 0.0F, 0.0F}},
+             }) {
+            ConnectorInstance connector;
+            connector.worldPosition = center
+                + rotateQuarterTurns(position, rotation);
+            connector.worldNormal = rotateQuarterTurns(normal, rotation);
+            connector.width = 1.8F;
+            connector.height = 2.4F;
+            room.connectors.push_back(connector);
+        }
+        room.enemyZones.push_back({toWorld({{-6.0F, 0.0F, -6.0F},
+            {-5.0F, 0.0F, -5.0F}})});
+        room.enemyZones.push_back({toWorld({{5.0F, 0.0F, 5.0F},
+            {6.0F, 0.0F, 6.0F}})});
+        room.propZones.push_back({toWorld({{5.0F, 0.0F, -1.0F},
+            {6.0F, 0.0F, 1.0F}})});
+        room.lootZones.push_back({toWorld({{-6.0F, 0.0F, -1.0F},
+            {-5.0F, 0.0F, 1.0F}})});
+
+        const auto parts = makeRoomArchitecture(room);
+        RoomInstance differentSeed = room;
+        differentSeed.seed = 1001U;
+        expect(parts.size() == 11U
+                && parts == makeRoomArchitecture(room)
+                && parts == makeRoomArchitecture(differentSeed),
+            "Central Hub preview is bounded and seed independent");
+        const std::array routes{
+            toWorld({{-3.5F, 0.0F, -10.0F},
+                {3.5F, 2.4F, -1.55F}}),
+            toWorld({{-3.5F, 0.0F, 1.55F},
+                {3.5F, 2.4F, 10.0F}}),
+            toWorld({{-10.0F, 0.0F, -1.2F},
+                {-1.55F, 2.4F, 1.2F}}),
+            toWorld({{1.55F, 0.0F, -1.2F},
+                {10.0F, 2.4F, 1.2F}}),
+            toWorld({{-4.0F, 0.0F, -4.0F},
+                {-1.55F, 2.4F, 4.0F}}),
+            toWorld({{1.55F, 0.0F, -4.0F},
+                {4.0F, 2.4F, 4.0F}}),
+            toWorld({{-4.0F, 0.0F, -4.0F},
+                {4.0F, 2.4F, -1.55F}}),
+            toWorld({{-4.0F, 0.0F, 1.55F},
+                {4.0F, 2.4F, 4.0F}}),
+            toWorld({{-0.5F, 0.0F, 3.5F},
+                {0.5F, 2.2F, 4.5F}}),
+            toWorld({{-0.5F, 0.0F, 8.0F},
+                {0.5F, 2.2F, 9.0F}}),
+        };
+        bool contained = true;
+        bool routesClear = true;
+        bool noIntersections = true;
+        for (std::size_t first = 0U; first < parts.size(); ++first) {
+            const RoomArchitecturePart& part = parts[first];
+            contained &= part.solid && !part.breakable
+                && part.bounds.isValid()
+                && room.worldBounds.contains(part.bounds.minimum)
+                && room.worldBounds.contains(part.bounds.maximum);
+            for (const Aabb route : routes) {
+                routesClear &= !overlapsOpen(part.bounds, route);
+            }
+            for (std::size_t second = first + 1U;
+                 second < parts.size(); ++second) {
+                noIntersections &= !overlapsOpen(part.bounds,
+                    parts[second].bounds);
+            }
+        }
+        const bool landmarkSupported = parts.size() >= 7U
+            && nearlyEqual(parts[0].bounds.minimum.y, center.y, 1.0e-4F)
+            && nearlyEqual(parts[0].bounds.maximum.y,
+                parts[1].bounds.minimum.y, 1.0e-4F)
+            && nearlyEqual(parts[1].bounds.maximum.y,
+                parts[2].bounds.minimum.y, 1.0e-4F)
+            && parts[1].decoration == RoomDecorationPart::CentralHubColumnShaft
+            && std::all_of(parts.begin() + 3, parts.begin() + 7,
+                [](const RoomArchitecturePart& part) {
+                    return part.decoration
+                        == RoomDecorationPart::CentralHubRouteDisplay;
+                });
+        bool directionPlatesTouch = parts.size() >= 7U;
+        if (directionPlatesTouch) {
+            const Aabb shaft = parts[1].bounds;
+            for (std::size_t index = 3U; index < 7U; ++index) {
+                const Aabb plate = parts[index].bounds;
+                const bool touchesX = nearlyEqual(plate.maximum.x,
+                        shaft.minimum.x, 1.0e-4F)
+                    || nearlyEqual(plate.minimum.x,
+                        shaft.maximum.x, 1.0e-4F);
+                const bool touchesZ = nearlyEqual(plate.maximum.z,
+                        shaft.minimum.z, 1.0e-4F)
+                    || nearlyEqual(plate.minimum.z,
+                        shaft.maximum.z, 1.0e-4F);
+                const bool xOverlaps = plate.minimum.x < shaft.maximum.x
+                    && plate.maximum.x > shaft.minimum.x;
+                const bool zOverlaps = plate.minimum.z < shaft.maximum.z
+                    && plate.maximum.z > shaft.minimum.z;
+                directionPlatesTouch &= plate.minimum.y < shaft.maximum.y
+                    && plate.maximum.y > shaft.minimum.y
+                    && ((touchesX && zOverlaps)
+                        || (touchesZ && xOverlaps));
+            }
+        }
+        const bool bypassesConnect = overlapsOpen(routes[0], routes[4])
+            && overlapsOpen(routes[0], routes[5])
+            && overlapsOpen(routes[1], routes[4])
+            && overlapsOpen(routes[1], routes[5])
+            && overlapsOpen(routes[2], routes[4])
+            && overlapsOpen(routes[3], routes[5])
+            && overlapsOpen(routes[4], routes[6])
+            && overlapsOpen(routes[4], routes[7])
+            && overlapsOpen(routes[5], routes[6])
+            && overlapsOpen(routes[5], routes[7]);
+        expect(contained && routesClear && noIntersections
+                && landmarkSupported && directionPlatesTouch
+                && bypassesConnect
+                && validateRoomArchitecture(room, parts),
+            "Central Hub four doors connect around a supported landmark without blocking zones or terminal");
+        if (rotation == QuarterTurn::Degrees0) {
+            unrotated = parts;
+        } else {
+            bool followsRotation = parts.size() == unrotated.size();
+            if (followsRotation) {
+                for (std::size_t index = 0U; index < parts.size(); ++index) {
+                    const Vec3 original = (unrotated[index].bounds.minimum
+                        + unrotated[index].bounds.maximum) * 0.5F;
+                    const Vec3 actual = (parts[index].bounds.minimum
+                        + parts[index].bounds.maximum) * 0.5F;
+                    followsRotation &= nearlyEqual(actual, center
+                        + rotateQuarterTurns(original - center, rotation),
+                        1.0e-4F);
+                }
+            }
+            expect(followsRotation,
+                "Central Hub preview follows all quarter-turn rotations");
+        }
+        auto blocked = parts;
+        blocked.front().bounds = toWorld({{-5.8F, 0.0F, -5.8F},
+            {-5.2F, 1.5F, -5.2F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Central Hub rejects occupied enemy zone");
+        blocked.front().bounds = toWorld({{5.2F, 0.0F, -0.4F},
+            {5.8F, 1.5F, 0.4F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Central Hub rejects occupied prop zone");
+        blocked.front().bounds = toWorld({{-5.8F, 0.0F, -0.4F},
+            {-5.2F, 1.5F, 0.4F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Central Hub rejects occupied loot zone");
+        blocked.front().bounds = toWorld({{-0.3F, 0.0F, -9.8F},
+            {0.3F, 1.5F, -9.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Central Hub rejects blocked connector");
+    }
+
+    RoomInstance ordinary;
+    ordinary.role = RoomRole::Hub;
+    ordinary.worldBounds = {{-10.0F, 0.0F, -10.0F},
+        {10.0F, 6.0F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Campaign Hub rooms retain generic architecture");
+    ordinary.moduleId = centralHubPreviewModuleId;
+    ordinary.worldBounds = {{-9.9F, 0.0F, -10.0F},
+        {9.9F, 6.0F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Central Hub preview rejects an undersized room");
+}
+
+void testSecurityPreviewArchitecture()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr Vec3 center{17.0F, 2.0F, -13.0F};
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb a, const Aabb b) {
+        return a.minimum.x < b.maximum.x && a.maximum.x > b.minimum.x
+            && a.minimum.y < b.maximum.y && a.maximum.y > b.minimum.y
+            && a.minimum.z < b.maximum.z && a.maximum.z > b.minimum.z;
+    };
+    std::vector<RoomArchitecturePart> unrotated;
+    for (const QuarterTurn rotation : rotations) {
+        const auto toWorld = [&](const Aabb local) {
+            Vec3 minimum{1000.0F, center.y + local.minimum.y, 1000.0F};
+            Vec3 maximum{-1000.0F, center.y + local.maximum.y, -1000.0F};
+            for (const float x : {local.minimum.x, local.maximum.x}) {
+                for (const float z : {local.minimum.z, local.maximum.z}) {
+                    const Vec3 point = center
+                        + rotateQuarterTurns(Vec3{x, 0.0F, z}, rotation);
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.z = std::min(minimum.z, point.z);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.z = std::max(maximum.z, point.z);
+                }
+            }
+            return Aabb{minimum, maximum};
+        };
+        RoomInstance room;
+        room.theme = RoomTheme::Security;
+        room.moduleId = securityPreviewModuleId;
+        room.sizeClass = RoomSizeClass::Large;
+        room.rotation = rotation;
+        room.seed = 31U;
+        room.worldBounds = toWorld({{-9.0F, 0.0F, -9.0F},
+            {9.0F, 6.0F, 9.0F}});
+        for (const auto& [position, normal] : std::array{
+                 std::pair{Vec3{0.0F, 0.0F, -9.0F},
+                     Vec3{0.0F, 0.0F, -1.0F}},
+                 std::pair{Vec3{9.0F, 0.0F, 0.0F},
+                     Vec3{1.0F, 0.0F, 0.0F}},
+                 std::pair{Vec3{0.0F, 0.0F, 9.0F},
+                     Vec3{0.0F, 0.0F, 1.0F}},
+                 std::pair{Vec3{-9.0F, 0.0F, 0.0F},
+                     Vec3{-1.0F, 0.0F, 0.0F}},
+             }) {
+            ConnectorInstance connector;
+            connector.worldPosition = center
+                + rotateQuarterTurns(position, rotation);
+            connector.worldNormal = rotateQuarterTurns(normal, rotation);
+            connector.width = 1.8F;
+            connector.height = 2.4F;
+            room.connectors.push_back(connector);
+        }
+        room.enemyZones.push_back({toWorld({{-0.8F, 0.0F, -6.4F},
+            {0.8F, 0.0F, -5.4F}})});
+        room.enemyZones.push_back({toWorld({{-0.8F, 0.0F, 5.4F},
+            {0.8F, 0.0F, 6.4F}})});
+        room.propZones.push_back({toWorld({{3.0F, 0.0F, -0.8F},
+            {4.0F, 0.0F, 0.8F}})});
+        room.lootZones.push_back({toWorld({{-4.0F, 0.0F, -0.8F},
+            {-3.0F, 0.0F, 0.8F}})});
+
+        const auto parts = makeRoomArchitecture(room);
+        RoomInstance differentSeed = room;
+        differentSeed.seed = 1001U;
+        expect(parts.size() == 16U
+                && parts == makeRoomArchitecture(room)
+                && parts == makeRoomArchitecture(differentSeed),
+            "Security preview geometry is bounded and seed independent");
+        const Aabb mainLane = toWorld({{-1.5F, 0.0F, -9.0F},
+            {1.5F, 2.4F, 9.0F}});
+        const Aabb transverseLane = toWorld({{-9.0F, 0.0F, -1.8F},
+            {9.0F, 2.4F, 1.8F}});
+        const Aabb leftFlank = toWorld({{-7.2F, 0.0F, -7.2F},
+            {-5.2F, 2.4F, 7.2F}});
+        const Aabb rightFlank = toWorld({{5.2F, 0.0F, -7.2F},
+            {8.3F, 2.4F, 7.2F}});
+        const Aabb returnTerminal = toWorld({{-0.5F, 0.0F, 7.0F},
+            {0.5F, 2.2F, 8.0F}});
+        const QuarterTurn inverseRotation = rotation == QuarterTurn::Degrees90
+            ? QuarterTurn::Degrees270
+            : rotation == QuarterTurn::Degrees270
+                ? QuarterTurn::Degrees90 : rotation;
+        bool contained = true;
+        bool routesClear = true;
+        bool noIntersections = true;
+        std::size_t supportedScreens = 0U;
+        std::size_t barricades = 0U;
+        std::size_t nichePieces = 0U;
+        for (std::size_t first = 0U; first < parts.size(); ++first) {
+            const RoomArchitecturePart& part = parts[first];
+            contained &= part.solid && !part.breakable
+                && part.bounds.isValid()
+                && room.worldBounds.contains(part.bounds.minimum)
+                && room.worldBounds.contains(part.bounds.maximum);
+            routesClear &= !overlapsOpen(part.bounds, mainLane)
+                && !overlapsOpen(part.bounds, transverseLane)
+                && !overlapsOpen(part.bounds, leftFlank)
+                && !overlapsOpen(part.bounds, rightFlank)
+                && !overlapsOpen(part.bounds, returnTerminal);
+            const Vec3 midpoint = (part.bounds.minimum
+                + part.bounds.maximum) * 0.5F;
+            const Vec3 local = rotateQuarterTurns(midpoint - center,
+                inverseRotation);
+            if (part.bounds.minimum.y == center.y
+                && nearlyEqual(part.bounds.maximum.y,
+                    center.y + 1.05F, 1.0e-4F)) {
+                ++barricades;
+                routesClear &= nearlyEqual(local.x,
+                        local.x < 0.0F ? -4.20F : 4.20F, 1.0e-4F)
+                    && nearlyEqual(local.z,
+                        local.x < 0.0F ? 3.80F : -3.80F, 1.0e-4F);
+            }
+            if ((nearlyEqual(local.x, -6.45F, 1.0e-4F)
+                    || nearlyEqual(local.x, -4.45F, 1.0e-4F))
+                && nearlyEqual(local.z, -8.725F, 1.0e-4F)) {
+                bool supported = false;
+                for (const RoomArchitecturePart& candidate : parts) {
+                    supported |= nearlyEqual(
+                            part.bounds.minimum.y,
+                            candidate.bounds.maximum.y, 1.0e-4F)
+                        && part.bounds.minimum.x < candidate.bounds.maximum.x
+                        && part.bounds.maximum.x > candidate.bounds.minimum.x
+                        && part.bounds.minimum.z < candidate.bounds.maximum.z
+                        && part.bounds.maximum.z > candidate.bounds.minimum.z;
+                }
+                supportedScreens += static_cast<std::size_t>(supported);
+            }
+            if (local.x > 8.40F && local.z > 2.30F && local.z < 5.90F) {
+                ++nichePieces;
+            }
+            for (std::size_t second = first + 1U;
+                 second < parts.size(); ++second) {
+                noIntersections &= !overlapsOpen(part.bounds,
+                    parts[second].bounds);
+            }
+        }
+        expect(contained && routesClear && noIntersections
+                && barricades == 2U && supportedScreens == 2U
+                && nichePieces == 5U
+                && validateRoomArchitecture(room, parts),
+            "Security preview keeps doors, reserved zones, terminal and circulation clear");
+        if (rotation == QuarterTurn::Degrees0) {
+            unrotated = parts;
+        } else {
+            bool followsRotation = parts.size() == unrotated.size();
+            if (followsRotation) {
+                for (std::size_t index = 0U; index < parts.size(); ++index) {
+                    const Vec3 original = (unrotated[index].bounds.minimum
+                        + unrotated[index].bounds.maximum) * 0.5F;
+                    const Vec3 actual = (parts[index].bounds.minimum
+                        + parts[index].bounds.maximum) * 0.5F;
+                    followsRotation &= nearlyEqual(actual, center
+                        + rotateQuarterTurns(original - center, rotation),
+                        1.0e-4F);
+                }
+            }
+            expect(followsRotation,
+                "Security preview follows all quarter-turn rotations");
+        }
+        auto blocked = parts;
+        blocked.front().bounds = toWorld({{-0.3F, 0.0F, 5.6F},
+            {0.3F, 1.5F, 6.0F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Security preview rejects occupied enemy zone");
+        blocked.front().bounds = toWorld({{3.2F, 0.0F, -0.3F},
+            {3.8F, 1.5F, 0.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Security preview rejects occupied prop zone");
+        blocked.front().bounds = toWorld({{-3.8F, 0.0F, -0.3F},
+            {-3.2F, 1.5F, 0.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Security preview rejects occupied loot zone");
+        blocked.front().bounds = toWorld({{-0.3F, 0.0F, -8.8F},
+            {0.3F, 1.5F, -8.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Security preview rejects blocked rear connector");
+    }
+
+    RoomInstance ordinary;
+    ordinary.theme = RoomTheme::Security;
+    ordinary.worldBounds = {{-9.0F, 0.0F, -9.0F},
+        {9.0F, 6.0F, 9.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Security campaign rooms keep their generic architecture");
+    ordinary.moduleId = securityPreviewModuleId;
+    ordinary.worldBounds = {{-8.9F, 0.0F, -9.0F},
+        {8.9F, 6.0F, 9.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Security preview rejects an undersized room");
+}
+
+void testTechnicalPreviewArchitecture()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr Vec3 center{19.0F, 3.0F, -17.0F};
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb a, const Aabb b) {
+        return a.minimum.x < b.maximum.x && a.maximum.x > b.minimum.x
+            && a.minimum.y < b.maximum.y && a.maximum.y > b.minimum.y
+            && a.minimum.z < b.maximum.z && a.maximum.z > b.minimum.z;
+    };
+    std::vector<RoomArchitecturePart> unrotated;
+    for (const QuarterTurn rotation : rotations) {
+        const auto toWorld = [&](const Aabb local) {
+            Vec3 minimum{1000.0F, center.y + local.minimum.y, 1000.0F};
+            Vec3 maximum{-1000.0F, center.y + local.maximum.y, -1000.0F};
+            for (const float x : {local.minimum.x, local.maximum.x}) {
+                for (const float z : {local.minimum.z, local.maximum.z}) {
+                    const Vec3 point = center
+                        + rotateQuarterTurns(Vec3{x, 0.0F, z}, rotation);
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.z = std::min(minimum.z, point.z);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.z = std::max(maximum.z, point.z);
+                }
+            }
+            return Aabb{minimum, maximum};
+        };
+        RoomInstance room;
+        room.theme = RoomTheme::Maintenance;
+        room.moduleId = technicalPreviewModuleId;
+        room.sizeClass = RoomSizeClass::Large;
+        room.rotation = rotation;
+        room.seed = 5U;
+        room.worldBounds = toWorld({{-8.0F, 0.0F, -10.0F},
+            {8.0F, 5.5F, 10.0F}});
+        for (const auto& [position, normal] : std::array{
+                 std::pair{Vec3{0.0F, 0.0F, -10.0F},
+                     Vec3{0.0F, 0.0F, -1.0F}},
+                 std::pair{Vec3{8.0F, 0.0F, 0.0F},
+                     Vec3{1.0F, 0.0F, 0.0F}},
+                 std::pair{Vec3{0.0F, 0.0F, 10.0F},
+                     Vec3{0.0F, 0.0F, 1.0F}},
+                 std::pair{Vec3{-8.0F, 0.0F, 0.0F},
+                     Vec3{-1.0F, 0.0F, 0.0F}},
+             }) {
+            ConnectorInstance connector;
+            connector.worldPosition = center
+                + rotateQuarterTurns(position, rotation);
+            connector.worldNormal = rotateQuarterTurns(normal, rotation);
+            connector.width = 1.8F;
+            connector.height = 2.4F;
+            room.connectors.push_back(connector);
+        }
+        for (const float z : {-6.0F, 6.0F}) {
+            room.enemyZones.push_back({toWorld({{-0.8F, 0.0F, z - 0.6F},
+                {0.8F, 0.0F, z + 0.6F}})});
+        }
+        room.propZones.push_back({toWorld({{3.0F, 0.0F, -0.8F},
+            {4.0F, 0.0F, 0.8F}})});
+        room.lootZones.push_back({toWorld({{-4.0F, 0.0F, -0.8F},
+            {-3.0F, 0.0F, 0.8F}})});
+
+        const auto parts = makeRoomArchitecture(room);
+        RoomInstance differentSeed = room;
+        differentSeed.seed = 555U;
+        expect(parts.size() == 36U
+                && parts == makeRoomArchitecture(room)
+                && parts == makeRoomArchitecture(differentSeed),
+            "Technical preview has bounded seed-independent geometry");
+        const Aabb centralLane = toWorld({{-2.0F, 0.0F, -10.0F},
+            {2.0F, 2.4F, 10.0F}});
+        const Aabb sideDoorLane = toWorld({{-8.0F, 0.0F, -1.8F},
+            {8.0F, 2.4F, 1.8F}});
+        const Aabb leftFlank = toWorld({{-6.30F, 0.0F, -8.2F},
+            {-4.50F, 2.4F, 8.2F}});
+        const Aabb rightFlank = toWorld({{4.50F, 0.0F, -8.2F},
+            {6.30F, 2.4F, 8.2F}});
+        const Aabb returnTerminal = toWorld({{-0.5F, 0.0F, 8.0F},
+            {0.5F, 2.2F, 9.0F}});
+        const QuarterTurn inverseRotation = rotation == QuarterTurn::Degrees90
+            ? QuarterTurn::Degrees270
+            : rotation == QuarterTurn::Degrees270
+                ? QuarterTurn::Degrees90 : rotation;
+        bool contained = true;
+        bool routesClear = true;
+        bool noIntersections = true;
+        bool stationsSupported = true;
+        bool onlyModulesBreakable = true;
+        std::size_t leftStationParts = 0U;
+        std::size_t rightStationParts = 0U;
+        std::size_t technicalModules = 0U;
+        std::size_t breakableModules = 0U;
+        for (std::size_t first = 0U; first < parts.size(); ++first) {
+            const RoomArchitecturePart& part = parts[first];
+            contained &= part.solid && part.bounds.isValid()
+                && room.worldBounds.contains(part.bounds.minimum)
+                && room.worldBounds.contains(part.bounds.maximum);
+            routesClear &= !overlapsOpen(part.bounds, centralLane)
+                && !overlapsOpen(part.bounds, sideDoorLane)
+                && !overlapsOpen(part.bounds, leftFlank)
+                && !overlapsOpen(part.bounds, rightFlank)
+                && !overlapsOpen(part.bounds, returnTerminal);
+            const Vec3 midpoint = (part.bounds.minimum
+                + part.bounds.maximum) * 0.5F;
+            const Vec3 local = rotateQuarterTurns(midpoint - center,
+                inverseRotation);
+            bool isTechnicalModule = false;
+            if (part.bounds.maximum.y <= center.y + 1.33F
+                && std::abs(local.x) > 2.4F && std::abs(local.x) < 3.6F
+                && std::abs(local.z) > 2.5F && std::abs(local.z) < 5.0F) {
+                (local.x < 0.0F ? leftStationParts : rightStationParts)++;
+                isTechnicalModule = part.bounds.minimum.y
+                    >= center.y + 0.92F - 1.0e-4F;
+                technicalModules += static_cast<std::size_t>(
+                    isTechnicalModule);
+                routesClear &= nearlyEqual(local.x,
+                        local.x < 0.0F
+                            ? (isTechnicalModule ? -3.25F : -3.0F)
+                            : (isTechnicalModule ? 3.25F : 3.0F),
+                        1.0e-4F)
+                    && nearlyEqual(local.z,
+                        local.x < 0.0F ? -3.80F : 3.80F, 1.0e-4F);
+                if (part.bounds.minimum.y > center.y + 1.0e-4F) {
+                    bool touchesSupport = false;
+                    for (const RoomArchitecturePart& candidate : parts) {
+                        touchesSupport |= nearlyEqual(
+                                part.bounds.minimum.y,
+                                candidate.bounds.maximum.y, 1.0e-4F)
+                            && part.bounds.minimum.x < candidate.bounds.maximum.x
+                            && part.bounds.maximum.x > candidate.bounds.minimum.x
+                            && part.bounds.minimum.z < candidate.bounds.maximum.z
+                            && part.bounds.maximum.z > candidate.bounds.minimum.z;
+                    }
+                    stationsSupported &= touchesSupport;
+                }
+            }
+            onlyModulesBreakable &= part.breakable == isTechnicalModule;
+            if (part.breakable) {
+                ++breakableModules;
+                const Vec3 expectedTint = local.x < 0.0F
+                    ? Vec3{0.44F, 0.43F, 0.30F}
+                    : Vec3{0.34F, 0.35F, 0.34F};
+                onlyModulesBreakable &= nearlyEqual(part.tint,
+                    expectedTint, 1.0e-4F);
+            }
+            for (std::size_t second = first + 1U;
+                 second < parts.size(); ++second) {
+                noIntersections &= !overlapsOpen(part.bounds,
+                    parts[second].bounds);
+            }
+        }
+        expect(contained && routesClear && noIntersections
+                && stationsSupported && onlyModulesBreakable
+                && leftStationParts == 3U && rightStationParts == 3U
+                && technicalModules == 2U && breakableModules == 2U
+                && validateRoomArchitecture(room, parts),
+            "Technical preview keeps doors, zones, terminal and three long lanes clear");
+        if (rotation == QuarterTurn::Degrees0) {
+            unrotated = parts;
+        } else {
+            bool followsRotation = parts.size() == unrotated.size();
+            if (followsRotation) {
+                for (std::size_t index = 0U; index < parts.size(); ++index) {
+                    const Vec3 original = (unrotated[index].bounds.minimum
+                        + unrotated[index].bounds.maximum) * 0.5F;
+                    const Vec3 actual = (parts[index].bounds.minimum
+                        + parts[index].bounds.maximum) * 0.5F;
+                    followsRotation &= nearlyEqual(actual, center
+                        + rotateQuarterTurns(original - center, rotation),
+                        1.0e-4F);
+                }
+            }
+            expect(followsRotation,
+                "Technical preview follows all quarter-turn rotations");
+        }
+        auto blocked = parts;
+        blocked.front().bounds = toWorld({{-0.3F, 0.0F, 5.8F},
+            {0.3F, 1.5F, 6.2F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Technical preview rejects enemy zone obstruction");
+        blocked.front().bounds = toWorld({{3.2F, 0.0F, -0.3F},
+            {3.8F, 1.5F, 0.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Technical preview rejects prop zone obstruction");
+        blocked.front().bounds = toWorld({{-3.8F, 0.0F, -0.3F},
+            {-3.2F, 1.5F, 0.3F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Technical preview rejects loot zone obstruction");
+        blocked.front().bounds = toWorld({{-0.3F, 0.0F, 9.3F},
+            {0.3F, 1.5F, 9.8F}});
+        expect(!validateRoomArchitecture(room, blocked),
+            "Technical preview rejects a blocked connector");
+    }
+
+    RoomInstance ordinary;
+    ordinary.theme = RoomTheme::Maintenance;
+    ordinary.worldBounds = {{-8.0F, 0.0F, -10.0F},
+        {8.0F, 5.5F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Maintenance campaign rooms retain generic architecture");
+    ordinary.moduleId = technicalPreviewModuleId;
+    ordinary.worldBounds = {{-7.9F, 0.0F, -10.0F},
+        {7.9F, 5.5F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Technical preview rejects a room below its reserved footprint");
+}
+
+void testLaboratoryPreviewArchitecture()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr Vec3 center{23.0F, 2.0F, -19.0F};
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb first, const Aabb second) {
+        return first.minimum.x < second.maximum.x
+            && first.maximum.x > second.minimum.x
+            && first.minimum.y < second.maximum.y
+            && first.maximum.y > second.minimum.y
+            && first.minimum.z < second.maximum.z
+            && first.maximum.z > second.minimum.z;
+    };
+    std::vector<RoomArchitecturePart> unrotated;
+    for (const QuarterTurn rotation : rotations) {
+        const auto toWorld = [&](const Aabb local) {
+            Vec3 minimum{1000.0F, center.y + local.minimum.y, 1000.0F};
+            Vec3 maximum{-1000.0F, center.y + local.maximum.y, -1000.0F};
+            for (const float x : {local.minimum.x, local.maximum.x}) {
+                for (const float z : {local.minimum.z, local.maximum.z}) {
+                    const Vec3 point = center
+                        + rotateQuarterTurns(Vec3{x, 0.0F, z}, rotation);
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.z = std::min(minimum.z, point.z);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.z = std::max(maximum.z, point.z);
+                }
+            }
+            return Aabb{minimum, maximum};
+        };
+        RoomInstance room;
+        room.theme = RoomTheme::Laboratory;
+        room.moduleId = laboratoryPreviewModuleId;
+        room.sizeClass = RoomSizeClass::Large;
+        room.rotation = rotation;
+        room.seed = 7U;
+        room.worldBounds = toWorld({{-9.0F, 0.0F, -10.0F},
+            {9.0F, 6.0F, 10.0F}});
+        for (const auto& [position, normal] : std::array{
+                 std::pair{Vec3{0.0F, 0.0F, -10.0F},
+                     Vec3{0.0F, 0.0F, -1.0F}},
+                 std::pair{Vec3{9.0F, 0.0F, 0.0F},
+                     Vec3{1.0F, 0.0F, 0.0F}},
+                 std::pair{Vec3{0.0F, 0.0F, 10.0F},
+                     Vec3{0.0F, 0.0F, 1.0F}},
+                 std::pair{Vec3{-9.0F, 0.0F, 0.0F},
+                     Vec3{-1.0F, 0.0F, 0.0F}},
+             }) {
+            ConnectorInstance connector;
+            connector.worldPosition = center
+                + rotateQuarterTurns(position, rotation);
+            connector.worldNormal = rotateQuarterTurns(normal, rotation);
+            connector.width = 1.8F;
+            connector.height = 2.4F;
+            room.connectors.push_back(connector);
+        }
+        room.enemyZones.push_back({toWorld({{-0.8F, 0.0F, -6.5F},
+            {0.8F, 0.0F, -5.3F}})});
+        room.enemyZones.push_back({toWorld({{-0.8F, 0.0F, 5.3F},
+            {0.8F, 0.0F, 6.5F}})});
+        room.propZones.push_back({toWorld({{3.0F, 0.0F, -0.8F},
+            {4.0F, 0.0F, 0.8F}})});
+        room.lootZones.push_back({toWorld({{-4.0F, 0.0F, 3.0F},
+            {-3.0F, 0.0F, 4.0F}})});
+
+        const auto parts = makeRoomArchitecture(room);
+        const auto columns = makeRoomWallColumns(room);
+        const auto shafts = std::count_if(columns.begin(), columns.end(),
+            [](const RoomArchitecturePart& part) {
+                return part.structuralColumn && part.solid;
+            });
+        const auto indicators = std::count_if(columns.begin(), columns.end(),
+            [](const RoomArchitecturePart& part) {
+                return part.decoration
+                    == RoomDecorationPart::LaboratoryColumnIndicator;
+            });
+        bool columnsSafe = shafts >= 4 && indicators == shafts * 2;
+        for (const RoomArchitecturePart& column : columns) {
+            columnsSafe &= room.worldBounds.contains(column.bounds.minimum)
+                && room.worldBounds.contains(column.bounds.maximum);
+            if (!column.solid) continue;
+            for (const RoomArchitecturePart& furniture : parts) {
+                columnsSafe &= !overlapsOpen(column.bounds, furniture.bounds);
+            }
+            for (const ConnectorInstance& door : room.connectors) {
+                const Vec3 midpoint = (column.bounds.minimum
+                    + column.bounds.maximum) * 0.5F;
+                const float along = std::abs(door.worldNormal.x) > 0.5F
+                    ? std::abs(midpoint.z - door.worldPosition.z)
+                    : std::abs(midpoint.x - door.worldPosition.x);
+                const float normal = std::abs(door.worldNormal.x) > 0.5F
+                    ? std::abs(midpoint.x - door.worldPosition.x)
+                    : std::abs(midpoint.z - door.worldPosition.z);
+                columnsSafe &= normal > 0.5F
+                    || along > door.width * 0.5F + 0.31F;
+            }
+        }
+        expect(columnsSafe,
+            "Laboratory 3D wall columns and lights clear furniture and doors in every rotation");
+        RoomInstance differentSeed = room;
+        differentSeed.seed = 999U;
+        expect(parts.size() == 41U
+                && parts == makeRoomArchitecture(room)
+                && parts == makeRoomArchitecture(differentSeed),
+            "Laboratory preview parts are bounded and seed independent");
+        expect(std::count_if(parts.begin(), parts.end(),
+                   [](const RoomArchitecturePart& part) {
+                       return part.decoration == RoomDecorationPart::CeilingDuct;
+                   }) == 2U
+                && std::count_if(parts.begin(), parts.end(),
+                       [](const RoomArchitecturePart& part) {
+                           return part.decoration
+                               == RoomDecorationPart::GlassTestPlanter;
+                       }) == 1U
+                && std::count_if(parts.begin(), parts.end(),
+                       [&](const RoomArchitecturePart& part) {
+                           return part.decoration
+                                   == RoomDecorationPart::SmallGlassTestPlanter
+                               && nearlyEqual(part.bounds.minimum.y,
+                                   center.y + 0.92F, 1.0e-4F);
+                       }) == 4U,
+            "Laboratory has extraction ducts, a corner specimen and four tabletop specimens");
+        const Aabb mainLane = toWorld({{-2.8F, 0.0F, -10.0F},
+            {2.8F, 2.4F, 10.0F}});
+        const Aabb sideDoorLane = toWorld({{-9.0F, 0.0F, -1.8F},
+            {9.0F, 2.4F, 1.8F}});
+        const Aabb leftFlank = toWorld({{-7.0F, 0.0F, -8.3F},
+            {-5.25F, 2.4F, 8.3F}});
+        const Aabb rightFlank = toWorld({{5.25F, 0.0F, -8.3F},
+            {7.0F, 2.4F, 8.3F}});
+        const Aabb returnTerminal = toWorld({{-0.5F, 0.0F, 8.0F},
+            {0.5F, 2.2F, 9.0F}});
+        const QuarterTurn inverseRotation = rotation == QuarterTurn::Degrees90
+            ? QuarterTurn::Degrees270
+            : rotation == QuarterTurn::Degrees270
+                ? QuarterTurn::Degrees90 : rotation;
+        bool partsContained = true;
+        bool routesClear = true;
+        bool solidsSeparated = true;
+        std::size_t leftIslandParts = 0U;
+        std::size_t rightIslandParts = 0U;
+        for (std::size_t first = 0U; first < parts.size(); ++first) {
+            const RoomArchitecturePart& part = parts[first];
+            partsContained &= part.solid && part.bounds.isValid()
+                && room.worldBounds.contains(part.bounds.minimum)
+                && room.worldBounds.contains(part.bounds.maximum);
+            routesClear &= !overlapsOpen(part.bounds, mainLane)
+                && !overlapsOpen(part.bounds, sideDoorLane)
+                && !overlapsOpen(part.bounds, leftFlank)
+                && !overlapsOpen(part.bounds, rightFlank)
+                && !overlapsOpen(part.bounds, returnTerminal);
+            const Vec3 midpoint = (part.bounds.minimum
+                + part.bounds.maximum) * 0.5F;
+            const Vec3 localMidpoint = rotateQuarterTurns(midpoint - center,
+                inverseRotation);
+            if (part.bounds.maximum.y <= center.y + 1.0F
+                && std::abs(localMidpoint.x) > 3.0F
+                && std::abs(localMidpoint.x) < 6.0F
+                && std::abs(localMidpoint.z) > 2.0F
+                && std::abs(localMidpoint.z) < 6.0F) {
+                const bool left = localMidpoint.x < 0.0F;
+                (left ? leftIslandParts : rightIslandParts)++;
+                routesClear &= nearlyEqual(localMidpoint.x,
+                        left ? -4.40F : 4.40F, 1.0e-4F)
+                    && nearlyEqual(localMidpoint.z,
+                        left ? -3.90F : 3.90F, 1.0e-4F);
+            }
+            for (std::size_t second = first + 1U;
+                 second < parts.size(); ++second) {
+                solidsSeparated &= !overlapsOpen(part.bounds,
+                    parts[second].bounds);
+            }
+        }
+        expect(partsContained && routesClear && solidsSeparated
+                && leftIslandParts == 2U && rightIslandParts == 2U
+                && validateRoomArchitecture(room, parts),
+            "Laboratory islands keep four doors, reserved zones, central corridor, terminal and flanks clear");
+        if (rotation == QuarterTurn::Degrees0) {
+            unrotated = parts;
+        } else {
+            bool followsRotation = parts.size() == unrotated.size();
+            if (followsRotation) {
+                for (std::size_t index = 0U; index < parts.size(); ++index) {
+                    const Vec3 originalMidpoint = (unrotated[index].bounds.minimum
+                        + unrotated[index].bounds.maximum) * 0.5F;
+                    const Vec3 actualMidpoint = (parts[index].bounds.minimum
+                        + parts[index].bounds.maximum) * 0.5F;
+                    const Vec3 expectedMidpoint = center
+                        + rotateQuarterTurns(originalMidpoint - center, rotation);
+                    followsRotation &= nearlyEqual(expectedMidpoint,
+                        actualMidpoint, 1.0e-4F);
+                }
+            }
+            expect(followsRotation,
+                "Laboratory preview geometry follows all room rotations");
+        }
+        auto obstructed = parts;
+        obstructed.front().bounds = toWorld({{-0.3F, 0.0F, 5.6F},
+            {0.3F, 1.8F, 6.0F}});
+        expect(!validateRoomArchitecture(room, obstructed),
+            "Laboratory preview rejects an occupied enemy zone");
+        obstructed.front().bounds = toWorld({{3.2F, 0.0F, -0.3F},
+            {3.8F, 1.8F, 0.3F}});
+        expect(!validateRoomArchitecture(room, obstructed),
+            "Laboratory preview rejects an occupied prop zone");
+        obstructed.front().bounds = toWorld({{-3.8F, 0.0F, 3.2F},
+            {-3.2F, 1.8F, 3.8F}});
+        expect(!validateRoomArchitecture(room, obstructed),
+            "Laboratory preview rejects an occupied loot zone");
+        obstructed.front().bounds = toWorld({{-0.3F, 0.0F, 9.3F},
+            {0.3F, 1.8F, 9.8F}});
+        expect(!validateRoomArchitecture(room, obstructed),
+            "Laboratory preview rejects a blocked connector");
+    }
+
+    RoomInstance ordinary;
+    ordinary.theme = RoomTheme::Laboratory;
+    ordinary.worldBounds = {{-9.0F, 0.0F, -10.0F},
+        {9.0F, 6.0F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Laboratory architecture remains isolated from campaign rooms");
+    ordinary.moduleId = laboratoryPreviewModuleId;
+    ordinary.worldBounds = {{-8.9F, 0.0F, -10.0F},
+        {8.9F, 6.0F, 10.0F}};
+    expect(makeRoomArchitecture(ordinary).empty(),
+        "Laboratory preview rejects an undersized room");
+}
+
+void testStorageArchitecture()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr Vec3 origin{23.0F, 2.0F, -19.0F};
+    constexpr std::array rotations{
+        QuarterTurn::Degrees0,
+        QuarterTurn::Degrees90,
+        QuarterTurn::Degrees180,
+        QuarterTurn::Degrees270,
+    };
+    const auto overlapsOpen = [](const Aabb first, const Aabb second) {
+        return first.minimum.x < second.maximum.x
+            && first.maximum.x > second.minimum.x
+            && first.minimum.y < second.maximum.y
+            && first.maximum.y > second.minimum.y
+            && first.minimum.z < second.maximum.z
+            && first.maximum.z > second.minimum.z;
+    };
+    std::size_t storageVariants = 0U;
+    for (const RoomModule& module : makeDefaultRoomModuleLibrary()) {
+        if (module.theme != RoomTheme::Storage) {
+            continue;
+        }
+        ++storageVariants;
+        const RoomRole role = module.supportsRole(RoomRole::Normal)
+            ? RoomRole::Normal : RoomRole::Secret;
+        std::vector<RoomArchitecturePart> unrotated;
+        for (const QuarterTurn rotation : rotations) {
+            const auto room = instantiateRoom(module, module.id, role,
+                7U, origin, rotation);
+            expect(room.has_value(), "Storage room instantiates for architecture test");
+            if (!room) {
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            RoomInstance differentSeed = *room;
+            differentSeed.seed = 999U;
+            expect(!parts.empty() && parts.size() <= 256U
+                    && parts == makeRoomArchitecture(*room)
+                    && parts == makeRoomArchitecture(differentSeed),
+                "Storage architecture is bounded and independent of random seed");
+
+            bool contained = true;
+            bool centralLaneClear = true;
+            bool doorsClear = true;
+            bool spawnZonesClear = true;
+            bool generatedPropsClear = true;
+            bool allPartsSolid = true;
+            bool rackPartsSeparated = true;
+            bool shelvesTouchUprights = true;
+            bool boxesRestOnShelves = true;
+            std::size_t shelfBoxes = 0U;
+            std::size_t texturedRackParts = 0U;
+            std::size_t rackUprights = 0U;
+            std::size_t rackShelves = 0U;
+            std::size_t rackLips = 0U;
+            std::size_t rackBrackets = 0U;
+            std::size_t leftIslandPosts = 0U;
+            std::size_t rightIslandPosts = 0U;
+            bool islandSideAislesClear = true;
+            bool islandCentralAislesClear = true;
+            bool hallPropAislesClear = true;
+            const bool swapped = rotation == QuarterTurn::Degrees90
+                || rotation == QuarterTurn::Degrees270;
+            const QuarterTurn inverseRotation = rotation == QuarterTurn::Degrees90
+                ? QuarterTurn::Degrees270
+                : rotation == QuarterTurn::Degrees270
+                    ? QuarterTurn::Degrees90 : rotation;
+            const Vec3 center{
+                (room->worldBounds.minimum.x + room->worldBounds.maximum.x)
+                    * 0.5F,
+                room->worldBounds.minimum.y,
+                (room->worldBounds.minimum.z + room->worldBounds.maximum.z)
+                    * 0.5F,
+            };
+            if (module.id == 204U) {
+                hallPropAislesClear = room->propZones.size() == 1U;
+                if (hallPropAislesClear) {
+                    const Aabb zone = room->propZones.front().bounds;
+                    float minimumLocalX = 1000.0F;
+                    float maximumLocalX = -1000.0F;
+                    for (const float x : {zone.minimum.x, zone.maximum.x}) {
+                        for (const float z : {zone.minimum.z, zone.maximum.z}) {
+                            const Vec3 local = rotateQuarterTurns(
+                                Vec3{x, center.y, z} - center,
+                                inverseRotation);
+                            minimumLocalX = std::min(minimumLocalX, local.x);
+                            maximumLocalX = std::max(maximumLocalX, local.x);
+                        }
+                    }
+                    // Between the island edge at X=4.00 and wall rack at
+                    // X=8.07, the entire prop zone preserves one-metre aisles.
+                    hallPropAislesClear = minimumLocalX >= 5.00F
+                        && maximumLocalX <= 7.07F;
+                }
+            }
+            const Aabb lane = swapped
+                ? Aabb{{room->worldBounds.minimum.x,
+                            center.y, center.z - 1.5F},
+                      {room->worldBounds.maximum.x,
+                            center.y + 2.2F, center.z + 1.5F}}
+                : Aabb{{center.x - 1.5F, center.y,
+                            room->worldBounds.minimum.z},
+                      {center.x + 1.5F, center.y + 2.2F,
+                            room->worldBounds.maximum.z}};
+            for (const RoomArchitecturePart& part : parts) {
+                contained &= part.bounds.isValid()
+                    && room->worldBounds.contains(part.bounds.minimum)
+                    && room->worldBounds.contains(part.bounds.maximum);
+                allPartsSolid &= part.solid;
+                if (part.storageRack) {
+                    ++texturedRackParts;
+                    allPartsSolid &= !part.breakable;
+                    switch (part.storageRackPart) {
+                    case StorageRackPart::Upright: ++rackUprights; break;
+                    case StorageRackPart::Shelf: ++rackShelves; break;
+                    case StorageRackPart::Lip: ++rackLips; break;
+                    case StorageRackPart::Bracket: ++rackBrackets; break;
+                    case StorageRackPart::None: allPartsSolid = false; break;
+                    }
+                }
+                if (part.breakable) {
+                    ++shelfBoxes;
+                    allPartsSolid &= !part.storageRack
+                        && part.bounds.minimum.y > center.y
+                        && part.bounds.maximum.y - part.bounds.minimum.y <= 0.45F;
+                    bool supported = false;
+                    for (const RoomArchitecturePart& shelf : parts) {
+                        if (shelf.storageRackPart != StorageRackPart::Shelf) {
+                            continue;
+                        }
+                        supported |= nearlyEqual(part.bounds.minimum.y,
+                                shelf.bounds.maximum.y, 1.0e-4F)
+                            && part.bounds.minimum.x >= shelf.bounds.minimum.x
+                            && part.bounds.maximum.x <= shelf.bounds.maximum.x
+                            && part.bounds.minimum.z >= shelf.bounds.minimum.z
+                            && part.bounds.maximum.z <= shelf.bounds.maximum.z;
+                    }
+                    boxesRestOnShelves &= supported;
+                }
+                const Vec3 midpoint = (part.bounds.minimum + part.bounds.maximum)
+                    * 0.5F;
+                const Vec3 local = rotateQuarterTurns(midpoint - center,
+                    inverseRotation);
+                const bool islandPost = nearlyEqual(
+                        part.bounds.minimum.y, center.y, 1.0e-4F)
+                    && part.bounds.maximum.y >= center.y + 2.5F
+                    && std::abs(local.x) > 2.5F
+                    && std::abs(local.x) < 4.5F
+                    && std::abs(local.z) > 4.0F
+                    && std::abs(local.z) < 7.2F;
+                if (islandPost) {
+                    (local.x < 0.0F ? leftIslandPosts : rightIslandPosts)++;
+                    const float localHalfWidth = swapped
+                        ? (part.bounds.maximum.z - part.bounds.minimum.z) * 0.5F
+                        : (part.bounds.maximum.x - part.bounds.minimum.x) * 0.5F;
+                    // The nearest grounded wall rack starts at local |X|=8.07.
+                    islandSideAislesClear &= std::abs(local.x)
+                        + localHalfWidth <= 7.07F;
+                    islandCentralAislesClear &= std::abs(local.x)
+                        - localHalfWidth >= 2.50F;
+                }
+                if (!part.solid) {
+                    continue;
+                }
+                centralLaneClear &= !overlapsOpen(part.bounds, lane);
+                const auto clearOfZones = [&](const std::vector<SpawnZone>& zones,
+                                              const float margin) {
+                    for (const SpawnZone& zone : zones) {
+                        const Aabb occupied{
+                            {zone.bounds.minimum.x - margin, center.y,
+                                zone.bounds.minimum.z - margin},
+                            {zone.bounds.maximum.x + margin, center.y + 2.2F,
+                                zone.bounds.maximum.z + margin},
+                        };
+                        if (overlapsOpen(part.bounds, occupied)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                spawnZonesClear &= clearOfZones(room->enemyZones, 0.35F)
+                    && clearOfZones(room->propZones, 0.15F)
+                    && clearOfZones(room->lootZones, 0.10F);
+                for (const ConnectorInstance& connector : room->connectors) {
+                    const Vec3 p = connector.worldPosition;
+                    const Vec3 n = connector.worldNormal;
+                    const Aabb opening = std::abs(n.x) > 0.5F
+                        ? Aabb{{p.x - (n.x > 0.0F ? 0.95F : 0.0F),
+                                    p.y, p.z - 0.9F},
+                              {p.x + (n.x < 0.0F ? 0.95F : 0.0F),
+                                    p.y + 2.2F, p.z + 0.9F}}
+                        : Aabb{{p.x - 0.9F, p.y,
+                                    p.z - (n.z > 0.0F ? 0.95F : 0.0F)},
+                              {p.x + 0.9F, p.y + 2.2F,
+                                    p.z + (n.z < 0.0F ? 0.95F : 0.0F)}};
+                    doorsClear &= !overlapsOpen(part.bounds, opening);
+                }
+            }
+            for (std::size_t first = 0U; first < parts.size(); ++first) {
+                if (!parts[first].storageRack) continue;
+                for (std::size_t second = first + 1U;
+                     second < parts.size(); ++second) {
+                    if (parts[second].storageRack) {
+                        rackPartsSeparated &= !overlapsOpen(
+                            parts[first].bounds, parts[second].bounds);
+                    }
+                }
+                if (parts[first].storageRackPart != StorageRackPart::Shelf) {
+                    continue;
+                }
+                const Aabb shelf = parts[first].bounds;
+                std::size_t uprightContacts = 0U;
+                for (const RoomArchitecturePart& candidate : parts) {
+                    if (candidate.storageRackPart != StorageRackPart::Upright
+                        || candidate.bounds.minimum.y != center.y
+                        || candidate.bounds.maximum.y - center.y < 2.5F) {
+                        continue;
+                    }
+                    const Aabb upright = candidate.bounds;
+                    const bool xOverlaps = shelf.minimum.x < upright.maximum.x
+                        && shelf.maximum.x > upright.minimum.x;
+                    const bool zOverlaps = shelf.minimum.z < upright.maximum.z
+                        && shelf.maximum.z > upright.minimum.z;
+                    const bool touchesZ = nearlyEqual(shelf.minimum.z,
+                            upright.maximum.z, 1.0e-4F)
+                        || nearlyEqual(shelf.maximum.z,
+                            upright.minimum.z, 1.0e-4F);
+                    const bool touchesX = nearlyEqual(shelf.minimum.x,
+                            upright.maximum.x, 1.0e-4F)
+                        || nearlyEqual(shelf.maximum.x,
+                            upright.minimum.x, 1.0e-4F);
+                    uprightContacts += static_cast<std::size_t>(
+                        (xOverlaps && touchesZ) || (zOverlaps && touchesX));
+                }
+                shelvesTouchUprights &= uprightContacts == 4U;
+            }
+            for (wkc::core::Seed seed = 1U; seed <= 16U; ++seed) {
+                const PropLayout layout = generatePropLayout(
+                    seed, role, room->theme, 3U, room->propZones);
+                generatedPropsClear &= validatePropLayout(
+                    layout, room->propZones).isValid();
+                for (const PropSpawn& prop : layout.props) {
+                    const Aabb occupied{
+                        {prop.position.x - prop.scale.x * 0.5F, center.y,
+                            prop.position.z - prop.scale.z * 0.5F},
+                        {prop.position.x + prop.scale.x * 0.5F,
+                            center.y + prop.scale.y,
+                            prop.position.z + prop.scale.z * 0.5F},
+                    };
+                    for (const RoomArchitecturePart& part : parts) {
+                        generatedPropsClear &= !overlapsOpen(part.bounds, occupied);
+                    }
+                }
+            }
+            expect(contained && centralLaneClear && doorsClear
+                    && spawnZonesClear && generatedPropsClear && allPartsSolid
+                    && rackPartsSeparated && shelvesTouchUprights
+                    && boxesRestOnShelves
+                    && rackUprights * 3U == rackShelves * 4U
+                    && rackShelves == shelfBoxes
+                    && rackLips >= rackShelves
+                    && rackBrackets * 3U == rackShelves * 2U
+                    && shelfBoxes >= 12U
+                    && texturedRackParts >= 20U
+                    && validateRoomArchitecture(*room, parts),
+                "Storage solids leave doors, enemy and loot zones, and generated props clear");
+            if (module.id == 204U) {
+                expect(leftIslandPosts == 4U && rightIslandPosts == 4U
+                        && islandSideAislesClear && islandCentralAislesClear
+                        && hallPropAislesClear,
+                    "Storage Hall has two interior islands and metre-wide aisles around props in every rotation");
+            } else {
+                expect(leftIslandPosts == 0U && rightIslandPosts == 0U,
+                    "compact Storage variants keep the interior free of shelf islands");
+            }
+
+            if (rotation == QuarterTurn::Degrees0) {
+                auto blocked = parts;
+                blocked.front().bounds = {
+                    {center.x - 0.2F, center.y, center.z - 0.2F},
+                    {center.x + 0.2F, center.y + 1.8F, center.z + 0.2F}};
+                expect(!validateRoomArchitecture(*room, blocked),
+                    "Storage placement validation rejects a solid inside an enemy zone");
+                if (module.id == 204U) {
+                    blocked.front().bounds = {
+                        {center.x + 5.5F, center.y, center.z - 6.5F},
+                        {center.x + 6.0F, center.y + 1.8F,
+                            center.z - 6.0F}};
+                    expect(!validateRoomArchitecture(*room, blocked),
+                        "Storage placement validation rejects a solid in the Hall prop zone");
+                }
+                if (!room->connectors.empty()) {
+                    blocked.front().bounds = {
+                        {room->connectors.front().worldPosition.x - 0.2F,
+                            center.y,
+                            room->connectors.front().worldPosition.z - 0.2F},
+                        {room->connectors.front().worldPosition.x + 0.2F,
+                            center.y + 1.8F,
+                            room->connectors.front().worldPosition.z + 0.2F}};
+                    expect(!validateRoomArchitecture(*room, blocked),
+                        "Storage placement validation rejects a solid in a doorway");
+                }
+            }
+
+            if (rotation == QuarterTurn::Degrees0) {
+                unrotated = parts;
+            } else if (parts.size() == unrotated.size()) {
+                bool rotatedCorrectly = true;
+                for (std::size_t index = 0U; index < parts.size(); ++index) {
+                    const auto midpoint = [](const Aabb bounds) {
+                        return (bounds.minimum + bounds.maximum) * 0.5F;
+                    };
+                    const Vec3 expected = origin
+                        + rotateQuarterTurns(midpoint(unrotated[index].bounds)
+                                - origin, rotation);
+                    const Vec3 actual = midpoint(parts[index].bounds);
+                    rotatedCorrectly &= nearlyEqual(expected, actual, 1.0e-4F)
+                        && parts[index].solid == unrotated[index].solid;
+                }
+                expect(rotatedCorrectly,
+                    "Storage architecture follows room rotation in world space");
+            } else {
+                expect(false, "Storage architecture keeps part count under rotation");
+            }
+        }
+    }
+    expect(storageVariants == 4U,
+        "all compact, wide, secret and hall Storage modules receive architecture");
+
+    RoomInstance preview;
+    preview.theme = RoomTheme::Storage;
+    preview.sizeClass = RoomSizeClass::Large;
+    preview.worldBounds = {{-9.0F, 0.0F, -10.0F}, {9.0F, 6.0F, 10.0F}};
+    const auto previewParts = makeRoomArchitecture(preview);
+    const auto previewIslandPosts = std::count_if(
+        previewParts.begin(), previewParts.end(),
+        [](const RoomArchitecturePart& part) {
+            const Vec3 midpoint = (part.bounds.minimum + part.bounds.maximum)
+                * 0.5F;
+            return part.solid && part.bounds.minimum.y == 0.0F
+                && part.bounds.maximum.y >= 2.5F
+                && std::abs(midpoint.x) > 2.5F
+                && std::abs(midpoint.x) < 4.5F
+                && std::abs(midpoint.z) > 4.0F
+                && std::abs(midpoint.z) < 7.2F;
+        });
+    expect(previewIslandPosts == 8 && validateRoomArchitecture(preview, previewParts),
+        "18-by-20 Storage preview footprint receives the same two islands");
+
+    RoomInstance industrial;
+    industrial.theme = RoomTheme::Industrial;
+    industrial.worldBounds = {{-4.0F, 0.0F, -5.0F}, {4.0F, 4.0F, 5.0F}};
+    expect(makeRoomArchitecture(industrial).empty(),
+        "other themes keep the existing generic architecture");
 }
 
 void testInstantiationAndRotation()
@@ -305,7 +1720,9 @@ void testMapGraph()
     const MapGraph graph = generateMapGraph(12345, {8, 1});
     expect(validateMapGraph(graph).isValid(), "generated map graph satisfies invariants");
     expect(graph.nodes.size() == 8U, "graph contains requested room count");
-    expect(graph.edges.size() == 8U, "graph spends its single loop budget");
+    const bool hubSecret = graph.nodes[graph.mainPath.size()].role == RoomRole::Secret;
+    expect(graph.edges.size() == (hubSecret ? 7U : 8U),
+        "graph omits the loop that would wrap around the large Hub");
     expect(graph.mainPath.front() == 1U, "main path begins at START");
     const MapEdge& loop = graph.edges.back();
     const bool firstIsBranch = loop.first > graph.mainPath.size();
@@ -320,9 +1737,9 @@ void testMapGraph()
         });
     const RoomNodeId branchParent = branchLink == graph.edges.end() ? 0U
         : branchLink->first == branchEndpoint ? branchLink->second : branchLink->first;
-    expect(firstIsBranch != secondIsBranch && branchParent != 0U
+    expect(hubSecret || (firstIsBranch != secondIsBranch && branchParent != 0U
             && (mainEndpoint + 1U == branchParent
-                || branchParent + 1U == mainEndpoint),
+                || branchParent + 1U == mainEndpoint)),
         "loop closes a local branch instead of creating a map-spanning corridor");
     expect(graphToDot(graph).find("graph GDP") != std::string::npos,
         "graph debug dump uses DOT format");
@@ -347,7 +1764,7 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0x9F371F09C5AB76F3ULL,
+    expect(fingerprint == 0x2F12EA79CB4B4E45ULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
@@ -407,6 +1824,82 @@ void testCorridorRouting()
     const auto zigzag = routeCorridor(3, 1, 2, first, bentSecond, obstacles);
     expect(zigzag && zigzag->shape == CorridorShape::Z,
         "obstacles blocking both L routes select a Z corridor");
+}
+
+void testCorridorWallColumns()
+{
+    using namespace wkc::core;
+    using namespace gdp::world;
+
+    constexpr std::array straight{
+        Vec3{0.0F, 0.0F, 0.0F}, Vec3{0.0F, 0.0F, 10.3F}};
+    const auto wide = makeCorridorWallColumns(straight, 2.4F, 2.8F);
+    expect(wide.size() == 6U && wide == makeCorridorWallColumns(straight,
+            2.4F, 2.8F),
+        "long preview corridor receives three deterministic pairs of columns");
+    bool clear = true;
+    for (const Aabb& column : wide) {
+        const float closestEnd = std::min(column.minimum.z,
+            straight.back().z - column.maximum.z);
+        const bool leftWall = nearlyEqual(column.minimum.x, -1.2F)
+            && nearlyEqual(column.maximum.x, -1.02F);
+        const bool rightWall = nearlyEqual(column.minimum.x, 1.02F)
+            && nearlyEqual(column.maximum.x, 1.2F);
+        clear &= closestEnd >= 0.6F
+            && nearlyEqual(column.minimum.y, 0.0F)
+            && nearlyEqual(column.maximum.y, 2.8F)
+            && nearlyEqual(column.maximum.z - column.minimum.z, 0.38F)
+            && (leftWall || rightWall);
+    }
+    expect(clear,
+        "wide corridor columns touch its walls and clear both door thresholds");
+
+    const auto narrow = makeCorridorWallColumns(straight, 1.2F, 2.2F);
+    bool robotClearance = narrow.size() == wide.size();
+    for (const Aabb& column : narrow) {
+        robotClearance &= column.maximum.x <= -0.54F
+                || column.minimum.x >= 0.54F;
+    }
+    expect(robotClearance,
+        "standard 1.2 m corridors retain clearance for the 0.52 m robot radius");
+
+    constexpr std::array reversedStraight{
+        Vec3{0.0F, 0.0F, 10.3F}, Vec3{0.0F, 0.0F, 0.0F}};
+    expect(wide == makeCorridorWallColumns(reversedStraight, 2.4F, 2.8F),
+        "reversing a straight route preserves all column bounds and order");
+
+    constexpr std::array bend{
+        Vec3{0.0F, 0.0F, 0.0F}, Vec3{0.0F, 0.0F, 7.0F},
+        Vec3{7.0F, 0.0F, 7.0F}};
+    constexpr std::array reversedBend{
+        Vec3{7.0F, 0.0F, 7.0F}, Vec3{0.0F, 0.0F, 7.0F},
+        Vec3{0.0F, 0.0F, 0.0F}};
+    const auto bendColumns = makeCorridorWallColumns(bend, 2.4F, 2.8F);
+    expect(bendColumns.size() == 8U
+            && bendColumns == makeCorridorWallColumns(
+                reversedBend, 2.4F, 2.8F),
+        "L route has symmetric wall pairs on long arms, independent of direction");
+    bool cornerClear = true;
+    for (const Aabb& column : bendColumns) {
+        const float distanceX = std::max({column.minimum.x,
+            0.0F, -column.maximum.x});
+        const float distanceZ = std::max({column.minimum.z - 7.0F,
+            0.0F, 7.0F - column.maximum.z});
+        cornerClear &= std::max(distanceX, distanceZ) >= 0.6F;
+    }
+    expect(cornerClear, "L route bend keeps an unobstructed turning area");
+
+    constexpr std::array zigzag{
+        Vec3{0.0F, 0.0F, 0.0F}, Vec3{0.0F, 0.0F, 6.0F},
+        Vec3{7.0F, 0.0F, 6.0F}, Vec3{7.0F, 0.0F, 12.0F}};
+    const auto zigzagColumns = makeCorridorWallColumns(zigzag, 1.2F, 2.2F);
+    expect(zigzagColumns.size() == 12U,
+        "Z route places wall pairs only on sufficiently long straight arms");
+    constexpr std::array shortPath{
+        Vec3{0.0F, 0.0F, 0.0F}, Vec3{0.0F, 0.0F, 3.0F}};
+    expect(makeCorridorWallColumns(shortPath, 2.4F, 2.8F).empty()
+            && makeCorridorWallColumns(straight, 1.0F, 2.2F).empty(),
+        "short segments and corridors too narrow for the robot stay clear");
 }
 
 void testInitialEntityPopulation()
@@ -799,7 +2292,9 @@ void testWorldSeedBatch()
                 && room.sizeClass == RoomSizeClass::Large);
             worldHasWideNormal = worldHasWideNormal || (room.role == RoomRole::Normal
                 && room.sizeClass == RoomSizeClass::Large
-                && room.worldBounds.maximum.y - room.worldBounds.minimum.y == 6.0F);
+                && (room.worldBounds.maximum.y - room.worldBounds.minimum.y == 6.0F
+                    || (room.moduleId == maintenanceLModuleId
+                        && room.worldBounds.maximum.y - room.worldBounds.minimum.y == 5.5F)));
             sawCompactNormal = sawCompactNormal || (room.role == RoomRole::Normal
                 && room.sizeClass == RoomSizeClass::Compact);
             if ((room.role == RoomRole::Hub || room.role == RoomRole::Arena
@@ -878,8 +2373,7 @@ void testWorldSeedBatch()
         "each of 1,000 generated worlds contains a wide Normal room");
     expect(maximumCorridorLength <= 17.0F,
         "local loop policy prevents map-spanning corridors");
-    expect(secondBranchAwayFromHub && secretAtHub > 0U
-            && secretFarther > secretAtHub,
+    expect(secondBranchAwayFromHub && secretAtHub > 0U && secretFarther > 0U,
         "seed batch places the guaranteed secret weapon both at the Hub and elsewhere");
     expect(mainPathTurns && sawOneTurn && sawTwoTurns
             && std::all_of(firstDirections.begin(), firstDirections.end(), [](bool seen) { return seen; })
@@ -1092,6 +2586,7 @@ void testBossDifficultyProfiles()
     bool validProfiles = true;
     bool clearSpawns = true;
     bool coverValid = true;
+    bool arenaColumnsValid = true;
     std::array<bool, 4> rotations{};
     for (Seed seed = 0U; seed < 64U; ++seed) {
         const auto generated = generateWorld(seed);
@@ -1120,6 +2615,23 @@ void testBossDifficultyProfiles()
             if (room == populated.rooms.end()) {
                 validProfiles = false;
                 continue;
+            }
+            const auto arenaColumns = makeRoomArchitecture(*room);
+            arenaColumnsValid &= arenaColumns.size() == 8U
+                && validateRoomArchitecture(*room, arenaColumns);
+            for (const float z : {-8.0F, 8.0F}) {
+                const Vec3 center = room->transform.position
+                    + rotateQuarterTurns({7.0F, 0.0F, z}, room->rotation);
+                arenaColumnsValid &= std::any_of(arenaColumns.begin(), arenaColumns.end(),
+                    [center, room](const RoomArchitecturePart& part) {
+                        const Vec3 midpoint = (part.bounds.minimum + part.bounds.maximum)
+                            * 0.5F;
+                        return part.structuralColumn
+                            && std::abs(midpoint.x - center.x) < 0.01F
+                            && std::abs(midpoint.z - center.z) < 0.01F
+                            && part.bounds.maximum.y - part.bounds.minimum.y
+                                >= room->worldBounds.maximum.y - 0.2F;
+                    });
             }
             std::size_t fixedCoverCount = 0U;
             for (const EntityId id : room->entities) {
@@ -1207,12 +2719,24 @@ void testBossDifficultyProfiles()
                     const float dz = position.z - closestZ;
                     clearSpawns &= dx * dx + dz * dz >= radius * radius;
                 }
+                for (const RoomArchitecturePart& part : arenaColumns) {
+                    if (!part.solid) continue;
+                    const float closestX = std::clamp(position.x,
+                        part.bounds.minimum.x, part.bounds.maximum.x);
+                    const float closestZ = std::clamp(position.z,
+                        part.bounds.minimum.z, part.bounds.maximum.z);
+                    const float dx = position.x - closestX;
+                    const float dz = position.z - closestZ;
+                    clearSpawns &= dx * dx + dz * dz >= radius * radius;
+                }
             }
         }
     }
     expect(validProfiles, "Boss health and active aide composition match mode, difficulty and floor");
     expect(clearSpawns, "Boss and aide spawns clear walls, doors, terminal, props and each other");
     expect(coverValid, "Boss has two rotated low/tall barricades on the left flank");
+    expect(arenaColumnsValid,
+        "Boss has two full-height right columns clear of doors and reserved zones");
     expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
         "Boss spawn batch covers all four room rotations");
 }
@@ -1267,12 +2791,20 @@ int main()
 {
     testModuleValidation();
     testDefaultModuleStructuralVariety();
+    testCampaignRoomVariants();
+    testRoomWallColumns();
+    testCentralHubPreviewArchitecture();
+    testSecurityPreviewArchitecture();
+    testTechnicalPreviewArchitecture();
+    testLaboratoryPreviewArchitecture();
+    testStorageArchitecture();
     testInstantiationAndRotation();
     testConnectorContracts();
     testRequiredConnectorResolution();
     testMapGraph();
     testWorldGeneration();
     testCorridorRouting();
+    testCorridorWallColumns();
     testInitialEntityPopulation();
     testCampaignExitTerminalPopulation();
     testCampaignEncounterProgression();

@@ -1,13 +1,20 @@
 #include "game/visual/WeaponViewmodelAssets.hpp"
+#include "game/visual/EnemyModelAsset.hpp"
 
 #include "core/Math.hpp"
+
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <numbers>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace gdp::game::visual {
@@ -421,7 +428,9 @@ void makePistol(WeaponMeshBuilder& mesh)
 void makeCarbine(WeaponMeshBuilder& mesh)
 {
     using enum WeaponMaterial;
-    mesh.beveledLoft(CoatedSteel,
+    // Dark structural core with separate painted armor panels, so the rifle
+    // can receive its own orange tint without recoloring the other weapons.
+    mesh.beveledLoft(Polymer,
         std::array{WeaponMeshBuilder::LoftSection{-0.26F, 0.113F, 0.025F,
                        0.091F, 0.023F},
             WeaponMeshBuilder::LoftSection{-0.20F, 0.1225F, 0.025F,
@@ -430,7 +439,7 @@ void makeCarbine(WeaponMeshBuilder& mesh)
                 0.10F, 0.024F},
             WeaponMeshBuilder::LoftSection{0.27F, 0.105F, 0.022F,
                 0.082F, 0.02F}});
-    mesh.beveledPrism(CoatedSteel, {0.0F, -0.048F, 0.03F},
+    mesh.beveledPrism(BareSteel, {0.0F, -0.048F, 0.03F},
         {0.215F, 0.085F, 0.47F}, 0.012F);
     mesh.box(BareSteel, {0.0F, 0.128F, 0.005F}, {0.20F, 0.009F, 0.49F});
     mesh.beveledLoft(Polymer,
@@ -440,11 +449,11 @@ void makeCarbine(WeaponMeshBuilder& mesh)
                 0.085F, 0.022F},
             WeaponMeshBuilder::LoftSection{0.805F, 0.086F, 0.009F,
                 0.072F, 0.02F}});
-    mesh.beveledPrism(CoatedSteel, {0.0F, 0.018F, 0.275F},
+    mesh.beveledPrism(BareSteel, {0.0F, 0.018F, 0.275F},
         {0.19F, 0.14F, 0.067F}, 0.018F);
     // An open, adjustable stock reads as separate tube, cheek rest and rails
     // instead of the old uninterrupted rectangular block near the camera.
-    mesh.cylinder(CoatedSteel, {0.0F, -0.019F, 0.0F},
+    mesh.cylinder(BareSteel, {0.0F, -0.019F, 0.0F},
         0.047F, 0.047F, -0.64F, -0.22F);
     mesh.cylinder(Recess, {0.0F, -0.019F, 0.0F},
         0.055F, 0.055F, -0.62F, -0.59F);
@@ -474,11 +483,34 @@ void makeCarbine(WeaponMeshBuilder& mesh)
         mesh.box(Polymer, {0.0F, -0.34F, 0.268F}, {0.153F, 0.055F, 0.13F});
     });
     for (const float facing : {-1.0F, 1.0F}) {
+        // Layered side armor leaves the dark receiver and handguard visible
+        // between panels, matching the modular reference silhouette.
+        mesh.box(AccentPaint,
+            {facing * 0.132F, 0.061F, 0.025F},
+            {0.012F, 0.09F, 0.285F});
+        mesh.box(AccentPaint,
+            {facing * 0.123F, 0.063F, 0.535F},
+            {0.012F, 0.092F, 0.335F});
+        mesh.box(AccentPaint, {facing * 0.118F, -0.03F, 0.705F},
+            {0.014F, 0.14F, 0.07F}, -13.0F);
+        mesh.box(AccentPaint, {facing * 0.092F, 0.077F, -0.49F},
+            {0.013F, 0.048F, 0.24F});
+        mesh.box(BareSteel, {facing * 0.097F, -0.116F, -0.47F},
+            {0.018F, 0.029F, 0.33F}, 14.0F);
+        mesh.box(AccentPaint, {facing * 0.115F, -0.038F, 0.01F},
+            {0.008F, 0.028F, 0.125F});
+        for (const float screwZ : {0.40F, 0.67F}) {
+            const float sideX = 0.132F;
+            mesh.sideDisc(BareSteel, facing * sideX, 0.08F, screwZ,
+                0.010F);
+            mesh.sideDisc(Recess, facing * (sideX + 0.002F), 0.08F,
+                screwZ, 0.003F);
+        }
         mesh.box(Recess, {facing * 0.124F, 0.048F, -0.04F},
             {0.007F, 0.063F, 0.135F});
         mesh.box(BareSteel, {facing * 0.129F, 0.057F, -0.041F},
             {0.005F, 0.037F, 0.102F});
-        mesh.box(CoatedSteel, {facing * 0.132F, 0.043F, -0.041F},
+        mesh.box(BareSteel, {facing * 0.135F, 0.043F, -0.041F},
             {0.005F, 0.007F, 0.085F});
         mesh.part(WeaponPart::Mechanism, [&] {
             mesh.box(BareSteel, {facing * 0.126F, -0.017F, -0.17F},
@@ -486,24 +518,28 @@ void makeCarbine(WeaponMeshBuilder& mesh)
         });
         mesh.sideDisc(BareSteel, facing * 0.129F, -0.033F, 0.092F, 0.025F);
         mesh.sideDisc(Recess, facing * 0.131F, -0.033F, 0.092F, 0.008F);
-        for (const float screwZ : {-0.205F, 0.193F}) {
+        for (const float screwZ : {0.193F}) {
             mesh.sideDisc(BareSteel, facing * 0.126F, 0.091F, screwZ, 0.009F);
             mesh.sideDisc(Recess, facing * 0.128F, 0.091F, screwZ, 0.003F);
         }
-        mesh.box(Recess, {facing * 0.112F, -0.056F, 0.51F},
-            {0.006F, 0.014F, 0.46F});
+        mesh.box(Recess, {facing * 0.132F, -0.051F, 0.52F},
+            {0.007F, 0.020F, 0.36F});
+        mesh.box(Sight, {facing * 0.137F, -0.051F, 0.51F},
+            {0.004F, 0.008F, 0.085F});
         mesh.box(BareSteel, {facing * 0.113F, 0.084F, 0.52F},
             {0.005F, 0.005F, 0.40F});
         mesh.part(WeaponPart::Magazine, [&] {
             mesh.box(Recess, {facing * 0.073F, -0.2F, 0.225F},
                 {0.005F, 0.25F, 0.086F}, -8.0F);
-            for (int rib = 0; rib < 5; ++rib) {
+            mesh.box(AccentPaint, {facing * 0.079F, -0.24F, 0.252F},
+                {0.004F, 0.18F, 0.022F}, -8.0F);
+            for (int rib = 0; rib < 3; ++rib) {
                 mesh.box(BareSteel, {facing * 0.078F,
                         -0.075F - static_cast<float>(rib) * 0.048F, 0.24F},
                     {0.004F, 0.004F, 0.066F}, -8.0F);
             }
         });
-        for (int row = 0; row < 5; ++row) {
+        for (int row = 0; row < 3; ++row) {
             mesh.box(Recess, {facing * 0.067F,
                     -0.18F - static_cast<float>(row) * 0.029F, -0.091F},
                 {0.004F, 0.006F, 0.083F});
@@ -512,24 +548,32 @@ void makeCarbine(WeaponMeshBuilder& mesh)
     mesh.cylinder(BareSteel, {0.0F, 0.0F, 0.0F}, 0.046F, 0.046F, 0.75F, 1.0F);
     mesh.cylinder(Recess, {0.0F, 0.0F, 0.0F}, 0.064F, 0.064F, 0.99F, 1.075F);
     mesh.cylinder(BareSteel, {0.0F, 0.0F, 0.0F}, 0.052F, 0.052F, 1.03F, 1.07F);
-    mesh.box(CoatedSteel, {0.0F, 0.125F, 0.39F}, {0.12F, 0.02F, 0.82F});
-    for (int notch = 0; notch < 11; ++notch) {
+    mesh.box(BareSteel, {0.0F, 0.125F, 0.39F}, {0.12F, 0.02F, 0.82F});
+    for (int notch = 0; notch < 6; ++notch) {
         mesh.box(Recess, {0.0F, 0.139F,
-                0.04F + 0.068F * static_cast<float>(notch)},
+                0.075F + 0.13F * static_cast<float>(notch)},
             {0.105F, 0.008F, 0.012F});
     }
-    for (int slot = 0; slot < 5; ++slot) {
-        const float z = 0.34F + 0.085F * static_cast<float>(slot);
+    for (int slot = 0; slot < 3; ++slot) {
+        const float z = 0.36F + 0.14F * static_cast<float>(slot);
         mesh.box(Recess, {0.113F, 0.032F, z},
             {0.008F, 0.034F, 0.058F});
         mesh.box(Recess, {-0.113F, 0.032F, z},
             {0.008F, 0.034F, 0.058F});
     }
-    mesh.box(Recess, {0.0F, 0.145F, -0.205F}, {0.095F, 0.018F, 0.045F});
-    mesh.box(Recess, {-0.037F, 0.185F, -0.205F},
-        {0.018F, 0.07F, 0.032F});
-    mesh.box(Recess, {0.037F, 0.185F, -0.205F},
-        {0.018F, 0.07F, 0.032F});
+    // Compact holographic sight, with a genuinely open sight window instead
+    // of a solid box that obscures the player's firing line.
+    mesh.box(Recess, {0.0F, 0.147F, -0.045F}, {0.18F, 0.033F, 0.17F});
+    mesh.box(BareSteel, {-0.081F, 0.226F, -0.045F},
+        {0.027F, 0.135F, 0.095F}, -8.0F);
+    mesh.box(BareSteel, {0.081F, 0.226F, -0.045F},
+        {0.027F, 0.135F, 0.095F}, 8.0F);
+    mesh.box(BareSteel, {0.0F, 0.299F, -0.045F},
+        {0.178F, 0.024F, 0.095F});
+    mesh.box(Sight, {0.0F, 0.158F, -0.1F},
+        {0.065F, 0.008F, 0.008F});
+    mesh.box(Sight, {0.0F, 0.232F, -0.095F},
+        {0.008F, 0.009F, 0.008F});
     mesh.box(Recess, {0.0F, 0.145F, 0.72F}, {0.07F, 0.016F, 0.033F});
     mesh.box(Recess, {0.0F, 0.18F, 0.72F}, {0.018F, 0.067F, 0.025F});
     mesh.box(Sight, {0.0F, 0.216F, 0.72F}, {0.014F, 0.008F, 0.009F});
@@ -764,6 +808,80 @@ void makeKnife(WeaponMeshBuilder& mesh)
     mesh.box(BareSteel, {0.0F, 0.015F, -0.28F}, {0.11F, 0.072F, 0.011F});
 }
 
+std::optional<std::array<MeshData, weaponMaterialCount>> loadBlenderWeapon(
+    const HudWeaponRole role)
+{
+    const std::string_view relative = [&]() -> std::string_view {
+        switch (role) {
+        case HudWeaponRole::Pistol:
+            return "models/player_weapons/pistol/player_pistol.isemesh";
+        case HudWeaponRole::Carbine:
+            return "models/player_weapons/rifle/player_rifle.isemesh";
+        case HudWeaponRole::Knife:
+            return "models/player_weapons/knife/player_knife.isemesh";
+        case HudWeaponRole::Sniper:
+            return "models/player_weapons/sniper/player_sniper.isemesh";
+        case HudWeaponRole::Shotgun:
+            return "models/player_weapons/shotgun/player_shotgun.isemesh";
+        case HudWeaponRole::SubmachineGun:
+            return "models/player_weapons/smg/player_smg.isemesh";
+        }
+        return {};
+    }();
+    if (relative.empty()) return std::nullopt;
+    const char* const basePath = SDL_GetBasePath();
+    const std::filesystem::path base = basePath != nullptr
+        ? std::filesystem::path{basePath} : std::filesystem::path{};
+    const std::array candidates{
+        std::filesystem::path{"assets/visual"} / relative,
+        base / "visual" / relative,
+        base / "../Resources/visual" / relative,
+    };
+    for (const auto& path : candidates) {
+        std::error_code error;
+        if (!std::filesystem::exists(path, error)) continue;
+        std::string reason;
+        const auto asset = loadEnemyModelAsset(path, &reason);
+        if (!asset) return std::nullopt;
+        std::array<MeshData, weaponMaterialCount> result;
+        for (const EnemyModelSubmesh& submesh : asset->submeshes) {
+            if (submesh.materialId >= weaponMaterialCount
+                || (submesh.partId > 2U && submesh.partId != 9U)) {
+                return std::nullopt;
+            }
+            MeshData& mesh = result[submesh.materialId];
+            const auto first = static_cast<std::uint32_t>(mesh.vertices.size());
+            const std::uint32_t semantic = submesh.partId == 9U ? 1U
+                : submesh.partId == 1U ? 2U
+                : submesh.partId == 2U ? 3U : 0U;
+            for (auto vertex : submesh.mesh.vertices) {
+                vertex.semanticRegion = semantic;
+                mesh.vertices.push_back(vertex);
+            }
+            for (const auto index : submesh.mesh.indices)
+                mesh.indices.push_back(first + index);
+        }
+        for (auto& mesh : result) {
+            if (mesh.vertices.empty()) continue;
+            Vec3 minimum{std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+            Vec3 maximum{-minimum.x, -minimum.y, -minimum.z};
+            for (const auto& vertex : mesh.vertices) {
+                minimum.x = std::min(minimum.x, vertex.position.x);
+                minimum.y = std::min(minimum.y, vertex.position.y);
+                minimum.z = std::min(minimum.z, vertex.position.z);
+                maximum.x = std::max(maximum.x, vertex.position.x);
+                maximum.y = std::max(maximum.y, vertex.position.y);
+                maximum.z = std::max(maximum.z, vertex.position.z);
+            }
+            mesh.bounds = {minimum, maximum};
+            mesh.backfaceCullingSafe = false;
+        }
+        return result;
+    }
+    return std::nullopt;
+}
+
 std::uint32_t pixelNoise(const int x, const int y, const std::uint32_t seed)
 {
     std::uint32_t value = static_cast<std::uint32_t>(x) * 0x9e3779b9U
@@ -779,6 +897,7 @@ std::uint32_t pixelNoise(const int x, const int y, const std::uint32_t seed)
 std::array<MeshData, weaponMaterialCount> makeWeaponViewmodelMeshes(
     const HudWeaponRole role)
 {
+    if (auto blender = loadBlenderWeapon(role)) return std::move(*blender);
     WeaponMeshBuilder builder;
     switch (role) {
     case HudWeaponRole::Pistol: makePistol(builder); break;
@@ -857,22 +976,24 @@ WeaponMaterialImages makeUsedWeaponMaterialImages(
         image->rgba.resize(static_cast<std::size_t>(resolution * resolution * 4));
     }
     const bool coated = material == WeaponMaterial::CoatedSteel;
+    const bool accent = material == WeaponMaterial::AccentPaint;
+    const bool painted = coated || accent;
     const bool bare = material == WeaponMaterial::BareSteel;
     const bool polymer = material == WeaponMaterial::Polymer;
     const bool recess = material == WeaponMaterial::Recess;
-    const int base = coated ? 216 : bare ? 234 : polymer ? 224 : recess ? 235 : 255;
-    const int roughness = coated ? 105 : bare ? 76 : polymer ? 209 : 180;
-    const int metalness = coated ? 156 : bare ? 211 : polymer ? 0 : recess ? 12 : 18;
+    const int base = painted ? 216 : bare ? 234 : polymer ? 224 : recess ? 235 : 255;
+    const int roughness = painted ? 105 : bare ? 76 : polymer ? 209 : 180;
+    const int metalness = painted ? 156 : bare ? 211 : polymer ? 0 : recess ? 12 : 18;
     for (int y = 0; y < resolution; ++y) {
         for (int x = 0; x < resolution; ++x) {
             const std::uint32_t noise = pixelNoise(x, y,
                 0x76532U + static_cast<std::uint32_t>(material));
             const int grain = static_cast<int>(noise & 7U) - 3;
-            const int brush = (bare || coated) ? ((x + y / 17) & 7) - 3 : 0;
+            const int brush = (bare || painted) ? ((x + y / 17) & 7) - 3 : 0;
             const int molded = polymer ? ((x / 3 + y / 5) & 3) - 1 : 0;
-            const bool hairline = (bare || coated) && (noise & 1023U) < 2U
+            const bool hairline = (bare || painted) && (noise & 1023U) < 2U
                 && (y % 37) < 2;
-            const bool contactWear = coated && ((x > resolution - 11
+            const bool contactWear = painted && ((x > resolution - 11
                     || y > resolution - 9)
                 && (noise & 15U) < 5U);
             const int tone = std::clamp(base + grain + brush + molded
@@ -882,9 +1003,9 @@ WeaponMaterialImages makeUsedWeaponMaterialImages(
             const auto byte = [](const int value) {
                 return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
             };
-            images.albedo.rgba[offset] = byte(tone - (bare ? 3 : coated ? 6 : 0));
+            images.albedo.rgba[offset] = byte(tone - (bare ? 3 : painted ? 6 : 0));
             images.albedo.rgba[offset + 1U] = byte(tone);
-            images.albedo.rgba[offset + 2U] = byte(tone + (bare ? 4 : coated ? 5 : 0));
+            images.albedo.rgba[offset + 2U] = byte(tone + (bare ? 4 : painted ? 5 : 0));
             images.albedo.rgba[offset + 3U] = 255U;
             images.normal.rgba[offset] = byte(128 + grain / 2 + molded);
             images.normal.rgba[offset + 1U] = byte(128 + brush * 2

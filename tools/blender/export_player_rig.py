@@ -1,4 +1,4 @@
-"""Export the saved Player .blend to the small ISPLYR01 runtime-preview format.
+"""Export the saved Player .blend to the small ISPLYR03 runtime-preview format.
 
 Run from the repository root:
   blender -b --python-exit-code 1 assets/visual/models/player_rig.blend \
@@ -18,7 +18,7 @@ from mathutils import Matrix, Vector
 ROOT = Path(__file__).resolve().parents[2]
 DEST = ROOT / "assets/visual/models/player_rig/player_rig.isplayer"
 RIG = bpy.data.objects["Player_Rig"]
-MAGIC = b"ISPLYR01"
+MAGIC = b"ISPLYR03"
 MATERIALS = (
     "M01_Graphite_Cloth", "M02_Stitched_Trim", "M03_Reinforcement",
     "M04_Belt_Leather", "M05_Blackened_Metal", "M06_Rubber",
@@ -31,18 +31,28 @@ BONES = (
     "thigh.R", "shin.R", "foot.R",
 )
 CLIPS = ("Idle", "Walk", "Jog", "Crouch", "Jump", "Draw_Primary_Back")
-# The Blender source retains its center zipper. In first person, that thin
-# vertical detail projects directly in front of the camera as a bright stick.
-# Omit only this object from the opt-in runtime preview export.
-PREVIEW_EXCLUDED_OBJECT = "Jacket_CenterZip"
+# Keep the editable Blender source intact. These collar/shoulder details sit
+# across the first-person camera and appear as a large ring or bright spikes;
+# the zipper similarly projects as a vertical stick. Omit them only here.
+PREVIEW_EXCLUDED_OBJECTS = {
+    "Jacket_CenterZip": "M05_Blackened_Metal",
+    "Jacket_Open_Collar": "M03_Reinforcement",
+    "Shoulder_Seam_-1": "M02_Stitched_Trim",
+    "Shoulder_Seam_1": "M02_Stitched_Trim",
+}
+PARTS = ("torso", "legs", "arm.L", "arm.R")
+TORSO_BONES = {"pelvis", "spine", "chest"}
+LEG_BONES = {f"{stem}.{side}" for side in ("L", "R")
+             for stem in ("thigh", "shin", "foot")}
 assert len(BONES) == 19 and len(MATERIALS) == 6 and len(CLIPS) == 6
 assert RIG.type == "ARMATURE"
 assert set(BONES) == set(RIG.data.bones.keys())
 assert set(CLIPS).issubset(bpy.data.actions.keys())
 assert RIG.matrix_world == Matrix.Identity(4), "rig transform must remain identity"
-assert PREVIEW_EXCLUDED_OBJECT in bpy.data.objects
-assert bpy.data.objects[PREVIEW_EXCLUDED_OBJECT].type == "MESH"
-assert bpy.data.objects[PREVIEW_EXCLUDED_OBJECT].data.materials[0].name == MATERIALS[4]
+for name, expected_material in PREVIEW_EXCLUDED_OBJECTS.items():
+    assert name in bpy.data.objects
+    assert bpy.data.objects[name].type == "MESH"
+    assert bpy.data.objects[name].data.materials[0].name == expected_material
 
 # Parent-approved model-space axis contract: Blender (x,y,z) -> game (x,z,y).
 # C is a reflection (det=-1), so triangle winding must be reversed on export.
@@ -72,12 +82,61 @@ def weights_for(obj, vertex):
     return influences[0][0], influences[1][0], influences[0][1] / total
 
 
-def flatten_material(material_id):
+def object_part(obj):
+    """Split torso, legs and arms without changing the source mesh or weights."""
+    for side, part in (("L", 2), ("R", 3)):
+        if (obj.name == f"Jacket_Sleeve.{side}" or
+                (obj.name.startswith("Glove_") and obj.name.endswith(f".{side}"))):
+            return part
+    assert not obj.name.startswith("Glove_") and not obj.name.startswith("Jacket_Sleeve."), obj.name
+    used_bones = {obj.vertex_groups[weight.group].name
+                  for vertex in obj.data.vertices for weight in vertex.groups
+                  if weight.weight > 1e-6}
+    if used_bones and used_bones <= TORSO_BONES:
+        return 0
+    if used_bones and used_bones <= LEG_BONES:
+        return 1
+    raise AssertionError((obj.name, used_bones))
+
+
+source_meshes = sorted((o for o in bpy.data.objects if o.type == "MESH" and
+                        o.name not in PREVIEW_EXCLUDED_OBJECTS), key=lambda o: o.name)
+objects_by_part = {part: [obj for obj in source_meshes if object_part(obj) == part]
+                   for part in range(len(PARTS))}
+assert sum(map(len, objects_by_part.values())) == len(source_meshes)
+assert len(source_meshes) + len(PREVIEW_EXCLUDED_OBJECTS) == 43
+assert [len(objects_by_part[part]) for part in range(len(PARTS))] == [11, 12, 8, 8]
+assert {"Jacket_OnePiece", "Holster_Pistol_Right", "Sheath_Knife_Left",
+        "Grenade_Clip_Left_Front", "Primary_Back_Mount"} <= {
+    obj.name for obj in objects_by_part[0]}
+assert {"Trousers.L", "Trousers.R", "KneePad.L", "KneePad.R"} <= {
+    obj.name for obj in objects_by_part[1]}
+for side, part in (("L", 2), ("R", 3)):
+    assert {obj.name for obj in objects_by_part[part]} == {
+        f"Jacket_Sleeve.{side}", f"Glove_Cuff.{side}", f"Glove_Palm.{side}",
+        f"Glove_Thumb.{side}", *(f"Glove_Finger{i}.{side}" for i in range(4)),
+    }
+for part, objects in objects_by_part.items():
+    for obj in objects:
+        assert len(obj.data.materials) == 1 and obj.data.materials[0].name in MATERIALS
+        used_bones = {obj.vertex_groups[weight.group].name
+                      for vertex in obj.data.vertices for weight in vertex.groups
+                      if weight.weight > 1e-6}
+        if part == 0:
+            assert used_bones and used_bones <= TORSO_BONES, (obj.name, used_bones)
+        elif part == 1:
+            assert used_bones and used_bones <= LEG_BONES, (obj.name, used_bones)
+        else:
+            side = "L" if part == 2 else "R"
+            side_bones = {f"{stem}.{side}" for stem in
+                          ("clavicle", "upper_arm", "forearm", "hand")}
+            assert used_bones and used_bones <= side_bones, (obj.name, used_bones)
+
+
+def flatten_material(part_id, material_id):
     vertices = []
     indices = []
-    for obj in sorted((o for o in bpy.data.objects if o.type == "MESH"), key=lambda o: o.name):
-        if obj.name == PREVIEW_EXCLUDED_OBJECT:
-            continue
+    for obj in objects_by_part[part_id]:
         assert len(obj.data.materials) == 1, obj.name
         if obj.data.materials[0].name != MATERIALS[material_id]:
             continue
@@ -109,7 +168,8 @@ def flatten_material(material_id):
                     vertices.append(vertex)
                     seen[key] = index
                 indices.append(index)
-    assert vertices and indices and len(indices) % 3 == 0
+    assert len(indices) % 3 == 0
+    assert bool(vertices) == bool(indices)
     assert len(vertices) < 500_000 and len(indices) < 1_500_000
     return vertices, indices
 
@@ -147,10 +207,12 @@ def clip_frames(name):
 RIG.animation_data.action = bpy.data.actions["Idle"]
 bpy.context.scene.frame_set(1)
 bpy.context.view_layer.update()
-groups = [flatten_material(i) for i in range(len(MATERIALS))]
+groups = [flatten_material(part, material)
+          for part in range(len(PARTS)) for material in range(len(MATERIALS))]
 payload = bytearray(MAGIC)
 payload.extend(struct.pack("<3I", len(BONES), len(groups), len(CLIPS)))
-for material_id, (vertices, indices) in enumerate(groups):
+for group_id, (vertices, indices) in enumerate(groups):
+    material_id = group_id % len(MATERIALS)
     payload.extend(struct.pack("<3I", material_id, len(vertices), len(indices)))
     for vertex in vertices:
         payload.extend(struct.pack("<8f", *vertex))
@@ -171,5 +233,7 @@ temporary = DEST.with_suffix(".isplayer.tmp")
 temporary.write_bytes(payload)
 temporary.replace(DEST)
 print("ISPLAYER_EXPORT_OK", DEST, "bytes", len(payload),
+      "excluded", sorted(PREVIEW_EXCLUDED_OBJECTS),
+      "parts", [(PARTS[part], len(objects_by_part[part])) for part in range(len(PARTS))],
       "meshes", [(len(v), len(i)) for v, i in groups],
       "bones", len(BONES), "clips", len(CLIPS))

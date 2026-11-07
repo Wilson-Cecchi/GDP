@@ -10,7 +10,7 @@
 
 namespace gdp::world {
 
-inline constexpr std::size_t maxRoomLights = 4U;
+inline constexpr std::size_t maxRoomLights = 5U;
 
 enum class RoomLightingMood : std::uint8_t {
     Neutral,

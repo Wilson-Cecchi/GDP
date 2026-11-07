@@ -48,18 +48,18 @@ void testDeterministicPlan()
         "same room seed reproduces the complete lighting plan");
     expect(first.seed == wkc::core::deriveSeed(seed, gdp::game::SeedDomain::Lighting, 0U),
         "lighting plan starts from the isolated Lighting seed domain");
-    expect(!first.supportsAlert && first.lights.size() == 3U,
+    expect(!first.supportsAlert && first.lights.size() == 4U,
         "safe START lighting is readable without lockdown alert");
     expect(validateRoomLightingPlan(first, roomBounds).isValid(),
         "representative START lighting plan validates");
 
     const RoomLightingPlan terminal = generateRoomLightingPlan(
         seed, RoomRole::Terminal, RoomTheme::Security, roomBounds);
-    expect(terminal.supportsAlert && terminal.lights.size() == 4U
+    expect(terminal.supportsAlert && terminal.lights.size() == 5U
             && validateRoomLightingPlan(terminal, roomBounds).isValid(),
         "dedicated Terminal room supports lockdown lighting");
 
-    constexpr std::uint64_t goldenHash = 0x9784746862ECF493ULL;
+    constexpr std::uint64_t goldenHash = 0x6E8D56782A473FC6ULL;
     expect(first.planHash == goldenHash,
         "representative lighting plan keeps its golden hash");
 }
@@ -78,18 +78,21 @@ void testRoleAndThemeContracts()
     const RoomLightingPlan hub = generateRoomLightingPlan(
         14, RoomRole::Hub, RoomTheme::Office, roomBounds);
 
-    expect(secret.mood == RoomLightingMood::Dim && secret.lights.size() == 1U
+    expect(secret.mood == RoomLightingMood::Dim && secret.lights.size() == 2U
             && secret.ambientIntensity >= 0.10F,
         "secret room remains dim without becoming unreadable");
-    expect(boss.mood == RoomLightingMood::Ominous && boss.lights.size() == 4U
+    expect(boss.mood == RoomLightingMood::Ominous && boss.lights.size() == 5U
             && boss.supportsAlert,
         "boss room receives a full ominous alert-capable rig");
     expect(laboratory.mood == RoomLightingMood::Clinical,
         "laboratory theme receives clinical lighting");
-    expect(cafeteria.mood == RoomLightingMood::Warm,
-        "cafeteria theme receives warm lighting");
-    expect(hub.lights.size() == 4U,
-        "hub receives four fixtures for navigation readability");
+    expect(cafeteria.mood == RoomLightingMood::Warm
+            && cafeteria.ambientColor == wkc::core::Vec3{0.84F, 0.81F, 0.75F}
+            && cafeteria.lights.front().color.y > 0.85F
+            && cafeteria.ambientIntensity >= 0.218F,
+        "cafeteria receives the approved softer neutral-warm light");
+    expect(hub.lights.size() == 5U,
+        "hub receives a fifth physical fill fixture");
 }
 
 void testSpaciousRoomLighting()
@@ -101,6 +104,10 @@ void testSpaciousRoomLighting()
         {-8.85F, 0.0F, -10.85F}, {8.85F, 6.0F, 10.85F}};
     constexpr wkc::core::Aabb smallerNormalBounds{
         {-7.85F, 0.0F, -8.85F}, {7.85F, 5.0F, 8.85F}};
+    constexpr wkc::core::Aabb cafeteriaPreviewBounds{
+        {-9.0F, 0.0F, -10.0F}, {9.0F, 6.0F, 10.0F}};
+    constexpr wkc::core::Aabb hubBounds{
+        {-10.0F, 0.0F, -10.0F}, {10.0F, 6.0F, 10.0F}};
     const auto checkCoverage = [](const RoomLightingPlan& plan,
                                    const wkc::core::Aabb bounds,
                                    const float maximumNormalizedDistance) {
@@ -126,35 +133,88 @@ void testSpaciousRoomLighting()
             seed, RoomRole::Boss, RoomTheme::Security, bossBounds);
         const RoomLightingPlan normal = generateRoomLightingPlan(
             seed, RoomRole::Normal, RoomTheme::Laboratory, normalBounds);
+        const RoomLightingPlan cafeteria = generateRoomLightingPlan(
+            seed, RoomRole::Start, RoomTheme::Cafeteria,
+            cafeteriaPreviewBounds);
+        const RoomLightingPlan hub = generateRoomLightingPlan(
+            seed, RoomRole::Hub, RoomTheme::Industrial, hubBounds);
         expect(validateRoomLightingPlan(boss, bossBounds).isValid()
-                && validateRoomLightingPlan(normal, normalBounds).isValid(),
-            "spacious Boss and Normal lighting validate across 1,000 seeds");
-        expect(boss.lights.size() == 4U && normal.lights.size() == 4U,
-            "spacious rooms stay within the four-light budget");
+                && validateRoomLightingPlan(normal, normalBounds).isValid()
+                && validateRoomLightingPlan(cafeteria,
+                    cafeteriaPreviewBounds).isValid()
+                && validateRoomLightingPlan(hub, hubBounds).isValid(),
+            "spacious room lighting validates across 1,000 seeds");
+        expect(boss.lights.size() == 5U && normal.lights.size() == 5U
+                && cafeteria.lights.size() == 5U && hub.lights.size() == 5U,
+            "spacious rooms add a weaker fifth fixture to the four-light layout");
         expect(boss.ambientIntensity >= 0.198F
                 && boss.ambientIntensity <= 0.222F,
             "spacious Boss keeps its dark palette with readable ambient fill");
         expect(checkCoverage(boss, bossBounds, 1.20F)
-                && checkCoverage(normal, normalBounds, 1.20F),
-            "four-point plans reach every corner at camera height");
-        for (const RoomPointLight& light : boss.lights) {
-            expect(light.range >= 11.0F && light.range <= 11.8F
-                    && light.intensity >= 1.05F && light.intensity <= 1.25F
+                && checkCoverage(normal, normalBounds, 1.20F)
+                && checkCoverage(cafeteria, cafeteriaPreviewBounds, 1.20F)
+                && checkCoverage(hub, hubBounds, 1.20F),
+            "room lighting plans reach every corner at camera height");
+        expect(cafeteria.ambientIntensity >= 0.218F
+                && cafeteria.ambientIntensity <= 0.242F
+                && cafeteria.fixtureEmissive >= 0.74F
+                && cafeteria.fixtureEmissive <= 0.82F,
+            "Cafeteria keeps the approved comfortable fill and fixture range");
+        for (std::size_t index = 0U; index < cafeteria.lights.size(); ++index) {
+            const RoomPointLight& light = cafeteria.lights[index];
+            expect(index == 4U
+                    ? light.range >= 4.5F && light.range <= 8.0F
+                        && light.intensity == 0.55F
+                    : light.range >= 8.8F && light.range <= 9.4F
+                        && light.intensity >= 0.96F && light.intensity <= 1.08F,
+                "Cafeteria fixtures spread light evenly without hotspots");
+        }
+        for (std::size_t index = 0U; index < boss.lights.size(); ++index) {
+            const RoomPointLight& light = boss.lights[index];
+            expect((index == 4U
+                    ? light.range >= 4.5F && light.range <= 8.0F
+                        && light.intensity == 0.55F
+                    : light.range >= 11.0F && light.range <= 11.8F
+                        && light.intensity >= 1.05F && light.intensity <= 1.25F)
                     && light.position.x > bossBounds.minimum.x + 5.0F
                     && light.position.x < bossBounds.maximum.x - 5.0F
                     && light.position.z > bossBounds.minimum.z + 5.0F
                     && light.position.z < bossBounds.maximum.z - 5.0F,
                 "Boss fixtures keep controlled reach away from room boundaries");
         }
-        for (const RoomPointLight& light : normal.lights) {
-            expect(light.range >= 8.5F && light.range <= 9.3F
-                    && light.intensity >= 0.96F && light.intensity <= 1.14F,
+        for (std::size_t index = 0U; index < normal.lights.size(); ++index) {
+            const RoomPointLight& light = normal.lights[index];
+            expect(index == 4U
+                    ? light.range >= 4.5F && light.range <= 8.0F
+                        && light.intensity == 0.55F
+                    : light.range >= 8.5F && light.range <= 9.3F
+                        && light.intensity >= 0.96F && light.intensity <= 1.14F,
                 "spacious Normal uses a shorter local lighting reach");
+        }
+        for (std::size_t index = 0U; index < hub.lights.size(); ++index) {
+            const RoomPointLight& light = hub.lights[index];
+            expect(index == 4U
+                    ? light.range == 6.5F && light.intensity == 0.55F
+                    : light.range >= 8.5F && light.range <= 9.3F
+                        && light.intensity >= 0.96F
+                        && light.intensity <= 1.14F,
+                "Hub fill fixture remains weaker than the four main lights");
+            expect(std::abs(light.position.y - 5.52F) < 0.001F,
+                "Hub fixtures remain suspended at the ceiling height");
+            if (index == 4U) {
+                expect(std::abs(light.position.x - 5.0F) < 0.001F
+                        && std::abs(light.position.z) < 0.001F,
+                    "fifth Hub fixture fills the barricade side");
+            } else {
+                expect(std::abs(std::abs(light.position.x) - 5.0F) < 0.001F
+                        && std::abs(std::abs(light.position.z) - 5.0F) < 0.001F,
+                    "original Hub fixtures keep their four quadrants");
+            }
         }
     }
     const RoomLightingPlan smallerNormal = generateRoomLightingPlan(
         77U, RoomRole::Normal, RoomTheme::Industrial, smallerNormalBounds);
-    expect(smallerNormal.lights.size() == 4U
+    expect(smallerNormal.lights.size() == 5U
             && validateRoomLightingPlan(smallerNormal, smallerNormalBounds).isValid(),
         "a 16 by 18 module retains the spacious lighting plan after wall inset");
 }

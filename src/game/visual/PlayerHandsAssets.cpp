@@ -200,7 +200,7 @@ Contacts contacts(const HudWeaponRole role) noexcept
     switch(role) {
     case HudWeaponRole::Pistol:
         return {{.080F,-.213F,-.133F},{-.076F,-.242F,-.125F},
-            {-.061F,-.267F,-.101F},{0,.120F,-.180F}};
+            {-.061F,-.267F,-.101F},{0,.020F,-.180F}};
     case HudWeaponRole::Knife:
         return {{.010F,-.038F,-.100F},{-.43F,-.27F,.05F},{},{}};
     case HudWeaponRole::Sniper:

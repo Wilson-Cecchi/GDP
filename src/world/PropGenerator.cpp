@@ -68,6 +68,8 @@ wkc::core::Vec3 scaleFor(const gdp::entities::PropType type) noexcept
     switch (type) {
     case PropType::Crate:
         return {0.78F, 0.72F, 0.78F};
+    case PropType::StorageBox:
+        return {0.40F, 0.44F, 0.72F};
     case PropType::Canister:
         return {0.46F, 1.02F, 0.46F};
     case PropType::Barricade:
@@ -88,6 +90,8 @@ float healthFor(const gdp::entities::PropType type) noexcept
     switch (type) {
     case PropType::Crate:
         return 60.0F;
+    case PropType::StorageBox:
+        return 35.0F;
     case PropType::Canister:
         return 35.0F;
     case PropType::Barricade:

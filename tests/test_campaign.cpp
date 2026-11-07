@@ -4,6 +4,7 @@
 #include "world/EventGenerator.hpp"
 #include "world/WorldEntities.hpp"
 #include "world/WorldGenerator.hpp"
+#include "world/RoomArchitecture.hpp"
 
 #include <algorithm>
 #include <array>
@@ -16,6 +17,72 @@
 namespace {
 
 int failures = 0;
+void expect(bool condition, std::string_view message);
+
+void testCampaignRoomPlaytestSeeds()
+{
+    using namespace gdp;
+    {
+        constexpr unsigned laboratorySeed = 2U;
+        const auto layout = gameplay::campaignFloorLayout(laboratorySeed, 1U);
+        world::WorldGenerationConfig config;
+        config.roomCount = layout.roomCount;
+        config.loopBudget = layout.loopBudget;
+        const auto generated = world::generateWorld(laboratorySeed, config);
+        expect(generated.succeeded(),
+            "Laboratory campaign playtest seed generates a floor");
+        if (generated.world) {
+            const auto room = std::find_if(generated.world->rooms.begin(),
+                generated.world->rooms.end(), [](const auto& candidate) {
+                    return candidate.moduleId == world::laboratoryHallModuleId;
+                });
+            expect(room != generated.world->rooms.end()
+                    && room->role == world::RoomRole::Terminal,
+                "Laboratory playtest seed places authored room at Terminal objective");
+            if (room != generated.world->rooms.end()) {
+                const auto parts = world::makeRoomArchitecture(*room);
+                expect(!parts.empty()
+                        && world::validateRoomArchitecture(*room, parts),
+                    "Laboratory campaign furniture clears spawns and doors");
+            }
+        }
+    }
+    for (const auto& [seed, extraModule] : std::array{
+             std::pair{1793U, world::maintenanceLModuleId},
+             std::pair{3710U, 204U}, // Storage hall
+         }) {
+        const auto layout = gameplay::campaignFloorLayout(seed, 1U);
+        world::WorldGenerationConfig config;
+        config.roomCount = layout.roomCount;
+        config.loopBudget = layout.loopBudget;
+        auto generated = world::generateWorld(seed, config);
+        expect(generated.succeeded(), "campaign playtest seed generates a floor");
+        if (!generated.world) continue;
+        const auto hasModule = [&](const world::RoomModuleId id) {
+            return std::any_of(generated.world->rooms.begin(),
+                generated.world->rooms.end(),
+                [id](const world::RoomInstance& room) {
+                    return room.moduleId == id;
+                });
+        };
+        expect(hasModule(world::centralHubModuleId)
+                && hasModule(world::combatGalleryArenaModuleId)
+                && hasModule(world::cafeteriaLongModuleId)
+                && hasModule(world::securityTModuleId)
+                && hasModule(extraModule),
+            "campaign playtest floor contains approved room variants");
+        for (const auto& room : generated.world->rooms) {
+            const auto parts = world::makeRoomArchitecture(room);
+            expect(world::validateRoomArchitecture(room, parts),
+                "campaign playtest room architecture clears spawn zones and doors");
+        }
+        entities::EntityManager manager;
+        const auto initial = world::populateInitialEntities(
+            *generated.world, manager, {}, 1.0F, true, 1U);
+        expect(initial.isValid(),
+            "campaign playtest floor populates player, objective and encounters");
+    }
+}
 
 void expect(const bool condition, const std::string_view message)
 {
@@ -660,6 +727,7 @@ void testCampaignFloorVarietyAndMissions()
 
 int main()
 {
+    testCampaignRoomPlaytestSeeds();
     testCampaignCarryoverRoundTrip();
     testCampaignCarryoverRejectsInvalidStateAtomically();
     testNextFloorGrenadeResupply();

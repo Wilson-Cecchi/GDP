@@ -41,6 +41,25 @@ void printUsage(const std::string_view executable)
               << "  --headless           Run without creating a window or OpenGL context.\n"
 #if GDP_ENABLE_TEST_MODE
               << "  --test-mode          Open the dedicated development arena directly.\n"
+              << "  --storage-room-preview  Open the Storage room layout preview directly.\n"
+              << "  --combat-room-preview  Open the Combat room layout preview directly.\n"
+              << "  --boss-room-preview  Open the Boss arena with its encounter directly.\n"
+              << "  --cafeteria-preview  Open the Cafeteria layout preview directly.\n"
+              << "  --cafeteria-long-preview  Open the elongated Cafeteria preview directly.\n"
+              << "  --laboratory-preview  Open the Laboratory layout preview directly.\n"
+              << "  --technical-preview  Open the Technical/Maintenance layout preview directly.\n"
+              << "  --technical-l-preview  Open the L-shaped Maintenance layout preview directly.\n"
+              << "  --security-preview  Open the Security layout preview directly.\n"
+              << "  --security-t-preview  Open the T-shaped Security layout preview directly.\n"
+              << "  --security-indicator-demo  Cycle the Security T alarm, reboot, and ready indicators.\n"
+              << "  --central-hub-preview  Open the Central Hub layout preview directly.\n"
+              << "  --central-hub-shadow-preview  Test geometry shadows in the Central Hub.\n"
+              << "  --central-hub-shadow-legacy-preview  Compare the same scene with prior shadows.\n"
+              << "  --legacy-shadows  Compare a preview with the previous shadow system.\n"
+              << "  --industrial-corridor-preview  Open an Industrial Corridor traversal preview directly.\n"
+              << "  --fixture-preview NAME  Compare a ceiling fixture in the clear Security room.\n"
+              << "      NAME: industrial, storage, maintenance, laboratory, cafeteria,\n"
+              << "            security, office, boss, or hub.\n"
 #endif
               << "  --benchmark PROFILE  Measure POTATO, LOW, MEDIUM, HIGH, or ULTRA at 1280x720.\n"
               << "  --frames N           Stop after exactly N rendered loop iterations.\n"
@@ -198,6 +217,96 @@ int main(const int argc, char* argv[])
         }
 #if GDP_ENABLE_TEST_MODE
         if (argument == "--test-mode") { config.testMode = true; continue; }
+        if (argument == "--storage-room-preview") {
+            config.storageRoomPreview = true;
+            continue;
+        }
+        if (argument == "--combat-room-preview") {
+            config.combatRoomPreview = true;
+            continue;
+        }
+        if (argument == "--boss-room-preview") {
+            config.bossRoomPreview = true;
+            continue;
+        }
+        if (argument == "--cafeteria-preview") {
+            config.cafeteriaPreview = true;
+            continue;
+        }
+        if (argument == "--cafeteria-long-preview") {
+            config.cafeteriaLongPreview = true;
+            continue;
+        }
+        if (argument == "--laboratory-preview") {
+            config.laboratoryPreview = true;
+            continue;
+        }
+        if (argument == "--technical-preview") {
+            config.technicalPreview = true;
+            continue;
+        }
+        if (argument == "--technical-l-preview") {
+            config.technicalLPreview = true;
+            continue;
+        }
+        if (argument == "--security-preview") {
+            config.securityPreview = true;
+            continue;
+        }
+        if (argument == "--security-t-preview") {
+            config.securityTPreview = true;
+            continue;
+        }
+        if (argument == "--security-indicator-demo") {
+            config.securityIndicatorDemo = true;
+            continue;
+        }
+        if (argument == "--central-hub-preview") {
+            config.centralHubPreview = true;
+            continue;
+        }
+        if (argument == "--central-hub-shadow-preview") {
+            config.centralHubPreview = true;
+            config.centralHubShadowPreview = true;
+            continue;
+        }
+        if (argument == "--central-hub-shadow-legacy-preview") {
+            config.centralHubPreview = true;
+            config.centralHubShadowPreview = true;
+            config.legacyGeometryShadows = true;
+            continue;
+        }
+        if (argument == "--legacy-shadows") {
+            config.legacyGeometryShadows = true;
+            continue;
+        }
+        if (argument == "--industrial-corridor-preview") {
+            config.industrialCorridorPreview = true;
+            continue;
+        }
+        if (argument == "--fixture-preview") {
+            if (index + 1 >= argc) {
+                std::cerr << "--fixture-preview needs a fixture name\n";
+                return 2;
+            }
+            const std::string_view name{argv[++index]};
+            using Fixture = gdp::game::visual::CeilingFixtureVariant;
+            if (name == "industrial") config.fixturePreviewVariant = Fixture::Industrial;
+            else if (name == "storage") config.fixturePreviewVariant = Fixture::Storage;
+            else if (name == "maintenance") config.fixturePreviewVariant = Fixture::Maintenance;
+            else if (name == "laboratory") config.fixturePreviewVariant = Fixture::Laboratory;
+            else if (name == "cafeteria") config.fixturePreviewVariant = Fixture::Cafeteria;
+            else if (name == "security") config.fixturePreviewVariant = Fixture::Security;
+            else if (name == "office") config.fixturePreviewVariant = Fixture::Office;
+            else if (name == "boss") config.fixturePreviewVariant = Fixture::BossArena;
+            else if (name == "hub") config.fixturePreviewVariant = Fixture::CentralHub;
+            else {
+                std::cerr << "Unknown fixture preview: " << name << '\n';
+                return 2;
+            }
+            config.securityPreview = true;
+            continue;
+        }
 #endif
 
         if (argument == "--scripted-enemies") {
@@ -383,6 +492,19 @@ int main(const int argc, char* argv[])
 
     if (trainingMode) {
         if (config.benchmarkQuality || config.frameLimit
+            || config.testMode || config.storageRoomPreview
+            || config.combatRoomPreview
+            || config.bossRoomPreview
+            || config.cafeteriaPreview
+            || config.cafeteriaLongPreview
+            || config.laboratoryPreview
+            || config.technicalPreview
+            || config.technicalLPreview
+            || config.securityPreview
+            || config.securityTPreview
+            || config.securityIndicatorDemo
+            || config.centralHubPreview
+            || config.industrialCorridorPreview
             || config.scriptedEnemies || config.experimentalNeuralEnemy
             || config.neuralBrainPath || config.testBrainDirectory) {
             std::cerr << "Training cannot be combined with gameplay or benchmark options\n";
@@ -453,6 +575,26 @@ int main(const int argc, char* argv[])
     }
     if (config.headless && config.benchmarkQuality) {
         std::cerr << "--headless and --benchmark cannot be used together\n";
+        return 2;
+    }
+    if (config.securityIndicatorDemo && !config.securityTPreview) {
+        std::cerr << "--security-indicator-demo needs --security-t-preview\n";
+        return 2;
+    }
+    if (static_cast<int>(config.storageRoomPreview)
+            + static_cast<int>(config.combatRoomPreview)
+            + static_cast<int>(config.bossRoomPreview)
+            + static_cast<int>(config.cafeteriaPreview)
+            + static_cast<int>(config.cafeteriaLongPreview)
+            + static_cast<int>(config.laboratoryPreview)
+            + static_cast<int>(config.technicalPreview)
+            + static_cast<int>(config.technicalLPreview)
+            + static_cast<int>(config.securityPreview)
+            + static_cast<int>(config.securityTPreview)
+            + static_cast<int>(config.centralHubPreview)
+            + static_cast<int>(config.industrialCorridorPreview)
+            + static_cast<int>(config.testMode) > 1) {
+        std::cerr << "Select one room preview or --test-mode\n";
         return 2;
     }
     if (config.benchmarkQuality && !config.frameLimit) {

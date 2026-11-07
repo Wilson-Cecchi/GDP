@@ -31,6 +31,7 @@
 #include "platform/Input.hpp"
 #include "platform/SdlGamepad.hpp"
 #include "world/LightingGenerator.hpp"
+#include "world/RoomArchitecture.hpp"
 #include "world/WorldGenerator.hpp"
 
 #include <cstdint>
@@ -58,6 +59,22 @@ struct ApplicationConfig {
     bool headless{false};
     bool scriptedEnemies{false};
     bool testMode{false};
+    bool storageRoomPreview{false};
+    bool combatRoomPreview{false};
+    bool bossRoomPreview{false};
+    bool cafeteriaPreview{false};
+    bool cafeteriaLongPreview{false};
+    bool laboratoryPreview{false};
+    bool technicalPreview{false};
+    bool technicalLPreview{false};
+    bool securityPreview{false};
+    bool securityTPreview{false};
+    bool securityIndicatorDemo{false};
+    bool centralHubPreview{false};
+    bool centralHubShadowPreview{false};
+    bool legacyGeometryShadows{false};
+    bool industrialCorridorPreview{false};
+    std::optional<visual::CeilingFixtureVariant> fixturePreviewVariant;
     bool enableGamepad{true};
     std::optional<entities::EnemyArchetype> experimentalNeuralEnemy;
     std::optional<std::filesystem::path> neuralBrainPath;
@@ -87,6 +104,12 @@ private:
         visual::ImpactRenderData render{};
         std::uint32_t roomId{0U};
         float remaining{0.0F};
+    };
+    struct BulletMark {
+        visual::ImpactRenderData render{};
+        std::uint32_t roomId{0U};
+        std::optional<world::EdgeId> doorEdge{};
+        float doorOffset{0.0F};
     };
     struct ActiveGrenadeBlast {
         wkc::core::Vec3 position{};
@@ -193,15 +216,19 @@ private:
     std::vector<world::RoomId> visitedRooms_;
     std::unordered_map<world::RoomId, float> roomEntryGraceRemaining_;
     std::vector<gameplay::RoomEventRuntime> roomEvents_;
+    std::unordered_map<world::RoomId, std::uint64_t> roomEventPhaseStartTicks_;
     std::vector<world::RoomLightingPlan> roomLighting_;
     std::unordered_map<world::RoomId, std::vector<entities::EntityId>>
         roomFixtureEntities_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
+    std::unordered_map<world::RoomId,
+        std::vector<world::RoomArchitecturePart>> roomArchitectureParts_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;
     std::unordered_map<world::EdgeId, std::uint64_t> doorAudioEventCounters_;
     std::unordered_map<std::uint64_t, visual::EnemyAnimationTransition>
         enemyAnimationTransitions_;
     std::vector<ActiveImpact> activeImpacts_;
+    std::vector<BulletMark> bulletMarks_;
     std::vector<ActiveGrenadeBlast> activeGrenadeBlasts_;
     gameplay::PlayerGrenadeSystem playerGrenades_;
     gameplay::EnemyProjectileSystem enemyProjectiles_;

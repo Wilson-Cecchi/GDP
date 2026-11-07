@@ -29,6 +29,7 @@
 #include "game/visual/MenuBackdrop.hpp"
 #include "world/EventGenerator.hpp"
 #include "world/LightingGenerator.hpp"
+#include "world/RoomFootprint.hpp"
 #include "world/WorldEntities.hpp"
 
 #include <SDL3/SDL.h>
@@ -59,6 +60,7 @@ using wkc::platform::MouseButton;
 namespace {
 
 constexpr float impactVisualDuration = 0.32F;
+constexpr std::size_t maximumBulletMarks = 48U;
 constexpr float grenadeBlastVisualDuration = 1.10F;
 constexpr float weaponRecoilDuration = 0.12F;
 constexpr float weaponMeleeDuration = 0.28F;
@@ -238,13 +240,61 @@ visual::EnemyVisualRole visualRoleFor(
     return visual::EnemyVisualRole::Worker;
 }
 
+visual::CeilingFixtureVariant fixtureVariantFor(
+    const gdp::world::RoomLightingPlan& plan) noexcept
+{
+    if (plan.role == gdp::world::RoomRole::Boss
+        || plan.role == gdp::world::RoomRole::Arena) {
+        return visual::CeilingFixtureVariant::BossArena;
+    }
+    if (plan.role == gdp::world::RoomRole::Hub) {
+        return visual::CeilingFixtureVariant::CentralHub;
+    }
+    switch (plan.theme) {
+    case gdp::world::RoomTheme::Industrial:
+        return visual::CeilingFixtureVariant::Industrial;
+    case gdp::world::RoomTheme::Storage:
+        return visual::CeilingFixtureVariant::Storage;
+    case gdp::world::RoomTheme::Maintenance:
+        return visual::CeilingFixtureVariant::Maintenance;
+    case gdp::world::RoomTheme::Laboratory:
+        return visual::CeilingFixtureVariant::Laboratory;
+    case gdp::world::RoomTheme::Cafeteria:
+        return visual::CeilingFixtureVariant::Cafeteria;
+    case gdp::world::RoomTheme::Security:
+        return visual::CeilingFixtureVariant::Security;
+    case gdp::world::RoomTheme::Office:
+        return visual::CeilingFixtureVariant::Office;
+    }
+    return visual::CeilingFixtureVariant::Industrial;
+}
+
+visual::CeilingFixtureCondition fixtureConditionFor(
+    const gdp::world::RoomLightingPlan& plan,
+    const std::size_t index) noexcept
+{
+    // One predictable rhythm per room: never scatter several worn units.
+    const std::size_t phase = static_cast<std::size_t>(plan.seed % 3U);
+    if (index == 0U) {
+        return visual::CeilingFixtureCondition::Used;
+    }
+    if (index == 1U + phase) {
+        return visual::CeilingFixtureCondition::Worn;
+    }
+    if (index == 1U + ((phase + 1U) % 3U)) {
+        return visual::CeilingFixtureCondition::Maintained;
+    }
+    return visual::CeilingFixtureCondition::Used;
+}
+
 visual::RoomLightingRenderData makeRenderLighting(
     const gdp::world::RoomLightingPlan& plan,
     const bool alert,
     const entities::EntityManager& entities,
     const std::unordered_map<gdp::world::RoomId,
         std::vector<entities::EntityId>>& roomFixtureEntities,
-    const gdp::world::RoomId roomId)
+    const gdp::world::RoomId roomId,
+    const wkc::core::Aabb roomBounds)
 {
     static_assert(gdp::world::maxRoomLights <= visual::maxRenderedRoomLights);
     visual::RoomLightingRenderData lighting;
@@ -280,8 +330,17 @@ visual::RoomLightingRenderData makeRenderLighting(
             source.range,
             fixtureState,
             outputScale,
+            fixtureVariantFor(plan),
+            fixtureConditionFor(plan, index),
+            roomBounds,
+            true,
+            source.intensity,
         };
     }
+    lighting.ambientIntensity = visual::fixtureDrivenAmbientIntensity(
+        lighting, lighting.alert
+            ? std::max(plan.ambientIntensity, 0.16F)
+            : plan.ambientIntensity);
     return lighting;
 }
 
@@ -363,7 +422,8 @@ void appendConnectedRoomLights(
         const gdp::world::RoomLightingPlan& plan = roomLighting[roomIndex];
         const visual::RoomLightingRenderData rendered
             = makeRenderLighting(
-                plan, false, entities, roomFixtureEntities, roomId);
+                plan, false, entities, roomFixtureEntities, roomId,
+                room->worldBounds);
         for (std::size_t lightIndex = 0; lightIndex < rendered.lightCount; ++lightIndex) {
             const visual::PointLightRenderData& source = rendered.lights[lightIndex];
             const wkc::core::Vec3 offset = source.position - observerPosition;
@@ -435,17 +495,23 @@ bool prepareRoomMaterials(
     visual::GdpRenderer& renderer,
     const world::RoomInstance& room)
 {
-    if (room.role == world::RoomRole::Hub) {
+    if (room.role == world::RoomRole::Hub
+        || room.moduleId == world::centralHubPreviewModuleId) {
         return renderer.prepareCentralHubRoomMaterials(room.seed);
     }
-    if (room.role == world::RoomRole::Arena || room.role == world::RoomRole::Boss) {
+    if (room.role == world::RoomRole::Arena || room.role == world::RoomRole::Boss
+        || room.moduleId == world::bossRoomPreviewModuleId
+        || room.moduleId == world::combatRoomPreviewModuleId) {
         return renderer.prepareCombatRoomMaterials(room.seed);
     }
     switch (room.theme) {
     case world::RoomTheme::Storage:
-        return renderer.prepareStorageRoomMaterials(room.seed);
+        return renderer.prepareStorageRoomMaterials(room.seed,
+            room.sizeClass == world::RoomSizeClass::Large);
     case world::RoomTheme::Laboratory:
-        return renderer.prepareLaboratoryRoomMaterials(room.seed);
+        return renderer.prepareLaboratoryRoomMaterials(room.seed,
+            room.moduleId == world::laboratoryPreviewModuleId
+                || room.moduleId == world::laboratoryHallModuleId);
     case world::RoomTheme::Maintenance:
         return renderer.prepareTechnicalRoomMaterials(room.seed);
     case world::RoomTheme::Security:
@@ -457,6 +523,31 @@ bool prepareRoomMaterials(
         return renderer.prepareIndustrialRoomMaterials(room.seed);
     }
     return false;
+}
+
+bool usesAuthoredRoomArchitecture(const world::RoomInstance& room) noexcept
+{
+    if (room.moduleId == world::industrialCorridorDestinationPreviewModuleId) {
+        return false;
+    }
+    return room.role == world::RoomRole::Boss
+        || room.moduleId == world::bossRoomPreviewModuleId
+        || room.theme == world::RoomTheme::Storage
+        || room.moduleId == world::combatRoomPreviewModuleId
+        || room.moduleId == world::combatGalleryArenaModuleId
+        || room.moduleId == world::cafeteriaPreviewModuleId
+        || room.moduleId == world::cafeteriaLongPreviewModuleId
+        || room.moduleId == world::cafeteriaLongModuleId
+        || room.moduleId == world::laboratoryPreviewModuleId
+        || room.moduleId == world::laboratoryHallModuleId
+        || room.moduleId == world::technicalPreviewModuleId
+        || room.moduleId == world::technicalLPreviewModuleId
+        || room.moduleId == world::maintenanceLModuleId
+        || room.moduleId == world::securityPreviewModuleId
+        || room.moduleId == world::securityTPreviewModuleId
+        || room.moduleId == world::securityTModuleId
+        || room.moduleId == world::centralHubPreviewModuleId
+        || room.moduleId == world::centralHubModuleId;
 }
 
 float yawForDirection(const wkc::core::Vec3 direction) noexcept
@@ -533,7 +624,17 @@ Application::Application(ApplicationConfig config)
     , collisionWorld_(baseCollisionWorld_)
     , session_(config_.worldSeed)
 {
-    if (config_.testMode) (void)session_.selectRunMode(gameplay::RunMode::TestMode);
+    if (config_.testMode || config_.storageRoomPreview
+        || config_.combatRoomPreview || config_.bossRoomPreview
+        || config_.cafeteriaPreview
+        || config_.cafeteriaLongPreview
+        || config_.laboratoryPreview || config_.technicalPreview
+        || config_.technicalLPreview
+        || config_.securityPreview || config_.securityTPreview
+        || config_.centralHubPreview
+        || config_.industrialCorridorPreview) {
+        (void)session_.selectRunMode(gameplay::RunMode::TestMode);
+    }
 }
 
 Application::~Application()
@@ -558,7 +659,7 @@ int Application::run()
         if (!initialize()) {
             return 1;
         }
-        if (launchRunImmediately && !initializeRun()) {
+        if (launchRunImmediately && !world_ && !initializeRun()) {
             shutdown();
             return 1;
         }
@@ -806,6 +907,8 @@ bool Application::initialize()
         log(LogLevel::Error, "Renderer initialization failed");
         return false;
     }
+    renderer_->setGeometryShadowsEnabled(
+        !config_.legacyGeometryShadows);
     const bool fullscreen = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0U;
     int actualWindowWidth = 0;
     int actualWindowHeight = 0;
@@ -816,7 +919,7 @@ bool Application::initialize()
                   << " mode at " << actualWindowWidth << 'x' << actualWindowHeight;
     log(LogLevel::Info, windowSummary.str());
     const gameplay::GraphicsQualitySettings initializedQuality
-        = gameplay::graphicsQualitySettings(runtimeSettings_.graphicsQuality);
+        = gameplay::effectiveGraphicsQualitySettings(runtimeSettings_);
     std::ostringstream qualitySummary;
     qualitySummary << "Graphics quality "
                    << gameplay::graphicsQualityName(runtimeSettings_.graphicsQuality)
@@ -840,7 +943,15 @@ bool Application::initialize()
     gameplay::openMainMenu(mainMenu_);
     log(LogLevel::Info, "GDP initialized with an OpenGL 3.3 core context");
     log(LogLevel::Info, "Main menu initialized before world generation");
-    if (config_.testMode) return initializeRun();
+    if (config_.testMode || config_.storageRoomPreview
+        || config_.combatRoomPreview || config_.bossRoomPreview
+        || config_.cafeteriaPreview
+        || config_.cafeteriaLongPreview
+        || config_.laboratoryPreview || config_.technicalPreview
+        || config_.technicalLPreview
+        || config_.securityPreview || config_.securityTPreview
+        || config_.centralHubPreview
+        || config_.industrialCorridorPreview) return initializeRun();
     return true;
 }
 
@@ -922,6 +1033,7 @@ bool Application::initializeRun()
     enemyAnimationTicks_ = 0U;
     enemyAnimationTransitions_.clear();
     activeImpacts_.clear();
+    bulletMarks_.clear();
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;
@@ -930,6 +1042,7 @@ bool Application::initializeRun()
     grenadeThrowChargeStrength_ = 0.0F;
     enemyProjectiles_.clear();
     roomFixtureEntities_.clear();
+    roomEventPhaseStartTicks_.clear();
     visitedRooms_.clear();
     roomEntryGraceRemaining_.clear();
     impactVisualCounter_ = 0U;
@@ -962,7 +1075,33 @@ bool Application::initializeRun()
     world::WorldGenerationResult generation = world::generateWorld(
         config_.worldSeed, worldConfig);
 #if GDP_ENABLE_TEST_MODE
-    if (session_.state().mode == gameplay::RunMode::TestMode) generation.world = makeTestArena(config_.worldSeed);
+    if (session_.state().mode == gameplay::RunMode::TestMode) {
+        generation.world = config_.storageRoomPreview
+            ? makeStorageRoomPreview(config_.worldSeed)
+            : config_.bossRoomPreview
+                ? makeBossRoomPreview(config_.worldSeed)
+            : config_.combatRoomPreview
+                ? makeCombatRoomPreview(config_.worldSeed)
+                : config_.cafeteriaLongPreview
+                    ? makeCafeteriaLongPreview(config_.worldSeed)
+                : config_.cafeteriaPreview
+                    ? makeCafeteriaPreview(config_.worldSeed)
+                    : config_.laboratoryPreview
+                        ? makeLaboratoryPreview(config_.worldSeed)
+                        : config_.technicalPreview
+                            ? makeTechnicalPreview(config_.worldSeed)
+                            : config_.technicalLPreview
+                                ? makeTechnicalLPreview(config_.worldSeed)
+                            : config_.securityTPreview
+                                ? makeSecurityTPreview(config_.worldSeed)
+                            : config_.securityPreview
+                                ? makeSecurityPreview(config_.worldSeed)
+                                : config_.centralHubPreview
+                                    ? makeCentralHubPreview(config_.worldSeed)
+                                : config_.industrialCorridorPreview
+                                    ? makeIndustrialCorridorPreview(config_.worldSeed)
+                        : makeTestArena(config_.worldSeed);
+    }
 #endif
     performanceMonitor_.setWorldGenerationMilliseconds(
         std::chrono::duration<double, std::milli>(
@@ -972,6 +1111,23 @@ bool Application::initializeRun()
         return false;
     }
     world_ = std::move(generation.world);
+    roomArchitectureParts_.clear();
+    for (const world::RoomInstance& room : world_->rooms) {
+        const bool authored = usesAuthoredRoomArchitecture(room);
+        auto parts = authored
+            ? world::makeRoomArchitecture(room)
+            : std::vector<world::RoomArchitecturePart>{};
+        if (authored && !world::validateRoomArchitecture(room, parts)) {
+            log(LogLevel::Error,
+                "Room architecture obstructs a door or spawn zone");
+            return false;
+        }
+        auto columns = world::makeRoomWallColumns(room);
+        parts.insert(parts.end(), columns.begin(), columns.end());
+        if (!parts.empty()) {
+            roomArchitectureParts_.emplace(room.id, std::move(parts));
+        }
+    }
     const auto bossRoom = std::find_if(world_->rooms.begin(), world_->rooms.end(),
         [](const world::RoomInstance& room) {
             return room.role == world::RoomRole::Boss;
@@ -989,7 +1145,9 @@ bool Application::initializeRun()
     const wkc::core::Vec3 startForward = wkc::core::rotateQuarterTurns(
         {0.0F, 0.0F, -1.0F}, startRoom->rotation);
     const wkc::core::Vec3 startPosition = startRoom->transform.position
-        + wkc::core::rotateQuarterTurns({0.0F, 0.0F, 4.0F}, startRoom->rotation);
+        + wkc::core::rotateQuarterTurns(
+            {0.0F, 0.0F, config_.bossRoomPreview ? 13.0F : 4.0F},
+            startRoom->rotation);
     player_.spawn(startPosition, yawForDirection(startForward));
     playerBodyMotion_ = {};
     if (campaignCarryover_) {
@@ -1018,10 +1176,56 @@ bool Application::initializeRun()
     world::InitialEntitySet initialEntities;
 #if GDP_ENABLE_TEST_MODE
     if (session_.state().mode == gameplay::RunMode::TestMode) {
-        initialEntities = populateTestArena(*world_, entities_, {
-            .transform = {.position = player_.state().position}, .health = player_.state().health,
-            .armor = player_.state().armor, .maximumArmor = player_.state().maximumArmor});
-        (void)weapon_.equip(gameplay::WeaponArchetype::Carbine);
+        const entities::PlayerCreateInfo playerInfo{
+            .transform = {.position = player_.state().position},
+            .health = player_.state().health,
+            .armor = player_.state().armor,
+            .maximumArmor = player_.state().maximumArmor,
+        };
+        initialEntities = config_.storageRoomPreview
+            ? populateStorageRoomPreview(*world_, entities_, playerInfo)
+            : config_.bossRoomPreview
+                ? populateBossRoomPreview(*world_, entities_, playerInfo)
+            : config_.combatRoomPreview
+                ? populateCombatRoomPreview(*world_, entities_, playerInfo)
+                : (config_.cafeteriaPreview || config_.cafeteriaLongPreview)
+                    ? populateCafeteriaPreview(*world_, entities_, playerInfo)
+                    : config_.laboratoryPreview
+                        ? populateLaboratoryPreview(*world_, entities_, playerInfo)
+                        : config_.technicalPreview
+                            ? populateTechnicalPreview(*world_, entities_, playerInfo)
+                            : config_.technicalLPreview
+                                ? populateTechnicalPreview(*world_, entities_, playerInfo)
+                            : (config_.securityPreview || config_.securityTPreview)
+                                ? populateSecurityPreview(*world_, entities_, playerInfo)
+                                : config_.centralHubPreview
+                                    ? populateCentralHubPreview(*world_, entities_, playerInfo,
+                                        config_.centralHubShadowPreview)
+                                : config_.industrialCorridorPreview
+                                    ? populateIndustrialCorridorPreview(*world_, entities_, playerInfo)
+                        : populateTestArena(*world_, entities_, playerInfo);
+        const bool mapPreview = config_.storageRoomPreview
+            || config_.combatRoomPreview || config_.bossRoomPreview
+            || config_.cafeteriaPreview
+            || config_.cafeteriaLongPreview
+            || config_.laboratoryPreview || config_.technicalPreview
+            || config_.technicalLPreview
+            || config_.securityPreview || config_.securityTPreview
+            || config_.centralHubPreview
+            || config_.industrialCorridorPreview;
+        const gameplay::WeaponArchetype previewWeapon = mapPreview
+            ? gameplay::WeaponArchetype::Sniper
+            : gameplay::WeaponArchetype::Carbine;
+        if (!weapon_.equip(previewWeapon)) {
+            log(LogLevel::Error, "Cannot equip the test room starting weapon");
+            return false;
+        }
+        if (config_.bossRoomPreview) {
+            roomEntryGraceRemaining_[world_->rooms.front().id] = 1.25F;
+        }
+        log(LogLevel::Info, mapPreview
+            ? "Map preview starts with Sniper"
+            : "Test arena starts with Carbine");
     } else
 #endif
     initialEntities = world::populateInitialEntities(
@@ -1038,6 +1242,33 @@ bool Application::initializeRun()
     if (!initialEntities.isValid()) {
         log(LogLevel::Error, "Initial entity population requires START and Terminal rooms");
         return false;
+    }
+    for (world::RoomInstance& room : world_->rooms) {
+        const auto architecture = roomArchitectureParts_.find(room.id);
+        if (architecture == roomArchitectureParts_.end()) continue;
+        for (std::size_t index = 0; index < architecture->second.size(); ++index) {
+            const world::RoomArchitecturePart& part = architecture->second[index];
+            if (!part.breakable) continue;
+            const wkc::core::Vec3 scale = part.bounds.maximum - part.bounds.minimum;
+            const wkc::core::Vec3 position{
+                (part.bounds.minimum.x + part.bounds.maximum.x) * 0.5F,
+                part.bounds.minimum.y,
+                (part.bounds.minimum.z + part.bounds.maximum.z) * 0.5F,
+            };
+            // The lowest seed bit preserves the authored olive/charcoal tier.
+            const wkc::core::Seed visualSeed = (wkc::core::deriveSeed(
+                room.seed, gdp::game::SeedDomain::Props, 1000U + index) & ~1ULL)
+                | (part.tint.x < 0.4F ? 1ULL : 0ULL);
+            room.entities.push_back(entities_.createProp({
+                .transform = {.position = position, .scale = scale},
+                .roomId = room.id,
+                .type = entities::PropType::StorageBox,
+                .solid = true,
+                .health = 35.0F,
+                .maximumHealth = 35.0F,
+                .visualSeed = visualSeed,
+            }));
+        }
     }
     player_.bindEntity(initialEntities.player);
     terminalEntity_ = initialEntities.terminal;
@@ -1135,8 +1366,74 @@ bool Application::initializeRun()
             return false;
         }
         roomEvents_.push_back(gameplay::makeRoomEventRuntime(std::move(plan), room.id));
+        const world::RoomRole lightingRole = config_.industrialCorridorPreview
+            ? world::RoomRole::Normal
+            : config_.centralHubPreview ? world::RoomRole::Hub : room.role;
         world::RoomLightingPlan lighting = world::generateRoomLightingPlan(
-            room.seed, room.role, room.theme, room.worldBounds);
+            room.seed, lightingRole, room.theme, room.worldBounds);
+        if (room.moduleId == world::securityTPreviewModuleId
+            || room.moduleId == world::securityTModuleId) {
+            // One fixture over the narrow approach, two over the gallery,
+            // and a weaker fill between the gallery lights.
+            if (lighting.lights.size() < 4U) {
+                log(LogLevel::Error, "Security T needs four ceiling fixtures");
+                return false;
+            }
+            lighting.lights.resize(4U);
+            // Lower the Security model enough to expose its two rods. Its
+            // local ceiling mounts meet the 6 m ceiling at this height.
+            const float hangingLight = room.worldBounds.maximum.y - 0.44F;
+            for (std::size_t index = 0U; index < lighting.lights.size(); ++index) {
+                const wkc::core::Vec3 local = index == 0U
+                    ? wkc::core::Vec3{0.0F, 0.0F, -6.0F}
+                    : wkc::core::Vec3{index == 3U ? 0.0F
+                        : index == 1U ? -5.5F : 5.5F,
+                        0.0F, 4.0F};
+                lighting.lights[index].position = room.transform.position
+                    + wkc::core::rotateQuarterTurns(local, room.rotation);
+                lighting.lights[index].position.y = hangingLight;
+            }
+            lighting.lights[3U].intensity = 0.55F;
+            lighting.lights[3U].range = 6.5F;
+            lighting.planHash = world::roomLightingPlanHash(lighting);
+        }
+        if (!room.walkableOutline.empty()) {
+            // Rectangular lighting anchors can land in a clipped corner.
+            // Move only those fixtures to the nearest safe half-metre grid
+            // point, then restore the canonical hash before validation.
+            for (world::RoomPointLight& fixture : lighting.lights) {
+                if (world::footprintContainsDisk(
+                        room.walkableOutline, fixture.position, 0.75F)) {
+                    continue;
+                }
+                float bestDistanceSquared = std::numeric_limits<float>::max();
+                wkc::core::Vec3 best = fixture.position;
+                for (float x = room.worldBounds.minimum.x + 0.5F;
+                     x < room.worldBounds.maximum.x; x += 0.5F) {
+                    for (float z = room.worldBounds.minimum.z + 0.5F;
+                         z < room.worldBounds.maximum.z; z += 0.5F) {
+                        const wkc::core::Vec3 candidate{x, fixture.position.y, z};
+                        if (!world::footprintContainsDisk(
+                                room.walkableOutline, candidate, 0.75F)) {
+                            continue;
+                        }
+                        const float dx = x - fixture.position.x;
+                        const float dz = z - fixture.position.z;
+                        const float distanceSquared = dx * dx + dz * dz;
+                        if (distanceSquared < bestDistanceSquared) {
+                            bestDistanceSquared = distanceSquared;
+                            best = candidate;
+                        }
+                    }
+                }
+                if (bestDistanceSquared == std::numeric_limits<float>::max()) {
+                    log(LogLevel::Error, "Shaped room has no safe ceiling fixture point");
+                    return false;
+                }
+                fixture.position = best;
+            }
+            lighting.planHash = world::roomLightingPlanHash(lighting);
+        }
         if (!world::validateRoomLightingPlan(lighting, room.worldBounds).isValid()) {
             log(LogLevel::Error, "Room lighting plan failed deterministic validation");
             return false;
@@ -1194,7 +1491,10 @@ bool Application::initializeRun()
             return false;
         }
         for (const world::RoomInstance& room : world_->rooms) {
-            if (!prepareRoomMaterials(*renderer_, room)) {
+            const bool materialsReady = config_.industrialCorridorPreview
+                ? renderer_->prepareIndustrialRoomMaterials(room.seed)
+                : prepareRoomMaterials(*renderer_, room);
+            if (!materialsReady) {
                 log(LogLevel::Error, "World room material preparation failed");
                 return false;
             }
@@ -1235,7 +1535,7 @@ bool Application::initializeRun()
             "Campaign started without a persistent floor checkpoint");
     }
     // The first equipped item also enters from its mount, including the
-    // Carbine granted by the development arena after the initial reset.
+    // The weapon granted by the selected development preview or arena.
     presentedWeapon_ = weapon_.definition().archetype;
     equipOutgoingWeapon_ = presentedWeapon_;
     presentedGrenade_ = equipOutgoingGrenade_ = equipOutgoingVisible_ = false;
@@ -1853,12 +2153,14 @@ bool Application::returnToMainMenu()
     renderer_.reset();
     entities_.clear();
     roomEvents_.clear();
+    roomEventPhaseStartTicks_.clear();
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    bulletMarks_.clear();
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;
@@ -1928,6 +2230,8 @@ bool Application::returnToMainMenu()
         log(LogLevel::Error, "Main menu renderer reinitialization failed");
         return false;
     }
+    renderer_->setGeometryShadowsEnabled(
+        !config_.legacyGeometryShadows);
     if (!SDL_SetWindowRelativeMouseMode(window_, false)) {
         log(LogLevel::Warning, sdlError("Main menu mouse mode update failed"));
     }
@@ -2835,6 +3139,64 @@ void Application::fixedUpdate(const double fixedStep)
                     .roomId = playerRoom,
                     .remaining = impactVisualDuration,
                 });
+                if (!meleeAttack && signal.kind == gameplay::CombatSignalKind::ImpactWorld) {
+                    std::optional<world::EdgeId> doorEdge;
+                    float doorOffset = 0.0F;
+                    if (world_ && std::abs(signal.impact->normal.y) < 0.3F) {
+                        const auto room = std::find_if(world_->rooms.begin(),
+                            world_->rooms.end(), [playerRoom](const auto& candidate) {
+                                return candidate.id == playerRoom;
+                            });
+                        if (room != world_->rooms.end()) {
+                            for (const world::ConnectorInstance& connector
+                                : room->connectors) {
+                                if (connector.sealed || !connector.edge) continue;
+                                const auto door = doorRuntimes_.find(*connector.edge);
+                                if (door == doorRuntimes_.end()
+                                    || gameplay::isDoorPassable(door->second)) {
+                                    continue;
+                                }
+                                const wkc::core::Vec3 delta
+                                    = signal.impact->point - connector.worldPosition;
+                                const wkc::core::Vec3 transverse
+                                    = std::abs(connector.worldNormal.x) > 0.5F
+                                        ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
+                                        : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+                                const float lateral = wkc::core::dot(delta, transverse);
+                                if (std::abs(wkc::core::dot(delta,
+                                        connector.worldNormal)) > 0.65F
+                                    || std::abs(lateral) > connector.width * 0.5F - 0.04F
+                                    || delta.y < 0.05F
+                                    || delta.y > connector.height - 0.05F
+                                    || std::abs(wkc::core::dot(
+                                        signal.impact->normal,
+                                        connector.worldNormal)) < 0.7F) {
+                                    continue;
+                                }
+                                doorEdge = *connector.edge;
+                                doorOffset = lateral;
+                                break;
+                            }
+                        }
+                    }
+                    if (bulletMarks_.size() >= maximumBulletMarks) {
+                        bulletMarks_.erase(bulletMarks_.begin());
+                    }
+                    bulletMarks_.push_back({
+                        .render = {
+                            .position = signal.impact->point,
+                            .normal = signal.impact->normal,
+                            .material = visual::ImpactVisualMaterial::Metal,
+                            .strength = 1.0F,
+                            .visualSeed = wkc::core::hashCombine(
+                                config_.worldSeed, impactVisualCounter_++),
+                            .kind = visual::ImpactVisualKind::BulletMark,
+                        },
+                        .roomId = playerRoom,
+                        .doorEdge = doorEdge,
+                        .doorOffset = doorOffset,
+                    });
+                }
             }
             if (signal.kind != gameplay::CombatSignalKind::WeaponFired) {
                 continue;
@@ -3321,6 +3683,8 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
         if (event.activated) {
+            roomEventPhaseStartTicks_[activeEvent->roomId]
+                = session_.state().elapsedRunTicks;
             (void)gameplay::advanceCampaignMission(campaignMission_,
                 activeEvent->roomId, {
                     .terminalActivated = activeEvent->plan.role == world::RoomRole::Terminal
@@ -3349,6 +3713,8 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
         if (event.completed) {
+            roomEventPhaseStartTicks_[activeEvent->roomId]
+                = session_.state().elapsedRunTicks;
             const gameplay::CampaignMissionProgress missionProgress{
                 .arenaCleared = activeEvent->plan.role == world::RoomRole::Arena
                     && activeEvent->plan.type == world::RoomEventType::Lockdown,
@@ -3587,7 +3953,7 @@ void Application::render()
         return;
     }
     const gameplay::GraphicsQualitySettings graphicsQuality
-        = gameplay::graphicsQualitySettings(runtimeSettings_.graphicsQuality);
+        = gameplay::effectiveGraphicsQualitySettings(runtimeSettings_);
     const visual::HudGraphicsQuality hudGraphicsQuality
         = static_cast<visual::HudGraphicsQuality>(runtimeSettings_.graphicsQuality);
 
@@ -3687,6 +4053,7 @@ void Application::render()
         hud.worldRenderScalePercent = graphicsQuality.renderScalePercent;
         hud.detailedMaterials = graphicsQuality.detailedMaterials;
         hud.graphicsQuality = hudGraphicsQuality;
+        hud.geometryShadowLightBudget = 0U;
         (void)renderAndPresent([&] {
             return renderer_->render(width, height, backdrop.camera, backdrop.enemies,
                 {}, backdrop.props, backdrop.lighting, backdrop.room, {}, {}, {}, hud);
@@ -3715,8 +4082,13 @@ void Application::render()
     std::vector<visual::EnemyRenderData> visibleEnemies;
     std::vector<visual::PickupRenderData> visiblePickups;
     std::vector<visual::PropRenderData> visibleProps;
+    std::uint32_t onScreenEnemyCount = 0U;
+    std::uint32_t onScreenPropCount = 0U;
     const entities::Entity* playerEntity = entities_.find(player_.entity());
     const std::uint32_t playerRoom = playerEntity == nullptr ? 0 : playerEntity->roomId;
+    const bool geometryShadowCasters = !config_.legacyGeometryShadows
+        && graphicsQuality.shadowsEnabled
+        && graphicsQuality.maximumShadowLights > 0U;
     std::vector<world::RoomId> visibleRoomIds = world_
         ? roomsWithinGraphDistance(
             *world_, playerRoom, graphicsQuality.visibleRoomDepth)
@@ -3747,10 +4119,12 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
+        const bool onScreen = entity != nullptr && sphereIsVisible(
+            entity->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F},
+            1.5F);
         if (entity != nullptr && enemy != nullptr && isVisibleRoom(entity->roomId)
-            && sphereIsVisible(
-                entity->transform.position + wkc::core::Vec3{0.0F, 0.9F, 0.0F},
-                1.5F)
+            && (onScreen || (geometryShadowCasters
+                && entity->roomId == playerRoom))
             && (enemy->archetype == entities::EnemyArchetype::Worker
                 || enemy->archetype == entities::EnemyArchetype::Guard
                 || enemy->archetype == entities::EnemyArchetype::Officer
@@ -3796,6 +4170,7 @@ void Application::render()
                     ? std::clamp(enemy->attackVisualTime / 0.28F, 0.0F, 1.0F)
                     : 0.0F,
             });
+            if (onScreen) ++onScreenEnemyCount;
         }
     }
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Item)) {
@@ -3845,14 +4220,17 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Prop)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::PropData* prop = entities_.findData<entities::PropData>(id);
+        const bool onScreen = entity != nullptr && sphereIsVisible(
+            entity->transform.position
+                + wkc::core::Vec3{
+                    0.0F, entity->transform.scale.y * 0.5F, 0.0F},
+            std::max(0.75F,
+                wkc::core::length(entity->transform.scale) * 0.65F));
         if (entity == nullptr || prop == nullptr || !isVisibleRoom(entity->roomId)
-            || !sphereIsVisible(
-                entity->transform.position
-                    + wkc::core::Vec3{
-                        0.0F, entity->transform.scale.y * 0.5F, 0.0F},
-                std::max(0.75F,
-                    wkc::core::length(entity->transform.scale) * 0.65F))
+            || (!onScreen && !(geometryShadowCasters
+                && entity->roomId == playerRoom))
             || (prop->type != entities::PropType::Crate
+                && prop->type != entities::PropType::StorageBox
                 && prop->type != entities::PropType::Canister
                 && prop->type != entities::PropType::Barricade)) {
             continue;
@@ -3862,6 +4240,8 @@ void Application::render()
             role = visual::PropVisualRole::Canister;
         } else if (prop->type == entities::PropType::Barricade) {
             role = visual::PropVisualRole::Barricade;
+        } else if (prop->type == entities::PropType::StorageBox) {
+            role = visual::PropVisualRole::StorageBox;
         }
         visual::PropVisualState state = visual::PropVisualState::Intact;
         if (prop->state == entities::PropState::Damaged) {
@@ -3876,6 +4256,7 @@ void Application::render()
             state,
             prop->visualSeed,
         });
+        if (onScreen) ++onScreenPropCount;
     }
     std::ostringstream title;
     title << "GDP | Run " << (session_.state().runIndex + 1U)
@@ -3933,7 +4314,52 @@ void Application::render()
             title << " [LOCKDOWN]";
         }
     }
+    const float securityDemoSeconds = config_.securityIndicatorDemo
+        ? std::fmod(static_cast<float>(session_.state().elapsedRunTicks)
+                / static_cast<float>(gameplay::runTimerTicksPerSecond), 23.0F)
+        : 0.0F;
+    const auto applySecurityIndicatorState = [this, securityDemoSeconds](
+        const world::RoomId roomId, visual::RoomRenderData& destination) {
+        if (config_.securityTPreview && config_.securityIndicatorDemo) {
+            destination.securityIndicatorPhase = securityDemoSeconds < 10.0F
+                ? visual::SecurityIndicatorPhase::Alarm
+                : visual::SecurityIndicatorPhase::Recovery;
+            destination.securityIndicatorSeconds = securityDemoSeconds < 10.0F
+                ? securityDemoSeconds : securityDemoSeconds - 10.0F;
+            return;
+        }
+        const auto event = std::find_if(roomEvents_.begin(), roomEvents_.end(),
+            [roomId](const gameplay::RoomEventRuntime& runtime) {
+                return runtime.roomId == roomId;
+            });
+        if (event == roomEvents_.end() || !event->plan.locksRoom
+            || !event->plan.requiresRoomClear
+            || event->phase == gameplay::RoomEventPhase::Dormant) {
+            return;
+        }
+        destination.securityIndicatorPhase
+            = event->phase == gameplay::RoomEventPhase::Active
+                ? visual::SecurityIndicatorPhase::Alarm
+                : visual::SecurityIndicatorPhase::Recovery;
+        const std::uint64_t ticks = session_.state().elapsedRunTicks;
+        const auto [start, inserted]
+            = roomEventPhaseStartTicks_.try_emplace(roomId, ticks);
+        (void)inserted;
+        destination.securityIndicatorSeconds
+            = static_cast<float>(ticks - start->second)
+                / static_cast<float>(gameplay::runTimerTicksPerSecond);
+    };
     visual::RoomLightingRenderData lighting;
+    lighting.visibleFixturesPopulated = world_.has_value();
+    const auto appendVisibleFixtures = [&lighting, &sphereIsVisible](
+        const visual::RoomLightingRenderData& source) {
+        for (std::uint32_t index = 0U; index < source.lightCount; ++index) {
+            const visual::PointLightRenderData& fixture = source.lights[index];
+            if (sphereIsVisible(fixture.position, 1.0F)) {
+                lighting.visibleFixtures.push_back(fixture);
+            }
+        }
+    };
     visual::RoomRenderData roomRender;
     std::vector<visual::DoorRenderData> visibleDoors;
     std::vector<visual::CorridorRenderData> visibleCorridors;
@@ -3950,6 +4376,15 @@ void Application::render()
             roomRender.origin = currentRoom->transform.position;
             roomRender.rotation = currentRoom->rotation;
             roomRender.worldBounds = currentRoom->worldBounds;
+            roomRender.walkableOutline = currentRoom->walkableOutline;
+            applySecurityIndicatorState(currentRoom->id, roomRender);
+            if (const auto architecture = roomArchitectureParts_.find(currentRoom->id);
+                architecture != roomArchitectureParts_.end()) {
+                roomRender.architectureParts = architecture->second;
+                roomRender.customArchitecture = usesAuthoredRoomArchitecture(*currentRoom)
+                    && currentRoom->role != world::RoomRole::Boss
+                    && currentRoom->moduleId != world::bossRoomPreviewModuleId;
+            }
             if (const auto material = roomMaterialKeys_.find(currentRoom->id);
                 material != roomMaterialKeys_.end()) {
                 roomRender.materialKey = material->second;
@@ -3957,11 +4392,22 @@ void Application::render()
             const std::size_t roomIndex = static_cast<std::size_t>(
                 std::distance(world_->rooms.begin(), currentRoom));
             if (roomIndex < roomLighting_.size()) {
-                const bool alert = activeEvent != roomEvents_.end()
-                    && gameplay::isRoomLocked(*activeEvent);
+                const bool alert = (activeEvent != roomEvents_.end()
+                    && gameplay::isRoomLocked(*activeEvent))
+                    || (config_.securityTPreview && config_.securityIndicatorDemo
+                        && securityDemoSeconds < 10.0F);
                 lighting = makeRenderLighting(
                     roomLighting_[roomIndex], alert, entities_,
-                    roomFixtureEntities_, currentRoom->id);
+                    roomFixtureEntities_, currentRoom->id,
+                    currentRoom->worldBounds);
+                lighting.visibleFixturesPopulated = true;
+                appendVisibleFixtures(lighting);
+                lighting.ambientRegions[0] = {
+                    currentRoom->worldBounds,
+                    lighting.ambientColor,
+                    lighting.ambientIntensity,
+                };
+                lighting.ambientRegionCount = 1U;
             }
             if (!gameplay::roomContainingPosition(*world_, player_.state().position)) {
                 for (const world::CorridorPath& corridor : world_->corridors) {
@@ -3996,7 +4442,8 @@ void Application::render()
                     const visual::RoomLightingRenderData otherLighting
                         = makeRenderLighting(
                             roomLighting_[otherIndex], false, entities_,
-                            roomFixtureEntities_, otherRoomId);
+                            roomFixtureEntities_, otherRoomId,
+                            otherRoom->worldBounds);
                     lighting.ambientColor = (lighting.ambientColor * (1.0F - otherWeight))
                         + (otherLighting.ambientColor * otherWeight);
                     lighting.ambientIntensity
@@ -4013,18 +4460,50 @@ void Application::render()
                 roomFixtureEntities_, playerRoom, player_.state().position);
             lighting.lightCount = std::min<std::uint32_t>(
                 lighting.lightCount, graphicsQuality.maximumLights);
+            if (config_.fixturePreviewVariant || config_.centralHubPreview) {
+                const visual::CeilingFixtureVariant variant
+                    = config_.fixturePreviewVariant.value_or(
+                        visual::CeilingFixtureVariant::CentralHub);
+                for (std::uint32_t index = 0U; index < lighting.lightCount; ++index) {
+                    lighting.lights[index].fixtureVariant = variant;
+                }
+            }
             lighting.flashlightEnabled = flashlightOn_
                 && player_.state().alive;
             lighting.flashlightPosition = player_.cameraPosition();
             lighting.flashlightDirection = player_.forwardDirection();
-            if (graphicsQuality.maximumShadowLights > 0U
+            if (graphicsQuality.shadowsEnabled
+                && graphicsQuality.maximumShadowLights > 0U
                 && graphicsQuality.maximumShadowOccluders > 0U) {
                 std::vector<visual::ShadowOccluderRenderData> shadowCandidates;
-                shadowCandidates.reserve(visibleEnemies.size() + visibleProps.size());
+                shadowCandidates.reserve(visibleEnemies.size() + visibleProps.size()
+                    + roomRender.architectureParts.size());
                 const auto appendShadowOccluder
-                    = [&shadowCandidates](const wkc::core::Aabb bounds) {
-                          shadowCandidates.push_back({bounds});
+                    = [&shadowCandidates](const wkc::core::Aabb bounds,
+                          const bool structuralPriority = false,
+                          const bool octagonalPrism = false) {
+                          shadowCandidates.push_back({bounds, structuralPriority,
+                              octagonalPrism});
                       };
+                const auto appendHubColumnShadow
+                    = [&appendShadowOccluder](const visual::RoomRenderData& renderedRoom) {
+                          for (const world::RoomArchitecturePart& part
+                              : renderedRoom.architectureParts) {
+                              const bool shaft = part.decoration
+                                  == world::RoomDecorationPart::CentralHubColumnShaft;
+                              const bool plinth = part.decoration
+                                  == world::RoomDecorationPart::CentralHubColumnPlinth;
+                              if (shaft || plinth) {
+                                  // Keep the tall shaft ahead of movable
+                                  // occluders; the short base can yield a slot.
+                                  appendShadowOccluder(part.bounds, shaft, shaft);
+                              }
+                          }
+                      };
+                appendHubColumnShadow(roomRender);
+                for (const visual::RoomRenderData& connectedRoom : connectedRooms) {
+                    appendHubColumnShadow(connectedRoom);
+                }
                 for (const visual::EnemyRenderData& enemy : visibleEnemies) {
                     if (!enemy.active || !enemy.alive) {
                         continue;
@@ -4062,10 +4541,12 @@ void Application::render()
                 lighting.ambientColor = {0.35F, 0.82F, 0.72F};
                 lighting.ambientIntensity = std::max(lighting.ambientIntensity, 0.34F);
                 lighting.alert = false;
+                lighting.ambientRegionCount = 0U;
             } else if (session_.state().phase == gameplay::SessionPhase::Defeat) {
                 lighting.ambientColor = {0.52F, 0.06F, 0.04F};
                 lighting.ambientIntensity = 0.14F;
                 lighting.alert = true;
+                lighting.ambientRegionCount = 0U;
             }
             const std::uint32_t geometryDepth
                 = graphicsQuality.visibleRoomDepth;
@@ -4111,13 +4592,46 @@ void Application::render()
                         camera, renderedRoom.worldBounds, cameraAspect)) {
                     continue;
                 }
-                connectedRooms.push_back({
-                    renderedRoom.transform.position,
-                    renderedRoom.rotation,
-                    roomMaterialKeys_.contains(renderedRoom.id)
-                        ? roomMaterialKeys_.at(renderedRoom.id) : 0U,
-                    renderedRoom.worldBounds,
-                });
+                visual::RoomRenderData connected;
+                connected.origin = renderedRoom.transform.position;
+                connected.rotation = renderedRoom.rotation;
+                connected.materialKey = roomMaterialKeys_.contains(renderedRoom.id)
+                    ? roomMaterialKeys_.at(renderedRoom.id) : 0U;
+                connected.worldBounds = renderedRoom.worldBounds;
+                connected.walkableOutline = renderedRoom.walkableOutline;
+                applySecurityIndicatorState(renderedRoom.id, connected);
+                if (const auto architecture = roomArchitectureParts_.find(renderedRoom.id);
+                    architecture != roomArchitectureParts_.end()) {
+                    connected.architectureParts = architecture->second;
+                    connected.customArchitecture = usesAuthoredRoomArchitecture(renderedRoom)
+                        && renderedRoom.role != world::RoomRole::Boss
+                        && renderedRoom.moduleId != world::bossRoomPreviewModuleId;
+                }
+                connectedRooms.push_back(connected);
+                const std::size_t connectedIndex = static_cast<std::size_t>(
+                    &renderedRoom - world_->rooms.data());
+                if (connectedIndex < roomLighting_.size()) {
+                    const bool connectedAlert = std::any_of(
+                        roomEvents_.begin(), roomEvents_.end(),
+                        [&renderedRoom](const gameplay::RoomEventRuntime& event) {
+                            return event.roomId == renderedRoom.id
+                                && gameplay::isRoomLocked(event);
+                        });
+                    const visual::RoomLightingRenderData connectedLighting
+                        = makeRenderLighting(
+                            roomLighting_[connectedIndex], connectedAlert, entities_,
+                            roomFixtureEntities_, renderedRoom.id,
+                            renderedRoom.worldBounds);
+                    appendVisibleFixtures(connectedLighting);
+                    if (lighting.ambientRegionCount
+                        < visual::maxRenderedAmbientRegions) {
+                        lighting.ambientRegions[lighting.ambientRegionCount++] = {
+                            renderedRoom.worldBounds,
+                            connectedLighting.ambientColor,
+                            connectedLighting.ambientIntensity,
+                        };
+                    }
+                }
             }
             const auto edgeIsLocked = [this, &visibleEdges](const world::EdgeId edge) {
                 if (std::find(visibleEdges.begin(), visibleEdges.end(), edge)
@@ -4154,6 +4668,14 @@ void Application::render()
                     });
                 }
             }
+        }
+    }
+    if (config_.fixturePreviewVariant || config_.centralHubPreview) {
+        const visual::CeilingFixtureVariant variant
+            = config_.fixturePreviewVariant.value_or(
+                visual::CeilingFixtureVariant::CentralHub);
+        for (visual::PointLightRenderData& fixture : lighting.visibleFixtures) {
+            fixture.fixtureVariant = variant;
         }
     }
     if (session_.state().phase == gameplay::SessionPhase::Playing) {
@@ -4207,6 +4729,8 @@ void Application::render()
     hud.graphicsQuality = hudGraphicsQuality;
     hud.worldRenderScalePercent = graphicsQuality.renderScalePercent;
     hud.detailedMaterials = graphicsQuality.detailedMaterials;
+    hud.geometryShadowLightBudget = graphicsQuality.shadowsEnabled
+        ? graphicsQuality.maximumShadowLights : 0U;
     const PerformanceSnapshot performance = performanceMonitor_.snapshot();
     hud.performanceOverlay
         = performanceOverlayVisible_ && performance.sampleCount > 0U;
@@ -4499,11 +5023,38 @@ void Application::render()
         }
     }
     std::vector<visual::ImpactRenderData> visibleImpacts;
-    visibleImpacts.reserve(activeImpacts_.size());
+    visibleImpacts.reserve(activeImpacts_.size() + bulletMarks_.size());
     for (const ActiveImpact& impact : activeImpacts_) {
         if (impact.roomId == playerRoom
             && sphereIsVisible(impact.render.position, 0.25F)) {
             visibleImpacts.push_back(impact.render);
+        }
+    }
+    for (const BulletMark& mark : bulletMarks_) {
+        if (!isVisibleRoom(mark.roomId)) continue;
+        visual::ImpactRenderData render = mark.render;
+        if (mark.doorEdge) {
+            if (!world_) continue;
+            const auto room = std::find_if(world_->rooms.begin(), world_->rooms.end(),
+                [&mark](const world::RoomInstance& candidate) {
+                    return candidate.id == mark.roomId;
+                });
+            if (room == world_->rooms.end()) continue;
+            const auto connector = std::find_if(room->connectors.begin(),
+                room->connectors.end(), [&mark](const world::ConnectorInstance& candidate) {
+                    return candidate.edge == mark.doorEdge;
+                });
+            if (connector == room->connectors.end()) continue;
+            const auto door = doorRuntimes_.find(*mark.doorEdge);
+            const float travel = door == doorRuntimes_.end() ? 0.0F
+                : gameplay::doorPanelTravel(door->second.openness);
+            render = visual::bulletMarkOnDoor(render,
+                {connector->worldPosition, connector->worldNormal,
+                    connector->width, connector->height, false, travel},
+                mark.doorOffset);
+        }
+        if (sphereIsVisible(render.position, 0.12F)) {
+            visibleImpacts.push_back(render);
         }
     }
     std::vector<visual::EnemyProjectileRenderData> visibleEnemyProjectiles;
@@ -4573,10 +5124,8 @@ void Application::render()
                 && equipSequenceRemaining_ <= 0.0F
             ? aimBlend_ : 0.0F,
     };
-    currentFramePerformance_.visibleEnemies = static_cast<std::uint32_t>(
-        visibleEnemies.size());
-    currentFramePerformance_.visibleProps = static_cast<std::uint32_t>(
-        visibleProps.size());
+    currentFramePerformance_.visibleEnemies = onScreenEnemyCount;
+    currentFramePerformance_.visibleProps = onScreenPropCount;
     currentFramePerformance_.visibleRooms = static_cast<std::uint32_t>(
         connectedRooms.size() + (world_ ? 1U : 0U));
     currentFramePerformance_.activeLights = lighting.lightCount;
@@ -4590,6 +5139,7 @@ void Application::render()
                 {.visible = player_.state().alive && session_.state().phase == gameplay::SessionPhase::Playing,
                     .feetPosition = player_.state().position,
                     .yawDegrees = player_.state().yawDegrees,
+                    .pitchDegrees = player_.state().pitchDegrees,
                     .crouchAmount = player_.state().crouchAmount,
                     .gaitPhase = playerBodyMotion_.phaseRadians,
                     .gaitWeight = playerBodyMotion_.weight,
@@ -4613,12 +5163,15 @@ void Application::shutdown()
     audio_.reset();
     entities_.clear();
     roomEvents_.clear();
+    roomEventPhaseStartTicks_.clear();
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
+    roomArchitectureParts_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
+    bulletMarks_.clear();
     activeGrenadeBlasts_.clear();
     playerGrenades_.clear();
     grenadeSelected_ = false;

@@ -1,4 +1,5 @@
 #include "gameplay/Collision.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <array>
@@ -7,6 +8,8 @@
 
 namespace gdp::gameplay {
 namespace {
+
+constexpr float maximumWalkableStep = 0.24F;
 
 wkc::core::Aabb combinedBounds(
     const std::vector<wkc::core::Aabb>& volumes) noexcept
@@ -97,21 +100,37 @@ CollisionWorld::CollisionWorld(
 CollisionWorld::CollisionWorld(
     const WalkableVolumesTag,
     std::vector<wkc::core::Aabb> walkableVolumes,
-    std::vector<wkc::core::Aabb> solids)
+    std::vector<wkc::core::Aabb> solids,
+    std::vector<wkc::core::Vec2> walkableOutline,
+    std::vector<std::vector<wkc::core::Vec2>> volumeOutlines,
+    std::vector<wkc::core::Aabb> octagonalSolids)
     : roomBounds_(combinedBounds(walkableVolumes))
     , walkableVolumes_(std::move(walkableVolumes))
+    , walkableOutline_(std::move(walkableOutline))
+    , volumeOutlines_(std::move(volumeOutlines))
     , solids_(std::move(solids))
+    , octagonalSolids_(std::move(octagonalSolids))
 {
+    if (volumeOutlines_.empty()) {
+        volumeOutlines_.resize(walkableVolumes_.size());
+        if (!volumeOutlines_.empty()) volumeOutlines_[0] = walkableOutline_;
+    }
 }
 
 CollisionWorld CollisionWorld::fromWalkableVolumes(
     std::vector<wkc::core::Aabb> walkableVolumes,
-    std::vector<wkc::core::Aabb> solids)
+    std::vector<wkc::core::Aabb> solids,
+    std::vector<wkc::core::Vec2> walkableOutline,
+    std::vector<std::vector<wkc::core::Vec2>> volumeOutlines,
+    std::vector<wkc::core::Aabb> octagonalSolids)
 {
     return {
         WalkableVolumesTag{},
         std::move(walkableVolumes),
         std::move(solids),
+        std::move(walkableOutline),
+        std::move(volumeOutlines),
+        std::move(octagonalSolids),
     };
 }
 
@@ -202,13 +221,33 @@ CharacterMotionResult CollisionWorld::moveCharacter(
         static_cast<int>(std::ceil(std::min(requiredSteps, 256.0F))), 1, 256);
     const float originalX = result.position.x;
     const float originalZ = result.position.z;
+    const auto tryStepUp = [this, collider, &result]() noexcept {
+        if (!result.grounded || result.velocity.y > 0.0F) return false;
+        float stepTop = result.position.y + maximumWalkableStep + 1.0F;
+        for (const wkc::core::Aabb solid : solids_) {
+            if (solid.maximum.y <= result.position.y + 1.0e-4F
+                || solid.maximum.y > result.position.y + maximumWalkableStep
+                || !overlapsHorizontally(result.position, collider, solid)) {
+                continue;
+            }
+            const wkc::core::Vec3 raised{
+                result.position.x, solid.maximum.y, result.position.z};
+            if (solid.maximum.y < stepTop && canOccupy(raised, collider)) {
+                stepTop = solid.maximum.y;
+            }
+        }
+        if (stepTop > result.position.y + maximumWalkableStep) return false;
+        result.position.y = stepTop;
+        result.velocity.y = 0.0F;
+        return true;
+    };
     for (int index = 0; index < substeps; ++index) {
         const float fraction = static_cast<float>(index + 1)
             / static_cast<float>(substeps);
         if (result.velocity.x != 0.0F) {
             const float previousX = result.position.x;
             result.position.x = originalX + displacementX * fraction;
-            if (!canOccupy(result.position, collider)) {
+            if (!canOccupy(result.position, collider) && !tryStepUp()) {
                 result.position.x = previousX;
                 result.velocity.x = 0.0F;
                 result.collided = true;
@@ -217,7 +256,7 @@ CharacterMotionResult CollisionWorld::moveCharacter(
         if (result.velocity.z != 0.0F) {
             const float previousZ = result.position.z;
             result.position.z = originalZ + displacementZ * fraction;
-            if (!canOccupy(result.position, collider)) {
+            if (!canOccupy(result.position, collider) && !tryStepUp()) {
                 result.position.z = previousZ;
                 result.velocity.z = 0.0F;
                 result.collided = true;
@@ -238,9 +277,41 @@ const std::vector<wkc::core::Aabb>& CollisionWorld::walkableVolumes() const noex
     return walkableVolumes_;
 }
 
+const std::vector<wkc::core::Vec2>& CollisionWorld::walkableOutline() const noexcept
+{
+    return walkableOutline_;
+}
+
+const std::vector<std::vector<wkc::core::Vec2>>& CollisionWorld::volumeOutlines() const noexcept
+{
+    return volumeOutlines_;
+}
+
 const std::vector<wkc::core::Aabb>& CollisionWorld::solids() const noexcept
 {
     return solids_;
+}
+
+const std::vector<wkc::core::Aabb>& CollisionWorld::octagonalSolids() const noexcept
+{
+    return octagonalSolids_;
+}
+
+bool CollisionWorld::projectileSolidContains(
+    const wkc::core::Vec3 point) const noexcept
+{
+    for (const wkc::core::Aabb& solid : solids_) {
+        if (!solid.contains(point)) continue;
+        if (std::find(octagonalSolids_.begin(), octagonalSolids_.end(), solid)
+            == octagonalSolids_.end()) return true;
+        const wkc::core::Vec3 center
+            = (solid.minimum + solid.maximum) * 0.5F;
+        const float halfWidth = (solid.maximum.x - solid.minimum.x) * 0.5F;
+        const float x = std::abs(point.x - center.x);
+        const float z = std::abs(point.z - center.z);
+        if (x + z <= halfWidth * 1.41421356237F) return true;
+    }
+    return false;
 }
 
 bool CollisionWorld::canOccupy(
@@ -256,10 +327,14 @@ bool CollisionWorld::insideWalkable(
     const CharacterCollider collider) const noexcept
 {
     const float top = feetPosition.y + collider.height;
-    for (const wkc::core::Aabb volume : walkableVolumes_) {
+    for (std::size_t index = 0U; index < walkableVolumes_.size(); ++index) {
+        const auto volume = walkableVolumes_[index];
         if (fitsHorizontally(feetPosition, collider, volume)
             && feetPosition.y >= volume.minimum.y - 1.0e-4F
-            && top <= volume.maximum.y + 1.0e-4F) {
+            && top <= volume.maximum.y + 1.0e-4F
+            && (index >= volumeOutlines_.size() || volumeOutlines_[index].empty()
+                || gdp::world::footprintContainsDisk(
+                    volumeOutlines_[index], feetPosition, collider.radius))) {
             return true;
         }
     }

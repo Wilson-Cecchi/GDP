@@ -186,6 +186,18 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
         RoomNodeId parent = hubIndex + 1U;
         if (index != mainCount) {
             parent = branchParents[(index - mainCount - 1U) % branchParents.size()];
+            if (branchRoles[0] == RoomRole::Secret
+                && graph.nodes[index].role == RoomRole::Terminal) {
+                // The wide Hub and Arena can enclose a terminal-sized room
+                // between them. Use another main-path parent when available.
+                const auto nonArenaParent = std::find_if(branchParents.begin(), branchParents.end(),
+                    [&graph](const RoomNodeId candidate) {
+                        return graph.nodes[candidate - 1U].role != RoomRole::Arena;
+                    });
+                if (nonArenaParent != branchParents.end()) {
+                    parent = *nonArenaParent;
+                }
+            }
         }
         graph.edges.push_back({nextEdge++, parent, index + 1U, false});
         connections.insert(connectionKey(parent, index + 1U));
@@ -207,6 +219,12 @@ MapGraph generateMapGraph(const wkc::core::Seed seed, MapGraphConfig config)
              secondIndex < config.roomCount; ++secondIndex) {
             const RoomNodeId first = firstIndex + 1U;
             const RoomNodeId second = secondIndex + 1U;
+            const RoomNodeId branch = isMainNode(first) ? second : first;
+            // A loop from the Hub's side branch to its previous/next room
+            // would need to wrap around the new 20-metre octagon.
+            if (branch == mainCount + 1U && branchRoles[0] == RoomRole::Secret) {
+                continue;
+            }
             const RoomRole mainRole = isMainNode(first)
                 ? graph.nodes[firstIndex].role : graph.nodes[secondIndex].role;
             if (isMainNode(first) == isMainNode(second)

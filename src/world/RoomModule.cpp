@@ -1,4 +1,5 @@
 #include "world/RoomModule.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <array>
@@ -132,6 +133,167 @@ RoomModule makeRectangularModule(
         {-halfX + 1.90F, 0.0F, -halfZ + 2.00F}}}};
     module.propZones = {{{{1.15F, 0.0F, -halfZ + 0.80F},
         {halfX - 1.00F, 0.0F, halfZ - 0.80F}}}};
+    if (theme == RoomTheme::Storage) {
+        // Keep loose loot clear of the shelving along the left wall.
+        module.lootZones = {{{{-halfX + 1.05F, 0.0F, -halfZ + 0.80F},
+            {-halfX + 1.90F, 0.0F, -halfZ + 2.00F}}}};
+    }
+    return module;
+}
+
+RoomModule makeBossArenaModule(
+    const RoomModuleId id,
+    std::string name,
+    const RoomTheme theme)
+{
+    RoomModule module = makeRectangularModule(id, std::move(name), theme,
+        RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss));
+    // Keep procedural breakables on the inside of the two right-side columns.
+    // The central firing lane, fixed left cover, aides and all four doors stay clear.
+    module.propZones = {
+        {{{2.0F, 0.0F, -12.0F}, {4.8F, 0.0F, -7.0F}}},
+        {{{2.0F, 0.0F, 7.0F}, {4.8F, 0.0F, 12.0F}}},
+    };
+    return module;
+}
+
+RoomModule makeStorageHallModule()
+{
+    RoomModule module = makeRectangularModule(
+        204, "StorageHall_01", RoomTheme::Storage,
+        RoomSizeClass::Large, {18, 6, 20}, roomRoleBit(RoomRole::Normal));
+    // The hall's loose props occupy a separate pocket behind the enemy zone.
+    // Keep the side shelves and the two free-standing racks available as
+    // cover without letting generated props intersect their solid geometry.
+    module.propZones = {{{{5.15F, 0.0F, -8.50F},
+        {6.95F, 0.0F, -4.00F}}}};
+    return module;
+}
+
+RoomModule makeLaboratoryHallModule()
+{
+    RoomModule module = makeRectangularModule(
+        laboratoryHallModuleId, "LaboratoryHall_01", RoomTheme::Laboratory,
+        RoomSizeClass::Large, {18, 6, 20},
+        roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal));
+    module.localBounds = {{-9.0F, 0.0F, -10.0F}, {9.0F, 6.0F, 10.0F}};
+    module.connectors[0].position.z = 10.0F;
+    module.connectors[1].position.z = -10.0F;
+    module.connectors[2].position.x = 9.0F;
+    module.connectors[3].position.x = -9.0F;
+    // The authored side installations and island benches leave this broad
+    // center lane free for encounter spawns and terminal reinforcements.
+    module.enemyZones = {{{{-2.5F, 0.0F, -2.0F},
+        {2.5F, 0.0F, 2.0F}}}};
+    module.lootZones = {{{{-6.5F, 0.0F, 5.6F},
+        {-2.9F, 0.0F, 8.5F}}}};
+    module.propZones = {{{{3.0F, 0.0F, -8.5F},
+        {6.8F, 0.0F, -1.8F}}}};
+    return module;
+}
+
+RoomModule makeCentralHubModule()
+{
+    RoomModule module = makeRectangularModule(centralHubModuleId, "IndustrialHub_01",
+        RoomTheme::Industrial, RoomSizeClass::Large, {20, 6, 20},
+        roomRoleBit(RoomRole::Hub));
+    module.localBounds = {{-10.0F, 0.0F, -10.0F}, {10.0F, 6.0F, 10.0F}};
+    module.localOutline = centralHubPreviewFootprint();
+    module.connectors[0].position.z = 10.0F;
+    module.connectors[1].position.z = -10.0F;
+    module.connectors[2].position.x = 10.0F;
+    module.connectors[3].position.x = -10.0F;
+    module.enemyZones = {
+        {{{-6.0F, 0.0F, -6.0F}, {-5.0F, 0.0F, -5.0F}}},
+        {{{5.0F, 0.0F, 5.0F}, {6.0F, 0.0F, 6.0F}}},
+    };
+    module.propZones = {{{{3.0F, 0.0F, -1.5F}, {7.0F, 0.0F, 1.5F}}}};
+    module.lootZones = {{{{-6.0F, 0.0F, -1.0F}, {-5.0F, 0.0F, 1.0F}}}};
+    return module;
+}
+
+RoomModule makeMaintenanceLModule()
+{
+    RoomModule module = makeRectangularModule(maintenanceLModuleId, "MaintenanceL_01",
+        RoomTheme::Maintenance, RoomSizeClass::Large, {16, 6, 20},
+        roomRoleBit(RoomRole::Normal));
+    module.localBounds = {{-8.0F, 0.0F, -10.0F}, {8.0F, 5.5F, 10.0F}};
+    module.localOutline = technicalLPreviewFootprint();
+    module.connectors[0].position.z = 10.0F;
+    module.connectors[1].position.z = -10.0F;
+    module.connectors[2].position.x = 8.0F;
+    module.connectors[3].position.x = -8.0F;
+    module.enemyZones = {
+        {{{-0.8F, 0.0F, -6.5F}, {0.8F, 0.0F, -5.3F}}},
+        {{{-0.8F, 0.0F, 5.3F}, {0.8F, 0.0F, 6.5F}}},
+    };
+    module.propZones = {{{{1.6F, 0.0F, -1.4F}, {6.1F, 0.0F, 1.0F}}}};
+    module.lootZones = {{{{-4.0F, 0.0F, -0.8F}, {-3.0F, 0.0F, 0.8F}}}};
+    return module;
+}
+
+RoomModule makeCombatGalleryArenaModule()
+{
+    RoomModule module = makeRectangularModule(
+        combatGalleryArenaModuleId, "MaintenanceGalleryArena_01",
+        RoomTheme::Maintenance, RoomSizeClass::Large, {20, 6, 22},
+        roomRoleBit(RoomRole::Arena));
+    // Keep the preview's wall-mounted stair dimensions and the four real
+    // doorway positions. Reserved placement areas stay off the stairs.
+    module.localBounds = {{-10.0F, 0.0F, -11.0F}, {10.0F, 6.0F, 11.0F}};
+    module.connectors[0].position.z = 11.0F;
+    module.connectors[1].position.z = -11.0F;
+    module.connectors[2].position.x = 10.0F;
+    module.connectors[3].position.x = -10.0F;
+    module.enemyZones = {{{{-2.0F, 0.0F, -2.0F}, {2.0F, 0.0F, 2.0F}}}};
+    module.lootZones = {{{{-6.0F, 0.0F, -7.8F},
+        {-4.7F, 0.0F, -6.6F}}}};
+    module.propZones = {{{{4.8F, 0.0F, -8.2F},
+        {7.0F, 0.0F, -2.8F}}}};
+    return module;
+}
+
+RoomModule makeSecurityTModule()
+{
+    RoomModule module = makeRectangularModule(
+        securityTModuleId, "SecurityT_01", RoomTheme::Security,
+        RoomSizeClass::Large, {20, 6, 20},
+        roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal));
+    module.localBounds = {{-10.0F, 0.0F, -10.0F}, {10.0F, 6.0F, 10.0F}};
+    module.localOutline = securityTPreviewFootprint();
+    module.connectors[0].position.z = 10.0F;
+    module.connectors[1].position.z = -10.0F;
+    module.connectors[2].position.x = 10.0F;
+    module.connectors[3].position.x = -10.0F;
+    // The Terminal encounter stages two more enemies beside the three fixed
+    // defenders, so the event zone needs room for both without crowding them.
+    module.enemyZones = {{{{-1.4F, 0.0F, -1.5F},
+        {1.4F, 0.0F, 1.5F}}}};
+    module.propZones = {{{{1.8F, 0.0F, -0.6F},
+        {7.6F, 0.0F, 0.6F}}}};
+    module.lootZones = {{{{-4.0F, 0.0F, -0.8F},
+        {-3.0F, 0.0F, 0.8F}}}};
+    return module;
+}
+
+RoomModule makeCafeteriaLongModule()
+{
+    RoomModule module = makeRectangularModule(
+        cafeteriaLongModuleId, "CafeteriaLong_01", RoomTheme::Cafeteria,
+        RoomSizeClass::Large, {18, 6, 24}, roomRoleBit(RoomRole::Normal));
+    module.localBounds = {{-9.0F, 0.0F, -12.0F}, {9.0F, 6.0F, 12.0F}};
+    module.connectors[0].position.z = 12.0F;
+    module.connectors[1].position.z = -12.0F;
+    module.connectors[2].position.x = 9.0F;
+    module.connectors[3].position.x = -9.0F;
+    module.enemyZones = {
+        {{{-0.8F, 0.0F, -9.7F}, {0.8F, 0.0F, -8.8F}}},
+        {{{-0.8F, 0.0F, 8.8F}, {0.8F, 0.0F, 9.7F}}},
+    };
+    module.lootZones = {{{{-2.3F, 0.0F, -5.2F},
+        {-1.3F, 0.0F, -4.2F}}}};
+    module.propZones = {{{{-2.9F, 0.0F, 3.0F},
+        {-1.7F, 0.0F, 9.0F}}}};
     return module;
 }
 
@@ -226,12 +388,44 @@ ModuleValidationResult validateRoomModule(const RoomModule& module)
         } else if (!isConnectorOnPerimeter(connector, module.localBounds)) {
             result.errors.push_back(ModuleValidationError::ConnectorOffPerimeter);
         }
+        if (!module.localOutline.empty()) {
+            const auto direction = directionFromNormal(connector.normal);
+            bool onFace = false;
+            constexpr float clearance = 0.30F;
+            for (std::size_t i = 0U; i < module.localOutline.size(); ++i) {
+                const auto a = module.localOutline[i];
+                const auto b = module.localOutline[(i + 1U) % module.localOutline.size()];
+                const float halfWidth = connector.width * 0.5F + clearance;
+                if (direction && (*direction == Direction::North
+                        || *direction == Direction::South)) {
+                    onFace |= wkc::core::nearlyEqual(a.y, connector.position.z)
+                        && wkc::core::nearlyEqual(b.y, connector.position.z)
+                        && connector.position.x - halfWidth >= std::min(a.x, b.x)
+                        && connector.position.x + halfWidth <= std::max(a.x, b.x);
+                } else if (direction) {
+                    onFace |= wkc::core::nearlyEqual(a.x, connector.position.x)
+                        && wkc::core::nearlyEqual(b.x, connector.position.x)
+                        && connector.position.z - halfWidth >= std::min(a.y, b.y)
+                        && connector.position.z + halfWidth <= std::max(a.y, b.y);
+                }
+            }
+            if (!onFace) result.errors.push_back(ModuleValidationError::ConnectorOffPerimeter);
+        }
     }
 
     const auto validateZones = [&result, &module](const std::vector<SpawnZone>& zones) {
         for (const SpawnZone& zone : zones) {
             if (!isZoneInside(zone, module.localBounds)) {
                 result.errors.push_back(ModuleValidationError::ZoneOutsideBounds);
+            }
+            if (!module.localOutline.empty()) {
+                for (const float x : {zone.bounds.minimum.x, zone.bounds.maximum.x}) {
+                    for (const float z : {zone.bounds.minimum.z, zone.bounds.maximum.z}) {
+                        if (!footprintContainsDisk(module.localOutline, {x, 0.0F, z})) {
+                            result.errors.push_back(ModuleValidationError::ZoneOutsideBounds);
+                        }
+                    }
+                }
             }
             for (const ConnectorDefinition& connector : module.connectors) {
                 if (validateConnector(connector) == ConnectorValidationError::None
@@ -245,6 +439,20 @@ ModuleValidationResult validateRoomModule(const RoomModule& module)
     validateZones(module.enemyZones);
     validateZones(module.lootZones);
     validateZones(module.propZones);
+    if (!module.localOutline.empty()) {
+        if (module.localOutline.size() < 3U) {
+            result.errors.push_back(ModuleValidationError::InvalidFootprint);
+        }
+        for (const auto point : module.localOutline) {
+            if (point.x < module.localBounds.minimum.x - 1.0e-4F
+                || point.x > module.localBounds.maximum.x + 1.0e-4F
+                || point.y < module.localBounds.minimum.z - 1.0e-4F
+                || point.y > module.localBounds.maximum.z + 1.0e-4F) {
+                result.errors.push_back(ModuleValidationError::InvalidFootprint);
+                break;
+            }
+        }
+    }
     return result;
 }
 
@@ -272,6 +480,13 @@ std::optional<RoomInstance> instantiateRoom(
         * 90.0F;
     room.rotation = rotation;
     room.worldBounds = transformBounds(module.localBounds, worldOrigin, rotation);
+    room.walkableOutline.reserve(module.localOutline.size());
+    for (const auto point : module.localOutline) {
+        const auto rotated = wkc::core::rotateQuarterTurns(
+            wkc::core::Vec3{point.x, 0.0F, point.y}, rotation);
+        room.walkableOutline.push_back({
+            worldOrigin.x + rotated.x, worldOrigin.z + rotated.z});
+    }
     room.connectors.reserve(module.connectors.size());
     for (const ConnectorDefinition& definition : module.connectors) {
         room.connectors.push_back(instantiateConnector(definition, worldOrigin, rotation));
@@ -331,8 +546,7 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {8, 4, 10}, common),
         makeRectangularModule(103, "IndustrialStart_01", RoomTheme::Industrial,
             RoomSizeClass::Medium, {9, 4, 10}, roomRoleBit(RoomRole::Start)),
-        makeRectangularModule(104, "IndustrialHub_01", RoomTheme::Industrial,
-            RoomSizeClass::Large, {12, 5, 12}, roomRoleBit(RoomRole::Hub)),
+        makeCentralHubModule(),
         makeRectangularModule(105, "IndustrialHall_01", RoomTheme::Industrial,
             RoomSizeClass::Large, {16, 6, 20}, roomRoleBit(RoomRole::Normal)),
 
@@ -342,8 +556,7 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {10, 4, 9}, common),
         makeRectangularModule(203, "StorageSecret_01", RoomTheme::Storage,
             RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
-        makeRectangularModule(204, "StorageHall_01", RoomTheme::Storage,
-            RoomSizeClass::Large, {18, 6, 20}, roomRoleBit(RoomRole::Normal)),
+        makeStorageHallModule(),
 
         makeRectangularModule(301, "OfficeCompact_01", RoomTheme::Office,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -358,11 +571,8 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {9, 5, 10}, common),
         makeRectangularModule(403, "LaboratorySecret_01", RoomTheme::Laboratory,
             RoomSizeClass::Compact, {7, 4, 9}, roomRoleBit(RoomRole::Secret)),
-        makeRectangularModule(404, "LaboratoryBoss_01", RoomTheme::Laboratory,
-            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
-        makeRectangularModule(405, "LaboratoryHall_01", RoomTheme::Laboratory,
-            RoomSizeClass::Large, {16, 6, 22},
-            roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal)),
+        makeBossArenaModule(404, "LaboratoryBoss_01", RoomTheme::Laboratory),
+        makeLaboratoryHallModule(),
 
         makeRectangularModule(501, "MaintenanceCompact_01", RoomTheme::Maintenance,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -370,10 +580,11 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {8, 5, 11}, common),
         makeRectangularModule(503, "MaintenanceArena_01", RoomTheme::Maintenance,
             RoomSizeClass::Large, {12, 5, 11}, roomRoleBit(RoomRole::Arena)),
-        makeRectangularModule(504, "MaintenanceBoss_01", RoomTheme::Maintenance,
-            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
+        makeCombatGalleryArenaModule(),
+        makeBossArenaModule(504, "MaintenanceBoss_01", RoomTheme::Maintenance),
         makeRectangularModule(505, "MaintenanceHall_01", RoomTheme::Maintenance,
             RoomSizeClass::Large, {16, 6, 20}, roomRoleBit(RoomRole::Normal)),
+        makeMaintenanceLModule(),
 
         makeRectangularModule(601, "SecurityCompact_01", RoomTheme::Security,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -381,11 +592,11 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {9, 4, 10}, common),
         makeRectangularModule(603, "SecurityArena_01", RoomTheme::Security,
             RoomSizeClass::Large, {13, 5, 12}, roomRoleBit(RoomRole::Arena)),
-        makeRectangularModule(604, "SecurityBoss_01", RoomTheme::Security,
-            RoomSizeClass::Large, {28, 7, 32}, roomRoleBit(RoomRole::Boss)),
+        makeBossArenaModule(604, "SecurityBoss_01", RoomTheme::Security),
         makeRectangularModule(605, "SecurityHall_01", RoomTheme::Security,
             RoomSizeClass::Large, {18, 6, 18},
             roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal)),
+        makeSecurityTModule(),
 
         makeRectangularModule(701, "CafeteriaCompact_01", RoomTheme::Cafeteria,
             RoomSizeClass::Compact, {7, 4, 9}, common),
@@ -393,6 +604,7 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
             RoomSizeClass::Medium, {10, 4, 9}, common),
         makeRectangularModule(703, "CafeteriaHall_01", RoomTheme::Cafeteria,
             RoomSizeClass::Large, {18, 6, 18}, roomRoleBit(RoomRole::Normal)),
+        makeCafeteriaLongModule(),
     };
 }
 

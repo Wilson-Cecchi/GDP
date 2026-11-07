@@ -37,5 +37,10 @@ struct CorridorPath {
 [[nodiscard]] bool validateCorridorPath(
     const CorridorPath& corridor,
     std::span<const RoomInstance> rooms) noexcept;
+// Shared world-space solids for corridor rendering and navigation collision.
+[[nodiscard]] std::vector<wkc::core::Aabb> makeCorridorWallColumns(
+    std::span<const wkc::core::Vec3> points,
+    float width,
+    float height);
 
 } // namespace gdp::world

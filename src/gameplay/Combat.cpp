@@ -1,6 +1,7 @@
 #include "gameplay/Combat.hpp"
 
 #include "gameplay/Props.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <array>
@@ -9,6 +10,7 @@
 #include <limits>
 #include <numbers>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace gdp::gameplay {
@@ -18,6 +20,61 @@ struct RayInterval {
     float nearDistance{0.0F};
     float farDistance{0.0F};
 };
+
+struct OctagonHit {
+    float distance{0.0F};
+    wkc::core::Vec3 normal{};
+};
+
+// The Central Hub shaft mesh has four straight and four bevelled faces.
+// Its AABB is retained for character movement, while shots use these planes.
+std::optional<OctagonHit> rayOctagon(
+    const wkc::core::Vec3 origin,
+    const wkc::core::Vec3 direction,
+    const wkc::core::Aabb bounds,
+    const float maximumDistance) noexcept
+{
+    const wkc::core::Vec3 center
+        = (bounds.minimum + bounds.maximum) * 0.5F;
+    const float halfWidth = (bounds.maximum.x - bounds.minimum.x) * 0.5F;
+    constexpr float diagonal = 0.70710678118F;
+    constexpr float bevel = 0.41421356237F; // tan(pi / 8)
+    const float diagonalLimit = halfWidth * (1.0F + bevel) * diagonal;
+    const std::array<std::pair<wkc::core::Vec3, float>, 10> planes{{
+        {{1.0F, 0.0F, 0.0F}, halfWidth},
+        {{-1.0F, 0.0F, 0.0F}, halfWidth},
+        {{0.0F, 0.0F, 1.0F}, halfWidth},
+        {{0.0F, 0.0F, -1.0F}, halfWidth},
+        {{diagonal, 0.0F, diagonal}, diagonalLimit},
+        {{diagonal, 0.0F, -diagonal}, diagonalLimit},
+        {{-diagonal, 0.0F, diagonal}, diagonalLimit},
+        {{-diagonal, 0.0F, -diagonal}, diagonalLimit},
+        {{0.0F, 1.0F, 0.0F}, bounds.maximum.y - center.y},
+        {{0.0F, -1.0F, 0.0F}, center.y - bounds.minimum.y},
+    }};
+    float nearDistance = 0.0F;
+    float farDistance = maximumDistance;
+    wkc::core::Vec3 nearNormal = direction * -1.0F;
+    for (const auto& [normal, limit] : planes) {
+        const float offset = wkc::core::dot(normal, origin - center);
+        const float velocity = wkc::core::dot(normal, direction);
+        if (std::abs(velocity) <= 1.0e-7F) {
+            if (offset > limit) return std::nullopt;
+            continue;
+        }
+        const float distance = (limit - offset) / velocity;
+        if (velocity < 0.0F) {
+            if (distance > nearDistance) {
+                nearDistance = distance;
+                nearNormal = normal;
+            }
+        } else {
+            farDistance = std::min(farDistance, distance);
+        }
+        if (nearDistance > farDistance) return std::nullopt;
+    }
+    return OctagonHit{nearDistance, nearNormal};
+}
 
 std::optional<RayInterval> rayAabbInterval(
     const wkc::core::Vec3 origin,
@@ -195,8 +252,16 @@ float firstWorldDistance(
 {
     float nearest = maximumDistance + 1.0F;
     for (const wkc::core::Aabb solid : collisionWorld.solids()) {
+        if (std::find(collisionWorld.octagonalSolids().begin(),
+                collisionWorld.octagonalSolids().end(), solid)
+            != collisionWorld.octagonalSolids().end()) continue;
         if (const auto interval = rayAabbInterval(origin, direction, solid, maximumDistance)) {
             nearest = std::min(nearest, interval->nearDistance);
+        }
+    }
+    for (const wkc::core::Aabb shaft : collisionWorld.octagonalSolids()) {
+        if (const auto hit = rayOctagon(origin, direction, shaft, maximumDistance)) {
+            nearest = std::min(nearest, hit->distance);
         }
     }
 
@@ -225,7 +290,143 @@ float firstWorldDistance(
     if (startsInsideWalkable) {
         nearest = std::min(nearest, continuousFar);
     }
+    const auto& volumes = collisionWorld.walkableVolumes();
+    const auto& outlines = collisionWorld.volumeOutlines();
+    for (std::size_t roomIndex = 0U;
+         roomIndex < volumes.size() && roomIndex < outlines.size();
+         ++roomIndex) {
+        const auto& outline = outlines[roomIndex];
+        for (std::size_t index = 0U; index < outline.size(); ++index) {
+            const auto a = outline[index];
+            const auto b = outline[(index + 1U) % outline.size()];
+            const float edgeX = b.x - a.x;
+            const float edgeZ = b.y - a.y;
+            const float divisor = direction.x * edgeZ - direction.z * edgeX;
+            if (std::abs(divisor) <= 1.0e-7F) continue;
+            const float offsetX = a.x - origin.x;
+            const float offsetZ = a.y - origin.z;
+            const float distance = (offsetX * edgeZ - offsetZ * edgeX) / divisor;
+            const float alongEdge = (offsetX * direction.z
+                - offsetZ * direction.x) / divisor;
+            const float impactY = origin.y + direction.y * distance;
+            if (distance >= 0.0F && distance <= maximumDistance
+                && alongEdge >= 0.0F && alongEdge <= 1.0F
+                && impactY >= volumes[roomIndex].minimum.y
+                && impactY <= volumes[roomIndex].maximum.y) {
+                // A corridor overlaps the doorway of an outlined room. That
+                // outline edge is open only where another walkable volume
+                // actually continues beyond it; the remaining edge is wall.
+                const wkc::core::Vec3 beyond
+                    = origin + direction * (distance + 0.01F);
+                bool continuesThroughDoorway = false;
+                for (std::size_t other = 0U; other < volumes.size(); ++other) {
+                    if (other == roomIndex || !volumes[other].contains(beyond)) {
+                        continue;
+                    }
+                    if (other >= outlines.size() || outlines[other].empty()
+                        || gdp::world::footprintContainsDisk(
+                            outlines[other], beyond)) {
+                        continuesThroughDoorway = true;
+                        break;
+                    }
+                }
+                if (continuesThroughDoorway) continue;
+                nearest = std::min(nearest, distance);
+            }
+        }
+    }
     return nearest;
+}
+
+wkc::core::Vec3 worldImpactNormal(
+    const wkc::core::Vec3 point,
+    const wkc::core::Vec3 direction,
+    const CollisionWorld& collisionWorld) noexcept
+{
+    wkc::core::Vec3 best = direction * -1.0F;
+    float bestError = 0.025F;
+    const float coordinates[]{point.x, point.y, point.z};
+    constexpr wkc::core::Vec3 axes[]{
+        {1.0F, 0.0F, 0.0F},
+        {0.0F, 1.0F, 0.0F},
+        {0.0F, 0.0F, 1.0F},
+    };
+    const auto considerBox = [&](const wkc::core::Aabb bounds, const bool inward) {
+        const float minima[]{bounds.minimum.x, bounds.minimum.y, bounds.minimum.z};
+        const float maxima[]{bounds.maximum.x, bounds.maximum.y, bounds.maximum.z};
+        for (int axis = 0; axis < 3; ++axis) {
+            const int otherA = (axis + 1) % 3;
+            const int otherB = (axis + 2) % 3;
+            if (coordinates[otherA] < minima[otherA] - bestError
+                || coordinates[otherA] > maxima[otherA] + bestError
+                || coordinates[otherB] < minima[otherB] - bestError
+                || coordinates[otherB] > maxima[otherB] + bestError) {
+                continue;
+            }
+            for (int side = 0; side < 2; ++side) {
+                const float face = side == 0 ? minima[axis] : maxima[axis];
+                const float error = std::abs(coordinates[axis] - face);
+                const float sign = (side == 0 ? -1.0F : 1.0F)
+                    * (inward ? -1.0F : 1.0F);
+                const wkc::core::Vec3 normal = axes[axis] * sign;
+                if (error < bestError && wkc::core::dot(normal, direction) < -0.01F) {
+                    best = normal;
+                    bestError = error;
+                }
+            }
+        }
+    };
+    for (const auto solid : collisionWorld.solids()) {
+        if (std::find(collisionWorld.octagonalSolids().begin(),
+                collisionWorld.octagonalSolids().end(), solid)
+            != collisionWorld.octagonalSolids().end()) continue;
+        considerBox(solid, false);
+    }
+    for (const auto shaft : collisionWorld.octagonalSolids()) {
+        constexpr float probeDistance = 0.04F;
+        const auto hit = rayOctagon(point - direction * probeDistance,
+            direction, shaft, probeDistance + bestError);
+        if (hit && std::abs(hit->distance - probeDistance) < bestError) {
+            best = hit->normal;
+            bestError = std::abs(hit->distance - probeDistance);
+        }
+    }
+    for (const auto volume : collisionWorld.walkableVolumes()) {
+        considerBox(volume, true);
+    }
+    const auto& outline = collisionWorld.walkableOutline();
+    for (std::size_t index = 0U; index < outline.size(); ++index) {
+        const auto a = outline[index];
+        const auto b = outline[(index + 1U) % outline.size()];
+        const float edgeX = b.x - a.x;
+        const float edgeZ = b.y - a.y;
+        const float lengthSquared = edgeX * edgeX + edgeZ * edgeZ;
+        if (lengthSquared <= 1.0e-8F
+            || point.y < collisionWorld.roomBounds().minimum.y
+            || point.y > collisionWorld.roomBounds().maximum.y) {
+            continue;
+        }
+        const float along = std::clamp(
+            ((point.x - a.x) * edgeX + (point.z - a.y) * edgeZ)
+                / lengthSquared,
+            0.0F, 1.0F);
+        const float offsetX = point.x - (a.x + along * edgeX);
+        const float offsetZ = point.z - (a.y + along * edgeZ);
+        const float error = std::sqrt(offsetX * offsetX + offsetZ * offsetZ);
+        if (error >= bestError) {
+            continue;
+        }
+        wkc::core::Vec3 normal = wkc::core::normalized(
+            wkc::core::Vec3{edgeZ, 0.0F, -edgeX});
+        if (wkc::core::dot(normal, direction) > 0.0F) {
+            normal = normal * -1.0F;
+        }
+        if (wkc::core::dot(normal, direction) < -0.01F) {
+            best = normal;
+            bestError = error;
+        }
+    }
+    return best;
 }
 
 ImpactMaterial enemyImpactMaterial(
@@ -241,6 +442,7 @@ ImpactMaterial propImpactMaterial(
     using gdp::entities::PropType;
     switch (prop.type) {
     case PropType::Crate:
+    case PropType::StorageBox:
     case PropType::Barricade:
     case PropType::Decoration:
         return ImpactMaterial::Composite;
@@ -603,7 +805,8 @@ static ShotContact traceHitscan(
             {},
             ImpactResult{
                 origin + (direction * worldDistance),
-                direction * -1.0F,
+                worldImpactNormal(origin + (direction * worldDistance),
+                    direction, collisionWorld),
                 ImpactMaterial::Metal,
             },
         };

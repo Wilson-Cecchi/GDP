@@ -18,6 +18,13 @@ gerador procedural ou HUD antes de uma aprovação visual explícita do usuário
 Alterações de gameplay, correções de cobertura e diagnósticos podem continuar,
 desde que não sejam apresentados como aprovação artística da textura.
 
+Toda proposta nova de superfície ou objeto deve declarar o tamanho físico do
+tile e como o UV preserva a mesma densidade em peças curtas e compridas. Não
+aplicar um único PNG esticado para preencher uma face maior. Se o desenho não
+for repetível (números, placas, juntas ou dano localizado), separar esses
+elementos em geometria, faixa de acabamento ou decal. O contrato e a
+verificação estão em [Escala física das texturas](TEXTURE_SCALE.md).
+
 Texturas de teto devem representar somente a superfície arquitetônica neutra:
 painéis, juntas, vigas, dutos e desgaste podem existir, mas nenhuma lâmpada,
 lente luminosa, faixa emissiva ou brilho de luminária pode ser desenhado ou
@@ -76,6 +83,7 @@ unidade visual:
 versão da proposta:
 arquivo/prancha:
 seeds mostradas:
+tile físico / mapeamento UV:
 decisão do usuário:
 data:
 commit de implementação:
@@ -84,6 +92,249 @@ resultado final:
 ```
 
 ## Propostas ativas
+
+### Central Hub/Column — proposta v1
+
+```text
+unidade visual: Central Hub/Column
+versão: v1
+data: 2026-11-05
+proposta: visual/proposals/central_hub_column_v1/README.md
+conceito: visual/proposals/central_hub_column_v1/concept.png
+decisão do usuário: "gostei da proposta, pode implementar"
+estado: IMPLEMENTADA EM VALIDAÇÃO
+asset do jogo: assets/visual/rooms/central_hub/column_plate_v1.png
+capturas técnicas: visual/validation/central_hub_column_v1/README.md; visual/validation/central_hub_blackout_fix_v1/README.md
+aceite visual em partida: pendente
+```
+
+### Central Hub/Floor e Central Hub/Ceiling — proposta v1
+
+```text
+unidades visuais: Central Hub/Floor; Central Hub/Ceiling
+versão: v1
+data: 2026-11-05
+proposta: visual/proposals/central_hub_floor_ceiling_v1/README.md
+conceito: visual/proposals/central_hub_floor_ceiling_v1/concept.png
+decisão do usuário: imagem conceitual apontada como meta de detalhes, reflexos e iluminação em 2026-11-06
+estado: FLOOR/TEXTURA PRINCIPAL ACEITA NO JOGO EM 06/11/2026; DETALHES E CEILING IMPLEMENTADOS EM VALIDAÇÃO
+asset do jogo: assets/visual/rooms/central_hub/floor_plate_v1.png; floor_detail_metal_v1.png; ceiling_plate_v1.png
+capturas técnicas: visual/validation/central_hub_material_light_stage1/README.md
+detalhes 3D localizados para playtest: visual/validation/central_hub_details_v1/README.md
+nova passagem técnica: visual/validation/central_hub_floor_details_ceiling_v2/README.md
+aceite dos novos detalhes e teto em partida: pendente
+```
+
+### Central Hub/Wall — proposta v1
+
+```text
+unidade visual: Central Hub/Wall
+versão: v1
+data: 2026-11-04
+proposta: visual/proposals/central_hub_wall_v1/README.md
+prancha: visual/proposals/central_hub_wall_v1/contact_sheet.png
+referências: 06_environments/centralHub.png e captura nativa do Hub
+tile físico proposto: 2 × 2 m; UV por metros reais ao longo de cada face
+estado: APROVADA PARA IMPLEMENTAÇÃO; implementada em validação
+asset do jogo: assets/visual/rooms/central_hub/wall_plate_v1.png
+aceite final em partida: pendente
+```
+
+As três condições compartilham o mesmo painel de aço pintado; conduítes,
+rodapé, filete ciano e placas de direção são geometria localizada. A prancha
+é direção de arte; o tile aplicado foi preparado a partir dela. Capturas
+técnicas: visual/validation/central_hub_wall_v1/README.md e
+visual/validation/central_hub_wall_details_v1/README.md. Os painéis de
+manutenção e grelhas 3D aguardam aceite visual em partida.
+
+### Security/Wall, Security/Floor, Security/Ceiling — v1
+
+```text
+unidades visuais: Security/Wall; Security/Floor; Security/Ceiling
+versão: v1
+data: 2026-11-02
+proposta: visual/proposals/security_material_v1/README.md
+prancha: visual/proposals/security_material_v1/contact_sheet.png
+conceito em perspectiva: visual/proposals/security_material_v1/scene_concept.png
+condições: Secured, Monitored, Alert
+tile físico proposto: 2 × 2 m por superfície; UV contínuo por metros reais
+decisão do usuário: "aplica as novas texturas" em 03/11/2026
+estado: IMPLEMENTADA EM VALIDAÇÃO
+assets do jogo: assets/visual/rooms/security/{wall,floor,ceiling}_{secured,monitored,alert}.png
+capturas técnicas: visual/validation/security_material_v1/
+aceite final em partida: pendente
+```
+
+O teto proposto contém apenas albedo arquitetônico neutro; luminárias 3D
+permanecem separadas. Tampa de piso e ventilação serão detalhes localizados,
+fora dos tiles repetíveis. Antes da integração, validar emendas e densidade
+em faces longas. A imagem em perspectiva é conceito, não captura nativa.
+A implementação repete as texturas a cada 2 m nas faces da sala em T e
+preserva as luminárias como geometria separada.
+
+### Security/Floor e detalhes de parede — revisão v2
+
+```text
+unidades visuais: Security/Floor; Security/WallTrim
+versão: v2
+data: 2026-11-03
+pedido do usuário: reduzir repetição do piso e decorar paredes com rodapé
+estado: IMPLEMENTADA EM VALIDAÇÃO
+asset do jogo: assets/visual/rooms/security/floor_neutral_v2.png
+fonte e processo: visual/proposals/security_floor_v2/README.md
+capturas técnicas: visual/validation/security_floor_details_v2/
+aceite final em partida: pendente
+```
+
+As paredes e tetos da v1 continuam como superfície base. Rodapé, fixações e
+painéis são geometria localizada e deixam as aberturas livres. Plantas ainda
+não integram esta revisão.
+
+### Security/Decoration — revisão v3
+
+```text
+unidades visuais: Security/WallTrim; Security/FloorVent; Security/Planter; Security/CeilingDuct
+versão: v3
+data: 2026-11-03
+pedido do usuário: unir rodapé nas quinas, destacar grelhas, incluir plantas e dutos 3D
+estado: IMPLEMENTADA EM VALIDAÇÃO
+capturas técnicas: visual/validation/security_details_v3/
+aceite final em partida: pendente
+```
+
+Os dois vasos e os dois trechos de duto estão na prévia isolada da Segurança
+em T. A geometria de duto pode ser reutilizada em outras salas após revisão
+de cada teto e luminária.
+
+### Security/Furniture — mobiliário v1
+
+```text
+unidade visual: Security/Furniture (consoles, armários e coberturas da prévia em T)
+versão: v1
+data: 2026-11-03
+proposta: visual/proposals/security_furniture_v1/concept.png
+tile físico: 0,75 × 0,75 m, mapeamento por posição no mundo com espelhamento nas emendas
+decisão do usuário: "proposta visual aceita, pode iniciar a implementação baseada no modelo que vc criou"
+estado: APROVADA NA PRÉVIA ISOLADA em 03/11/2026
+asset do jogo: assets/visual/rooms/security/furniture_graphite_v1.png
+capturas técnicas: visual/validation/security_furniture_v1/
+aceite final em partida: sala Segurança em T aprovada em 03/11/2026
+```
+
+O conceito guia forma e acabamento; as ferragens, telas, ventilações e
+faixas de segurança são volumes localizados. Os estados Secured, Monitored
+e Alert compartilham o albedo base e ajustam a tonalidade do casco. Os
+indicadores começam âmbar e seguem o alerta real: vermelho piscante, amarelo
+por três segundos após o encontro e verde em seguida. A sequência foi
+registrada em `visual/validation/security_indicator_sequence/`.
+O defeito de faces sobrepostas na cobertura, relatado em 03/11/2026, foi
+corrigido no renderer e registrado em
+`visual/validation/security_furniture_cover_fix/`. A sala Segurança em T,
+incluindo o mobiliário e a sequência de indicadores, foi aprovada em partida
+em 03/11/2026.
+
+### Cafeteria/Furniture — materiais dos móveis v1
+
+```text
+unidade visual: Cafeteria/Furniture (mesa, bancos, suportes e balcão)
+versão: v1
+data: 2026-10-31
+pranchas: visual/proposals/cafeteria_furniture_v1/{clean,inuse,faded}_board.png
+variantes: Clean, InUse, Faded
+decisão do usuário: "aprovados com essa textura metalica" em 31/10/2026
+estado: IMPLEMENTADA E APROVADA NA CAFETERIA ALONGADA
+assets do jogo: assets/visual/rooms/cafeteria/furniture_{steel,seat,support,cabinet}_{clean,inuse,faded}.png
+capturas técnicas: visual/validation/cafeteria_furniture_v1/;
+                  visual/validation/cafeteria_furniture_v1_uv_fix/;
+                  visual/validation/cafeteria_furniture_metal_v1/
+```
+
+As pranchas mostram detalhe e distância aproximada de gameplay. O
+[contrato de aplicação](proposals/cafeteria_furniture_v1/README.md) separa
+materiais de geometria e exige escala física do detalhe, especialmente no
+balcão. O renderer agora usa os 12 albedos e junta/puxador em escala física;
+o playtest humano da variante alongada foi aprovado em 02/11/2026. A revisão
+posterior removeu faixas longas dos albedos e corrigiu a repetição no shader. O aço
+agora reflete luminárias e lanterna; os acabamentos pintados recebem brilho
+mais difuso. As capturas dessa resposta à luz são técnicas; o aceite final
+foi dado em partida para a Cafeteria alongada.
+
+Em 02/11/2026, após testar a Cafeteria alongada, o usuário pediu fixadores 3D
+nos bancos e colunas mais coerentes com a paleta da sala. A prévia recebeu
+fixadores geométricos sobre os apoios, travessas sob mesas/bancos e um tom de
+coluna mais quente, sem
+alterar os PNGs aprovados de parede, piso, teto ou móveis. As
+[capturas técnicas](validation/cafeteria_furniture_v2/README.md) registram a
+revisão. O playtest posterior revelou faces irregulares no topo do balcão.
+As peças sobrepostas foram ajustadas, com [capturas técnicas de topo e vista
+rasante](validation/cafeteria_counter_top_fix/README.md); a nova correção
+foi aprovada em partida em 02/11/2026. O usuário sugeriu usar parafusos 3D
+com mais frequência em futuras mesas, estantes, armários e colunas, sem
+reabrir esta sala.
+
+### Lighting/CeilingFixture — família v2 por sala
+
+```text
+unidade visual: Lighting/CeilingFixture
+versão: família v2
+data: 2026-10-31
+prancha: visual/proposals/ceiling_fixture_family_v2/family_board.png
+variantes: sete temas de sala, Boss/Arena e Hub; carcaça Maintained/Used/Worn
+decisão do usuário: aprovada em 31/10/2026
+estado: IMPLEMENTADA EM VALIDAÇÃO
+assets do jogo: assets/visual/models/ceiling_fixture_family_v2/*.isemesh
+capturas técnicas: visual/validation/ceiling_fixture_family_v2/
+```
+
+A [proposta editável no Blender](proposals/ceiling_fixture_family_v2/README.md)
+mantém uma base de luminária comum e apresenta adaptações de geometria por
+ambiente. As pranchas distinguem condição da carcaça dos estados ON/OFF/ALERT.
+As nove variantes foram aprovadas para integração. A validação técnica no jogo
+e o playtest da aparência são registrados separadamente.
+O apagão dinâmico foi implementado em 31/10/2026: ao quebrar as luminárias,
+a luz ambiente rebatida da sala diminui; luzes de salas vizinhas deixam de
+atravessar paredes distantes. As [capturas técnicas](validation/room_blackout_v1/README.md)
+mostram o resultado com luzes intactas, destruídas e lanterna ligada na
+Cafeteria e no Storage. A aparência do apagão em partida aguarda validação.
+A revisão de 01/11/2026 também mantém a intensidade ambiente própria de cada
+sala visível ao fundo, inclusive quando observada pela porta de outra sala.
+O renderer carrega as nove malhas; há capturas nativas de Storage,
+Maintenance, Laboratory, Security e Hub na Quadro K2100M, POTATO/ULTRA,
+FOV 60/100. O playtest humano das demais variantes integradas está pendente.
+Em 31/10/2026, o usuário relatou ter gostado da prévia Security aberta na
+build de teste com sniper. O comentário confirma essa prévia; não estende a
+aprovação em partida às outras oito variantes da família.
+
+### Industrial Corridor / conjunto próprio de materiais — v2
+
+```text
+unidade visual: Industrial Corridor / parede, piso e teto exclusivos do corredor
+versão: v2
+data: 2026-10-31
+prancha: visual/proposals/industrial_corridor_dedicated_material_v2/board.png
+variantes: Maintained, Used, Worn
+decisão do usuário: aguardando
+estado: AGUARDANDO APROVAÇÃO
+```
+
+A v1 recebeu pedido de revisão por se parecer demais com o material atual.
+Contrato e limites da v2 em
+[`proposals/industrial_corridor_dedicated_material_v2/README.md`](proposals/industrial_corridor_dedicated_material_v2/README.md).
+
+### Industrial Corridor / conjunto próprio de materiais — v1
+
+```text
+unidade visual: Industrial Corridor / parede, piso e teto exclusivos do corredor
+versão: v1
+data: 2026-10-31
+prancha: visual/proposals/industrial_corridor_dedicated_material_v1/board.png
+variantes: Maintained, Used, Worn
+decisão do usuário: "faz uma textura realmente nova"
+estado: REVISÃO SOLICITADA
+```
+
+Contrato e limites em
+[`proposals/industrial_corridor_dedicated_material_v1/README.md`](proposals/industrial_corridor_dedicated_material_v1/README.md).
 
 ### Sniper — luneta v2 e visão de mira v1
 
@@ -166,7 +417,7 @@ data: 2026-10-18
 prancha: visual/proposals/player_body_proposal_v4.png
 contrato: visual/proposals/player_body_proposal_v4.md
 decisão do usuário sobre a prancha v4: usar como referência para modelagem no Blender em 2026-10-20
-implementação: blockout Blender criado; prévia opt-in GDP_PLAYER_RIG_PREVIEW=1 na build local; corpo v1 permanece padrão
+implementação: blockout Blender criado; prévia opt-in GDP_PLAYER_RIG_PREVIEW=1 na build local; export ISPLYR03 com torso, pernas e braços separados; corpo v1 permanece padrão
 estado: REFERÊNCIA DE MODELAGEM APROVADA; VALIDAÇÃO VISUAL EM JOGO PENDENTE
 ```
 
@@ -727,16 +978,207 @@ colisões do preview, separadamente dos testes de distribuição ainda necessár
 
 Todas as superfícies abaixo começam como `NÃO REVISADA`.
 
+### Storage/Wall — v1 Dusty e variações de desgaste
+
+```text
+unidade visual: Storage/Wall na sala grande StorageHall_01 e sua prévia
+versão da proposta: v1 Dusty com cinco variações derivadas
+referência: 06_environments/storage.png
+amostra aprovada: visual/proposals/storage_material_v1/wall_dusty.png
+asset do jogo: assets/visual/rooms/storage/wall_dusty_v1.png
+decisão do usuário: "gostei das texturas, podemos usar elas nas paredes";
+                   "assim temos 6 variações para as paredes do Storage, por mim esta tudo bem,
+                    contanto que por parede apenas uma das chapas seja numerada"
+data: 2026-10-28
+escopo: paredes da Storage grande; Floor e Ceiling não incluídos
+capturas no jogo: visual/validation/storage_wall_v1/preview_1920x1080_ultra.png (mapeamento anterior);
+                 visual/validation/storage_wall_v1/preview_uv_corrected_1920x1080_ultra.png (mapeamento quadrado)
+variações: Orderly, Dusty, Neglected; cada uma com e sem marcação
+regra: no máximo uma chapa numerada por parede; faixa de segurança na base
+capturas atuais: visual/validation/storage_wall_v1/preview_six_variants_orientation_1849x1011.png;
+                 visual/validation/storage_wall_v1/preview_side1_1920x1080.png
+resultado final: ACEITA NO PLAYTEST da sala Storage em 2026-10-28
+```
+
+A amostra foi gerada com `imagegen` a partir da prancha Storage. A autorização
+direta do usuário se refere à amostra de parede mostrada nesta conversa; não
+aprova mudanças futuras de paleta ou a aplicação das amostras ao piso e teto.
+
+### Storage/Floor e Storage/Ceiling — propostas v1
+
+```text
+unidades visuais: Storage/Floor e Storage/Ceiling
+proposta: visual/proposals/storage_material_v1/review_floor_ceiling.html
+amostras: floor_{orderly,dusty,neglected}.png;
+          ceiling_{orderly,dusty,neglected}.png
+pedido do usuário: "sobre tetos e pisos, vamos criar variações para eles também"
+data: 2026-10-28
+decisão do usuário: "aprovados" (piso e teto)
+estado: IMPLEMENTADAS NO HALL; playtest aprovado em 2026-10-28
+assets do jogo: assets/visual/rooms/storage/floor_*_v1.png;
+               assets/visual/rooms/storage/ceiling_*_v1.png
+```
+
+As seis amostras são ortogonais, com luz neutra; nenhuma luminária está pintada
+nos tetos. O usuário aprovou o playtest da sala em 2026-10-28.
+
+### Storage/Boxes — proposta v1
+
+```text
+unidade visual: caixas quebráveis sobre as estantes da Storage
+amostras: visual/proposals/storage_box_v1/box_olive_v1.png;
+          visual/proposals/storage_box_v1/box_charcoal_v1.png
+decisão do usuário: "textura das caixas aprovadas" em 2026-10-28
+decisão final do usuário: "as caixas foram aprovadas" em 2026-11-02,
+                          após solicitar conferência da aplicação no jogo
+estado: ACEITA NO JOGO para a Storage Hall
+assets do jogo: assets/visual/rooms/storage/box_olive_v1.png;
+               assets/visual/rooms/storage/box_charcoal_v1.png
+```
+
+As caixas usam colisão e dano dinâmicos. O cubo padrão mapeia a amostra uma
+vez por face. A aprovação final cobre a aplicação na Storage Hall.
+
+### Storage/Rack — proposta v1
+
+```text
+unidade visual: armação fixa das estantes da Storage
+proposta: visual/proposals/storage_rack_v1/review.html
+amostras: rack_{orderly,dusty,neglected}.png
+pedido do usuário: estantes ainda sem textura, observado em 29/10/2026
+decisão do usuário: "pode implementar" em 29/10/2026
+estado: REVISÃO SOLICITADA em 29/10/2026; v1 permanece no jogo
+escopo: postes e prateleiras; caixas quebráveis não incluídas
+assets do jogo: assets/visual/rooms/storage/rack_{orderly,dusty,neglected}_v1.png
+```
+
+A estrutura usava `RoomMaterialChannel::Generic` e o checker de fallback. A
+montagem na proposta é conceitual e não substitui captura nativa após a
+implementação. O desgaste da estante acompanha a condição da sala.
+
+### Storage/Rack — proposta v2
+
+```text
+unidade visual: armação fixa das estantes da Storage
+proposta: visual/proposals/storage_rack_v2/review.html
+amostras: rack_{orderly,dusty,neglected}.png
+pedido: material parece liso e apenas pintado; prateleiras atravessam montantes
+estado: SUBSTITUÍDA PELA PROPOSTA V3 antes da integração
+escopo: abrasão legível e UV 1,0; sem alterar caixas
+```
+
+A interseção geométrica das prateleiras foi corrigida independentemente da
+aprovação do material. As amostras v2 são proposta local e ainda não são
+carregadas pelo jogo.
+
+### Storage/Rack — proposta v3
+
+```text
+unidade visual: estrutura fixa das estantes da Storage
+proposta: visual/proposals/storage_rack_v3/review.html
+prancha: visual/proposals/storage_rack_v3/rack_family_v3.png
+vista de jogo conceitual: visual/proposals/storage_rack_v3/gameplay_distance_concept.png
+variantes: conservada, usada, negligenciada
+pedido: textura com identidade mais marcante e sem esticar na aplicação
+resposta: usuário gostou da direção visual, exigiu UV sem esticar e disse
+          "pode implementar a v3" em 29/10/2026; depois pediu um pouco mais
+          de desgaste nas colunas laranja e sugeriu testar tom mais verde;
+          após testar a build de playtest, disse "aprovado, podemos prosseguir
+          para a proxima sala" em 29/10/2026
+estado: ACEITA NO JOGO para a estante v3 com tom mais verde
+escopo: colunas, tampos, bordas e junções; caixas excluídas
+assets do jogo: assets/visual/rooms/storage/rack_v3_{upright,shelf}_{orderly,dusty,neglected}.png
+```
+
+O mapeamento antigo `vUv * 3.0` não mantinha a densidade da textura em faces
+de dimensões diferentes. A v3 projeta o desgaste em metros reais e espelha o
+albedo nas emendas; furos visuais e nervuras usam passo físico de 18 cm no
+shader. As quinas das colunas recebem lascas adicionais em escala física. Os
+furos são recessos sombreados, sem vazamento físico da malha de colisão.
+As capturas técnicas da revisão estão em
+`visual/validation/storage_rack_v3/`. O usuário testou a build de playtest e
+aprovou a estante com o tom mais verde antes de seguir à próxima sala.
+
+### Cafeteria/Wall, Floor, Ceiling e iluminação — proposta v1
+
+```text
+unidades visuais: Cafeteria/Wall; Cafeteria/Floor; Cafeteria/Ceiling;
+                 direção de iluminação Cafeteria
+proposta: visual/proposals/cafeteria_material_v1/review.html
+amostras: wall_{clean,inuse,faded}.png;
+          floor_{clean,inuse,faded}.png;
+          ceiling_{clean,inuse,faded}.png
+vista de sala: gameplay_concept_soft_warm.png (conceito, não captura nativa)
+pedido: texturas da Cafeteria após aprovação do layout;
+        iluminação um pouco mais confortável
+estado: APROVADAS pelo usuário em 28/10/2026; integradas e aceitas na captura
+        nativa NVIDIA/ULTRA após o ajuste final de brilho
+assets do jogo: assets/visual/rooms/cafeteria/{wall,floor,ceiling}_{clean,inuse,faded}.png
+capturas nativas: visual/validation/cafeteria_material_v1/before_nvidia_ultra_seed20261029.png;
+                 visual/validation/cafeteria_material_v1/adjusted_nvidia_ultra_seed20261029.png;
+                 visual/validation/cafeteria_material_v1/darker_nvidia_ultra_seed20261029.png (aprovada)
+```
+
+As amostras são albedos sob luz neutra, e o teto não contém luminárias
+pintadas. O usuário aprovou as três superfícies e a iluminação em 28/10/2026;
+a captura nativa em ULTRA confirmou a correção da saturação e o usuário aprovou
+a versão final mais escura. MEDIUM e POTATO permanecem sem captura própria.
+
+### Cafeteria/ServiceCounter — detalhe v2 em prévia
+
+```text
+pedido: balcões menos simples, com mais decoração e detalhes
+implementação: portas, puxadores, rodapé, faixa, bandeja e nicho de serviço
+capturas: visual/validation/cafeteria_counter_v3/README.md
+estado: IMPLEMENTADA NA PRÉVIA; aguardando aceite visual em partida
+```
+
+As peças ficam dentro da linha de serviço existente e deixam a porta lateral
+livre. A geometria nova é sólida e compartilhada com a colisão. A densidade
+das texturas dos móveis continua baseada em metros, sem alongar o albedo.
+
+### Laboratory/Wall, Floor e Ceiling — proposta v1
+
+```text
+proposta: visual/proposals/laboratory_material_v1/review.html
+amostras: wall_operational_v2.png; floor_operational.png;
+          ceiling_operational.png
+estado: IMPLEMENTADA NA PRÉVIA ISOLADA; aceite em partida pendente
+decisão: aprovada para implementação pelo usuário em 01/11/2026
+assets: assets/visual/rooms/laboratory/{wall,floor,ceiling}_operational_v1.png
+capturas técnicas: visual/validation/laboratory_material_v1/
+```
+
+Amostras criadas a partir da prancha `06_environments/laboratorio.png`, com
+repetição planejada de 2 × 2 m por imagem. A versão inicial da parede mantinha
+uma faixa azul na borda e foi substituída por uma revisão com faixa central;
+essa revisão usa espelhamento de tiles a cada 2 m para evitar emendas abruptas.
+Os móveis da prévia usam `furniture_enamel_v1.png` em escala de 0,75 m, com
+portas, molduras e fixadores 3D. A campanha mantém o perfil procedural.
+
+### Laboratory/Wall — revisão v2
+
+```text
+proposta e prompt: visual/proposals/laboratory_material_v2/README.md
+asset da prévia: assets/visual/rooms/laboratory/wall_operational_v2.png
+estado: IMPLEMENTADA NA PRÉVIA ISOLADA; aceite em partida pendente
+```
+
+O feedback de 03/11/2026 apontou excesso de informação visual na parede. A
+faixa azul foi removida do bitmap e representada por colunas físicas com
+colisão, acabamento e indicador luminoso. O piso, teto e mobiliário v1
+permanecem na prévia.
+
 | Ambiente | Wall | Floor | Ceiling |
 |---|---|---|---|
 | Industrial Corridor | V2 HD aceita no jogo | Não revisada | V1 HD aceita no jogo |
-| Storage | Não revisada | Não revisada | Não revisada |
+| Storage | V1 com seis variações aprovada no playtest | Três variantes aprovadas no playtest | Três variantes aprovadas no playtest |
 | Combat Room | Não revisada | Não revisada | Não revisada |
-| Cafeteria | Não revisada | Não revisada | Não revisada |
-| Laboratory | Não revisada | Não revisada | Não revisada |
+| Cafeteria | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA |
+| Laboratory | V2 em validação na prévia | V1 em validação na prévia | V1 em validação na prévia |
 | Technical Area | Não revisada | Não revisada | Não revisada |
 | Security | Não revisada | Não revisada | Não revisada |
-| Central Hub | Não revisada | Não revisada | Não revisada |
+| Central Hub | Wall v1 implementada, em validação visual | Chapa v1 em prévia, aceite em partida pendente | Proposta v1 aguardando implementação |
 
 ## Outros pacotes visuais
 
@@ -759,7 +1201,8 @@ Todas as superfícies abaixo começam como `NÃO REVISADA`.
 | HUD/map visual language | V2 A Precision implementada em validação; mapa não revisado |
 | Weapon/ground pickup | V2 modelos Used caídos implementada em validação; V1 substituída |
 | Grenade/first-person and thrown | Aparência e efeito da 0.1.6 parcialmente aprovados em 14/10/2026; revisão geral de texturas planejada para fase posterior, sem aprovação automática de nova versão |
-| Lighting/CeilingFixture | V1 HD aceita no jogo |
+| Lighting/CeilingFixture | V1 HD aceita no jogo; família v2 implementada em validação |
+| Architecture/StructuralColumn | V1 repetível de 0,8 m, três estados de desgaste, implementada em validação; aprovação visual em partida pendente |
 
 ## Relação com os testes
 

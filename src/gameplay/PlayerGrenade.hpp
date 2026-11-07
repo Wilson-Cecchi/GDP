@@ -14,7 +14,7 @@ namespace gdp::gameplay {
 inline constexpr float grenadeMaximumChargeSeconds = 1.2F;
 inline constexpr float grenadePinPullSeconds = 0.32F;
 inline constexpr float grenadeFuseSeconds = 4.87F;
-inline constexpr float grenadeBlastRadius = 3.8F;
+inline constexpr float grenadeBlastRadius = 7.0F;
 
 [[nodiscard]] float grenadeThrowSpeed(float chargeSeconds) noexcept;
 

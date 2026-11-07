@@ -16,6 +16,7 @@
 #include "render/Mesh.hpp"
 #include "render/RasterState.hpp"
 #include "render/Shader.hpp"
+#include "render/ShadowCubeMap.hpp"
 #include "render/Texture.hpp"
 
 #include <span>
@@ -32,6 +33,7 @@ namespace gdp::game::visual {
 struct RendererFrameStats {
     std::uint64_t drawCalls{0U};
     std::uint64_t triangles{0U};
+    std::uint32_t geometryShadowMaps{0U};
     std::size_t meshCacheEntries{0U};
     std::size_t textureCacheEntries{0U};
     std::uint64_t uniformUploads{0U};
@@ -109,10 +111,12 @@ public:
 
     [[nodiscard]] bool initialize(int width, int height);
     [[nodiscard]] bool prepareIndustrialRoomMaterials(wkc::core::Seed roomSeed);
-    [[nodiscard]] bool prepareStorageRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareStorageRoomMaterials(
+        wkc::core::Seed roomSeed, bool approvedHallMaterials = false);
     [[nodiscard]] bool prepareCombatRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareCafeteriaRoomMaterials(wkc::core::Seed roomSeed);
-    [[nodiscard]] bool prepareLaboratoryRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareLaboratoryRoomMaterials(
+        wkc::core::Seed roomSeed, bool approvedPreviewMaterials = false);
     [[nodiscard]] bool prepareTechnicalRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareSecurityRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareCentralHubRoomMaterials(wkc::core::Seed roomSeed);
@@ -139,6 +143,10 @@ public:
     void setShadowShaderSpecializationEnabled(const bool enabled) noexcept
     {
         shadowShaderSpecializationEnabled_ = enabled;
+    }
+    void setGeometryShadowsEnabled(const bool enabled) noexcept
+    {
+        geometryShadowsEnabled_ = enabled;
     }
     [[nodiscard]] bool prepareWorkerVisual(wkc::core::Seed visualSeed);
     [[nodiscard]] bool prepareGuardVisual(wkc::core::Seed visualSeed);
@@ -264,6 +272,11 @@ private:
         wkc::render::Texture emission;
     };
 
+    struct CeilingFixtureGpuPart {
+        wkc::render::Mesh mesh;
+        std::uint32_t materialId{0U};
+    };
+
     struct WeaponGpuMaterial {
         wkc::render::Texture albedo;
         wkc::render::Texture normal;
@@ -279,6 +292,17 @@ private:
         wkc::core::Vec2 ceilingUvOffset{};
         float wallTone{1.0F};
         float ceilingTone{1.0F};
+        bool storageHallV1{false};
+        std::uint64_t storageHallSeed{0};
+        std::optional<StorageCondition> storageRackCondition{};
+        bool cafeteriaV1{false};
+        std::uint8_t cafeteriaCondition{0};
+        bool laboratoryPreviewV1{false};
+        std::optional<CentralHubCondition> centralHubWallCondition{};
+        bool securityV1{false};
+        float securityFloorSeed{0.0F};
+        float securityFloorTone{1.0F};
+        std::uint8_t columnCondition{0};
     };
 
     wkc::render::GlApi gl_{};
@@ -289,11 +313,30 @@ private:
     wkc::render::Shader shadow3Shader_{};
     wkc::render::Shader shadow6Shader_{};
     wkc::render::Shader lowSpecShader_{};
+    wkc::render::Shader shadowDepthShader_{};
+    std::array<wkc::render::ShadowCubeMap, maxRenderedRoomLights> shadowCubes_{};
+    bool geometryShadowsEnabled_{false};
+    std::uint32_t shadowCubeCount_{0U};
+    std::array<wkc::core::Vec3, maxRenderedRoomLights> shadowCubeLightPositions_{};
     wkc::render::Shader uiShader_{};
     wkc::render::Mesh uiQuad_{};
     wkc::render::Texture uiFont_{};
     wkc::render::Mesh box_{};
+    wkc::render::Mesh centralHubColumnShaft_{};
+    wkc::render::Mesh planterLeafMesh_{};
+    wkc::render::Mesh glassTestDome_{};
+    // Static world-space shell meshes for shaped preview rooms.
+    std::unordered_map<std::uint64_t, wkc::render::Mesh> footprintMeshes_{};
     wkc::render::Mesh grenadeBody_{};
+    wkc::render::Mesh grenadeArmor_{};
+    wkc::render::Mesh grenadeLights_{};
+    wkc::render::Mesh grenadeRing_{};
+    struct GrenadeGpuPart {
+        std::uint32_t partId{0U};
+        std::uint32_t materialId{0U};
+        wkc::render::Mesh mesh{};
+    };
+    std::vector<GrenadeGpuPart> grenadeModelParts_{};
     wkc::render::Mesh smokePuff_{};
     std::array<std::array<wkc::render::Mesh, weaponMaterialCount>,
         weaponRoleCount> weaponMeshes_{};
@@ -304,14 +347,15 @@ private:
     std::array<WeaponGpuMaterial, playerBodyMaterialCount> playerBodyMaterials_{};
     bool playerRigPreview_{false};
     std::optional<PlayerRigAsset> playerRigAsset_{};
-    std::array<wkc::render::Mesh, playerRigMaterialCount> playerRigMeshes_{};
-    std::array<wkc::render::Texture, playerRigMaterialCount> playerRigAlbedo_{};
+    std::array<wkc::render::Mesh, playerExosuitMeshCount> playerRigMeshes_{};
+    std::array<wkc::render::Texture, playerExosuitMaterialCount> playerRigAlbedo_{};
     std::array<wkc::render::Mesh, playerHandsMaterialCount> playerHandsMeshes_{};
     std::array<wkc::render::Mesh, playerHandsMaterialCount> playerSingleHandMeshes_{};
     std::array<WeaponGpuMaterial, playerHandsMaterialCount> playerHandsMaterials_{};
     wkc::render::MeshBindingCache meshBindings_{};
     wkc::render::BackfaceCullingStateCache backfaceCulling_{};
     wkc::render::Texture fallbackTexture_{};
+    wkc::render::Texture solidColorTexture_{};
     wkc::render::Texture workerPaintTexture_{};
     wkc::render::Texture workerFrontPanelTexture_{};
     wkc::render::Texture referenceWhiteTexture_{};
@@ -321,6 +365,9 @@ private:
     std::array<bool, 5U> referenceModelReady_{};
     wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
+    std::array<std::vector<CeilingFixtureGpuPart>,
+        static_cast<std::size_t>(CeilingFixtureVariant::Count)>
+        ceilingFixtureModels_{};
     wkc::resources::AssetCache<wkc::render::MeshData> meshCache_{};
     wkc::resources::AssetCache<wkc::render::ImageData> textureCache_{};
     std::unordered_map<wkc::core::Seed, EnemyGpuVisual> workerVisuals_{};
@@ -334,6 +381,21 @@ private:
     std::array<std::optional<IndustrialWallGpuMaterial>,
         static_cast<std::size_t>(IndustrialCondition::Count)>
         industrialCeilingMaterials_{};
+    std::array<wkc::render::Texture, 6> storageWallTextures_{};
+    std::array<wkc::render::Texture, 3> storageFloorTextures_{};
+    std::array<wkc::render::Texture, 3> storageCeilingTextures_{};
+    std::array<wkc::render::Texture, 3> storageRackUprightTextures_{};
+    std::array<wkc::render::Texture, 3> storageRackShelfTextures_{};
+    std::array<wkc::render::Texture, 3> cafeteriaWallTextures_{};
+    std::array<wkc::render::Texture, 3> cafeteriaFloorTextures_{};
+    std::array<wkc::render::Texture, 3> cafeteriaCeilingTextures_{};
+    std::array<std::array<wkc::render::Texture, 3>, 4> cafeteriaFurnitureTextures_{};
+    wkc::render::Texture laboratoryFurnitureTexture_{};
+    wkc::render::Texture securityFurnitureTexture_{};
+    std::array<wkc::render::Texture, 3> structuralColumnTextures_{};
+    wkc::render::Texture centralHubColumnTexture_{};
+    wkc::render::Texture centralHubFloorDetailTexture_{};
+    std::array<wkc::render::Texture, 2> storageBoxTextures_{};
     std::unordered_map<std::uint64_t, RoomGpuMaterials> roomMaterials_{};
     std::uint64_t activeRoomMaterialKey_{0};
     std::uint64_t fallbackRoomMaterialKey_{0};

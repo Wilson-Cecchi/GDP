@@ -3,6 +3,7 @@
 #include "core/Math.hpp"
 #include "core/Seed.hpp"
 #include "gameplay/Language.hpp"
+#include "world/RoomArchitecture.hpp"
 
 #include <array>
 #include <cstddef>
@@ -54,6 +55,7 @@ enum class PropVisualRole : std::uint8_t {
     Crate,
     Canister,
     Barricade,
+    StorageBox,
 };
 
 enum class PropVisualState : std::uint8_t {
@@ -203,12 +205,18 @@ enum class ImpactVisualMaterial : std::uint8_t {
     Flesh,
 };
 
+enum class ImpactVisualKind : std::uint8_t {
+    Burst,
+    BulletMark,
+};
+
 struct ImpactRenderData {
     wkc::core::Vec3 position{};
     wkc::core::Vec3 normal{0.0F, 0.0F, 1.0F};
     ImpactVisualMaterial material{ImpactVisualMaterial::Metal};
     float strength{1.0F};
     wkc::core::Seed visualSeed{0U};
+    ImpactVisualKind kind{ImpactVisualKind::Burst};
 };
 
 struct EnemyProjectileRenderData {
@@ -234,6 +242,7 @@ struct PlayerBodyRenderData {
     bool visible{false};
     wkc::core::Vec3 feetPosition{};
     float yawDegrees{-90.0F};
+    float pitchDegrees{0.0F};
     float crouchAmount{0.0F};
     float gaitPhase{0.0F};
     float gaitWeight{0.0F};
@@ -319,6 +328,22 @@ struct WeaponReloadPose {
 [[nodiscard]] wkc::core::Mat4 sampleWeaponPresentationTransform(
     const WeaponViewmodelRenderData& weapon) noexcept;
 
+enum class SecurityIndicatorPhase : std::uint8_t {
+    Nominal,
+    Alarm,
+    Recovery,
+};
+
+struct SecurityIndicatorVisual {
+    wkc::core::Vec3 color{};
+    float emissiveStrength{0.0F};
+
+    constexpr bool operator==(const SecurityIndicatorVisual&) const noexcept = default;
+};
+
+[[nodiscard]] SecurityIndicatorVisual sampleSecurityIndicator(
+    SecurityIndicatorPhase phase, float elapsedSeconds) noexcept;
+
 struct RoomRenderData {
     wkc::core::Vec3 origin{};
     wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
@@ -327,6 +352,11 @@ struct RoomRenderData {
         {-3.85F, 0.0F, -4.85F},
         {3.85F, 4.0F, 4.85F},
     };
+    std::span<const wkc::core::Vec2> walkableOutline{};
+    std::span<const world::RoomArchitecturePart> architectureParts{};
+    bool customArchitecture{false};
+    SecurityIndicatorPhase securityIndicatorPhase{SecurityIndicatorPhase::Nominal};
+    float securityIndicatorSeconds{0.0F};
 };
 
 struct DoorRenderData {
@@ -337,6 +367,10 @@ struct DoorRenderData {
     bool locked{false};
     float openFraction{1.0F};
 };
+
+[[nodiscard]] ImpactRenderData bulletMarkOnDoor(
+    ImpactRenderData mark, const DoorRenderData& door,
+    float lateralOffset) noexcept;
 
 struct CorridorRenderData {
     std::span<const wkc::core::Vec3> points{};
@@ -466,6 +500,7 @@ enum class HudGraphicsQuality : std::uint8_t {
     Medium,
     High,
     Ultra,
+    Custom,
 };
 
 struct UiRect {
@@ -757,6 +792,7 @@ struct HudRenderData {
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
     HudGraphicsQuality graphicsQuality{HudGraphicsQuality::Medium};
+    std::uint8_t geometryShadowLightBudget{1U};
     std::uint16_t worldRenderScalePercent{100U};
     bool detailedMaterials{true};
     std::uint16_t windowWidth{1280U};
@@ -810,9 +846,30 @@ inline constexpr std::size_t maxActiveShadowOccluders = 8U;
 
 struct ShadowOccluderRenderData {
     wkc::core::Aabb bounds{};
+    bool structuralPriority{false};
+    bool octagonalPrism{false};
 
     constexpr bool operator==(const ShadowOccluderRenderData&) const noexcept
         = default;
+};
+
+enum class CeilingFixtureVariant : std::uint8_t {
+    Industrial,
+    Storage,
+    Maintenance,
+    Laboratory,
+    Cafeteria,
+    Security,
+    Office,
+    BossArena,
+    CentralHub,
+    Count,
+};
+
+enum class CeilingFixtureCondition : std::uint8_t {
+    Maintained,
+    Used,
+    Worn,
 };
 
 struct PointLightRenderData {
@@ -822,6 +879,19 @@ struct PointLightRenderData {
     float range{6.0F};
     PropVisualState fixtureState{PropVisualState::Intact};
     float fixtureEmissionScale{1.0F};
+    CeilingFixtureVariant fixtureVariant{CeilingFixtureVariant::Industrial};
+    CeilingFixtureCondition fixtureCondition{CeilingFixtureCondition::Used};
+    wkc::core::Aabb sourceRoomBounds{};
+    bool boundedToRoom{false};
+    float ambientWeight{1.0F};
+};
+
+inline constexpr std::size_t maxRenderedAmbientRegions = 16U;
+
+struct AmbientRegionRenderData {
+    wkc::core::Aabb bounds{};
+    wkc::core::Vec3 color{0.70F, 0.78F, 0.88F};
+    float intensity{0.0F};
 };
 
 struct RoomLightingRenderData {
@@ -831,6 +901,11 @@ struct RoomLightingRenderData {
         PointLightRenderData{{0.0F, 3.4F, 1.0F}, {0.78F, 0.88F, 1.0F}, 1.0F, 6.0F},
     };
     std::uint32_t lightCount{1U};
+    // Visible fixture meshes are independent of the limited shader light budget.
+    std::vector<PointLightRenderData> visibleFixtures{};
+    bool visibleFixturesPopulated{false};
+    std::array<AmbientRegionRenderData, maxRenderedAmbientRegions> ambientRegions{};
+    std::uint32_t ambientRegionCount{0U};
     std::array<ShadowOccluderRenderData, maxShadowOccluders> shadowOccluders{};
     std::uint32_t shadowOccluderCount{0U};
     std::uint32_t shadowLightCount{0U};
@@ -840,6 +915,11 @@ struct RoomLightingRenderData {
     wkc::core::Vec3 flashlightPosition{};
     wkc::core::Vec3 flashlightDirection{0.0F, 0.0F, -1.0F};
 };
+
+// The room-wide fill represents light bounced from its own ceiling fixtures.
+// Call before appending neighbouring rooms' lights to the render list.
+[[nodiscard]] float fixtureDrivenAmbientIntensity(
+    const RoomLightingRenderData& lighting, float plannedIntensity) noexcept;
 
 struct ShadowBudgetResult {
     std::uint32_t activeLights{0U};

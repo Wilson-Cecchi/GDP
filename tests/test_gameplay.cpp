@@ -306,6 +306,19 @@ void testCollisionAndGravity()
     expect(wkc::core::nearlyEqual(falling.state().position.y, 0.0F),
         "gravity settles the player on the floor");
     expect(falling.state().grounded, "floor collision marks the player grounded");
+
+    const CollisionWorld steps{{{-4.0F, 0.0F, -4.0F}, {4.0F, 4.0F, 4.0F}},
+        {{{-1.0F, 0.0F, 0.8F}, {1.0F, 0.2F, 1.3F}},
+            {{-1.0F, 0.0F, 0.3F}, {1.0F, 0.4F, 0.8F}},
+            {{-1.0F, 0.0F, -1.0F}, {1.0F, 1.2F, -0.5F}}}};
+    Player stairWalker;
+    stairWalker.spawn({0.0F, 0.0F, 1.8F});
+    updateMany(stairWalker, {.moveForward = 1.0F}, steps, 20);
+    expect(stairWalker.state().position.y >= 0.39F,
+        "grounded player climbs two walkable risers");
+    updateMany(stairWalker, {.moveForward = 1.0F}, steps, 20);
+    expect(stairWalker.state().position.z > -0.5F,
+        "step-up does not climb a tall obstacle");
 }
 
 void testCrouchAndJumpMovement()

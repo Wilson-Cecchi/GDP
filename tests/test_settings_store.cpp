@@ -114,7 +114,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 12\n"
+        "version = 13\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -155,7 +155,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 12\n"
+        "version = 13\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -239,7 +239,7 @@ void testRecoveryAndForwardCompatibility()
             && v11Custom.settings.gamepadControls == v11Preset,
         "custom v11 remaps survive without hijacking R3 or R1");
 
-    writeText(path, "version = 12\ngamepad_binding_7 = X / SQUARE\n"
+    writeText(path, "version = 13\ngamepad_binding_7 = X / SQUARE\n"
         "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
     const auto brokenGamepad = loadRuntimeSettings(path);
     expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery
@@ -326,6 +326,40 @@ void testRecoveryAndForwardCompatibility()
         "schema version 5 preserves the former renderer as Ultra");
 }
 
+void testCustomGraphicsPersistence()
+{
+    using namespace gdp::persistence;
+    using namespace gdp::gameplay;
+    TemporaryDirectory directory;
+    const auto path = directory.path() / "graphics.toml";
+    RuntimeSettings settings;
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::Shadows, -1)
+            && adjustRuntimeSetting(settings, SettingsMenuOption::RenderScale, 1)
+            && adjustRuntimeSetting(settings, SettingsMenuOption::MaximumLights, -1),
+        "individual graphics values can be prepared for persistence");
+    expect(saveRuntimeSettings(path, settings), "custom graphics settings save");
+    const auto loaded = loadRuntimeSettings(path);
+    expect(loaded.status == SettingsLoadStatus::Loaded
+            && loaded.settings == settings
+            && loaded.settings.graphicsQuality == GraphicsQuality::Custom,
+        "custom values and preset selection survive a disk round trip");
+
+    writeText(path, "version = 12\ngraphics_quality = HIGH\n");
+    const auto migrated = loadRuntimeSettings(path);
+    expect(migrated.status == SettingsLoadStatus::Migrated
+            && migrated.settings.graphicsQuality == GraphicsQuality::High
+            && migrated.settings.customGraphics == graphicsQualitySettings(GraphicsQuality::High),
+        "v12 preset migrates with matching custom baseline");
+
+    writeText(path, "version = 13\ngraphics_quality = CUSTOM\n"
+        "custom_render_scale = 100\ncustom_max_lights = 8\ncustom_shadows = false\n");
+    const auto recovered = loadRuntimeSettings(path);
+    expect(recovered.status == SettingsLoadStatus::LoadedWithRecovery
+            && recovered.settings.graphicsQuality == GraphicsQuality::Custom
+            && !recovered.settings.customGraphics.shadowsEnabled,
+        "incomplete Custom profile recovers valid fields and reports recovery");
+}
+
 void testInvalidAndUnsupportedFiles()
 {
     using namespace gdp::persistence;
@@ -372,6 +406,7 @@ int main()
 {
     testMissingAndRoundTrip();
     testRecoveryAndForwardCompatibility();
+    testCustomGraphicsPersistence();
     testInvalidAndUnsupportedFiles();
     if (failures != 0) {
         std::cerr << failures << " settings persistence test(s) failed\n";

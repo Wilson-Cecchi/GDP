@@ -2,6 +2,7 @@
 
 #include "gameplay/Combat.hpp"
 #include "gameplay/Props.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -24,10 +25,10 @@ bool projectileCanOccupy(const wkc::core::Vec3 point,
         world.walkableVolumes().end(), [point](const auto volume) {
             return containsPoint(volume, point);
         });
-    return walkable && std::none_of(world.solids().begin(),
-        world.solids().end(), [point](const auto solid) {
-            return containsPoint(solid, point);
-        });
+    return walkable
+        && (world.walkableOutline().empty()
+            || gdp::world::footprintContainsDisk(world.walkableOutline(), point))
+        && !world.projectileSolidContains(point);
 }
 
 bool projectileHitsPlayer(

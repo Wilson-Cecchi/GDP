@@ -3244,9 +3244,6 @@ std::optional<wkc::render::ImageData> generateCentralHubSurfaceAlbedo(
             }
 
             if (recipe.surface == RoomSurface::Wall) {
-                if (x >= 30U && x <= 33U) {
-                    color = multiply(recipe.secondaryColor, 0.66F);
-                }
                 const std::uint32_t signMinX = (recipe.seed & 1U) == 0U ? 8U : 42U;
                 const bool sign = x >= signMinX && x < signMinX + 14U
                     && y >= 20U && y < 25U;

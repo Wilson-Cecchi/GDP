@@ -213,6 +213,32 @@ void testPropDamageCollisionAndDrops()
         "destroyed prop is removed from the rebuilt collision world");
 }
 
+void testStorageShelfBoxBreaksAtShelfHeight()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    EntityManager manager;
+    const EntityId box = manager.createProp({
+        .transform = {.position = {1.0F, 1.53F, 2.0F},
+            .scale = {0.40F, 0.44F, 0.72F}},
+        .roomId = 7U,
+        .type = PropType::StorageBox,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const auto* entity = manager.find(box);
+    const auto* prop = manager.findData<PropData>(box);
+    expect(entity && prop && prop->health == 35.0F
+            && propCollisionBounds(*entity, *prop).minimum.y == 1.53F
+            && collisionWorldWithProps(base, manager, 7U).solids().size() == 1U,
+        "Storage shelf box has damageable geometry at its elevated shelf position");
+    const auto result = damageProp(manager, box, 40.0F);
+    expect(result.outcome == PropDamageOutcome::Destroyed
+            && !result.spawnedDrop.isValid()
+            && collisionWorldWithProps(base, manager, 7U).solids().empty(),
+        "destroying a Storage shelf box removes its collision without a drop");
+}
+
 void testHitscanPropPriority()
 {
     using namespace gdp::entities;
@@ -361,6 +387,7 @@ int main()
     testDeterministicPropLayout();
     testPropSeedBatch();
     testPropDamageCollisionAndDrops();
+    testStorageShelfBoxBreaksAtShelfHeight();
     testHitscanPropPriority();
     testTallCoverSupportsHiddenMovement();
     testDestructibleCeilingFixture();

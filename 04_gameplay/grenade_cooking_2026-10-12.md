@@ -25,6 +25,9 @@ Valores inválidos são rejeitados. O tempo do fusível do projétil consome o
 passo inteiro mesmo quando a simulação de movimento limita um passo grande.
 `Application` encaminha a explosão na mão a `resolveGrenadeBlast`, que calcula
 dano radial ao jogador e aos alvos próximos conforme sala, alcance e cobertura.
+O dano máximo da explosão foi dobrado: 200 contra inimigos, 200 contra objetos
+quebráveis e 140 contra o jogador. O raio é 7 m, com queda linear
+pela distância. A mesma escala vale para granadas lançadas e detonadas na mão.
 O input consome a granada no começo da retirada do pino, bloqueia a troca de
 arma durante o preparo e congela o pavio quando a partida está pausada. Após
 soltar, o projétil nasce com o tempo restante do pavio e a animação de soltura

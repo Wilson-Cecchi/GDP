@@ -138,4 +138,99 @@ bool validateCorridorPath(
         corridor.secondRoom);
 }
 
+std::vector<wkc::core::Aabb> makeCorridorWallColumns(
+    const std::span<const wkc::core::Vec3> points,
+    const float width,
+    const float height)
+{
+    std::vector<wkc::core::Aabb> columns;
+    // The largest corridor occupant has radius 0.52 m. Keep at least
+    // 1.08 m between facing columns so it can pass down the center.
+    constexpr float minimumClearWidth = 1.08F;
+    constexpr float minimumSegmentLength = 5.0F;
+    constexpr float endpointClearance = 1.2F;
+    constexpr float stationSpacing = 2.8F;
+    constexpr float halfColumnLength = 0.19F;
+    if (points.size() < 2U || !std::isfinite(width)
+        || !std::isfinite(height) || width <= minimumClearWidth
+        || height <= 0.0F) {
+        return columns;
+    }
+    const float depth = std::min(0.18F,
+        (width - minimumClearWidth) * 0.5F);
+    if (depth < 0.025F) {
+        return columns;
+    }
+
+    for (std::size_t segment = 0U; segment + 1U < points.size(); ++segment) {
+        const auto first = points[segment];
+        const auto second = points[segment + 1U];
+        if (!std::isfinite(first.x) || !std::isfinite(first.y)
+            || !std::isfinite(first.z) || !std::isfinite(second.x)
+            || !std::isfinite(second.y) || !std::isfinite(second.z)
+            || !wkc::core::nearlyEqual(first.y, second.y)) {
+            continue;
+        }
+        const float dx = second.x - first.x;
+        const float dz = second.z - first.z;
+        const bool alongX = std::abs(dx) >= minimumSegmentLength
+            && wkc::core::nearlyEqual(first.z, second.z);
+        const bool alongZ = std::abs(dz) >= minimumSegmentLength
+            && wkc::core::nearlyEqual(first.x, second.x);
+        if (alongX == alongZ) {
+            continue;
+        }
+        const float length = alongX ? std::abs(dx) : std::abs(dz);
+        const auto count = std::min<std::size_t>(16U,
+            1U + static_cast<std::size_t>(
+                std::floor((length - 2.0F * endpointClearance)
+                    / stationSpacing)));
+        const float floor = (first.y + second.y) * 0.5F;
+        const float ceiling = floor + height;
+        for (std::size_t station = 0U; station < count; ++station) {
+            // A centered fraction gives identical placements when a route is
+            // visited in reverse, including segments in an L or Z path.
+            const float numerator = static_cast<float>(
+                static_cast<int>(2U * station) - static_cast<int>(count - 1U));
+            const float offset = numerator
+                / static_cast<float>(2U * (count + 1U));
+            if (alongX) {
+                const float x = (first.x + second.x) * 0.5F + dx * offset;
+                const float z = (first.z + second.z) * 0.5F;
+                columns.push_back({
+                    {x - halfColumnLength, floor, z - width * 0.5F},
+                    {x + halfColumnLength, ceiling,
+                        z - width * 0.5F + depth}});
+                columns.push_back({
+                    {x - halfColumnLength, floor,
+                        z + width * 0.5F - depth},
+                    {x + halfColumnLength, ceiling, z + width * 0.5F}});
+            } else {
+                const float x = (first.x + second.x) * 0.5F;
+                const float z = (first.z + second.z) * 0.5F + dz * offset;
+                columns.push_back({
+                    {x - width * 0.5F, floor, z - halfColumnLength},
+                    {x - width * 0.5F + depth, ceiling,
+                        z + halfColumnLength}});
+                columns.push_back({
+                    {x + width * 0.5F - depth, floor,
+                        z - halfColumnLength},
+                    {x + width * 0.5F, ceiling,
+                        z + halfColumnLength}});
+            }
+        }
+    }
+    std::sort(columns.begin(), columns.end(),
+        [](const wkc::core::Aabb& first, const wkc::core::Aabb& second) {
+            if (first.minimum.x != second.minimum.x) {
+                return first.minimum.x < second.minimum.x;
+            }
+            if (first.minimum.z != second.minimum.z) {
+                return first.minimum.z < second.minimum.z;
+            }
+            return first.minimum.y < second.minimum.y;
+        });
+    return columns;
+}
+
 } // namespace gdp::world

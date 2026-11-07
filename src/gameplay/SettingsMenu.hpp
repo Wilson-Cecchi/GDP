@@ -40,6 +40,10 @@ enum class SettingsMenuOption : std::uint8_t {
     GamepadMoveDeadzone,
     GamepadLookDeadzone,
     GamepadInvertY,
+    Shadows,
+    DetailedMaterials,
+    RenderScale,
+    MaximumLights,
 };
 
 enum class GraphicsQuality : std::uint8_t {
@@ -48,6 +52,7 @@ enum class GraphicsQuality : std::uint8_t {
     Medium,
     High,
     Ultra,
+    Custom,
     Count,
 };
 
@@ -58,6 +63,7 @@ struct GraphicsQualitySettings {
     std::uint8_t maximumShadowOccluders{3U};
     std::uint8_t visibleRoomDepth{2U};
     bool detailedMaterials{true};
+    bool shadowsEnabled{true};
 
     constexpr bool operator==(const GraphicsQualitySettings&) const noexcept
         = default;
@@ -93,6 +99,7 @@ struct RuntimeSettings {
     bool invertMouseY{false};
     std::uint16_t fieldOfViewDegrees{68U};
     GraphicsQuality graphicsQuality{GraphicsQuality::Medium};
+    GraphicsQualitySettings customGraphics{};
     WindowResolution windowResolution{WindowResolution::R1280x720};
     bool fullscreen{false};
     bool verticalSync{true};
@@ -138,6 +145,8 @@ void selectSettingsMenuOption(
 [[nodiscard]] float mouseSensitivity(const RuntimeSettings& settings) noexcept;
 [[nodiscard]] GraphicsQualitySettings graphicsQualitySettings(
     GraphicsQuality quality) noexcept;
+[[nodiscard]] GraphicsQualitySettings effectiveGraphicsQualitySettings(
+    const RuntimeSettings& settings) noexcept;
 [[nodiscard]] std::string_view graphicsQualityName(
     GraphicsQuality quality) noexcept;
 [[nodiscard]] std::optional<GraphicsQuality> graphicsQualityForName(

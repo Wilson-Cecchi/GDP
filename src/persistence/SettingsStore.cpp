@@ -89,6 +89,18 @@ bool assignClamped(
     return clamped == *parsed;
 }
 
+bool assignByte(
+    std::uint8_t& target,
+    const std::string_view value,
+    const std::uint16_t minimum,
+    const std::uint16_t maximum) noexcept
+{
+    std::uint16_t parsed = target;
+    const bool valid = assignClamped(parsed, value, minimum, maximum);
+    target = static_cast<std::uint8_t>(parsed);
+    return valid;
+}
+
 std::string serialize(const gameplay::RuntimeSettings& source)
 {
     const gameplay::RuntimeSettings settings
@@ -105,6 +117,13 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "field_of_view = " << settings.fieldOfViewDegrees << '\n'
            << "graphics_quality = "
            << gameplay::graphicsQualityName(settings.graphicsQuality) << '\n'
+           << "custom_render_scale = " << settings.customGraphics.renderScalePercent << '\n'
+           << "custom_max_lights = " << static_cast<unsigned>(settings.customGraphics.maximumLights) << '\n'
+           << "custom_shadow_lights = " << static_cast<unsigned>(settings.customGraphics.maximumShadowLights) << '\n'
+           << "custom_shadow_occluders = " << static_cast<unsigned>(settings.customGraphics.maximumShadowOccluders) << '\n'
+           << "custom_visible_room_depth = " << static_cast<unsigned>(settings.customGraphics.visibleRoomDepth) << '\n'
+           << "custom_detailed_materials = " << (settings.customGraphics.detailedMaterials ? "true" : "false") << '\n'
+           << "custom_shadows = " << (settings.customGraphics.shadowsEnabled ? "true" : "false") << '\n'
            << "window_width = "
            << gameplay::windowResolutionSize(settings.windowResolution).width << '\n'
            << "window_height = "
@@ -155,6 +174,7 @@ SettingsLoadResult loadRuntimeSettings(
         std::optional<std::uint64_t> version;
         std::optional<std::uint64_t> windowWidth;
         std::optional<std::uint64_t> windowHeight;
+        std::uint8_t customFieldsSeen = 0U;
         std::string line;
         while (std::getline(input, line)) {
             std::string_view content = trim(line);
@@ -257,6 +277,34 @@ SettingsLoadResult loadRuntimeSettings(
                 } else {
                     recovered = true;
                 }
+            } else if (key == "custom_render_scale") {
+                customFieldsSeen |= 1U;
+                recovered = !assignClamped(result.settings.customGraphics.renderScalePercent,
+                    value, 50U, 100U) || recovered;
+            } else if (key == "custom_max_lights") {
+                customFieldsSeen |= 2U;
+                recovered = !assignByte(result.settings.customGraphics.maximumLights,
+                    value, 2U, 8U) || recovered;
+            } else if (key == "custom_shadow_lights") {
+                customFieldsSeen |= 4U;
+                recovered = !assignByte(result.settings.customGraphics.maximumShadowLights,
+                    value, 0U, 8U) || recovered;
+            } else if (key == "custom_shadow_occluders") {
+                customFieldsSeen |= 8U;
+                recovered = !assignByte(result.settings.customGraphics.maximumShadowOccluders,
+                    value, 0U, 16U) || recovered;
+            } else if (key == "custom_visible_room_depth") {
+                customFieldsSeen |= 16U;
+                recovered = !assignByte(result.settings.customGraphics.visibleRoomDepth,
+                    value, 1U, 4U) || recovered;
+            } else if (key == "custom_detailed_materials") {
+                customFieldsSeen |= 32U;
+                if (const auto enabled = parseBoolean(value)) result.settings.customGraphics.detailedMaterials = *enabled;
+                else recovered = true;
+            } else if (key == "custom_shadows") {
+                customFieldsSeen |= 64U;
+                if (const auto enabled = parseBoolean(value)) result.settings.customGraphics.shadowsEnabled = *enabled;
+                else recovered = true;
             } else if (key == "language") {
                 if (const auto language = gameplay::languageForName(value)) {
                     result.settings.language = *language;
@@ -384,6 +432,13 @@ SettingsLoadResult loadRuntimeSettings(
         if (*version <= 5U) {
             // Preserve the exact pre-preset renderer for existing players.
             result.settings.graphicsQuality = gameplay::GraphicsQuality::Ultra;
+        }
+        if (*version <= 12U) {
+            result.settings.customGraphics = gameplay::graphicsQualitySettings(
+                result.settings.graphicsQuality);
+        } else if (result.settings.graphicsQuality == gameplay::GraphicsQuality::Custom
+            && customFieldsSeen != 127U) {
+            recovered = true;
         }
         if (*version <= 7U) result.settings.language = gameplay::Language::English;
         result.settings = gameplay::sanitizeRuntimeSettings(result.settings);

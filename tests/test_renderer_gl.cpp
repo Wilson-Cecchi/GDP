@@ -2,6 +2,8 @@
 #include "game/MenuFlow.hpp"
 #include "game/visual/MenuBackdrop.hpp"
 #include "gameplay/PlayerGrenade.hpp"
+#include "world/RoomArchitecture.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -23,6 +25,894 @@
 #include "PlayerBodyValidation.hpp"
 
 namespace {
+
+// Hidden OpenGL room captures are technical pixel evidence; the played room
+// still needs visual acceptance from the user.
+enum class RoomPreviewKind {
+    Storage, Cafeteria, CafeteriaLong, Laboratory, Technical, TechnicalL,
+    Security, SecurityT, CentralHub, Boss
+};
+
+bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
+    const RoomPreviewKind kind, const bool blackout = false,
+    const bool shadowPilot = false)
+{
+    using namespace gdp::game::visual;
+    const bool cafeteriaLong = kind == RoomPreviewKind::CafeteriaLong;
+    const bool cafeteria = kind == RoomPreviewKind::Cafeteria || cafeteriaLong;
+    const bool laboratory = kind == RoomPreviewKind::Laboratory;
+    const bool technicalL = kind == RoomPreviewKind::TechnicalL;
+    const bool technical = kind == RoomPreviewKind::Technical || technicalL;
+    const bool securityT = kind == RoomPreviewKind::SecurityT;
+    const bool security = kind == RoomPreviewKind::Security || securityT;
+    const bool centralHub = kind == RoomPreviewKind::CentralHub;
+    const bool boss = kind == RoomPreviewKind::Boss;
+    const char* directory = shadowPilot
+        ? std::getenv(centralHub
+            ? "GDP_CENTRAL_HUB_SHADOW_CAPTURE_DIR"
+            : "GDP_ROOM_SHADOW_CAPTURE_DIR") : blackout
+        ? std::getenv("GDP_ROOM_BLACKOUT_CAPTURE_DIR")
+        : std::getenv(boss
+            ? "GDP_BOSS_COLUMNS_CAPTURE_DIR" : cafeteriaLong
+            ? "GDP_CAFETERIA_LONG_CAPTURE_DIR" : cafeteria
+            ? "GDP_CAFETERIA_FURNITURE_CAPTURE_DIR" : centralHub
+            ? "GDP_CENTRAL_HUB_CAPTURE_DIR" : securityT
+            ? "GDP_SECURITY_T_CAPTURE_DIR" : security
+            ? "GDP_SECURITY_CAPTURE_DIR" : technicalL
+            ? "GDP_TECHNICAL_L_CAPTURE_DIR" : technical
+            ? "GDP_TECHNICAL_CAPTURE_DIR" : laboratory
+            ? "GDP_LABORATORY_CAPTURE_DIR" : "GDP_STORAGE_RACK_CAPTURE_DIR");
+    if (!directory || !*directory) {
+        std::cerr << "Set the matching room capture directory\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    gdp::world::RoomInstance worldRoom;
+    worldRoom.theme = boss ? gdp::world::RoomTheme::Maintenance
+        : cafeteria ? gdp::world::RoomTheme::Cafeteria
+        : centralHub ? gdp::world::RoomTheme::Industrial
+        : security ? gdp::world::RoomTheme::Security
+        : technical ? gdp::world::RoomTheme::Maintenance
+        : laboratory ? gdp::world::RoomTheme::Laboratory
+            : gdp::world::RoomTheme::Storage;
+    worldRoom.moduleId = boss ? gdp::world::bossRoomPreviewModuleId
+        : cafeteriaLong ? gdp::world::cafeteriaLongPreviewModuleId
+        : cafeteria ? gdp::world::cafeteriaPreviewModuleId
+        : centralHub ? gdp::world::centralHubPreviewModuleId
+        : securityT ? gdp::world::securityTPreviewModuleId
+        : security ? gdp::world::securityPreviewModuleId
+        : technicalL ? gdp::world::technicalLPreviewModuleId
+        : technical ? gdp::world::technicalPreviewModuleId
+        : laboratory ? gdp::world::laboratoryPreviewModuleId : 0U;
+    worldRoom.worldBounds = {{boss ? -13.85F
+                : centralHub || securityT ? -10.0F : technical ? -8.0F : -9.0F,
+            0.0F, boss ? -15.85F
+                : cafeteriaLong ? -12.0F : security && !securityT ? -9.0F : -10.0F},
+        {boss ? 13.85F : centralHub || securityT ? 10.0F : technical ? 8.0F : 9.0F,
+            boss ? 7.0F : technical ? 5.5F : 6.0F,
+            boss ? 15.85F : cafeteriaLong ? 12.0F
+                : security && !securityT ? 9.0F : 10.0F}};
+    if (boss) worldRoom.role = gdp::world::RoomRole::Boss;
+    worldRoom.seed = 20261031U;
+    if (securityT) {
+        worldRoom.walkableOutline = gdp::world::securityTPreviewFootprint();
+    } else if (technicalL) {
+        worldRoom.walkableOutline = gdp::world::technicalLPreviewFootprint();
+    } else if (centralHub) {
+        worldRoom.walkableOutline = gdp::world::centralHubPreviewFootprint();
+    }
+    auto parts = gdp::world::makeRoomArchitecture(worldRoom);
+    const auto columns = gdp::world::makeRoomWallColumns(worldRoom);
+    parts.insert(parts.end(), columns.begin(), columns.end());
+    if (parts.empty()) return false;
+    std::vector<PropRenderData> breakableProps;
+    for (const gdp::world::RoomArchitecturePart& part : parts) {
+        if (!part.breakable) continue;
+        breakableProps.push_back({
+            {(part.bounds.minimum.x + part.bounds.maximum.x) * 0.5F,
+                part.bounds.minimum.y,
+                (part.bounds.minimum.z + part.bounds.maximum.z) * 0.5F},
+            part.bounds.maximum - part.bounds.minimum,
+            PropVisualRole::StorageBox,
+            PropVisualState::Intact,
+            part.tint.x < 0.4F ? 1U : 0U,
+        });
+    }
+    if (boss) {
+        breakableProps.push_back({{-8.5F, 0.0F, -8.5F},
+            {2.4F, 1.35F, 0.6F}, PropVisualRole::Barricade,
+            PropVisualState::Intact, 901U});
+        breakableProps.push_back({{-8.5F, 0.0F, 8.5F},
+            {0.6F, 2.25F, 2.4F}, PropVisualRole::Barricade,
+            PropVisualState::Intact, 902U});
+    }
+    if (shadowPilot) {
+        breakableProps.push_back({{4.5F, 0.0F, -1.5F},
+            {1.8F, 1.25F, 0.55F}, PropVisualRole::Barricade,
+            PropVisualState::Intact, 20261114U});
+    }
+    const std::array<EnemyRenderData, 1U> pilotEnemy{{
+        {{-5.2F, 0.0F, -4.0F}, true, 20261113U,
+            EnemyVisualRole::Worker, true, EnemyAnimationState::Walk, 36U}
+    }};
+    const std::span<const EnemyRenderData> pilotEnemies = shadowPilot
+        ? std::span<const EnemyRenderData>{pilotEnemy}
+        : std::span<const EnemyRenderData>{};
+    renderer.setGeometryShadowsEnabled(shadowPilot);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    RoomLightingRenderData lighting;
+    lighting.ambientColor = boss
+        ? wkc::core::Vec3{0.77F, 0.81F, 0.78F}
+        : cafeteria
+        ? wkc::core::Vec3{0.89F, 0.83F, 0.75F}
+        : centralHub
+        ? wkc::core::Vec3{0.73F, 0.72F, 0.68F}
+        : security
+        ? wkc::core::Vec3{0.71F, 0.75F, 0.81F}
+        : technical
+        ? wkc::core::Vec3{0.78F, 0.77F, 0.74F}
+        : laboratory ? wkc::core::Vec3{0.77F, 0.84F, 0.92F}
+        : wkc::core::Vec3{0.80F, 0.77F, 0.70F};
+    lighting.ambientIntensity = 0.34F;
+    lighting.lightCount = 2U;
+    lighting.lights[0] = {{3.5F, 5.1F, -5.0F},
+        {1.0F, 0.86F, 0.70F}, 1.2F, 8.5F};
+    lighting.lights[1] = {{-3.5F, 5.1F, -5.0F},
+        {0.84F, 0.89F, 1.0F}, 1.0F, 8.5F};
+    if (centralHub) {
+        // Match the four-corner coverage of the playable 20 m Hub rather
+        // than validating its column with two artificial rear lights.
+        lighting.ambientIntensity = 0.19F;
+        lighting.lightCount = 5U;
+        constexpr std::array positions{
+            wkc::core::Vec3{-5.0F, 5.52F, -5.0F},
+            wkc::core::Vec3{5.0F, 5.52F, 5.0F},
+            wkc::core::Vec3{5.0F, 5.52F, -5.0F},
+            wkc::core::Vec3{-5.0F, 5.52F, 5.0F},
+            wkc::core::Vec3{5.0F, 5.52F, 0.0F},
+        };
+        for (std::size_t index = 0U; index < positions.size(); ++index) {
+            lighting.lights[index] = {positions[index],
+                {1.0F, 0.87F, 0.74F}, index == 4U ? 0.55F : 1.05F,
+                index == 4U ? 6.5F : 9.0F};
+        }
+    }
+    if (securityT) {
+        lighting.lightCount = 3U;
+        lighting.lights[0].position = {0.0F, 5.56F, -6.0F};
+        lighting.lights[1].position = {-5.5F, 5.56F, 4.0F};
+        lighting.lights[2] = {{5.5F, 5.56F, 4.0F},
+            {0.88F, 0.93F, 1.0F}, 1.0F, 8.5F};
+    }
+    if (technicalL) lighting.lights[0].position = {0.0F, 5.1F, -5.0F};
+    const CeilingFixtureVariant fixtureVariant = boss
+        ? CeilingFixtureVariant::BossArena : cafeteria
+        ? CeilingFixtureVariant::Cafeteria : centralHub
+        ? CeilingFixtureVariant::CentralHub : security
+        ? CeilingFixtureVariant::Security : technical
+        ? CeilingFixtureVariant::Maintenance : laboratory
+        ? CeilingFixtureVariant::Laboratory : CeilingFixtureVariant::Storage;
+    for (std::size_t index = 0; index < lighting.lightCount; ++index) {
+        lighting.lights[index].fixtureVariant = fixtureVariant;
+        lighting.lights[index].fixtureCondition = index == 0U
+            ? CeilingFixtureCondition::Used
+            : CeilingFixtureCondition::Worn;
+        lighting.lights[index].sourceRoomBounds = worldRoom.worldBounds;
+        lighting.lights[index].boundedToRoom = true;
+    }
+    bool passed = true;
+    for (const bool potato : {false, true}) {
+        for (const float fov : {60.0F, 100.0F}) {
+            const wkc::core::Seed seed = centralHub ? 20261030U
+                : securityT ? 20261102U : 20261029U;
+            passed &= (boss
+                ? renderer.prepareCombatRoomMaterials(seed)
+                : cafeteria
+                ? renderer.prepareCafeteriaRoomMaterials(seed)
+                : centralHub
+                ? renderer.prepareCentralHubRoomMaterials(seed)
+                : security
+                ? renderer.prepareSecurityRoomMaterials(seed)
+                : technical
+                ? renderer.prepareTechnicalRoomMaterials(seed)
+                : laboratory ? renderer.prepareLaboratoryRoomMaterials(seed, true)
+                : renderer.prepareStorageRoomMaterials(seed, true));
+            RoomRenderData room;
+            room.worldBounds = worldRoom.worldBounds;
+            room.walkableOutline = worldRoom.walkableOutline;
+            room.materialKey = renderer.activeRoomMaterialKey();
+            room.architectureParts = parts;
+            room.customArchitecture = !boss;
+            std::array<float, 3> hubShaftBrightness{};
+            for (int variant = 0; variant < (
+                    blackout ? 3 : centralHub ? (shadowPilot ? 10 : 8)
+                    : securityT ? 16 : cafeteriaLong ? 7
+                    : cafeteria ? 5 : laboratory ? 7
+                    : kind == RoomPreviewKind::Storage ? 3 : 2);
+                 ++variant) {
+            const bool fixtureDetail = !blackout && variant == 1;
+            const bool laboratoryBenchDetail = laboratory && variant == 2;
+            const bool laboratoryContainmentDetail = laboratory && variant == 3;
+            const bool laboratoryDomeDetail = laboratory && variant == 4;
+            const bool laboratoryDuctDetail = laboratory && variant == 5;
+            const bool laboratoryTabletopDetail = laboratory && variant == 6;
+            const bool floorDetail = securityT && variant == 2;
+            const bool floorOverview = securityT && variant == 3;
+            const bool planterDetail = securityT && variant == 4;
+            const bool ductDetail = securityT && variant == 5;
+            const bool trimCornerDetail = securityT && variant == 6;
+            const bool securityConsoleDetail = securityT && variant == 7;
+            const bool securityCabinetDetail = securityT && variant == 8;
+            const bool securityCoverDetail = securityT && variant == 9;
+            const bool securityCoverCornerDetail = securityT && variant == 10;
+            const bool bulletMarkDetail = securityT && variant == 11;
+            const bool securityIndicatorDetail = securityT && variant >= 12;
+            const bool counterDetail = cafeteria && !blackout && variant == 2;
+            const bool counterTopDetail = cafeteria && !blackout && variant == 3;
+            const bool counterGrazingDetail = cafeteria && !blackout && variant == 4;
+            const bool storageDuctDetail = kind == RoomPreviewKind::Storage
+                && !blackout && variant == 2;
+            const bool hubHatchDetail = centralHub && !blackout && variant == 2;
+            const bool hubVentDetail = centralHub && !blackout && variant == 3;
+            const bool hubCeilingDetail = centralHub && !blackout && variant == 4;
+            const bool hubDuctDetail = centralHub && !blackout && variant == 5;
+            const bool hubWallPanelDetail = centralHub && !blackout && variant == 6;
+            const bool hubWallVentDetail = centralHub && !blackout && variant == 7;
+            const bool cafeteriaPlantDetail = cafeteriaLong && variant == 5;
+            const bool cafeteriaDuctDetail = cafeteriaLong && variant == 6;
+            CameraData camera;
+            camera.position = boss
+                ? wkc::core::Vec3{1.4F, 1.62F, 13.2F}
+                : cafeteria
+                ? wkc::core::Vec3{2.8F, 1.62F, cafeteriaLong ? 10.2F : 8.2F}
+                : centralHub
+                ? wkc::core::Vec3{2.6F, 1.62F, 7.6F}
+                : securityT
+                ? wkc::core::Vec3{0.0F, 1.62F, -8.0F}
+                : security
+                ? wkc::core::Vec3{-0.5F, 1.62F, 6.6F}
+                : technical
+                ? wkc::core::Vec3{1.0F, 1.62F, 8.2F}
+                : laboratory ? wkc::core::Vec3{0.4F, 1.62F, 8.0F}
+                : wkc::core::Vec3{4.7F, 1.62F, -0.8F};
+            camera.forward = boss
+                ? wkc::core::Vec3{0.28F, -0.02F, -1.0F}
+                : cafeteria
+                ? wkc::core::Vec3{-0.18F, -0.025F, -1.0F}
+                : centralHub
+                ? wkc::core::Vec3{-0.25F, -0.025F, -1.0F}
+                : securityT
+                ? wkc::core::Vec3{0.0F, 0.08F, 1.0F}
+                : security
+                ? wkc::core::Vec3{-0.12F, -0.025F, -1.0F}
+                : technical
+                ? wkc::core::Vec3{0.0F, -0.04F, -1.0F}
+                : laboratory ? wkc::core::Vec3{0.2F, -0.02F, -1.0F}
+                : wkc::core::Vec3{0.65F, -0.02F, -0.76F};
+            if (shadowPilot && centralHub && variant == 8) {
+                camera.position = {-7.4F, 1.62F, 5.8F};
+                camera.forward = {1.0F, -0.02F, -0.75F};
+            }
+            if (shadowPilot && centralHub && variant == 9) {
+                camera.position = {4.7F, 1.55F, 2.6F};
+                camera.forward = {-0.05F, -0.16F, -1.0F};
+            }
+            if (fixtureDetail) {
+                camera.position = cafeteria
+                    ? wkc::core::Vec3{3.0F, 1.55F, 6.45F}
+                    : wkc::core::Vec3{3.5F, 3.0F, -3.0F};
+                camera.forward = cafeteria
+                    ? wkc::core::Vec3{0.0F, -0.29F, -1.0F}
+                    : wkc::core::Vec3{0.0F, 0.72F, -0.70F};
+                if (securityT) {
+                    camera.position = {0.0F, 2.4F, -8.5F};
+                    camera.forward = {0.0F, 0.78F, 0.62F};
+                }
+            }
+            if (floorDetail) {
+                camera.position = {0.0F, 1.7F, -3.5F};
+                camera.forward = {0.0F, -0.78F, 0.63F};
+            }
+            if (floorOverview) {
+                camera.position = {0.0F, 5.15F, 1.5F};
+                camera.forward = {0.0F, -1.0F, 0.1F};
+            }
+            if (planterDetail) {
+                camera.position = {4.7F, 1.6F, -0.5F};
+                camera.forward = {1.0F, -0.04F, -0.10F};
+            }
+            if (ductDetail) {
+                camera.position = {1.0F, 2.2F, -4.0F};
+                camera.forward = {0.25F, 0.65F, 1.0F};
+            }
+            if (trimCornerDetail) {
+                camera.position = {6.4F, 1.45F, 0.5F};
+                camera.forward = {-0.77F, -0.30F, -0.62F};
+            }
+            if (securityConsoleDetail || securityIndicatorDetail) {
+                camera.position = {5.6F, 1.65F, 4.4F};
+                camera.forward = {0.0F, -0.02F, 1.0F};
+            }
+            if (securityCabinetDetail) {
+                camera.position = {0.0F, 1.60F, -6.8F};
+                camera.forward = {0.95F, -0.04F, 0.28F};
+            }
+            if (securityCoverDetail) {
+                camera.position = {6.3F, 1.60F, -0.8F};
+                camera.forward = {0.0F, -0.10F, 1.0F};
+            }
+            if (securityCoverCornerDetail) {
+                camera.position = {7.8F, 1.55F, 0.8F};
+                camera.forward = {-0.68F, -0.25F, 0.72F};
+            }
+            if (laboratoryBenchDetail) {
+                camera.position = {2.7F, 1.65F, 2.3F};
+                camera.forward = {1.0F, -0.27F, 0.90F};
+            }
+            if (laboratoryContainmentDetail) {
+                camera.position = {5.4F, 1.65F, 6.7F};
+                camera.forward = {1.0F, -0.03F, 0.18F};
+            }
+            if (laboratoryDomeDetail) {
+                camera.position = {-6.4F, 1.36F, 9.05F};
+                camera.forward = {-1.0F, -0.27F, -0.08F};
+            }
+            if (laboratoryDuctDetail) {
+                camera.position = {-3.1F, 1.75F, 5.3F};
+                camera.forward = {-0.30F, 0.78F, -1.0F};
+            }
+            if (laboratoryTabletopDetail) {
+                camera.position = {2.65F, 1.62F, 3.9F};
+                camera.forward = {1.0F, -0.24F, 0.0F};
+            }
+            if (bulletMarkDetail) {
+                camera.position = {-7.0F, 1.62F, 4.0F};
+                camera.forward = {-1.0F, 0.0F, 0.0F};
+            }
+            if (counterDetail) {
+                camera.position = {2.4F, 1.65F, 2.4F};
+                camera.forward = {0.9F, -0.12F, -0.4F};
+            }
+            if (counterTopDetail) {
+                camera.position = {7.0F, 3.15F, 4.0F};
+                camera.forward = {0.63F, -0.76F, -0.18F};
+            }
+            if (counterGrazingDetail) {
+                camera.position = {6.7F, 2.75F, 7.2F};
+                camera.forward = {0.36F, -0.64F, -0.8F};
+            }
+            if (storageDuctDetail) {
+                camera.position = {1.8F, 1.7F, 5.0F};
+                camera.forward = {-0.18F, 0.60F, -1.0F};
+            }
+            if (hubHatchDetail) {
+                camera.position = {-2.5F, 1.7F, 6.3F};
+                camera.forward = {-0.65F, -0.55F, -0.8F};
+            }
+            if (hubVentDetail) {
+                camera.position = {6.0F, 1.7F, -1.6F};
+                camera.forward = {-0.55F, -0.60F, -0.8F};
+            }
+            if (hubCeilingDetail) {
+                camera.position = {2.6F, 2.1F, 5.5F};
+                camera.forward = {0.10F, 1.0F, -0.45F};
+            }
+            if (hubDuctDetail) {
+                camera.position = {2.6F, 2.1F, 5.5F};
+                camera.forward = {0.35F, 0.30F, -1.0F};
+            }
+            if (hubWallPanelDetail) {
+                camera.position = {4.2F, 1.62F, -4.2F};
+                camera.forward = {1.0F, 0.12F, -1.0F};
+            }
+            if (hubWallVentDetail) {
+                camera.position = {4.2F, 1.62F, 4.2F};
+                camera.forward = {1.0F, 0.12F, 1.0F};
+            }
+            if (cafeteriaPlantDetail) {
+                camera.position = {-5.9F, 1.55F, 8.6F};
+                camera.forward = {-0.72F, -0.22F, 1.0F};
+            }
+            if (cafeteriaDuctDetail) {
+                camera.position = {5.6F, 1.8F, 6.0F};
+                camera.forward = {0.28F, 0.70F, -1.0F};
+            }
+            camera.verticalFieldOfViewDegrees = fov;
+            HudRenderData hud;
+            hud.graphicsQuality = potato
+                ? HudGraphicsQuality::Potato : HudGraphicsQuality::Ultra;
+            hud.geometryShadowLightBudget = shadowPilot && !potato ? 8U : 0U;
+            hud.detailedMaterials = !potato;
+            hud.worldRenderScalePercent = potato ? 50U : 100U;
+            RoomLightingRenderData frameLighting = lighting;
+            if (centralHub) {
+                const auto shaft = std::find_if(parts.begin(), parts.end(),
+                    [](const gdp::world::RoomArchitecturePart& part) {
+                        return part.decoration
+                            == gdp::world::RoomDecorationPart::CentralHubColumnShaft;
+                    });
+                if (shaft == parts.end()) return false;
+                const auto plinth = std::find_if(parts.begin(), parts.end(),
+                    [](const gdp::world::RoomArchitecturePart& part) {
+                        return part.decoration
+                            == gdp::world::RoomDecorationPart::CentralHubColumnPlinth;
+                    });
+                if (plinth == parts.end()) return false;
+                const std::array shadowCandidates{
+                    ShadowOccluderRenderData{shaft->bounds, true, true},
+                    ShadowOccluderRenderData{plinth->bounds, false, false}};
+                (void)optimizeShadowBudget(
+                    frameLighting, camera.position, shadowCandidates);
+            }
+            if (securityIndicatorDetail) {
+                room.securityIndicatorPhase = variant <= 13
+                    ? SecurityIndicatorPhase::Alarm
+                    : SecurityIndicatorPhase::Recovery;
+                room.securityIndicatorSeconds = variant == 13 ? 1.1F
+                    : variant == 15 ? 3.1F : 0.0F;
+                frameLighting.alert = variant <= 13;
+            }
+            if (blackout && variant > 0) {
+                for (std::size_t index = 0U; index < frameLighting.lightCount; ++index) {
+                    frameLighting.lights[index].intensity = 0.0F;
+                    frameLighting.lights[index].fixtureState
+                        = PropVisualState::Destroyed;
+                    frameLighting.lights[index].fixtureEmissionScale = 0.0F;
+                }
+                frameLighting.ambientIntensity = fixtureDrivenAmbientIntensity(
+                    frameLighting, lighting.ambientIntensity);
+                frameLighting.flashlightEnabled = variant == 2;
+                frameLighting.flashlightPosition = camera.position;
+                frameLighting.flashlightDirection = camera.forward;
+            }
+            constexpr std::array bulletMarks{
+                ImpactRenderData{{-10.0F, 1.62F, 3.7F}, {1.0F, 0.0F, 0.0F},
+                    ImpactVisualMaterial::Metal, 1.0F, 101U,
+                    ImpactVisualKind::BulletMark},
+                ImpactRenderData{{-10.0F, 1.69F, 4.0F}, {1.0F, 0.0F, 0.0F},
+                    ImpactVisualMaterial::Metal, 1.0F, 102U,
+                    ImpactVisualKind::BulletMark},
+                ImpactRenderData{{-10.0F, 1.57F, 4.3F}, {1.0F, 0.0F, 0.0F},
+                    ImpactVisualMaterial::Metal, 1.0F, 103U,
+                    ImpactVisualKind::BulletMark},
+            };
+            const std::span<const ImpactRenderData> marks = bulletMarkDetail
+                ? std::span<const ImpactRenderData>{bulletMarks}
+                : std::span<const ImpactRenderData>{};
+            if (shadowPilot && !potato) {
+                passed &= renderer.render(width, height, camera, pilotEnemies, {},
+                    breakableProps, frameLighting, room, {}, {}, {}, hud, marks);
+            }
+            passed &= renderer.render(width, height, camera, pilotEnemies, {},
+                breakableProps, frameLighting, room, {}, {}, {}, hud, marks);
+            if (shadowPilot && !potato) {
+                passed &= renderer.lastFrameStats().geometryShadowMaps
+                    == frameLighting.lightCount;
+            }
+            glFinish();
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pixels.data());
+            passed &= glGetError() == GL_NO_ERROR;
+            if (shadowPilot && !potato && fov == 60.0F && variant == 0) {
+                renderer.setGeometryShadowsEnabled(false);
+                passed &= renderer.render(width, height, camera, pilotEnemies, {},
+                    breakableProps, frameLighting, room, {}, {}, {}, hud, marks);
+                glFinish();
+                std::vector<std::uint8_t> legacyPixels(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    legacyPixels.data());
+                std::size_t changedPixels = 0U;
+                for (std::size_t pixel = 0; pixel < pixels.size(); pixel += 4U) {
+                    const int difference = std::abs(int(pixels[pixel])
+                            - int(legacyPixels[pixel]))
+                        + std::abs(int(pixels[pixel + 1U])
+                            - int(legacyPixels[pixel + 1U]))
+                        + std::abs(int(pixels[pixel + 2U])
+                            - int(legacyPixels[pixel + 2U]));
+                    if (difference > 30) ++changedPixels;
+                }
+                std::cout << "Geometry shadows versus legacy: "
+                    << changedPixels << " changed pixels\n";
+                passed &= changedPixels > 500U && glGetError() == GL_NO_ERROR;
+                renderer.setGeometryShadowsEnabled(true);
+            }
+            if (shadowPilot && centralHub && !potato && fov == 60.0F
+                && variant == 8) {
+                hud.geometryShadowLightBudget = 1U;
+                passed &= renderer.render(width, height, camera, pilotEnemies, {},
+                    breakableProps, frameLighting, room, {}, {}, {}, hud, marks);
+                passed &= renderer.render(width, height, camera, pilotEnemies, {},
+                    breakableProps, frameLighting, room, {}, {}, {}, hud, marks);
+                glFinish();
+                std::vector<std::uint8_t> oneLightPixels(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    oneLightPixels.data());
+                std::vector<std::uint8_t> oneLightTopDown(pixels.size());
+                const std::size_t rowBytes = static_cast<std::size_t>(width * 4);
+                for (int row = 0; row < height; ++row) {
+                    std::copy_n(oneLightPixels.data()
+                            + static_cast<std::size_t>(height - row - 1) * rowBytes,
+                        rowBytes,
+                        oneLightTopDown.data()
+                            + static_cast<std::size_t>(row) * rowBytes);
+                }
+                const auto oneLightPath = std::filesystem::path{directory}
+                    / "shadow_one_light_opposite_fov60.bmp";
+                SDL_Surface* oneLightSurface = SDL_CreateSurfaceFrom(
+                    width, height, SDL_PIXELFORMAT_RGBA32,
+                    oneLightTopDown.data(), width * 4);
+                passed &= oneLightSurface
+                    && SDL_SaveBMP(oneLightSurface,
+                        oneLightPath.string().c_str());
+                if (oneLightSurface) SDL_DestroySurface(oneLightSurface);
+                std::size_t changedPixels = 0U;
+                for (std::size_t pixel = 0; pixel < pixels.size(); pixel += 4U) {
+                    const int difference = std::abs(int(pixels[pixel])
+                            - int(oneLightPixels[pixel]))
+                        + std::abs(int(pixels[pixel + 1U])
+                            - int(oneLightPixels[pixel + 1U]))
+                        + std::abs(int(pixels[pixel + 2U])
+                            - int(oneLightPixels[pixel + 2U]));
+                    if (difference > 30) ++changedPixels;
+                }
+                std::cout << "Opposite-side all-lights versus one-light: "
+                    << changedPixels << " changed pixels\n";
+                passed &= changedPixels > 500U && glGetError() == GL_NO_ERROR;
+            }
+            if (shadowPilot && centralHub && !potato && fov == 60.0F
+                && variant == 9) {
+                renderer.setGeometryShadowsEnabled(false);
+                RoomLightingRenderData unshadowed = frameLighting;
+                unshadowed.shadowLightCount = 0U;
+                unshadowed.shadowOccluderCount = 0U;
+                passed &= renderer.render(width, height, camera, pilotEnemies,
+                    {}, breakableProps, unshadowed, room, {}, {}, {}, hud,
+                    marks);
+                glFinish();
+                std::vector<std::uint8_t> unshadowedPixels(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    unshadowedPixels.data());
+                std::vector<std::uint8_t> unshadowedTopDown(pixels.size());
+                const std::size_t unshadowedRowBytes
+                    = static_cast<std::size_t>(width * 4);
+                for (int row = 0; row < height; ++row) {
+                    std::copy_n(unshadowedPixels.data()
+                            + static_cast<std::size_t>(height - row - 1)
+                                * unshadowedRowBytes,
+                        unshadowedRowBytes, unshadowedTopDown.data()
+                            + static_cast<std::size_t>(row)
+                                * unshadowedRowBytes);
+                }
+                const auto unshadowedPath = std::filesystem::path{directory}
+                    / "shadow_box_disabled_fov60.bmp";
+                SDL_Surface* unshadowedSurface = SDL_CreateSurfaceFrom(
+                    width, height, SDL_PIXELFORMAT_RGBA32,
+                    unshadowedTopDown.data(), width * 4);
+                passed &= unshadowedSurface && SDL_SaveBMP(unshadowedSurface,
+                    unshadowedPath.string().c_str());
+                if (unshadowedSurface) SDL_DestroySurface(unshadowedSurface);
+                renderer.setGeometryShadowsEnabled(true);
+                passed &= renderer.render(width, height, camera, pilotEnemies,
+                    {}, breakableProps, frameLighting, room, {}, {}, {}, hud,
+                    marks);
+                passed &= renderer.render(width, height, camera, pilotEnemies,
+                    {}, breakableProps, frameLighting, room, {}, {}, {}, hud,
+                    marks);
+                std::uint64_t previousBoxBrightness = 0U;
+                std::vector<std::uint8_t> previousPixels = pixels;
+                for (const std::uint32_t remaining : {4U, 2U, 1U, 0U}) {
+                    RoomLightingRenderData fewerLights = frameLighting;
+                    for (std::uint32_t index = remaining;
+                         index < fewerLights.lightCount; ++index) {
+                        fewerLights.lights[index].intensity = 0.0F;
+                        fewerLights.lights[index].fixtureEmissionScale = 0.0F;
+                        fewerLights.lights[index].fixtureState
+                            = PropVisualState::Destroyed;
+                    }
+                    fewerLights.ambientIntensity = fixtureDrivenAmbientIntensity(
+                        fewerLights, lighting.ambientIntensity);
+                    passed &= renderer.render(width, height, camera, pilotEnemies,
+                        {}, breakableProps, fewerLights, room, {}, {}, {}, hud,
+                        marks);
+                    passed &= renderer.render(width, height, camera, pilotEnemies,
+                        {}, breakableProps, fewerLights, room, {}, {}, {}, hud,
+                        marks);
+                    passed &= renderer.lastFrameStats().geometryShadowMaps
+                        == remaining;
+                    glFinish();
+                    std::vector<std::uint8_t> fewerPixels(pixels.size());
+                    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                        fewerPixels.data());
+                    std::uint64_t boxBrightness = 0U;
+                    std::size_t changedPixels = 0U;
+                    for (int y = 220; y < 415; ++y) {
+                        for (int x = 500; x < 780; ++x) {
+                            const std::size_t offset
+                                = static_cast<std::size_t>((y * width + x) * 4);
+                            for (int channel = 0; channel < 3; ++channel) {
+                                boxBrightness += fewerPixels[offset + channel];
+                            }
+                        }
+                    }
+                    for (std::size_t offset = 0; offset < pixels.size();
+                         offset += 4U) {
+                        const int delta = std::abs(int(previousPixels[offset])
+                                - int(fewerPixels[offset]))
+                            + std::abs(int(previousPixels[offset + 1U])
+                                - int(fewerPixels[offset + 1U]))
+                            + std::abs(int(previousPixels[offset + 2U])
+                                - int(fewerPixels[offset + 2U]));
+                        if (delta > 30) ++changedPixels;
+                    }
+                    if (remaining == 4U) {
+                        for (int y = 220; y < 415; ++y) {
+                            for (int x = 500; x < 780; ++x) {
+                                const std::size_t offset = static_cast<std::size_t>(
+                                    (y * width + x) * 4);
+                                for (int channel = 0; channel < 3; ++channel) {
+                                    previousBoxBrightness += pixels[offset + channel];
+                                }
+                            }
+                        }
+                    }
+                    std::cout << "Hub box with " << remaining
+                        << " lights: box brightness " << boxBrightness
+                        << ", changed pixels " << changedPixels << '\n';
+                    passed &= previousBoxBrightness > boxBrightness
+                        && changedPixels > 500U && glGetError() == GL_NO_ERROR;
+                    previousBoxBrightness = boxBrightness;
+                    previousPixels = fewerPixels;
+                    std::vector<std::uint8_t> topDown(fewerPixels.size());
+                    const std::size_t rowBytes
+                        = static_cast<std::size_t>(width * 4);
+                    for (int row = 0; row < height; ++row) {
+                        std::copy_n(fewerPixels.data()
+                                + static_cast<std::size_t>(height - row - 1)
+                                    * rowBytes,
+                            rowBytes, topDown.data()
+                                + static_cast<std::size_t>(row) * rowBytes);
+                    }
+                    const auto path = std::filesystem::path{directory}
+                        / ("shadow_box_" + std::to_string(remaining)
+                            + "_lights_fov60.bmp");
+                    SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                        SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                    passed &= surface
+                        && SDL_SaveBMP(surface, path.string().c_str());
+                    if (surface) SDL_DestroySurface(surface);
+                }
+            }
+            if (centralHub && !shadowPilot && !blackout && !potato && fov == 60.0F
+                && variant == 0) {
+                RoomLightingRenderData withoutShadows = frameLighting;
+                withoutShadows.shadowLightCount = 0U;
+                withoutShadows.shadowOccluderCount = 0U;
+                passed &= renderer.render(width, height, camera, {}, {},
+                    breakableProps, withoutShadows, room, {}, {}, {}, hud, marks);
+                glFinish();
+                std::vector<std::uint8_t> withoutShadowPixels(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    withoutShadowPixels.data());
+                std::size_t shadowedFloorPixels = 0U;
+                for (int y = 0; y < height / 2; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const std::size_t pixel
+                            = static_cast<std::size_t>((y * width + x) * 4);
+                        const int lit = withoutShadowPixels[pixel]
+                            + withoutShadowPixels[pixel + 1U]
+                            + withoutShadowPixels[pixel + 2U];
+                        const int shadowed = pixels[pixel] + pixels[pixel + 1U]
+                            + pixels[pixel + 2U];
+                        if (lit > shadowed + 30) ++shadowedFloorPixels;
+                    }
+                }
+                if (shadowedFloorPixels <= 500U) {
+                    std::cerr << "Central Hub column casts no visible floor shadow: "
+                        << shadowedFloorPixels << " pixels\n";
+                }
+                passed &= shadowedFloorPixels > 500U;
+                RoomLightingRenderData squareColumnShadow = frameLighting;
+                squareColumnShadow.shadowOccluders[0].octagonalPrism = false;
+                passed &= renderer.render(width, height, camera, {}, {},
+                    breakableProps, squareColumnShadow, room, {}, {}, {}, hud, marks);
+                glFinish();
+                std::vector<std::uint8_t> squareShadowPixels(pixels.size());
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                    squareShadowPixels.data());
+                std::size_t correctedShadowPixels = 0U;
+                for (int y = 0; y < height / 2; ++y) {
+                    for (int x = 0; x < width; ++x) {
+                        const std::size_t pixel
+                            = static_cast<std::size_t>((y * width + x) * 4);
+                        const int square = squareShadowPixels[pixel]
+                            + squareShadowPixels[pixel + 1U]
+                            + squareShadowPixels[pixel + 2U];
+                        const int octagonal = pixels[pixel] + pixels[pixel + 1U]
+                            + pixels[pixel + 2U];
+                        if (octagonal > square + 20) ++correctedShadowPixels;
+                    }
+                }
+                if (correctedShadowPixels <= 20U) {
+                    std::cerr << "Central Hub bevels did not correct the floor shadow: "
+                        << correctedShadowPixels << " pixels\n";
+                }
+                passed &= correctedShadowPixels > 20U;
+            }
+            std::vector<std::uint8_t> topDown(pixels.size());
+            const std::size_t stride = static_cast<std::size_t>(width * 4);
+            for (int row = 0; row < height; ++row) {
+                std::copy_n(pixels.data()
+                        + static_cast<std::size_t>(height - row - 1) * stride,
+                    stride,
+                    topDown.data() + static_cast<std::size_t>(row) * stride);
+            }
+            if (blackout && centralHub && !potato && fov == 60.0F) {
+                // An upper shaft patch excludes the route screen and light
+                // strip. It must go dark with the room, then respond to the
+                // flashlight instead of retaining a fixed unlit fill.
+                std::uint64_t channelSum = 0U;
+                for (int y = 120; y < 200; ++y) {
+                    for (int x = 520; x < 580; ++x) {
+                        const std::size_t pixel
+                            = static_cast<std::size_t>((y * width + x) * 4);
+                        channelSum += topDown[pixel] + topDown[pixel + 1U]
+                            + topDown[pixel + 2U];
+                    }
+                }
+                hubShaftBrightness[static_cast<std::size_t>(variant)]
+                    = static_cast<float>(channelSum) / (60.0F * 80.0F * 3.0F);
+            }
+            const std::string prefix = shadowPilot
+                ? std::string{"shadow_pilot_"} + std::to_string(variant) + "_"
+                : blackout
+                ? std::string{centralHub ? "central_hub_"
+                    : cafeteria ? "cafeteria_" : "storage_"}
+                    + (variant == 0 ? "lit_"
+                        : variant == 1 ? "dark_" : "flashlight_")
+                : floorOverview ? "floor_overview_"
+                : floorDetail ? "floor_detail_"
+                : hubHatchDetail ? "hub_hatch_detail_"
+                : hubVentDetail ? "hub_vent_detail_"
+                : hubCeilingDetail ? "hub_ceiling_detail_"
+                : hubDuctDetail ? "hub_duct_detail_"
+                : hubWallPanelDetail ? "hub_wall_panel_detail_"
+                : hubWallVentDetail ? "hub_wall_vent_detail_"
+                : planterDetail ? "planter_detail_"
+                : ductDetail ? "duct_detail_"
+                : trimCornerDetail ? "trim_corner_detail_"
+                : securityConsoleDetail ? "security_console_detail_"
+                : securityCabinetDetail ? "security_cabinet_detail_"
+                : securityCoverDetail ? "security_cover_detail_"
+                : securityCoverCornerDetail ? "security_cover_corner_detail_"
+                : bulletMarkDetail ? "bullet_mark_detail_"
+                : securityIndicatorDetail
+                    ? (variant == 12 ? "security_alarm_on_"
+                        : variant == 13 ? "security_alarm_off_"
+                        : variant == 14 ? "security_reboot_"
+                        : "security_ready_")
+                : laboratoryBenchDetail ? "bench_detail_"
+                : laboratoryContainmentDetail ? "containment_detail_"
+                : laboratoryDomeDetail ? "dome_detail_"
+                : laboratoryDuctDetail ? "lab_duct_detail_"
+                : laboratoryTabletopDetail ? "tabletop_domes_"
+                : counterGrazingDetail ? "counter_grazing_detail_"
+                : counterTopDetail ? "counter_top_detail_"
+                : counterDetail ? "counter_detail_"
+                : storageDuctDetail ? "storage_duct_detail_"
+                : cafeteriaPlantDetail ? "cafeteria_plant_detail_"
+                : cafeteriaDuctDetail ? "cafeteria_duct_detail_"
+                : fixtureDetail
+                    ? (cafeteria ? "furniture_detail_" : "fixture_detail_")
+                    : "";
+            const auto path = std::filesystem::path{directory}
+                / (prefix
+                    + (potato ? "potato" : "ultra")
+                    + "_fov" + std::to_string(static_cast<int>(fov)) + ".bmp");
+            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+            if (surface) SDL_DestroySurface(surface);
+            }
+            if (blackout && centralHub && !potato && fov == 60.0F) {
+                const bool shaftFollowsLighting
+                    = hubShaftBrightness[0] > hubShaftBrightness[1] + 40.0F
+                    && hubShaftBrightness[2] > hubShaftBrightness[1] + 40.0F;
+                if (!shaftFollowsLighting) {
+                    std::cerr << "Hub shaft ignores room lighting: lit="
+                        << hubShaftBrightness[0] << " dark="
+                        << hubShaftBrightness[1] << " flashlight="
+                        << hubShaftBrightness[2] << '\n';
+                }
+                passed &= shaftFollowsLighting;
+            }
+        }
+    }
+    return passed;
+}
+
+bool captureIndustrialCorridorPreview(
+    gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* directory = std::getenv("GDP_INDUSTRIAL_CORRIDOR_CAPTURE_DIR");
+    if (!directory || !*directory) return false;
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    if (!renderer.prepareIndustrialRoomMaterials(20261031U)) return false;
+    const std::uint64_t materialKey = renderer.activeRoomMaterialKey();
+    RoomRenderData startRoom;
+    startRoom.worldBounds = {{-3.85F, 0.0F, -4.85F},
+        {3.85F, 4.0F, 4.85F}};
+    startRoom.materialKey = materialKey;
+    RoomRenderData destination;
+    destination.worldBounds = {{-3.85F, 0.0F, -24.85F},
+        {3.85F, 4.0F, -15.15F}};
+    destination.materialKey = materialKey;
+    const std::array points{
+        wkc::core::Vec3{0.0F, 0.0F, -4.85F},
+        wkc::core::Vec3{0.0F, 0.0F, -15.15F},
+    };
+    const std::array corridor{
+        CorridorRenderData{points, 2.4F, 2.8F, materialKey},
+    };
+    const std::array doors{
+        DoorRenderData{{0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F},
+            2.4F, 2.8F, false, 1.0F},
+        DoorRenderData{{0.0F, 0.0F, -15.15F}, {0.0F, 0.0F, 1.0F},
+            2.4F, 2.8F, false, 1.0F},
+    };
+    RoomLightingRenderData lighting;
+    lighting.ambientColor = {0.76F, 0.79F, 0.82F};
+    lighting.ambientIntensity = 0.37F;
+    lighting.lightCount = 2U;
+    lighting.lights[0] = {{0.0F, 2.45F, -7.0F},
+        {0.95F, 0.89F, 0.78F}, 1.15F, 7.0F};
+    lighting.lights[1] = {{0.0F, 2.45F, -11.0F},
+        {0.95F, 0.89F, 0.78F}, 1.15F, 7.0F};
+    bool passed = true;
+    for (const bool potato : {false, true}) {
+        for (const float fov : {60.0F, 100.0F}) {
+            CameraData camera;
+            camera.position = {0.0F, 1.62F, -6.5F};
+            camera.forward = {0.0F, -0.02F, -1.0F};
+            camera.verticalFieldOfViewDegrees = fov;
+            HudRenderData hud;
+            hud.graphicsQuality = potato
+                ? HudGraphicsQuality::Potato : HudGraphicsQuality::Ultra;
+            hud.detailedMaterials = !potato;
+            hud.worldRenderScalePercent = potato ? 50U : 100U;
+            passed &= renderer.render(width, height, camera, {}, {}, {},
+                lighting, startRoom, doors, corridor,
+                std::span<const RoomRenderData>{&destination, 1U}, hud);
+            glFinish();
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pixels.data());
+            passed &= glGetError() == GL_NO_ERROR;
+            std::vector<std::uint8_t> topDown(pixels.size());
+            const std::size_t stride = static_cast<std::size_t>(width * 4);
+            for (int row = 0; row < height; ++row) {
+                std::copy_n(pixels.data()
+                        + static_cast<std::size_t>(height - row - 1) * stride,
+                    stride,
+                    topDown.data() + static_cast<std::size_t>(row) * stride);
+            }
+            const auto path = std::filesystem::path{directory}
+                / (std::string{potato ? "potato" : "ultra"}
+                    + "_fov" + std::to_string(static_cast<int>(fov)) + ".bmp");
+            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+            if (surface) SDL_DestroySurface(surface);
+        }
+    }
+    return passed;
+}
 
 struct InstancingPixelComparison {
     unsigned maximumDelta{0U};
@@ -958,6 +1848,82 @@ bool validateNewWeaponVisuals(gdp::game::visual::GdpRenderer& renderer)
         const auto drop = readFrame();
         passed &= floor != drop && save(drop, name + "-ground");
     }
+    // A grenade with only its dark housing visible still changes pixels, but
+    // fails the visual contract: its orange armor must read while held.
+    {
+        CameraData camera;
+        HudRenderData quality;
+        passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+            {}, {}, {}, {}, quality);
+        const auto baseline = readFrame();
+        WeaponViewmodelRenderData held{
+            .visible = true, .grenadeSelected = true,
+            .grenadeVisible = true, .role = HudWeaponRole::Pistol};
+        passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+            {}, {}, {}, {}, quality, {}, held);
+        const auto pixels = readFrame();
+        std::size_t visibleOrange = 0U;
+        for (std::size_t index = 0U; index < pixels.size(); index += 4U) {
+            if (pixels[index] > 70U
+                && pixels[index] > pixels[index + 1U] + 18U
+                && pixels[index + 1U] > pixels[index + 2U] + 6U
+                && (pixels[index] != baseline[index]
+                    || pixels[index + 1U] != baseline[index + 1U]
+                    || pixels[index + 2U] != baseline[index + 2U])) {
+                ++visibleOrange;
+            }
+        }
+        if (visibleOrange < 8U) {
+            std::cerr << "Held grenade lost its orange armor: pixels="
+                << visibleOrange << '\n';
+            passed = false;
+        }
+    }
+    if (capture) {
+        for (const bool potato : {false, true}) {
+            HudRenderData quality;
+            quality.detailedMaterials = !potato;
+            quality.worldRenderScalePercent = potato ? 50U : 100U;
+            quality.graphicsQuality = potato
+                ? HudGraphicsQuality::Potato : HudGraphicsQuality::Medium;
+            for (const float fov : {60.0F, 100.0F}) {
+                CameraData camera;
+                camera.verticalFieldOfViewDegrees = fov;
+                const std::string suffix = std::string{potato ? "potato" : "medium"}
+                    + "-fov" + std::to_string(static_cast<int>(fov));
+                for (const auto& [role, name] : std::array{
+                         std::pair{HudWeaponRole::Pistol, "pistol"},
+                         std::pair{HudWeaponRole::Knife, "knife"},
+                         std::pair{HudWeaponRole::Sniper, "sniper"},
+                         std::pair{HudWeaponRole::Shotgun, "shotgun"},
+                         std::pair{HudWeaponRole::SubmachineGun, "smg"}}) {
+                    WeaponViewmodelRenderData weapon{
+                        .visible = true, .role = role, .visualSeed = 1717U};
+                    passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+                        {}, {}, {}, {}, quality, {}, weapon);
+                    passed &= save(readFrame(), std::string{name} + "-" + suffix);
+                }
+                WeaponViewmodelRenderData rifle{
+                    .visible = true, .role = HudWeaponRole::Carbine,
+                    .visualSeed = 1717U};
+                passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+                    {}, {}, {}, {}, quality, {}, rifle);
+                passed &= save(readFrame(), "rifle-" + suffix);
+                WeaponViewmodelRenderData grenade{
+                    .visible = true, .grenadeSelected = true,
+                    .grenadeVisible = true, .role = HudWeaponRole::Pistol};
+                passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+                    {}, {}, {}, {}, quality, {}, grenade);
+                passed &= save(readFrame(), "grenade-hand-" + suffix);
+                grenade.grenadePriming = true;
+                grenade.grenadePinProgress = 1.0F;
+                grenade.grenadeChargeStrength = 1.0F;
+                passed &= renderer.render(width, height, camera, {}, {}, {}, {},
+                    {}, {}, {}, {}, quality, {}, grenade);
+                passed &= save(readFrame(), "grenade-held-after-pin-" + suffix);
+            }
+        }
+    }
     if (!passed) std::cerr << "Approved new weapon silhouettes failed pixel validation\n";
     return passed;
 }
@@ -1019,7 +1985,14 @@ bool validateSniperScope(gdp::game::visual::GdpRenderer& renderer)
         }
         passed &= isDark(cx + outer, cy + 4) && isDark(cx + 4, cy + outer);
         // White standard crosshair is not also painted over the optical reticle.
-        passed &= isDark(cx + 8, cy) && isDark(cx, cy + 8);
+        const auto reticleDarkens = [&](int x, int y) {
+            const auto i = offset(x, y);
+            return scope[i] <= 8U && scope[i + 1U] <= 8U && scope[i + 2U] <= 8U
+                && scope[i] + 8U < reference[i]
+                && scope[i + 1U] + 8U < reference[i + 1U]
+                && scope[i + 2U] + 8U < reference[i + 2U];
+        };
+        passed &= reticleDarkens(cx + 8, cy) && reticleDarkens(cx, cy + 8);
         const auto center = offset(cx, cy);
         passed &= scope[center] > 160U && scope[center + 1U] > 160U;
 
@@ -1077,7 +2050,14 @@ bool validateSniperScope(gdp::game::visual::GdpRenderer& renderer)
             model.aimStrength = 1.0F;
             const auto other = frame(model, hud);
             model.aimStrength = 0.0F;
-            passed &= other == frame(model, hud) && sameCenter(other, reference);
+            const bool stable = other == frame(model, hud);
+            // A longer weapon or raised knife may cross the small center
+            // fixture. Check that it does not enable the sniper's dark mask.
+            const auto corner = offset(2, 2);
+            const bool unmasked = std::equal(other.begin() + static_cast<std::ptrdiff_t>(corner),
+                other.begin() + static_cast<std::ptrdiff_t>(corner + 3U),
+                reference.begin() + static_cast<std::ptrdiff_t>(corner));
+            passed &= stable && unmasked;
         }
         model.role = HudWeaponRole::Sniper;
         // Return to aim, then release: no stale shader mode left on UI or next frame.
@@ -1138,6 +2118,42 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--worker-limb-capture";
     const bool enemyReferenceCapture = argc == 2
         && std::string{argv[1]} == "--enemy-reference-capture";
+    const bool storageRackCapture = argc == 2
+        && std::string{argv[1]} == "--storage-rack-capture";
+    const bool cafeteriaCapture = argc == 2
+        && std::string{argv[1]} == "--cafeteria-furniture-capture";
+    const bool cafeteriaLongCapture = argc == 2
+        && std::string{argv[1]} == "--cafeteria-long-capture";
+    const bool blackoutCapture = argc == 2
+        && std::string{argv[1]} == "--room-blackout-capture";
+    const bool laboratoryCapture = argc == 2
+        && std::string{argv[1]} == "--laboratory-capture";
+    const bool technicalCapture = argc == 2
+        && std::string{argv[1]} == "--technical-capture";
+    const bool technicalLCapture = argc == 2
+        && std::string{argv[1]} == "--technical-l-capture";
+    const bool securityCapture = argc == 2
+        && std::string{argv[1]} == "--security-capture";
+    const bool securityTCapture = argc == 2
+        && std::string{argv[1]} == "--security-t-capture";
+    const bool centralHubCapture = argc == 2
+        && std::string{argv[1]} == "--central-hub-capture";
+    const bool centralHubShadowCapture = argc == 2
+        && std::string{argv[1]} == "--central-hub-shadow-capture";
+    const bool storageShadowCapture = argc == 2
+        && std::string{argv[1]} == "--storage-shadow-capture";
+    const bool cafeteriaShadowCapture = argc == 2
+        && std::string{argv[1]} == "--cafeteria-shadow-capture";
+    const bool securityShadowCapture = argc == 2
+        && std::string{argv[1]} == "--security-shadow-capture";
+    const bool laboratoryShadowCapture = argc == 2
+        && std::string{argv[1]} == "--laboratory-shadow-capture";
+    const bool centralHubBlackoutCapture = argc == 2
+        && std::string{argv[1]} == "--central-hub-blackout-capture";
+    const bool bossColumnsCapture = argc == 2
+        && std::string{argv[1]} == "--boss-columns-capture";
+    const bool industrialCorridorCapture = argc == 2
+        && std::string{argv[1]} == "--industrial-corridor-capture";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -1308,6 +2324,48 @@ int main(const int argc, char** argv)
             passed = captureWorkerLimbVariation(renderer);
         } else if (enemyReferenceCapture) {
             passed = captureEnemyReferenceModels(renderer);
+        } else if (storageRackCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Storage);
+        } else if (cafeteriaCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Cafeteria);
+        } else if (cafeteriaLongCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::CafeteriaLong);
+        } else if (blackoutCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Cafeteria, true)
+                && captureRoomPreview(renderer, RoomPreviewKind::Storage, true);
+        } else if (laboratoryCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Laboratory);
+        } else if (technicalCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Technical);
+        } else if (technicalLCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::TechnicalL);
+        } else if (securityCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Security);
+        } else if (securityTCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::SecurityT);
+        } else if (centralHubCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub);
+        } else if (centralHubShadowCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub,
+                false, true);
+        } else if (storageShadowCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Storage,
+                false, true);
+        } else if (cafeteriaShadowCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Cafeteria,
+                false, true);
+        } else if (securityShadowCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Security,
+                false, true);
+        } else if (laboratoryShadowCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Laboratory,
+                false, true);
+        } else if (centralHubBlackoutCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub, true);
+        } else if (bossColumnsCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Boss);
+        } else if (industrialCorridorCapture) {
+            passed = captureIndustrialCorridorPreview(renderer);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {
@@ -1340,6 +2398,45 @@ int main(const int argc, char** argv)
             const std::uint64_t storageMaterialKey = renderer.activeRoomMaterialKey();
             std::vector<std::uint8_t> storagePixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, storagePixels.data());
+            std::array<gdp::world::RoomArchitecturePart, 1> rackParts{
+                gdp::world::RoomArchitecturePart{
+                    {{-0.7F, 0.0F, -1.0F}, {0.7F, 2.0F, 0.0F}},
+                    {0.39F, 0.35F, 0.30F}, true, false, true,
+                    gdp::world::StorageRackPart::Upright},
+            };
+            gdp::game::visual::RoomRenderData rackRoom;
+            rackRoom.materialKey = storageMaterialKey;
+            rackRoom.architectureParts = rackParts;
+            rackRoom.customArchitecture = true;
+            const bool renderedTexturedRack = renderer.render(
+                width, height, {}, {}, {}, {}, {}, rackRoom);
+            std::vector<std::uint8_t> texturedRackPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                texturedRackPixels.data());
+            rackParts[0].storageRackPart = gdp::world::StorageRackPart::Shelf;
+            const bool renderedShelfRack = renderer.render(
+                width, height, {}, {}, {}, {}, {}, rackRoom);
+            std::vector<std::uint8_t> shelfRackPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                shelfRackPixels.data());
+            rackParts[0].storageRack = false;
+            const bool renderedGenericRack = renderer.render(
+                width, height, {}, {}, {}, {}, {}, rackRoom);
+            std::vector<std::uint8_t> genericRackPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                genericRackPixels.data());
+            std::size_t rackChangedChannels = 0U;
+            std::size_t rackRoleChangedChannels = 0U;
+            for (std::size_t index = 0U; index < texturedRackPixels.size(); ++index) {
+                rackChangedChannels += texturedRackPixels[index]
+                    != genericRackPixels[index];
+                rackRoleChangedChannels += texturedRackPixels[index]
+                    != shelfRackPixels[index];
+            }
+            const bool storageRackMaterialVisible = renderedTexturedRack
+                && renderedShelfRack && renderedGenericRack
+                && rackChangedChannels > 100U
+                && rackRoleChangedChannels > 100U;
 
             const bool renderedCombatVariant = renderer.prepareCombatRoomMaterials(13579)
                 && renderer.render(width, height);
@@ -1349,8 +2446,38 @@ int main(const int argc, char** argv)
             const bool renderedCafeteriaVariant
                 = renderer.prepareCafeteriaRoomMaterials(97531)
                 && renderer.render(width, height);
+            const std::uint64_t cafeteriaMaterialKey
+                = renderer.activeRoomMaterialKey();
             std::vector<std::uint8_t> cafeteriaPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, cafeteriaPixels.data());
+            std::array<gdp::world::RoomArchitecturePart, 1> furnitureParts{
+                gdp::world::RoomArchitecturePart{
+                    {{-0.7F, 0.0F, -1.0F}, {0.7F, 2.0F, 0.0F}},
+                    {0.49F, 0.50F, 0.48F}, true, false, false,
+                    gdp::world::StorageRackPart::None,
+                    gdp::world::CafeteriaFurniturePart::Steel},
+            };
+            gdp::game::visual::RoomRenderData furnitureRoom;
+            furnitureRoom.materialKey = cafeteriaMaterialKey;
+            furnitureRoom.architectureParts = furnitureParts;
+            furnitureRoom.customArchitecture = true;
+            const bool renderedTexturedFurniture = renderer.render(
+                width, height, {}, {}, {}, {}, {}, furnitureRoom);
+            std::vector<std::uint8_t> texturedFurniturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                texturedFurniturePixels.data());
+            furnitureParts[0].cafeteriaFurniturePart
+                = gdp::world::CafeteriaFurniturePart::None;
+            const bool renderedGenericFurniture = renderer.render(
+                width, height, {}, {}, {}, {}, {}, furnitureRoom);
+            std::vector<std::uint8_t> genericFurniturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                genericFurniturePixels.data());
+            std::size_t furnitureChangedChannels = 0U;
+            for (std::size_t index = 0U; index < texturedFurniturePixels.size(); ++index) {
+                furnitureChangedChannels += texturedFurniturePixels[index]
+                    != genericFurniturePixels[index];
+            }
 
             const bool renderedLaboratoryVariant
                 = renderer.prepareLaboratoryRoomMaterials(86420)
@@ -1401,6 +2528,40 @@ int main(const int argc, char** argv)
             std::vector<std::uint8_t> darkPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 darkPixels.data());
+            // Fixture meshes must remain visible when the shader light budget
+            // is exhausted, as when looking into the next room from a corridor.
+            auto fixtureBudgetLighting = darkLighting;
+            fixtureBudgetLighting.visibleFixturesPopulated = true;
+            fixtureBudgetLighting.visibleFixtures.assign(
+                proceduralLighting.lights.begin(),
+                proceduralLighting.lights.begin() + 2);
+            const bool renderedTwoFixtures = renderer.render(
+                width, height, {}, {}, {}, {}, fixtureBudgetLighting);
+            std::vector<std::uint8_t> twoFixturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                twoFixturePixels.data());
+            fixtureBudgetLighting.visibleFixtures.assign(
+                proceduralLighting.lights.begin(),
+                proceduralLighting.lights.begin() + proceduralLighting.lightCount);
+            const bool renderedAllFixtures = renderer.render(
+                width, height, {}, {}, {}, {}, fixtureBudgetLighting);
+            std::vector<std::uint8_t> allFixturePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                allFixturePixels.data());
+            std::size_t extraFixturePixels = 0U;
+            for (std::size_t index = 0U; index < baseline.size(); index += 4U) {
+                const int difference = std::abs(
+                    static_cast<int>(allFixturePixels[index])
+                    - static_cast<int>(twoFixturePixels[index]));
+                if (difference >= 12) {
+                    ++extraFixturePixels;
+                }
+            }
+            passed &= renderedTwoFixtures && renderedAllFixtures
+                && extraFixturePixels > 20U;
+            if (extraFixturePixels <= 20U) {
+                std::cerr << "Visible fixture meshes still follow the shader light budget\n";
+            }
             darkLighting.flashlightEnabled = true;
             darkLighting.flashlightPosition = {0.0F, 1.62F, 4.0F};
             darkLighting.flashlightDirection = {0.0F, 0.0F, -1.0F};
@@ -1414,6 +2575,62 @@ int main(const int argc, char** argv)
                 if (static_cast<int>(darkFlashlightPixels[index])
                         - static_cast<int>(darkPixels[index]) >= 20) {
                     ++darkBeamPixels;
+                }
+            }
+            gdp::game::visual::RoomLightingRenderData neighbourLighting
+                = proceduralLighting;
+            neighbourLighting.ambientIntensity = 0.006F;
+            neighbourLighting.lightCount = 1U;
+            neighbourLighting.lights[0].position = {20.0F, 3.5F, -4.0F};
+            neighbourLighting.lights[0].intensity = 4.0F;
+            neighbourLighting.lights[0].range = 50.0F;
+            neighbourLighting.lights[0].sourceRoomBounds = {
+                {18.0F, 0.0F, -6.0F}, {22.0F, 4.0F, -2.0F}};
+            neighbourLighting.lights[0].boundedToRoom = true;
+            const bool renderedBoundedNeighbour = renderer.render(
+                width, height, {}, {}, {}, {}, neighbourLighting);
+            std::vector<std::uint8_t> boundedNeighbourPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                boundedNeighbourPixels.data());
+            neighbourLighting.lights[0].boundedToRoom = false;
+            const bool renderedUnboundedNeighbour = renderer.render(
+                width, height, {}, {}, {}, {}, neighbourLighting);
+            std::vector<std::uint8_t> unboundedNeighbourPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                unboundedNeighbourPixels.data());
+            std::size_t neighbourLeakPixels = 0U;
+            for (std::size_t index = 0U; index < baseline.size(); index += 4U) {
+                if (unboundedNeighbourPixels[index]
+                    > boundedNeighbourPixels[index] + 8U) {
+                    ++neighbourLeakPixels;
+                }
+            }
+            gdp::game::visual::RoomLightingRenderData ambientRegionLighting
+                = proceduralLighting;
+            ambientRegionLighting.lightCount = 0U;
+            ambientRegionLighting.ambientIntensity = 0.25F;
+            const bool renderedBrightRoom = renderer.render(
+                width, height, {}, {}, {}, {}, ambientRegionLighting);
+            std::vector<std::uint8_t> brightRoomPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                brightRoomPixels.data());
+            ambientRegionLighting.ambientRegionCount = 1U;
+            ambientRegionLighting.ambientRegions[0] = {
+                {{-100.0F, -10.0F, -100.0F},
+                    {100.0F, 20.0F, 100.0F}},
+                {0.70F, 0.78F, 0.88F},
+                0.006F,
+            };
+            const bool renderedDarkRoomRegion = renderer.render(
+                width, height, {}, {}, {}, {}, ambientRegionLighting);
+            std::vector<std::uint8_t> darkRoomRegionPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                darkRoomRegionPixels.data());
+            std::size_t roomAmbientOverridePixels = 0U;
+            for (std::size_t index = 0U; index < baseline.size(); index += 4U) {
+                if (brightRoomPixels[index]
+                    > darkRoomRegionPixels[index] + 8U) {
+                    ++roomAmbientOverridePixels;
                 }
             }
 
@@ -2155,6 +3372,36 @@ int main(const int argc, char** argv)
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 propPixels.data());
 
+            std::array storageBoxProps{
+                gdp::game::visual::PropRenderData{
+                    {0.0F, 0.0F, -1.2F}, {0.80F, 0.88F, 0.80F},
+                    gdp::game::visual::PropVisualRole::StorageBox,
+                    gdp::game::visual::PropVisualState::Intact, 0U},
+            };
+            gdp::game::visual::RoomRenderData storageBoxRoom;
+            storageBoxRoom.customArchitecture = true;
+            (void)renderer.render(width, height, {}, {}, {}, {}, {}, storageBoxRoom);
+            std::vector<std::uint8_t> emptyBoxPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                emptyBoxPixels.data());
+            const bool renderedOliveBox = renderer.render(
+                width, height, {}, {}, {}, storageBoxProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> oliveBoxPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                oliveBoxPixels.data());
+            storageBoxProps.front().visualSeed = 1U;
+            const bool renderedCharcoalBox = renderer.render(
+                width, height, {}, {}, {}, storageBoxProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> charcoalBoxPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                charcoalBoxPixels.data());
+            if (oliveBoxPixels == charcoalBoxPixels) {
+                std::cerr << "Storage box variants rendered identical frames"
+                    << " olive=" << renderedOliveBox
+                    << " charcoal=" << renderedCharcoalBox
+                    << " visible=" << (oliveBoxPixels != emptyBoxPixels) << '\n';
+            }
+
             const bool renderedImpactBaseline = renderer.render(width, height);
             std::vector<std::uint8_t> impactBaselinePixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
@@ -2175,6 +3422,17 @@ int main(const int argc, char** argv)
             std::vector<std::uint8_t> impactPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 impactPixels.data());
+            constexpr std::array bulletMarks{
+                gdp::game::visual::ImpactRenderData{
+                    {-0.22F, 1.62F, 3.0F}, {0.0F, 0.0F, 1.0F},
+                    gdp::game::visual::ImpactVisualMaterial::Metal, 1.0F, 84U,
+                    gdp::game::visual::ImpactVisualKind::BulletMark},
+            };
+            const bool renderedBulletMark = renderer.render(
+                width, height, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, bulletMarks);
+            std::vector<std::uint8_t> bulletMarkPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                bulletMarkPixels.data());
 
             constexpr gdp::game::visual::WeaponViewmodelRenderData pistolViewmodel{
                 .visible = true,
@@ -2390,6 +3648,7 @@ int main(const int argc, char** argv)
             std::size_t pickupChangedChannels = 0;
             std::size_t propChangedChannels = 0;
             std::size_t impactChangedChannels = 0;
+            std::size_t bulletMarkChangedChannels = 0;
             std::size_t pistolViewmodelChangedChannels = 0;
             std::size_t carbineViewmodelChangedChannels = 0;
             std::size_t knifeViewmodelChangedChannels = 0;
@@ -2616,6 +3875,10 @@ int main(const int argc, char** argv)
                         != impactBaselinePixels[index + channel]) {
                         ++impactChangedChannels;
                     }
+                    if (bulletMarkPixels[index + channel]
+                        != impactBaselinePixels[index + channel]) {
+                        ++bulletMarkChangedChannels;
+                    }
                     if (pistolViewmodelPixels[index + channel]
                         != impactBaselinePixels[index + channel]) {
                         ++pistolViewmodelChangedChannels;
@@ -2643,8 +3906,11 @@ int main(const int argc, char** argv)
                 && renderedRoomVariant && repeatedRoom
                 && roomPixels == repeatedRoomPixels && roomChangedChannels > 100U
                 && renderedStorageVariant && themeChangedChannels > 100U
+                && storageRackMaterialVisible
                 && renderedCombatVariant && combatChangedChannels > 100U
                 && renderedCafeteriaVariant && cafeteriaChangedChannels > 100U
+                && renderedTexturedFurniture && renderedGenericFurniture
+                && furnitureChangedChannels > 100U
                 && renderedLaboratoryVariant && laboratoryChangedChannels > 100U
                 && renderedTechnicalVariant && technicalChangedChannels > 100U
                 && renderedSecurityVariant && securityChangedChannels > 100U
@@ -2653,6 +3919,10 @@ int main(const int argc, char** argv)
                 && renderedFlashlight && flashlightChangedChannels > 30U
                 && renderedDarkReference && renderedDarkFlashlight
                 && darkBeamPixels > 500U
+                && renderedBoundedNeighbour && renderedUnboundedNeighbour
+                && neighbourLeakPixels > 500U
+                && renderedBrightRoom && renderedDarkRoomRegion
+                && roomAmbientOverridePixels > 500U
                 && renderedInfoHud && infoHudPixels != functionalHudPixels
                 && renderedPotatoQuality && potatoQualityChangedChannels > 100U
                 && renderedPotatoFlashlight
@@ -2762,8 +4032,13 @@ int main(const int argc, char** argv)
                 && renderedIndustrialRobot && industrialRobotChangedChannels > 100U
                 && renderedPickups && pickupChangedChannels > 100U
                 && renderedProps && propChangedChannels > 100U
+                && renderedOliveBox && renderedCharcoalBox
+                && oliveBoxPixels != emptyBoxPixels
+                && charcoalBoxPixels != emptyBoxPixels
+                && oliveBoxPixels != charcoalBoxPixels
                 && renderedImpactBaseline && renderedImpacts
                 && impactChangedChannels > 10U
+                && renderedBulletMark && bulletMarkChangedChannels > 10U
                 && renderedPistolViewmodel
                 && pistolViewmodelChangedChannels > 100U
                 && renderedCarbineViewmodel
@@ -2791,6 +4066,7 @@ int main(const int argc, char** argv)
                           << fullShadowReferenceStats.shadowShaderOccluderCapacity
                           << '/' << specializedShadowStats.shadowShaderOccluderCapacity
                           << " impact=" << impactChangedChannels
+                          << " bulletMark=" << bulletMarkChangedChannels
                           << " pistol=" << pistolViewmodelChangedChannels
                           << " carbine=" << carbineViewmodelChangedChannels
                           << " knife=" << knifeViewmodelChangedChannels

@@ -1,4 +1,7 @@
 #include "gameplay/RoomTraversal.hpp"
+#include "world/Corridor.hpp"
+#include "world/RoomArchitecture.hpp"
+#include "world/RoomFootprint.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -96,11 +99,49 @@ wkc::core::Aabb corridorSegmentVolume(
 
 void appendFixedRoomSolids(
     const gdp::world::RoomInstance& room,
-    std::vector<wkc::core::Aabb>& solids)
+    std::vector<wkc::core::Aabb>& solids,
+    std::vector<wkc::core::Aabb>& octagonalSolids)
 {
-    const CollisionWorld fixed = CollisionWorld::fixedRoom(
-        room.transform.position, room.rotation);
-    solids.insert(solids.end(), fixed.solids().begin(), fixed.solids().end());
+    const bool authored = room.role == gdp::world::RoomRole::Boss
+        || room.moduleId == gdp::world::bossRoomPreviewModuleId
+        || room.theme == gdp::world::RoomTheme::Storage
+        || room.moduleId == gdp::world::combatRoomPreviewModuleId
+        || room.moduleId == gdp::world::combatGalleryArenaModuleId
+        || room.moduleId == gdp::world::cafeteriaPreviewModuleId
+        || room.moduleId == gdp::world::cafeteriaLongPreviewModuleId
+        || room.moduleId == gdp::world::cafeteriaLongModuleId
+        || room.moduleId == gdp::world::laboratoryPreviewModuleId
+        || room.moduleId == gdp::world::laboratoryHallModuleId
+        || room.moduleId == gdp::world::technicalPreviewModuleId
+        || room.moduleId == gdp::world::technicalLPreviewModuleId
+        || room.moduleId == gdp::world::maintenanceLModuleId
+        || room.moduleId == gdp::world::securityPreviewModuleId
+        || room.moduleId == gdp::world::securityTPreviewModuleId
+        || room.moduleId == gdp::world::securityTModuleId
+        || room.moduleId == gdp::world::centralHubPreviewModuleId
+        || room.moduleId == gdp::world::centralHubModuleId;
+    if (authored) {
+        for (const gdp::world::RoomArchitecturePart& part
+            : gdp::world::makeRoomArchitecture(room)) {
+            if (part.solid && !part.breakable) {
+                solids.push_back(part.bounds);
+                if (part.decoration
+                    == gdp::world::RoomDecorationPart::CentralHubColumnShaft) {
+                    octagonalSolids.push_back(part.bounds);
+                }
+            }
+        }
+    }
+    if (!authored || room.role == gdp::world::RoomRole::Boss
+        || room.moduleId == gdp::world::bossRoomPreviewModuleId) {
+        const CollisionWorld fixed = CollisionWorld::fixedRoom(
+            room.transform.position, room.rotation);
+        solids.insert(solids.end(), fixed.solids().begin(), fixed.solids().end());
+    }
+    for (const gdp::world::RoomArchitecturePart& column
+        : gdp::world::makeRoomWallColumns(room)) {
+        if (column.solid) solids.push_back(column.bounds);
+    }
 }
 
 } // namespace
@@ -208,11 +249,14 @@ CollisionWorld makeRoomNavigationCollision(
     }
 
     std::vector<wkc::core::Aabb> volumes{source->worldBounds};
+    std::vector<std::vector<wkc::core::Vec2>> outlines{source->walkableOutline};
     std::vector<wkc::core::Aabb> solids;
-    appendFixedRoomSolids(*source, solids);
+    std::vector<wkc::core::Aabb> octagonalSolids;
+    appendFixedRoomSolids(*source, solids, octagonalSolids);
     if (doorsLocked) {
         return CollisionWorld::fromWalkableVolumes(
-            std::move(volumes), std::move(solids));
+            std::move(volumes), std::move(solids), source->walkableOutline,
+            std::move(outlines), std::move(octagonalSolids));
     }
 
     for (const gdp::world::CorridorPath& corridor : world.corridors) {
@@ -234,7 +278,11 @@ CollisionWorld makeRoomNavigationCollision(
             continue;
         }
         volumes.push_back(destination->worldBounds);
-        appendFixedRoomSolids(*destination, solids);
+        outlines.push_back(destination->walkableOutline);
+        appendFixedRoomSolids(*destination, solids, octagonalSolids);
+        const auto columns = gdp::world::makeCorridorWallColumns(
+            corridor.points, corridor.width, corridor.height);
+        solids.insert(solids.end(), columns.begin(), columns.end());
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
             // Door thresholds need extra overlap with each room for the
             // largest enemy. At bends, restrict the extension to the visible
@@ -247,10 +295,12 @@ CollisionWorld makeRoomNavigationCollision(
                 index == 0U ? doorwayOverlap : bendOverlap,
                 index + 2U == corridor.points.size()
                     ? doorwayOverlap : bendOverlap));
+            outlines.emplace_back();
         }
     }
     return CollisionWorld::fromWalkableVolumes(
-        std::move(volumes), std::move(solids));
+        std::move(volumes), std::move(solids), source->walkableOutline,
+        std::move(outlines), std::move(octagonalSolids));
 }
 
 std::optional<gdp::world::RoomId> roomContainingPosition(
@@ -258,7 +308,10 @@ std::optional<gdp::world::RoomId> roomContainingPosition(
     const wkc::core::Vec3 feetPosition) noexcept
 {
     for (const gdp::world::RoomInstance& room : world.rooms) {
-        if (room.worldBounds.contains(feetPosition)) {
+        if (room.worldBounds.contains(feetPosition)
+            && (room.walkableOutline.empty()
+                || gdp::world::footprintContainsDisk(
+                    room.walkableOutline, feetPosition))) {
             return room.id;
         }
     }
@@ -281,7 +334,10 @@ std::optional<gdp::world::RoomId> roomContainingCharacter(
             && feetPosition.z >= room.worldBounds.minimum.z + collider.radius
             && feetPosition.z <= room.worldBounds.maximum.z - collider.radius
             && feetPosition.y >= room.worldBounds.minimum.y - 1.0e-4F
-            && top <= room.worldBounds.maximum.y + 1.0e-4F) {
+            && top <= room.worldBounds.maximum.y + 1.0e-4F
+            && (room.walkableOutline.empty()
+                || gdp::world::footprintContainsDisk(
+                    room.walkableOutline, feetPosition, collider.radius))) {
             return room.id;
         }
     }

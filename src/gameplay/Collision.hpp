@@ -23,7 +23,10 @@ public:
     CollisionWorld(wkc::core::Aabb roomBounds, std::vector<wkc::core::Aabb> solids = {});
     [[nodiscard]] static CollisionWorld fromWalkableVolumes(
         std::vector<wkc::core::Aabb> walkableVolumes,
-        std::vector<wkc::core::Aabb> solids = {});
+        std::vector<wkc::core::Aabb> solids = {},
+        std::vector<wkc::core::Vec2> walkableOutline = {},
+        std::vector<std::vector<wkc::core::Vec2>> volumeOutlines = {},
+        std::vector<wkc::core::Aabb> octagonalSolids = {});
 
     [[nodiscard]] static CollisionWorld fixedRoom(
         wkc::core::Vec3 worldOrigin = {},
@@ -36,7 +39,11 @@ public:
 
     [[nodiscard]] const wkc::core::Aabb& roomBounds() const noexcept;
     [[nodiscard]] const std::vector<wkc::core::Aabb>& walkableVolumes() const noexcept;
+    [[nodiscard]] const std::vector<wkc::core::Vec2>& walkableOutline() const noexcept;
+    [[nodiscard]] const std::vector<std::vector<wkc::core::Vec2>>& volumeOutlines() const noexcept;
     [[nodiscard]] const std::vector<wkc::core::Aabb>& solids() const noexcept;
+    [[nodiscard]] const std::vector<wkc::core::Aabb>& octagonalSolids() const noexcept;
+    [[nodiscard]] bool projectileSolidContains(wkc::core::Vec3 point) const noexcept;
     [[nodiscard]] bool canOccupy(
         wkc::core::Vec3 feetPosition,
         CharacterCollider collider = {}) const noexcept;
@@ -48,7 +55,10 @@ private:
     CollisionWorld(
         WalkableVolumesTag,
         std::vector<wkc::core::Aabb> walkableVolumes,
-        std::vector<wkc::core::Aabb> solids);
+        std::vector<wkc::core::Aabb> solids,
+        std::vector<wkc::core::Vec2> walkableOutline,
+        std::vector<std::vector<wkc::core::Vec2>> volumeOutlines,
+        std::vector<wkc::core::Aabb> octagonalSolids);
 
     [[nodiscard]] bool insideWalkable(
         wkc::core::Vec3 feetPosition,
@@ -59,7 +69,10 @@ private:
 
     wkc::core::Aabb roomBounds_;
     std::vector<wkc::core::Aabb> walkableVolumes_;
+    std::vector<wkc::core::Vec2> walkableOutline_;
+    std::vector<std::vector<wkc::core::Vec2>> volumeOutlines_;
     std::vector<wkc::core::Aabb> solids_;
+    std::vector<wkc::core::Aabb> octagonalSolids_;
 };
 
 } // namespace gdp::gameplay

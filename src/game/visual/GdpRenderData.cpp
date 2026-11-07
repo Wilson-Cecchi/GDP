@@ -11,6 +11,71 @@
 #include <vector>
 
 namespace gdp::game::visual {
+ImpactRenderData bulletMarkOnDoor(
+    ImpactRenderData mark, const DoorRenderData& door,
+    const float lateralOffset) noexcept
+{
+    const wkc::core::Vec3 transverse = std::abs(door.outwardNormal.x) > 0.5F
+        ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
+        : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+    const float panelWidth = std::max(0.05F, door.width * 0.5F - 0.02F);
+    const float travel = std::isfinite(door.openFraction)
+        ? std::clamp(door.openFraction, 0.0F, 1.0F) : 0.0F;
+    const float side = lateralOffset < 0.0F ? -1.0F : 1.0F;
+    const float impactHeight = mark.position.y;
+    mark.position = door.position - door.outwardNormal * 0.173F
+        + transverse * (lateralOffset + side * panelWidth * travel);
+    mark.position.y = impactHeight;
+    mark.normal = door.outwardNormal * -1.0F;
+    return mark;
+}
+
+SecurityIndicatorVisual sampleSecurityIndicator(
+    const SecurityIndicatorPhase phase, const float elapsedSeconds) noexcept
+{
+    const float seconds = std::isfinite(elapsedSeconds)
+        ? std::max(0.0F, elapsedSeconds) : 0.0F;
+    switch (phase) {
+    case SecurityIndicatorPhase::Alarm:
+        if (std::fmod(seconds, 2.0F) >= 1.0F) {
+            return {{0.035F, 0.015F, 0.012F}, 0.0F};
+        }
+        return {{1.0F, 0.12F, 0.06F}, 1.8F};
+    case SecurityIndicatorPhase::Recovery:
+        return seconds < 3.0F
+            ? SecurityIndicatorVisual{{1.0F, 0.70F, 0.12F}, 1.8F}
+            : SecurityIndicatorVisual{{0.17F, 0.82F, 0.14F}, 1.8F};
+    case SecurityIndicatorPhase::Nominal:
+        return {{0.94F, 0.46F, 0.10F}, 1.8F};
+    }
+    return {{0.94F, 0.46F, 0.10F}, 1.8F};
+}
+
+float fixtureDrivenAmbientIntensity(
+    const RoomLightingRenderData& lighting, const float plannedIntensity) noexcept
+{
+    constexpr float unlitFloor = 0.006F;
+    const std::size_t count = std::min<std::size_t>(
+        lighting.lightCount, maxRenderedRoomLights);
+    if (count == 0U) {
+        return unlitFloor;
+    }
+    float output = 0.0F;
+    float totalWeight = 0.0F;
+    for (std::size_t index = 0U; index < count; ++index) {
+        const float weight = std::isfinite(lighting.lights[index].ambientWeight)
+            ? std::clamp(lighting.lights[index].ambientWeight, 0.0F, 2.0F)
+            : 0.0F;
+        output += weight * std::clamp(
+            lighting.lights[index].fixtureEmissionScale, 0.0F, 1.0F);
+        totalWeight += weight;
+    }
+    const float remaining = totalWeight > 0.0F ? output / totalWeight : 0.0F;
+    return unlitFloor
+        + (std::max(plannedIntensity, unlitFloor) - unlitFloor)
+            * remaining * remaining;
+}
+
 ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count,
     const bool titleScreen)
 {
@@ -1460,11 +1525,11 @@ DroppedWeaponPose sampleDroppedWeaponPose(
     const float yawVariation = static_cast<float>(variation % 51U) - 25.0F;
     const float side = (variation & 0x80U) == 0U ? 1.0F : -1.0F;
     const float settle = t * t * (3.0F - 2.0F * t);
-    const float floorHeight = role == PickupVisualRole::DroppedPistol ? 0.11F
-        : role == PickupVisualRole::DroppedSniper ? (side > 0.0F ? 0.113F : 0.24F)
-        : role == PickupVisualRole::DroppedShotgun ? 0.115F
+    const float floorHeight = role == PickupVisualRole::DroppedPistol ? 0.112F
+        : role == PickupVisualRole::DroppedSniper ? (side > 0.0F ? 0.120F : 0.24F)
+        : role == PickupVisualRole::DroppedShotgun ? 0.139F
         : role == PickupVisualRole::DroppedSubmachineGun
-            ? (side > 0.0F ? 0.16F : 0.115F) : 0.14F;
+            ? (side > 0.0F ? 0.16F : 0.125F) : 0.14F;
     return {
         .yawDegrees = yawVariation + (1.0F - settle) * side * 16.0F,
         .rollDegrees = side * (18.0F + 72.0F * settle),
@@ -1779,6 +1844,10 @@ ShadowBudgetResult optimizeShadowBudget(
     }
     std::stable_sort(ranked.begin(), ranked.end(),
         [](const RankedOccluder& left, const RankedOccluder& right) {
+            if (left.occluder.structuralPriority
+                != right.occluder.structuralPriority) {
+                return left.occluder.structuralPriority;
+            }
             return left.distanceSquared < right.distanceSquared;
         });
 

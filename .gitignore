@@ -6,6 +6,8 @@
 # Visual proposals and validation captures are local review artifacts, not game assets.
 /visual/**/*.png
 /visual/**/*.gif
+/visual/**/*.bmp
+*.blend1
 __pycache__/
 *.pyc
 

@@ -41,13 +41,15 @@ of stowing one weapon and drawing another.
 - The head is deliberately absent: the first-person camera must never see
   a self-intersecting head. A third-person head can be a separate later asset.
 
-The runtime keeps its seven-bone lower-body presentation and separate
+The runtime keeps its seven-bone lower-body presentation and procedural
 first-person hands by default. Set `GDP_PLAYER_RIG_PREVIEW=1` to display the
-exported Blender body during a local playtest; see
+exported Blender torso, legs and arms during a local playtest; see
 `visual/validation/player_blender_game/README.md`. Final retargeting, grip
-alignment and visual approval remain pending.
+cleanup and visual approval remain pending. The preview retargets the separated
+Blender arms to the existing per-weapon hand contacts. Vertical look drives the
+neck control and a small chest bend; the Blender source has no head mesh.
 
-## Runtime preview export: `ISPLYR01`
+## Runtime preview export: `ISPLYR03`
 
 This versioned binary is made from the saved `.blend` without changing it:
 
@@ -57,12 +59,11 @@ blender -b --python-exit-code 1 assets/visual/models/player_rig.blend \
 python3 tools/blender/validate_player_rig_export.py
 ```
 
-`player_rig.isplayer` is 690,196 bytes, with 19 bones, six material groups,
-7,222 triangles and six animation clips. It is an **opt-in preview input**.
-The export omits only `Jacket_CenterZip` (42 vertices, 80 triangles): this
-thin metal detail appeared as a vertical stick in the first-person camera.
-The editable `.blend` and interchange `.glb` still contain the piece. The
-preview omission needs confirmation in a native game capture.
+`player_rig.isplayer` contains 19 bones, 24 mesh groups (four parts by six
+materials), 5,830 triangles and six animation clips. It is an **opt-in preview
+input**. The export omits the center zipper, collar and two shoulder seams,
+which obstructed the first-person camera. The editable `.blend` and interchange
+`.glb` retain those pieces.
 The existing `ISEMESH1` enemy format has rigid pivots
 and cannot represent this weighted Player. The new file uses the existing
 Player vertex shader's two-bone UV encoding and fits its 36-matrix uniform
@@ -71,14 +72,14 @@ array. The renderer loads and samples this file only when the preview flag is se
 All integers and floats are little-endian. Layout, without padding:
 
 ```text
-8 bytes  ASCII "ISPLYR01"
+8 bytes  ASCII "ISPLYR03"
 u32      boneCount = 19
-u32      meshCount = 6
+u32      meshCount = 24
 u32      clipCount = 6
 repeat meshCount:
-  u32    materialId (0..5)
+  u32    materialId (mesh index modulo 6)
   u32    vertexCount
-  u32    indexCount (multiple of 3)
+  u32    indexCount (multiple of 3; both counts may be zero)
   repeat vertexCount: float32 position[3], normal[3], encodedUv[2]
   repeat indexCount: u32 triangleIndex
 repeat clipCount:
@@ -88,6 +89,13 @@ repeat clipCount:
   repeat frameCount * boneCount: float32 skinMatrix[16], column-major
 EOF exactly
 ```
+
+Groups 0–5 are torso and belt, 6–11 legs, 12–17 character left arm and 18–23
+character right arm. The renderer draws torso with a near-camera fade so it
+does not block the crosshair when the player looks down. The two arm groups
+follow the weapon-contact IK in the separate first-person viewmodel pass. The
+world body is scaled to 90% height in this first-person preview, keeping feet
+at floor height and the eyes above the collar; proportions need playtest review.
 
 Bone indices are fixed in this order:
 
@@ -126,6 +134,6 @@ Other clips may start posed, so the sampler should blend from the previous
 state rather than assuming their first frame is identity.
 
 The independent Python reader verifies counts, finite data, weight encoding,
-all indices, 7,222 nondegenerate front-facing triangles, all matrix values,
+all indices, 5,830 nondegenerate front-facing triangles, all matrix values,
 the idle bind frame and exact end of file. This does not validate on-screen
 skin quality or GPU budget; those remain integration/playtest checks.

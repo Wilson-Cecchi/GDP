@@ -80,6 +80,7 @@ enum class PropType : std::uint8_t {
     Canister,
     Barricade,
     CeilingFixture,
+    StorageBox,
 };
 
 enum class PropState : std::uint8_t {

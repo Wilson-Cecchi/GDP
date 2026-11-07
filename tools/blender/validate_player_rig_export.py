@@ -25,22 +25,24 @@ def take(fmt):
     return value
 
 
-assert data[:8] == b"ISPLYR01"
+assert data[:8] == b"ISPLYR03"
 offset = 8
 bone_count, mesh_count, clip_count = take("<3I")
-assert (bone_count, mesh_count, clip_count) == (19, 6, 6)
+assert (bone_count, mesh_count, clip_count) == (19, 24, 6)
 counts = []
 faces_checked = 0
 faces_negative = 0
 faces_degenerate = 0
-for material_id in range(mesh_count):
+for group_id in range(mesh_count):
     mat, vertex_count, index_count = take("<3I")
-    assert mat == material_id
-    assert 0 < vertex_count < 500_000
-    assert 0 < index_count < 1_500_000 and index_count % 3 == 0
+    assert mat == group_id % 6
+    assert 0 <= vertex_count < 500_000
+    assert 0 <= index_count < 1_500_000 and index_count % 3 == 0
+    assert (vertex_count == 0) == (index_count == 0)
     vertices = [take("<8f") for _ in range(vertex_count)]
     indices = take(f"<{index_count}I")
-    assert max(indices) < vertex_count
+    if indices:
+        assert max(indices) < vertex_count
     for position_normal_uv in vertices:
         assert all(math.isfinite(v) for v in position_normal_uv)
         x, y, z, nx, ny, nz, u, v = position_normal_uv
@@ -68,9 +70,11 @@ for material_id in range(mesh_count):
     counts.append((vertex_count, index_count))
 
 assert faces_checked > 1000
-assert counts == [(1148, 3294), (124, 720), (3196, 5304),
-                  (4608, 6768), (446, 924), (1956, 4656)], counts
-assert faces_checked == 7222
+assert all(sum(counts[part*6+i][1] for i in range(6)) > 0
+           for part in range(4)), counts
+assert [counts[12+i][1] for i in range(6)] == [counts[18+i][1]
+                                                   for i in range(6)]
+assert faces_checked == 5830
 assert faces_negative == 0, f"inverted triangles: {faces_negative}/{faces_checked}"
 assert faces_degenerate == 0, f"degenerate triangles: {faces_degenerate}"
 

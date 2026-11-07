@@ -54,6 +54,22 @@ O corpo/cinto v4 do Player ainda aguarda aprovação da prancha, e as animaçõe
 de guardar e sacar armas permanecem em validação visual; esta aprovação dos
 inimigos não se estende a esses itens.
 
+### Versão 0.1.9
+
+Esta versão reúne a modelagem e as texturas novas das salas e de seus móveis,
+os formatos ampliados ou assimétricos, os modelos Blender do Player e das
+armas, as luminárias físicas por tipo de sala e as sombras por geometria. Uma
+luminária fraca adicional preenche parte das sombras das outras; sua quebra
+atualiza a luz e a sombra. Inclui também correções de colisão e tiro entre
+salas, o aviso de teclado ou controle conforme o dispositivo ativo e os
+ajustes recentes de combate e granada.
+
+Worker 1820 e Robot 2030 são os cérebros ativos já promovidos na `main` após
+a avaliação documentada em
+[`05_enemies/ai_evaluation_2026-10-25.md`](05_enemies/ai_evaluation_2026-10-25.md).
+Guard, Officer e Engineer conservam os ativos anteriores; os candidatos da
+auditoria de 02/11 não foram promovidos.
+
 O Download público só muda após CI do SHA exato da `main`, builds das quatro
 plataformas e conclusão do workflow de release.
 

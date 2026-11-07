@@ -14,6 +14,12 @@ namespace gdp::world {
 
 using RoomModuleId = std::uint32_t;
 using RoomId = std::uint32_t;
+inline constexpr RoomModuleId centralHubModuleId = 104U;
+inline constexpr RoomModuleId maintenanceLModuleId = 506U;
+inline constexpr RoomModuleId combatGalleryArenaModuleId = 507U;
+inline constexpr RoomModuleId securityTModuleId = 606U;
+inline constexpr RoomModuleId cafeteriaLongModuleId = 704U;
+inline constexpr RoomModuleId laboratoryHallModuleId = 405U;
 
 enum class RoomRole : std::uint8_t {
     Start,
@@ -72,6 +78,8 @@ struct RoomModule {
     std::vector<SpawnZone> enemyZones;
     std::vector<SpawnZone> lootZones;
     std::vector<SpawnZone> propZones;
+    // Local X/Z polygon; empty keeps the rectangular module footprint.
+    std::vector<wkc::core::Vec2> localOutline;
 
     [[nodiscard]] bool supportsRole(RoomRole role) const noexcept;
 };
@@ -107,6 +115,8 @@ struct RoomInstance {
     wkc::core::Transform transform{};
     wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
     wkc::core::Aabb worldBounds{};
+    // Empty for rectangular modules; world-space X/Z outline for shaped rooms.
+    std::vector<wkc::core::Vec2> walkableOutline;
     std::vector<ConnectorInstance> connectors;
     std::vector<SpawnZone> enemyZones;
     std::vector<SpawnZone> lootZones;

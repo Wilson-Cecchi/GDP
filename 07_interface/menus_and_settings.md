@@ -143,6 +143,15 @@ a origem ao voltar. Display conserva FOV, perfis gráficos, resolução, fullscr
 e VSync; Audio conserva Master/Effects/Ambient/UI. Controls conserva sensibilidade
 e Invert Y e adiciona duas páginas de bindings.
 
+Display também mostra ajustes independentes para Sombras, Materiais Detalhados,
+Escala de Renderização (50–100%, passos de 5%) e Luzes (2–8). Alterar um desses
+valores muda o perfil para `CUSTOM`/`PERSONALIZADO` e salva os valores no
+`settings.toml` (schema 13). Escolher um perfil predefinido restaura todos os
+valores dele. Os perfis POTATO/LOW deixam sombras desligadas; MEDIUM mantém uma
+luminária com sombra; HIGH/ULTRA admitem até oito luminárias com sombra. A
+opção Sombras pode ser desligada sem reduzir o número de luzes da sala.
+Arquivos do schema 12 ou anterior preservam o preset selecionado na migração.
+
 Controls agora separa Keyboard / Mouse de Controller. O primeiro conserva
 sensibilidade, inversão de Y e as duas páginas de teclas; o segundo oferece
 duas páginas de botões remapeáveis com troca ao reutilizar um botão, reset

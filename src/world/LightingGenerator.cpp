@@ -36,10 +36,15 @@ LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
     if (role == RoomRole::Boss) {
         return {RoomLightingMood::Ominous, {0.54F, 0.32F, 0.28F}, {0.94F, 0.44F, 0.30F}};
     }
+    if (role == RoomRole::Hub) {
+        return {RoomLightingMood::Warm, {0.73F, 0.72F, 0.68F},
+            {1.0F, 0.87F, 0.74F}};
+    }
     switch (theme) {
     case RoomTheme::Storage:
-    case RoomTheme::Cafeteria:
         return {RoomLightingMood::Warm, {0.82F, 0.70F, 0.52F}, {1.0F, 0.78F, 0.48F}};
+    case RoomTheme::Cafeteria:
+        return {RoomLightingMood::Warm, {0.84F, 0.81F, 0.75F}, {1.0F, 0.89F, 0.77F}};
     case RoomTheme::Laboratory:
         return {RoomLightingMood::Clinical, {0.68F, 0.84F, 0.88F}, {0.72F, 0.96F, 1.0F}};
     case RoomTheme::Security:
@@ -58,14 +63,14 @@ std::size_t lightCountFor(const RoomRole role, const wkc::core::Aabb bounds) noe
     if (role == RoomRole::Secret) {
         return 1U;
     }
-    if (role == RoomRole::Hub || role == RoomRole::Terminal
-        || role == RoomRole::Arena || role == RoomRole::Boss) {
-        return maxRoomLights;
+    if (role == RoomRole::Hub || role == RoomRole::Terminal || role == RoomRole::Arena
+        || role == RoomRole::Boss) {
+        return maxRoomLights - 1U;
     }
     const float width = bounds.maximum.x - bounds.minimum.x;
     const float depth = bounds.maximum.z - bounds.minimum.z;
     if (isSpaciousNormal(role, bounds)) {
-        return maxRoomLights;
+        return maxRoomLights - 1U;
     }
     return width * depth >= 72.0F ? 3U : 2U;
 }
@@ -123,14 +128,24 @@ RoomLightingPlan generateRoomLightingPlan(
     const bool spaciousBoss = roomBounds.isValid() && role == RoomRole::Boss
         && std::min(width, depth) >= 24.0F
         && std::max(width, depth) >= 28.0F;
+    const bool spaciousCafeteria = roomBounds.isValid()
+        && theme == RoomTheme::Cafeteria && role == RoomRole::Start
+        && std::min(width, depth) >= 15.5F
+        && std::max(width, depth) >= 17.5F;
+    const bool spaciousHub = roomBounds.isValid() && role == RoomRole::Hub
+        && std::min(width, depth) >= 18.0F;
 
     wkc::core::RandomStream random{wkc::core::deriveSeed(
         plan.seed, gdp::game::SeedDomain::Lighting, 1U)};
     const float roleAmbient = role == RoomRole::Secret ? 0.115F
         : spaciousBoss ? 0.21F : role == RoomRole::Boss ? 0.14F
-        : role == RoomRole::Arena ? 0.17F : 0.19F;
+        : role == RoomRole::Arena ? 0.17F
+        : theme == RoomTheme::Cafeteria ? 0.23F : 0.19F;
     plan.ambientIntensity = roleAmbient + random.rangeFloat(-0.012F, 0.012F);
-    plan.fixtureEmissive = random.rangeFloat(0.68F, 0.92F);
+    plan.fixtureEmissive = theme == RoomTheme::Cafeteria
+        && role != RoomRole::Boss && role != RoomRole::Secret
+        ? random.rangeFloat(0.74F, 0.82F)
+        : random.rangeFloat(0.68F, 0.92F);
 
     if (roomBounds.isValid()) {
         constexpr std::array regularAnchors{
@@ -138,23 +153,36 @@ RoomLightingPlan generateRoomLightingPlan(
             wkc::core::Vec2{0.72F, 0.70F},
             wkc::core::Vec2{0.72F, 0.30F},
             wkc::core::Vec2{0.28F, 0.70F},
+            wkc::core::Vec2{0.75F, 0.50F},
         };
         constexpr std::array spaciousAnchors{
             wkc::core::Vec2{0.25F, 0.25F},
             wkc::core::Vec2{0.75F, 0.75F},
             wkc::core::Vec2{0.75F, 0.25F},
             wkc::core::Vec2{0.25F, 0.75F},
+            wkc::core::Vec2{0.75F, 0.50F},
         };
         const bool spaciousNormal = isSpaciousNormal(role, roomBounds);
         const auto& anchors = spaciousBoss || spaciousNormal
+                || spaciousCafeteria || spaciousHub
             ? spaciousAnchors : regularAnchors;
-        const std::size_t count = lightCountFor(role, roomBounds);
-        const float ceiling = roomBounds.maximum.y - 0.16F;
+        const std::size_t mainLightCount = spaciousCafeteria
+            ? maxRoomLights - 1U : lightCountFor(role, roomBounds);
+        const std::size_t count = std::min(maxRoomLights, mainLightCount + 1U);
+        // The four Hub bars follow a symmetric quadrant layout. Their actual
+        // light origins sit with the suspended models, not at the ceiling.
+        const float ceiling = roomBounds.maximum.y
+            - (spaciousHub ? 0.48F : 0.16F);
         for (std::size_t index = 0; index < count; ++index) {
-            const float jitterX = random.rangeFloat(-0.025F, 0.025F);
-            const float jitterZ = random.rangeFloat(-0.025F, 0.025F);
-            const float normalizedX = std::clamp(anchors[index].x + jitterX, 0.15F, 0.85F);
-            const float normalizedZ = std::clamp(anchors[index].y + jitterZ, 0.15F, 0.85F);
+            const bool fillLight = index == mainLightCount;
+            const float jitterX = spaciousHub
+                ? 0.0F : random.rangeFloat(-0.025F, 0.025F);
+            const float jitterZ = spaciousHub
+                ? 0.0F : random.rangeFloat(-0.025F, 0.025F);
+            const wkc::core::Vec2 anchor = fillLight && mainLightCount < 4U
+                ? wkc::core::Vec2{0.50F, 0.50F} : anchors[index];
+            const float normalizedX = std::clamp(anchor.x + jitterX, 0.15F, 0.85F);
+            const float normalizedZ = std::clamp(anchor.y + jitterZ, 0.15F, 0.85F);
             wkc::core::Vec3 lightColor = palette.light;
             const float colorVariation = random.rangeFloat(-0.035F, 0.035F);
             lightColor.x = std::clamp(lightColor.x + colorVariation, 0.0F, 1.0F);
@@ -169,11 +197,22 @@ RoomLightingPlan generateRoomLightingPlan(
                         + ((roomBounds.maximum.z - roomBounds.minimum.z) * normalizedZ),
                 },
                 lightColor,
-                spaciousBoss ? random.rangeFloat(1.05F, 1.25F)
-                    : spaciousNormal ? random.rangeFloat(0.96F, 1.14F)
+                fillLight ? 0.55F
+                    : spaciousBoss ? random.rangeFloat(1.05F, 1.25F)
+                    : theme == RoomTheme::Cafeteria
+                        && (spaciousNormal || spaciousCafeteria)
+                        ? random.rangeFloat(0.96F, 1.08F)
+                    : spaciousNormal || spaciousHub
+                        ? random.rangeFloat(0.96F, 1.14F)
                     : random.rangeFloat(0.86F, 1.16F),
-                spaciousBoss ? random.rangeFloat(11.0F, 11.8F)
-                    : spaciousNormal ? random.rangeFloat(8.5F, 9.3F)
+                fillLight ? (spaciousHub ? 6.5F
+                    : std::clamp(std::min(width, depth) * 0.42F, 4.5F, 8.0F))
+                    : spaciousBoss ? random.rangeFloat(11.0F, 11.8F)
+                    : theme == RoomTheme::Cafeteria
+                        && (spaciousNormal || spaciousCafeteria)
+                        ? random.rangeFloat(8.8F, 9.4F)
+                    : spaciousNormal || spaciousHub
+                        ? random.rangeFloat(8.5F, 9.3F)
                     : random.rangeFloat(4.8F, 6.8F),
             });
         }
