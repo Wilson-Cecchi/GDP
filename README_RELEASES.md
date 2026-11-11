@@ -54,7 +54,11 @@ O corpo/cinto v4 do Player ainda aguarda aprovação da prancha, e as animaçõe
 de guardar e sacar armas permanecem em validação visual; esta aprovação dos
 inimigos não se estende a esses itens.
 
-### Versão 0.1.9
+### Versão 0.1.10
+
+A tag `public-v0.1.9` passou na CI de origem, mas o build Windows falhou antes
+de gerar qualquer pacote público. A versão 0.1.10 leva o mesmo conteúdo com a
+correção de compatibilidade do renderer para MSVC.
 
 Esta versão reúne a modelagem e as texturas novas das salas e de seus móveis,
 os formatos ampliados ou assimétricos, os modelos Blender do Player e das

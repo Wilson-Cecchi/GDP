@@ -398,7 +398,7 @@ wkc::render::MeshData makeCentralHubColumnShaftMesh()
     // A regular octagon inside the existing square collision shaft. Its
     // square plinth remains wider than every bevel at player height.
     constexpr float pi = std::numbers::pi_v<float>;
-    constexpr float radius = 0.5F / std::cos(pi / 8.0F);
+    const float radius = 0.5F / std::cos(pi / 8.0F);
     wkc::render::MeshData mesh;
     mesh.vertices.reserve(32U);
     mesh.indices.reserve(48U);
@@ -682,7 +682,8 @@ void main() {
 }
 )glsl";
 
-constexpr std::string_view fragmentShaderSource = R"glsl(#version 330 core
+const std::string fragmentShaderSource = [] {
+    std::string source{R"glsl(#version 330 core
 #ifndef GDP_LOW_SPEC
 #define GDP_LOW_SPEC 0
 #endif
@@ -869,7 +870,8 @@ float directLightVisibility(
         if (mapIndex == 0) nearest = texture(uShadowCubes[0], fromLight).r;
         else if (mapIndex == 1) nearest = texture(uShadowCubes[1], fromLight).r;
         else if (mapIndex == 2) nearest = texture(uShadowCubes[2], fromLight).r;
-        else if (mapIndex == 3) nearest = texture(uShadowCubes[3], fromLight).r;
+)glsl"};
+    source += R"glsl(        else if (mapIndex == 3) nearest = texture(uShadowCubes[3], fromLight).r;
         else if (mapIndex == 4) nearest = texture(uShadowCubes[4], fromLight).r;
         else if (mapIndex == 5) nearest = texture(uShadowCubes[5], fromLight).r;
         else if (mapIndex == 6) nearest = texture(uShadowCubes[6], fromLight).r;
@@ -1045,7 +1047,8 @@ void main()
     float roughness = 0.72;
     float metalness = 0.0;
     float ambientOcclusion = 1.0;
-    if (uRackPart != 0) {
+)glsl";
+    source += R"glsl(    if (uRackPart != 0) {
         roughness = 0.58;
         metalness = 0.12;
     } else if (uFurniturePart != 0) {
@@ -1239,6 +1242,8 @@ void main()
         uOpacity * edgeOpacity * haloOpacity * bodyOpacity);
 }
 )glsl";
+    return source;
+}();
 
 std::string makeLowSpecFragmentShaderSource()
 {
