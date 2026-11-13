@@ -998,26 +998,29 @@ TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
     recipe.wearAmount = amounts.wear;
     recipe.dirtAmount = amounts.dirt;
     recipe.oilAmount = amounts.oil;
-    recipe.resolution = 64;
+    // v4 keeps room-scale atlases but draws broad steel sheets instead of
+    // repeating one-metre plates. The ceiling retains its neutral v2 tile.
+    recipe.resolution = surface == RoomSurface::Ceiling ? 128U : 64U;
+    recipe.version = surface == RoomSurface::Ceiling ? 2U : 4U;
 
     const float tone = random.rangeFloat(0.94F, 1.05F);
     switch (surface) {
     case RoomSurface::Wall:
         recipe.family = MaterialFamily::PaintedSteel;
-        recipe.baseColor = multiply({0.23F, 0.23F, 0.22F}, tone);
-        recipe.secondaryColor = multiply({0.13F, 0.14F, 0.13F}, tone);
-        recipe.accentColor = {0.71F, 0.48F, 0.0F};
+        recipe.baseColor = multiply({0.35F, 0.34F, 0.32F}, tone);
+        recipe.secondaryColor = multiply({0.29F, 0.28F, 0.27F}, tone);
+        recipe.accentColor = {0.63F, 0.43F, 0.15F};
         recipe.panelColumns = 2;
         recipe.panelRows = 2;
-        recipe.pipeAmount = random.rangeFloat(0.30F, 0.55F);
+        recipe.pipeAmount = 0.0F;
         recipe.oilAmount = 0.0F;
         recipe.mechanicalAmount = random.rangeFloat(0.12F, 0.28F);
         break;
     case RoomSurface::Floor:
         recipe.family = MaterialFamily::BareSteel;
-        recipe.baseColor = multiply({0.20F, 0.21F, 0.20F}, tone);
-        recipe.secondaryColor = multiply({0.12F, 0.13F, 0.12F}, tone);
-        recipe.accentColor = {0.31F, 0.33F, 0.31F};
+        recipe.baseColor = multiply({0.105F, 0.11F, 0.12F}, tone);
+        recipe.secondaryColor = multiply({0.075F, 0.08F, 0.09F}, tone);
+        recipe.accentColor = {0.38F, 0.40F, 0.39F};
         recipe.panelColumns = 2;
         recipe.panelRows = 2;
         recipe.pipeAmount = 0.0F;
@@ -1025,15 +1028,15 @@ TechnicalSurfaceRecipe makeTechnicalSurfaceRecipe(
         break;
     case RoomSurface::Ceiling:
         recipe.family = MaterialFamily::BareSteel;
-        recipe.baseColor = multiply({0.18F, 0.19F, 0.18F}, tone);
-        recipe.secondaryColor = multiply({0.10F, 0.11F, 0.10F}, tone);
-        recipe.accentColor = {0.74F, 0.69F, 0.55F};
+        recipe.baseColor = multiply({0.19F, 0.21F, 0.22F}, tone);
+        recipe.secondaryColor = multiply({0.13F, 0.15F, 0.16F}, tone);
+        recipe.accentColor = {0.30F, 0.32F, 0.33F};
         recipe.panelColumns = 2;
-        recipe.panelRows = static_cast<std::uint8_t>(random.rangeInt(2, 3));
-        recipe.pipeAmount = random.rangeFloat(0.18F, 0.40F);
+        recipe.panelRows = 2;
+        recipe.pipeAmount = 0.0F;
         recipe.oilAmount = 0.0F;
         recipe.mechanicalAmount = random.rangeFloat(0.35F, 0.60F);
-        recipe.emissiveAmount = random.rangeFloat(0.18F, 0.34F);
+        recipe.emissiveAmount = 0.0F;
         break;
     case RoomSurface::Count:
         break;
@@ -2588,7 +2591,7 @@ TechnicalMaterialValidationResult validateTechnicalSurfaceRecipe(
         const bool isCeiling = recipe.surface == RoomSurface::Ceiling;
         if ((isWall && (recipe.family != MaterialFamily::PaintedSteel
                            || recipe.panelRows != 2U
-                           || recipe.pipeAmount <= 0.0F
+                           || recipe.pipeAmount != 0.0F
                            || recipe.oilAmount != 0.0F
                            || recipe.mechanicalAmount <= 0.0F))
             || (isFloor && (recipe.family != MaterialFamily::BareSteel
@@ -2597,10 +2600,10 @@ TechnicalMaterialValidationResult validateTechnicalSurfaceRecipe(
                                || recipe.oilAmount <= 0.0F
                                || recipe.mechanicalAmount <= 0.0F))
             || (isCeiling && (recipe.family != MaterialFamily::BareSteel
-                                 || recipe.pipeAmount <= 0.0F
+                                 || recipe.pipeAmount != 0.0F
                                  || recipe.oilAmount != 0.0F
                                  || recipe.mechanicalAmount <= 0.0F
-                                 || recipe.emissiveAmount <= 0.0F))
+                                 || recipe.emissiveAmount != 0.0F))
             || (!isCeiling && recipe.emissiveAmount != 0.0F)) {
             result.errors.push_back(TechnicalMaterialValidationError::InvalidSurfaceRule);
         }
@@ -2674,6 +2677,188 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
         return std::nullopt;
     }
 
+    if (recipe.version == 4U && recipe.surface != RoomSurface::Ceiling) {
+        // One atlas covers the room at 32 px/m. Wall U follows the complete
+        // perimeter; floor UVs start at the room's minimum X/Z. The plate
+        // layout is therefore continuous at corners and cannot form a short
+        // repeating pattern within a room.
+        const bool wall = recipe.surface == RoomSurface::Wall;
+        wkc::render::ImageData image;
+        image.width = static_cast<int>((wall ? 48U : 12U) * recipe.resolution);
+        image.height = static_cast<int>((wall ? 4U : 12U) * recipe.resolution);
+        image.rgba.resize(static_cast<std::size_t>(image.width)
+            * static_cast<std::size_t>(image.height) * 4U);
+        constexpr std::array wallRowStarts{0U, 32U, 88U, 144U, 200U};
+        constexpr std::array wallPlateWidths{256U, 128U, 112U, 144U, 120U};
+        constexpr std::array wallOffsets{0U, 0U, 56U, 104U, 32U};
+        constexpr std::array oilCenters{
+            std::pair{106, 155}, std::pair{438, 281}, std::pair{272, 522}};
+        for (std::uint32_t y = 0; y < static_cast<std::uint32_t>(image.height); ++y) {
+            const std::uint32_t course = wall
+                ? (y < 32U ? 0U : y < 88U ? 1U : y < 144U ? 2U
+                    : y < 200U ? 3U : 4U)
+                : y / 96U;
+            const std::uint32_t rowStart = wall ? wallRowStarts[course] : course * 96U;
+            const std::uint32_t rowHeight = wall
+                ? (course == 0U ? 32U : course == 4U ? 56U
+                    : wallRowStarts[course + 1U] - rowStart)
+                : 96U;
+            const std::uint32_t plateWidth = wall ? wallPlateWidths[course] : 128U;
+            const std::uint32_t offset = wall ? wallOffsets[course]
+                : (course % 2U == 0U ? 0U : 64U);
+            for (std::uint32_t x = 0; x < static_cast<std::uint32_t>(image.width);
+                 ++x) {
+                const std::uint32_t along = x + offset;
+                const std::uint32_t panelX = along % plateWidth;
+                const std::uint32_t panelY = y - rowStart;
+                const std::uint64_t panelId
+                    = (static_cast<std::uint64_t>(course) << 32U)
+                    | (along / plateWidth);
+                const std::uint64_t pixelId
+                    = (static_cast<std::uint64_t>(y) << 32U) | x;
+                const float panelTone = 0.82F + 0.32F * unitNoise(
+                    wkc::core::hashCombine(recipe.seed, panelId));
+                wkc::core::Vec3 color = multiply(mix(recipe.baseColor,
+                    recipe.secondaryColor, 0.22F), panelTone);
+                if (wall && course == 0U) {
+                    // A continuous one-metre plinth, without square modules.
+                    color = multiply(color, 0.31F);
+                }
+                const float brush = (smoothNoise(recipe.seed ^ 0x4252555348ULL,
+                    x, y / 3U, 31U) - 0.5F) * (wall ? 0.060F : 0.038F);
+                const float macro = (smoothNoise(recipe.seed ^ 0x4D4143524FULL,
+                    x, y, 177U) - 0.5F) * (wall ? 0.065F : 0.035F);
+                const float grain = (unitNoise(wkc::core::hashCombine(
+                    recipe.seed ^ 0x475241494EULL, pixelId)) - 0.5F) * 0.022F;
+                color = add(color, brush + macro + grain);
+                const std::uint32_t edge = std::min({panelX,
+                    plateWidth - 1U - panelX, panelY, rowHeight - 1U - panelY});
+                const bool verticalSeam = panelX < 2U && !(wall && course == 0U);
+                if (verticalSeam || panelY < 2U) {
+                    color = wall ? wkc::core::Vec3{0.10F, 0.10F, 0.10F}
+                                 : wkc::core::Vec3{0.065F, 0.075F, 0.075F};
+                } else if (edge <= 5U) {
+                    color = mix(color, recipe.secondaryColor, 0.27F);
+                    const float chip = unitNoise(wkc::core::hashCombine(
+                        recipe.seed ^ 0x4544474557ULL, pixelId));
+                    if (chip < recipe.wearAmount * 0.10F) {
+                        color = mix(color, {0.43F, 0.42F, 0.39F}, 0.27F);
+                    }
+                }
+                if (wall && course > 0U && edge > 5U) {
+                    // Broad, low-frequency grime at service height and a few
+                    // fine brush marks make the painted sheets read as metal.
+                    const float grime = smoothNoise(recipe.seed ^ 0x534D55444745ULL,
+                        x, y, 83U);
+                    const float lower = course == 1U ? 0.11F : 0.035F;
+                    color = mix(color, {0.22F, 0.19F, 0.17F},
+                        std::max(0.0F, grime - 0.48F) * lower
+                            * (0.5F + recipe.dirtAmount));
+                    const float scratch = unitNoise(wkc::core::hashCombine(
+                        recipe.seed ^ 0x53435241544348ULL,
+                        static_cast<std::uint64_t>(x / 2U) * 131U + y / 17U));
+                    if (scratch > 0.992F && (y % 17U) < 11U) {
+                        color = mix(color, {0.63F, 0.57F, 0.51F},
+                            0.16F * recipe.wearAmount);
+                    }
+                }
+                if (wall && course != 0U && panelX >= 5U && panelX < 7U
+                    && (panelY == 5U || panelY + 6U == rowHeight)) {
+                    color = {0.12F, 0.12F, 0.12F};
+                }
+                if (!wall && edge > 7U && recipe.oilAmount > 0.0F) {
+                    for (const auto& [centerX, centerY] : oilCenters) {
+                        const int dx = static_cast<int>(x) - centerX;
+                        const int dy = static_cast<int>(y) - centerY;
+                        const float distance = static_cast<float>(dx * dx) / 6'400.0F
+                            + static_cast<float>(dy * dy) / 2'025.0F;
+                        if (distance < 1.0F) {
+                            const float opacity = (1.0F - distance)
+                                * recipe.oilAmount * 0.22F;
+                            color = mix(color, {0.09F, 0.10F, 0.10F}, opacity);
+                        }
+                    }
+                }
+                writePixel(image, x, y, color);
+            }
+        }
+        return image;
+    }
+
+    if (recipe.version == 3U && recipe.surface != RoomSurface::Ceiling) {
+        // The atlas covers an entire Technical room at a constant 32 px/m.
+        // Every 2 m cell has its own steel wear and panel tone, so neither
+        // wall nor floor repeats the same four plates across the room.
+        const std::uint32_t columns = recipe.surface == RoomSurface::Wall ? 48U : 12U;
+        const std::uint32_t rows = recipe.surface == RoomSurface::Wall ? 4U : 12U;
+        wkc::render::ImageData atlas;
+        atlas.width = static_cast<int>(columns * recipe.resolution);
+        atlas.height = static_cast<int>(rows * recipe.resolution);
+        atlas.rgba.resize(static_cast<std::size_t>(atlas.width)
+            * static_cast<std::size_t>(atlas.height) * 4U);
+        for (std::uint32_t row = 0; row < rows; ++row) {
+            for (std::uint32_t column = 0; column < columns; ++column) {
+                TechnicalSurfaceRecipe cellRecipe = recipe;
+                cellRecipe.version = 2U;
+                cellRecipe.seed = wkc::core::hashCombine(recipe.seed,
+                    0x544543485F43454CULL + row * columns + column);
+                const float tone = 0.84F + 0.30F * unitNoise(
+                    wkc::core::hashCombine(cellRecipe.seed, 0x544F4E45ULL));
+                const auto feature = wkc::core::hashCombine(
+                    cellRecipe.seed, 0x46454154555245ULL) % 13U;
+                cellRecipe.baseColor = multiply(recipe.baseColor, tone);
+                cellRecipe.secondaryColor = multiply(recipe.secondaryColor, tone);
+                const auto cell = generateTechnicalSurfaceAlbedo(cellRecipe);
+                if (!cell) return std::nullopt;
+                for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+                    const auto source = cell->rgba.begin()
+                        + static_cast<std::ptrdiff_t>(y * recipe.resolution * 4U);
+                    const auto destination = atlas.rgba.begin()
+                        + static_cast<std::ptrdiff_t>(
+                            ((row * recipe.resolution + y) * columns * recipe.resolution
+                                + column * recipe.resolution) * 4U);
+                    std::copy_n(source, recipe.resolution * 4U, destination);
+                    for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+                        const bool accessPanel = recipe.surface == RoomSurface::Wall
+                            && feature <= 1U && x >= 7U && x < 57U
+                            && y >= 10U && y < 54U;
+                        const bool wallStripe = recipe.surface == RoomSurface::Wall
+                            && feature == 2U && x >= 6U && x < 58U
+                            && y >= 28U && y < 36U;
+                        const bool floorHatch = recipe.surface == RoomSurface::Floor
+                            && feature <= 1U && x >= 8U && x < 56U
+                            && y >= 8U && y < 56U;
+                        const bool floorRepair = recipe.surface == RoomSurface::Floor
+                            && feature == 2U && x >= 8U && x < 56U
+                            && y >= 12U && y < 52U;
+                        if (!accessPanel && !wallStripe && !floorHatch && !floorRepair)
+                            continue;
+                        auto* pixel = &*(destination + static_cast<std::ptrdiff_t>(x * 4U));
+                        const bool border = x <= 10U || x >= 53U
+                            || y <= (floorHatch ? 11U : 14U)
+                            || y >= (floorRepair ? 48U : 51U);
+                        if (border) {
+                            pixel[0] = 27U; pixel[1] = 32U; pixel[2] = 34U;
+                        } else if (wallStripe) {
+                            pixel[0] = 120U; pixel[1] = 87U; pixel[2] = 48U;
+                        } else if (floorHatch && y % 8U < 3U) {
+                            pixel[0] = 23U; pixel[1] = 29U; pixel[2] = 30U;
+                        } else {
+                            const float shade = floorRepair ? 0.87F : 0.72F;
+                            for (std::size_t channel = 0; channel < 3U; ++channel) {
+                                pixel[channel] = static_cast<std::uint8_t>(
+                                    static_cast<float>(pixel[channel]) * shade);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return atlas;
+    }
+
+    // One image covers 2 x 2 metres. Each half is a one-metre steel plate;
+    // pipes, vents, grates, warning signs and lights belong to room geometry.
     wkc::render::ImageData image;
     image.width = static_cast<int>(recipe.resolution);
     image.height = static_cast<int>(recipe.resolution);
@@ -2681,123 +2866,80 @@ std::optional<wkc::render::ImageData> generateTechnicalSurfaceAlbedo(
         * static_cast<std::size_t>(recipe.resolution) * 4U);
     const std::uint32_t cellWidth = recipe.resolution / recipe.panelColumns;
     const std::uint32_t cellHeight = recipe.resolution / recipe.panelRows;
+    const std::uint32_t seamWidth = std::max(1U, recipe.resolution / 96U);
+    const std::uint32_t bevelWidth = std::max(4U, recipe.resolution / 32U);
+    const std::uint32_t boltInset = std::max(6U, recipe.resolution / 20U);
+    const std::uint32_t boltRadius = std::max(2U, recipe.resolution / 64U);
+    const wkc::core::Vec3 joint = recipe.surface == RoomSurface::Wall
+        ? wkc::core::Vec3{0.14F, 0.14F, 0.13F}
+        : wkc::core::Vec3{0.07F, 0.09F, 0.10F};
+    const wkc::core::Vec3 exposedSteel = recipe.surface == RoomSurface::Wall
+        ? wkc::core::Vec3{0.51F, 0.49F, 0.45F}
+        : wkc::core::Vec3{0.35F, 0.38F, 0.38F};
+    const std::array boltCenters{
+        std::pair{boltInset, boltInset},
+        std::pair{cellWidth - 1U - boltInset, boltInset},
+        std::pair{boltInset, cellHeight - 1U - boltInset},
+        std::pair{cellWidth - 1U - boltInset, cellHeight - 1U - boltInset},
+    };
 
     for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
         for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
-            const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
-            const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
-                | (x / cellWidth);
-            const float panelBlend = 0.08F + unitNoise(
-                wkc::core::hashCombine(recipe.seed, panelId)) * 0.16F;
-            wkc::core::Vec3 color = mix(
-                recipe.baseColor, recipe.secondaryColor, panelBlend);
             const std::uint32_t panelX = x % cellWidth;
             const std::uint32_t panelY = y % cellHeight;
-            const bool seam = panelX <= 2U || panelY <= 2U;
-            if (seam) {
-                color = multiply(color, 0.48F);
-            }
-            const float wearNoise = unitNoise(wkc::core::hashCombine(
-                recipe.seed ^ 0x7EC471AULL, pixelId));
-            if (!seam && wearNoise < recipe.wearAmount * 0.035F) {
-                color = mix(color, {0.31F, 0.32F, 0.30F}, 0.58F);
+            const std::uint32_t edge = std::min({panelX, panelY,
+                cellWidth - 1U - panelX, cellHeight - 1U - panelY});
+            const std::uint64_t panelId
+                = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+                | (x / cellWidth);
+            const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+            const float panelVariation = 0.10F + 0.18F * unitNoise(
+                wkc::core::hashCombine(recipe.seed, panelId));
+            wkc::core::Vec3 color = mix(
+                recipe.baseColor, recipe.secondaryColor, panelVariation);
+            const float brushing = (smoothNoise(recipe.seed ^ 0x544543485F425255ULL,
+                x, y, 13U) - 0.5F) * 0.025F;
+            const float grain = (unitNoise(wkc::core::hashCombine(
+                recipe.seed ^ 0x544543485F47524EULL, pixelId)) - 0.5F) * 0.014F;
+            color = add(color, brushing + grain);
+
+            if (edge <= seamWidth) {
+                color = joint;
+            } else if (edge <= bevelWidth) {
+                const float bevel = static_cast<float>(bevelWidth - edge + 1U)
+                    / static_cast<float>(bevelWidth - seamWidth);
+                color = mix(color, exposedSteel, bevel * 0.24F);
             }
 
-            if (recipe.surface == RoomSurface::Wall) {
-                const std::uint32_t pipeCount = recipe.pipeAmount > 0.42F ? 2U : 1U;
-                const int pipeHalfWidth = 2 + static_cast<int>(recipe.pipeAmount * 4.0F);
-                for (std::uint32_t pipe = 0; pipe < pipeCount; ++pipe) {
-                    const int centerX = pipe == 0U ? 14 : 34;
-                    const int dx = static_cast<int>(x) - centerX;
-                    if (std::abs(dx) <= pipeHalfWidth) {
-                        if (dx <= -pipeHalfWidth + 1) {
-                            color = {0.10F, 0.11F, 0.10F};
-                        } else if (dx >= pipeHalfWidth - 1) {
-                            color = {0.48F, 0.49F, 0.45F};
-                        } else {
-                            color = {0.31F, 0.32F, 0.30F};
-                        }
-                    }
-                }
-                if (recipe.mechanicalAmount > 0.20F) {
-                    const int dx = static_cast<int>(x) - 14;
-                    const int dy = static_cast<int>(y) - 32;
-                    const int distanceSquared = (dx * dx) + (dy * dy);
-                    if (distanceSquared <= 25 && distanceSquared >= 10) {
-                        color = {0.48F, 0.12F, 0.10F};
-                    } else if (distanceSquared < 10) {
-                        color = recipe.accentColor;
-                    }
-                }
-                const bool box = x >= 44U && x < 59U && y >= 17U && y < 36U;
-                if (box) {
-                    const bool border = x < 46U || x >= 57U || y < 19U || y >= 34U;
-                    color = border ? wkc::core::Vec3{0.32F, 0.33F, 0.31F}
-                                   : wkc::core::Vec3{0.15F, 0.16F, 0.15F};
-                }
-                if (y < 7U && (x < 22U || (pipeCount == 2U && x > 27U && x < 42U))) {
-                    const float dirt = unitNoise(wkc::core::hashCombine(
-                        recipe.seed ^ 0xD127ULL, x / 2U));
-                    if (dirt < recipe.dirtAmount) {
-                        color = multiply(color, 0.62F);
-                    }
-                }
-            } else if (recipe.surface == RoomSurface::Floor) {
-                const bool bolt = ((panelX >= 5U && panelX <= 6U)
-                        || (panelX + 7U >= cellWidth && panelX + 5U < cellWidth))
-                    && ((panelY >= 5U && panelY <= 6U)
-                        || (panelY + 7U >= cellHeight && panelY + 5U < cellHeight));
-                if (bolt) {
-                    color = {0.38F, 0.39F, 0.36F};
-                }
-                if (recipe.mechanicalAmount > 0.17F) {
-                    const bool grate = x >= 8U && x < 29U && y >= 36U && y < 57U;
-                    if (grate) {
-                        const bool frame = x < 11U || x >= 26U || y < 39U || y >= 54U;
-                        color = frame || (x % 4U <= 1U)
-                            ? wkc::core::Vec3{0.27F, 0.28F, 0.26F}
-                            : wkc::core::Vec3{0.07F, 0.08F, 0.07F};
-                    }
-                }
-                const int radiusX = 4 + static_cast<int>(recipe.oilAmount * 18.0F);
-                const int radiusY = std::max(3, radiusX * 2 / 3);
-                const int dx = static_cast<int>(x) - 47;
-                const int dy = static_cast<int>(y) - 17;
-                const int ellipse = (dx * dx * radiusY * radiusY)
-                    + (dy * dy * radiusX * radiusX);
-                const int radiusSquared = radiusX * radiusX * radiusY * radiusY;
-                if (ellipse <= radiusSquared) {
-                    color = ellipse < radiusSquared * 3 / 5
-                        ? wkc::core::Vec3{0.09F, 0.10F, 0.09F}
-                        : mix(color, {0.09F, 0.10F, 0.09F}, 0.56F);
-                }
-            } else {
-                const std::uint32_t panelLinear = (y / cellHeight) * recipe.panelColumns
-                    + (x / cellWidth);
-                const float category = unitNoise(wkc::core::hashCombine(
-                    recipe.seed ^ 0xCE111A6ULL, panelLinear));
-                const std::uint32_t centerX = cellWidth / 2U;
-                const std::uint32_t centerY = cellHeight / 2U;
-                if (category < 0.60F) {
-                    if (panelY >= centerY - 3U && panelY <= centerY + 3U) {
-                        color = panelY == centerY - 3U
-                            ? wkc::core::Vec3{0.08F, 0.09F, 0.08F}
-                            : (panelY == centerY + 3U
-                                    ? wkc::core::Vec3{0.42F, 0.43F, 0.39F}
-                                    : wkc::core::Vec3{0.27F, 0.28F, 0.26F});
-                    }
-                } else if (category < 0.75F) {
-                    const bool duct = panelX >= 7U && panelX + 7U < cellWidth
-                        && panelY >= centerY - 6U && panelY <= centerY + 6U;
-                    if (duct) {
-                        const bool border = panelX < 10U || panelX + 10U >= cellWidth
-                            || panelY == centerY - 6U || panelY == centerY + 6U;
-                        color = border ? wkc::core::Vec3{0.08F, 0.09F, 0.08F}
-                                       : wkc::core::Vec3{0.25F, 0.26F, 0.24F};
-                    }
-                } else if (category < 0.90F
-                    && (panelX == centerX || panelX == centerX + 2U)) {
-                    color = {0.32F, 0.20F, 0.08F};
+            const float wearNoise = unitNoise(wkc::core::hashCombine(
+                recipe.seed ^ 0x544543485F574541ULL, pixelId));
+            if (edge > seamWidth && edge <= bevelWidth + 7U
+                && wearNoise < recipe.wearAmount * 0.14F) {
+                color = mix(color, exposedSteel, 0.48F);
+            }
+            const float grime = smoothNoise(recipe.seed ^ 0x544543485F444952ULL,
+                x, y, 19U);
+            const float dirtThreshold = recipe.dirtAmount
+                * (edge <= bevelWidth + 4U ? 0.45F : 0.08F);
+            if (grime < dirtThreshold) {
+                color = mix(color, joint, recipe.surface == RoomSurface::Wall
+                    ? 0.17F : 0.25F);
+            }
+            if (recipe.surface == RoomSurface::Floor && edge > bevelWidth + 4U
+                && smoothNoise(recipe.seed ^ 0x544543485F4F494CULL,
+                    x, y, 23U) < recipe.oilAmount * 0.45F) {
+                color = mix(color, joint, 0.17F);
+            }
+
+            for (const auto& [boltX, boltY] : boltCenters) {
+                const int dx = static_cast<int>(panelX) - static_cast<int>(boltX);
+                const int dy = static_cast<int>(panelY) - static_cast<int>(boltY);
+                const auto distanceSquared = static_cast<std::uint32_t>(
+                    dx * dx + dy * dy);
+                if (distanceSquared <= boltRadius * boltRadius) {
+                    color = distanceSquared <= (boltRadius / 2U) * (boltRadius / 2U)
+                        ? joint : exposedSteel;
+                    break;
                 }
             }
             writePixel(image, x, y, color);

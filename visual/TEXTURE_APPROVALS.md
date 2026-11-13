@@ -93,6 +93,21 @@ resultado final:
 
 ## Propostas ativas
 
+### Técnica — materiais e props v1
+
+```text
+unidades visuais: Technical/Wall, Technical/Floor, Technical/Ceiling, Technical/Furniture
+versão: v1
+data: 2026-11-11
+proposta: visual/proposals/technical_material_props_v1/README.md
+pranchas: visual/proposals/technical_material_props_v1/scene_concept.png; visual/proposals/technical_material_props_v1/neutral_material_board.png
+tile físico / UV: 2 x 2 m nas superfícies da sala; 0,5 x 0,5 m nos tampos e 1 x 1 m nos painéis longos; UV por metros reais
+decisão do usuário: "implementa esses prompt e me manda para playteste" em 11/11/2026, abrangendo as quatro unidades da proposta v1
+estado: REVISADA EM PLAYTESTE; a primeira decoração foi reprovada como vazia
+capturas técnicas: visual/validation/technical_decor_v2/README.md
+aceite visual em partida: pendente para a revisão v2
+```
+
 ### Central Hub/Column — proposta v1
 
 ```text
@@ -1176,9 +1191,33 @@ permanecem na prévia.
 | Combat Room | Não revisada | Não revisada | Não revisada |
 | Cafeteria | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA |
 | Laboratory | V2 em validação na prévia | V1 em validação na prévia | V1 em validação na prévia |
-| Technical Area | Não revisada | Não revisada | Não revisada |
+| Technical Area | Revisão v2 aprovada após piso mais fosco | Revisão v2 aprovada após piso mais fosco | V1 permanece em validação |
 | Security | Não revisada | Não revisada | Não revisada |
 | Central Hub | Wall v1 implementada, em validação visual | Chapa v1 em prévia, aceite em partida pendente | Proposta v1 aguardando implementação |
+
+### Technical/Wall e Technical/Floor — revisão v2
+
+```text
+proposta: visual/proposals/technical_material_v2/README.md
+conceitos: visual/proposals/technical_material_v2/scene_concept.png;
+           visual/proposals/technical_material_v2/neutral_material_board.png
+decisão do usuário: "gostei dessa nova proposta" em 13/11/2026
+estado: REVISÃO V2 APROVADA em 13/11/2026 após ajuste do piso para mais fosco
+capturas técnicas: visual/validation/technical_material_v2/README.md
+```
+
+A v3 anterior, com chapas quadradas pequenas e molduras/escotilhas pintadas,
+foi rejeitada em partida. A revisão aprovada usa chapas largas em fiadas
+desencontradas, faixa inferior contínua e desgaste localizado. A escala e a
+aplicação estão descritas na proposta; o teto não faz parte desta revisão.
+O usuário rejeitou a primeira captura da v2 porque piso e parede ficaram
+parecidos e distantes do conceito. A revisão atual separa os dois albedos e
+a paleta de luz. Em 13/11/2026, autorizou considerar a revisão aprovada após
+deixar o piso um pouco mais fosco; o ajuste foi aplicado à resposta de luz do
+piso. A captura nativa documenta a implementação, não uma sessão de playtest
+posterior ao ajuste.
+As pranchas e capturas citadas acima são artefatos locais ignorados pelo Git;
+os albedos de runtime estão em `assets/visual/rooms/technical/`.
 
 ## Outros pacotes visuais
 

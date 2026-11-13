@@ -50,8 +50,9 @@ env __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
 ```
 
 A prévia abre sem inimigos para avaliar formato e circulação. Bancadas,
-gabinetes e geradores usam material genérico nesta fase; as duas caixas usam
-as variações oliva e carvão já existentes. As
+gabinetes e geradores usam os três albedos metálicos da proposta v1, com
+detalhes de acabamento em geometria; as duas caixas usam as variações oliva
+e carvão já existentes. As
 [capturas técnicas](../visual/validation/technical_geometry_preview/README.md)
 mostram FOV 60 e 100 em POTATO e ULTRA; a aprovação em partida está pendente.
 
@@ -79,18 +80,63 @@ Consulte a [ordem de integração](room_shape_plan.md).
 `generateTechnicalRoomMaterials(roomSeed)` seleciona `Serviced`, `Working` ou
 `Overloaded`. A condição usa o ID local 500; as superfícies usam 501–503:
 
-- **Wall:** PaintedSteel sobre base simples 2×2, 1–2 tubos verticais com sombra,
-  corpo e highlight, além de caixa técnica e válvula sempre conectadas;
-- **Floor:** BareSteel pesado 2×2 com juntas escuras, parafusos, uma grade
-  opcional emoldurada e uma mancha de óleo controlada/não totalmente preta;
-- **Ceiling:** BareSteel dividido em categorias de painel, tubo, duto e cabo,
-  garantindo exatamente uma luminária protegida para navegação.
+- **Wall:** chapa pintada em cinza quente, juntas e desgaste localizado;
+- **Floor:** placas grafite com juntas e desgaste moderado;
+- **Ceiling:** painéis grafite neutros, sem luminária ou faixa emissiva pintada.
+
+A parede e o piso usam atlas por sala com UV por distância real: 96 × 8 m
+acompanham o perímetro das paredes e 24 × 24 m cobrem o piso. A revisão v4
+desenha chapas de parede de aproximadamente 3–4 m de largura em fiadas
+desencontradas, uma faixa inferior contínua e placas de piso de 4 × 3 m.
+O desgaste muda por chapa e manchas de óleo ficam em pontos amplos esparsos;
+não há escotilhas pintadas em padrão curto. O teto continua com tile de
+2 × 2 m. Tubos, dutos, bandejas de
+cabos, válvulas, grelhas e luminárias pertencem à geometria. Os tampos dos
+móveis usam tile de 0,5 m; os painéis longos, 1 m.
+Consulte a [proposta visual v1](../visual/proposals/technical_material_props_v1/README.md).
 
 Wear, dirt e oil crescem com carga sem transformar todas as superfícies em
 detalhe. Receitas e conjunto usam hashes próprios e substreams 500–503. O
 renderer prepara/cacheia o perfil via `prepareTechnicalRoomMaterials`. Salas
 com tema Maintenance usam este perfil no jogo; ele também é exercitado pela
 regressão OpenGL offscreen.
+
+### Revisão de decoração
+
+Após o primeiro playtest, a sala recebeu painéis de serviço tridimensionais
+nas paredes laterais e na parede interna do L, uma linha de cabos elevada,
+tubos âmbar verticais, acabamento das bancadas, bandejas de peças e frentes
+mais legíveis nos geradores e instrumentos. Os painéis ficam junto às paredes
+e acima da passagem; as bancadas, geradores e caixas mantêm suas áreas de
+colisão. Esta revisão está em playtest visual. As [capturas técnicas da revisão
+v2](../visual/validation/technical_decor_v2/README.md) não substituem a
+aprovação em partida.
+
+Os dois dutos de teto agora terminam nas paredes. Na sala retangular, ambos
+atravessam o comprimento inteiro. Na variante em L, o duto do lado do recorte
+liga a parede interna à parede externa; o outro liga as duas paredes externas.
+As juntas têm colares 3D. A [validação da correção](../visual/validation/technical_duct_wall_fix/README.md)
+mostra as duas formas em FOV 60 e 100.
+
+### Variação das paredes e do piso
+
+A revisão v3 variou chapas pequenas, mas o resultado continuou repetitivo e
+foi rejeitado em partida. A [proposta v2 de direção artística](../visual/proposals/technical_material_v2/README.md)
+foi aprovada em 13/11/2026; a implementação das chapas largas (receita v4)
+está em [validação técnica](../visual/validation/technical_material_v2/README.md).
+O primeiro resultado no jogo foi rejeitado por deixar piso e paredes muito
+parecidos e por divergir da proposta. A revisão atual usa fontes de albedo
+separadas em `assets/visual/rooms/technical/`, amostradas por distância real
+com mipmaps, piso grafite mais escuro e luz de trabalho neutra. O brilho do
+piso acompanha somente luminárias ativas.
+Em 13/11/2026, o usuário aprovou a revisão com a condição de deixar o piso
+um pouco mais fosco. A rugosidade e o brilho direto foram ajustados; a
+revisão v2 de parede e piso está aprovada. O teto mantém estado próprio.
+Pranchas e capturas em `visual/proposals/` e `visual/validation/` são
+artefatos locais de revisão, ignorados pelo Git; os albedos usados no jogo
+ficam em `assets/visual/rooms/technical/`.
+As [capturas antigas da v3](../visual/validation/technical_material_variation_v3/README.md)
+permanecem apenas como comparação histórica.
 
 ## Validação visual
 

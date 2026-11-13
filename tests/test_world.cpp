@@ -857,9 +857,32 @@ void testTechnicalPreviewArchitecture()
             {-3.0F, 0.0F, 0.8F}})});
 
         const auto parts = makeRoomArchitecture(room);
+        const std::array expectedDucts{
+            toWorld({{-6.11F, 5.05F, -10.0F},
+                {-5.59F, 5.33F, 10.0F}}),
+            toWorld({{5.59F, 5.05F, -10.0F},
+                {6.11F, 5.33F, 10.0F}}),
+        };
+        expect(std::count_if(parts.begin(), parts.end(),
+                   [](const RoomArchitecturePart& part) {
+                       return part.decoration == RoomDecorationPart::CeilingDuct;
+                   }) == 2
+                && std::all_of(expectedDucts.begin(), expectedDucts.end(),
+                    [&](const Aabb expected) {
+                        return std::any_of(parts.begin(), parts.end(),
+                            [&](const RoomArchitecturePart& part) {
+                                return part.decoration
+                                        == RoomDecorationPart::CeilingDuct
+                                    && nearlyEqual(part.bounds.minimum,
+                                        expected.minimum, 1.0e-4F)
+                                    && nearlyEqual(part.bounds.maximum,
+                                        expected.maximum, 1.0e-4F);
+                            });
+                    }),
+            "Technical ceiling ducts meet both walls in every rotation");
         RoomInstance differentSeed = room;
         differentSeed.seed = 555U;
-        expect(parts.size() == 36U
+        expect(parts.size() == 38U
                 && parts == makeRoomArchitecture(room)
                 && parts == makeRoomArchitecture(differentSeed),
             "Technical preview has bounded seed-independent geometry");

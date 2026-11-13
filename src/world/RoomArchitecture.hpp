@@ -71,6 +71,15 @@ enum class LaboratoryFurniturePart : std::uint8_t {
     CeilingRib,
 };
 
+enum class TechnicalFurniturePart : std::uint8_t {
+    None,
+    BenchBase,
+    BenchTop,
+    Generator,
+    Instrument,
+    ServicePipe,
+};
+
 // World-space authored geometry. Breakable parts are spawned as dynamic props;
 // the remaining parts share their geometry with navigation collision.
 struct RoomArchitecturePart {
@@ -85,6 +94,7 @@ struct RoomArchitecturePart {
     RoomDecorationPart decoration{RoomDecorationPart::None};
     SecurityFurniturePart securityFurniturePart{SecurityFurniturePart::None};
     LaboratoryFurniturePart laboratoryFurniturePart{LaboratoryFurniturePart::None};
+    TechnicalFurniturePart technicalFurniturePart{TechnicalFurniturePart::None};
 
     constexpr bool operator==(const RoomArchitecturePart&) const noexcept = default;
 };

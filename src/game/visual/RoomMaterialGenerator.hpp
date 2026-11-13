@@ -211,22 +211,23 @@ enum class TechnicalCondition : std::uint8_t {
 };
 
 struct TechnicalSurfaceRecipe {
-    std::uint32_t version{1};
+    std::uint32_t version{2};
     wkc::core::Seed seed{0};
     RoomSurface surface{RoomSurface::Wall};
     wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
-    wkc::core::Vec3 baseColor{0.23F, 0.23F, 0.22F};
-    wkc::core::Vec3 secondaryColor{0.13F, 0.14F, 0.13F};
-    wkc::core::Vec3 accentColor{0.71F, 0.48F, 0.0F};
+    wkc::core::Vec3 baseColor{0.46F, 0.43F, 0.39F};
+    wkc::core::Vec3 secondaryColor{0.37F, 0.35F, 0.32F};
+    wkc::core::Vec3 accentColor{0.63F, 0.43F, 0.15F};
     std::uint8_t panelColumns{2};
     std::uint8_t panelRows{2};
     float wearAmount{0.36F};
     float dirtAmount{0.40F};
-    float pipeAmount{0.38F};
+    // Pipes and luminaires are separate geometry, never painted into this tile.
+    float pipeAmount{0.0F};
     float oilAmount{0.0F};
     float mechanicalAmount{0.24F};
     float emissiveAmount{0.0F};
-    std::uint32_t resolution{64};
+    std::uint32_t resolution{128};
 
     constexpr bool operator==(const TechnicalSurfaceRecipe&) const noexcept = default;
 };

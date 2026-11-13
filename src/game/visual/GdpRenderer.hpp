@@ -298,6 +298,7 @@ private:
         bool cafeteriaV1{false};
         std::uint8_t cafeteriaCondition{0};
         bool laboratoryPreviewV1{false};
+        bool technicalV1{false};
         std::optional<CentralHubCondition> centralHubWallCondition{};
         bool securityV1{false};
         float securityFloorSeed{0.0F};
@@ -392,6 +393,9 @@ private:
     std::array<std::array<wkc::render::Texture, 3>, 4> cafeteriaFurnitureTextures_{};
     wkc::render::Texture laboratoryFurnitureTexture_{};
     wkc::render::Texture securityFurnitureTexture_{};
+    std::array<wkc::render::Texture, 3> technicalFurnitureTextures_{};
+    wkc::render::Texture technicalWallDetailTexture_{};
+    wkc::render::Texture technicalFloorDetailTexture_{};
     std::array<wkc::render::Texture, 3> structuralColumnTextures_{};
     wkc::render::Texture centralHubColumnTexture_{};
     wkc::render::Texture centralHubFloorDetailTexture_{};

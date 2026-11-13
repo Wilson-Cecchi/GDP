@@ -52,8 +52,12 @@ LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
     case RoomTheme::Office:
         return {RoomLightingMood::Neutral, {0.74F, 0.76F, 0.68F}, {0.90F, 0.88F, 0.70F}};
     case RoomTheme::Industrial:
-    case RoomTheme::Maintenance:
         return {RoomLightingMood::Cool, {0.58F, 0.68F, 0.78F}, {0.70F, 0.84F, 1.0F}};
+    case RoomTheme::Maintenance:
+        // The Technical room uses warm neutral work lamps so its painted
+        // steel stays distinct from the darker graphite floor.
+        return {RoomLightingMood::Neutral, {0.71F, 0.71F, 0.70F},
+            {1.0F, 0.93F, 0.85F}};
     }
     return {RoomLightingMood::Neutral, {0.70F, 0.78F, 0.88F}, {0.82F, 0.90F, 1.0F}};
 }

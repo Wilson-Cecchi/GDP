@@ -697,6 +697,7 @@ uniform sampler2D uAlbedo;
 uniform sampler2D uNormalMap;
 uniform sampler2D uMaterialMap;
 uniform sampler2D uEmissionMap;
+uniform sampler2D uTechnicalDetailAlbedo;
 uniform vec3 uTint;
 uniform float uOpacity;
 uniform int uPlayerBodyFade;
@@ -753,6 +754,7 @@ uniform int uFurniturePart;
 uniform float uPropIndirectFill;
 uniform int uHubWallMaterial;
 uniform int uHubFloorMaterial;
+uniform int uTechnicalSteelMaterial;
 uniform int uHubPlinthContactShadow;
 uniform vec3 uHubPlinthFootprint;
 uniform int uSecurityFloorVariation;
@@ -973,6 +975,22 @@ void main()
     } else {
         albedo = texture(uAlbedo, materialUv).rgb * uTint;
     }
+    if (uTechnicalSteelMaterial != 0 && uDetailedMaterialsEnabled != 0) {
+        // The large plate atlas supplies joints and room-scale variation;
+        // a separately mipmapped source retains fine brushed-metal detail
+        // without a 12k-wide atlas or nearest-neighbour aliasing.
+        vec2 detailUv = uTechnicalSteelMaterial == 2
+            ? vWorldPosition.xz / 4.0
+            : (abs(normal.x) > abs(normal.z)
+                ? vec2(vWorldPosition.z, vWorldPosition.y) / 4.0
+                : vec2(vWorldPosition.x, vWorldPosition.y) / 4.0);
+        vec3 detail = texture(uTechnicalDetailAlbedo, detailUv).rgb;
+        vec3 neutral = uTechnicalSteelMaterial == 2
+            ? vec3(0.19, 0.19, 0.19)
+            : vec3(0.463, 0.404, 0.345);
+        albedo += (detail - neutral) * (uTechnicalSteelMaterial == 2 ? 0.9 : 0.75)
+            * smoothstep(0.07, 0.20, max(max(albedo.r, albedo.g), albedo.b));
+    }
     if (uFurniturePart == 4 && abs(normal.y) < 0.5) {
         // Cabinet joints and inset pulls are sized in metres. They remain
         // aligned on a long counter while its albedo repeats independently.
@@ -1066,6 +1084,13 @@ void main()
         // the broad low-spec lobe avoids extra material-map fetches.
         roughness = uDetailedMaterialsEnabled != 0 ? 0.34 : 0.54;
         metalness = uDetailedMaterialsEnabled != 0 ? 0.28 : 0.16;
+    } else if (uTechnicalSteelMaterial != 0) {
+        // Broad painted wall sheets and bare floor plates share the room
+        // lamps, with a soft sheen that survives lower presets.
+        roughness = uTechnicalSteelMaterial == 2
+            ? (uDetailedMaterialsEnabled != 0 ? 0.38 : 0.55)
+            : 0.62;
+        metalness = uTechnicalSteelMaterial == 2 ? 0.34 : 0.10;
     }
 #if !GDP_LOW_SPEC
     if (uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0) {
@@ -1139,6 +1164,19 @@ void main()
             : 1.0;
 #endif
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
+        if (uTechnicalSteelMaterial == 2 && uDetailedMaterialsEnabled != 0
+            && diffuse > 0.0) {
+            // A narrow lamp footprint gives the broad graphite plates a
+            // readable metallic response without a costly reflection probe.
+            // It follows each live fixture and its shadow visibility.
+            vec2 viewAxis = normalize(viewDirection.xz + vec2(0.0001));
+            vec2 lampOffset = uLightPositions[index].xz - vWorldPosition.xz;
+            float across = dot(lampOffset, vec2(-viewAxis.y, viewAxis.x));
+            float along = dot(lampOffset, viewAxis);
+            float footprint = exp(-0.5 * (across * across / 1.2
+                + along * along / 64.0));
+            result += radiance * footprint * visibility * diffuse * 0.30;
+        }
         if (uPropIndirectFill > 0.0 && uViewmodel == 0) {
             // Approximate nearby floor/wall bounce on vertical prop faces.
             // Every surviving fixture contributes independently.
@@ -1148,18 +1186,21 @@ void main()
         }
 #if GDP_LOW_SPEC
         if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+                || uTechnicalSteelMaterial != 0
                 || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
             && diffuse > 0.0) {
 #else
         if (((uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0)
                 || uFurniturePart != 0 || uHubFloorMaterial != 0
+                || uTechnicalSteelMaterial != 0
                 || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
             && diffuse > 0.0) {
 #endif
             vec3 halfway = normalize(lightDirection + viewDirection);
-            float exponent = uHubFloorMaterial != 0
+            float exponent = (uHubFloorMaterial != 0
+                    || uTechnicalSteelMaterial == 2)
                 ? mix(11.0, 3.0, roughness)
-                : (uFurniturePart != 0
+                : (uFurniturePart != 0 || uTechnicalSteelMaterial != 0
                     || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
                     ? mix(44.0, 7.0, roughness)
                     : mix(96.0, 8.0, roughness);
@@ -1168,7 +1209,9 @@ void main()
             if (uDetailedMaterialsEnabled == 0) exponent *= 0.65;
             float highlightStrength = uHubFloorMaterial != 0
                 ? mix(2.8, 0.50, roughness)
-                : (uFurniturePart != 0
+                : uTechnicalSteelMaterial == 2
+                    ? mix(3.4, 0.55, roughness)
+                : (uFurniturePart != 0 || uTechnicalSteelMaterial != 0
                     || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
                     ? mix(2.0, 0.20, roughness)
                     : mix(0.90, 0.12, roughness);
@@ -1191,6 +1234,7 @@ void main()
             result += albedo * vec3(0.90, 0.95, 1.0)
                 * cone * incidence * falloff * rangeFade * 5.5;
             if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+                    || uTechnicalSteelMaterial != 0
                     || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
                 && incidence > 0.0) {
                 vec3 halfway = normalize(-beamDirection + viewDirection);
@@ -1271,6 +1315,7 @@ enum class RoomMaterialChannel : std::uint8_t {
     CafeteriaFurniture,
     LaboratoryFurniture,
     SecurityFurniture,
+    TechnicalFurniture,
     StructuralColumn,
     SolidColor,
     Generic,
@@ -2279,6 +2324,36 @@ bool GdpRenderer::prepareTechnicalRoomMaterials(const wkc::core::Seed roomSeed)
 
     RoomGpuMaterials gpuMaterials;
     gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
+    gpuMaterials.technicalV1 = true;
+    constexpr std::array<std::string_view, 3> furnitureFiles{
+        "rooms/technical/furniture_serviced.png",
+        "rooms/technical/furniture_working.png",
+        "rooms/technical/furniture_overloaded.png",
+    };
+    for (std::size_t index = 0; index < furnitureFiles.size(); ++index) {
+        if (technicalFurnitureTextures_[index].isValid()) continue;
+        const auto image = loadVisualImage(furnitureFiles[index]);
+        if (!image || !technicalFurnitureTextures_[index].upload(
+                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Technical furniture texture is missing or invalid");
+            return false;
+        }
+    }
+    for (const auto& [texture, fileName] : {
+             std::pair{&technicalWallDetailTexture_,
+                 "rooms/technical/wall_steel_albedo_v2.png"},
+             std::pair{&technicalFloorDetailTexture_,
+                 "rooms/technical/floor_graphite_albedo_v2.png"}}) {
+        if (texture->isValid()) continue;
+        const auto image = loadVisualImage(fileName);
+        if (!image || !texture->upload(gl_, *image,
+                wkc::render::TextureSampling::Trilinear)) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Technical wall or floor albedo source is missing");
+            return false;
+        }
+    }
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const TechnicalSurfaceRecipe& recipe = materials.surfaces[index];
         const auto textureData = textureCache_.acquire(
@@ -2859,6 +2934,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uNormalMap", 1);
     shader.setInt(gl_, "uMaterialMap", 2);
     shader.setInt(gl_, "uEmissionMap", 3);
+    shader.setInt(gl_, "uTechnicalDetailAlbedo", 12);
     shader.setInt(gl_, "uUseEmissionMap", 0);
     shader.setInt(gl_, "uViewmodel", 0);
     shader.setFloat(gl_, "uPropIndirectFill", 0.0F);
@@ -3148,6 +3224,10 @@ bool GdpRenderer::render(
         wkc::core::Vec2 materialUvOffset{};
         switch (material) {
         case RoomMaterialChannel::Wall:
+            if (roomMaterials.technicalV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.laboratoryPreviewV1) {
                 style.surfaceTileMetres = 2.0F;
                 style.mirrorSurfaceTile = true;
@@ -3167,6 +3247,10 @@ bool GdpRenderer::render(
             }
             break;
         case RoomMaterialChannel::Floor:
+            if (roomMaterials.technicalV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.centralHubWallCondition) {
                 style.mirrorSurfaceTile = true;
             }
@@ -3184,6 +3268,10 @@ bool GdpRenderer::render(
             style.surfaceTileMetres = 0.75F;
             break;
         case RoomMaterialChannel::Ceiling:
+            if (roomMaterials.technicalV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.centralHubWallCondition) {
                 style.mirrorSurfaceTile = true;
             }
@@ -3216,6 +3304,9 @@ bool GdpRenderer::render(
         case RoomMaterialChannel::SecurityFurniture:
             style.surfaceTileMetres = 0.75F;
             style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::TechnicalFurniture:
+            style.surfaceTileMetres = 1.0F;
             break;
         case RoomMaterialChannel::StructuralColumn:
             style.surfaceTileMetres = 0.8F;
@@ -3256,16 +3347,31 @@ bool GdpRenderer::render(
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
         const wkc::core::Aabb bounds = renderedRoom.worldBounds;
-        if (!renderedRoom.walkableOutline.empty()) {
+        // Technical atlases follow continuous room UVs. Give rectangular
+        // rooms the same shell UVs used by the shaped Technical room.
+        std::vector<wkc::core::Vec2> rectangularOutline;
+        if (roomMaterials.technicalV1 && renderedRoom.walkableOutline.empty()) {
+            rectangularOutline = {
+                {bounds.minimum.x, bounds.minimum.z},
+                {bounds.maximum.x, bounds.minimum.z},
+                {bounds.maximum.x, bounds.maximum.z},
+                {bounds.minimum.x, bounds.maximum.z},
+            };
+        }
+        const std::span<const wkc::core::Vec2> shellOutline =
+            renderedRoom.walkableOutline.empty()
+                ? std::span<const wkc::core::Vec2>{rectangularOutline}
+                : std::span<const wkc::core::Vec2>{renderedRoom.walkableOutline};
+        if (!shellOutline.empty()) {
             constexpr std::array surfaces{FootprintSurface::Floor,
                 FootprintSurface::Ceiling, FootprintSurface::Wall};
             for (const FootprintSurface surface : surfaces) {
                 const auto key = footprintMeshKey(
-                    renderedRoom.walkableOutline, bounds, surface, doors);
+                    shellOutline, bounds, surface, doors);
                 auto mesh = footprintMeshes_.find(key);
                 if (mesh == footprintMeshes_.end()) {
                     const auto data = makeFootprintMesh(
-                        renderedRoom.walkableOutline, bounds, surface, doors);
+                        shellOutline, bounds, surface, doors);
                     if (!data) { footprintShellReady = false; return; }
                     auto inserted = footprintMeshes_.try_emplace(key).first;
                     if (!inserted->second.upload(gl_, *data)) {
@@ -3291,6 +3397,21 @@ bool GdpRenderer::render(
                         ? 2.0F : 1.0F);
                 surfaceCommands.back().model = wkc::core::Mat4::identity();
                 surfaceCommands.back().mesh = &mesh->second;
+                if (roomMaterials.technicalV1 && surface != FootprintSurface::Ceiling) {
+                    auto& style = surfaceCommands.back().style;
+                    style.surfaceTileMetres = 0.0F;
+                    style.mirrorSurfaceTile = false;
+                    if (surface == FootprintSurface::Wall) {
+                        // 48 two-metre cells around the perimeter, four high.
+                        style.uvScale = {4.0F / 96.0F, 4.0F / 8.0F};
+                        style.uvOffset = {};
+                    } else {
+                        // 12 two-metre cells per axis, anchored at room bounds.
+                        style.uvScale = {4.0F / 24.0F, 4.0F / 24.0F};
+                        style.uvOffset = {-bounds.minimum.x / 24.0F,
+                            -bounds.minimum.z / 24.0F};
+                    }
+                }
             }
             return;
         }
@@ -3298,7 +3419,8 @@ bool GdpRenderer::render(
         const float roomDepth = bounds.maximum.z - bounds.minimum.z;
         const float roomHeight = bounds.maximum.y - bounds.minimum.y;
         const bool approvedTiledRoom = roomMaterials.storageHallV1
-            || roomMaterials.cafeteriaV1 || roomMaterials.securityV1;
+            || roomMaterials.cafeteriaV1 || roomMaterials.securityV1
+            || roomMaterials.technicalV1;
         const wkc::core::Vec3 floorTint = roomMaterials.cafeteriaV1
             ? wkc::core::Vec3{0.57F, 0.57F, 0.57F}
             : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
@@ -3312,7 +3434,8 @@ bool GdpRenderer::render(
         };
         constexpr float shellThickness = 0.20F;
         if (approvedTiledRoom) {
-            const float materialTileMetres = roomMaterials.securityV1
+            const float materialTileMetres = (roomMaterials.securityV1
+                    || roomMaterials.technicalV1)
                 ? 2.0F : 6.0F;
             const std::size_t tileCountX = static_cast<std::size_t>(
                 std::ceil(roomWidth / materialTileMetres));
@@ -3623,6 +3746,213 @@ bool GdpRenderer::render(
     drawSecurityFloorDetails(room);
     for (const RoomRenderData& connectedRoom : connectedRooms) {
         drawSecurityFloorDetails(connectedRoom);
+    }
+
+    const auto drawTechnicalFloorDetails = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.technicalV1) return;
+        const wkc::core::Vec3 center{
+            (renderedRoom.worldBounds.minimum.x
+                + renderedRoom.worldBounds.maximum.x) * 0.5F,
+            renderedRoom.worldBounds.minimum.y,
+            (renderedRoom.worldBounds.minimum.z
+                + renderedRoom.worldBounds.maximum.z) * 0.5F};
+        for (const float localZ : {-5.1F, 5.1F}) {
+            const wkc::core::Vec3 offset = wkc::core::rotateQuarterTurns(
+                {0.0F, 0.0F, localZ}, renderedRoom.rotation);
+            const wkc::core::Vec3 at = center + offset;
+            if (!renderedRoom.walkableOutline.empty()
+                && !world::footprintContainsDisk(
+                    renderedRoom.walkableOutline, at, 0.76F)) {
+                continue;
+            }
+            const bool vent = localZ > 0.0F;
+            const auto piece = [&](const float x, const float z,
+                const wkc::core::Vec3 size, const wkc::core::Vec3 color) {
+                const wkc::core::Vec3 rotated = wkc::core::rotateQuarterTurns(
+                    {x, 0.0F, z}, renderedRoom.rotation);
+                const bool quarterTurn
+                    = renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
+                        || renderedRoom.rotation
+                            == wkc::core::QuarterTurn::Degrees270;
+                queueSurface(materials,
+                    {at.x + rotated.x, at.y + size.y * 0.5F,
+                        at.z + rotated.z},
+                    quarterTurn
+                        ? wkc::core::Vec3{size.z, size.y, size.x} : size,
+                    RoomMaterialChannel::SolidColor, 1.0F, color);
+            };
+            piece(0.0F, 0.0F, {1.35F, 0.012F, 0.72F},
+                vent ? wkc::core::Vec3{0.035F, 0.045F, 0.048F}
+                     : wkc::core::Vec3{0.22F, 0.25F, 0.25F});
+            for (const float side : {-1.0F, 1.0F}) {
+                piece(0.0F, side * 0.34F,
+                    {1.40F, 0.034F, 0.045F}, {0.38F, 0.41F, 0.40F});
+                piece(side * 0.67F, 0.0F,
+                    {0.045F, 0.034F, 0.72F}, {0.38F, 0.41F, 0.40F});
+                for (const float end : {-1.0F, 1.0F}) {
+                    piece(side * 0.58F, end * 0.26F,
+                        {0.045F, 0.038F, 0.045F}, {0.15F, 0.16F, 0.16F});
+                }
+            }
+            if (vent) {
+                for (int slat = -2; slat <= 2; ++slat) {
+                    piece(static_cast<float>(slat) * 0.21F, 0.0F,
+                        {0.075F, 0.025F, 0.57F}, {0.48F, 0.51F, 0.49F});
+                }
+            } else {
+                piece(0.0F, 0.0F,
+                    {1.02F, 0.017F, 0.48F}, {0.27F, 0.29F, 0.29F});
+                piece(0.0F, -0.25F,
+                    {0.62F, 0.020F, 0.026F}, {0.47F, 0.34F, 0.16F});
+            }
+        }
+    };
+    drawTechnicalFloorDetails(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawTechnicalFloorDetails(connectedRoom);
+    }
+
+    const auto drawTechnicalServiceWalls = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.technicalV1) return;
+        const auto extent = renderedRoom.worldBounds.maximum
+            - renderedRoom.worldBounds.minimum;
+        if (std::min(extent.x, extent.z) < 15.9F
+            || std::max(extent.x, extent.z) < 19.9F
+            || extent.y < 5.4F
+            || !std::any_of(renderedRoom.architectureParts.begin(),
+                renderedRoom.architectureParts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.technicalFurniturePart
+                        == world::TechnicalFurniturePart::Generator;
+                })) {
+            return;
+        }
+        const wkc::core::Vec3 origin{
+            (renderedRoom.worldBounds.minimum.x
+                + renderedRoom.worldBounds.maximum.x) * 0.5F,
+            renderedRoom.worldBounds.minimum.y,
+            (renderedRoom.worldBounds.minimum.z
+                + renderedRoom.worldBounds.maximum.z) * 0.5F};
+        const bool quarterTurn
+            = renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
+                || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270;
+        const auto piece = [&](const float x, const float y, const float z,
+            const wkc::core::Vec3 size, const wkc::core::Vec3 color) {
+            const auto offset = wkc::core::rotateQuarterTurns(
+                {x, 0.0F, z}, renderedRoom.rotation);
+            queueSurface(materials,
+                {origin.x + offset.x, origin.y + y, origin.z + offset.z},
+                quarterTurn ? wkc::core::Vec3{size.z, size.y, size.x} : size,
+                RoomMaterialChannel::SolidColor, 1.0F, color);
+        };
+        constexpr wkc::core::Vec3 casing{0.22F, 0.24F, 0.24F};
+        constexpr wkc::core::Vec3 steel{0.47F, 0.48F, 0.45F};
+        constexpr wkc::core::Vec3 dark{0.055F, 0.065F, 0.066F};
+        constexpr wkc::core::Vec3 amber{0.66F, 0.34F, 0.075F};
+        // These shallow assemblies are mounted above the player. The service
+        // stations below them retain their existing collision and clearances.
+        const auto station = [&](const float x, const float z,
+            const float facing) {
+            const float front = x + facing * 0.10F;
+            piece(x, 3.16F, z, {0.11F, 1.34F, 1.72F}, casing);
+            piece(front, 3.16F, z, {0.035F, 1.16F, 1.50F}, steel);
+            piece(front + facing * 0.022F, 3.20F, z - 0.22F,
+                {0.025F, 0.72F, 0.76F}, dark);
+            for (int slat = 0; slat < 5; ++slat) {
+                piece(front + facing * 0.041F,
+                    2.92F + static_cast<float>(slat) * 0.13F,
+                    z - 0.22F, {0.018F, 0.026F, 0.65F}, casing);
+            }
+            piece(front + facing * 0.024F, 3.47F, z + 0.45F,
+                {0.03F, 0.19F, 0.30F}, dark);
+            piece(front + facing * 0.046F, 3.47F, z + 0.45F,
+                {0.016F, 0.075F, 0.20F}, amber);
+            for (const float side : {-1.0F, 1.0F}) {
+                piece(front + facing * 0.035F, 3.16F,
+                    z + side * 0.80F, {0.04F, 1.36F, 0.05F}, dark);
+                for (const float y : {2.59F, 3.73F}) {
+                    piece(front + facing * 0.05F, y,
+                        z + side * 0.72F, {0.035F, 0.07F, 0.07F}, dark);
+                }
+            }
+            piece(front + facing * 0.031F, 2.63F, z,
+                {0.025F, 0.08F, 1.45F}, amber);
+        };
+        station(-7.90F, -6.75F, 1.0F);
+        station(-7.90F, 2.85F, 1.0F);
+        station(7.90F, 2.85F, -1.0F);
+        if (renderedRoom.walkableOutline.size() == 6U) {
+            station(0.90F, -6.20F, -1.0F);
+        } else {
+            station(7.90F, -6.75F, -1.0F);
+        }
+        for (const float x : {-7.87F, 7.87F}) {
+            for (const float z : {-8.35F, 8.35F}) {
+                if (x > 0.0F && z < 0.0F
+                    && renderedRoom.walkableOutline.size() == 6U) {
+                    continue;
+                }
+                const float facing = x < 0.0F ? 1.0F : -1.0F;
+                piece(x, 2.35F, z, {0.13F, 4.32F, 0.14F}, casing);
+                piece(x + facing * 0.075F, 2.35F, z,
+                    {0.045F, 3.65F, 0.05F}, amber);
+                for (const float y : {0.52F, 2.10F, 3.75F}) {
+                    piece(x + facing * 0.095F, y, z,
+                        {0.08F, 0.12F, 0.24F}, dark);
+                }
+            }
+        }
+        if (renderedRoom.walkableOutline.size() == 6U) {
+            // The north-facing inner return is the dominant wall from the
+            // standard L-room camera. Give it its own large service assembly.
+            piece(4.50F, 2.75F, -1.90F,
+                {4.25F, 2.55F, 0.11F}, casing);
+            piece(4.50F, 2.75F, -1.83F,
+                {3.93F, 2.24F, 0.045F}, steel);
+            piece(4.50F, 2.89F, -1.80F,
+                {2.88F, 1.46F, 0.03F}, dark);
+            for (int slat = 0; slat < 8; ++slat) {
+                piece(4.50F, 2.37F + static_cast<float>(slat) * 0.13F,
+                    -1.77F, {2.70F, 0.031F, 0.025F}, casing);
+            }
+            for (const float side : {-1.0F, 1.0F}) {
+                piece(4.50F + side * 1.78F, 2.75F, -1.77F,
+                    {0.085F, 2.30F, 0.055F}, dark);
+                for (const float y : {1.67F, 3.82F}) {
+                    piece(4.50F + side * 1.78F, y, -1.72F,
+                        {0.075F, 0.075F, 0.055F}, amber);
+                }
+            }
+            piece(4.50F, 1.57F, -1.75F,
+                {3.90F, 0.10F, 0.06F}, amber);
+            piece(4.50F, 4.15F, -1.90F,
+                {5.60F, 0.12F, 0.13F}, casing);
+        }
+        // A continuous exposed cable run connects the panels visually.
+        // Its wall-facing size stays small and its height clears every door.
+        for (const float x : {-7.88F, 7.88F}) {
+            if (x > 0.0F && renderedRoom.walkableOutline.size() == 6U) {
+                piece(x, 4.18F, 6.05F, {0.08F, 0.09F, 6.6F}, casing);
+                piece(x - 0.03F, 4.18F, 6.05F,
+                    {0.04F, 0.025F, 6.6F}, amber);
+            } else {
+                piece(x, 4.18F, 0.0F, {0.08F, 0.09F, 17.0F}, casing);
+                piece(x + (x < 0.0F ? 0.03F : -0.03F), 4.18F, 0.0F,
+                    {0.04F, 0.025F, 17.0F}, amber);
+            }
+        }
+        if (renderedRoom.walkableOutline.size() == 6U) {
+            piece(0.90F, 4.18F, -6.0F,
+                {0.08F, 0.09F, 7.2F}, casing);
+            piece(0.86F, 4.18F, -6.0F,
+                {0.04F, 0.025F, 7.2F}, amber);
+        }
+    };
+    drawTechnicalServiceWalls(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawTechnicalServiceWalls(connectedRoom);
     }
 
     const auto drawRoomWallTrim = [&](const RoomRenderData& renderedRoom) {
@@ -4592,6 +4922,26 @@ bool GdpRenderer::render(
                 queueSurface(roomMaterials, position, scale,
                     RoomMaterialChannel::StructuralColumn, 1.0F,
                     {0.39F, 0.45F, 0.47F});
+                if (roomMaterials.technicalV1) {
+                    // A shallow mounting collar makes the duct-to-wall joint
+                    // visible without extending into the room's walkable space.
+                    for (const float end : {-1.0F, 1.0F}) {
+                        const float along = end * (length * 0.5F - 0.055F);
+                        queueSurface(roomMaterials,
+                            alongX
+                                ? wkc::core::Vec3{position.x + along,
+                                    position.y, position.z}
+                                : wkc::core::Vec3{position.x, position.y,
+                                    position.z + along},
+                            alongX
+                                ? wkc::core::Vec3{0.11F,
+                                    scale.y + 0.12F, ductWidth + 0.12F}
+                                : wkc::core::Vec3{ductWidth + 0.12F,
+                                    scale.y + 0.12F, 0.11F},
+                            RoomMaterialChannel::StructuralColumn, 1.0F,
+                            {0.55F, 0.58F, 0.55F});
+                    }
+                }
                 const float hangerGap = renderedRoom.worldBounds.maximum.y
                     - part.bounds.maximum.y;
                 if (hangerGap > 0.08F) {
@@ -4683,6 +5033,11 @@ bool GdpRenderer::render(
             const bool laboratoryFurniture = roomMaterials.laboratoryPreviewV1
                 && part.laboratoryFurniturePart
                     != world::LaboratoryFurniturePart::None;
+            const bool technicalFurniture = roomMaterials.technicalV1
+                && part.technicalFurniturePart
+                    != world::TechnicalFurniturePart::None
+                && part.technicalFurniturePart
+                    != world::TechnicalFurniturePart::ServicePipe;
             const float securityTone = roomMaterials.columnCondition == 0U
                 ? 1.18F : roomMaterials.columnCondition == 2U ? 0.94F : 1.05F;
             queueSurface(roomMaterials, position, scale,
@@ -4695,6 +5050,7 @@ bool GdpRenderer::render(
                             ? RoomMaterialChannel::SolidColor
                             : RoomMaterialChannel::LaboratoryFurniture)
                     : securityFurniture ? RoomMaterialChannel::SecurityFurniture
+                    : technicalFurniture ? RoomMaterialChannel::TechnicalFurniture
                     : RoomMaterialChannel::Generic,
                 texturedRack ? 3.0F : 2.0F,
                 texturedRack
@@ -4705,15 +5061,274 @@ bool GdpRenderer::render(
                     : texturedFurniture ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                     : securityFurniture ? wkc::core::Vec3{
                         securityTone, securityTone, securityTone}
+                    : technicalFurniture ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                     : part.tint,
                 {}, {}, texturedRack
                     ? static_cast<std::uint8_t>(
                         *roomMaterials.storageRackCondition)
-                    : texturedFurniture ? roomMaterials.cafeteriaCondition : 0U,
+                    : texturedFurniture ? roomMaterials.cafeteriaCondition
+                    : technicalFurniture ? roomMaterials.columnCondition : 0U,
                 texturedRack ? part.storageRackPart
                     : world::StorageRackPart::None,
                 texturedFurniture ? part.cafeteriaFurniturePart
                     : world::CafeteriaFurniturePart::None);
+            if (technicalFurniture) {
+                const auto kind = part.technicalFurniturePart;
+                surfaceCommands.back().style.furniturePart
+                    = kind == world::TechnicalFurniturePart::BenchTop
+                        ? world::CafeteriaFurniturePart::Steel
+                        : world::CafeteriaFurniturePart::Support;
+                if (kind == world::TechnicalFurniturePart::BenchTop) {
+                    surfaceCommands.back().style.surfaceTileMetres = 0.5F;
+                }
+                const wkc::core::Vec3 min = part.bounds.minimum;
+                const wkc::core::Vec3 max = part.bounds.maximum;
+                const bool alongZ = scale.z >= scale.x;
+                const float roomX = (renderedRoom.worldBounds.minimum.x
+                    + renderedRoom.worldBounds.maximum.x) * 0.5F;
+                const float roomZ = (renderedRoom.worldBounds.minimum.z
+                    + renderedRoom.worldBounds.maximum.z) * 0.5F;
+                const float face = alongZ
+                    ? (position.x >= roomX ? min.x - 0.006F : max.x + 0.006F)
+                    : (position.z >= roomZ ? min.z - 0.006F : max.z + 0.006F);
+                const auto detail = [&](const wkc::core::Vec3 center,
+                    const wkc::core::Vec3 size,
+                    const wkc::core::Vec3 tint) {
+                    queueSurface(roomMaterials, center, size,
+                        RoomMaterialChannel::SolidColor, 1.0F, tint);
+                };
+                constexpr wkc::core::Vec3 seam{0.055F, 0.060F, 0.061F};
+                constexpr wkc::core::Vec3 edge{0.53F, 0.55F, 0.54F};
+                constexpr wkc::core::Vec3 bolt{0.18F, 0.19F, 0.19F};
+                if (kind == world::TechnicalFurniturePart::BenchTop) {
+                    // Raised metal lip and corner fasteners follow the actual
+                    // bench bounds, while the albedo repeats every 0.5 m.
+                    for (const float side : {-1.0F, 1.0F}) {
+                        detail(alongZ
+                                ? wkc::core::Vec3{position.x + side
+                                    * (scale.x * 0.5F - 0.018F),
+                                    max.y + 0.008F, position.z}
+                                : wkc::core::Vec3{position.x,
+                                    max.y + 0.008F,
+                                    position.z + side
+                                        * (scale.z * 0.5F - 0.018F)},
+                            alongZ
+                                ? wkc::core::Vec3{0.035F, 0.018F, scale.z}
+                                : wkc::core::Vec3{scale.x, 0.018F, 0.035F},
+                            edge);
+                    }
+                    for (const float x : {min.x + 0.10F, max.x - 0.10F}) {
+                        for (const float z : {min.z + 0.10F, max.z - 0.10F}) {
+                            detail({x, max.y + 0.015F, z},
+                                {0.055F, 0.028F, 0.055F}, bolt);
+                        }
+                    }
+                    // Parts trays and a tool rail stay within the solid
+                    // bench footprint; they make each work station readable
+                    // from the player's normal view height.
+                    const float trayZ = position.z + scale.z * 0.28F;
+                    detail({position.x, max.y + 0.024F, trayZ},
+                        {scale.x * 0.56F, 0.045F, 0.28F}, seam);
+                    detail({position.x, max.y + 0.051F, trayZ},
+                        {scale.x * 0.46F, 0.012F, 0.19F}, edge);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        detail({position.x + side * scale.x * 0.16F,
+                                max.y + 0.063F, trayZ},
+                            {0.11F, 0.025F, 0.08F}, bolt);
+                    }
+                } else if (kind == world::TechnicalFurniturePart::BenchBase) {
+                    const float length = alongZ ? scale.z : scale.x;
+                    const int drawers = std::max(1,
+                        static_cast<int>(std::floor(length / 0.8F)));
+                    const float drawerWidth = length / static_cast<float>(drawers);
+                    for (int drawer = 0; drawer < drawers; ++drawer) {
+                        const float along = -length * 0.5F
+                            + drawerWidth * (static_cast<float>(drawer) + 0.5F);
+                        const wkc::core::Vec3 panel = alongZ
+                            ? wkc::core::Vec3{face, position.y, position.z + along}
+                            : wkc::core::Vec3{position.x + along, position.y, face};
+                        detail(panel, alongZ
+                                ? wkc::core::Vec3{0.014F, scale.y * 0.55F,
+                                    drawerWidth - 0.08F}
+                                : wkc::core::Vec3{drawerWidth - 0.08F,
+                                    scale.y * 0.55F, 0.014F}, seam);
+                        detail({panel.x, position.y + 0.10F, panel.z},
+                            alongZ
+                                ? wkc::core::Vec3{0.028F, 0.045F, 0.22F}
+                                : wkc::core::Vec3{0.22F, 0.045F, 0.028F}, edge);
+                    }
+                } else if (kind == world::TechnicalFurniturePart::Generator
+                    && scale.y > 0.8F && scale.x > 0.5F && scale.z > 0.5F) {
+                    // The service grille is geometry, so its slots and
+                    // fasteners stay crisp without baking them into a tile.
+                    const float length = alongZ ? scale.z : scale.x;
+                    detail(alongZ
+                            ? wkc::core::Vec3{face, position.y, position.z}
+                            : wkc::core::Vec3{position.x, position.y, face},
+                        alongZ
+                            ? wkc::core::Vec3{0.018F, scale.y * 0.53F,
+                                length - 0.26F}
+                            : wkc::core::Vec3{length - 0.26F,
+                                scale.y * 0.53F, 0.018F}, seam);
+                    for (int slat = -3; slat <= 3; ++slat) {
+                        const float y = position.y + static_cast<float>(slat) * 0.105F;
+                        detail(alongZ
+                                ? wkc::core::Vec3{face - 0.004F, y, position.z}
+                                : wkc::core::Vec3{position.x, y, face - 0.004F},
+                            alongZ
+                                ? wkc::core::Vec3{0.022F, 0.022F,
+                                    length - 0.37F}
+                                : wkc::core::Vec3{length - 0.37F,
+                                    0.022F, 0.022F}, edge);
+                    }
+                    for (const float along : {-length * 0.5F + 0.16F,
+                             length * 0.5F - 0.16F}) {
+                        for (const float y : {position.y - 0.42F,
+                                 position.y + 0.42F}) {
+                            detail(alongZ
+                                    ? wkc::core::Vec3{face - 0.008F,
+                                        y, position.z + along}
+                                    : wkc::core::Vec3{position.x + along,
+                                        y, face - 0.008F},
+                                {0.05F, 0.05F, 0.05F}, bolt);
+                        }
+                    }
+                    // A framed turbine housing and service lamps give the
+                    // large generator a distinct silhouette in side view.
+                    const float facing = position.x >= roomX ? -1.0F : 1.0F;
+                    const float front = face + facing * 0.02F;
+                    if (alongZ) {
+                        detail({front, position.y + 0.18F, position.z},
+                            {0.035F, 0.77F, 1.08F}, bolt);
+                        detail({front + facing * 0.008F,
+                                position.y + 0.18F, position.z},
+                            {0.040F, 0.55F, 0.84F}, edge);
+                        detail({front + facing * 0.017F,
+                                position.y + 0.18F, position.z},
+                            {0.043F, 0.33F, 0.61F}, seam);
+                        for (const float side : {-1.0F, 1.0F}) {
+                            detail({front + facing * 0.024F,
+                                    position.y - 0.48F,
+                                    position.z + side * 0.36F},
+                                {0.045F, 0.065F, 0.28F},
+                                {0.68F, 0.37F, 0.085F});
+                        }
+                    }
+                    detail(alongZ
+                            ? wkc::core::Vec3{face - 0.03F,
+                                position.y + scale.y * 0.32F,
+                                position.z + length * 0.33F}
+                            : wkc::core::Vec3{position.x + length * 0.33F,
+                                position.y + scale.y * 0.32F, face - 0.03F},
+                        alongZ ? wkc::core::Vec3{0.045F, 0.12F, 0.22F}
+                               : wkc::core::Vec3{0.22F, 0.12F, 0.045F},
+                        {0.74F, 0.42F, 0.10F});
+                } else if (kind == world::TechnicalFurniturePart::Instrument
+                    && scale.y > 0.30F) {
+                    // The instrument now has a distinct inset display and
+                    // controls instead of reading as a plain cargo box.
+                    const auto panel = alongZ
+                        ? wkc::core::Vec3{face - 0.01F,
+                            position.y + scale.y * 0.12F, position.z}
+                        : wkc::core::Vec3{position.x,
+                            position.y + scale.y * 0.12F, face - 0.01F};
+                    detail(panel,
+                        alongZ ? wkc::core::Vec3{0.025F, scale.y * 0.52F,
+                            scale.z * 0.68F}
+                               : wkc::core::Vec3{scale.x * 0.68F,
+                                   scale.y * 0.52F, 0.025F}, seam);
+                    detail({panel.x, panel.y + 0.035F, panel.z},
+                        alongZ ? wkc::core::Vec3{0.030F, 0.12F, 0.31F}
+                               : wkc::core::Vec3{0.31F, 0.12F, 0.030F},
+                        {0.035F, 0.056F, 0.057F});
+                    detail({panel.x, panel.y - 0.10F, panel.z},
+                        alongZ ? wkc::core::Vec3{0.032F, 0.035F, 0.23F}
+                               : wkc::core::Vec3{0.23F, 0.035F, 0.032F},
+                        {0.68F, 0.38F, 0.10F});
+                }
+            }
+            if (roomMaterials.technicalV1
+                && part.technicalFurniturePart
+                    == world::TechnicalFurniturePart::ServicePipe) {
+                const auto servicePiece = [&](const wkc::core::Vec3 center,
+                    const wkc::core::Vec3 size,
+                    const wkc::core::Vec3 tint) {
+                    queueSurface(roomMaterials, center, size,
+                        RoomMaterialChannel::SolidColor, 1.0F, tint);
+                };
+                constexpr wkc::core::Vec3 tray{0.18F, 0.20F, 0.21F};
+                constexpr wkc::core::Vec3 rim{0.43F, 0.44F, 0.40F};
+                const bool alongX = scale.x > scale.z;
+                const float length = std::max(scale.x, scale.z);
+                if (length > 10.0F) {
+                    // Shallow cable tray hangs below the existing overhead
+                    // pipe. Both runs stay above player and door height.
+                    servicePiece({position.x, position.y - 0.22F, position.z},
+                        alongX
+                            ? wkc::core::Vec3{length - 0.20F, 0.035F, 0.32F}
+                            : wkc::core::Vec3{0.32F, 0.035F, length - 0.20F},
+                        tray);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        servicePiece(alongX
+                                ? wkc::core::Vec3{position.x,
+                                    position.y - 0.16F,
+                                    position.z + side * 0.15F}
+                                : wkc::core::Vec3{
+                                    position.x + side * 0.15F,
+                                    position.y - 0.16F, position.z},
+                            alongX
+                                ? wkc::core::Vec3{length - 0.20F,
+                                    0.09F, 0.026F}
+                                : wkc::core::Vec3{0.026F, 0.09F,
+                                    length - 0.20F}, rim);
+                    }
+                    for (float along = -length * 0.5F + 1.25F;
+                         along < length * 0.5F - 0.50F; along += 2.5F) {
+                        servicePiece(alongX
+                                ? wkc::core::Vec3{position.x + along,
+                                    position.y - 0.22F, position.z}
+                                : wkc::core::Vec3{position.x,
+                                    position.y - 0.22F, position.z + along},
+                            alongX
+                                ? wkc::core::Vec3{0.045F, 0.06F, 0.38F}
+                                : wkc::core::Vec3{0.38F, 0.06F, 0.045F}, rim);
+                    }
+                } else if (scale.y > 3.0F) {
+                    const float valveY = part.bounds.minimum.y + 3.42F;
+                    const float roomX = (renderedRoom.worldBounds.minimum.x
+                        + renderedRoom.worldBounds.maximum.x) * 0.5F;
+                    const float roomZ = (renderedRoom.worldBounds.minimum.z
+                        + renderedRoom.worldBounds.maximum.z) * 0.5F;
+                    const bool xWall = std::abs(position.x - roomX)
+                        > std::abs(position.z - roomZ);
+                    const wkc::core::Vec3 wheelCenter = xWall
+                        ? wkc::core::Vec3{position.x
+                                + (position.x > roomX ? -0.16F : 0.16F),
+                            valveY, position.z}
+                        : wkc::core::Vec3{position.x, valveY,
+                            position.z
+                                + (position.z > roomZ ? -0.16F : 0.16F)};
+                    servicePiece(wheelCenter,
+                        {0.08F, 0.08F, 0.08F}, tray);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        servicePiece(wheelCenter
+                                + wkc::core::Vec3{0.0F,
+                                    side * 0.15F, 0.0F},
+                            xWall
+                                ? wkc::core::Vec3{0.045F, 0.04F, 0.34F}
+                                : wkc::core::Vec3{0.34F, 0.04F, 0.045F}, rim);
+                        servicePiece(wheelCenter
+                                + (xWall
+                                    ? wkc::core::Vec3{0.0F, 0.0F,
+                                        side * 0.15F}
+                                    : wkc::core::Vec3{side * 0.15F,
+                                        0.0F, 0.0F}),
+                            xWall
+                                ? wkc::core::Vec3{0.045F, 0.34F, 0.04F}
+                                : wkc::core::Vec3{0.04F, 0.34F, 0.045F}, rim);
+                    }
+                }
+            }
             if (laboratoryFurniture) {
                 const wkc::core::Vec3 min = part.bounds.minimum;
                 const wkc::core::Vec3 max = part.bounds.maximum;
@@ -5165,6 +5780,10 @@ bool GdpRenderer::render(
         case RoomMaterialChannel::SecurityFurniture:
             securityFurnitureTexture_.bind(gl_, textureBindings_);
             break;
+        case RoomMaterialChannel::TechnicalFurniture:
+            technicalFurnitureTextures_[style.surfaceVariant]
+                .bind(gl_, textureBindings_);
+            break;
         case RoomMaterialChannel::StructuralColumn:
             if (style.hubColumnPlate) {
                 centralHubColumnTexture_.bind(gl_, textureBindings_);
@@ -5179,6 +5798,13 @@ bool GdpRenderer::render(
         case RoomMaterialChannel::Generic:
             fallbackTexture_.bind(gl_, textureBindings_);
             break;
+        }
+        if (roomMaterials.technicalV1) {
+            if (style.material == RoomMaterialChannel::Wall) {
+                technicalWallDetailTexture_.bind(gl_, textureBindings_, 12U);
+            } else if (style.material == RoomMaterialChannel::Floor) {
+                technicalFloorDetailTexture_.bind(gl_, textureBindings_, 12U);
+            }
         }
         shader.setVec3(gl_, "uTint", style.tint);
         shader.setInt(gl_, "uDetailedMaterial",
@@ -5197,6 +5823,11 @@ bool GdpRenderer::render(
                 && (style.material == RoomMaterialChannel::Floor
                     || style.material == RoomMaterialChannel::HubFloorDetail)
                 ? 1 : 0);
+        shader.setInt(gl_, "uTechnicalSteelMaterial",
+            roomMaterials.technicalV1
+                ? (style.material == RoomMaterialChannel::Floor ? 2
+                    : style.material == RoomMaterialChannel::Wall ? 1 : 0)
+                : 0);
         shader.setInt(gl_, "uSecurityFloorVariation",
             roomMaterials.securityV1
                 && style.material == RoomMaterialChannel::Floor ? 1 : 0);
@@ -5283,6 +5914,7 @@ bool GdpRenderer::render(
         shader.setInt(gl_, "uFurniturePart", 0);
         shader.setInt(gl_, "uHubWallMaterial", 0);
         shader.setInt(gl_, "uHubFloorMaterial", 0);
+        shader.setInt(gl_, "uTechnicalSteelMaterial", 0);
         shader.setInt(gl_, "uSecurityFloorVariation", 0);
         shader.setFloat(gl_, "uEmissiveStrength", 0.10F);
         shader.setFloat(gl_, "uOpacity", 0.19F);
@@ -5307,6 +5939,7 @@ bool GdpRenderer::render(
     shader.setInt(gl_, "uFurniturePart", 0);
     shader.setInt(gl_, "uHubWallMaterial", 0);
     shader.setInt(gl_, "uHubFloorMaterial", 0);
+    shader.setInt(gl_, "uTechnicalSteelMaterial", 0);
     shader.setInt(gl_, "uSecurityFloorVariation", 0);
     shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
     shader.setInt(gl_, "uMirrorSurfaceTile", 0);

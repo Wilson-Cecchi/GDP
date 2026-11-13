@@ -788,10 +788,12 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
                 {{minimumX, 0.0F, benchMinZ},
                     {maximumX, 0.84F, benchMaxZ}},
                 technicalCabinet, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::BenchBase;
             addPart(parts, frame,
                 {{minimumX, 0.84F, benchMinZ},
                     {maximumX, 0.98F, benchMaxZ}},
                 technicalSteel, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::BenchTop;
 
             const float toolMinX = side > 0.0F ? 7.05F : -7.75F;
             const float toolMaxX = side > 0.0F ? 7.75F : -7.05F;
@@ -800,6 +802,7 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
                 {{toolMinX, 0.98F, toolMinZ},
                     {toolMaxX, 1.50F, toolMinZ + 1.50F}},
                 technicalCabinet, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::Instrument;
 
             // The heavy generator is sealed and opaque. Its plinth touches
             // both bench and wall, keeping collision equal to its silhouette.
@@ -807,10 +810,12 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
                 {{minimumX, 0.0F, generatorMinZ},
                     {maximumX, 0.25F, generatorMaxZ}},
                 technicalSteel, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::Generator;
             addPart(parts, frame,
                 {{minimumX, 0.25F, generatorMinZ},
                     {maximumX, 2.25F, generatorMaxZ}},
                 technicalCabinet, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::Generator;
             const float panelMinX = side > 0.0F
                 ? minimumX - 0.05F : maximumX;
             addPart(parts, frame,
@@ -818,6 +823,7 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
                     {panelMinX + 0.05F, 1.72F,
                         generatorMaxZ - 0.38F}},
                 technicalPipe, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::Generator;
         }
 
         // A pipe run remains near the wall and above player head height.
@@ -828,11 +834,13 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
             {{pipeMinX, 4.62F, -8.50F},
                 {pipeMaxX, 4.78F, 8.50F}},
             technicalPipe, true);
+        parts.back().technicalFurniturePart = TechnicalFurniturePart::ServicePipe;
         for (const float z : {-8.62F, 8.50F}) {
             addPart(parts, frame,
                 {{pipeMinX, 0.0F, z},
                     {pipeMaxX, 4.78F, z + 0.12F}},
                 technicalPipe, true);
+            parts.back().technicalFurniturePart = TechnicalFurniturePart::ServicePipe;
         }
     }
 
@@ -846,10 +854,12 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
             {{center.x - 0.65F, 0.0F, center.z - 1.05F},
                 {center.x + 0.65F, 0.78F, center.z + 1.05F}},
             technicalCabinet, true);
+        parts.back().technicalFurniturePart = TechnicalFurniturePart::BenchBase;
         addPart(parts, frame,
             {{center.x - 0.80F, 0.78F, center.z - 1.20F},
                 {center.x + 0.80F, 0.92F, center.z + 1.20F}},
             technicalSteel, true);
+        parts.back().technicalFurniturePart = TechnicalFurniturePart::BenchTop;
         const float instrumentX = center.x
             + (center.x > 0.0F ? 0.25F : -0.25F);
         addPart(parts, frame,
@@ -857,6 +867,20 @@ std::vector<RoomArchitecturePart> makeTechnicalPreviewArchitecture(
                 {instrumentX + 0.26F, 1.32F, center.z + 0.35F}},
             center.x < 0.0F ? oliveCargo : charcoalCargo,
             true, true);
+        parts.back().technicalFurniturePart = TechnicalFurniturePart::Instrument;
+    }
+    // Exposed service ducts flank the ceiling fixtures and meet the walls.
+    // In the L variant, the right duct begins at the inner return instead
+    // of crossing the removed south-east corner.
+    const bool lFootprint = room.moduleId == technicalLPreviewModuleId
+        || room.moduleId == maintenanceLModuleId;
+    for (const float x : {-5.85F, 5.85F}) {
+        const float southWall = lFootprint && x > 0.0F ? -2.0F : -10.0F;
+        addPart(parts, frame,
+            {{x - 0.26F, 5.05F, southWall},
+                {x + 0.26F, 5.33F, 10.0F}},
+            technicalSteel, true);
+        parts.back().decoration = RoomDecorationPart::CeilingDuct;
     }
     return parts;
 }

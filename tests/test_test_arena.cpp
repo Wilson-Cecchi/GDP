@@ -526,6 +526,70 @@ void testTechnicalLPreview()
     const auto parts = world::makeRoomArchitecture(room);
     expect(!parts.empty() && world::validateRoomArchitecture(room, parts),
         "Maintenance L furniture clears reserved positions");
+    for (const auto rotation : {wkc::core::QuarterTurn::Degrees0,
+             wkc::core::QuarterTurn::Degrees90,
+             wkc::core::QuarterTurn::Degrees180,
+             wkc::core::QuarterTurn::Degrees270}) {
+        world::RoomInstance turned = room;
+        turned.rotation = rotation;
+        turned.enemyZones.clear();
+        turned.propZones.clear();
+        turned.lootZones.clear();
+        turned.worldBounds.minimum.x = 1000.0F;
+        turned.worldBounds.minimum.z = 1000.0F;
+        turned.worldBounds.maximum.x = -1000.0F;
+        turned.worldBounds.maximum.z = -1000.0F;
+        for (const float x : {room.worldBounds.minimum.x,
+                 room.worldBounds.maximum.x}) {
+            for (const float z : {room.worldBounds.minimum.z,
+                     room.worldBounds.maximum.z}) {
+                const auto point = wkc::core::rotateQuarterTurns(
+                    wkc::core::Vec3{x, 0.0F, z}, rotation);
+                turned.worldBounds.minimum.x = std::min(
+                    turned.worldBounds.minimum.x, point.x);
+                turned.worldBounds.minimum.z = std::min(
+                    turned.worldBounds.minimum.z, point.z);
+                turned.worldBounds.maximum.x = std::max(
+                    turned.worldBounds.maximum.x, point.x);
+                turned.worldBounds.maximum.z = std::max(
+                    turned.worldBounds.maximum.z, point.z);
+            }
+        }
+        for (auto& vertex : turned.walkableOutline) {
+            const auto point = wkc::core::rotateQuarterTurns(
+                wkc::core::Vec3{vertex.x, 0.0F, vertex.y}, rotation);
+            vertex = {point.x, point.z};
+        }
+        const auto rotatedParts = world::makeRoomArchitecture(turned);
+        const auto ductMatches = [&](const wkc::core::Aabb local) {
+            wkc::core::Aabb expected{{1000.0F, local.minimum.y, 1000.0F},
+                {-1000.0F, local.maximum.y, -1000.0F}};
+            for (const float x : {local.minimum.x, local.maximum.x}) {
+                for (const float z : {local.minimum.z, local.maximum.z}) {
+                    const auto point = wkc::core::rotateQuarterTurns(
+                        wkc::core::Vec3{x, 0.0F, z}, rotation);
+                    expected.minimum.x = std::min(expected.minimum.x, point.x);
+                    expected.minimum.z = std::min(expected.minimum.z, point.z);
+                    expected.maximum.x = std::max(expected.maximum.x, point.x);
+                    expected.maximum.z = std::max(expected.maximum.z, point.z);
+                }
+            }
+            return std::any_of(rotatedParts.begin(), rotatedParts.end(),
+                [&](const world::RoomArchitecturePart& part) {
+                    return part.decoration == world::RoomDecorationPart::CeilingDuct
+                        && wkc::core::nearlyEqual(part.bounds.minimum,
+                            expected.minimum, 1.0e-4F)
+                        && wkc::core::nearlyEqual(part.bounds.maximum,
+                            expected.maximum, 1.0e-4F);
+                });
+        };
+        expect(world::validateRoomArchitecture(turned, rotatedParts)
+                && ductMatches({{-6.11F, 5.05F, -10.0F},
+                    {-5.59F, 5.33F, 10.0F}})
+                && ductMatches({{5.59F, 5.05F, -2.0F},
+                    {6.11F, 5.33F, 10.0F}}),
+            "Maintenance L ducts meet the outer and inner walls in every rotation");
+    }
     const auto navigation = makeRoomNavigationCollision(preview, room.id, false);
     expect(navigation.canOccupy({0.0F, 0.0F, 4.0F})
             && navigation.canOccupy({0.0F, 0.0F, -8.0F})
