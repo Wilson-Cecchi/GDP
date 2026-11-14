@@ -3813,6 +3813,64 @@ bool GdpRenderer::render(
         drawTechnicalFloorDetails(connectedRoom);
     }
 
+    const auto drawTechnicalCeilingBraces = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.technicalV1) return;
+        const auto extent = renderedRoom.worldBounds.maximum
+            - renderedRoom.worldBounds.minimum;
+        // This layout belongs to the 16 x 20 m Maintenance module. Smaller
+        // Technical rooms keep their existing ceiling and fixture spacing.
+        if (std::abs(std::min(extent.x, extent.z) - 16.0F) > 0.1F
+            || std::abs(std::max(extent.x, extent.z) - 20.0F) > 0.1F
+            || extent.y < 5.4F) return;
+
+        const wkc::core::Vec3 origin{
+            (renderedRoom.worldBounds.minimum.x
+                + renderedRoom.worldBounds.maximum.x) * 0.5F,
+            renderedRoom.worldBounds.minimum.y,
+            (renderedRoom.worldBounds.minimum.z
+                + renderedRoom.worldBounds.maximum.z) * 0.5F};
+        const bool quarterTurn = renderedRoom.rotation
+                == wkc::core::QuarterTurn::Degrees90
+            || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270;
+        const bool lShape = renderedRoom.walkableOutline.size() == 6U;
+        const auto piece = [&](const float x, const float z,
+            const wkc::core::Vec3 size, const wkc::core::Vec3 color,
+            const float drop = 0.075F) {
+            const auto offset = wkc::core::rotateQuarterTurns(
+                {x, 0.0F, z}, renderedRoom.rotation);
+            queueSurface(materials,
+                {origin.x + offset.x, renderedRoom.worldBounds.maximum.y - drop,
+                    origin.z + offset.z},
+                quarterTurn ? wkc::core::Vec3{size.z, size.y, size.x} : size,
+                RoomMaterialChannel::SolidColor, 1.0F, color);
+            surfaceCommands.back().castsShadow = true;
+        };
+        constexpr wkc::core::Vec3 brace{0.23F, 0.25F, 0.25F};
+        constexpr wkc::core::Vec3 fastener{0.49F, 0.48F, 0.44F};
+        // Long braces end at the return wall in the L variant. Cross braces
+        // on its narrow side stop before the missing corner, leaving no
+        // geometry floating outside the room footprint.
+        for (const float x : {-6.0F, -2.0F, 2.0F, 6.0F}) {
+            const bool shortened = lShape && x > 0.0F;
+            piece(x, shortened ? 4.0F : 0.0F,
+                {0.16F, 0.13F, shortened ? 11.8F : 19.8F}, brace);
+        }
+        for (const float z : {-8.0F, -4.0F, 0.0F, 4.0F, 8.0F}) {
+            const bool shortened = lShape && z < -2.0F;
+            piece(shortened ? -3.5F : 0.0F, z,
+                {shortened ? 8.8F : 15.8F, 0.13F, 0.16F}, brace);
+            for (const float x : {-6.0F, -2.0F, 2.0F, 6.0F}) {
+                if (shortened && x > 0.0F) continue;
+                piece(x, z, {0.075F, 0.015F, 0.075F}, fastener, 0.145F);
+            }
+        }
+    };
+    drawTechnicalCeilingBraces(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawTechnicalCeilingBraces(connectedRoom);
+    }
+
     const auto drawTechnicalServiceWalls = [&](const RoomRenderData& renderedRoom) {
         const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
         if (!materials.technicalV1) return;

@@ -13,7 +13,7 @@ testada, sem se estender automaticamente às outras salas do mesmo tema.
 | --- | --- | --- |
 | Storage Hall, 18 × 20 m | **Pronta** | — |
 | Central Hub octogonal | Em validação | Conexões em partida e aprovação final dos objetos/materiais aplicados. |
-| Manutenção em L | Em validação | Conexões em partida e texturas/aparência dos móveis, ainda genéricos. |
+| Manutenção em L | **Pronta** | — |
 | Cafeteria alongada, 18 × 24 m | **Pronta** | — |
 | Segurança em T | **Pronta na prévia isolada** | Integração na campanha é etapa separada. |
 | Arena do Boss com colunas | Em validação | Playtest da revisão com colunas e aceite visual completo da variante. |
@@ -25,6 +25,9 @@ Estado em 02/11/2026: Central Hub octogonal e Manutenção em L estão na geraç
 da campanha para playtest das conexões. A Cafeteria alongada foi aprovada em
 partida como variante pronta, mas ainda está disponível apenas na prévia
 isolada; sua entrada na campanha é uma etapa de integração distinta.
+Em 14/11/2026, o usuário aprovou a variante em L da Manutenção com seus móveis,
+materiais e teto revisado. A campanha na semente 1793, a travessia e a geração
+de mundo passaram pelos testes; a variante passa a **pronta**.
 Segurança em T foi aprovada pelo usuário em 03/11/2026, após o teste da
 sequência de indicadores. Continua em prévia isolada; a campanha ainda não
 recebeu esse formato.

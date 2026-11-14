@@ -1191,7 +1191,7 @@ permanecem na prévia.
 | Combat Room | Não revisada | Não revisada | Não revisada |
 | Cafeteria | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA |
 | Laboratory | V2 em validação na prévia | V1 em validação na prévia | V1 em validação na prévia |
-| Technical Area | Revisão v2 aprovada após piso mais fosco | Revisão v2 aprovada após piso mais fosco | V1 permanece em validação |
+| Technical Area | Revisão v2 aprovada na Manutenção em L | Revisão v2 fosca aprovada na Manutenção em L | V1 com travessas 3D aprovada na Manutenção em L em 14/11/2026 |
 | Security | Não revisada | Não revisada | Não revisada |
 | Central Hub | Wall v1 implementada, em validação visual | Chapa v1 em prévia, aceite em partida pendente | Proposta v1 aguardando implementação |
 

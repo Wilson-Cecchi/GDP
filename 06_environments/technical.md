@@ -1,9 +1,8 @@
 # Environment — Technical / Maintenance
 
-> **Estado:** materiais de parede, piso e teto implementados e validados na
-> Fase 10. Uma prévia isolada da geometria e dos móveis está pronta para
-> playtest. A variante em L está integrada como sala normal grande na campanha;
-> suas conexões aguardam playtest.
+> **Estado:** variante em L pronta: formato, móveis, parede, piso e teto
+> aprovados em 14/11/2026. Integrada à campanha como sala normal grande;
+> geração, conexões e travessia passaram pela validação.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -72,7 +71,8 @@ env __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
 
 As [capturas técnicas](../visual/validation/shaped_rooms_v1/README.md) cobrem
 FOV 60/100 e POTATO/ULTRA. O formato em L foi aprovado em partida para
-implementação; as conexões reais com corredores ainda precisam de validação.
+implementação. Em 14/11/2026, o usuário aprovou a variante concluída; a
+campanha na semente 1793 e os testes de travessia e mundo passaram.
 Na campanha, o formato em L aparece como variante de Manutenção grande, com
 as quatro rotações possíveis. A sala retangular permanece na biblioteca.
 Consulte a [ordem de integração](room_shape_plan.md).
@@ -108,7 +108,7 @@ nas paredes laterais e na parede interna do L, uma linha de cabos elevada,
 tubos âmbar verticais, acabamento das bancadas, bandejas de peças e frentes
 mais legíveis nos geradores e instrumentos. Os painéis ficam junto às paredes
 e acima da passagem; as bancadas, geradores e caixas mantêm suas áreas de
-colisão. Esta revisão está em playtest visual. As [capturas técnicas da revisão
+colisão. Esta revisão foi aprovada pelo usuário em 14/11/2026. As [capturas técnicas da revisão
 v2](../visual/validation/technical_decor_v2/README.md) não substituem a
 aprovação em partida.
 
@@ -123,7 +123,7 @@ mostra as duas formas em FOV 60 e 100.
 A revisão v3 variou chapas pequenas, mas o resultado continuou repetitivo e
 foi rejeitado em partida. A [proposta v2 de direção artística](../visual/proposals/technical_material_v2/README.md)
 foi aprovada em 13/11/2026; a implementação das chapas largas (receita v4)
-está em [validação técnica](../visual/validation/technical_material_v2/README.md).
+está documentada na [validação técnica](../visual/validation/technical_material_v2/README.md).
 O primeiro resultado no jogo foi rejeitado por deixar piso e paredes muito
 parecidos e por divergir da proposta. A revisão atual usa fontes de albedo
 separadas em `assets/visual/rooms/technical/`, amostradas por distância real
@@ -132,6 +132,12 @@ piso acompanha somente luminárias ativas.
 Em 13/11/2026, o usuário aprovou a revisão com a condição de deixar o piso
 um pouco mais fosco. A rugosidade e o brilho direto foram ajustados; a
 revisão v2 de parede e piso está aprovada. O teto mantém estado próprio.
+Uma revisão do teto acrescenta travessas de aço em 3D a cada 4 m sobre os
+painéis grafite existentes, com pequenos fixadores nos encontros. Na variante
+em L, as travessas terminam na parede de retorno em vez de atravessar o canto
+ausente. Dutos e luminárias continuam peças separadas nas posições atuais.
+O usuário aprovou esta revisão do teto em 14/11/2026; ela não altera o
+aceite da parede e do piso.
 Pranchas e capturas em `visual/proposals/` e `visual/validation/` são
 artefatos locais de revisão, ignorados pelo Git; os albedos usados no jogo
 ficam em `assets/visual/rooms/technical/`.
