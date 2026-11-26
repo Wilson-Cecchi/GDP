@@ -170,6 +170,7 @@ Mesh::Mesh(Mesh&& other) noexcept
     , instanceAttributesConfigured_(
           std::exchange(other.instanceAttributesConfigured_, false))
     , backfaceCullingSafe_(std::exchange(other.backfaceCullingSafe_, false))
+    , bounds_(std::exchange(other.bounds_, {}))
 {
 }
 
@@ -188,6 +189,7 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept
             = std::exchange(other.instanceAttributesConfigured_, false);
         backfaceCullingSafe_
             = std::exchange(other.backfaceCullingSafe_, false);
+        bounds_ = std::exchange(other.bounds_, {});
     }
     return *this;
 }
@@ -236,6 +238,7 @@ bool Mesh::upload(const GlApi& gl, const MeshData& data)
 
     indexCount_ = static_cast<std::uint32_t>(data.indices.size());
     backfaceCullingSafe_ = data.backfaceCullingSafe;
+    bounds_ = data.bounds;
     return vertexArray_ != 0 && vertexBuffer_ != 0 && indexBuffer_ != 0;
 }
 
@@ -356,6 +359,7 @@ void Mesh::reset() noexcept
     instanceCount_ = 0;
     instanceAttributesConfigured_ = false;
     backfaceCullingSafe_ = false;
+    bounds_ = {};
 }
 
 bool Mesh::isValid() const noexcept
@@ -371,6 +375,11 @@ std::uint32_t Mesh::indexCount() const noexcept
 std::uint32_t Mesh::instanceCount() const noexcept
 {
     return instanceCount_;
+}
+
+wkc::core::Aabb Mesh::bounds() const noexcept
+{
+    return bounds_;
 }
 
 bool Mesh::backfaceCullingSafe() const noexcept

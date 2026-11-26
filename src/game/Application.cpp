@@ -1660,6 +1660,14 @@ bool Application::initializeRun()
             log(LogLevel::Error, "Run initialization requires an active renderer");
             return false;
         }
+        roomShellDoors_.clear();
+        for (const world::RoomInstance& room : world_->rooms) {
+            for (const world::ConnectorInstance& connector : room.connectors) {
+                if (connector.sealed || !connector.edge) continue;
+                roomShellDoors_.push_back({connector.worldPosition,
+                    connector.worldNormal, connector.width, connector.height});
+            }
+        }
         for (const world::RoomInstance& room : world_->rooms) {
             const bool materialsReady = config_.industrialCorridorPreview
                 ? renderer_->prepareIndustrialRoomMaterials(room.seed)
@@ -1669,6 +1677,15 @@ bool Application::initializeRun()
                 return false;
             }
             roomMaterialKeys_.emplace(room.id, renderer_->activeRoomMaterialKey());
+            visual::RoomRenderData shell;
+            shell.materialKey = renderer_->activeRoomMaterialKey();
+            shell.worldBounds = room.worldBounds;
+            shell.walkableOutline = room.walkableOutline;
+            shell.shellDoors = roomShellDoors_;
+            if (!renderer_->prepareRoomShell(shell)) {
+                log(LogLevel::Error, "World room shell preparation failed");
+                return false;
+            }
         }
         for (const world::CorridorPath& corridor : world_->corridors) {
             const wkc::core::Seed corridorSeed = wkc::core::hashCombine(
@@ -2353,6 +2370,7 @@ bool Application::returnToMainMenu()
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
+    roomShellDoors_.clear();
     corridorMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
@@ -4743,6 +4761,7 @@ void Application::render()
             roomRender.rotation = currentRoom->rotation;
             roomRender.worldBounds = currentRoom->worldBounds;
             roomRender.walkableOutline = currentRoom->walkableOutline;
+            roomRender.shellDoors = roomShellDoors_;
             applySecurityIndicatorState(currentRoom->id, roomRender);
             if (const auto architecture = roomArchitectureParts_.find(currentRoom->id);
                 architecture != roomArchitectureParts_.end()) {
@@ -4976,6 +4995,7 @@ void Application::render()
                     ? roomMaterialKeys_.at(renderedRoom.id) : 0U;
                 connected.worldBounds = renderedRoom.worldBounds;
                 connected.walkableOutline = renderedRoom.walkableOutline;
+                connected.shellDoors = roomShellDoors_;
                 applySecurityIndicatorState(renderedRoom.id, connected);
                 if (const auto architecture = roomArchitectureParts_.find(renderedRoom.id);
                     architecture != roomArchitectureParts_.end()) {
@@ -5561,6 +5581,7 @@ void Application::shutdown(const bool preserveWindow)
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
+    roomShellDoors_.clear();
     corridorMaterialKeys_.clear();
     roomArchitectureParts_.clear();
     doorRuntimes_.clear();

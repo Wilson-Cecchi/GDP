@@ -1353,6 +1353,8 @@ bool updateNeuralEnemy(
     NeuralEnemyMotorState* motor = nullptr;
     if (experiment->controlAll) {
         motor = &experiment->motors[id.packed()];
+        motor->navigationSecondsRemaining = std::max(
+            0.0F, motor->navigationSecondsRemaining - step);
         if (motor->scriptedSecondsRemaining > 0.0F) {
             motor->scriptedSecondsRemaining = std::max(
                 0.0F, motor->scriptedSecondsRemaining - step);
@@ -1433,6 +1435,39 @@ bool updateNeuralEnemy(
             const std::int8_t preferredSide = enemy.avoidanceSide != 0
                 ? enemy.avoidanceSide
                 : ((enemy.visualSeed ^ id.packed()) & 1U) == 0U ? -1 : 1;
+            const auto steerAroundObstacle = [&](const wkc::core::Vec3 target) {
+                if (motor == nullptr) {
+                    return navigationDirection(collisionWorld, start,
+                        target, collider, preferredSide);
+                }
+                // The corner graph is expensive in a crowded room. Reuse a
+                // short-lived waypoint while checking the current segment on
+                // every tick, so doors and broken props still invalidate it.
+                const bool stale = !motor->navigationCached
+                    || motor->navigationSecondsRemaining <= 0.0F
+                    || motor->navigationSide != preferredSide
+                    || planarDistanceSquared(motor->navigationTarget, target)
+                        > 0.1225F
+                    || (motor->navigationWaypoint
+                        && planarDistanceSquared(start,
+                            *motor->navigationWaypoint) < 0.01F)
+                    || (motor->navigationWaypoint
+                        && !navigationSegmentClear(collisionWorld, start,
+                            *motor->navigationWaypoint, collider));
+                if (stale) {
+                    motor->navigationWaypoint = navigationWaypoint(
+                        collisionWorld, start, target, collider, preferredSide);
+                    motor->navigationTarget = target;
+                    motor->navigationSide = preferredSide;
+                    motor->navigationSecondsRemaining = 0.10F;
+                    motor->navigationCached = true;
+                }
+                const wkc::core::Vec3 waypoint
+                    = motor->navigationWaypoint.value_or(target);
+                const wkc::core::Vec3 offset = waypoint - start;
+                return wkc::core::normalized(
+                    {offset.x, 0.0F, offset.z});
+            };
             const auto approach = reachablePlayerApproach(
                 collisionWorld, start, targetPosition, collider,
                 preferredSide);
@@ -1446,12 +1481,10 @@ bool updateNeuralEnemy(
                 reachedApproach = true;
             } else if (approach && (pursuingWorker || !navigationSegmentClear(
                     collisionWorld, start, *approach, collider))) {
-                travelDirection = navigationDirection(
-                    collisionWorld, start, *approach, collider, preferredSide);
+                travelDirection = steerAroundObstacle(*approach);
                 navigating = true;
             } else if (blockedApproach) {
-                travelDirection = navigationDirection(
-                    collisionWorld, start, *approach, collider, preferredSide);
+                travelDirection = steerAroundObstacle(*approach);
                 navigating = true;
             }
         }

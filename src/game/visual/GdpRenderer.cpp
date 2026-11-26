@@ -128,6 +128,24 @@ wkc::render::MeshData makeGlassTestDomeMesh()
 
 enum class FootprintSurface : std::uint8_t { Floor, Ceiling, Wall };
 
+bool doorMatchesFootprintEdge(const DoorRenderData& door,
+    const wkc::core::Vec2 a, const wkc::core::Vec2 b,
+    const wkc::core::Vec3 inward) noexcept
+{
+    const float dx = b.x - a.x;
+    const float dz = b.y - a.y;
+    const float length = std::sqrt(dx * dx + dz * dz);
+    if (length < 1.0e-4F) return false;
+    const float along = ((door.position.x - a.x) * dx
+        + (door.position.z - a.y) * dz) / length;
+    const float offsetX = door.position.x - (a.x + dx * along / length);
+    const float offsetZ = door.position.z - (a.y + dz * along / length);
+    return wkc::core::dot(door.outwardNormal, inward) < -0.9F
+        && offsetX * offsetX + offsetZ * offsetZ < 0.04F
+        && along - door.width * 0.5F >= -1.0e-3F
+        && along + door.width * 0.5F <= length + 1.0e-3F;
+}
+
 std::uint64_t footprintMeshKey(const std::span<const wkc::core::Vec2> outline,
     const wkc::core::Aabb bounds, const FootprintSurface surface,
     const std::span<const DoorRenderData> doors) noexcept
@@ -141,7 +159,31 @@ std::uint64_t footprintMeshKey(const std::span<const wkc::core::Vec2> outline,
     add(bounds.maximum.y);
     for (const auto point : outline) { add(point.x); add(point.y); }
     if (surface == FootprintSurface::Wall) {
+        float signedArea = 0.0F;
+        for (std::size_t index = 0U; index < outline.size(); ++index) {
+            const auto a = outline[index];
+            const auto b = outline[(index + 1U) % outline.size()];
+            signedArea += a.x * b.y - b.x * a.y;
+        }
+        const float orientation = signedArea >= 0.0F ? 1.0F : -1.0F;
         for (const auto& door : doors) {
+            bool belongsToRoom = false;
+            for (std::size_t index = 0U; index < outline.size(); ++index) {
+                const auto a = outline[index];
+                const auto b = outline[(index + 1U) % outline.size()];
+                const float dx = b.x - a.x;
+                const float dz = b.y - a.y;
+                const float length = std::sqrt(dx * dx + dz * dz);
+                if (length < 1.0e-4F) continue;
+                const wkc::core::Vec3 inward{
+                    -orientation * dz / length, 0.0F,
+                    orientation * dx / length};
+                if (doorMatchesFootprintEdge(door, a, b, inward)) {
+                    belongsToRoom = true;
+                    break;
+                }
+            }
+            if (!belongsToRoom) continue;
             add(door.position.x); add(door.position.z);
             add(door.outwardNormal.x); add(door.outwardNormal.z);
             add(door.width); add(door.height);
@@ -213,16 +255,7 @@ std::optional<wkc::render::MeshData> makeFootprintMesh(
             };
             const auto door = std::find_if(doors.begin(), doors.end(),
                 [&](const DoorRenderData& candidate) {
-                    const float along = ((candidate.position.x - a.x) * dx
-                        + (candidate.position.z - a.y) * dz) / length;
-                    const float offsetX = candidate.position.x
-                        - (a.x + dx * along / length);
-                    const float offsetZ = candidate.position.z
-                        - (a.y + dz * along / length);
-                    return wkc::core::dot(candidate.outwardNormal, inward) < -0.9F
-                        && offsetX * offsetX + offsetZ * offsetZ < 0.04F
-                        && along - candidate.width * 0.5F >= -1.0e-3F
-                        && along + candidate.width * 0.5F <= length + 1.0e-3F;
+                    return doorMatchesFootprintEdge(candidate, a, b, inward);
                 });
             if (door == doors.end()) {
                 addSpan(0.0F, length, floor, ceiling);
@@ -2036,6 +2069,44 @@ bool GdpRenderer::initialize(const int width, const int height)
     return true;
 }
 
+bool GdpRenderer::prepareRoomShell(const RoomRenderData& room)
+{
+    if (!initialized_) return false;
+    const auto materials = roomMaterials_.find(room.materialKey);
+    if (materials == roomMaterials_.end()) return false;
+    std::vector<wkc::core::Vec2> rectangularOutline;
+    if (materials->second.technicalV1 && room.walkableOutline.empty()) {
+        const auto bounds = room.worldBounds;
+        rectangularOutline = {
+            {bounds.minimum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.maximum.z},
+            {bounds.minimum.x, bounds.maximum.z},
+        };
+    }
+    const std::span<const wkc::core::Vec2> outline
+        = room.walkableOutline.empty()
+            ? std::span<const wkc::core::Vec2>{rectangularOutline}
+            : room.walkableOutline;
+    if (outline.empty()) return true;
+    constexpr std::array surfaces{FootprintSurface::Floor,
+        FootprintSurface::Ceiling, FootprintSurface::Wall};
+    for (const FootprintSurface surface : surfaces) {
+        const auto key = footprintMeshKey(
+            outline, room.worldBounds, surface, room.shellDoors);
+        if (footprintMeshes_.contains(key)) continue;
+        const auto data = makeFootprintMesh(
+            outline, room.worldBounds, surface, room.shellDoors);
+        if (!data) return false;
+        auto inserted = footprintMeshes_.try_emplace(key).first;
+        if (!inserted->second.upload(gl_, *data)) {
+            footprintMeshes_.erase(inserted);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
 {
     if (!initialized_) {
@@ -3744,12 +3815,14 @@ bool GdpRenderer::render(
             constexpr std::array surfaces{FootprintSurface::Floor,
                 FootprintSurface::Ceiling, FootprintSurface::Wall};
             for (const FootprintSurface surface : surfaces) {
+                const auto shellDoors = renderedRoom.shellDoors.empty()
+                    ? doors : renderedRoom.shellDoors;
                 const auto key = footprintMeshKey(
-                    shellOutline, bounds, surface, doors);
+                    shellOutline, bounds, surface, shellDoors);
                 auto mesh = footprintMeshes_.find(key);
                 if (mesh == footprintMeshes_.end()) {
                     const auto data = makeFootprintMesh(
-                        shellOutline, bounds, surface, doors);
+                        shellOutline, bounds, surface, shellDoors);
                     if (!data) { footprintShellReady = false; return; }
                     auto inserted = footprintMeshes_.try_emplace(key).first;
                     if (!inserted->second.upload(gl_, *data)) {
@@ -9451,6 +9524,33 @@ bool GdpRenderer::render(
                     && wkc::core::length(center - lightPosition)
                         > light.range + radius) {
                     continue;
+                }
+                if (caster.mesh != &box_) {
+                    const wkc::core::Aabb bounds = caster.mesh->bounds();
+                    const wkc::core::Vec3 localCenter
+                        = (bounds.minimum + bounds.maximum) * 0.5F;
+                    const wkc::core::Vec3 half
+                        = (bounds.maximum - bounds.minimum) * 0.5F;
+                    const wkc::core::Vec3 worldCenter{
+                        e[0] * localCenter.x + e[4] * localCenter.y
+                            + e[8] * localCenter.z + e[12],
+                        e[1] * localCenter.x + e[5] * localCenter.y
+                            + e[9] * localCenter.z + e[13],
+                        e[2] * localCenter.x + e[6] * localCenter.y
+                            + e[10] * localCenter.z + e[14],
+                    };
+                    const wkc::core::Vec3 worldHalf{
+                        std::abs(e[0]) * half.x + std::abs(e[4]) * half.y
+                            + std::abs(e[8]) * half.z,
+                        std::abs(e[1]) * half.x + std::abs(e[5]) * half.y
+                            + std::abs(e[9]) * half.z,
+                        std::abs(e[2]) * half.x + std::abs(e[6]) * half.y
+                            + std::abs(e[10]) * half.z,
+                    };
+                    if (wkc::core::length(worldCenter - lightPosition)
+                        > light.range + wkc::core::length(worldHalf) + 0.05F) {
+                        continue;
+                    }
                 }
                 if (caster.mesh == &box_) {
                     boxShadowModels.push_back(caster.model);

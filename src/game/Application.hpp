@@ -228,6 +228,7 @@ private:
     std::unordered_map<world::RoomId, std::vector<entities::EntityId>>
         roomFixtureEntities_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
+    std::vector<visual::DoorRenderData> roomShellDoors_;
     std::unordered_map<world::EdgeId, std::uint64_t> corridorMaterialKeys_;
     std::unordered_map<world::RoomId,
         std::vector<world::RoomArchitecturePart>> roomArchitectureParts_;

@@ -79,6 +79,7 @@ public:
     [[nodiscard]] std::uint32_t indexCount() const noexcept;
     [[nodiscard]] std::uint32_t instanceCount() const noexcept;
     [[nodiscard]] bool backfaceCullingSafe() const noexcept;
+    [[nodiscard]] wkc::core::Aabb bounds() const noexcept;
 
 private:
     const GlApi* gl_{nullptr};
@@ -90,6 +91,7 @@ private:
     std::uint32_t instanceCount_{0};
     bool instanceAttributesConfigured_{false};
     bool backfaceCullingSafe_{false};
+    wkc::core::Aabb bounds_{};
 };
 
 } // namespace wkc::render

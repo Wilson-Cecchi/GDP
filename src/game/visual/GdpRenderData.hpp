@@ -361,6 +361,16 @@ struct SecurityIndicatorVisual {
 [[nodiscard]] SecurityIndicatorVisual sampleSecurityIndicator(
     SecurityIndicatorPhase phase, float elapsedSeconds) noexcept;
 
+struct DoorRenderData {
+    wkc::core::Vec3 position{};
+    wkc::core::Vec3 outwardNormal{0.0F, 0.0F, 1.0F};
+    float width{1.2F};
+    float height{2.2F};
+    bool locked{false};
+    float openFraction{1.0F};
+    bool inspectionWindow{false};
+};
+
 struct RoomRenderData {
     wkc::core::Vec3 origin{};
     wkc::core::QuarterTurn rotation{wkc::core::QuarterTurn::Degrees0};
@@ -371,19 +381,10 @@ struct RoomRenderData {
     };
     std::span<const wkc::core::Vec2> walkableOutline{};
     std::span<const world::RoomArchitecturePart> architectureParts{};
+    std::span<const DoorRenderData> shellDoors{};
     bool customArchitecture{false};
     SecurityIndicatorPhase securityIndicatorPhase{SecurityIndicatorPhase::Nominal};
     float securityIndicatorSeconds{0.0F};
-};
-
-struct DoorRenderData {
-    wkc::core::Vec3 position{};
-    wkc::core::Vec3 outwardNormal{0.0F, 0.0F, 1.0F};
-    float width{1.2F};
-    float height{2.2F};
-    bool locked{false};
-    float openFraction{1.0F};
-    bool inspectionWindow{false};
 };
 
 [[nodiscard]] ImpactRenderData bulletMarkOnDoor(

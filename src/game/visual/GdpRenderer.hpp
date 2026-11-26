@@ -125,6 +125,7 @@ public:
     [[nodiscard]] bool prepareTechnicalRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareSecurityRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareCentralHubRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareRoomShell(const RoomRenderData& room);
     [[nodiscard]] std::uint64_t activeRoomMaterialKey() const noexcept
     {
         return activeRoomMaterialKey_;

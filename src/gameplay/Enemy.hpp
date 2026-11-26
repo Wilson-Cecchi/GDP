@@ -148,6 +148,11 @@ struct NeuralEnemyMotorState {
     std::array<float, 5> outputs{};
     float ineffectiveSeconds{0.0F};
     float scriptedSecondsRemaining{0.0F};
+    float navigationSecondsRemaining{0.0F};
+    wkc::core::Vec3 navigationTarget{};
+    std::optional<wkc::core::Vec3> navigationWaypoint{};
+    std::int8_t navigationSide{0};
+    bool navigationCached{false};
 };
 
 // One trained genome can control every enemy of an archetype, with independent
