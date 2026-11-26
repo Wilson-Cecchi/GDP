@@ -728,7 +728,8 @@ int Application::run()
         fixedUpdates_ = 0U;
         performanceMonitor_.reset();
         currentFramePerformance_ = {};
-        if (!initialize()) {
+        if (!sdlInitialized_ && !initialize()) {
+            shutdown();
             return 1;
         }
         if (launchRunImmediately && !world_ && !initializeRun()) {
@@ -890,21 +891,56 @@ int Application::run()
             log(LogLevel::Info, benchmarkSummary.str());
         }
         beginAnotherRun = restartRequested_;
-        shutdown();
         if (fatalError_) {
+            shutdown();
             return 1;
         }
         if (beginAnotherRun) {
+            // A new floor replaces the run's world and GPU resources, but the
+            // SDL window and GL context remain alive throughout the transition.
+            shutdown(true);
             const auto nextSeed = session_.restart(restartMode_);
             if (!nextSeed) {
                 log(LogLevel::Error, "Session rejected a requested restart");
+                shutdown();
                 return 1;
             }
             config_.worldSeed = *nextSeed;
+            applyRuntimeSettings();
+            if (!reinitializeRendererForNextRun()) {
+                shutdown();
+                return 1;
+            }
             launchRunImmediately = true;
         }
     } while (beginAnotherRun);
+    shutdown();
     return 0;
+}
+
+bool Application::reinitializeRendererForNextRun()
+{
+    if (config_.headless) return true;
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    if (window_ == nullptr || glContext_ == nullptr
+        || !SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight)
+        || drawableWidth <= 0 || drawableHeight <= 0) {
+        log(LogLevel::Error, "Next run framebuffer size unavailable");
+        return false;
+    }
+    if (!SDL_GL_MakeCurrent(window_, glContext_)) {
+        log(LogLevel::Error, sdlError("Next run GL context unavailable"));
+        return false;
+    }
+    renderer_ = std::make_unique<visual::GdpRenderer>();
+    if (!renderer_->initialize(drawableWidth, drawableHeight)) {
+        log(LogLevel::Error, "Next run renderer initialization failed");
+        return false;
+    }
+    renderer_->setGeometryShadowsEnabled(!config_.legacyGeometryShadows);
+    log(LogLevel::Info, "Next run kept the SDL window and GL context open");
+    return true;
 }
 
 bool Application::initialize()
@@ -1818,9 +1854,8 @@ void Application::processEvents()
                         / static_cast<float>(windowWidth),
                     pointer.y * static_cast<float>(drawableHeight)
                         / static_cast<float>(windowHeight),
-                    mainMenu_.active ? 100U : gameplay::resolvedUiScalePercent(
-                        runtimeSettings_, drawableWidth, drawableHeight,
-                        windowWidth, windowHeight));
+                    gameplay::resolvedUiScalePercent(runtimeSettings_,
+                        drawableWidth, drawableHeight, windowWidth, windowHeight));
             }
         }
         const auto confirmationOptionFor
@@ -1977,7 +2012,9 @@ void Application::processEvents()
                     pointer.x * static_cast<float>(drawableWidth)
                         / static_cast<float>(windowWidth),
                     pointer.y * static_cast<float>(drawableHeight)
-                        / static_cast<float>(windowHeight));
+                        / static_cast<float>(windowHeight),
+                    gameplay::resolvedUiScalePercent(runtimeSettings_,
+                        drawableWidth, drawableHeight, windowWidth, windowHeight));
             }
         }
         const auto resultOptionFor
@@ -4278,7 +4315,6 @@ void Application::render()
         visual::HudRenderData hud;
         hud.language = runtimeSettings_.language;
         fillFrontendMenuHud(hud);
-        if (menuFlow_.page == MenuPage::Root) hud.uiScalePercent = 100U;
         hud.exitConfirmation = exitConfirmation_.active;
         if (pauseConfirmationCommand_ == gameplay::PauseMenuCommand::RestartRun)
             hud.pauseConfirmation = visual::HudPauseSelection::RestartRun;
@@ -5503,7 +5539,7 @@ void Application::render()
     }
 }
 
-void Application::shutdown()
+void Application::shutdown(const bool preserveWindow)
 {
     running_ = false;
     runDifficulty_ = 1.0F;
@@ -5511,7 +5547,14 @@ void Application::shutdown()
     (void)savePersistedSettings();
 
     renderer_.reset();
-    audio_.reset();
+    if (preserveWindow) {
+        if (audio_) {
+            audio_->stopAmbience();
+            audio_->clearVoices();
+        }
+    } else {
+        audio_.reset();
+    }
     entities_.clear();
     roomEvents_.clear();
     roomEventPhaseStartTicks_.clear();
@@ -5531,8 +5574,10 @@ void Application::shutdown()
     grenadeThrowRemaining_ = 0.0F;
     grenadeThrowChargeStrength_ = 0.0F;
     enemyProjectiles_.clear();
-    gamepad_.close(input_);
-    gamepadConnected_ = false;
+    if (!preserveWindow) {
+        gamepad_.close(input_);
+        gamepadConnected_ = false;
+    }
     input_ = Input{};
     player_ = gameplay::Player{};
     weapon_ = gameplay::Weapon{};
@@ -5577,17 +5622,17 @@ void Application::shutdown()
     visitedRooms_.clear();
     roomEntryGraceRemaining_.clear();
 
-    if (glContext_ != nullptr) {
+    if (!preserveWindow && glContext_ != nullptr) {
         SDL_GL_DestroyContext(glContext_);
         glContext_ = nullptr;
     }
 
-    if (window_ != nullptr) {
+    if (!preserveWindow && window_ != nullptr) {
         SDL_DestroyWindow(window_);
         window_ = nullptr;
     }
 
-    if (sdlInitialized_) {
+    if (!preserveWindow && sdlInitialized_) {
         SDL_Quit();
         sdlInitialized_ = false;
     }

@@ -727,6 +727,17 @@ void testResultMenuLayout()
     expect(!resultMenuSelectionAt(1280, 720, 0.0F, 0.0F),
         "pointer outside result buttons has no selection");
 
+    const ResultMenuLayout enlarged = makeResultMenuLayout(1280, 720, 200U);
+    expect(enlarged.textScale > wide.textScale
+            && enlarged.panel.width > wide.panel.width
+            && enlarged.playAgainButton.height > wide.playAgainButton.height,
+        "result screen grows with the in-game UI scale setting");
+    expect(resultMenuSelectionAt(1280, 720,
+               pointerX(enlarged.playAgainButton),
+               pointerY(enlarged.playAgainButton), 200U)
+            == HudResultMenuSelection::PlayAgain,
+        "result screen pointer follows the enlarged buttons");
+
     const ResultMenuLayout compact = makeResultMenuLayout(320, 200);
     expect(compact.scale == 1,
         "compact result menu uses base bitmap scale");

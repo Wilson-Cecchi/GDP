@@ -3348,43 +3348,78 @@ bool GdpRenderer::render(
         "uLightPositions[2]", "uLightPositions[3]",
         "uLightPositions[4]", "uLightPositions[5]",
         "uLightPositions[6]", "uLightPositions[7]",
+        "uLightPositions[8]", "uLightPositions[9]",
+        "uLightPositions[10]", "uLightPositions[11]",
+        "uLightPositions[12]", "uLightPositions[13]",
+        "uLightPositions[14]", "uLightPositions[15]",
     };
     constexpr std::array colorUniforms{
         "uLightColors[0]", "uLightColors[1]",
         "uLightColors[2]", "uLightColors[3]",
         "uLightColors[4]", "uLightColors[5]",
         "uLightColors[6]", "uLightColors[7]",
+        "uLightColors[8]", "uLightColors[9]",
+        "uLightColors[10]", "uLightColors[11]",
+        "uLightColors[12]", "uLightColors[13]",
+        "uLightColors[14]", "uLightColors[15]",
     };
     constexpr std::array intensityUniforms{
         "uLightIntensities[0]", "uLightIntensities[1]",
         "uLightIntensities[2]", "uLightIntensities[3]",
         "uLightIntensities[4]", "uLightIntensities[5]",
         "uLightIntensities[6]", "uLightIntensities[7]",
+        "uLightIntensities[8]", "uLightIntensities[9]",
+        "uLightIntensities[10]", "uLightIntensities[11]",
+        "uLightIntensities[12]", "uLightIntensities[13]",
+        "uLightIntensities[14]", "uLightIntensities[15]",
     };
     constexpr std::array rangeUniforms{
         "uLightRanges[0]", "uLightRanges[1]",
         "uLightRanges[2]", "uLightRanges[3]",
         "uLightRanges[4]", "uLightRanges[5]",
         "uLightRanges[6]", "uLightRanges[7]",
+        "uLightRanges[8]", "uLightRanges[9]",
+        "uLightRanges[10]", "uLightRanges[11]",
+        "uLightRanges[12]", "uLightRanges[13]",
+        "uLightRanges[14]", "uLightRanges[15]",
     };
     constexpr std::array roomMinimumUniforms{
         "uLightRoomMinima[0]", "uLightRoomMinima[1]",
         "uLightRoomMinima[2]", "uLightRoomMinima[3]",
         "uLightRoomMinima[4]", "uLightRoomMinima[5]",
         "uLightRoomMinima[6]", "uLightRoomMinima[7]",
+        "uLightRoomMinima[8]", "uLightRoomMinima[9]",
+        "uLightRoomMinima[10]", "uLightRoomMinima[11]",
+        "uLightRoomMinima[12]", "uLightRoomMinima[13]",
+        "uLightRoomMinima[14]", "uLightRoomMinima[15]",
     };
     constexpr std::array roomMaximumUniforms{
         "uLightRoomMaxima[0]", "uLightRoomMaxima[1]",
         "uLightRoomMaxima[2]", "uLightRoomMaxima[3]",
         "uLightRoomMaxima[4]", "uLightRoomMaxima[5]",
         "uLightRoomMaxima[6]", "uLightRoomMaxima[7]",
+        "uLightRoomMaxima[8]", "uLightRoomMaxima[9]",
+        "uLightRoomMaxima[10]", "uLightRoomMaxima[11]",
+        "uLightRoomMaxima[12]", "uLightRoomMaxima[13]",
+        "uLightRoomMaxima[14]", "uLightRoomMaxima[15]",
     };
     constexpr std::array boundedUniforms{
         "uLightBoundedToRoom[0]", "uLightBoundedToRoom[1]",
         "uLightBoundedToRoom[2]", "uLightBoundedToRoom[3]",
         "uLightBoundedToRoom[4]", "uLightBoundedToRoom[5]",
         "uLightBoundedToRoom[6]", "uLightBoundedToRoom[7]",
+        "uLightBoundedToRoom[8]", "uLightBoundedToRoom[9]",
+        "uLightBoundedToRoom[10]", "uLightBoundedToRoom[11]",
+        "uLightBoundedToRoom[12]", "uLightBoundedToRoom[13]",
+        "uLightBoundedToRoom[14]", "uLightBoundedToRoom[15]",
     };
+    static_assert(positionUniforms.size() == maxRenderedRoomLights
+        && colorUniforms.size() == maxRenderedRoomLights
+        && intensityUniforms.size() == maxRenderedRoomLights
+        && rangeUniforms.size() == maxRenderedRoomLights
+        && roomMinimumUniforms.size() == maxRenderedRoomLights
+        && roomMaximumUniforms.size() == maxRenderedRoomLights
+        && boundedUniforms.size() == maxRenderedRoomLights);
     constexpr std::array shadowMinimumUniforms{
         "uShadowOccluderMinima[0]", "uShadowOccluderMinima[1]",
         "uShadowOccluderMinima[2]", "uShadowOccluderMinima[3]",
@@ -10838,6 +10873,7 @@ bool GdpRenderer::render(
     const auto drawInfoOverlay = [&] {
         if (hud.infoOverlay && hud.visible && !hud.mainMenu && !hud.paused
             && !hud.settingsMenu) {
+            scaleGameplayHud = true;
             std::array<std::string, 11> lines{
                 "RUN STATUS",
                 "SEED " + std::to_string(hud.runSeed),
@@ -11303,17 +11339,19 @@ bool GdpRenderer::render(
             ? "FLOOR CLEAR"
             : victory && hud.campaignMode ? "CAMPAIGN CLEAR"
             : victory ? "VICTORY" : "DEFEAT";
-        const ResultMenuLayout layout = makeResultMenuLayout(width, height);
-        const int scale = layout.scale;
+        const ResultMenuLayout layout = makeResultMenuLayout(width, height,
+            hud.uiScalePercent);
+        const float scale = layout.textScale;
         const wkc::core::Vec3 resultColor = victory
             ? uiTheme.success : uiTheme.danger;
-        drawMenuPanel(layout.panel, scale, resultColor);
+        drawMenuPanel(layout.panel, layout.scale, resultColor);
         drawBitmapText((width - bitmapTextWidth(result, 2 * scale)) / 2,
-            layout.panel.y + layout.panel.height - (24 * scale),
+            layout.panel.y + layout.panel.height
+                - static_cast<int>(std::lround(24.0F * scale)),
             2 * scale, result, resultColor);
 
         if (hud.speedrunMode && hud.speedrunRecordVisible
-            && layout.panel.height >= 140 * scale) {
+            && static_cast<float>(layout.panel.height) >= 140.0F * scale) {
             const std::string recordText
                 = (hud.newSpeedrunRecord ? "NEW RECORD " : "BEST ")
                 + runTimeText(hud.bestSpeedrunTicks);
@@ -11322,7 +11360,7 @@ bool GdpRenderer::render(
                 : wkc::core::Vec3{0.64F, 0.78F, 0.82F};
             drawBitmapText(
                 (width - bitmapTextWidth(recordText, scale)) / 2,
-                layout.panel.y + (104 * scale), scale,
+                layout.panel.y + static_cast<int>(std::lround(104.0F * scale)), scale,
                 recordText, recordColor);
         }
 
@@ -11352,14 +11390,17 @@ bool GdpRenderer::render(
             }
             const int optionWidth = bitmapTextWidth(options[index], scale);
             drawBitmapText((width - optionWidth) / 2,
-                button.y + (3 * scale), scale, options[index],
+                button.y + static_cast<int>(std::lround(3.0F * scale)),
+                scale, options[index],
                 index == selected ? resultColor : textColor);
         }
         const std::string_view controls = width >= 480
             ? "W S  ENTER  MOUSE  ESC"
             : "W S  ENTER  MOUSE";
-        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
-            layout.panel.y + (7 * scale), 1, controls,
+        const float footerScale = std::max(1.0F, scale / 2.0F);
+        drawBitmapText((width - bitmapTextWidth(controls, footerScale)) / 2,
+            layout.panel.y + static_cast<int>(7.0F * scale),
+            footerScale, controls,
             uiTheme.mutedText);
     }
     if (hud.paused) {

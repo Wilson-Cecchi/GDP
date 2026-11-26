@@ -1958,6 +1958,31 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, changed.data());
             passed &= pixels != changed;
             if (page == MenuPage::Root) {
+                if (width >= 960) {
+                    hud.listMenu.uiScalePercent = 200U;
+                    passed &= renderBackdrop(0.0);
+                    std::vector<std::uint8_t> scaled(pixels.size());
+                    glReadPixels(0, 0, width, height, GL_RGBA,
+                        GL_UNSIGNED_BYTE, scaled.data());
+                    passed &= scaled != pixels;
+                    if (captureDirectory && width == 1280 && height == 720) {
+                        std::vector<std::uint8_t> topDown(scaled.size());
+                        const auto stride = static_cast<std::size_t>(width * 4);
+                        for (int row = 0; row < height; ++row)
+                            std::copy_n(scaled.data()
+                                    + static_cast<std::size_t>(height - row - 1) * stride,
+                                stride, topDown.data()
+                                    + static_cast<std::size_t>(row) * stride);
+                        const auto path = std::filesystem::path{captureDirectory}
+                            / (std::string{gdp::gameplay::languageName(language)}
+                                + "-menu-root-200-1280x720.bmp");
+                        auto* surface = SDL_CreateSurfaceFrom(width, height,
+                            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+                        passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+                        SDL_DestroySurface(surface);
+                    }
+                    hud.listMenu.uiScalePercent = 100U;
+                }
                 passed &= renderBackdrop(8.0);
                 std::vector<std::uint8_t> animated(pixels.size());
                 glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, animated.data());
@@ -3206,6 +3231,24 @@ int main(const int argc, char** argv)
             std::vector<std::uint8_t> lightingPixels(baseline.size());
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                 lightingPixels.data());
+            // Graphics settings allow up to 16 lights. Exercise the first
+            // index beyond the old eight-entry uniform list and the maximum.
+            auto expandedLighting = proceduralLighting;
+            for (std::size_t index = 8U; index < expandedLighting.lights.size(); ++index) {
+                expandedLighting.lights[index] = expandedLighting.lights[index - 8U];
+            }
+            expandedLighting.lightCount = 9U;
+            const bool renderedNineLights = renderer.render(
+                width, height, {}, {}, {}, {}, expandedLighting);
+            expandedLighting.lightCount = 16U;
+            const bool renderedSixteenLights = renderer.render(
+                width, height, {}, {}, {}, {}, expandedLighting);
+            std::vector<std::uint8_t> sixteenLightPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                sixteenLightPixels.data());
+            passed &= renderedNineLights && renderedSixteenLights
+                && glGetError() == GL_NO_ERROR
+                && sixteenLightPixels != lightingPixels;
             gdp::game::visual::RoomLightingRenderData flashlightLighting
                 = proceduralLighting;
             flashlightLighting.flashlightEnabled = true;

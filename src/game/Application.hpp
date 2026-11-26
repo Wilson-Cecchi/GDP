@@ -126,7 +126,8 @@ private:
     void fixedUpdate(double fixedStepSeconds);
     void updateEnemyAnimationTransitions(bool deadOnly);
     void render();
-    void shutdown();
+    void shutdown(bool preserveWindow = false);
+    [[nodiscard]] bool reinitializeRendererForNextRun();
     void setPaused(bool paused);
     [[nodiscard]] bool stageCampaignFloorReplay();
     [[nodiscard]] bool returnToMainMenu();

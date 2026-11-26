@@ -89,15 +89,26 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     // Do not inflate hit targets on large/ultrawide displays. Dense pages still fit 360p.
     layout.scale = width >= 640 && height >= std::max(360, 136 + n * 16) ? 2 : 1;
     const int scale = layout.scale;
-    layout.textScale = titleScreen ? static_cast<float>(scale)
-        : static_cast<float>(scale)
-            * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
-    const float uiScale = layout.textScale;
+    const float requestedScale = static_cast<float>(scale)
+        * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
+    // The title must grow with the same setting as the other menus. Keep all
+    // title actions visible by tightening their spacing only when enlarged.
+    const float titleRowUnits = 16.0F - 2.0F
+        * std::clamp((requestedScale / static_cast<float>(scale) - 1.0F), 0.0F, 1.0F);
     const int margin = width >= 640 ? width / 20 : 8;
+    const float titleHeightLimit = static_cast<float>(height - 8)
+        / (64.0F + static_cast<float>(n) * titleRowUnits);
+    const float titleWidthLimit = static_cast<float>(width - 2 * margin) / 190.0F;
+    layout.textScale = titleScreen
+        ? std::min(requestedScale, std::max(static_cast<float>(scale),
+            std::min(titleHeightLimit, titleWidthLimit)))
+        : requestedScale;
+    const float uiScale = layout.textScale;
     const int panelWidth = std::min(width - 2 * margin,
         static_cast<int>(std::lround((titleScreen ? 190 : 340) * uiScale)));
     const int rowHeight = titleScreen
-        ? std::max(8, std::min(16 * scale, (height - 68 * scale) / n))
+        ? std::max(8, std::min(static_cast<int>(std::lround(titleRowUnits * uiScale)),
+            (height - static_cast<int>(std::lround(68.0F * uiScale))) / n))
         : std::max(8, static_cast<int>(std::lround(
             listMenuTwoLineRowUnits * uiScale)));
     // The footer needs its own space below the final value line. Keep the
@@ -1267,33 +1278,45 @@ bool controlsMenuBackAt(const int width, const int height,
         pixelX, pixelY);
 }
 
-ResultMenuLayout makeResultMenuLayout(const int width, const int height) noexcept
+ResultMenuLayout makeResultMenuLayout(const int width, const int height,
+    const std::uint16_t uiScalePercent) noexcept
 {
     const int safeWidth = std::max(width, 1);
     const int safeHeight = std::max(height, 1);
     const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
+    const float requestedScale = static_cast<float>(scale)
+        * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
+    const float uiScale = std::min({requestedScale,
+        std::max(0.1F, static_cast<float>(safeWidth - 16) / 220.0F),
+        std::max(0.1F, static_cast<float>(safeHeight - 16) / 162.0F)});
     const int panelWidth = std::max(1,
-        std::min(safeWidth - 16, 220 * scale));
+        std::min(safeWidth - 16, static_cast<int>(std::lround(220.0F * uiScale))));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 162 * scale));
+        std::min(safeHeight - 16, static_cast<int>(std::lround(162.0F * uiScale))));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
-        std::min(panelWidth - (20 * scale), 112 * scale));
+        std::min(panelWidth - static_cast<int>(std::lround(20.0F * uiScale)),
+            static_cast<int>(std::lround(112.0F * uiScale))));
     const int buttonHeight = std::max(1,
-        std::min(13 * scale, panelHeight));
+        std::min(static_cast<int>(std::lround(13.0F * uiScale)), panelHeight));
     const int buttonX = (safeWidth - buttonWidth) / 2;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
     const int playAgainY = std::clamp(
-        panelY + (78 * scale), panelY, maximumButtonY);
+        panelY + static_cast<int>(std::lround(78.0F * uiScale)),
+        panelY, maximumButtonY);
     const int replaySeedY = std::clamp(
-        playAgainY - (18 * scale), panelY, maximumButtonY);
+        playAgainY - static_cast<int>(std::lround(18.0F * uiScale)),
+        panelY, maximumButtonY);
     const int mainMenuY = std::clamp(
-        playAgainY - (36 * scale), panelY, maximumButtonY);
+        playAgainY - static_cast<int>(std::lround(36.0F * uiScale)),
+        panelY, maximumButtonY);
     const int exitY = std::clamp(
-        playAgainY - (54 * scale), panelY, maximumButtonY);
+        playAgainY - static_cast<int>(std::lround(54.0F * uiScale)),
+        panelY, maximumButtonY);
     return {
         scale,
+        uiScale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, playAgainY, buttonWidth, buttonHeight},
         {buttonX, replaySeedY, buttonWidth, buttonHeight},
@@ -1306,7 +1329,7 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     const int width,
     const int height,
     const float pointerX,
-    const float pointerY) noexcept
+    const float pointerY, const std::uint16_t uiScalePercent) noexcept
 {
     if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
         || !std::isfinite(pointerY)) {
@@ -1314,7 +1337,8 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     }
     const int pixelX = static_cast<int>(pointerX);
     const int pixelY = height - 1 - static_cast<int>(pointerY);
-    const ResultMenuLayout layout = makeResultMenuLayout(width, height);
+    const ResultMenuLayout layout = makeResultMenuLayout(width, height,
+        uiScalePercent);
     if (layout.playAgainButton.contains(pixelX, pixelY)) {
         return HudResultMenuSelection::PlayAgain;
     }

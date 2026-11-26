@@ -125,7 +125,10 @@ bool setRuntimeNumericSetting(RuntimeSettings& settings,
     case O::MouseSensitivity: settings.mouseSensitivityPercent = rounded; break;
     case O::MouseAimSensitivity: settings.mouseAimSensitivityPercent = rounded; break;
     case O::FieldOfView: settings.fieldOfViewDegrees = rounded; break;
-    case O::UiScaleManual: settings.uiScaleManualPercent = rounded; break;
+    case O::UiScaleManual:
+        settings.uiScaleManualPercent = rounded;
+        settings.uiScaleAuto = false;
+        break;
     case O::GamepadVibrationStrength: settings.gamepadVibrationPercent = rounded; break;
     case O::GamepadLookHorizontal: settings.gamepadLookHorizontalPercent = rounded; break;
     case O::GamepadLookVertical: settings.gamepadLookVerticalPercent = rounded; break;

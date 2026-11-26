@@ -783,12 +783,24 @@ struct ApplicationMenuTestAccess {
                     && app.campaignCarryover_ == carryover,
                     "intermediate terminal requests next floor with exact resources, without results menu");
                 const auto restartMode = app.restartMode_;
-                app.shutdown();
+                SDL_Window* const existingWindow = app.window_;
+                SDL_GLContext const existingContext = app.glContext_;
+                app.shutdown(true);
+                expect(app.window_ == existingWindow
+                    && app.glContext_ == existingContext
+                    && SDL_GL_GetCurrentContext() == existingContext,
+                    "floor transition keeps the same SDL window and active GL context");
                 const auto nextSeed = app.session_.restart(restartMode);
                 expect(nextSeed.has_value(), "terminal advances deterministic floor sequence");
                 if (nextSeed) app.config_.worldSeed = *nextSeed;
+                app.applyRuntimeSettings();
                 app.restartRequested_ = false; app.running_ = true;
-                expect(app.initialize() && app.initializeRun(), "next floor is generated through the normal gameplay initialization");
+                expect(app.reinitializeRendererForNextRun() && app.initializeRun(),
+                    "next floor loads on the existing window without retaining GPU room resources");
+                expect(app.window_ == existingWindow
+                    && app.glContext_ == existingContext
+                    && SDL_GL_GetCurrentContext() == existingContext,
+                    "the next campaign floor still uses the same window and GL context");
                 expect(app.session_.state().campaignFloor == 2U && !app.session_.state().campaignExitReady
                     && gameplay::captureCampaignCarryover(app.player_, app.weapon_, app.progression_) == carryover
                     && app.campaignSlots_[app.activeCampaignSlot_].checkpoint->floor == 2U,

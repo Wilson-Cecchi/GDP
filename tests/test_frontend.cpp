@@ -296,6 +296,27 @@ void layoutTests() {
             static_cast<float>(r.x + r.width + 1), static_cast<float>(dimensions[1] - r.y - r.height / 2), true),
             "empty scene outside compact title buttons is not clickable");
     }
+    for (const auto dimensions : {std::array{1280, 720}, std::array{960, 540}}) {
+        const auto normal = makeListMenuLayout(dimensions[0], dimensions[1], 8U,
+            true, 100U);
+        const auto enlarged = makeListMenuLayout(dimensions[0], dimensions[1], 8U,
+            true, 200U);
+        expect(enlarged.textScale > normal.textScale
+                && enlarged.panel.width > normal.panel.width
+                && enlarged.rows[0].height > normal.rows[0].height,
+            "title screen grows with the UI scale setting");
+        for (std::size_t i = 0; i < enlarged.rows.size(); ++i) {
+            const auto row = enlarged.rows[i];
+            expect(row.width > 0 && row.height > 0 && row.y >= 0
+                    && row.y + row.height <= dimensions[1],
+                "all enlarged title actions stay on screen");
+            expect(listMenuSelectionAt(dimensions[0], dimensions[1], 8U,
+                static_cast<float>(row.x + row.width / 2),
+                static_cast<float>(dimensions[1] - row.y - row.height / 2),
+                true, 200U) == i,
+                "enlarged title hit targets follow the drawn rows");
+        }
+    }
     expect(makeListMenuLayout(320, 50, 14U).rows.empty(), "impossibly small viewports do not create offscreen hit targets");
     std::size_t decoded = 0U;
     bool antialias = false;

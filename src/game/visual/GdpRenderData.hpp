@@ -635,6 +635,7 @@ struct ControlsMenuLayout {
 
 struct ResultMenuLayout {
     int scale{1};
+    float textScale{1.0F};
     UiRect panel{};
     UiRect playAgainButton{};
     UiRect replaySeedButton{};
@@ -673,12 +674,13 @@ struct SettingsMenuLayout {
     int height,
     float pointerX,
     float pointerY, std::uint16_t uiScalePercent = 100U) noexcept;
-[[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height) noexcept;
+[[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height,
+    std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     int width,
     int height,
     float pointerX,
-    float pointerY) noexcept;
+    float pointerY, std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] ExitConfirmationLayout makeExitConfirmationLayout(
     int width,
     int height, std::uint16_t uiScalePercent = 100U) noexcept;

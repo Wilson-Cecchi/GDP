@@ -172,6 +172,13 @@ void testRuntimeSettingsClamps()
             && settings.uiScaleAuto
             && settings.uiScaleManualPercent == 105U,
         "Auto keeps the player's separate manual scale preference");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::UiScaleManual, 1)
+            && !settings.uiScaleAuto
+            && resolvedUiScalePercent(settings, 1280, 720, 1280, 720) == 110U,
+        "adjusting manual UI scale applies it immediately, even from Auto");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::UiScaleMode, -1)
+            && settings.uiScaleAuto,
+        "the player can restore automatic scaling after manual adjustment");
     const auto uiScaleDescriptor = numericSettingDescriptor(
         settings, SettingsMenuOption::UiScaleManual);
     const auto fovDescriptor = numericSettingDescriptor(
