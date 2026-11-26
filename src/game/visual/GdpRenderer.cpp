@@ -9870,8 +9870,9 @@ bool GdpRenderer::render(
         std::clamp(hud.uiScalePercent, std::uint16_t{75}, std::uint16_t{200})) / 100.0F;
     // On narrow windows, cap enlargement before the left and right resource
     // groups can cover each other. Reducing the setting still works normally.
-    const float gameplayHudScale = std::min(requestedHudScale,
-        std::max(1.0F, static_cast<float>(width) / 480.0F));
+    const float gameplayHudScale = std::min({requestedHudScale,
+        std::max(1.0F, static_cast<float>(width) / 480.0F),
+        std::max(1.0F, static_cast<float>(height) / 320.0F)});
     bool scaleGameplayHud = false;
     int hudAnchorX = 0;
     int hudAnchorY = 0;
