@@ -386,6 +386,16 @@ void backdropTests() {
             expect(std::isfinite(enemy.yawDegrees) && scene.room.worldBounds.contains(enemy.position),
                 "presentation patrol stays inside the demo room");
         }
+        for (const auto& prop : scene.props) {
+            const auto& bounds = scene.room.worldBounds;
+            expect(prop.position.y == bounds.minimum.y
+                    && prop.position.x - prop.scale.x * 0.5F > bounds.minimum.x
+                    && prop.position.x + prop.scale.x * 0.5F < bounds.maximum.x
+                    && prop.position.z - prop.scale.z * 0.5F > bounds.minimum.z
+                    && prop.position.z + prop.scale.z * 0.5F < bounds.maximum.z
+                    && prop.position.y + prop.scale.y < bounds.maximum.y,
+                "menu equipment rests on the floor and fits inside the room");
+        }
     }
 }
 void persistenceTests(const std::filesystem::path& directory) {

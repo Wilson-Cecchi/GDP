@@ -2690,7 +2690,7 @@ void testConfigurationScaleLayout()
                 std::uint16_t{125U}, std::uint16_t{150U},
                 std::uint16_t{200U}}) {
             const auto layout = makeListMenuLayout(width, height, 14U,
-                false, percent, 13U);
+                false, percent, 13U, false, true);
             expect(layout.panel.x >= 0 && layout.panel.y >= 0
                     && layout.panel.x + layout.panel.width <= width
                     && layout.panel.y + layout.panel.height <= height,
@@ -2703,23 +2703,23 @@ void testConfigurationScaleLayout()
             const float x = static_cast<float>(row.x + row.width / 2);
             const float y = static_cast<float>(height - row.y - row.height / 2);
             expect(listMenuSelectionAt(width, height, 14U, x, y,
-                       false, percent, 13U) == 13U,
+                       false, percent, 13U, false, true) == 13U,
                 "scaled pointer hit matches the selected visible row");
             const auto track = listMenuSliderTrack(layout, 13U);
             const float sliderX = static_cast<float>(track.x + track.width / 2);
             expect(!listMenuSliderFractionAt(width, height, 14U, 13U,
-                       sliderX, y, percent, 13U),
+                       sliderX, y, percent, 13U, false, true),
                 "clicking the label line does not drag a slider");
             const float sliderY = static_cast<float>(
                 height - track.y - track.height / 2);
             const auto fraction = listMenuSliderFractionAt(width, height,
-                14U, 13U, sliderX, sliderY, percent, 13U);
+                14U, 13U, sliderX, sliderY, percent, 13U, false, true);
             expect(fraction && *fraction > 0.45F && *fraction < 0.55F,
                 "slider drag coordinates follow the shared scaled layout");
         }
     }
     const auto controls = makeListMenuLayout(1280, 720, 12U,
-        false, 200U, 0U, true);
+        false, 200U, 0U, true, true);
     const auto tab = controls.controlTabs[1U];
     expect(tab.width > 0 && controls.rows[0U].x >= tab.x + tab.width
             && configurationControlTabAt(1280, 720, 12U,
@@ -2727,6 +2727,62 @@ void testConfigurationScaleLayout()
                 static_cast<float>(720 - tab.y - tab.height / 2),
                 200U, 0U) == 1U,
         "control sidebar renders beside content and shares its mouse hitboxes");
+}
+
+void testConfigurationTopAnchor()
+{
+    using namespace gdp::game::visual;
+    for (const auto& [width, height] : {
+             std::pair{1280, 720}, std::pair{640, 360},
+             std::pair{320, 200}}) {
+        for (const auto percent : {std::uint16_t{75U},
+                 std::uint16_t{100U}, std::uint16_t{150U},
+                 std::uint16_t{200U}}) {
+            const auto display = makeListMenuLayout(width, height, 14U,
+                false, percent, 13U, false, true);
+            const auto audio = makeListMenuLayout(width, height, 5U,
+                false, percent, 0U, false, true);
+            const auto controls = makeListMenuLayout(width, height, 12U,
+                false, percent, 11U, true, true);
+            const int top = display.panel.y + display.panel.height;
+            expect(top == audio.panel.y + audio.panel.height
+                    && top == controls.panel.y + controls.panel.height
+                    && top >= height - std::clamp(height / 20, 8, 36),
+                "configuration tabs keep the same upper-screen position across pages");
+            expect(display.panel.y >= 0 && audio.panel.y >= 0
+                    && controls.panel.y >= 0,
+                "anchored configuration panels stay inside short viewports");
+            const int tabWidth = (display.panel.width
+                    - 2 * static_cast<int>(std::lround(
+                        8.0F * display.textScale))) / 4;
+            const int tabX = display.panel.x
+                + static_cast<int>(std::lround(8.0F * display.textScale))
+                + tabWidth / 2;
+            const int tabY = top
+                - static_cast<int>(std::lround(38.0F * display.textScale));
+            expect(configurationTabAt(width, height, 14U,
+                       static_cast<float>(tabX),
+                       static_cast<float>(height - 1 - tabY),
+                       percent, 13U) == 0U
+                    && configurationTabAt(width, height, 5U,
+                       static_cast<float>(tabX),
+                       static_cast<float>(height - 1 - tabY),
+                       percent, 0U) == 0U,
+                "configuration tab hit target remains fixed when switching pages");
+            const auto last = display.rows[13U];
+            expect(last.width > 0 && last.y >= display.panel.y
+                    && last.y + last.height <= top,
+                "last display option remains visible while the menu is scrolled");
+            expect(listMenuSelectionAt(width, height, 14U,
+                       static_cast<float>(last.x + last.width / 2),
+                       static_cast<float>(height - last.y - last.height / 2),
+                       false, percent, 13U, false, true) == 13U,
+                "anchored configuration row uses the same mouse hit target");
+        }
+    }
+    const auto ordinary = makeListMenuLayout(1280, 720, 5U);
+    expect(ordinary.panel.y == (720 - ordinary.panel.height) / 2,
+        "non-configuration pages retain centered placement");
 }
 
 void testListMenuTextClearance()
@@ -2803,6 +2859,7 @@ int main()
     testPlayerHands();
     testSettingsMenuLayout();
     testConfigurationScaleLayout();
+    testConfigurationTopAnchor();
     testListMenuTextClearance();
     testPlayerBody();
 

@@ -10212,7 +10212,8 @@ bool GdpRenderer::render(
         const auto& menu = hud.listMenu;
         const auto layout = makeListMenuLayout(width, height, menu.rows.size(),
             menu.titleScreen, menu.uiScalePercent, menu.selection,
-            menu.configuration && menu.configurationSection == 2U);
+            menu.configuration && menu.configurationSection == 2U,
+            menu.configuration);
         const int scale = layout.scale;
         const float menuScale = layout.textScale;
         const auto configurationAccent = menu.configuration

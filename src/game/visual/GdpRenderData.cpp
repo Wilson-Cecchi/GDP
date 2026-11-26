@@ -80,7 +80,8 @@ float fixtureDrivenAmbientIntensity(
 
 ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count,
     const bool titleScreen, const std::uint16_t uiScalePercent,
-    const std::size_t selectedRow, const bool controlSidebar)
+    const std::size_t selectedRow, const bool controlSidebar,
+    const bool configurationAnchored)
 {
     ListMenuLayout layout;
     if (width < 64 || count == 0U || count > 24U
@@ -89,6 +90,9 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     // Do not inflate hit targets on large/ultrawide displays. Dense pages still fit 360p.
     layout.scale = width >= 640 && height >= std::max(360, 136 + n * 16) ? 2 : 1;
     const int scale = layout.scale;
+    const int topMargin = configurationAnchored && !titleScreen
+        ? std::clamp(height / 20, 8, 36) : 0;
+    const int availableHeight = height - 8 - topMargin;
     const float requestedScale = static_cast<float>(scale)
         * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
     // The title must grow with the same setting as the other menus. Keep all
@@ -102,7 +106,13 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     layout.textScale = titleScreen
         ? std::min(requestedScale, std::max(static_cast<float>(scale),
             std::min(titleHeightLimit, titleWidthLimit)))
-        : requestedScale;
+        : configurationAnchored
+            // A 200% interface cannot fit even one setting under the tabs
+            // in a short window; cap it at the largest usable size there.
+            ? std::min(requestedScale,
+                static_cast<float>(availableHeight)
+                    / (72.0F + listMenuTwoLineRowUnits))
+            : requestedScale;
     const float uiScale = layout.textScale;
     const int panelWidth = std::min(width - 2 * margin,
         static_cast<int>(std::lround((titleScreen ? 190 : 340) * uiScale)));
@@ -116,11 +126,15 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     const int headerHeight = static_cast<int>(std::lround(
         (titleScreen ? 64.0F : 72.0F) * uiScale));
     const int visibleCount = titleScreen ? n : std::clamp(
-        (height - 8 - headerHeight) / rowHeight, 1, n);
-    const int panelHeight = std::min(height - 8,
+        (availableHeight - headerHeight) / rowHeight, 1, n);
+    const int panelHeight = std::min(availableHeight,
         headerHeight + visibleCount * rowHeight);
     const int panelX = width >= 800 && titleScreen ? margin : (width - panelWidth) / 2;
-    layout.panel = {panelX, (height - panelHeight) / 2, panelWidth, panelHeight};
+    layout.panel = {panelX,
+        configurationAnchored && !titleScreen
+            ? height - topMargin - panelHeight
+            : (height - panelHeight) / 2,
+        panelWidth, panelHeight};
     layout.rows.resize(count);
     const int firstRow = titleScreen ? 0 : std::clamp(
         static_cast<int>(selectedRow) - visibleCount + 1, 0, n - visibleCount);
@@ -152,11 +166,12 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
 std::optional<std::size_t> listMenuSelectionAt(const int width, const int height,
     const std::size_t count, const float pointerX, const float pointerY,
     const bool titleScreen, const std::uint16_t uiScalePercent,
-    const std::size_t selectedRow, const bool controlSidebar)
+    const std::size_t selectedRow, const bool controlSidebar,
+    const bool configurationAnchored)
 {
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
     const auto layout = makeListMenuLayout(width, height, count, titleScreen,
-        uiScalePercent, selectedRow, controlSidebar);
+        uiScalePercent, selectedRow, controlSidebar, configurationAnchored);
     // SDL pointers have a top-left origin; UI rectangles have a bottom-left origin.
     const float y = static_cast<float>(height) - pointerY;
     for (std::size_t i = 0; i < layout.rows.size(); ++i) {
@@ -170,13 +185,15 @@ std::optional<std::size_t> listMenuSelectionAt(const int width, const int height
 std::optional<int> listMenuAdjustmentDirectionAt(const int width, const int height,
     const std::size_t count, const float pointerX, const float pointerY,
     const bool titleScreen, const std::uint16_t uiScalePercent,
-    const std::size_t selectedRow, const bool controlSidebar)
+    const std::size_t selectedRow, const bool controlSidebar,
+    const bool configurationAnchored)
 {
     const auto selected = listMenuSelectionAt(width, height, count, pointerX,
-        pointerY, titleScreen, uiScalePercent, selectedRow, controlSidebar);
+        pointerY, titleScreen, uiScalePercent, selectedRow, controlSidebar,
+        configurationAnchored);
     if (!selected) return std::nullopt;
     const auto layout = makeListMenuLayout(width, height, count, titleScreen,
-        uiScalePercent, selectedRow, controlSidebar);
+        uiScalePercent, selectedRow, controlSidebar, configurationAnchored);
     const auto r = layout.rows[*selected];
     const float right = static_cast<float>(r.x + r.width);
     if (pointerX >= right - 40.0F * layout.textScale
@@ -193,7 +210,7 @@ std::optional<std::uint8_t> configurationTabAt(const int width,
 {
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
     const auto layout = makeListMenuLayout(width, height, count, false,
-        uiScalePercent, selectedRow);
+        uiScalePercent, selectedRow, false, true);
     if (layout.panel.width <= 0) return std::nullopt;
     const float scale = layout.textScale;
     const int inset = static_cast<int>(std::lround(8.0F * scale));
@@ -228,11 +245,11 @@ std::optional<float> listMenuSliderFractionAt(const int width,
     const int height, const std::size_t count, const std::size_t rowIndex,
     const float pointerX, const float pointerY,
     const std::uint16_t uiScalePercent, const std::size_t selectedRow,
-    const bool controlSidebar)
+    const bool controlSidebar, const bool configurationAnchored)
 {
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
     const auto layout = makeListMenuLayout(width, height, count, false,
-        uiScalePercent, selectedRow, controlSidebar);
+        uiScalePercent, selectedRow, controlSidebar, configurationAnchored);
     if (rowIndex >= layout.rows.size()) return std::nullopt;
     const auto row = layout.rows[rowIndex];
     const auto track = listMenuSliderTrack(layout, rowIndex);
@@ -254,7 +271,7 @@ std::optional<std::uint8_t> configurationControlTabAt(const int width,
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY))
         return std::nullopt;
     const auto layout = makeListMenuLayout(width, height, count, false,
-        uiScalePercent, selectedRow, true);
+        uiScalePercent, selectedRow, true, true);
     const int y = height - 1 - static_cast<int>(pointerY);
     for (std::uint8_t i = 0U; i < layout.controlTabs.size(); ++i)
         if (layout.controlTabs[i].contains(static_cast<int>(pointerX), y))

@@ -190,7 +190,7 @@ void Application::processFrontendMenu()
                 dw, dh, ww, wh);
             pointed = visual::listMenuSelectionAt(dw, dh, view.rows.size(), pointerX,
                 pointerY, menuFlow_.page == MenuPage::Root, uiScalePercent,
-                layoutSelection, controlSidebar);
+                layoutSelection, controlSidebar, settingsMenu_.active);
         }
     }
     if (settingsMenu_.active && window_
@@ -257,7 +257,7 @@ void Application::processFrontendMenu()
         const auto direction = visual::listMenuAdjustmentDirectionAt(dw, dh,
             view.rows.size(), pointerX, pointerY,
             menuFlow_.page == MenuPage::Root, uiScalePercent, layoutSelection,
-            controlSidebar);
+            controlSidebar, settingsMenu_.active);
         if (direction) mouseDirection = *direction;
     }
     bool settingChanged = false;
@@ -269,7 +269,8 @@ void Application::processFrontendMenu()
         if (descriptor && click) {
             if (visual::listMenuSliderFractionAt(dw, dh, view.rows.size(),
                     menuFlow_.selection, pointerX, pointerY,
-                    uiScalePercent, layoutSelection, controlSidebar)) {
+                    uiScalePercent, layoutSelection, controlSidebar,
+                    settingsMenu_.active)) {
                 sliderDraggingRow_ = menuFlow_.selection;
                 menuAdjustmentRepeat_.reset();
             }
@@ -277,7 +278,7 @@ void Application::processFrontendMenu()
         if (descriptor && sliderDraggingRow_ == menuFlow_.selection && mouseHeld) {
             const auto layout = visual::makeListMenuLayout(dw, dh,
                 view.rows.size(), false, uiScalePercent, menuFlow_.selection,
-                controlSidebar);
+                controlSidebar, settingsMenu_.active);
             const auto track = visual::listMenuSliderTrack(layout, menuFlow_.selection);
             if (track.width > 0) {
                 const float fraction = std::clamp(

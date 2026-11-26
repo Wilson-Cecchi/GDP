@@ -403,7 +403,7 @@ struct ApplicationMenuTestAccess {
             (void)SDL_GetWindowSize(app.window_, &logicalWidth, &logicalHeight);
             const auto layout = visual::makeListMenuLayout(drawWidth, drawHeight,
                 app.frontendMenuView().rows.size(), false, 100U,
-                app.menuFlow_.selection, true);
+                app.menuFlow_.selection, true, true);
             const auto tab = layout.controlTabs[index];
             SDL_Event pendingEvent{};
             while (SDL_PollEvent(&pendingEvent)) {}
@@ -471,7 +471,8 @@ struct ApplicationMenuTestAccess {
         int width = 0, height = 0, ww = 0, wh = 0;
         (void)SDL_GetWindowSizeInPixels(app.window_, &width, &height);
         (void)SDL_GetWindowSize(app.window_, &ww, &wh);
-        const auto layout = visual::makeListMenuLayout(width, height, view.rows.size());
+        const auto layout = visual::makeListMenuLayout(width, height,
+            view.rows.size(), false, 100U, app.menuFlow_.selection, false, true);
         auto click = [&](int x, int y) {
             SDL_Event pendingEvent{};
             while (SDL_PollEvent(&pendingEvent)) {}
@@ -510,7 +511,8 @@ struct ApplicationMenuTestAccess {
         key(Key::Left);
         expect(app.runtimeSettings_.language == gameplay::Language::English, "keyboard can return to English");
         const auto languageLayout = visual::makeListMenuLayout(width, height,
-            app.frontendMenuView().rows.size(), false, 100U, languageIndex);
+            app.frontendMenuView().rows.size(), false, 100U, languageIndex,
+            false, true);
         const auto languageRow = languageLayout.rows[languageIndex];
         click(languageRow.x + languageRow.width - 10 * languageLayout.scale, languageRow.y + languageRow.height / 2);
         expect(app.runtimeSettings_.language == gameplay::Language::PortugueseBrazil

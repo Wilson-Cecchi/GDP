@@ -601,15 +601,16 @@ struct ListMenuRenderData {
 };
 [[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count,
     bool titleScreen = false, std::uint16_t uiScalePercent = 100U,
-    std::size_t selectedRow = 0U, bool controlSidebar = false);
+    std::size_t selectedRow = 0U, bool controlSidebar = false,
+    bool configurationAnchored = false);
 [[nodiscard]] std::optional<std::size_t> listMenuSelectionAt(int width, int height,
     std::size_t count, float pointerX, float pointerY, bool titleScreen = false,
     std::uint16_t uiScalePercent = 100U, std::size_t selectedRow = 0U,
-    bool controlSidebar = false);
+    bool controlSidebar = false, bool configurationAnchored = false);
 [[nodiscard]] std::optional<int> listMenuAdjustmentDirectionAt(int width, int height,
     std::size_t count, float pointerX, float pointerY, bool titleScreen = false,
     std::uint16_t uiScalePercent = 100U, std::size_t selectedRow = 0U,
-    bool controlSidebar = false);
+    bool controlSidebar = false, bool configurationAnchored = false);
 [[nodiscard]] std::optional<std::uint8_t> configurationTabAt(int width,
     int height, std::size_t count, float pointerX, float pointerY,
     std::uint16_t uiScalePercent, std::size_t selectedRow);
@@ -618,7 +619,7 @@ struct ListMenuRenderData {
 [[nodiscard]] std::optional<float> listMenuSliderFractionAt(int width,
     int height, std::size_t count, std::size_t rowIndex, float pointerX,
     float pointerY, std::uint16_t uiScalePercent, std::size_t selectedRow,
-    bool controlSidebar = false);
+    bool controlSidebar = false, bool configurationAnchored = false);
 [[nodiscard]] std::optional<std::uint8_t> configurationControlTabAt(
     int width, int height, std::size_t count, float pointerX,
     float pointerY, std::uint16_t uiScalePercent, std::size_t selectedRow);
