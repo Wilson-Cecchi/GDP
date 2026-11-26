@@ -3249,6 +3249,30 @@ int main(const int argc, char** argv)
             passed &= renderedNineLights && renderedSixteenLights
                 && glGetError() == GL_NO_ERROR
                 && sixteenLightPixels != lightingPixels;
+            // The classroom crash involved raising the light limit beyond
+            // eight while geometry shadows remained enabled. Exercise that
+            // combination across the old boundary in one live GL context.
+            gdp::game::visual::HudRenderData maximumLightHud;
+            maximumLightHud.graphicsQuality
+                = gdp::game::visual::HudGraphicsQuality::Ultra;
+            maximumLightHud.geometryShadowLightBudget = 8U;
+            maximumLightHud.detailedMaterials = true;
+            expandedLighting.lightCount = 8U;
+            const bool shadowedEightLights = renderer.render(width, height,
+                {}, {}, {}, {}, expandedLighting, {}, {}, {}, {},
+                maximumLightHud);
+            expandedLighting.lightCount = 9U;
+            const bool shadowedNineLights = renderer.render(width, height,
+                {}, {}, {}, {}, expandedLighting, {}, {}, {}, {},
+                maximumLightHud);
+            expandedLighting.lightCount = 16U;
+            const bool shadowedSixteenLights = renderer.render(width, height,
+                {}, {}, {}, {}, expandedLighting, {}, {}, {}, {},
+                maximumLightHud);
+            passed &= shadowedEightLights && shadowedNineLights
+                && shadowedSixteenLights
+                && renderer.lastFrameStats().geometryShadowMaps == 8U
+                && glGetError() == GL_NO_ERROR;
             gdp::game::visual::RoomLightingRenderData flashlightLighting
                 = proceduralLighting;
             flashlightLighting.flashlightEnabled = true;
