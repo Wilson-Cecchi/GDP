@@ -1176,7 +1176,7 @@ void testTrainingAndPersistence()
     expect(!error, "temporary training files are cleaned up");
 }
 
-void testOtherArchetypes()
+void testOtherArchetypes(const std::optional<gdp::entities::EnemyArchetype> selected = std::nullopt)
 {
     namespace fs = std::filesystem;
     using namespace gdp::game::ai;
@@ -1192,6 +1192,7 @@ void testOtherArchetypes()
     for (const EnemyArchetype archetype : {
              EnemyArchetype::Guard, EnemyArchetype::Officer,
              EnemyArchetype::Engineer, EnemyArchetype::IndustrialRobot}) {
+        if (selected && archetype != *selected) continue;
         WorkerTrainingOptions options;
         options.archetype = archetype;
         options.seed = 42U;
@@ -1382,6 +1383,16 @@ int main(const int argc, char* argv[])
 {
     const std::string_view selection = argc == 1 ? "--all"
         : argc == 2 ? std::string_view{argv[1]} : "";
+    std::optional<gdp::entities::EnemyArchetype> otherArchetype;
+    if (selection == "--other-archetypes-guard") {
+        otherArchetype = gdp::entities::EnemyArchetype::Guard;
+    } else if (selection == "--other-archetypes-officer") {
+        otherArchetype = gdp::entities::EnemyArchetype::Officer;
+    } else if (selection == "--other-archetypes-engineer") {
+        otherArchetype = gdp::entities::EnemyArchetype::Engineer;
+    } else if (selection == "--other-archetypes-robot") {
+        otherArchetype = gdp::entities::EnemyArchetype::IndustrialRobot;
+    }
     if (selection != "--all" && selection != "--fitness"
         && selection != "--cooperative" && selection != "--persistence"
         && selection != "--other-archetypes"
@@ -1389,7 +1400,7 @@ int main(const int argc, char* argv[])
         && selection != "--curriculum-v20"
         && selection != "--curriculum-v21"
         && selection != "--curriculum-v22"
-        && selection != "--curriculum-v23") {
+        && selection != "--curriculum-v23" && !otherArchetype) {
         std::cerr << "Unknown worker-training test group\n";
         return 2;
     }
@@ -1398,8 +1409,8 @@ int main(const int argc, char* argv[])
         testCooperativeTraining();
     if (selection == "--all" || selection == "--persistence")
         testTrainingAndPersistence();
-    if (selection == "--all" || selection == "--other-archetypes")
-        testOtherArchetypes();
+    if (selection == "--all" || selection == "--other-archetypes"
+        || otherArchetype) testOtherArchetypes(otherArchetype);
     if (selection == "--all" || selection == "--population-encounters")
         testFullPopulationAndEncounters();
     if (selection == "--all" || selection == "--curriculum-v20")

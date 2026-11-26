@@ -646,13 +646,22 @@ if(GDP_BUILD_TESTS)
 
     # ASan/UBSan runs arena simulation much slower. Keep independent cases in
     # separate CTest invocations so each 600-second limit covers one case.
-    foreach(group fitness cooperative persistence other-archetypes
+    foreach(group fitness cooperative persistence
             population-encounters curriculum-v20 curriculum-v21 curriculum-v22
             curriculum-v23)
         string(REPLACE "-" "_" test_suffix "${group}")
         add_test(NAME worker_training_${test_suffix}
             COMMAND gdp_worker_training_tests --${group})
         set_tests_properties(worker_training_${test_suffix} PROPERTIES TIMEOUT 600)
+    endforeach()
+    # This group trains four archetypes twice and also checks checkpoint
+    # continuation. Give each archetype its own timeout without dropping any
+    # determinism or persistence assertions.
+    foreach(archetype guard officer engineer robot)
+        add_test(NAME worker_training_other_${archetype}
+            COMMAND gdp_worker_training_tests --other-archetypes-${archetype})
+        set_tests_properties(worker_training_other_${archetype}
+            PROPERTIES TIMEOUT 600)
     endforeach()
 
     add_executable(gdp_active_enemy_brain_tests tests/test_active_enemy_brains.cpp)
@@ -699,7 +708,9 @@ if(GDP_BUILD_TESTS)
         NAME all_enemy_training_cli_smoke
         COMMAND gdp --ai-training all --population 2 --generations 1 --seed 42
     )
-    set_tests_properties(all_enemy_training_cli_smoke PROPERTIES TIMEOUT 120)
+    # One generation still simulates every archetype. Instrumented Debug and
+    # ASan builds need more time than a Release build for this integration check.
+    set_tests_properties(all_enemy_training_cli_smoke PROPERTIES TIMEOUT 600)
 
     add_executable(gdp_enemy_sensors_tests tests/test_enemy_sensors.cpp)
     target_link_libraries(gdp_enemy_sensors_tests PRIVATE gdp_gameplay)
