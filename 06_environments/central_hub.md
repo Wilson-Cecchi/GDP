@@ -1,9 +1,8 @@
 # Environment — Central Hub
 
-> **Estado:** formato octogonal na campanha. Textura principal do piso aprovada
-> em partida em 06/11/2026. Os novos acabamentos da escotilha/grelhas, a chapa
-> do teto e a suspensão das luminárias estão implementados para playtest;
-> o aceite visual desses novos elementos permanece pendente.
+> **Estado:** variante octogonal aprovada em partida após revisão de paredes,
+> piso, teto, coluna e objetos. Integrada à campanha; as travessas adicionais
+> do teto também foram aprovadas em 15/11/2026.
 > Em 07/11/2026, a quinta luminária física de preenchimento ao lado leste
 > serviu de piloto aprovado para estender o preenchimento às demais salas.
 >
@@ -80,9 +79,34 @@ A revisão visual da parede segue a
 [proposta Central Hub/Wall v1](../visual/proposals/central_hub_wall_v1/README.md).
 A parede v1 está aplicada no Hub octogonal e aguarda aprovação visual em partida.
 O tile de 2 × 2 m repete por distância real nas faces retas e diagonais. O rodapé
-grafite, filete ciano, juntas, parafusos e conduítes são peças 3D separadas.
+grafite, filete laranja, juntas, parafusos e conduítes são peças 3D separadas.
 As [capturas técnicas](../visual/validation/central_hub_wall_v1/README.md)
 incluem FOV 60/100 em POTATO/ULTRA na Quadro K2100M.
+Após o feedback de que as paredes estavam claras demais, a prévia de 14/11/2026
+escurece apenas o tom das chapas e aumenta sua resposta metálica às luminárias.
+Uma segunda revisão aproxima o tom das paredes do aço grafite quente da coluna
+central, mantendo a textura e o desgaste próprios das paredes. O reflexo também
+aparece em POTATO; esta revisão aguarda aprovação em partida.
+Para harmonizar o restante da sala com a coluna e as paredes, o rodapé,
+pilastras, conduítes, painéis, dutos, grelhas, escotilha e carcaças das
+luminárias receberam grafite quente e aço de borda menos azulado. A sinalização
+das rotas passou de ciano para laranja na revisão seguinte. A textura principal
+do piso, já aprovada,
+e a posição/intensidade das luminárias foram preservadas. As
+[capturas técnicas da revisão](../visual/validation/central_hub_harmony_v1/README.md)
+aguardam confirmação visual em partida.
+Na prévia seguinte, o piso ganhou um tom mais quente e reflexo metálico mais
+suave, mantendo o desenho e a escala das chapas. As faixas do piso, filetes da
+parede, indicadores e LEDs da coluna compartilham o laranja. As
+[capturas desta passagem](../visual/validation/central_hub_floor_orange_v1/README.md)
+foram aprovadas pelo usuário. A passagem seguinte acrescenta pares de baias
+de serviço rasas e trilhos de status nas quatro paredes diagonais, sem ocupar
+as portas. O Hub agora usa apenas sua decoração fixa; o gerador deixa de
+colocar a caixa ou barricada aleatória nessa sala. As demais salas conservam
+seus props funcionais até a substituição por famílias próprias, descritas em
+[props variáveis e drops](random_props_plan.md). As
+[capturas técnicas do Hub e dos drops](../visual/validation/central_hub_decor_pickups_v1/README.md)
+registram a passagem; a aprovação visual em partida ainda está pendente.
 
 `generateCentralHubRoomMaterials(roomSeed)` seleciona `Open`, `Active` ou
 `Rerouted` e um eixo `Horizontal`, `Vertical` ou `Cross`. Condição/eixo usam o
@@ -93,7 +117,7 @@ ID local 700; Wall/Floor/Ceiling usam 701–703:
   A coluna central usa o acabamento visual próprio descrito abaixo;
 - **Floor:** a receita BareSteel ainda produz variações para o gate de geração;
   no Hub octogonal, o renderer usa `floor_plate_v1.png` em tile de 2 × 2 m,
-  enquanto quatro linhas ciano são geometria localizada;
+  enquanto quatro linhas laranja são geometria localizada;
 - **Ceiling:** chapa grafite `ceiling_plate_v1.png` em tile de 2 × 2 m no
   octógono. Quatro luminárias lineares ocupam quadrantes simétricos, suspensas
   por duas hastes cada uma; uma quinta, mais fraca e de menor alcance, fica

@@ -17,6 +17,7 @@ using RoomId = std::uint32_t;
 inline constexpr RoomModuleId centralHubModuleId = 104U;
 inline constexpr RoomModuleId maintenanceLModuleId = 506U;
 inline constexpr RoomModuleId combatGalleryArenaModuleId = 507U;
+inline constexpr RoomModuleId securityHallModuleId = 605U;
 inline constexpr RoomModuleId securityTModuleId = 606U;
 inline constexpr RoomModuleId cafeteriaLongModuleId = 704U;
 inline constexpr RoomModuleId laboratoryHallModuleId = 405U;

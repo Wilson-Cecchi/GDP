@@ -190,7 +190,10 @@ std::vector<EnemyProjectileEvent> EnemyProjectileSystem::update(
             && prop->state != entities::PropState::Destroyed
             && (prop->solid
                 || prop->type == entities::PropType::CeilingFixture)) {
-            propBounds.push_back({id, propCollisionBounds(*entity, *prop)});
+            const PropSolidBounds parts = propPhysicalBounds(*entity, *prop);
+            for (std::size_t index = 0U; index < parts.count; ++index) {
+                propBounds.push_back({id, parts.parts[index]});
+            }
         }
     }
     for (EnemyProjectile shot : projectiles_) {

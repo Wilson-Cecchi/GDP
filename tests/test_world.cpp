@@ -1,6 +1,7 @@
 #include "core/Math.hpp"
 #include "world/Connector.hpp"
 #include "world/Corridor.hpp"
+#include "world/LightingGenerator.hpp"
 #include "world/MapGraph.hpp"
 #include "world/LootGenerator.hpp"
 #include "world/PropGenerator.hpp"
@@ -190,6 +191,7 @@ void testCampaignRoomVariants()
     const auto library = makeDefaultRoomModuleLibrary();
     for (const auto& [id, role] : std::array{
              std::pair{combatGalleryArenaModuleId, RoomRole::Arena},
+             std::pair{securityHallModuleId, RoomRole::Terminal},
              std::pair{securityTModuleId, RoomRole::Terminal},
              std::pair{cafeteriaLongModuleId, RoomRole::Normal},
              std::pair{laboratoryHallModuleId, RoomRole::Normal},
@@ -208,6 +210,17 @@ void testCampaignRoomVariants()
             const auto parts = makeRoomArchitecture(*room);
             expect(!parts.empty() && validateRoomArchitecture(*room, parts),
                 "campaign room architecture clears encounters and doorways");
+            const auto fractionalRoom = instantiateRoom(*module, id, role,
+                0xA55AU, {-15.85F, 0.0F, 10.3F},
+                static_cast<QuarterTurn>(rotation));
+            expect(fractionalRoom.has_value(),
+                "campaign room variant instantiates at fractional world coordinates");
+            if (fractionalRoom) {
+                const auto fractionalParts = makeRoomArchitecture(*fractionalRoom);
+                expect(!fractionalParts.empty()
+                        && validateRoomArchitecture(*fractionalRoom, fractionalParts),
+                    "rotated room architecture tolerates sub-millimetre rounding");
+            }
         }
         for (std::uint32_t seed = 0; seed < 32U; ++seed) {
             const auto room = instantiateRoom(*module, id, role, seed,
@@ -259,7 +272,15 @@ void testRoomWallColumns()
             }
             const auto columns = makeRoomWallColumns(*room);
             const auto authored = makeRoomArchitecture(*room);
-            expect(!columns.empty()
+            const bool industrialHasIntegratedColumns = moduleId == 101U
+                && std::count_if(authored.begin(), authored.end(),
+                    [](const RoomArchitecturePart& part) {
+                        const Vec3 extent = part.bounds.maximum
+                            - part.bounds.minimum;
+                        return part.structuralColumn && extent.y > 3.0F
+                            && extent.x < 0.5F && extent.z < 0.5F;
+                    }) >= 4;
+            expect((!columns.empty() || industrialHasIntegratedColumns)
                     && columns == makeRoomWallColumns(*room),
                 "wall columns exist and repeat exactly for the same seed");
             bool safe = true;
@@ -660,7 +681,7 @@ void testSecurityPreviewArchitecture()
         const auto parts = makeRoomArchitecture(room);
         RoomInstance differentSeed = room;
         differentSeed.seed = 1001U;
-        expect(parts.size() == 16U
+        expect(parts.size() == 18U
                 && parts == makeRoomArchitecture(room)
                 && parts == makeRoomArchitecture(differentSeed),
             "Security preview geometry is bounded and seed independent");
@@ -671,7 +692,7 @@ void testSecurityPreviewArchitecture()
         const Aabb leftFlank = toWorld({{-7.2F, 0.0F, -7.2F},
             {-5.2F, 2.4F, 7.2F}});
         const Aabb rightFlank = toWorld({{5.2F, 0.0F, -7.2F},
-            {8.3F, 2.4F, 7.2F}});
+            {7.8F, 2.4F, 7.2F}});
         const Aabb returnTerminal = toWorld({{-0.5F, 0.0F, 7.0F},
             {0.5F, 2.2F, 8.0F}});
         const QuarterTurn inverseRotation = rotation == QuarterTurn::Degrees90
@@ -686,7 +707,9 @@ void testSecurityPreviewArchitecture()
         std::size_t nichePieces = 0U;
         for (std::size_t first = 0U; first < parts.size(); ++first) {
             const RoomArchitecturePart& part = parts[first];
-            contained &= part.solid && !part.breakable
+            contained &= part.solid
+                && (!part.breakable || part.securityFurniturePart
+                    == SecurityFurniturePart::Monitor)
                 && part.bounds.isValid()
                 && room.worldBounds.contains(part.bounds.minimum)
                 && room.worldBounds.contains(part.bounds.maximum);
@@ -708,9 +731,7 @@ void testSecurityPreviewArchitecture()
                     && nearlyEqual(local.z,
                         local.x < 0.0F ? 3.80F : -3.80F, 1.0e-4F);
             }
-            if ((nearlyEqual(local.x, -6.45F, 1.0e-4F)
-                    || nearlyEqual(local.x, -4.45F, 1.0e-4F))
-                && nearlyEqual(local.z, -8.725F, 1.0e-4F)) {
+            if (part.securityFurniturePart == SecurityFurniturePart::Monitor) {
                 bool supported = false;
                 for (const RoomArchitecturePart& candidate : parts) {
                     supported |= nearlyEqual(
@@ -778,8 +799,8 @@ void testSecurityPreviewArchitecture()
     ordinary.theme = RoomTheme::Security;
     ordinary.worldBounds = {{-9.0F, 0.0F, -9.0F},
         {9.0F, 6.0F, 9.0F}};
-    expect(makeRoomArchitecture(ordinary).empty(),
-        "Security campaign rooms keep their generic architecture");
+    expect(!makeRoomArchitecture(ordinary).empty(),
+        "Security campaign variants receive a compact authored station");
     ordinary.moduleId = securityPreviewModuleId;
     ordinary.worldBounds = {{-8.9F, 0.0F, -9.0F},
         {8.9F, 6.0F, 9.0F}};
@@ -1015,13 +1036,73 @@ void testTechnicalPreviewArchitecture()
     ordinary.theme = RoomTheme::Maintenance;
     ordinary.worldBounds = {{-8.0F, 0.0F, -10.0F},
         {8.0F, 5.5F, 10.0F}};
-    expect(makeRoomArchitecture(ordinary).empty(),
-        "Maintenance campaign rooms retain generic architecture");
+    expect(!makeRoomArchitecture(ordinary).empty(),
+        "Maintenance campaign variants receive a compact authored station");
     ordinary.moduleId = technicalPreviewModuleId;
     ordinary.worldBounds = {{-7.9F, 0.0F, -10.0F},
         {7.9F, 5.5F, 10.0F}};
     expect(makeRoomArchitecture(ordinary).empty(),
         "Technical preview rejects a room below its reserved footprint");
+}
+
+void testMaintenanceLAtFractionalCoordinates()
+{
+    using namespace gdp::world;
+    using wkc::core::QuarterTurn;
+
+    const auto library = makeDefaultRoomModuleLibrary();
+    const auto module = std::find_if(library.begin(), library.end(),
+        [](const RoomModule& candidate) {
+            return candidate.id == maintenanceLModuleId;
+        });
+    expect(module != library.end(), "Maintenance L module is in the campaign library");
+    if (module == library.end()) return;
+
+    for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+             QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+             QuarterTurn::Degrees270}) {
+        const auto room = instantiateRoom(*module, 6U, RoomRole::Normal,
+            722U, {-15.85F, 0.0F, 10.3F}, rotation);
+        expect(room.has_value(), "Maintenance L instantiates at fractional coordinates");
+        if (!room) continue;
+        const auto parts = makeRoomArchitecture(*room);
+        expect(!parts.empty() && validateRoomArchitecture(*room, parts),
+            "Maintenance L keeps furniture and ducts at fractional coordinates");
+    }
+}
+
+void testCampaignArchitectureAtFractionalCoordinates()
+{
+    using namespace gdp::world;
+    using wkc::core::QuarterTurn;
+
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool allValid = !library.empty();
+    for (const RoomModule& module : library) {
+        RoomRole role = RoomRole::Normal;
+        for (const RoomRole candidate : {RoomRole::Start, RoomRole::Normal,
+                 RoomRole::Hub, RoomRole::Arena, RoomRole::DeadEnd,
+                 RoomRole::Secret, RoomRole::Boss, RoomRole::Terminal}) {
+            if (module.supportsRole(candidate)) {
+                role = candidate;
+                break;
+            }
+        }
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(module, module.id, role,
+                722U, {-15.85F, 0.0F, 10.3F}, rotation);
+            if (!room) {
+                allValid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            allValid &= validateRoomArchitecture(*room, parts);
+        }
+    }
+    expect(allValid,
+        "every campaign room variant keeps valid architecture across rotations");
 }
 
 void testLaboratoryPreviewArchitecture()
@@ -1250,8 +1331,8 @@ void testLaboratoryPreviewArchitecture()
     ordinary.theme = RoomTheme::Laboratory;
     ordinary.worldBounds = {{-9.0F, 0.0F, -10.0F},
         {9.0F, 6.0F, 10.0F}};
-    expect(makeRoomArchitecture(ordinary).empty(),
-        "Laboratory architecture remains isolated from campaign rooms");
+    expect(!makeRoomArchitecture(ordinary).empty(),
+        "Laboratory campaign variants receive a compact authored station");
     ordinary.moduleId = laboratoryPreviewModuleId;
     ordinary.worldBounds = {{-8.9F, 0.0F, -10.0F},
         {8.9F, 6.0F, 10.0F}};
@@ -1614,8 +1695,38 @@ void testStorageArchitecture()
     RoomInstance industrial;
     industrial.theme = RoomTheme::Industrial;
     industrial.worldBounds = {{-4.0F, 0.0F, -5.0F}, {4.0F, 4.0F, 5.0F}};
-    expect(makeRoomArchitecture(industrial).empty(),
-        "other themes keep the existing generic architecture");
+    const auto industrialParts = makeRoomArchitecture(industrial);
+    expect(!industrialParts.empty()
+            && validateRoomArchitecture(industrial, industrialParts)
+            && std::any_of(industrialParts.begin(), industrialParts.end(),
+                [](const RoomArchitecturePart& part) {
+                    return part.decoration == RoomDecorationPart::CeilingDuct;
+                }),
+        "Industrial rooms use authored service details instead of generic blocks");
+
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool industrialConstructionValid = true;
+    for (const RoomModuleId id : {101U, 102U, 103U, 105U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        industrialConstructionValid &= module != library.end();
+        if (module == library.end()) continue;
+        for (const QuarterTurn rotation : rotations) {
+            const RoomRole role = id == 103U
+                ? RoomRole::Start : RoomRole::Normal;
+            const auto room = instantiateRoom(*module, id, role, 1793U,
+                origin, rotation);
+            if (!room) {
+                industrialConstructionValid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            industrialConstructionValid &= validateRoomArchitecture(*room, parts)
+                && parts.size() >= (id == 103U ? 60U : 35U);
+        }
+    }
+    expect(industrialConstructionValid,
+        "Industrial construction and safe arrival cabinets clear every rotation");
 }
 
 void testInstantiationAndRotation()
@@ -1787,13 +1898,32 @@ void testWorldGeneration()
     }
 
     const std::uint64_t fingerprint = worldFingerprint(*first.world);
-    expect(fingerprint == 0x2F12EA79CB4B4E45ULL,
+    // The wider Hub/Arena transfer and connector/corridor dimensions now
+    // belong to the deterministic world identity.
+    expect(fingerprint == 0x8B4BEE9554BBA15EULL,
         "golden world fingerprint remains stable across builds");
     expect(fingerprint == worldFingerprint(*repeat.world),
         "same seed produces the same complete world fingerprint");
     expect(fingerprint != worldFingerprint(*different.world),
         "different seed changes the world fingerprint");
     expect(validateWorld(*first.world).isValid(), "committed world passes every structural gate");
+
+    World changedGauge = *first.world;
+    changedGauge.corridors.front().width += 0.1F;
+    expect(worldFingerprint(changedGauge) != fingerprint
+            && !validateWorld(changedGauge).isValid(),
+        "corridor width changes fingerprint and must match both door connectors");
+    World changedConnector = *first.world;
+    const EdgeId changedEdge = changedConnector.corridors.front().edge;
+    for (ConnectorInstance& connector : changedConnector.rooms.front().connectors) {
+        if (connector.edge == changedEdge) {
+            connector.height += 0.1F;
+            break;
+        }
+    }
+    expect(worldFingerprint(changedConnector) != fingerprint
+            && !validateWorld(changedConnector).isValid(),
+        "door height changes fingerprint and fails corridor dimension validation");
 
     World overlapping = *first.world;
     overlapping.rooms[1].worldBounds = overlapping.rooms[0].worldBounds;
@@ -1806,6 +1936,55 @@ void testWorldGeneration()
         7, {.maximumAttempts = 3}, invalidLibrary);
     expect(!exhausted.succeeded() && exhausted.attempts == 3U,
         "invalid library exhausts deterministic attempt budget explicitly");
+}
+
+void testCampaignCorridorGauges()
+{
+    using namespace gdp::world;
+    std::size_t mixedSeeds = 0U;
+    std::size_t fallbackSeeds = 0U;
+    bool validMix = true;
+    bool dimensionsMatch = true;
+    bool wideArchitectureClear = true;
+    for (wkc::core::Seed seed = 0U; seed < 128U; ++seed) {
+        const auto result = generateWorld(seed);
+        if (!result.world) {
+            validMix = false;
+            break;
+        }
+        std::size_t wideCount = 0U;
+        std::size_t narrowCount = 0U;
+        for (const CorridorPath& corridor : result.world->corridors) {
+            const bool wide = std::abs(corridor.width - 2.4F) < 0.01F
+                && std::abs(corridor.height - 2.8F) < 0.01F;
+            const bool narrow = std::abs(corridor.width - 1.2F) < 0.01F
+                && std::abs(corridor.height - 2.2F) < 0.01F;
+            wideCount += wide ? 1U : 0U;
+            narrowCount += narrow ? 1U : 0U;
+            if (!wide && !narrow) dimensionsMatch = false;
+            for (const RoomInstance& room : result.world->rooms) {
+                for (const ConnectorInstance& connector : room.connectors) {
+                    if (connector.edge != corridor.edge) continue;
+                    dimensionsMatch &= std::abs(connector.width - corridor.width) < 0.01F
+                        && std::abs(connector.height - corridor.height) < 0.01F;
+                    if (wide && usesAuthoredRoomArchitecture(room)) {
+                        const auto parts = makeRoomArchitecture(room);
+                        wideArchitectureClear &= validateRoomArchitecture(room, parts);
+                    }
+                }
+            }
+        }
+        mixedSeeds += wideCount == 1U && narrowCount >= 1U ? 1U : 0U;
+        fallbackSeeds += wideCount == 0U && narrowCount >= 1U ? 1U : 0U;
+        validMix &= wideCount <= 1U && narrowCount >= 1U;
+    }
+    expect(validMix && mixedSeeds >= 120U
+            && mixedSeeds + fallbackSeeds == 128U,
+        "campaign seeds normally mix one wide transfer and narrow service corridors, with safe fallback");
+    expect(dimensionsMatch,
+        "generated corridor gauges match both linked door openings");
+    expect(wideArchitectureClear,
+        "wide door clearance remains free of authored room solids");
 }
 
 void testCorridorRouting()
@@ -1946,8 +2125,12 @@ void testInitialEntityPopulation()
     expect(manager.query(EntityKind::Player) == std::vector<EntityId>{initial.player},
         "population creates exactly one player entity");
     const PropData* terminal = manager.findData<PropData>(initial.terminal);
-    expect(terminal != nullptr && terminal->type == PropType::Terminal && terminal->solid,
-        "dedicated Terminal room receives the solid interaction terminal");
+    const Entity* terminalEntity = manager.find(initial.terminal);
+    expect(terminal != nullptr && terminalEntity != nullptr
+            && terminal->type == PropType::Terminal && terminal->solid
+            && wkc::core::nearlyEqual(terminalEntity->transform.scale,
+                wkc::core::Vec3{1.15F, 1.80F, 0.60F}),
+        "dedicated Terminal room receives the portal terminal");
     expect(!initial.exitTerminal.isValid(), "non-Campaign population has no exit terminal");
 
     bool arenaCompositionValid = true;
@@ -2443,9 +2626,12 @@ void testCampaignExitTerminalPopulation()
             && prop->solid && prop->maximumHealth == 0.0F
             && nearlyEqual(terminal->transform.position, position)
             && nearlyEqual(terminal->transform.scale,
-                sideways ? Vec3{0.3F, 2.0F, 0.8F} : Vec3{0.8F, 2.0F, 0.3F})
+                sideways ? Vec3{0.60F, 1.80F, 1.15F}
+                    : Vec3{1.15F, 1.80F, 0.60F})
+            && nearlyEqual(terminal->transform.rotationDegrees.y,
+                90.0F * static_cast<float>(boss->rotation))
             && std::count(boss->entities.begin(), boss->entities.end(), initial.exitTerminal) == 1,
-            "protected exit bounds match the authored console in the owning rotated Boss room");
+            "protected exit portal follows the owning rotated Boss room");
     }
     expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
         "Campaign exit seed batch exercises all four console rotations");
@@ -2558,6 +2744,347 @@ void testCampaignEncounterProgression()
     expect(deterministic, "Campaign enemy layout repeats for the same seed and floor");
 }
 
+void testBossTerminalLightingAcrossRotations()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+
+    const auto library = makeDefaultRoomModuleLibrary();
+    const auto bossModule = std::find_if(library.begin(), library.end(),
+        [](const RoomModule& module) {
+            return module.supportsRole(RoomRole::Boss);
+        });
+    expect(bossModule != library.end(), "Boss lighting has an arena module");
+    if (bossModule == library.end()) return;
+
+    bool valid = true;
+    for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+             QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+             QuarterTurn::Degrees270}) {
+        const auto room = instantiateRoom(*bossModule, 1U, RoomRole::Boss,
+            20261120U, {37.0F, 0.0F, -19.0F}, rotation);
+        if (!room) {
+            valid = false;
+            continue;
+        }
+        const RoomLightingPlan plan = generateRoomLightingPlan(
+            room->seed, room->role, room->theme, room->worldBounds);
+        if (plan.lights.size() != maxRoomLights
+            || !validateRoomLightingPlan(plan, room->worldBounds).isValid()) {
+            valid = false;
+            continue;
+        }
+        const Vec3 center = (room->worldBounds.minimum
+            + room->worldBounds.maximum) * 0.5F;
+        const RoomPointLight& focal = plan.lights.back();
+        const Vec3 terminal = room->transform.position
+            + rotateQuarterTurns({0.0F, 0.0F, 2.2F}, rotation);
+        const Vec3 offset = focal.position - terminal;
+        valid &= nearlyEqual(focal.position.x, center.x)
+            && nearlyEqual(focal.position.z, center.z)
+            && offset.x * offset.x + offset.z * offset.z < 3.0F * 3.0F;
+        for (const RoomArchitecturePart& part : makeRoomArchitecture(*room)) {
+            if (part.combatPart != CombatArchitecturePart::CeilingBeam
+                && part.combatPart != CombatArchitecturePart::CeilingGrille) {
+                continue;
+            }
+            const bool overlapsFixture = part.bounds.minimum.x < center.x + 1.30F
+                && part.bounds.maximum.x > center.x - 1.30F
+                && part.bounds.minimum.z < center.z + 0.20F
+                && part.bounds.maximum.z > center.z - 0.20F;
+            valid &= !overlapsFixture;
+        }
+    }
+    expect(valid,
+        "Boss focal fixture reaches the terminal and clears ceiling structures in all rotations");
+}
+
+void testCompactFurnitureClearanceAcrossRotations()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool allClear = true;
+    for (const RoomModuleId moduleId : {301U, 302U, 303U,
+             401U, 402U, 501U, 502U, 505U,
+             601U, 602U, 603U, 701U, 702U, 703U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [moduleId](const RoomModule& candidate) {
+                return candidate.id == moduleId;
+            });
+        if (module == library.end()) {
+            allClear = false;
+            continue;
+        }
+        const RoomRole role = module->supportsRole(RoomRole::Normal)
+            ? RoomRole::Normal : RoomRole::Arena;
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(*module, 1U, role,
+                20261120U, {37.0F, 0.0F, -19.0F}, rotation);
+            if (!room) {
+                allClear = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            const bool clear = !parts.empty()
+                && validateRoomArchitecture(*room, parts);
+            if (!clear) {
+                std::cerr << "Furniture module " << moduleId
+                    << " rotation " << static_cast<int>(rotation)
+                    << " parts " << parts.size() << " failed clearance\n";
+            }
+            allClear &= clear;
+        }
+    }
+    expect(allClear,
+        "campaign furniture variants clear connectors, loot and enemy zones in four rotations");
+}
+
+void testOfficeHallArchiveDesks()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool hallValid = true;
+    for (const RoomModuleId id : {301U, 302U, 303U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        if (module == library.end()) {
+            hallValid = false;
+            continue;
+        }
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(*module, id, RoomRole::Normal,
+                1116U, {-15.85F, 0.0F, 10.30F}, rotation);
+            const auto otherSeed = instantiateRoom(*module, id,
+                RoomRole::Normal, 1793U, {-15.85F, 0.0F, 10.30F}, rotation);
+            if (!room || !otherSeed) {
+                hallValid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            const auto otherParts = makeRoomArchitecture(*otherSeed);
+            hallValid &= validateRoomArchitecture(*room, parts)
+                && parts == otherParts;
+            if (id == 303U) {
+                // The broad room has two 2.1 m archive desktops. Both are
+                // outside the central spawn and the reserved prop pocket.
+                const auto desktopCount = std::count_if(parts.begin(),
+                    parts.end(), [](const RoomArchitecturePart& part) {
+                        const auto extent = part.bounds.maximum
+                            - part.bounds.minimum;
+                        return (nearlyEqual(extent.x, 2.10F, 0.001F)
+                                   || nearlyEqual(extent.z, 2.10F, 0.001F))
+                            && nearlyEqual(extent.y, 0.12F, 0.001F);
+                    });
+                hallValid &= parts.size() >= 30U && desktopCount == 2;
+                if (!validateRoomArchitecture(*room, parts)
+                    || desktopCount != 2 || parts.size() < 30U) {
+                    std::cerr << "Office hall rotation "
+                        << static_cast<int>(rotation) << " parts "
+                        << parts.size() << " desktops " << desktopCount
+                        << " clearance " << validateRoomArchitecture(*room, parts)
+                        << '\n';
+                }
+            } else {
+                // Compact offices may carry additional mechanical trim and
+                // overhead service geometry around the original workstation.
+                hallValid &= parts.size() >= 6U;
+            }
+        }
+    }
+    expect(hallValid,
+        "Office hall archive desks are deterministic and clear all reserved zones in four rotations");
+}
+
+void testBreakableCafeteriaPlantsAndSecurityMonitors()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool valid = true;
+    for (const RoomModuleId id : {601U, 605U, 606U,
+             701U, 702U, 703U, 704U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        if (module == library.end()) {
+            valid = false;
+            continue;
+        }
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(*module, id,
+                RoomRole::Normal, 1116U, {-15.85F, 0.0F, 10.30F}, rotation);
+            const auto otherSeed = instantiateRoom(*module, id,
+                RoomRole::Normal, 1793U, {-15.85F, 0.0F, 10.30F}, rotation);
+            if (!room || !otherSeed) {
+                valid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            const auto otherParts = makeRoomArchitecture(*otherSeed);
+            const bool clear = !parts.empty()
+                && validateRoomArchitecture(*room, parts)
+                && parts == otherParts;
+            valid &= clear;
+            std::size_t breakablePlants = 0U;
+            std::size_t breakableMonitors = 0U;
+            std::size_t monitorBodies = 0U;
+            std::size_t monitorStrips = 0U;
+            std::size_t observationPanels = 0U;
+            for (const RoomArchitecturePart& part : parts) {
+                if (part.decoration == RoomDecorationPart::Planter
+                    || part.decoration == RoomDecorationPart::BroadleafPlanter) {
+                    breakablePlants += static_cast<std::size_t>(part.breakable);
+                }
+                if (part.securityFurniturePart
+                    == SecurityFurniturePart::Monitor) {
+                    breakableMonitors += static_cast<std::size_t>(part.breakable);
+                    const float height = part.bounds.maximum.y
+                        - part.bounds.minimum.y;
+                    monitorBodies += static_cast<std::size_t>(height > 0.3F);
+                    monitorStrips += static_cast<std::size_t>(height < 0.2F);
+                }
+                if (part.securityFurniturePart
+                    == SecurityFurniturePart::ObservationPanel) {
+                    ++observationPanels;
+                    valid &= !part.breakable;
+                }
+            }
+            if (id >= 701U) {
+                valid &= breakablePlants == 2U;
+            } else {
+                valid &= breakableMonitors == 2U
+                    && monitorBodies == (id == 601U ? 1U : 2U)
+                    && monitorStrips == (id == 601U ? 1U : 0U)
+                    && observationPanels == (id == 605U ? 1U : 0U);
+            }
+            if (!clear) {
+                std::cerr << "Breakable room module " << id << " rotation "
+                    << static_cast<int>(rotation) << " failed clearance\n";
+            }
+        }
+    }
+    expect(valid,
+        "Cafeteria plants and Security monitor bodies remain breakable without blocking four rotations");
+}
+
+void testCompactSecurityConsoleTrim()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool valid = true;
+    for (const RoomModuleId id : {601U, 602U, 603U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        if (module == library.end()) {
+            valid = false;
+            continue;
+        }
+        const RoomRole role = id == 603U ? RoomRole::Arena
+            : RoomRole::Normal;
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(*module, id, role, 1116U,
+                {-15.85F, 0.0F, 10.30F}, rotation);
+            if (!room) {
+                valid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            std::size_t tops = 0U;
+            std::size_t trims = 0U;
+            bool topSizesValid = true;
+            for (const RoomArchitecturePart& part : parts) {
+                const Vec3 size = part.bounds.maximum - part.bounds.minimum;
+                if (part.securityFurniturePart
+                    == SecurityFurniturePart::ConsoleTop) {
+                    ++tops;
+                    topSizesValid &= std::min(size.x, size.z) > 0.5F;
+                } else if (part.securityFurniturePart
+                    == SecurityFurniturePart::ConsoleTrim) {
+                    ++trims;
+                    topSizesValid &= std::min(size.x, size.z) < 0.1F;
+                }
+            }
+            const bool roomValid = validateRoomArchitecture(*room, parts);
+            if (!roomValid || tops != 1U || trims != 3U || !topSizesValid) {
+                std::cerr << "Compact Security console " << id
+                    << " rotation " << static_cast<int>(rotation)
+                    << " parts " << parts.size() << " tops " << tops
+                    << " trims " << trims << " sizes " << topSizesValid
+                    << " clearance " << roomValid << '\n';
+            }
+            valid &= roomValid && tops == 1U
+                && trims == (id == 601U ? 3U : 4U) && topSizesValid;
+        }
+    }
+    expect(valid,
+        "Compact Security drawer faces never generate full-size console tops in four rotations");
+}
+
+void testSecretLaboratorySampleVaults()
+{
+    using namespace gdp::world;
+    using namespace wkc::core;
+    const auto library = makeDefaultRoomModuleLibrary();
+    bool valid = true;
+    for (const RoomModuleId id : {401U, 402U, 403U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [id](const RoomModule& candidate) { return candidate.id == id; });
+        if (module == library.end()) {
+            valid = false;
+            continue;
+        }
+        const RoomRole role = id == 403U ? RoomRole::Secret : RoomRole::Normal;
+        for (const QuarterTurn rotation : {QuarterTurn::Degrees0,
+                 QuarterTurn::Degrees90, QuarterTurn::Degrees180,
+                 QuarterTurn::Degrees270}) {
+            const auto room = instantiateRoom(*module, id, role, 1793U,
+                {-15.85F, 0.0F, 10.30F}, rotation);
+            const auto otherSeed = instantiateRoom(*module, id, role, 1116U,
+                {-15.85F, 0.0F, 10.30F}, rotation);
+            if (!room || !otherSeed) {
+                valid = false;
+                continue;
+            }
+            const auto parts = makeRoomArchitecture(*room);
+            const bool clear = validateRoomArchitecture(*room, parts)
+                && parts == makeRoomArchitecture(*otherSeed);
+            const auto statusStrips = std::count_if(parts.begin(), parts.end(),
+                [](const RoomArchitecturePart& part) {
+                    return part.laboratoryFurniturePart
+                        == LaboratoryFurniturePart::StatusStrip;
+                });
+            valid &= clear && (id == 403U
+                ? parts.size() >= 30U && statusStrips == 2
+                : parts.size() >= 15U && statusStrips == 0);
+            if (!clear || (id == 403U
+                    ? parts.size() < 30U || statusStrips != 2
+                    : parts.size() < 15U || statusStrips != 0)) {
+                std::cerr << "Lab module " << id << " rotation "
+                    << static_cast<int>(rotation) << " parts "
+                    << parts.size() << " strips " << statusStrips
+                    << " clearance " << clear << '\n';
+            }
+            if (!clear) {
+                std::cerr << "Secret laboratory module " << id
+                    << " rotation " << static_cast<int>(rotation)
+                    << " failed clearance\n";
+            }
+        }
+    }
+    expect(valid,
+        "Laboratory furniture and the two secret sample vaults clear all rotations");
+}
+
 void testBossDifficultyProfiles()
 {
     using namespace gdp::entities;
@@ -2640,8 +3167,28 @@ void testBossDifficultyProfiles()
                 continue;
             }
             const auto arenaColumns = makeRoomArchitecture(*room);
-            arenaColumnsValid &= arenaColumns.size() == 8U
+            arenaColumnsValid &= arenaColumns.size() == 115U
                 && validateRoomArchitecture(*room, arenaColumns);
+            arenaColumnsValid &= std::count_if(arenaColumns.begin(),
+                arenaColumns.end(), [](const RoomArchitecturePart& part) {
+                    return part.combatPart
+                        == CombatArchitecturePart::ColumnInset;
+                }) == 8;
+            arenaColumnsValid &= std::count_if(arenaColumns.begin(),
+                arenaColumns.end(), [](const RoomArchitecturePart& part) {
+                    return part.combatPart
+                        == CombatArchitecturePart::CeilingBeam;
+                }) == 6;
+            arenaColumnsValid &= std::count_if(arenaColumns.begin(),
+                arenaColumns.end(), [](const RoomArchitecturePart& part) {
+                    return part.combatPart
+                        == CombatArchitecturePart::GallerySupport;
+                }) == 4;
+            arenaColumnsValid &= std::count_if(arenaColumns.begin(),
+                arenaColumns.end(), [](const RoomArchitecturePart& part) {
+                    return part.combatPart
+                        == CombatArchitecturePart::CeilingGrille;
+                }) == 24;
             for (const float z : {-8.0F, 8.0F}) {
                 const Vec3 center = room->transform.position
                     + rotateQuarterTurns({7.0F, 0.0F, z}, room->rotation);
@@ -2819,6 +3366,8 @@ int main()
     testCentralHubPreviewArchitecture();
     testSecurityPreviewArchitecture();
     testTechnicalPreviewArchitecture();
+    testMaintenanceLAtFractionalCoordinates();
+    testCampaignArchitectureAtFractionalCoordinates();
     testLaboratoryPreviewArchitecture();
     testStorageArchitecture();
     testInstantiationAndRotation();
@@ -2826,11 +3375,18 @@ int main()
     testRequiredConnectorResolution();
     testMapGraph();
     testWorldGeneration();
+    testCampaignCorridorGauges();
     testCorridorRouting();
     testCorridorWallColumns();
     testInitialEntityPopulation();
     testCampaignExitTerminalPopulation();
     testCampaignEncounterProgression();
+    testBossTerminalLightingAcrossRotations();
+    testCompactFurnitureClearanceAcrossRotations();
+    testOfficeHallArchiveDesks();
+    testBreakableCafeteriaPlantsAndSecurityMonitors();
+    testCompactSecurityConsoleTrim();
+    testSecretLaboratorySampleVaults();
     testBossDifficultyProfiles();
     testWorldSeedBatch();
     testSeparatedTerminalAcrossMapSizes();

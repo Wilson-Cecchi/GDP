@@ -44,6 +44,9 @@ enum class SettingsMenuOption : std::uint8_t {
     DetailedMaterials,
     RenderScale,
     MaximumLights,
+    MouseAimSensitivity,
+    UiScaleMode,
+    UiScaleManual,
 };
 
 enum class GraphicsQuality : std::uint8_t {
@@ -74,6 +77,9 @@ enum class WindowResolution : std::uint8_t {
     R1280x720,
     R1600x900,
     R1920x1080,
+    R2560x1440,
+    R2880x1620,
+    R3840x2160,
     Count,
 };
 
@@ -96,12 +102,13 @@ struct RuntimeSettings {
     std::uint16_t ambientVolumePercent{100U};
     std::uint16_t uiVolumePercent{100U};
     std::uint16_t mouseSensitivityPercent{100U};
+    std::uint16_t mouseAimSensitivityPercent{100U};
     bool invertMouseY{false};
-    std::uint16_t fieldOfViewDegrees{68U};
-    GraphicsQuality graphicsQuality{GraphicsQuality::Medium};
+    std::uint16_t fieldOfViewDegrees{100U};
+    GraphicsQuality graphicsQuality{GraphicsQuality::Ultra};
     GraphicsQualitySettings customGraphics{};
     WindowResolution windowResolution{WindowResolution::R1280x720};
-    bool fullscreen{false};
+    bool fullscreen{true};
     bool verticalSync{true};
     Language language{Language::English};
     ControlBindings controls{};
@@ -115,8 +122,19 @@ struct RuntimeSettings {
     std::uint16_t gamepadMoveDeadzonePercent{18U};
     std::uint16_t gamepadLookDeadzonePercent{18U};
     bool invertGamepadY{false};
+    bool uiScaleAuto{true};
+    std::uint16_t uiScaleManualPercent{100U};
 
     constexpr bool operator==(const RuntimeSettings&) const noexcept = default;
+};
+
+struct NumericSettingDescriptor {
+    std::uint16_t minimum{0U};
+    std::uint16_t maximum{100U};
+    std::uint16_t step{1U};
+    std::uint16_t value{0U};
+    std::uint16_t defaultValue{0U};
+    std::string_view unit{};
 };
 
 struct SettingsMenuState {
@@ -139,10 +157,17 @@ void selectSettingsMenuOption(
     RuntimeSettings& settings,
     SettingsMenuOption option,
     int direction) noexcept;
+[[nodiscard]] std::optional<NumericSettingDescriptor> numericSettingDescriptor(
+    const RuntimeSettings& settings, SettingsMenuOption option) noexcept;
+[[nodiscard]] bool setRuntimeNumericSetting(RuntimeSettings& settings,
+    SettingsMenuOption option, int value) noexcept;
 [[nodiscard]] SettingsMenuCommand activateSettingsMenuSelection(
     SettingsMenuState& state) noexcept;
 [[nodiscard]] float normalizedVolume(std::uint16_t percent) noexcept;
 [[nodiscard]] float mouseSensitivity(const RuntimeSettings& settings) noexcept;
+[[nodiscard]] std::uint16_t resolvedUiScalePercent(
+    const RuntimeSettings& settings, int drawableWidth, int drawableHeight,
+    int windowWidth, int windowHeight) noexcept;
 [[nodiscard]] GraphicsQualitySettings graphicsQualitySettings(
     GraphicsQuality quality) noexcept;
 [[nodiscard]] GraphicsQualitySettings effectiveGraphicsQualitySettings(

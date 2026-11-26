@@ -87,6 +87,159 @@ float smoothNoise(
     return scalarMix(top, bottom, blendY);
 }
 
+// The cover texture repeats at object scale. Wrap lattice samples so that the
+// painted grain is continuous across tile boundaries without a panel grid.
+float coverTileNoise(
+    const wkc::core::Seed seed,
+    const std::uint32_t x,
+    const std::uint32_t y,
+    const std::uint32_t cellSize) noexcept
+{
+    constexpr std::uint32_t resolution = 256U;
+    const std::uint32_t cells = resolution / cellSize;
+    const std::uint32_t gridX = x / cellSize;
+    const std::uint32_t gridY = y / cellSize;
+    const float localX = static_cast<float>(x % cellSize) / static_cast<float>(cellSize);
+    const float localY = static_cast<float>(y % cellSize) / static_cast<float>(cellSize);
+    const float blendX = localX * localX * (3.0F - 2.0F * localX);
+    const float blendY = localY * localY * (3.0F - 2.0F * localY);
+    const auto sample = [seed, cells](const std::uint32_t sampleX,
+                            const std::uint32_t sampleY) {
+        const std::uint64_t id = (static_cast<std::uint64_t>(sampleY % cells) << 32U)
+            | (sampleX % cells);
+        return unitNoise(wkc::core::hashCombine(seed, id));
+    };
+    return scalarMix(
+        scalarMix(sample(gridX, gridY), sample(gridX + 1U, gridY), blendX),
+        scalarMix(sample(gridX, gridY + 1U), sample(gridX + 1U, gridY + 1U), blendX),
+        blendY);
+}
+
+struct BossArenaSurfaceSample {
+    wkc::core::Vec3 albedo{};
+    float height{0.5F};
+    float roughness{0.5F};
+    float metalness{0.8F};
+    float ambientOcclusion{1.0F};
+};
+
+BossArenaSurfaceSample bossArenaSurfaceSample(
+    const CombatSurfaceRecipe& recipe, const std::uint32_t x,
+    const std::uint32_t y) noexcept
+{
+    const bool wall = recipe.surface == RoomSurface::Wall;
+    const bool floor = recipe.surface == RoomSurface::Floor;
+    const std::uint32_t cellWidth = 256U / recipe.panelColumns;
+    const std::uint32_t cellHeight = 256U / recipe.panelRows;
+    const std::uint32_t panelX = x % cellWidth;
+    const std::uint32_t panelY = y % cellHeight;
+    const std::uint32_t edge = std::min({panelX, cellWidth - 1U - panelX,
+        panelY, cellHeight - 1U - panelY});
+    const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+    const std::uint64_t panelId =
+        (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+        | (x / cellWidth);
+    const float panelTone = unitNoise(wkc::core::hashCombine(
+        recipe.seed ^ 0x424F5353504C4154ULL, panelId));
+    const float patina = coverTileNoise(
+        recipe.seed ^ 0x424F535350415449ULL, x, y, 64U);
+    const float fine = coverTileNoise(
+        recipe.seed ^ 0x424F535346494E45ULL, x, y, 8U);
+    const float grain = unitNoise(wkc::core::hashCombine(
+        recipe.seed ^ 0x424F535347524149ULL, pixelId));
+    const float bodyTone = 0.89F + 0.10F * patina
+        + 0.055F * (fine - 0.5F) + 0.030F * (grain - 0.5F);
+
+    BossArenaSurfaceSample sample;
+    sample.albedo = multiply(mix(recipe.baseColor, recipe.secondaryColor,
+        0.12F + 0.36F * panelTone), bodyTone);
+    sample.height = 0.53F + 0.045F * (patina - 0.5F)
+        + 0.017F * (fine - 0.5F);
+    sample.roughness = (floor ? 0.42F : wall ? 0.58F : 0.64F)
+        + 0.075F * (patina - 0.5F) + 0.035F * (fine - 0.5F);
+    sample.metalness = floor ? 0.88F : wall ? 0.72F : 0.78F;
+    sample.ambientOcclusion = 1.0F;
+
+    const wkc::core::Vec3 seamColor = wall
+        ? wkc::core::Vec3{0.055F, 0.052F, 0.049F}
+        : floor ? wkc::core::Vec3{0.032F, 0.034F, 0.035F}
+                : wkc::core::Vec3{0.032F, 0.032F, 0.034F};
+    if (edge <= 2U) {
+        sample.albedo = seamColor;
+        sample.height = 0.10F;
+        sample.roughness = 0.81F;
+        sample.metalness = 0.82F;
+        sample.ambientOcclusion = 0.36F;
+        return sample;
+    }
+
+    // The rolled lip and its shadow remain narrow at the real UV scale:
+    // 3-10 texels on a 2 m floor tile or 6 m wall tile.
+    if (edge <= 5U) {
+        sample.albedo = multiply(sample.albedo, 0.68F);
+        sample.height = 0.31F;
+        sample.ambientOcclusion = 0.69F;
+    } else if (edge <= 9U) {
+        sample.albedo = mix(sample.albedo,
+            {0.31F, 0.30F, 0.28F}, wall ? 0.12F : 0.16F);
+        sample.height += 0.075F;
+        sample.roughness -= 0.055F;
+    }
+
+    // Sparse strokes vary with the material seed. They are deliberately
+    // narrow and short so the repeated tile does not become an obvious stamp.
+    const std::uint32_t scuffCount = floor ? 10U : wall ? 6U : 3U;
+    for (std::uint32_t mark = 0U; mark < scuffCount; ++mark) {
+        const std::uint64_t markSeed = wkc::core::hashCombine(
+            recipe.seed ^ 0x424F535353435546ULL, mark);
+        const std::uint32_t startX = 18U
+            + static_cast<std::uint32_t>(markSeed % 188U);
+        const std::uint32_t startY = 18U
+            + static_cast<std::uint32_t>((markSeed >> 17U) % 188U);
+        const std::uint32_t length = 13U
+            + static_cast<std::uint32_t>((markSeed >> 39U) % 36U);
+        const bool stroke = floor
+            ? y == startY && x >= startX && x < startX + length
+            : x == startX && y >= startY && y < startY + length;
+        if (stroke && edge > 10U) {
+            sample.albedo = mix(sample.albedo,
+                {0.34F, 0.33F, 0.30F}, floor ? 0.40F : 0.27F);
+            sample.height += 0.023F;
+            sample.roughness += 0.13F;
+            sample.metalness = 0.91F;
+            break;
+        }
+    }
+
+    // The corner fasteners are sunk into the plate, with a smaller worn cap.
+    const int boltInset = floor ? 17 : 13;
+    const int boltX = std::min(
+        std::abs(static_cast<int>(panelX) - boltInset),
+        std::abs(static_cast<int>(panelX)
+            - static_cast<int>(cellWidth) + boltInset + 1));
+    const int boltY = std::min(
+        std::abs(static_cast<int>(panelY) - boltInset),
+        std::abs(static_cast<int>(panelY)
+            - static_cast<int>(cellHeight) + boltInset + 1));
+    const int radiusSquared = boltX * boltX + boltY * boltY;
+    if (radiusSquared <= 36) {
+        if (radiusSquared > 16) {
+            sample.albedo = seamColor;
+            sample.height = 0.18F;
+            sample.roughness = 0.72F;
+            sample.ambientOcclusion = 0.55F;
+        } else {
+            sample.albedo = {0.25F, 0.25F, 0.24F};
+            sample.height = 0.60F;
+            sample.roughness = 0.34F;
+            sample.metalness = 0.96F;
+            sample.ambientOcclusion = 0.85F;
+        }
+    }
+    sample.roughness = std::clamp(sample.roughness, 0.08F, 1.0F);
+    return sample;
+}
+
 struct IndustrialWallSample {
     wkc::core::Vec3 albedo{};
     float height{0.5F};
@@ -275,9 +428,9 @@ IndustrialWallSample industrialWallSample(
     const std::uint32_t cellHeight,
     const std::uint32_t stripeHeight) noexcept
 {
-    constexpr wkc::core::Vec3 jointColor{21.0F / 255.0F, 26.0F / 255.0F, 28.0F / 255.0F};
+    constexpr wkc::core::Vec3 jointColor{24.0F / 255.0F, 24.0F / 255.0F, 23.0F / 255.0F};
     constexpr wkc::core::Vec3 exposedSteel{
-        139.0F / 255.0F, 144.0F / 255.0F, 145.0F / 255.0F};
+        100.0F / 255.0F, 98.0F / 255.0F, 94.0F / 255.0F};
     constexpr wkc::core::Vec3 grimeColor{73.0F / 255.0F, 56.0F / 255.0F, 43.0F / 255.0F};
     constexpr wkc::core::Vec3 stripeBlack{0.055F, 0.060F, 0.065F};
 
@@ -299,7 +452,7 @@ IndustrialWallSample industrialWallSample(
     const bool bevel = !seam && !frame && edge <= bevelWidth;
 
     const float panelBlend = 0.08F + unitNoise(
-        wkc::core::hashCombine(recipe.seed, panelId)) * 0.10F;
+        wkc::core::hashCombine(recipe.seed, panelId)) * 0.18F;
     sample.albedo = mix(recipe.baseColor, recipe.secondaryColor, panelBlend);
     const float macro = (smoothNoise(recipe.seed ^ 0x4D414352U, x, y, 128U) - 0.5F)
         * 0.055F;
@@ -312,7 +465,8 @@ IndustrialWallSample industrialWallSample(
         * 0.009F;
     sample.albedo = add(sample.albedo, macro + orangePeel + brush + grain);
     sample.height = 0.50F + orangePeel * 0.42F + grain * 0.12F;
-    sample.roughness = 0.61F + orangePeel * 1.4F;
+    sample.roughness = 0.70F + macro * 0.7F + orangePeel * 1.4F;
+    sample.metalness = 0.05F;
 
     if (seam) {
         sample.albedo = jointColor;
@@ -1255,9 +1409,250 @@ void writePixel(
     image.rgba[index + 3U] = 255U;
 }
 
+struct CorridorSample {
+    wkc::core::Vec3 albedo{};
+    float height{0.5F};
+    float roughness{0.55F};
+    float metalness{0.72F};
+    float occlusion{1.0F};
+};
+
+CorridorSample officeSample(
+    const CorridorSurfaceRecipe& recipe, const std::uint32_t x,
+    const std::uint32_t y) noexcept
+{
+    const bool wall = recipe.surface == RoomSurface::Wall;
+    const bool floor = recipe.surface == RoomSurface::Floor;
+    const std::uint64_t pixel = (static_cast<std::uint64_t>(y) << 32U) | x;
+    const float grain = (unitNoise(wkc::core::hashCombine(recipe.seed, pixel))
+        - 0.5F) * 0.034F;
+    const float patina = coverTileNoise(
+        recipe.seed ^ 0x4F46464943455054ULL, x, y, 64U) - 0.5F;
+    CorridorSample sample;
+    sample.albedo = add(recipe.baseColor, grain + patina * 0.050F);
+    sample.height = 0.53F + grain * 0.2F + patina * 0.025F;
+    sample.roughness = (wall ? 0.54F : floor ? 0.48F : 0.62F)
+        + patina * 0.075F;
+    sample.metalness = wall ? 0.67F : 0.79F;
+
+    if (wall) {
+        // One broad, recessed wall cassette per tile. The lower service panel
+        // is a separate finish, rather than the corridor's narrow sheets.
+        const bool rim = x < 3U || x > 252U || y < 3U || y > 252U;
+        const bool inset = x < 8U || x > 247U || y < 8U || y > 247U;
+        if (rim) {
+            sample.albedo = mix(recipe.secondaryColor, recipe.baseColor, 0.42F);
+            sample.height = 0.26F;
+            sample.occlusion = 0.61F;
+        } else if (inset) {
+            sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.22F);
+            sample.height = 0.64F;
+            sample.roughness = 0.43F;
+        }
+        if (y >= 184U && y < 240U && x >= 10U && x <= 245U) {
+            sample.albedo = mix(recipe.secondaryColor, recipe.baseColor,
+                0.47F + patina * 0.10F);
+            sample.height = 0.59F;
+            sample.roughness = 0.47F;
+        }
+        if (y == 181U || y == 239U) {
+            sample.albedo = mix(recipe.secondaryColor, recipe.baseColor, 0.30F);
+            sample.height = 0.25F;
+            sample.occlusion = 0.64F;
+        }
+        if (y >= 185U && y <= 187U && x >= 20U && x <= 235U) {
+            sample.albedo = recipe.accentColor;
+            sample.height = 0.61F;
+            sample.roughness = 0.51F;
+        }
+        // Fine horizontal brushing is only visible close to the surface.
+        if (y > 18U && y < 176U && y % 13U == 0U) {
+            sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.08F);
+        }
+        const bool boltX = (x >= 16U && x <= 19U)
+            || (x >= 236U && x <= 239U);
+        const bool boltY = (y >= 16U && y <= 19U)
+            || (y >= 170U && y <= 173U)
+            || (y >= 228U && y <= 231U);
+        if (boltX && boltY) {
+            sample.albedo = {0.15F, 0.18F, 0.18F};
+            sample.height = 0.72F;
+            sample.metalness = 0.9F;
+        }
+    } else if (floor) {
+        // Wide offset metal plates; no repeated corridor grip strips or rails.
+        const std::uint32_t row = y / 128U;
+        const std::uint32_t localX = (x + row * 64U) % 128U;
+        const std::uint32_t localY = y % 128U;
+        if (localX <= 3U || localY <= 3U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.19F;
+            sample.occlusion = 0.48F;
+        } else if (localX <= 7U || localY <= 7U) {
+            sample.albedo = mix(sample.albedo, recipe.secondaryColor, 0.34F);
+            sample.height = 0.66F;
+        }
+        if (localX >= 14U && localX <= 18U
+            && localY >= 14U && localY <= 18U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.69F;
+        }
+    } else {
+        // Large ceiling cassette with a recessed central service channel.
+        if (x < 5U || x > 250U || y < 5U || y > 250U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.18F;
+            sample.occlusion = 0.49F;
+        } else if (x >= 108U && x <= 148U) {
+            sample.albedo = mix(recipe.secondaryColor, recipe.baseColor, 0.18F);
+            sample.height = 0.34F;
+            sample.roughness = 0.73F;
+        }
+    }
+
+    const float wear = unitNoise(wkc::core::hashCombine(
+        recipe.seed ^ 0x4F46464943455752ULL, pixel));
+    if (wear < recipe.wearAmount * 0.018F) {
+        sample.albedo = mix(sample.albedo, {0.53F, 0.55F, 0.53F}, 0.38F);
+        sample.roughness = 0.4F;
+    }
+    const float dirt = unitNoise(wkc::core::hashCombine(
+        recipe.seed ^ 0x4F46464943454454ULL, pixel));
+    if (dirt < recipe.dirtAmount * 0.025F) {
+        sample.albedo = multiply(sample.albedo, 0.74F);
+        sample.roughness = 0.79F;
+    }
+    return sample;
+}
+
+CorridorSample corridorSample(
+    const CorridorSurfaceRecipe& recipe, const std::uint32_t x,
+    const std::uint32_t y) noexcept
+{
+    if (recipe.pattern == CorridorSurfacePattern::Office) {
+        return officeSample(recipe, x, y);
+    }
+    const bool transit = recipe.pattern == CorridorSurfacePattern::StructuralTransit;
+    const bool wall = recipe.surface == RoomSurface::Wall;
+    const bool floor = recipe.surface == RoomSurface::Floor;
+    const std::uint64_t pixel = (static_cast<std::uint64_t>(y) << 32U) | x;
+    const float patina = coverTileNoise(
+        recipe.seed ^ 0x434F525250415449ULL, x, y, 64U) - 0.5F;
+    const float fine = coverTileNoise(
+        recipe.seed ^ 0x434F525246494E45ULL, x, y, 8U) - 0.5F;
+    const float grain = (unitNoise(wkc::core::hashCombine(recipe.seed, pixel)) - 0.5F)
+        * 0.015F;
+    // The service wall has two broad 2 m cassettes per tile; transit uses one
+    // calmer 4 m cassette. Structural portals and rail lights are separate 3D.
+    const std::uint32_t wallPanel = transit ? 256U : 128U;
+    const std::uint32_t section = wall ? x / wallPanel
+        : floor ? y / 128U : x / 128U;
+    const float sectionTone = (unitNoise(wkc::core::hashCombine(
+        recipe.seed ^ 0x434F525250414E4CULL, section)) - 0.5F)
+        * (transit ? 0.045F : 0.055F);
+    CorridorSample sample;
+    sample.albedo = add(recipe.baseColor,
+        grain + sectionTone + patina * 0.043F + fine * 0.014F);
+    sample.height = 0.52F + patina * 0.045F + fine * 0.025F;
+    sample.roughness = wall ? 0.67F : floor ? 0.54F : 0.72F;
+    sample.roughness += patina * 0.09F + fine * 0.04F;
+    sample.metalness = wall ? 0.18F : floor ? 0.78F : 0.50F;
+
+    if (wall) {
+        const std::uint32_t seam = x % wallPanel;
+        const std::uint32_t opposite = wallPanel - 1U - seam;
+        const std::uint32_t edge = std::min({seam, opposite, y, 255U - y});
+        if (edge <= 2U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.13F;
+            sample.roughness = 0.84F;
+            sample.occlusion = 0.34F;
+        } else if (edge <= 7U) {
+            sample.albedo = multiply(sample.albedo, 0.80F);
+            sample.height = 0.35F;
+            sample.occlusion = 0.76F;
+        }
+        if (!transit && y >= 210U && y < 248U) {
+            // Dark replaceable impact skirt. The amber route line sits on a
+            // distinct physical rail, so it is absent from this albedo.
+            sample.albedo = mix(recipe.secondaryColor, recipe.baseColor, 0.12F);
+            sample.height = 0.58F;
+            sample.roughness = 0.51F;
+            sample.metalness = 0.81F;
+        }
+        if (!transit && (y == 209U || y == 248U)) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.18F;
+            sample.occlusion = 0.52F;
+        }
+        // Sparse recessed fasteners belong only to actual panel corners.
+        const int cornerX = std::min(
+            std::abs(static_cast<int>(seam) - 16),
+            std::abs(static_cast<int>(opposite) - 16));
+        const int cornerY = std::min(
+            std::abs(static_cast<int>(y) - 16),
+            std::abs(static_cast<int>(y) - 239));
+        if (cornerX * cornerX + cornerY * cornerY <= 15) {
+            sample.albedo = {0.16F, 0.16F, 0.15F};
+            sample.height = 0.27F;
+            sample.roughness = 0.42F;
+            sample.metalness = 0.90F;
+            sample.occlusion = 0.64F;
+        }
+    } else if (floor) {
+        // Broad graphite plates; the hatches and rail are modeled separately.
+        const std::uint32_t seam = y % 128U;
+        if (seam <= 2U || x <= 2U || x >= 253U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.14F;
+            sample.occlusion = 0.38F;
+        } else if (seam <= 7U || x <= 7U || x >= 248U) {
+            sample.albedo = multiply(sample.albedo, 0.78F);
+            sample.height = 0.40F;
+            sample.occlusion = 0.76F;
+        }
+    } else {
+        // A neutral ceiling behind physical ducts, cable trays and fixtures.
+        const std::uint32_t edge = x % 128U;
+        if (edge <= 3U || edge >= 125U || y <= 2U || y >= 253U) {
+            sample.albedo = recipe.secondaryColor;
+            sample.height = 0.18F;
+            sample.occlusion = 0.47F;
+        }
+    }
+
+    // Scuffs cluster near seams and the base, avoiding uniform random specks.
+    const std::uint32_t nearbyEdge = wall
+        ? std::min(x % wallPanel, wallPanel - 1U - x % wallPanel)
+        : floor ? std::min(y % 128U, 127U - y % 128U)
+                : std::min(x % 128U, 127U - x % 128U);
+    const float wear = coverTileNoise(
+        recipe.seed ^ 0x434F525257454152ULL, x, y, 16U);
+    if (nearbyEdge >= 5U && nearbyEdge <= 20U
+        && wear < 0.18F + recipe.wearAmount * 0.54F) {
+        sample.albedo = mix(sample.albedo, {0.35F, 0.36F, 0.35F}, 0.26F);
+        sample.roughness = 0.47F;
+        sample.metalness = std::max(sample.metalness, 0.63F);
+    }
+    const float dirt = coverTileNoise(
+        recipe.seed ^ 0x434F525244495254ULL, x, y, 32U);
+    if (dirt < 0.16F + recipe.dirtAmount * 0.50F
+        && (!wall || y >= 192U)) {
+        sample.albedo = multiply(sample.albedo, 0.84F);
+        sample.roughness = 0.82F;
+    }
+    sample.roughness = std::clamp(sample.roughness, 0.08F, 1.0F);
+    return sample;
+}
+
 } // namespace
 
 bool IndustrialMaterialValidationResult::isValid() const noexcept
+{
+    return errors.empty();
+}
+
+bool CorridorMaterialValidationResult::isValid() const noexcept
 {
     return errors.empty();
 }
@@ -1311,16 +1706,188 @@ IndustrialRoomMaterialSet generateIndustrialRoomMaterials(const wkc::core::Seed 
     return materials;
 }
 
+CorridorRoomMaterialSet generateCorridorRoomMaterials(
+    const wkc::core::Seed corridorSeed,
+    const CorridorSurfacePattern pattern)
+{
+    CorridorRoomMaterialSet materials;
+    materials.corridorSeed = corridorSeed;
+    materials.condition = static_cast<CorridorCondition>(
+        wkc::core::mix64(corridorSeed ^ 0x434F52524D415456ULL) % 3U);
+    for (std::size_t i = 0; i < materials.surfaces.size(); ++i) {
+        CorridorSurfaceRecipe& recipe = materials.surfaces[i];
+        recipe.seed = wkc::core::deriveSeed(
+            corridorSeed, gdp::game::SeedDomain::Corridor, 0x4D415400ULL + i);
+        recipe.surface = static_cast<RoomSurface>(i);
+        recipe.pattern = pattern;
+        recipe.family = i == 0U ? MaterialFamily::PaintedSteel : MaterialFamily::BareSteel;
+        if (pattern == CorridorSurfacePattern::StructuralTransit) {
+            recipe.baseColor = i == 0U ? wkc::core::Vec3{0.17F, 0.23F, 0.27F}
+                : i == 1U ? wkc::core::Vec3{0.080F, 0.094F, 0.104F}
+                          : wkc::core::Vec3{0.10F, 0.12F, 0.13F};
+            recipe.secondaryColor = {0.040F, 0.052F, 0.058F};
+            recipe.accentColor = {0.12F, 0.56F, 0.62F};
+        } else if (pattern == CorridorSurfacePattern::ServiceCorridor) {
+            recipe.baseColor = i == 0U ? wkc::core::Vec3{0.22F, 0.205F, 0.18F}
+                : i == 1U ? wkc::core::Vec3{0.075F, 0.073F, 0.068F}
+                          : wkc::core::Vec3{0.11F, 0.108F, 0.102F};
+            recipe.secondaryColor = {0.043F, 0.044F, 0.043F};
+            recipe.accentColor = {0.58F, 0.29F, 0.075F};
+        }
+        constexpr std::array wear{0.07F, 0.25F, 0.52F};
+        constexpr std::array dirt{0.05F, 0.20F, 0.43F};
+        const std::size_t condition = static_cast<std::size_t>(materials.condition);
+        recipe.wearAmount = wear[condition];
+        recipe.dirtAmount = dirt[condition];
+    }
+    materials.materialHash = hashCorridorRoomMaterials(materials);
+    return materials;
+}
+
+CorridorMaterialValidationResult validateCorridorSurfaceRecipe(
+    const CorridorSurfaceRecipe& recipe)
+{
+    CorridorMaterialValidationResult result;
+    if (recipe.pattern >= CorridorSurfacePattern::Count) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidParameter);
+    }
+    if (recipe.surface >= RoomSurface::Count) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidSurface);
+    }
+    const MaterialFamily requiredFamily = recipe.surface == RoomSurface::Wall
+        ? MaterialFamily::PaintedSteel : MaterialFamily::BareSteel;
+    if (recipe.family != requiredFamily) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidFamily);
+    }
+    if (!isUnitColor(recipe.baseColor) || !isUnitColor(recipe.secondaryColor)
+        || !isUnitColor(recipe.accentColor)) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidColor);
+    }
+    if (!isUnitValue(recipe.wearAmount) || !isUnitValue(recipe.dirtAmount)
+        || recipe.emissiveAmount != 0.0F) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidParameter);
+    }
+    if (recipe.version != 2U || recipe.resolution != 256U) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidResolution);
+    }
+    return result;
+}
+
+CorridorMaterialValidationResult validateCorridorRoomMaterials(
+    const CorridorRoomMaterialSet& materials)
+{
+    CorridorMaterialValidationResult result;
+    if (materials.condition >= CorridorCondition::Count) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidCondition);
+    }
+    for (std::size_t i = 0; i < materials.surfaces.size(); ++i) {
+        const CorridorSurfaceRecipe& recipe = materials.surfaces[i];
+        const auto checked = validateCorridorSurfaceRecipe(recipe);
+        result.errors.insert(result.errors.end(),
+            checked.errors.begin(), checked.errors.end());
+        if (recipe.surface != static_cast<RoomSurface>(i)
+            || recipe.seed != wkc::core::deriveSeed(materials.corridorSeed,
+                gdp::game::SeedDomain::Corridor, 0x4D415400ULL + i)) {
+            result.errors.push_back(CorridorMaterialValidationError::InvalidSurfaceOrder);
+        }
+    }
+    if (materials.materialHash == 0U
+        || materials.materialHash != hashCorridorRoomMaterials(materials)) {
+        result.errors.push_back(CorridorMaterialValidationError::InvalidMaterialHash);
+    }
+    return result;
+}
+
+std::uint64_t corridorSurfaceRecipeHash(const CorridorSurfaceRecipe& recipe) noexcept
+{
+    std::uint64_t hash = wkc::core::hashCombine(0x434F525253555246ULL, recipe.version);
+    hash = wkc::core::hashCombine(hash, recipe.seed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.surface));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.pattern));
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(recipe.family));
+    hash = addVec3(hash, recipe.baseColor);
+    hash = addVec3(hash, recipe.secondaryColor);
+    hash = addVec3(hash, recipe.accentColor);
+    hash = addFloat(hash, recipe.wearAmount);
+    hash = addFloat(hash, recipe.dirtAmount);
+    hash = addFloat(hash, recipe.emissiveAmount);
+    return wkc::core::hashCombine(hash, recipe.resolution);
+}
+
+std::uint64_t hashCorridorRoomMaterials(
+    const CorridorRoomMaterialSet& materials) noexcept
+{
+    std::uint64_t hash = wkc::core::hashCombine(
+        0x434F5252524F4F4DULL, materials.corridorSeed);
+    hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(materials.condition));
+    for (const CorridorSurfaceRecipe& recipe : materials.surfaces) {
+        hash = wkc::core::hashCombine(hash, corridorSurfaceRecipeHash(recipe));
+    }
+    return hash;
+}
+
+std::optional<CorridorSurfaceMaterialImages>
+generateCorridorSurfaceMaterialImages(const CorridorSurfaceRecipe& recipe)
+{
+    if (!validateCorridorSurfaceRecipe(recipe).isValid()) {
+        return std::nullopt;
+    }
+    CorridorSurfaceMaterialImages images;
+    for (wkc::render::ImageData* const image
+        : {&images.albedo, &images.normal, &images.properties}) {
+        image->width = static_cast<int>(recipe.resolution);
+        image->height = static_cast<int>(recipe.resolution);
+        image->rgba.resize(static_cast<std::size_t>(recipe.resolution)
+            * recipe.resolution * 4U);
+    }
+    std::vector<float> heights(static_cast<std::size_t>(recipe.resolution)
+        * recipe.resolution);
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const CorridorSample sample = corridorSample(recipe, x, y);
+            writePixel(images.albedo, x, y, sample.albedo);
+            writePixel(images.properties, x, y,
+                {sample.roughness, sample.metalness, sample.occlusion});
+            heights[static_cast<std::size_t>(y) * recipe.resolution + x] = sample.height;
+        }
+    }
+    const auto at = [&](std::uint32_t x, std::uint32_t y) {
+        return heights[static_cast<std::size_t>(y) * recipe.resolution + x];
+    };
+    for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+            const std::uint32_t left = x == 0U ? 0U : x - 1U;
+            const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
+            const std::uint32_t down = y == 0U ? 0U : y - 1U;
+            const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
+            const wkc::core::Vec3 normal = wkc::core::normalized({
+                (at(left, y) - at(right, y)) * 2.6F,
+                (at(x, down) - at(x, up)) * 2.6F,
+                1.0F,
+            });
+            writePixel(images.normal, x, y, {
+                normal.x * 0.5F + 0.5F,
+                normal.y * 0.5F + 0.5F,
+                normal.z * 0.5F + 0.5F,
+            });
+        }
+    }
+    return images;
+}
+
 IndustrialSurfaceRecipe makeIndustrialWallArchetypeRecipe(
     const IndustrialCondition condition)
 {
     IndustrialSurfaceRecipe recipe;
-    recipe.version = 2;
-    recipe.seed = 0x48445F57414C4C00ULL + static_cast<std::uint64_t>(condition);
+    recipe.version = 3;
+    recipe.seed = 0x48445F57414C4C30ULL + static_cast<std::uint64_t>(condition);
     recipe.surface = IndustrialSurface::Wall;
     recipe.family = MaterialFamily::PaintedSteel;
-    recipe.baseColor = {0.33F, 0.35F, 0.36F};
-    recipe.secondaryColor = {0.20F, 0.21F, 0.22F};
+    // Neutral graphite stays distinct from the rusty Storage palette.
+    // The dark joints and controlled roughness give
+    // the wide plates depth under both intact and broken fixtures.
+    recipe.baseColor = {0.19F, 0.18F, 0.17F};
+    recipe.secondaryColor = {0.13F, 0.125F, 0.12F};
     recipe.accentColor = {0.83F, 0.60F, 0.0F};
     recipe.panelColumns = 2U;
     recipe.panelRows = 2U;
@@ -1410,10 +1977,11 @@ IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     }
     const bool powerOfTwo = recipe.resolution != 0U
         && (recipe.resolution & (recipe.resolution - 1U)) == 0U;
-    const bool hdDetailedSurface
-        = (recipe.surface == IndustrialSurface::Wall
-              || recipe.surface == IndustrialSurface::Ceiling)
-        && recipe.version == 2U && recipe.resolution == 1024U;
+    const bool hdDetailedSurface = recipe.resolution == 1024U
+        && ((recipe.surface == IndustrialSurface::Wall
+                && (recipe.version == 2U || recipe.version == 3U))
+            || (recipe.surface == IndustrialSurface::Ceiling
+                && recipe.version == 2U));
     const bool legacyFloor = recipe.surface == IndustrialSurface::Floor
         && recipe.resolution >= 32U && recipe.resolution <= 256U;
     if (!powerOfTwo || (!hdDetailedSurface && !legacyFloor)) {
@@ -1884,7 +2452,9 @@ std::optional<wkc::render::ImageData> generateStorageSurfaceAlbedo(
     return image;
 }
 
-CombatRoomMaterialSet generateCombatRoomMaterials(const wkc::core::Seed roomSeed)
+CombatRoomMaterialSet generateCombatRoomMaterials(
+    const wkc::core::Seed roomSeed, const bool galleryWallV1,
+    const bool bossArenaV1)
 {
     CombatRoomMaterialSet materials;
     materials.roomSeed = roomSeed;
@@ -1894,6 +2464,48 @@ CombatRoomMaterialSet generateCombatRoomMaterials(const wkc::core::Seed roomSeed
         makeCombatSurfaceRecipe(roomSeed, materials.condition, RoomSurface::Floor),
         makeCombatSurfaceRecipe(roomSeed, materials.condition, RoomSurface::Ceiling),
     };
+    if (galleryWallV1 || bossArenaV1) {
+        // Both arenas use physical-scale plates. Their palettes remain separate.
+        for (CombatSurfaceRecipe& recipe : materials.surfaces) {
+            recipe.version = 2U;
+            recipe.resolution = 256U;
+            recipe.panelColumns = 2U;
+            recipe.panelRows = 2U;
+        }
+        CombatSurfaceRecipe& wall = materials.surfaces[surfaceIndex(RoomSurface::Wall)];
+        wall.baseColor = {0.112F, 0.123F, 0.105F};
+        wall.secondaryColor = {0.091F, 0.102F, 0.088F};
+        wall.accentColor = {0.23F, 0.24F, 0.20F};
+        CombatSurfaceRecipe& floor = materials.surfaces[surfaceIndex(RoomSurface::Floor)];
+        // One 2 m plate per tile. Version three invalidates cached 1 m grids.
+        floor.version = 3U;
+        floor.panelColumns = 1U;
+        floor.panelRows = 1U;
+        floor.baseColor = {0.079F, 0.083F, 0.087F};
+        floor.secondaryColor = {0.062F, 0.066F, 0.070F};
+        floor.accentColor = {0.19F, 0.17F, 0.12F};
+        CombatSurfaceRecipe& ceiling = materials.surfaces[surfaceIndex(RoomSurface::Ceiling)];
+        ceiling.version = 3U;
+        ceiling.baseColor = {0.110F, 0.115F, 0.115F};
+        ceiling.secondaryColor = {0.075F, 0.080F, 0.085F};
+        ceiling.accentColor = {0.19F, 0.19F, 0.17F};
+        if (bossArenaV1) {
+            // Version four uses dedicated albedo, normal and property maps.
+            // It also keeps the Boss cache independent from the gallery.
+            wall.version = 4U;
+            floor.version = 4U;
+            ceiling.version = 4U;
+            wall.baseColor = {0.265F, 0.255F, 0.242F};
+            wall.secondaryColor = {0.205F, 0.199F, 0.191F};
+            wall.accentColor = {0.45F, 0.31F, 0.18F};
+            floor.baseColor = {0.125F, 0.127F, 0.126F};
+            floor.secondaryColor = {0.086F, 0.089F, 0.088F};
+            floor.accentColor = {0.38F, 0.20F, 0.075F};
+            ceiling.baseColor = {0.105F, 0.107F, 0.107F};
+            ceiling.secondaryColor = {0.070F, 0.073F, 0.075F};
+            ceiling.accentColor = {0.28F, 0.20F, 0.12F};
+        }
+    }
     materials.materialHash = combatRoomMaterialHash(materials);
     return materials;
 }
@@ -1902,6 +2514,10 @@ CombatMaterialValidationResult validateCombatSurfaceRecipe(
     const CombatSurfaceRecipe& recipe)
 {
     CombatMaterialValidationResult result;
+    if (recipe.version != 1U && recipe.version != 2U
+        && recipe.version != 3U && recipe.version != 4U) {
+        result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceRule);
+    }
     if (recipe.surface >= RoomSurface::Count) {
         result.errors.push_back(CombatMaterialValidationError::InvalidSurface);
     }
@@ -1915,7 +2531,7 @@ CombatMaterialValidationResult validateCombatSurfaceRecipe(
         result.errors.push_back(CombatMaterialValidationError::InvalidColor);
     }
     if (recipe.panelColumns < 1U || recipe.panelColumns > 4U
-        || recipe.panelRows < 2U || recipe.panelRows > 3U) {
+        || recipe.panelRows < 1U || recipe.panelRows > 3U) {
         result.errors.push_back(CombatMaterialValidationError::InvalidPanelGrid);
     }
     if (!isUnitValue(recipe.wearAmount) || !isUnitValue(recipe.impactAmount)
@@ -1932,6 +2548,19 @@ CombatMaterialValidationResult validateCombatSurfaceRecipe(
         const bool isWall = recipe.surface == RoomSurface::Wall;
         const bool isFloor = recipe.surface == RoomSurface::Floor;
         const bool isCeiling = recipe.surface == RoomSurface::Ceiling;
+        if (recipe.version == 3U
+            && !(isFloor || isCeiling)) {
+            result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceRule);
+        }
+        if (recipe.version == 4U && (recipe.resolution != 256U
+                || (isFloor && (recipe.panelColumns != 1U || recipe.panelRows != 1U))
+                || (!isFloor && (recipe.panelColumns != 2U || recipe.panelRows != 2U)))) {
+            result.errors.push_back(CombatMaterialValidationError::InvalidSurfaceRule);
+        }
+        if (recipe.version != 3U && recipe.version != 4U
+            && recipe.panelRows < 2U) {
+            result.errors.push_back(CombatMaterialValidationError::InvalidPanelGrid);
+        }
         if ((isWall && (recipe.family != MaterialFamily::PaintedSteel
                            || recipe.impactAmount <= 0.0F
                            || recipe.reinforcementAmount <= 0.0F
@@ -2010,11 +2639,261 @@ std::uint64_t combatRoomMaterialHash(const CombatRoomMaterialSet& materials) noe
     return hash;
 }
 
+std::uint64_t combatCoverMaterialHash(const wkc::core::Seed roomSeed) noexcept
+{
+    // Versioned independently from the Arena wall/floor/ceiling recipes.
+    return wkc::core::hashCombine(
+        wkc::core::hashCombine(0x434F5645525F5631ULL, roomSeed), 256U);
+}
+
+std::optional<wkc::render::ImageData> generateCombatCoverAlbedo(
+    const wkc::core::Seed roomSeed)
+{
+    constexpr std::uint32_t resolution = 256U;
+    constexpr wkc::core::Vec3 paintedSteel{0.174F, 0.190F, 0.157F};
+    constexpr wkc::core::Vec3 wornSteel{0.30F, 0.31F, 0.28F};
+    const wkc::core::Seed materialSeed = combatCoverMaterialHash(roomSeed);
+    wkc::render::ImageData image;
+    image.width = static_cast<int>(resolution);
+    image.height = static_cast<int>(resolution);
+    image.rgba.resize(static_cast<std::size_t>(resolution) * resolution * 4U);
+    for (std::uint32_t y = 0U; y < resolution; ++y) {
+        for (std::uint32_t x = 0U; x < resolution; ++x) {
+            const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+            const float patina = coverTileNoise(materialSeed ^ 0x504154494E41ULL,
+                x, y, 64U);
+            const float brushed = coverTileNoise(materialSeed ^ 0x42525553484544ULL,
+                x, y, 8U);
+            const float grain = unitNoise(wkc::core::hashCombine(
+                materialSeed ^ 0x4D4943524F4752ULL, pixelId));
+            // Broad olive paint variation and fine horizontal brushing read as
+            // metal on a 1-2 m object, without copying the 6 m wall plates.
+            const float tone = 0.88F + 0.18F * patina
+                + 0.060F * (brushed - 0.5F)
+                + 0.035F * (grain - 0.5F);
+            wkc::core::Vec3 color = multiply(paintedSteel, tone);
+            for (std::uint32_t mark = 0U; mark < 2U; ++mark) {
+                const auto markSeed = wkc::core::hashCombine(materialSeed, mark);
+                const std::uint32_t scratchY = 32U
+                    + static_cast<std::uint32_t>(markSeed % 192U);
+                const std::uint32_t scratchX = 24U
+                    + static_cast<std::uint32_t>((markSeed >> 12U) % 145U);
+                const std::uint32_t scratchLength = 23U
+                    + static_cast<std::uint32_t>((markSeed >> 28U) % 40U);
+                if (y == scratchY && x >= scratchX
+                    && x < scratchX + scratchLength) {
+                    const float wear = 0.12F + 0.13F * brushed;
+                    color = mix(color, wornSteel, wear);
+                }
+            }
+            writePixel(image, x, y, color);
+        }
+    }
+    return image;
+}
+
+std::uint64_t combatColumnMaterialHash(const wkc::core::Seed roomSeed) noexcept
+{
+    // Keep the column finish independent of both the wall and cover recipes.
+    return wkc::core::hashCombine(
+        wkc::core::hashCombine(0x434F4C554D4E5632ULL, roomSeed), 256U);
+}
+
+std::optional<wkc::render::ImageData> generateCombatColumnAlbedo(
+    const wkc::core::Seed roomSeed)
+{
+    constexpr std::uint32_t resolution = 256U;
+    constexpr wkc::core::Vec3 paintedSteel{0.68F, 0.71F, 0.72F};
+    constexpr wkc::core::Vec3 exposedSteel{0.82F, 0.84F, 0.84F};
+    constexpr wkc::core::Vec3 recessedSteel{0.23F, 0.25F, 0.26F};
+    const wkc::core::Seed materialSeed = combatColumnMaterialHash(roomSeed);
+    wkc::render::ImageData image;
+    image.width = static_cast<int>(resolution);
+    image.height = static_cast<int>(resolution);
+    image.rgba.resize(static_cast<std::size_t>(resolution) * resolution * 4U);
+
+    for (std::uint32_t y = 0U; y < resolution; ++y) {
+        for (std::uint32_t x = 0U; x < resolution; ++x) {
+            const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+            const float patina = coverTileNoise(materialSeed ^ 0x504154494E41ULL,
+                x, y, 64U);
+            const float fineGrain = coverTileNoise(materialSeed ^ 0x475241494EULL,
+                x, y, 8U);
+            // Fine column-direction brushing reads as metal without turning
+            // each narrow face into a repeated wall-sized panel grid.
+            const float brushed = unitNoise(wkc::core::hashCombine(
+                materialSeed ^ 0x4252555348ULL, x / 2U));
+            const float speckle = unitNoise(wkc::core::hashCombine(
+                materialSeed ^ 0x535045434BULL, pixelId));
+            const float tone = 0.88F + 0.19F * patina
+                + 0.070F * (brushed - 0.5F)
+                + 0.045F * (fineGrain - 0.5F)
+                + 0.028F * (speckle - 0.5F);
+            wkc::core::Vec3 color = multiply(paintedSteel, tone);
+
+            // The real 3D braces define the column sections. A single broad
+            // plate in this tile avoids several dark joints across one face.
+            const bool plateJoint = x <= 2U || x >= 253U
+                || y <= 2U || y >= 253U;
+            if (plateJoint) {
+                color = mix(color, recessedSteel, 0.66F);
+            } else if (x == 4U || x == 251U
+                || y == 4U || y == 251U) {
+                color = mix(color, exposedSteel, 0.38F);
+            }
+
+            // Four small bolt heads sit inside the plate corners, with a
+            // dark socket and a restrained highlight on the raised cap.
+            for (const std::uint32_t boltX : {18U, 238U}) {
+                for (const std::uint32_t boltY : {19U, 237U}) {
+                    const int dx = static_cast<int>(x) - static_cast<int>(boltX);
+                    const int dy = static_cast<int>(y) - static_cast<int>(boltY);
+                    const int radiusSquared = dx * dx + dy * dy;
+                    if (radiusSquared <= 25) {
+                        color = mix(color, recessedSteel,
+                            radiusSquared >= 16 ? 0.84F : 0.32F);
+                        if (radiusSquared <= 9 && dy <= 0) {
+                            color = mix(color, exposedSteel, 0.44F);
+                        }
+                    }
+                }
+            }
+
+            // Sparse vertical scuffs expose the metal without making every
+            // tile look like a repeated high-contrast wall decal.
+            for (std::uint32_t mark = 0U; mark < 10U; ++mark) {
+                const auto markSeed = wkc::core::hashCombine(materialSeed, mark);
+                const std::uint32_t scratchX = 10U
+                    + static_cast<std::uint32_t>(markSeed % 236U);
+                const std::uint32_t scratchY = 10U
+                    + static_cast<std::uint32_t>((markSeed >> 12U) % 188U);
+                const std::uint32_t scratchLength = 12U
+                    + static_cast<std::uint32_t>((markSeed >> 28U) % 38U);
+                if (x == scratchX && y >= scratchY
+                    && y < scratchY + scratchLength) {
+                    color = mix(color, exposedSteel, 0.26F + 0.18F * patina);
+                }
+            }
+            writePixel(image, x, y, color);
+        }
+    }
+    return image;
+}
+
+std::uint64_t combatRailMaterialHash(const wkc::core::Seed roomSeed) noexcept
+{
+    return wkc::core::hashCombine(
+        wkc::core::hashCombine(0x434F4D425241494CULL, roomSeed), 128U);
+}
+
+std::optional<wkc::render::ImageData> generateCombatRailAlbedo(
+    const wkc::core::Seed roomSeed)
+{
+    constexpr std::uint32_t resolution = 128U;
+    constexpr wkc::core::Vec3 paint{0.84F, 0.79F, 0.72F};
+    constexpr wkc::core::Vec3 exposedSteel{0.69F, 0.72F, 0.72F};
+    const wkc::core::Seed materialSeed = combatRailMaterialHash(roomSeed);
+    wkc::render::ImageData image;
+    image.width = static_cast<int>(resolution);
+    image.height = static_cast<int>(resolution);
+    image.rgba.resize(static_cast<std::size_t>(resolution) * resolution * 4U);
+
+    for (std::uint32_t y = 0U; y < resolution; ++y) {
+        for (std::uint32_t x = 0U; x < resolution; ++x) {
+            const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+            const float patina = coverTileNoise(materialSeed ^ 0x504154494E41ULL,
+                x, y, 32U);
+            const float brush = unitNoise(wkc::core::hashCombine(
+                materialSeed ^ 0x4252555348ULL, y / 2U));
+            const float grain = unitNoise(wkc::core::hashCombine(
+                materialSeed ^ 0x475241494EULL, pixelId));
+            wkc::core::Vec3 color = multiply(paint,
+                0.89F + 0.15F * patina + 0.09F * (brush - 0.5F)
+                    + 0.04F * (grain - 0.5F));
+            // Sparse exposed-metal scratches keep the painted railing from
+            // reading as a flat emissive orange strip at close range.
+            for (std::uint32_t mark = 0U; mark < 12U; ++mark) {
+                const auto markSeed = wkc::core::hashCombine(materialSeed, mark);
+                const std::uint32_t scratchX = 4U
+                    + static_cast<std::uint32_t>(markSeed % 116U);
+                const std::uint32_t scratchY = 3U
+                    + static_cast<std::uint32_t>((markSeed >> 12U) % 120U);
+                const std::uint32_t length = 5U
+                    + static_cast<std::uint32_t>((markSeed >> 28U) % 12U);
+                if (y == scratchY && x >= scratchX && x < scratchX + length) {
+                    color = mix(color, exposedSteel, 0.42F);
+                }
+            }
+            writePixel(image, x, y, color);
+        }
+    }
+    return image;
+}
+
+std::optional<CombatSurfaceMaterialImages> generateBossArenaSurfaceMaterialImages(
+    const CombatSurfaceRecipe& recipe)
+{
+    if (recipe.version != 4U || !validateCombatSurfaceRecipe(recipe).isValid()) {
+        return std::nullopt;
+    }
+
+    CombatSurfaceMaterialImages images;
+    for (wkc::render::ImageData* const image
+        : {&images.albedo, &images.normal, &images.properties}) {
+        image->width = static_cast<int>(recipe.resolution);
+        image->height = static_cast<int>(recipe.resolution);
+        image->rgba.resize(static_cast<std::size_t>(recipe.resolution)
+            * static_cast<std::size_t>(recipe.resolution) * 4U);
+    }
+    std::vector<float> heights(static_cast<std::size_t>(recipe.resolution)
+        * static_cast<std::size_t>(recipe.resolution));
+    for (std::uint32_t y = 0U; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0U; x < recipe.resolution; ++x) {
+            const BossArenaSurfaceSample sample = bossArenaSurfaceSample(recipe, x, y);
+            writePixel(images.albedo, x, y, sample.albedo);
+            writePixel(images.properties, x, y,
+                {sample.roughness, sample.metalness, sample.ambientOcclusion});
+            heights[static_cast<std::size_t>(y) * recipe.resolution + x]
+                = sample.height;
+        }
+    }
+    const auto heightAt = [&](const std::uint32_t x, const std::uint32_t y) {
+        return heights[static_cast<std::size_t>(y) * recipe.resolution + x];
+    };
+    for (std::uint32_t y = 0U; y < recipe.resolution; ++y) {
+        for (std::uint32_t x = 0U; x < recipe.resolution; ++x) {
+            const std::uint32_t left = x == 0U ? x : x - 1U;
+            const std::uint32_t right = std::min(x + 1U, recipe.resolution - 1U);
+            const std::uint32_t down = y == 0U ? y : y - 1U;
+            const std::uint32_t up = std::min(y + 1U, recipe.resolution - 1U);
+            const wkc::core::Vec3 normal = wkc::core::normalized({
+                (heightAt(left, y) - heightAt(right, y)) * 2.6F,
+                (heightAt(x, down) - heightAt(x, up)) * 2.6F,
+                1.0F,
+            });
+            writePixel(images.normal, x, y, {
+                normal.x * 0.5F + 0.5F,
+                normal.y * 0.5F + 0.5F,
+                normal.z * 0.5F + 0.5F,
+            });
+        }
+    }
+    return images;
+}
+
 std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     const CombatSurfaceRecipe& recipe)
 {
     if (!validateCombatSurfaceRecipe(recipe).isValid()) {
         return std::nullopt;
+    }
+
+    if (recipe.version == 4U) {
+        const auto images = generateBossArenaSurfaceMaterialImages(recipe);
+        if (!images) {
+            return std::nullopt;
+        }
+        return images->albedo;
     }
 
     wkc::render::ImageData image;
@@ -2027,6 +2906,163 @@ std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     const std::uint32_t impactCount = 1U
         + (recipe.impactAmount > 0.18F ? 1U : 0U)
         + (recipe.impactAmount > 0.34F ? 1U : 0U);
+
+    if (recipe.version == 3U) {
+        // The floor is one 2 m graphite plate. The ceiling remains four
+        // dark panels per tile; fixtures, grilles and ducts are separate 3D
+        // objects. Both materials keep their boundary in a recessed joint.
+        const bool floor = recipe.surface == RoomSurface::Floor;
+        const wkc::core::Vec3 joint = floor
+            ? wkc::core::Vec3{0.043F, 0.047F, 0.050F}
+            : wkc::core::Vec3{0.038F, 0.042F, 0.046F};
+        const wkc::core::Vec3 edgeSteel = floor
+            ? wkc::core::Vec3{0.155F, 0.160F, 0.160F}
+            : wkc::core::Vec3{0.132F, 0.137F, 0.140F};
+        for (std::uint32_t y = 0U; y < recipe.resolution; ++y) {
+            for (std::uint32_t x = 0U; x < recipe.resolution; ++x) {
+                const std::uint32_t panelX = x % cellWidth;
+                const std::uint32_t panelY = y % cellHeight;
+                const std::uint32_t edge = std::min({panelX,
+                    cellWidth - 1U - panelX, panelY, cellHeight - 1U - panelY});
+                const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+                const std::uint64_t panelId =
+                    (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+                    | (x / cellWidth);
+                const float plateTone = 0.19F + 0.17F * unitNoise(
+                    wkc::core::hashCombine(recipe.seed ^ 0x434F4D42504C4154ULL, panelId));
+                wkc::core::Vec3 color = mix(
+                    recipe.baseColor, recipe.secondaryColor, plateTone);
+                if (edge <= 2U) {
+                    color = joint;
+                } else {
+                    const float patina = coverTileNoise(
+                        recipe.seed ^ 0x434F4D4250415449ULL, x, y, 64U);
+                    const float brush = coverTileNoise(
+                        recipe.seed ^ 0x434F4D4242525553ULL, x, y, 8U);
+                    const float grain = unitNoise(wkc::core::hashCombine(
+                        recipe.seed ^ 0x434F4D4247524149ULL, pixelId));
+                    color = multiply(color, 0.92F + 0.10F * patina
+                        + 0.035F * (brush - 0.5F)
+                        + 0.025F * (grain - 0.5F));
+                    if (edge <= (floor ? 10U : 6U)) {
+                        // A thin, asymmetric bevel reads as sheet-metal
+                        // thickness without a repeated painted light strip.
+                        color = mix(color, edgeSteel,
+                            (panelX < cellWidth / 2U || panelY < cellHeight / 2U)
+                                ? 0.12F : 0.035F);
+                        const float chip = unitNoise(wkc::core::hashCombine(
+                            recipe.seed ^ 0x434F4D4245444745ULL, pixelId));
+                        if (chip < recipe.wearAmount * (floor ? 0.13F : 0.055F)) {
+                            color = mix(color, edgeSteel, floor ? 0.35F : 0.17F);
+                        }
+                    } else if (floor) {
+                        // Scuffs are short and low contrast so a 2 m repeat
+                        // does not turn into a visible stamp across the room.
+                        const float scuff = unitNoise(wkc::core::hashCombine(
+                            recipe.seed ^ 0x434F4D4253435546ULL, pixelId));
+                        if (scuff < recipe.wearAmount * 0.028F) {
+                            color = mix(color, edgeSteel, 0.18F);
+                        }
+                    }
+                    const int boltInset = floor ? 17 : 12;
+                    const int nearX = std::min(
+                        std::abs(static_cast<int>(panelX) - boltInset),
+                        std::abs(static_cast<int>(panelX)
+                            - static_cast<int>(cellWidth) + boltInset + 1));
+                    const int nearY = std::min(
+                        std::abs(static_cast<int>(panelY) - boltInset),
+                        std::abs(static_cast<int>(panelY)
+                            - static_cast<int>(cellHeight) + boltInset + 1));
+                    const int radiusSquared = nearX * nearX + nearY * nearY;
+                    const int outerRadiusSquared = floor ? 36 : 16;
+                    if (radiusSquared <= outerRadiusSquared) {
+                        color = radiusSquared <= (floor ? 9 : 4)
+                            ? mix(joint, edgeSteel, 0.36F) : joint;
+                    }
+                }
+                writePixel(image, x, y, color);
+            }
+        }
+        return image;
+    }
+
+    if (recipe.version == 2U) {
+        // Wall tiles cover six metres in the arena renderer; floor and
+        // ceiling tiles cover two. Fine seams are a material detail; lamps,
+        // beams, railings and route markings are geometry.
+        // This avoids multiplying painted lights and warning boxes per tile.
+        const bool wall = recipe.surface == RoomSurface::Wall;
+        const bool floor = recipe.surface == RoomSurface::Floor;
+        const std::uint32_t jointWidth = wall ? 2U : 1U;
+        const std::uint32_t bevelWidth = wall ? 6U : 4U;
+        const wkc::core::Vec3 joint = wall
+            ? wkc::core::Vec3{0.067F, 0.069F, 0.059F}
+            : floor ? wkc::core::Vec3{0.055F, 0.058F, 0.059F}
+                    : wkc::core::Vec3{0.043F, 0.047F, 0.051F};
+        const wkc::core::Vec3 exposedSteel = wall
+            ? wkc::core::Vec3{0.40F, 0.39F, 0.32F}
+            : wkc::core::Vec3{0.28F, 0.28F, 0.27F};
+        for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
+            for (std::uint32_t x = 0; x < recipe.resolution; ++x) {
+                const std::uint32_t panelX = x % cellWidth;
+                const std::uint32_t panelY = y % cellHeight;
+                const std::uint32_t edge = std::min({panelX, cellWidth - 1U - panelX,
+                    panelY, cellHeight - 1U - panelY});
+                const std::uint64_t panelId = (static_cast<std::uint64_t>(y / cellHeight) << 32U)
+                    | (x / cellWidth);
+                const std::uint64_t pixelId = (static_cast<std::uint64_t>(y) << 32U) | x;
+                const float tone = 0.15F + 0.34F * unitNoise(
+                    wkc::core::hashCombine(recipe.seed ^ 0x47414C4C455259ULL, panelId));
+                wkc::core::Vec3 color = mix(recipe.baseColor, recipe.secondaryColor, tone);
+                if (edge <= jointWidth) {
+                    color = joint;
+                } else {
+                    const float patina = smoothNoise(recipe.seed ^ 0x434F4D4257414C4CULL,
+                        x, y, wall ? 23U : 31U);
+                    const float grain = unitNoise(wkc::core::hashCombine(
+                        recipe.seed ^ 0x475241494E434D42ULL, pixelId));
+                    color = multiply(color, 0.93F + 0.10F * patina
+                        + (grain - 0.5F) * (floor ? 0.055F : 0.035F));
+                    if (edge <= bevelWidth) {
+                        color = multiply(color, wall ? 0.84F + 0.10F * patina
+                            : 0.87F + 0.07F * patina);
+                        const float chip = unitNoise(wkc::core::hashCombine(
+                            recipe.seed ^ 0x4348495045444745ULL, pixelId));
+                        if (chip < recipe.wearAmount * (wall ? 0.13F : 0.065F)) {
+                            color = mix(color, exposedSteel, wall ? 0.48F : 0.24F);
+                        }
+                    } else {
+                        // Fine wear rises through Ready, Active and Scarred.
+                        // Impacts are handled by world-space decals, so this
+                        // tile contains no duplicated bullet-hole pattern.
+                        const float abrasion = unitNoise(wkc::core::hashCombine(
+                            recipe.seed ^ 0x4142524153494F4EULL, pixelId));
+                        if (abrasion < recipe.wearAmount * (wall ? 0.028F : 0.018F)) {
+                            color = mix(color, exposedSteel, wall ? 0.25F : 0.12F);
+                        }
+                        const float grime = unitNoise(wkc::core::hashCombine(
+                            recipe.seed ^ 0x4752494D4557414CULL, pixelId));
+                        if (grime < recipe.impactAmount * (wall ? 0.018F : 0.007F)) {
+                            color = multiply(color, 0.68F);
+                        }
+                    }
+                    if (wall) {
+                        // Small corner screws belong to each steel plate.
+                        const int dx = std::min(std::abs(static_cast<int>(panelX) - 12),
+                            std::abs(static_cast<int>(panelX) - static_cast<int>(cellWidth) + 13));
+                        const int dy = std::min(std::abs(static_cast<int>(panelY) - 12),
+                            std::abs(static_cast<int>(panelY) - static_cast<int>(cellHeight) + 13));
+                        const int radius2 = dx * dx + dy * dy;
+                        if (radius2 <= 7) {
+                            color = radius2 <= 2 ? joint : exposedSteel;
+                        }
+                    }
+                }
+                writePixel(image, x, y, color);
+            }
+        }
+        return image;
+    }
 
     for (std::uint32_t y = 0; y < recipe.resolution; ++y) {
         for (std::uint32_t x = 0; x < recipe.resolution; ++x) {

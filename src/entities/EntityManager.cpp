@@ -16,6 +16,12 @@ float defaultPropHealth(const PropType type) noexcept
         return 60.0F;
     case PropType::StorageBox:
         return 35.0F;
+    case PropType::LaboratoryPlanter:
+        return 2.0F;
+    case PropType::SecurityMonitor:
+        return 24.0F;
+    case PropType::CafeteriaPlanter:
+        return 2.0F;
     case PropType::Canister:
         return 35.0F;
     case PropType::Barricade:
@@ -97,7 +103,8 @@ EntityId EntityManager::createProp(const PropCreateInfo& info)
         info.transform,
         info.roomId,
         PropData{info.type, info.state, info.solid, health, maximumHealth,
-            info.dropType, info.dropQuantity, info.visualSeed});
+            info.dropType, info.dropQuantity, info.visualSeed,
+            info.tabletopBox});
 }
 
 bool EntityManager::destroy(const EntityId id) noexcept

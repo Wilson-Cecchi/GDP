@@ -49,12 +49,12 @@ void testDeterministicPropLayout()
         "same room inputs reproduce prop type, state, dimensions and placement");
     expect(first.layoutHash != different.layoutHash,
         "different room seed changes the canonical prop layout");
-    constexpr std::uint64_t goldenHash = 0x28BB5CB31BBAF612ULL;
+    constexpr std::uint64_t goldenHash = 0x3D56117F9D2BE626ULL;
     expect(first.layoutHash == goldenHash,
         "golden procedural prop hash remains stable across builds");
-    expect(first.props.size() == 3U
+    expect(first.props.size() == 1U
             && first.props.front().type == gdp::entities::PropType::Crate,
-        "DeadEnd spends its full budget and guarantees a destructible crate");
+        "furnished DeadEnd keeps one destructible resource crate");
 
     PropLayout invalid = first;
     invalid.props.front().position = {99.0F, 0.0F, 99.0F};
@@ -71,6 +71,86 @@ void testDeterministicPropLayout()
     expect(containsError(
                validatePropLayout(invalid, zones), PropValidationError::InvalidLayoutHash),
         "prop validation detects canonical hash corruption");
+}
+
+void testHubUsesAuthoredDecoration()
+{
+    using namespace gdp::world;
+    constexpr std::array zones{
+        SpawnZone{{{1.5F, 0.0F, -3.0F}, {3.0F, 0.0F, 1.5F}}},
+    };
+    for (const wkc::core::Seed seed : {wkc::core::Seed{1U},
+             wkc::core::Seed{20261030U}}) {
+        const PropLayout layout = generatePropLayout(
+            seed, RoomRole::Hub, RoomTheme::Industrial, 3U, zones);
+        expect(layout.budget == 0U && layout.props.empty()
+                && validatePropLayout(layout, zones).isValid(),
+            "Central Hub omits generic random props while layout validates");
+    }
+}
+
+void testFurnishedRoomsAvoidLoosePropClusters()
+{
+    using namespace gdp::world;
+    constexpr std::array zones{
+        SpawnZone{{{1.5F, 0.0F, -3.0F}, {3.0F, 0.0F, 1.5F}}},
+    };
+    for (const RoomTheme theme : {RoomTheme::Storage, RoomTheme::Cafeteria,
+             RoomTheme::Security, RoomTheme::Laboratory,
+             RoomTheme::Maintenance, RoomTheme::Office}) {
+        for (const RoomRole role : {RoomRole::Normal, RoomRole::Terminal,
+                 RoomRole::DeadEnd}) {
+            for (wkc::core::Seed seed = 0; seed < 100U; ++seed) {
+                const PropLayout layout = generatePropLayout(
+                    seed, role, theme, 4U, zones, 0.5F);
+                expect(layout.props.size() <= 1U
+                        && validatePropLayout(layout, zones).isValid(),
+                    "furnished rooms never cluster loose props on easy difficulty");
+            }
+        }
+    }
+    for (const RoomRole role : {RoomRole::Arena, RoomRole::Boss}) {
+        const PropLayout layout = generatePropLayout(
+            1793U, role, RoomTheme::Maintenance, 4U, zones, 0.5F);
+        expect(layout.props.size() <= 2U
+                && validatePropLayout(layout, zones).isValid(),
+            "combat rooms retain cover without a three-prop cluster");
+    }
+}
+
+void testProtectedTerminalHasPhysicalBounds()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    EntityManager manager;
+    const EntityId terminal = manager.createProp({
+        .transform = {.position = {0.0F, 0.0F, 2.2F},
+            .scale = {1.15F, 1.80F, 0.60F}},
+        .roomId = 7U,
+        .type = PropType::Terminal,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const CollisionWorld withTerminal = collisionWorldWithProps(base, manager, 7U);
+    const auto* entity = manager.find(terminal);
+    const auto* prop = manager.findData<PropData>(terminal);
+    const PropSolidBounds pieces = propPhysicalBounds(*entity, *prop);
+    const auto hitsPiece = [&](const wkc::core::Vec3 point) {
+        return std::any_of(pieces.parts.begin(),
+            pieces.parts.begin() + static_cast<std::ptrdiff_t>(pieces.count),
+            [point](const auto& bounds) { return bounds.contains(point); });
+    };
+    expect(entity && prop && prop->maximumHealth == 0.0F
+            && withTerminal.solids().size() == 5U && pieces.count == 5U
+            && hitsPiece({-0.43F, 1.0F, 2.2F})
+            && hitsPiece({0.0F, 1.12F, 2.2F})
+            && !hitsPiece({0.0F, 0.60F, 2.2F}),
+        "portal terminal blocks its pylons and screen while leaving the lower gap open");
+    const PropSolidBounds rotated = terminalPhysicalBounds(
+        {0.0F, 0.0F, 2.2F}, {0.60F, 1.80F, 1.15F});
+    expect(rotated.count == 5U && rotated.parts[0].minimum.z < 2.0F
+            && rotated.parts[1].maximum.z > 2.4F,
+        "portal terminal physical pieces rotate with the owning room");
 }
 
 void testPropSeedBatch()
@@ -239,6 +319,136 @@ void testStorageShelfBoxBreaksAtShelfHeight()
         "destroying a Storage shelf box removes its collision without a drop");
 }
 
+void testSecurityMonitorDamageAndCollision()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    static_assert(static_cast<std::uint8_t>(PropType::LaboratoryPlanter) == 8U);
+    static_assert(static_cast<std::uint8_t>(PropType::SecurityMonitor) == 9U);
+    static_assert(static_cast<std::uint8_t>(PropType::CafeteriaPlanter) == 10U);
+
+    EntityManager manager;
+    const EntityId monitor = manager.createProp({
+        .transform = {.position = {0.0F, 1.05F, -2.0F},
+            .scale = {2.5F, 0.9F, 0.3F}},
+        .roomId = 7U,
+        .type = PropType::SecurityMonitor,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const auto* monitorData = manager.findData<PropData>(monitor);
+    expect(monitorData != nullptr && monitorData->maximumHealth == 24.0F
+            && collisionWorldWithProps(base, manager, 7U).solids().size() == 1U,
+        "intact Security monitor has damageable physical bounds");
+
+    const auto damaged = damageProp(manager, monitor, 12.0F);
+    monitorData = manager.findData<PropData>(monitor);
+    expect(damaged.outcome == PropDamageOutcome::Damaged && monitorData != nullptr
+            && monitorData->state == PropState::Damaged
+            && monitorData->health == 12.0F
+            && collisionWorldWithProps(base, manager, 7U).solids().size() == 1U,
+        "damaged Security monitor retains its collider");
+
+    const auto destroyed = damageProp(manager, monitor, 12.0F);
+    monitorData = manager.findData<PropData>(monitor);
+    expect(destroyed.outcome == PropDamageOutcome::Destroyed
+            && !destroyed.spawnedDrop.isValid() && monitorData != nullptr
+            && monitorData->state == PropState::Destroyed && !monitorData->solid
+            && collisionWorldWithProps(base, manager, 7U).solids().empty(),
+        "destroyed Security monitor loses collision and creates no loot");
+}
+
+void testCafeteriaPlanterBreaksInOneShot()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    EntityManager manager;
+    const EntityId planter = manager.createProp({
+        .transform = {.position = {0.0F, 0.0F, -2.0F},
+            .scale = {0.7F, 0.68F, 0.7F}},
+        .roomId = 7U,
+        .type = PropType::CafeteriaPlanter,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const auto* planterData = manager.findData<PropData>(planter);
+    expect(planterData != nullptr && planterData->maximumHealth == 2.0F
+            && collisionWorldWithProps(base, manager, 7U).solids().size() == 1U,
+        "Cafeteria planter has low health and a physical pot");
+
+    Weapon weapon({.damage = 10.0F, .fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult shot = fireHitscan(weapon,
+        {0.0F, 0.34F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        7U, collisionWorldWithProps(base, manager, 7U), manager);
+    planterData = manager.findData<PropData>(planter);
+    expect(shot.outcome == ShotOutcome::Destroyed && planterData != nullptr
+            && planterData->state == PropState::Destroyed && !planterData->solid
+            && collisionWorldWithProps(base, manager, 7U).solids().empty(),
+        "one hit destroys the Cafeteria planter and removes its collider");
+}
+
+void testLaboratoryPlanterBreaksGlassBeforePot()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    EntityManager manager;
+    const EntityId planter = manager.createProp({
+        .transform = {.position = {0.0F, 0.92F, -2.0F},
+            .scale = {0.44F, 0.42F, 0.44F}},
+        .roomId = 7U,
+        .type = PropType::LaboratoryPlanter,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    CollisionWorld collision = collisionWorldWithProps(base, manager, 7U);
+    Weapon weapon({.damage = 100.0F, .fireInterval = 0.0F, .range = 10.0F});
+    const ShotResult glass = fireHitscan(weapon,
+        {0.0F, 1.26F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        7U, collision, manager);
+    const auto* prop = manager.findData<PropData>(planter);
+    const auto* entity = manager.find(planter);
+    expect(glass.outcome == ShotOutcome::Hit && prop && entity
+            && prop->state == PropState::Damaged
+            && propCollisionBounds(*entity, *prop).maximum.y < 1.10F,
+        "first high-damage shot removes only the glass dome");
+
+    collision = collisionWorldWithProps(base, manager, 7U);
+    const ShotResult pot = fireHitscan(weapon,
+        {0.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F},
+        7U, collision, manager);
+    prop = manager.findData<PropData>(planter);
+    expect(pot.outcome == ShotOutcome::Destroyed && prop
+            && prop->state == PropState::Destroyed
+            && collisionWorldWithProps(base, manager, 7U).solids().empty(),
+        "second shot breaks the pot and removes its collision");
+}
+
+void testLaboratoryPlanterDirectShotBreaksGlassAndPot()
+{
+    using namespace gdp::entities;
+    using namespace gdp::gameplay;
+    EntityManager manager;
+    const EntityId planter = manager.createProp({
+        .transform = {.position = {0.0F, 0.92F, -2.0F},
+            .scale = {0.44F, 0.42F, 0.44F}},
+        .roomId = 7U,
+        .type = PropType::LaboratoryPlanter,
+        .solid = true,
+    });
+    const CollisionWorld base{{{-5.0F, 0.0F, -5.0F}, {5.0F, 4.0F, 5.0F}}};
+    const CollisionWorld collision = collisionWorldWithProps(base, manager, 7U);
+    Weapon weapon({.damage = 1.0F, .fireInterval = 0.0F, .range = 10.0F});
+    // The ray enters the glass above the pot, then reaches the pot behind it.
+    const ShotResult shot = fireHitscan(weapon,
+        {0.0F, 1.5F, 0.0F}, {0.0F, -0.2F, -1.0F},
+        7U, collision, manager);
+    const auto* prop = manager.findData<PropData>(planter);
+    expect(shot.outcome == ShotOutcome::Destroyed && prop
+            && prop->state == PropState::Destroyed
+            && collisionWorldWithProps(base, manager, 7U).solids().empty(),
+        "shot through the glass into the pot breaks both in one hit");
+}
+
 void testHitscanPropPriority()
 {
     using namespace gdp::entities;
@@ -282,17 +492,23 @@ void testHitscanPropPriority()
         "destroyed prop no longer blocks the following hitscan");
 
     const EntityId terminal = manager.createProp({
-        .transform = {.position = {2.0F, 0.0F, -2.0F}},
+        .transform = {.position = {2.0F, 0.0F, -2.0F},
+            .scale = {1.15F, 1.8F, 0.6F}},
         .roomId = 7,
         .type = PropType::Terminal,
         .solid = true,
     });
     const ShotResult protectedHit = fireHitscan(
-        weapon, {2.0F, 0.4F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, base, manager);
+        weapon, {2.0F, 1.0F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, base, manager);
     expect(protectedHit.outcome == ShotOutcome::ImpactProp && protectedHit.hit
             && protectedHit.hit->target == terminal && protectedHit.impact
             && protectedHit.impact->material == ImpactMaterial::Metal,
         "protected metal terminal absorbs hits and exposes its impact material");
+    Weapon gapWeapon({.fireInterval = 0.0F, .range = 3.0F});
+    const ShotResult gapShot = fireHitscan(
+        gapWeapon, {2.0F, 0.55F, 0.0F}, {0.0F, 0.0F, -1.0F}, 7, base, manager);
+    expect(gapShot.outcome == ShotOutcome::Miss && !gapShot.impact,
+        "shots pass through the open lower gap of the terminal pórtico");
 }
 
 void testTallCoverSupportsHiddenMovement()
@@ -385,9 +601,16 @@ void testDestructibleCeilingFixture()
 int main()
 {
     testDeterministicPropLayout();
+    testHubUsesAuthoredDecoration();
+    testFurnishedRoomsAvoidLoosePropClusters();
+    testProtectedTerminalHasPhysicalBounds();
     testPropSeedBatch();
     testPropDamageCollisionAndDrops();
     testStorageShelfBoxBreaksAtShelfHeight();
+    testSecurityMonitorDamageAndCollision();
+    testCafeteriaPlanterBreaksInOneShot();
+    testLaboratoryPlanterBreaksGlassBeforePot();
+    testLaboratoryPlanterDirectShotBreaksGlassAndPot();
     testHitscanPropPriority();
     testTallCoverSupportsHiddenMovement();
     testDestructibleCeilingFixture();

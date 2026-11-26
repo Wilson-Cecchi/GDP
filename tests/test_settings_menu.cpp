@@ -1,6 +1,8 @@
 #include "gameplay/SettingsMenu.hpp"
+#include "game/MenuAdjustmentRepeat.hpp"
 
 #include <cmath>
+#include <chrono>
 #include <iostream>
 #include <string_view>
 
@@ -46,14 +48,19 @@ void testRuntimeSettingsClamps()
 {
     using namespace gdp::gameplay;
     RuntimeSettings settings;
+    expect(settings.fieldOfViewDegrees == 100U
+            && settings.graphicsQuality == GraphicsQuality::Ultra
+            && settings.fullscreen && settings.verticalSync
+            && settings.uiScaleAuto && settings.uiScaleManualPercent == 100U,
+        "fresh video settings use the specified defaults");
     expect(!adjustRuntimeSetting(
                settings, SettingsMenuOption::MasterVolume, 1),
         "volume cannot exceed 100 percent");
     expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::MasterVolume, -1)
-            && settings.masterVolumePercent == 90U,
-        "volume decreases in ten percent steps");
-    for (int index = 0; index < 20; ++index) {
+            && settings.masterVolumePercent == 99U,
+        "volume decreases in one percent steps");
+    for (int index = 0; index < 120; ++index) {
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::MasterVolume, -1);
     }
@@ -72,13 +79,13 @@ void testRuntimeSettingsClamps()
             && !settings.invertMouseY,
         "left disables vertical mouse inversion");
     expect(adjustRuntimeSetting(
-               settings, SettingsMenuOption::Fullscreen, 1)
-            && settings.fullscreen,
-        "right enables fullscreen");
-    expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::Fullscreen, -1)
             && !settings.fullscreen,
         "left restores windowed mode");
+    expect(adjustRuntimeSetting(
+               settings, SettingsMenuOption::Fullscreen, 1)
+            && settings.fullscreen,
+        "right enables fullscreen");
     expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::VerticalSync, -1)
             && !settings.verticalSync,
@@ -93,7 +100,7 @@ void testRuntimeSettingsClamps()
 
     expect(adjustRuntimeSetting(
                settings, SettingsMenuOption::GraphicsQuality, -1)
-            && settings.graphicsQuality == GraphicsQuality::Low,
+            && settings.graphicsQuality == GraphicsQuality::High,
         "left selects a lighter graphics quality profile");
     for (int index = 0; index < 10; ++index) {
         (void)adjustRuntimeSetting(
@@ -132,38 +139,70 @@ void testRuntimeSettingsClamps()
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::WindowResolution, 1);
     }
-    expect(settings.windowResolution == WindowResolution::R1920x1080,
+    expect(settings.windowResolution == WindowResolution::R3840x2160,
         "window resolution clamps at the largest preset");
     expect(windowResolutionSize(WindowResolution::R1600x900)
             == WindowResolutionSize{1600U, 900U}
+            && windowResolutionForSize(2560U, 1440U)
+                == WindowResolution::R2560x1440
             && windowResolutionForSize(1920U, 1080U)
                 == WindowResolution::R1920x1080
             && !windowResolutionForSize(800U, 600U),
         "resolution catalog maps only supported 16:9 sizes");
 
-    for (int index = 0; index < 30; ++index) {
+    for (int index = 0; index < 250; ++index) {
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::MouseSensitivity, 1);
         (void)adjustRuntimeSetting(
             settings, SettingsMenuOption::FieldOfView, 1);
     }
-    expect(settings.mouseSensitivityPercent == 200U
-            && settings.fieldOfViewDegrees == 100U,
+    expect(settings.mouseSensitivityPercent == 300U
+            && settings.fieldOfViewDegrees == 120U,
         "sensitivity and FOV clamp at documented maxima");
-    expect(std::abs(mouseSensitivity(settings) - 0.24F) < 0.0001F,
+    expect(std::abs(mouseSensitivity(settings) - 0.36F) < 0.0001F,
         "sensitivity percent maps to the established player baseline");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::MouseAimSensitivity, -1)
+            && settings.mouseAimSensitivityPercent == 99U,
+        "mouse aim sensitivity adjusts independently of normal look");
+    expect(adjustRuntimeSetting(settings, SettingsMenuOption::UiScaleMode, 1)
+            && !settings.uiScaleAuto
+            && adjustRuntimeSetting(settings, SettingsMenuOption::UiScaleManual, 1)
+            && settings.uiScaleManualPercent == 105U
+            && adjustRuntimeSetting(settings, SettingsMenuOption::UiScaleMode, -1)
+            && settings.uiScaleAuto
+            && settings.uiScaleManualPercent == 105U,
+        "Auto keeps the player's separate manual scale preference");
+    const auto uiScaleDescriptor = numericSettingDescriptor(
+        settings, SettingsMenuOption::UiScaleManual);
+    const auto fovDescriptor = numericSettingDescriptor(
+        settings, SettingsMenuOption::FieldOfView);
+    expect(uiScaleDescriptor && uiScaleDescriptor->defaultValue == 100U
+            && uiScaleDescriptor->step == 5U && uiScaleDescriptor->unit == "%"
+            && fovDescriptor && fovDescriptor->defaultValue == 100U
+            && fovDescriptor->unit == "°",
+        "numeric metadata owns defaults, steps and displayed units");
+    auto unevenScale = settings;
+    unevenScale.uiScaleManualPercent = 123U;
+    expect(sanitizeRuntimeSettings(unevenScale).uiScaleManualPercent == 125U,
+        "loaded manual scale snaps to the documented five-percent increment");
+    expect(resolvedUiScalePercent(settings, 1280, 720, 1280, 720) == 100U
+            && resolvedUiScalePercent(settings, 2560, 1440, 2560, 1440) == 125U
+            && resolvedUiScalePercent(settings, 2880, 1620, 2880, 1620) == 150U
+            && resolvedUiScalePercent(settings, 3840, 2160, 3840, 2160) == 200U
+            && resolvedUiScalePercent(settings, 3840, 2160, 1920, 1080) == 100U,
+        "Auto scale uses useful size and respects high DPI logical dimensions");
     expect(std::abs(normalizedVolume(250U) - 1.0F) < 0.0001F,
         "volume normalization clamps invalid percentages");
 
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibration, -1)
             && !settings.gamepadVibration,
         "controller vibration toggle can be disabled");
-    for (int index = 0; index < 20; ++index)
+    for (int index = 0; index < 120; ++index)
         (void)adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, -1);
     expect(settings.gamepadVibrationPercent == 0U
             && !adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, -1),
         "controller vibration strength clamps at zero");
-    for (int index = 0; index < 20; ++index)
+    for (int index = 0; index < 120; ++index)
         (void)adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, 1);
     expect(settings.gamepadVibrationPercent == 100U
             && !adjustRuntimeSetting(settings, SettingsMenuOption::GamepadVibrationStrength, 1),
@@ -175,16 +214,16 @@ void testRuntimeSettingsClamps()
             && !settings.gamepadSouthpaw,
         "movement stick can swap between left and right without changing menu controls");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookHorizontal, 1)
-            && settings.gamepadLookHorizontalPercent == 110U
+            && settings.gamepadLookHorizontalPercent == 101U
             && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookVertical, -1)
-            && settings.gamepadLookVerticalPercent == 90U
+            && settings.gamepadLookVerticalPercent == 99U
             && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadAimSensitivity, -1)
-            && settings.gamepadAimSensitivityPercent == 90U,
+            && settings.gamepadAimSensitivityPercent == 99U,
         "controller camera axes and aiming sensitivity adjust independently");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::GamepadMoveDeadzone, -1)
-            && settings.gamepadMoveDeadzonePercent == 16U
+            && settings.gamepadMoveDeadzonePercent == 17U
             && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadLookDeadzone, 1)
-            && settings.gamepadLookDeadzonePercent == 20U
+            && settings.gamepadLookDeadzonePercent == 19U
             && adjustRuntimeSetting(settings, SettingsMenuOption::GamepadInvertY, 1)
             && settings.invertGamepadY,
         "controller deadzones and Y inversion have separate settings");
@@ -196,7 +235,7 @@ void testRuntimeSettingsClamps()
     settings.gamepadMoveDeadzonePercent = 90U;
     const RuntimeSettings sanitized = sanitizeRuntimeSettings(settings);
     expect(sanitized.windowResolution == WindowResolution::R1280x720
-            && sanitized.graphicsQuality == GraphicsQuality::Medium
+            && sanitized.graphicsQuality == GraphicsQuality::Ultra
             && sanitized.gamepadVibrationPercent == 100U
             && sanitized.gamepadLookHorizontalPercent == 200U
             && sanitized.gamepadMoveDeadzonePercent == 40U,
@@ -215,13 +254,13 @@ void testCustomGraphics()
         "unchanged shadow toggle does not report a change");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::DetailedMaterials, -1)
             && !settings.customGraphics.detailedMaterials
-            && settings.customGraphics.renderScalePercent == 85U,
+            && settings.customGraphics.renderScalePercent == 100U,
         "material toggle preserves the render scale");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::RenderScale, 1)
-            && settings.customGraphics.renderScalePercent == 90U,
-        "render scale adjusts in five percent steps");
+            && settings.customGraphics.renderScalePercent == 101U,
+        "render scale adjusts in one percent steps");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::MaximumLights, 1)
-            && settings.customGraphics.maximumLights == 7U,
+            && settings.customGraphics.maximumLights == 9U,
         "light budget adjusts independently");
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::GraphicsQuality, -1)
             && settings.graphicsQuality == GraphicsQuality::High
@@ -229,13 +268,31 @@ void testCustomGraphics()
         "selecting a preset restores all of its values");
     settings.graphicsQuality = GraphicsQuality::Low;
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::RenderScale, 1)
-            && settings.customGraphics.renderScalePercent == 70U,
-        "legacy 67 percent Low preset steps to the next five percent value");
+            && settings.customGraphics.renderScalePercent == 68U,
+        "legacy 67 percent Low preset advances one percent");
     settings.graphicsQuality = GraphicsQuality::Potato;
     expect(adjustRuntimeSetting(settings, SettingsMenuOption::Shadows, 1)
             && settings.customGraphics.shadowsEnabled
             && settings.customGraphics.maximumShadowLights >= 1U,
         "turning shadows on from Potato provisions a light");
+}
+
+void testNumericRepeatTiming()
+{
+    using namespace std::chrono_literals;
+    gdp::game::MenuAdjustmentRepeat repeat;
+    const auto start = gdp::game::MenuAdjustmentRepeat::Clock::time_point{};
+    expect(repeat.advance(10U, start, true, true) == 1
+            && repeat.advance(10U, start + 319ms, false, true) == 0
+            && repeat.advance(10U, start + 320ms, false, true) == 1
+            && repeat.advance(10U, start + 374ms, false, true) == 0
+            && repeat.advance(10U, start + 375ms, false, true) == 1,
+        "numeric hold starts immediately then waits 320ms and repeats every 55ms");
+    expect(repeat.advance(10U, start + 500ms, false, false) == 0
+            && repeat.advance(10U, start + 1000ms, false, true) == 0
+            && repeat.advance(11U, start + 1000ms, true, true) == 1
+            && repeat.advance(12U, start + 2000ms, false, true) == 0,
+        "release and row change cancel repetition without a phantom step");
 }
 
 } // namespace
@@ -245,6 +302,7 @@ int main()
     testSettingsNavigationAndReturn();
     testRuntimeSettingsClamps();
     testCustomGraphics();
+    testNumericRepeatTiming();
     if (failures != 0) {
         std::cerr << failures << " settings menu test(s) failed\n";
         return 1;

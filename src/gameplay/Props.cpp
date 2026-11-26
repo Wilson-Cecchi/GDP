@@ -16,6 +16,10 @@ wkc::core::Aabb propCollisionBounds(
             entity.transform.position + half,
         };
     }
+    if (prop.type == gdp::entities::PropType::LaboratoryPlanter
+        && prop.state == gdp::entities::PropState::Damaged) {
+        scale.y = 0.16F;
+    }
     if (prop.state == gdp::entities::PropState::Destroyed) {
         scale.y = std::min(scale.y, 0.12F);
     }
@@ -28,6 +32,49 @@ wkc::core::Aabb propCollisionBounds(
             entity.transform.position.y + scale.y,
             entity.transform.position.z + half.z},
     };
+}
+
+PropSolidBounds terminalPhysicalBounds(
+    const wkc::core::Vec3 position,
+    const wkc::core::Vec3 scale) noexcept
+{
+    PropSolidBounds result;
+    const bool sideways = scale.z > scale.x;
+    const auto part = [&](const float centerX, const float lowY,
+                          const float highY, const float halfX,
+                          const float halfZ) {
+        const float cx = sideways ? 0.0F : centerX;
+        const float cz = sideways ? centerX : 0.0F;
+        const float hx = sideways ? halfZ : halfX;
+        const float hz = sideways ? halfX : halfZ;
+        return wkc::core::Aabb{
+            position + wkc::core::Vec3{cx-hx, lowY, cz-hz},
+            position + wkc::core::Vec3{cx+hx, highY, cz+hz},
+        };
+    };
+    result.parts = {{
+        part(-0.43F, 0.0F, 1.80F, 0.145F, 0.26F),
+        part( 0.43F, 0.0F, 1.80F, 0.145F, 0.26F),
+        part(0.0F, 1.63F, 1.79F, 0.385F, 0.12F),
+        part(0.0F, 0.22F, 0.36F, 0.385F, 0.12F),
+        part(0.0F, 0.79F, 1.41F, 0.375F, 0.30F),
+    }};
+    result.count = result.parts.size();
+    return result;
+}
+
+PropSolidBounds propPhysicalBounds(
+    const gdp::entities::Entity& entity,
+    const gdp::entities::PropData& prop) noexcept
+{
+    if (prop.type == gdp::entities::PropType::Terminal) {
+        return terminalPhysicalBounds(
+            entity.transform.position, entity.transform.scale);
+    }
+    PropSolidBounds result;
+    result.parts[0] = propCollisionBounds(entity, prop);
+    result.count = 1U;
+    return result;
 }
 
 CollisionWorld collisionWorldWithProps(
@@ -47,10 +94,13 @@ CollisionWorld collisionWorldWithProps(
                        entity->roomId) != additionalRoomIds.end());
         if (entity == nullptr || prop == nullptr || !roomIncluded
             || !prop->solid || prop->state == gdp::entities::PropState::Destroyed
-            || prop->maximumHealth <= 0.0F) {
+            || (prop->maximumHealth <= 0.0F
+                && prop->type != gdp::entities::PropType::Terminal)) {
             continue;
         }
-        solids.push_back(propCollisionBounds(*entity, *prop));
+        const PropSolidBounds parts = propPhysicalBounds(*entity, *prop);
+        solids.insert(solids.end(), parts.parts.begin(),
+            parts.parts.begin() + static_cast<std::ptrdiff_t>(parts.count));
     }
     return CollisionWorld::fromWalkableVolumes(
         base.walkableVolumes(), std::move(solids), base.walkableOutline(),
@@ -60,7 +110,8 @@ CollisionWorld collisionWorldWithProps(
 PropDamageResult damageProp(
     gdp::entities::EntityManager& manager,
     const gdp::entities::EntityId target,
-    const float amount) noexcept
+    const float amount,
+    const bool directPotHit) noexcept
 {
     using namespace gdp::entities;
     Entity* entity = manager.find(target);
@@ -70,7 +121,15 @@ PropDamageResult damageProp(
         return {};
     }
 
-    prop->health = std::max(0.0F, prop->health - amount);
+    if (prop->type == PropType::LaboratoryPlanter
+        && prop->state == PropState::Intact && !directPotHit) {
+        prop->health = prop->maximumHealth * 0.5F;
+        prop->state = PropState::Damaged;
+        return {PropDamageOutcome::Damaged, {}};
+    }
+
+    prop->health = directPotHit && prop->type == PropType::LaboratoryPlanter
+        ? 0.0F : std::max(0.0F, prop->health - amount);
     if (prop->health > 0.0F) {
         prop->state = prop->health <= prop->maximumHealth * 0.5F
             ? PropState::Damaged : PropState::Intact;

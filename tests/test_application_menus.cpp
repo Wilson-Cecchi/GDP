@@ -22,6 +22,194 @@
 
 namespace gdp::game {
 struct ApplicationMenuTestAccess {
+    static int stressVideoSettings() {
+        ApplicationConfig config;
+        config.worldSeed = 12345U;
+        config.enableGamepad = false;
+        config.benchmarkQuality = gameplay::GraphicsQuality::Ultra;
+        Application app{config};
+        if (!app.initialize()) return 1;
+        (void)SDL_HideWindow(app.window_);
+        app.runtimeSettings_.windowResolution = gameplay::WindowResolution::R1920x1080;
+        app.runtimeSettings_.graphicsQuality = gameplay::GraphicsQuality::Custom;
+        app.runtimeSettings_.customGraphics = gameplay::graphicsQualitySettings(
+            gameplay::GraphicsQuality::Ultra);
+        app.applyRuntimeSettings();
+        if (!app.session_.selectRunMode(gameplay::RunMode::Campaign)
+            || !app.initializeRun()) return 2;
+        for (int scale = 100; scale <= 150; ++scale) {
+            app.runtimeSettings_.customGraphics.renderScalePercent
+                = static_cast<std::uint16_t>(scale);
+            app.applyRuntimeSettings();
+            app.render();
+            if (app.fatalError_) {
+                std::cerr << "Campaign render failed at scale " << scale << "%\n";
+                return 3;
+            }
+        }
+        app.runtimeSettings_.fullscreen = true;
+        app.applyRuntimeSettings();
+        app.render();
+        if (app.fatalError_) return 4;
+        app.runtimeSettings_.fullscreen = false;
+        app.applyRuntimeSettings();
+        app.render();
+        if (app.fatalError_) return 5;
+        gameplay::openSettingsMenu(app.settingsMenu_,
+            gameplay::SettingsMenuOrigin::PauseMenu);
+        SDL_Event pending{};
+        while (SDL_PollEvent(&pending)) {}
+        app.running_ = true;
+        for (std::uint8_t section = 0U; section < 4U; ++section) {
+            const std::uint8_t pageCount = section == 2U ? 3U : 1U;
+            for (std::uint8_t page = 0U; page < pageCount; ++page) {
+                openConfigurationSection(app.menuFlow_, section);
+                if (section == 2U) openConfigurationControlPage(app.menuFlow_, page);
+                const auto view = app.frontendMenuView();
+                for (std::size_t row = 0U; row < view.rows.size(); ++row) {
+                    if (!view.rows[row].setting || !view.rows[row].enabled) continue;
+                    for (const auto key : {wkc::platform::Key::Left,
+                             wkc::platform::Key::Right}) {
+                        app.menuFlow_.selection = row;
+                        app.input_ = wkc::platform::Input{};
+                        app.input_.handleKey(key, true);
+                        app.processEvents();
+                        app.render();
+                        if (app.fatalError_ || !app.running_) {
+                            std::cerr << "Settings menu closed in section "
+                                << static_cast<int>(section) << " page "
+                                << static_cast<int>(page) << " row " << row << '\n';
+                            return 6;
+                        }
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+    static int captureCampaignAudit(const std::filesystem::path& directory,
+        const wkc::core::Seed seed) {
+        ApplicationConfig config;
+        config.worldSeed = seed;
+        config.enableGamepad = false;
+        config.benchmarkQuality = gameplay::GraphicsQuality::High;
+        Application app{config};
+        if (!app.initialize()
+            || !app.session_.selectRunMode(gameplay::RunMode::Campaign)
+            || !app.initializeRun() || !app.world_ || !app.renderer_) return 1;
+        std::filesystem::create_directories(directory);
+        int width = 0;
+        int height = 0;
+        if (!SDL_GetWindowSizeInPixels(app.window_, &width, &height)
+            || width <= 0 || height <= 0) return 1;
+        bool valid = true;
+        for (const world::RoomInstance& room : app.world_->rooms) {
+            const auto connector = std::find_if(room.connectors.begin(),
+                room.connectors.end(), [](const world::ConnectorInstance& item) {
+                    return !item.sealed && item.edge.has_value();
+                });
+            if (connector == room.connectors.end()) { valid = false; break; }
+            wkc::core::Vec3 position = connector->worldPosition
+                - connector->worldNormal * 2.0F;
+            const char* focusProp = std::getenv("GDP_CAMPAIGN_AUDIT_FOCUS_PROP");
+            const entities::Entity* focusedEntity = nullptr;
+            if (focusProp != nullptr) {
+                const auto requestedType = std::string_view{focusProp}
+                        == "monitor" ? entities::PropType::SecurityMonitor
+                    : std::string_view{focusProp} == "plant"
+                        ? entities::PropType::CafeteriaPlanter
+                        : entities::PropType::Decoration;
+                for (const entities::EntityId id : room.entities) {
+                    const auto* prop = app.entities_.findData<entities::PropData>(id);
+                    if (prop != nullptr && prop->type == requestedType) {
+                        focusedEntity = app.entities_.find(id);
+                        break;
+                    }
+                }
+                if (focusedEntity != nullptr) {
+                    wkc::core::Vec3 inward = room.transform.position
+                        - focusedEntity->transform.position;
+                    inward.y = 0.0F;
+                    inward = wkc::core::normalized(inward);
+                    position = focusedEntity->transform.position + inward * 2.8F;
+                    position.y = room.worldBounds.minimum.y;
+                }
+            }
+            if (std::getenv("GDP_CAMPAIGN_AUDIT_OFFICE_SIDE_VIEW")
+                && room.moduleId >= 301U && room.moduleId <= 303U) {
+                const wkc::core::Vec3 tangent{
+                    connector->worldNormal.z, 0.0F, -connector->worldNormal.x};
+                position = position + tangent * 2.0F;
+            }
+            const wkc::core::Vec3 direction = wkc::core::normalized(
+                (focusedEntity != nullptr
+                    ? focusedEntity->transform.position : room.transform.position)
+                    - position);
+            app.player_.spawn(position,
+                std::atan2(direction.z, direction.x) * 57.295779513F);
+            if (focusedEntity != nullptr) {
+                const wkc::core::Vec3 aim = wkc::core::normalized(
+                    focusedEntity->transform.position - app.player_.cameraPosition());
+                app.player_.applyRecoil({0.0F,
+                    std::asin(aim.y) * 57.295779513F});
+            }
+            auto* playerEntity = app.entities_.find(app.player_.entity());
+            if (!playerEntity) { valid = false; break; }
+            playerEntity->roomId = room.id;
+            playerEntity->transform.position = position;
+            if (focusedEntity != nullptr) {
+                if (const char* state = std::getenv("GDP_CAMPAIGN_AUDIT_PROP_STATE")) {
+                    const auto* data = app.entities_.findData<entities::PropData>(
+                        focusedEntity->id);
+                    if (data != nullptr
+                        && std::string_view{state} == "damaged") {
+                        (void)gameplay::damageProp(app.entities_,
+                            focusedEntity->id, data->maximumHealth * 0.5F);
+                    } else if (data != nullptr
+                        && std::string_view{state} == "destroyed") {
+                        (void)gameplay::damageProp(app.entities_,
+                            focusedEntity->id, data->maximumHealth);
+                    }
+                }
+            }
+            app.baseCollisionWorld_ = gameplay::makeRoomNavigationCollision(
+                *app.world_, room.id);
+            app.collisionWorld_ = gameplay::collisionWorldWithProps(
+                app.baseCollisionWorld_, app.entities_, room.id);
+            app.render();
+            app.render();
+            glFinish();
+            valid &= glGetError() == GL_NO_ERROR && !app.fatalError_;
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(width * height * 4));
+            glReadBuffer(GL_FRONT);
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pixels.data());
+            valid &= glGetError() == GL_NO_ERROR;
+            const std::size_t stride = static_cast<std::size_t>(width * 4);
+            std::vector<std::uint8_t> topDown(pixels.size());
+            for (int row = 0; row < height; ++row) {
+                std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - row - 1) * stride,
+                    stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+            }
+            const auto path = directory / (std::to_string(room.id)
+                + "_module_" + std::to_string(room.moduleId) + ".bmp");
+            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+                SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+            valid &= surface != nullptr
+                && SDL_SaveBMP(surface, path.string().c_str());
+            if (surface) SDL_DestroySurface(surface);
+            std::cout << "CAMPAIGN_AUDIT seed=" << seed << " room=" << room.id
+                << " module=" << room.moduleId << " role="
+                << static_cast<int>(room.role) << " theme="
+                << static_cast<int>(room.theme) << " file=" << path << '\n';
+            if (!valid) break;
+        }
+        app.shutdown();
+        return valid ? 0 : 1;
+    }
+
     static int captureRoomScale(const std::filesystem::path& directory) {
         ApplicationConfig config;
         config.worldSeed = 12345U;
@@ -138,6 +326,13 @@ struct ApplicationMenuTestAccess {
         Application app{config};
         expect(app.initialize(), "graphical application boots before a world exists");
         if (!app.window_) return 1;
+        // The test injects synthetic input; a real fullscreen focus event from
+        // the desktop would otherwise race the first gamepad navigation step.
+        app.runtimeSettings_.fullscreen = false;
+        app.applyRuntimeSettings();
+        (void)SDL_SyncWindow(app.window_);
+        SDL_Event startupEvent{};
+        while (SDL_PollEvent(&startupEvent)) {}
         app.running_ = true;
         auto release = [&] { app.input_ = wkc::platform::Input{}; };
         auto key = [&](Key value) {
@@ -150,7 +345,6 @@ struct ApplicationMenuTestAccess {
         auto choose = [&](std::string_view label) {
             if (app.pauseMenu_.paused && !app.settingsMenu_.active) {
                 if (label == "SETTINGS") app.pauseMenu_.selection = gameplay::PauseMenuOption::Settings;
-                else if (label == "CONTROLS") app.pauseMenu_.selection = gameplay::PauseMenuOption::Controls;
                 else if (label == "RESUME") app.pauseMenu_.selection = gameplay::PauseMenuOption::Resume;
                 else { expect(false, "requested pause row exists"); return; }
                 key(Key::Enter); return;
@@ -192,22 +386,52 @@ struct ApplicationMenuTestAccess {
         expect(app.menuFlow_.feedbackDraft == "Erro ao abrir porta",
             "SDL text input reaches the feedback draft");
         key(Key::Enter);
-        expect(!app.menuFlow_.feedbackEditing && app.frontendMenuView().rows[9].enabled,
+        const auto feedbackRows = app.frontendMenuView().rows;
+        expect(!app.menuFlow_.feedbackEditing
+            && feedbackRows[feedbackRows.size() - 2U].enabled,
             "feedback draft enables explicit send without sending automatically");
         key(Key::Escape); key(Key::Escape);
         expect(app.menuFlow_.page == MenuPage::Root && app.menuFlow_.feedbackDraft == "Erro ao abrir porta",
             "leaving feedback does not discard an unsent draft");
-        choose("SETTINGS"); choose("CONTROLS"); choose("KEYBOARD / MOUSE");
+        choose("SETTINGS"); key(Key::Tab); key(Key::Tab);
+        expect(app.menuFlow_.page == MenuPage::KeyboardControls,
+            "Controls tab opens keyboard and mouse settings directly");
+        const auto clickControlTab = [&](const std::size_t index) {
+            int drawWidth = 0, drawHeight = 0, logicalWidth = 0,
+                logicalHeight = 0;
+            (void)SDL_GetWindowSizeInPixels(app.window_, &drawWidth, &drawHeight);
+            (void)SDL_GetWindowSize(app.window_, &logicalWidth, &logicalHeight);
+            const auto layout = visual::makeListMenuLayout(drawWidth, drawHeight,
+                app.frontendMenuView().rows.size(), false, 100U,
+                app.menuFlow_.selection, true);
+            const auto tab = layout.controlTabs[index];
+            SDL_Event pendingEvent{};
+            while (SDL_PollEvent(&pendingEvent)) {}
+            release();
+            app.input_.handleMouseButton(MouseButton::Primary, true,
+                {static_cast<float>(tab.x + tab.width / 2)
+                        * static_cast<float>(logicalWidth)
+                        / static_cast<float>(drawWidth),
+                    static_cast<float>(drawHeight - tab.y - tab.height / 2)
+                        * static_cast<float>(logicalHeight)
+                        / static_cast<float>(drawHeight)});
+            app.processEvents(); app.render();
+        };
+        clickControlTab(1U);
+        expect(app.menuFlow_.page == MenuPage::GamepadControls,
+            "controller sidebar hitbox opens the controller page");
+        clickControlTab(0U);
+        expect(app.menuFlow_.page == MenuPage::KeyboardControls,
+            "keyboard sidebar hitbox returns to mouse settings");
         choose("REMAP"); choose("FORWARD");
         expect(app.menuFlow_.capture == gameplay::ControlAction::Forward, "binding begins capture without assigning activation Enter");
         key(Key::I);
         expect(app.runtimeSettings_.controls.values[0] == gameplay::bindingForName("I"), "captured key is persisted as Forward");
         choose("CROUCH"); key(Key::Escape);
         expect(!app.menuFlow_.capture && app.menuFlow_.page == MenuPage::Bindings, "Esc cancels capture without leaving page");
-        key(Key::Escape); key(Key::Escape);
-        choose("CONTROLLER");
+        key(Key::Escape); key(Key::PageDown);
         expect(app.menuFlow_.page == MenuPage::GamepadControls,
-            "controller settings are separate from keyboard and mouse");
+            "secondary navigation reaches controller settings");
         app.menuFlow_.selection = 0U; key(Key::Right);
         expect(app.runtimeSettings_.gamepadSouthpaw,
             "controller setting remaps movement to the right stick");
@@ -215,15 +439,15 @@ struct ApplicationMenuTestAccess {
         expect(!app.runtimeSettings_.gamepadSouthpaw,
             "controller setting restores movement to the left stick");
         app.menuFlow_.selection = 1U; key(Key::Right);
-        expect(app.runtimeSettings_.gamepadLookHorizontalPercent == 110U,
+        expect(app.runtimeSettings_.gamepadLookHorizontalPercent == 101U,
             "controller horizontal camera sensitivity adjusts in the menu");
         app.menuFlow_.selection = 7U; key(Key::Left);
         expect(!app.runtimeSettings_.gamepadVibration, "vibration can be disabled");
         key(Key::Right);
         expect(app.runtimeSettings_.gamepadVibration, "vibration can be enabled again");
         app.menuFlow_.selection = 8U; key(Key::Left);
-        expect(app.runtimeSettings_.gamepadVibrationPercent == 40U,
-            "controller vibration intensity adjusts in ten-percent steps");
+        expect(app.runtimeSettings_.gamepadVibrationPercent == 49U,
+            "controller vibration intensity adjusts in one-percent steps");
         choose("REMAP BUTTONS"); choose("FIRE");
         pad(GamepadButton::West);
         expect(app.runtimeSettings_.gamepadControls.values[static_cast<std::size_t>(gameplay::ControlAction::Fire)]
@@ -231,6 +455,8 @@ struct ApplicationMenuTestAccess {
             && app.runtimeSettings_.gamepadControls.values[static_cast<std::size_t>(gameplay::ControlAction::Reload)]
                 == GamepadButton::RightTrigger,
             "controller capture swaps duplicate buttons without affecting keyboard bindings");
+        expect(app.menuFlow_.notice.starts_with("BINDING SWAPPED:"),
+            "binding conflict is disclosed after swapping controller actions");
         choose("JUMP"); pad(GamepadButton::Start);
         expect(!app.menuFlow_.capture && app.menuFlow_.page == MenuPage::GamepadBindings,
             "Options cancels gamepad capture without remapping pause");
@@ -239,40 +465,53 @@ struct ApplicationMenuTestAccess {
                 && app.runtimeSettings_.controls.values[0] == gameplay::bindingForName("I"),
             "controller reset restores only controller bindings");
         choose("FIRE"); pad(GamepadButton::West);
-        key(Key::Escape); key(Key::Escape); key(Key::Escape); choose("AUDIO");
+        key(Key::Escape);
+        key(Key::Tab); key(Key::Tab); key(Key::Tab);
         auto view = app.frontendMenuView();
         int width = 0, height = 0, ww = 0, wh = 0;
         (void)SDL_GetWindowSizeInPixels(app.window_, &width, &height);
         (void)SDL_GetWindowSize(app.window_, &ww, &wh);
         const auto layout = visual::makeListMenuLayout(width, height, view.rows.size());
         auto click = [&](int x, int y) {
+            SDL_Event pendingEvent{};
+            while (SDL_PollEvent(&pendingEvent)) {}
             release(); const wkc::core::Vec2 pointer{static_cast<float>(x) * static_cast<float>(ww) / static_cast<float>(width),
                 static_cast<float>(height - y) * static_cast<float>(wh) / static_cast<float>(height)};
             app.input_.handleMouseButton(MouseButton::Primary, true, pointer); app.processEvents(); app.render();
         };
         auto r = layout.rows[0];
         click(r.x + r.width - 30 * layout.scale, r.y + r.height / 2);
-        expect(app.runtimeSettings_.masterVolumePercent == 90U, "mouse left arrow reduces existing configuration");
-        click(r.x + r.width / 2, r.y + r.height / 2);
-        expect(app.runtimeSettings_.masterVolumePercent == 90U, "mouse label does not change setting");
+        expect(app.runtimeSettings_.masterVolumePercent == 99U, "mouse left arrow reduces existing configuration");
+        click(r.x + r.width / 4, r.y + r.height / 2);
+        expect(app.runtimeSettings_.masterVolumePercent == 99U, "mouse label does not change setting");
         click(r.x + r.width - 10 * layout.scale, r.y + r.height / 2);
         expect(app.runtimeSettings_.masterVolumePercent == 100U, "mouse right arrow increases existing configuration");
-        key(Key::Escape); key(Key::Escape);
+        key(Key::Escape);
         expect(!app.settingsMenu_.active && app.mainMenu_.active, "settings return to title");
         const auto root = visual::makeListMenuLayout(width, height, app.frontendMenuView().rows.size(), true);
         const auto settingsRow = root.rows[3];
         click(settingsRow.x + settingsRow.width + 1, settingsRow.y + settingsRow.height / 2);
         expect(app.menuFlow_.page == MenuPage::Root, "click outside compact title does not launch an option");
         click(settingsRow.x + settingsRow.width / 2, settingsRow.y + settingsRow.height / 2);
-        expect(app.settingsMenu_.active && app.menuFlow_.page == MenuPage::Settings,
+        expect(app.settingsMenu_.active && app.menuFlow_.page == MenuPage::Display,
             "compact title mouse target opens the displayed Settings row");
-        app.menuFlow_.selection = 3U; key(Key::Right);
+        const auto languageIndex = [&] {
+            const auto display = app.frontendMenuView();
+            for (std::size_t i = 0U; i < display.rows.size(); ++i)
+                if (display.rows[i].setting == gameplay::SettingsMenuOption::Language)
+                    return i;
+            return display.rows.size();
+        }();
+        expect(languageIndex < app.frontendMenuView().rows.size(),
+            "language selector remains available in Video");
+        app.menuFlow_.selection = languageIndex; key(Key::Right);
         expect(app.runtimeSettings_.language == gameplay::Language::PortugueseBrazil
-            && app.frontendMenuView().title == "CONFIGURAÇÕES", "keyboard switches language instantly without closing settings");
+            && app.frontendMenuView().title == "TELA", "keyboard switches language instantly without closing settings");
         key(Key::Left);
         expect(app.runtimeSettings_.language == gameplay::Language::English, "keyboard can return to English");
-        const auto languageLayout = visual::makeListMenuLayout(width, height, app.frontendMenuView().rows.size());
-        const auto languageRow = languageLayout.rows[3];
+        const auto languageLayout = visual::makeListMenuLayout(width, height,
+            app.frontendMenuView().rows.size(), false, 100U, languageIndex);
+        const auto languageRow = languageLayout.rows[languageIndex];
         click(languageRow.x + languageRow.width - 10 * languageLayout.scale, languageRow.y + languageRow.height / 2);
         expect(app.runtimeSettings_.language == gameplay::Language::PortugueseBrazil
             && !app.fatalError_, "mouse switches to Portuguese using the rendered language arrow");
@@ -399,8 +638,38 @@ struct ApplicationMenuTestAccess {
             expect(app.menuBackdropSeconds_ == pausedTime, "pause freezes the demonstration clock as well as gameplay");
             expect(app.pauseMenu_.paused && !app.settingsMenu_.active && app.activeCampaignSlot_ == slot,
                 "pause settings return preserves active campaign slot");
+            app.pauseMenu_.selection = gameplay::PauseMenuOption::RestartRun;
+            key(Key::Enter);
+            expect(app.exitConfirmation_.active
+                    && app.pauseConfirmationCommand_ == gameplay::PauseMenuCommand::RestartRun
+                    && app.pauseMenu_.paused && app.running_,
+                "Restart Run first opens a safe confirmation without discarding gameplay");
+            key(Key::Escape);
+            expect(!app.exitConfirmation_.active && app.pauseMenu_.paused
+                    && app.pauseConfirmationCommand_ == gameplay::PauseMenuCommand::None,
+                "canceling Restart Run returns to the paused game");
+            app.pauseMenu_.selection = gameplay::PauseMenuOption::MainMenu;
+            key(Key::Enter);
+            expect(app.exitConfirmation_.active
+                    && app.pauseConfirmationCommand_ == gameplay::PauseMenuCommand::MainMenu
+                    && app.running_,
+                "Return to Main Menu also waits for confirmation");
+            key(Key::Escape);
+            expect(!app.exitConfirmation_.active && app.pauseMenu_.paused,
+                "canceling Main Menu preserves the campaign");
             expect(app.saveCurrentCampaignCheckpoint(), "settings cannot redirect subsequent checkpoint to another slot");
-            expect(app.returnToMainMenu(), "campaign returns to title without deleting checkpoint");
+            if (slot == 0U) {
+                app.pauseMenu_.selection = gameplay::PauseMenuOption::MainMenu;
+                key(Key::Enter);
+                app.exitConfirmation_.selection = gameplay::ExitConfirmationOption::ExitGame;
+                key(Key::Enter);
+                expect(app.mainMenu_.active && !app.pauseMenu_.paused
+                        && !app.exitConfirmation_.active,
+                    "confirmed pause action returns to the original main menu");
+            } else {
+                expect(app.returnToMainMenu(),
+                    "campaign returns to title without deleting checkpoint");
+            }
         }
         choose("CAMPAIGN"); choose("SLOT 3"); choose("NEW GAME"); choose("EASY");
         expect(app.menuFlow_.page == MenuPage::Overwrite && app.menuFlow_.selection == 0U, "occupied slot requires safe overwrite confirmation");
@@ -778,6 +1047,14 @@ struct ApplicationMenuTestAccess {
 };
 }
 int main(const int argc, char** argv) {
+    if (argc == 2 && std::string_view{argv[1]} == "--settings-stress")
+        return gdp::game::ApplicationMenuTestAccess::stressVideoSettings();
+    if (argc == 3 && std::string_view{argv[1]} == "--campaign-audit") {
+        const char* directory = std::getenv("GDP_CAMPAIGN_AUDIT_DIR");
+        if (!directory || !*directory) return 2;
+        return gdp::game::ApplicationMenuTestAccess::captureCampaignAudit(
+            directory, static_cast<wkc::core::Seed>(std::strtoull(argv[2], nullptr, 10)));
+    }
     if (argc == 2 && std::string_view{argv[1]} == "--room-scale-capture") {
         const char* directory = std::getenv("GDP_ROOM_CAPTURE_DIR");
         return directory && *directory

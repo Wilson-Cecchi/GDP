@@ -23,12 +23,36 @@ void testCampaignRoomPlaytestSeeds()
 {
     using namespace gdp;
     {
+        constexpr unsigned securityHallSeed = 1U;
+        const auto layout = gameplay::campaignFloorLayout(securityHallSeed, 1U);
+        world::WorldGenerationConfig config;
+        config.roomCount = layout.roomCount;
+        config.loopBudget = layout.loopBudget;
+        const auto generated = world::generateWorld(securityHallSeed, config);
+        expect(generated.succeeded() && generated.world.has_value(),
+            "Security Hall campaign playtest seed generates a floor");
+        if (generated.world) {
+            const auto room = std::find_if(generated.world->rooms.begin(),
+                generated.world->rooms.end(), [](const world::RoomInstance& candidate) {
+                    return candidate.moduleId == world::securityHallModuleId;
+                });
+            expect(room != generated.world->rooms.end(),
+                "Security Hall playtest seed places the square room");
+            if (room != generated.world->rooms.end()) {
+                const auto parts = world::makeRoomArchitecture(*room);
+                expect(!parts.empty()
+                        && world::validateRoomArchitecture(*room, parts),
+                    "Security Hall campaign furniture clears spawns and doors");
+            }
+        }
+    }
+    {
         constexpr unsigned laboratorySeed = 2U;
         const auto layout = gameplay::campaignFloorLayout(laboratorySeed, 1U);
         world::WorldGenerationConfig config;
         config.roomCount = layout.roomCount;
         config.loopBudget = layout.loopBudget;
-        const auto generated = world::generateWorld(laboratorySeed, config);
+        auto generated = world::generateWorld(laboratorySeed, config);
         expect(generated.succeeded(),
             "Laboratory campaign playtest seed generates a floor");
         if (generated.world) {
@@ -44,6 +68,22 @@ void testCampaignRoomPlaytestSeeds()
                 expect(!parts.empty()
                         && world::validateRoomArchitecture(*room, parts),
                     "Laboratory campaign furniture clears spawns and doors");
+                entities::EntityManager manager;
+                const auto initial = world::populateInitialEntities(
+                    *generated.world, manager,
+                    {.transform = {.position = {0.0F, 0.0F, 4.0F}},
+                        .health = 100.0F},
+                    1.0F, true, 1U);
+                const auto* terminal = manager.find(initial.terminal);
+                const auto* terminalProp
+                    = manager.findData<entities::PropData>(initial.terminal);
+                expect(initial.isValid() && terminal && terminalProp
+                        && terminal->roomId == room->id
+                        && terminalProp->type == entities::PropType::Terminal
+                        && wkc::core::nearlyEqual(
+                            terminal->transform.scale.y, 1.80F)
+                        && initial.exitTerminal.isValid(),
+                    "seed 2 campaign spawns portal terminal in the Laboratory and Boss exit");
             }
         }
     }

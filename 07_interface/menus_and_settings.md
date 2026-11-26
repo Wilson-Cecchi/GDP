@@ -1,5 +1,71 @@
 # Interface — Menus e configurações
 
+## Implementação nativa da referência v3 — 2026-11-23
+
+Os arquivos `gdp_iron_seed_codex_prompt_completo_v3.txt` e
+`gdp_iron_seed_menu_v3_ui_scale.html` orientam o painel atual. O HTML é só
+referência; o jogo desenha tudo em OpenGL. O título principal conserva o layout
+anterior. A pausa contém **Resume Game, Restart Run, Return to Main Menu e
+Configuration**. Reiniciar e voltar ao título pedem confirmação; `Esc` em
+Configuration devolve à pausa ou ao título conforme a origem.
+
+Configuration abre em **Vídeo** e oferece abas superiores para Vídeo, Áudio,
+Controles e Feedback. `Tab`/`Shift+Tab`, ombros do controle e clique alternam as
+abas. Controles tem navegação lateral para Teclado/Mouse, Controle e Mapeamento;
+`PageUp`/`PageDown`, gatilhos do controle e clique alternam essas páginas.
+Controles também conserva linhas de troca acessíveis em janelas compactas. Vídeo
+também mantém o seletor de idioma. Na pausa, a cena da partida permanece atrás
+do painel, congelada. Os canais de áudio, bindings e envio de feedback continuam
+usando os sistemas existentes.
+
+`RuntimeSettings` e `numericSettingDescriptor` concentram limites, passos,
+valores padrão e unidades. `MenuAdjustmentRepeat` aplica um passo no pressionar,
+aguarda 320 ms e repete a cada 55 ms, sem aceleração. Soltar, trocar aba,
+perder foco ou atingir um limite interrompe a repetição. Arrastar a metade
+inferior de um slider altera o valor quantizado. Os valores mudam ao vivo, e
+o arquivo é salvo ao encerrar a interação ou o menu, evitando gravação a cada
+passo do botão segurado.
+
+O arquivo de preferências usa a versão 14. Preferências antigas válidas são
+preservadas e campos novos recebem padrões; valores inválidos são limitados.
+Instalações novas começam com FOV 100°, gráficos Ultra, tela cheia e VSync
+ligados. A escala da interface começa em Auto; Manual guarda 100% e permite
+75–200% em passos de 5%. A escala do render 3D é independente da interface.
+`resolvedUiScalePercent` usa o tamanho lógico da janela quando o SDL indica
+escala do sistema acima de 1,25; nos demais casos, usa a altura efetiva em
+pixels como heurística. Sem DPI físico confiável, o modo Manual é a correção
+oferecida ao jogador.
+
+`ListMenuLayout` fornece a geometria comum para desenho, foco e clique,
+inclusive barras, abas e rolagem por seleção/roda do mouse. O framebuffer e
+o tamanho lógico do SDL são consultados a cada quadro para converter o mouse.
+As opções ajustáveis reservam altura baseada na fonte para rótulo e valor em
+linhas separadas, inclusive nas páginas de Vídeo, Áudio e Controle. Listas que
+não cabem na tela mostram uma barra fina de posição; as abas reduzem a fonte
+quando o texto traduzido excede a largura disponível.
+O formulário de feedback mostra as três linhas mais recentes do texto para
+manter Enviar e Voltar visíveis nas resoluções usuais.
+O HUD Scale também dimensiona a mira, os recursos, o minimapa, o objetivo,
+os avisos e o painel de progresso da partida. Em janelas estreitas, a ampliação
+é limitada para impedir que os grupos de vida e munição se sobreponham; reduzir
+a escala continua disponível. A arma 3D mantém sua própria geometria. A lista
+de resolução possui os presets 960×540 a 3840×2160 e
+oculta modos não oferecidos pelo monitor/SDL; modos fora desse catálogo ainda
+não aparecem no seletor.
+
+Validação automática: testes de modelo/persistência, fluxo completo da aplicação,
+layouts e hitboxes nas alturas 720p, 1080p, 1440p, 1620p e 2160p, além de
+renderização OpenGL e captura técnica em 1280×720 com escala 200%. As
+resoluções acima da janela física do teste foram verificadas por geometria
+simulada, não por captura de framebuffer 4K. O teste em monitor 4K e a
+aprovação visual final ainda dependem de playtest nessa tela.
+Capturas locais PT-BR: `visual/validation/menu_v3_2026-11-23/` (Vídeo e
+Teclado/Mouse com a coluna lateral). Elas seguem a regra geral do projeto que
+ignora PNGs gerados em `visual/`.
+
+As seções históricas abaixo registram as revisões anteriores; os valores e o
+fluxo desta seção prevalecem para a implementação atual.
+
 ## Direção visual atual — aprovada em 2026-10-01
 
 **Tático minimalista nos menus e no HUD**. A revisão v4 substitui somente a

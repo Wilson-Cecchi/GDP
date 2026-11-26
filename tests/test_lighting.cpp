@@ -59,7 +59,7 @@ void testDeterministicPlan()
             && validateRoomLightingPlan(terminal, roomBounds).isValid(),
         "dedicated Terminal room supports lockdown lighting");
 
-    constexpr std::uint64_t goldenHash = 0x6E8D56782A473FC6ULL;
+    constexpr std::uint64_t goldenHash = 0x9B931860A415C85DULL;
     expect(first.planHash == goldenHash,
         "representative lighting plan keeps its golden hash");
 }

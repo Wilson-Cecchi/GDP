@@ -112,6 +112,9 @@ std::string serialize(const gameplay::RuntimeSettings& source)
            << "ambient_volume = " << settings.ambientVolumePercent << '\n'
            << "ui_volume = " << settings.uiVolumePercent << '\n'
            << "mouse_sensitivity = " << settings.mouseSensitivityPercent << '\n'
+           << "mouse_aim_sensitivity = " << settings.mouseAimSensitivityPercent << '\n'
+           << "ui_scale_auto = " << (settings.uiScaleAuto ? "true" : "false") << '\n'
+           << "ui_scale_manual = " << settings.uiScaleManualPercent << '\n'
            << "invert_mouse_y = "
            << (settings.invertMouseY ? "true" : "false") << '\n'
            << "field_of_view = " << settings.fieldOfViewDegrees << '\n'
@@ -170,6 +173,9 @@ SettingsLoadResult loadRuntimeSettings(
         bool recovered = false;
         bool sawGamepadBinding = false;
         bool sawEquipmentBinding = false;
+        bool sawFieldOfView = false;
+        bool sawGraphicsQuality = false;
+        bool sawFullscreen = false;
         bool foundVersion = false;
         std::optional<std::uint64_t> version;
         std::optional<std::uint64_t> windowWidth;
@@ -226,11 +232,11 @@ SettingsLoadResult loadRuntimeSettings(
                 if (const auto enabled = parseBoolean(value)) result.settings.gamepadSouthpaw = *enabled;
                 else recovered = true;
             } else if (key == "gamepad_look_horizontal") {
-                recovered = !assignClamped(result.settings.gamepadLookHorizontalPercent, value, 30U, 200U) || recovered;
+                recovered = !assignClamped(result.settings.gamepadLookHorizontalPercent, value, 1U, 200U) || recovered;
             } else if (key == "gamepad_look_vertical") {
-                recovered = !assignClamped(result.settings.gamepadLookVerticalPercent, value, 30U, 200U) || recovered;
+                recovered = !assignClamped(result.settings.gamepadLookVerticalPercent, value, 1U, 200U) || recovered;
             } else if (key == "gamepad_aim_sensitivity") {
-                recovered = !assignClamped(result.settings.gamepadAimSensitivityPercent, value, 30U, 150U) || recovered;
+                recovered = !assignClamped(result.settings.gamepadAimSensitivityPercent, value, 1U, 200U) || recovered;
             } else if (key == "gamepad_move_deadzone") {
                 recovered = !assignClamped(result.settings.gamepadMoveDeadzonePercent, value, 0U, 40U) || recovered;
             } else if (key == "gamepad_look_deadzone") {
@@ -256,8 +262,17 @@ SettingsLoadResult loadRuntimeSettings(
                     || recovered;
             } else if (key == "mouse_sensitivity") {
                 recovered = !assignClamped(
-                    result.settings.mouseSensitivityPercent, value, 30U, 200U)
+                    result.settings.mouseSensitivityPercent, value, 1U, 300U)
                     || recovered;
+            } else if (key == "mouse_aim_sensitivity") {
+                recovered = !assignClamped(result.settings.mouseAimSensitivityPercent,
+                    value, 1U, 200U) || recovered;
+            } else if (key == "ui_scale_auto") {
+                if (const auto automatic = parseBoolean(value)) result.settings.uiScaleAuto = *automatic;
+                else recovered = true;
+            } else if (key == "ui_scale_manual") {
+                recovered = !assignClamped(result.settings.uiScaleManualPercent,
+                    value, 75U, 200U) || recovered;
             } else if (key == "invert_mouse_y") {
                 const std::optional<bool> inverted = parseBoolean(value);
                 if (inverted) {
@@ -266,10 +281,12 @@ SettingsLoadResult loadRuntimeSettings(
                     recovered = true;
                 }
             } else if (key == "field_of_view") {
+                sawFieldOfView = true;
                 recovered = !assignClamped(
-                    result.settings.fieldOfViewDegrees, value, 60U, 100U)
+                    result.settings.fieldOfViewDegrees, value, 60U, 120U)
                     || recovered;
             } else if (key == "graphics_quality") {
+                sawGraphicsQuality = true;
                 const std::optional<gameplay::GraphicsQuality> quality
                     = gameplay::graphicsQualityForName(value);
                 if (quality) {
@@ -280,11 +297,11 @@ SettingsLoadResult loadRuntimeSettings(
             } else if (key == "custom_render_scale") {
                 customFieldsSeen |= 1U;
                 recovered = !assignClamped(result.settings.customGraphics.renderScalePercent,
-                    value, 50U, 100U) || recovered;
+                    value, 50U, 150U) || recovered;
             } else if (key == "custom_max_lights") {
                 customFieldsSeen |= 2U;
                 recovered = !assignByte(result.settings.customGraphics.maximumLights,
-                    value, 2U, 8U) || recovered;
+                    value, 1U, 16U) || recovered;
             } else if (key == "custom_shadow_lights") {
                 customFieldsSeen |= 4U;
                 recovered = !assignByte(result.settings.customGraphics.maximumShadowLights,
@@ -318,6 +335,7 @@ SettingsLoadResult loadRuntimeSettings(
                 windowHeight = parseUnsigned(value);
                 recovered = !windowHeight || recovered;
             } else if (key == "fullscreen") {
+                sawFullscreen = true;
                 const std::optional<bool> fullscreen = parseBoolean(value);
                 if (fullscreen) {
                     result.settings.fullscreen = *fullscreen;
@@ -342,6 +360,15 @@ SettingsLoadResult loadRuntimeSettings(
             result.settings = {};
             result.status = SettingsLoadStatus::Invalid;
             return result;
+        }
+        if (*version <= 13U) {
+            // v13 and older used a 68 degree, Medium, windowed baseline.
+            // Preserve it for partial legacy files while v14 fresh installs
+            // use the new specification defaults.
+            if (!sawFieldOfView) result.settings.fieldOfViewDegrees = 68U;
+            if (!sawGraphicsQuality) result.settings.graphicsQuality
+                = gameplay::GraphicsQuality::Medium;
+            if (!sawFullscreen) result.settings.fullscreen = false;
         }
         if (*version <= 11U) {
             // Slots added in v12 must not collide with a player's existing

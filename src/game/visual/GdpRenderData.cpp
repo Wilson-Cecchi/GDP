@@ -23,8 +23,10 @@ ImpactRenderData bulletMarkOnDoor(
         ? std::clamp(door.openFraction, 0.0F, 1.0F) : 0.0F;
     const float side = lateralOffset < 0.0F ? -1.0F : 1.0F;
     const float impactHeight = mark.position.y;
-    mark.position = door.position - door.outwardNormal * 0.173F
-        + transverse * (lateralOffset + side * panelWidth * travel);
+    // The raised armoured face sits ahead of the original flat leaf.
+    // Keep impacts just outside it while retaining the same sliding travel.
+    mark.position = door.position - door.outwardNormal * 0.218F
+        + transverse * (lateralOffset + side * (panelWidth + 0.04F) * travel);
     mark.position.y = impactHeight;
     mark.normal = door.outwardNormal * -1.0F;
     return mark;
@@ -77,7 +79,8 @@ float fixtureDrivenAmbientIntensity(
 }
 
 ListMenuLayout makeListMenuLayout(const int width, const int height, const std::size_t count,
-    const bool titleScreen)
+    const bool titleScreen, const std::uint16_t uiScalePercent,
+    const std::size_t selectedRow, const bool controlSidebar)
 {
     ListMenuLayout layout;
     if (width < 64 || count == 0U || count > 24U
@@ -86,45 +89,165 @@ ListMenuLayout makeListMenuLayout(const int width, const int height, const std::
     // Do not inflate hit targets on large/ultrawide displays. Dense pages still fit 360p.
     layout.scale = width >= 640 && height >= std::max(360, 136 + n * 16) ? 2 : 1;
     const int scale = layout.scale;
+    layout.textScale = titleScreen ? static_cast<float>(scale)
+        : static_cast<float>(scale)
+            * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
+    const float uiScale = layout.textScale;
     const int margin = width >= 640 ? width / 20 : 8;
-    const int panelWidth = std::min(width - 2 * margin, (titleScreen ? 190 : 340) * scale);
-    const int rowHeight = std::max(8, std::min(16 * scale, (height - 68 * scale) / n));
-    const int panelHeight = std::min(height - 8, 64 * scale + n * rowHeight);
+    const int panelWidth = std::min(width - 2 * margin,
+        static_cast<int>(std::lround((titleScreen ? 190 : 340) * uiScale)));
+    const int rowHeight = titleScreen
+        ? std::max(8, std::min(16 * scale, (height - 68 * scale) / n))
+        : std::max(8, static_cast<int>(std::lround(
+            listMenuTwoLineRowUnits * uiScale)));
+    // The footer needs its own space below the final value line. Keep the
+    // title-screen geometry unchanged; settings use a taller two-line row.
+    const int headerHeight = static_cast<int>(std::lround(
+        (titleScreen ? 64.0F : 72.0F) * uiScale));
+    const int visibleCount = titleScreen ? n : std::clamp(
+        (height - 8 - headerHeight) / rowHeight, 1, n);
+    const int panelHeight = std::min(height - 8,
+        headerHeight + visibleCount * rowHeight);
     const int panelX = width >= 800 && titleScreen ? margin : (width - panelWidth) / 2;
     layout.panel = {panelX, (height - panelHeight) / 2, panelWidth, panelHeight};
-    for (int i = 0; i < n; ++i) {
-        layout.rows.push_back({layout.panel.x + 8 * scale,
-            layout.panel.y + panelHeight - 52 * scale - (i + 1) * rowHeight,
-            panelWidth - 16 * scale, rowHeight - scale});
+    layout.rows.resize(count);
+    const int firstRow = titleScreen ? 0 : std::clamp(
+        static_cast<int>(selectedRow) - visibleCount + 1, 0, n - visibleCount);
+    const int inset = static_cast<int>(std::lround(8.0F * uiScale));
+    const int sidebarWidth = controlSidebar && !titleScreen && width >= 640
+        ? std::min(panelWidth / 3,
+            static_cast<int>(std::lround(56.0F * uiScale))) : 0;
+    if (sidebarWidth > 0) {
+        const int tabHeight = static_cast<int>(std::lround(12.0F * uiScale));
+        for (std::size_t i = 0U; i < layout.controlTabs.size(); ++i) {
+            layout.controlTabs[i] = {layout.panel.x + inset,
+                layout.panel.y + panelHeight
+                    - static_cast<int>(std::lround(
+                        (65.0F + 20.0F * static_cast<float>(i)) * uiScale)),
+                sidebarWidth - inset, tabHeight};
+        }
+    }
+    for (int i = 0; i < visibleCount; ++i) {
+        layout.rows[static_cast<std::size_t>(firstRow + i)] = {
+            layout.panel.x + inset + sidebarWidth,
+            layout.panel.y + panelHeight
+                - static_cast<int>(std::lround(52.0F * uiScale))
+                - (i + 1) * rowHeight,
+            panelWidth - 2 * inset - sidebarWidth,
+            rowHeight - std::max(1, static_cast<int>(std::lround(uiScale)))};
     }
     return layout;
 }
 std::optional<std::size_t> listMenuSelectionAt(const int width, const int height,
-    const std::size_t count, const float pointerX, const float pointerY, const bool titleScreen)
+    const std::size_t count, const float pointerX, const float pointerY,
+    const bool titleScreen, const std::uint16_t uiScalePercent,
+    const std::size_t selectedRow, const bool controlSidebar)
 {
     if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
-    const auto layout = makeListMenuLayout(width, height, count, titleScreen);
+    const auto layout = makeListMenuLayout(width, height, count, titleScreen,
+        uiScalePercent, selectedRow, controlSidebar);
     // SDL pointers have a top-left origin; UI rectangles have a bottom-left origin.
     const float y = static_cast<float>(height) - pointerY;
     for (std::size_t i = 0; i < layout.rows.size(); ++i) {
         const auto r = layout.rows[i];
-        if (pointerX >= static_cast<float>(r.x) && pointerX < static_cast<float>(r.x + r.width)
+        if (r.width > 0 && r.height > 0
+            && pointerX >= static_cast<float>(r.x) && pointerX < static_cast<float>(r.x + r.width)
             && y >= static_cast<float>(r.y) && y < static_cast<float>(r.y + r.height)) return i;
     }
     return std::nullopt;
 }
 std::optional<int> listMenuAdjustmentDirectionAt(const int width, const int height,
-    const std::size_t count, const float pointerX, const float pointerY, const bool titleScreen)
+    const std::size_t count, const float pointerX, const float pointerY,
+    const bool titleScreen, const std::uint16_t uiScalePercent,
+    const std::size_t selectedRow, const bool controlSidebar)
 {
-    const auto selected = listMenuSelectionAt(width, height, count, pointerX, pointerY, titleScreen);
+    const auto selected = listMenuSelectionAt(width, height, count, pointerX,
+        pointerY, titleScreen, uiScalePercent, selectedRow, controlSidebar);
     if (!selected) return std::nullopt;
-    const auto layout = makeListMenuLayout(width, height, count, titleScreen);
+    const auto layout = makeListMenuLayout(width, height, count, titleScreen,
+        uiScalePercent, selectedRow, controlSidebar);
     const auto r = layout.rows[*selected];
     const float right = static_cast<float>(r.x + r.width);
-    if (pointerX >= right - static_cast<float>(40 * layout.scale)
-        && pointerX < right - static_cast<float>(22 * layout.scale)) return -1;
-    if (pointerX >= right - static_cast<float>(20 * layout.scale)
-        && pointerX < right - static_cast<float>(2 * layout.scale)) return 1;
+    if (pointerX >= right - 40.0F * layout.textScale
+        && pointerX < right - 22.0F * layout.textScale) return -1;
+    if (pointerX >= right - 20.0F * layout.textScale
+        && pointerX < right - 2.0F * layout.textScale) return 1;
+    return std::nullopt;
+}
+
+std::optional<std::uint8_t> configurationTabAt(const int width,
+    const int height, const std::size_t count, const float pointerX,
+    const float pointerY, const std::uint16_t uiScalePercent,
+    const std::size_t selectedRow)
+{
+    if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
+    const auto layout = makeListMenuLayout(width, height, count, false,
+        uiScalePercent, selectedRow);
+    if (layout.panel.width <= 0) return std::nullopt;
+    const float scale = layout.textScale;
+    const int inset = static_cast<int>(std::lround(8.0F * scale));
+    const int tabWidth = (layout.panel.width - 2 * inset) / 4;
+    const int tabY = layout.panel.y + layout.panel.height
+        - static_cast<int>(std::lround(44.0F * scale));
+    const int tabHeight = static_cast<int>(std::lround(12.0F * scale));
+    const int y = height - 1 - static_cast<int>(pointerY);
+    for (std::uint8_t i = 0U; i < 4U; ++i) {
+        const UiRect tab{layout.panel.x + inset + static_cast<int>(i) * tabWidth,
+            tabY, tabWidth, tabHeight};
+        if (tab.contains(static_cast<int>(pointerX), y)) return i;
+    }
+    return std::nullopt;
+}
+
+UiRect listMenuSliderTrack(const ListMenuLayout& layout,
+    const std::size_t rowIndex) noexcept
+{
+    if (rowIndex >= layout.rows.size()) return {};
+    const UiRect row = layout.rows[rowIndex];
+    if (row.width <= 0 || row.height <= 0) return {};
+    const int left = row.x + static_cast<int>(std::lround(6.0F * layout.textScale));
+    const int right = row.x + row.width
+        - static_cast<int>(std::lround(80.0F * layout.textScale));
+    if (right <= left) return {};
+    return {left, row.y + static_cast<int>(std::lround(3.5F * layout.textScale)),
+        right - left, std::max(2, static_cast<int>(std::lround(2.0F * layout.textScale)))};
+}
+
+std::optional<float> listMenuSliderFractionAt(const int width,
+    const int height, const std::size_t count, const std::size_t rowIndex,
+    const float pointerX, const float pointerY,
+    const std::uint16_t uiScalePercent, const std::size_t selectedRow,
+    const bool controlSidebar)
+{
+    if (!std::isfinite(pointerX) || !std::isfinite(pointerY)) return std::nullopt;
+    const auto layout = makeListMenuLayout(width, height, count, false,
+        uiScalePercent, selectedRow, controlSidebar);
+    if (rowIndex >= layout.rows.size()) return std::nullopt;
+    const auto row = layout.rows[rowIndex];
+    const auto track = listMenuSliderTrack(layout, rowIndex);
+    const float y = static_cast<float>(height) - pointerY;
+    if (track.width <= 0 || pointerX < static_cast<float>(track.x)
+        || pointerX > static_cast<float>(track.x + track.width)
+        || y < static_cast<float>(row.y)
+        || y >= static_cast<float>(row.y + row.height / 2))
+        return std::nullopt;
+    return std::clamp((pointerX - static_cast<float>(track.x))
+        / static_cast<float>(track.width), 0.0F, 1.0F);
+}
+
+std::optional<std::uint8_t> configurationControlTabAt(const int width,
+    const int height, const std::size_t count, const float pointerX,
+    const float pointerY, const std::uint16_t uiScalePercent,
+    const std::size_t selectedRow)
+{
+    if (!std::isfinite(pointerX) || !std::isfinite(pointerY))
+        return std::nullopt;
+    const auto layout = makeListMenuLayout(width, height, count, false,
+        uiScalePercent, selectedRow, true);
+    const int y = height - 1 - static_cast<int>(pointerY);
+    for (std::uint8_t i = 0U; i < layout.controlTabs.size(); ++i)
+        if (layout.controlTabs[i].contains(static_cast<int>(pointerX), y))
+            return i;
     return std::nullopt;
 }
 namespace {
@@ -1039,44 +1162,45 @@ std::optional<HudMainMenuSelection> mainMenuSelectionAt(
     return std::nullopt;
 }
 
-PauseMenuLayout makePauseMenuLayout(const int width, const int height) noexcept
+PauseMenuLayout makePauseMenuLayout(const int width, const int height,
+    const std::uint16_t uiScalePercent) noexcept
 {
     const int safeWidth = std::max(width, 1);
     const int safeHeight = std::max(height, 1);
     const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
+    const float textScale = static_cast<float>(scale)
+        * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
+    const auto px = [textScale](const float units) {
+        return static_cast<int>(std::lround(units * textScale));
+    };
     const int panelWidth = std::max(1,
-        std::min(safeWidth - 16, 180 * scale));
+        std::min(safeWidth - 16, px(180.0F)));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 123 * scale));
+        std::min(safeHeight - 16, px(123.0F)));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
-        std::min(panelWidth - (20 * scale), 112 * scale));
+        std::min(panelWidth - px(20.0F), px(150.0F)));
     const int buttonHeight = std::max(1,
-        std::min(11 * scale, panelHeight));
+        std::min(px(11.0F), panelHeight));
     const int buttonX = (safeWidth - buttonWidth) / 2;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
     const int resumeY = std::clamp(
-        panelY + panelHeight - (36 * scale), panelY, maximumButtonY);
+        panelY + panelHeight - px(36.0F), panelY, maximumButtonY);
     const int restartY = std::clamp(
-        resumeY - (14 * scale), panelY, maximumButtonY);
-    const int settingsY = std::clamp(
-        resumeY - (28 * scale), panelY, maximumButtonY);
-    const int controlsY = std::clamp(
-        resumeY - (42 * scale), panelY, maximumButtonY);
+        resumeY - px(14.0F), panelY, maximumButtonY);
     const int mainMenuY = std::clamp(
-        resumeY - (56 * scale), panelY, maximumButtonY);
-    const int exitY = std::clamp(
-        resumeY - (70 * scale), panelY, maximumButtonY);
+        resumeY - px(28.0F), panelY, maximumButtonY);
+    const int settingsY = std::clamp(
+        resumeY - px(42.0F), panelY, maximumButtonY);
     return {
         scale,
+        textScale,
         {panelX, panelY, panelWidth, panelHeight},
         {buttonX, resumeY, buttonWidth, buttonHeight},
         {buttonX, restartY, buttonWidth, buttonHeight},
-        {buttonX, settingsY, buttonWidth, buttonHeight},
-        {buttonX, controlsY, buttonWidth, buttonHeight},
         {buttonX, mainMenuY, buttonWidth, buttonHeight},
-        {buttonX, exitY, buttonWidth, buttonHeight},
+        {buttonX, settingsY, buttonWidth, buttonHeight},
     };
 }
 
@@ -1084,7 +1208,7 @@ std::optional<HudPauseSelection> pauseMenuSelectionAt(
     const int width,
     const int height,
     const float pointerX,
-    const float pointerY) noexcept
+    const float pointerY, const std::uint16_t uiScalePercent) noexcept
 {
     if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
         || !std::isfinite(pointerY)) {
@@ -1092,24 +1216,18 @@ std::optional<HudPauseSelection> pauseMenuSelectionAt(
     }
     const int pixelX = static_cast<int>(pointerX);
     const int pixelY = height - 1 - static_cast<int>(pointerY);
-    const PauseMenuLayout layout = makePauseMenuLayout(width, height);
+    const PauseMenuLayout layout = makePauseMenuLayout(width, height, uiScalePercent);
     if (layout.resumeButton.contains(pixelX, pixelY)) {
         return HudPauseSelection::Resume;
     }
     if (layout.restartButton.contains(pixelX, pixelY)) {
         return HudPauseSelection::RestartRun;
     }
-    if (layout.settingsButton.contains(pixelX, pixelY)) {
-        return HudPauseSelection::Settings;
-    }
-    if (layout.controlsButton.contains(pixelX, pixelY)) {
-        return HudPauseSelection::Controls;
-    }
     if (layout.mainMenuButton.contains(pixelX, pixelY)) {
         return HudPauseSelection::MainMenu;
     }
-    if (layout.exitButton.contains(pixelX, pixelY)) {
-        return HudPauseSelection::ExitGame;
+    if (layout.settingsButton.contains(pixelX, pixelY)) {
+        return HudPauseSelection::Settings;
     }
     return std::nullopt;
 }
@@ -1214,33 +1332,39 @@ std::optional<HudResultMenuSelection> resultMenuSelectionAt(
 
 ExitConfirmationLayout makeExitConfirmationLayout(
     const int width,
-    const int height) noexcept
+    const int height, const std::uint16_t uiScalePercent) noexcept
 {
     const int safeWidth = std::max(width, 1);
     const int safeHeight = std::max(height, 1);
     const int scale = safeWidth >= 640 && safeHeight >= 360 ? 2 : 1;
+    const float textScale = static_cast<float>(scale)
+        * static_cast<float>(std::clamp<std::uint16_t>(uiScalePercent, 75U, 200U)) / 100.0F;
+    const auto px = [textScale](const float units) {
+        return static_cast<int>(std::lround(units * textScale));
+    };
     const int panelWidth = std::max(1,
-        std::min(safeWidth - 16, 210 * scale));
+        std::min(safeWidth - 16, px(210.0F)));
     const int panelHeight = std::max(1,
-        std::min(safeHeight - 16, 84 * scale));
+        std::min(safeHeight - 16, px(84.0F)));
     const int panelX = (safeWidth - panelWidth) / 2;
     const int panelY = (safeHeight - panelHeight) / 2;
     const int buttonWidth = std::max(1,
-        std::min((panelWidth - (30 * scale)) / 2, 76 * scale));
+        std::min((panelWidth - px(30.0F)) / 2, px(76.0F)));
     const int buttonHeight = std::max(1,
-        std::min(13 * scale, panelHeight));
+        std::min(px(13.0F), panelHeight));
     const int maximumButtonX = panelX + panelWidth - buttonWidth;
     const int maximumButtonY = panelY + panelHeight - buttonHeight;
-    const int gap = 8 * scale;
+    const int gap = px(8.0F);
     const int cancelX = std::clamp(
         (safeWidth / 2) - buttonWidth - (gap / 2),
         panelX, maximumButtonX);
     const int exitX = std::clamp(
         (safeWidth / 2) + (gap / 2), panelX, maximumButtonX);
     const int buttonY = std::clamp(
-        panelY + (16 * scale), panelY, maximumButtonY);
+        panelY + px(16.0F), panelY, maximumButtonY);
     return {
         scale,
+        textScale,
         {panelX, panelY, panelWidth, panelHeight},
         {cancelX, buttonY, buttonWidth, buttonHeight},
         {exitX, buttonY, buttonWidth, buttonHeight},
@@ -1251,7 +1375,7 @@ std::optional<HudExitConfirmationSelection> exitConfirmationSelectionAt(
     const int width,
     const int height,
     const float pointerX,
-    const float pointerY) noexcept
+    const float pointerY, const std::uint16_t uiScalePercent) noexcept
 {
     if (width <= 0 || height <= 0 || !std::isfinite(pointerX)
         || !std::isfinite(pointerY)) {
@@ -1260,7 +1384,7 @@ std::optional<HudExitConfirmationSelection> exitConfirmationSelectionAt(
     const int pixelX = static_cast<int>(pointerX);
     const int pixelY = height - 1 - static_cast<int>(pointerY);
     const ExitConfirmationLayout layout
-        = makeExitConfirmationLayout(width, height);
+        = makeExitConfirmationLayout(width, height, uiScalePercent);
     if (layout.cancelButton.contains(pixelX, pixelY)) {
         return HudExitConfirmationSelection::Cancel;
     }

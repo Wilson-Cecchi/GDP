@@ -31,6 +31,83 @@ wkc::render::ImageData makeIndustrialCheckerImage(const int width, const int hei
     return image;
 }
 
+wkc::render::ImageData makeStructuralSteelImage(const std::uint8_t condition)
+{
+    // This material is shared by columns, cabinet shells and small steel
+    // details. Its old four-panel grid repeated at every UV tile, even on
+    // parts that have real 3D seams and fasteners. Keep the paint continuous;
+    // let the geometry define where plates actually meet.
+    constexpr int resolution = 256;
+    wkc::render::ImageData image;
+    image.width = resolution;
+    image.height = resolution;
+    image.rgba.resize(static_cast<std::size_t>(resolution) * resolution * 4U);
+    const auto hash = [](std::uint32_t x, std::uint32_t y,
+                          std::uint32_t seed) {
+        std::uint32_t value = x * 0x9E3779B9U ^ y * 0x85EBCA6BU ^ seed;
+        value ^= value >> 16U;
+        value *= 0x7FEB352DU;
+        value ^= value >> 15U;
+        value *= 0x846CA68BU;
+        return value ^ (value >> 16U);
+    };
+    const auto smoothNoise = [&hash](const int x, const int y,
+                                 const int cells, const std::uint32_t seed) {
+        const float px = static_cast<float>(x)
+            * static_cast<float>(cells) / static_cast<float>(resolution);
+        const float py = static_cast<float>(y)
+            * static_cast<float>(cells) / static_cast<float>(resolution);
+        const int cellX = static_cast<int>(px);
+        const int cellY = static_cast<int>(py);
+        const float tx = px - static_cast<float>(cellX);
+        const float ty = py - static_cast<float>(cellY);
+        const float sx = tx * tx * (3.0F - 2.0F * tx);
+        const float sy = ty * ty * (3.0F - 2.0F * ty);
+        const auto sample = [&](const int dx, const int dy) {
+            return static_cast<float>(hash(
+                static_cast<std::uint32_t>((cellX + dx) % cells),
+                static_cast<std::uint32_t>((cellY + dy) % cells), seed)
+                & 255U) / 255.0F;
+        };
+        const float top = sample(0, 0) * (1.0F - sx) + sample(1, 0) * sx;
+        const float bottom = sample(0, 1) * (1.0F - sx) + sample(1, 1) * sx;
+        return top * (1.0F - sy) + bottom * sy;
+    };
+    const int base = condition == 0U ? 219 : condition == 1U ? 209 : 198;
+    const std::uint32_t chipChance = condition == 0U ? 0U
+        : condition == 1U ? 3U : 8U;
+    for (int y = 0; y < resolution; ++y) {
+        for (int x = 0; x < resolution; ++x) {
+            const float broad = smoothNoise(x, y, 7, 0x51A3U) - 0.5F;
+            const float fine = smoothNoise(x, y, 29, 0xC93BU) - 0.5F;
+            const int grain = static_cast<int>(hash(
+                static_cast<std::uint32_t>(x),
+                static_cast<std::uint32_t>(y), 0x7831U) & 7U) - 3;
+            const int cellX = x / 16;
+            const int cellY = y / 16;
+            const std::uint32_t defect = hash(
+                static_cast<std::uint32_t>(cellX),
+                static_cast<std::uint32_t>(cellY), 0xB719U);
+            const int nickX = 3 + static_cast<int>((defect >> 8U) % 10U);
+            const int nickY = 3 + static_cast<int>((defect >> 16U) % 10U);
+            const int dx = x % 16 - nickX;
+            const int dy = y % 16 - nickY;
+            const bool nick = (defect & 255U) < chipChance
+                && dx * dx + dy * dy <= (condition == 2U ? 5 : 2);
+            const int value = std::clamp(base
+                + static_cast<int>(broad * 17.0F + fine * 7.0F)
+                + grain - (nick ? 20 : 0), 0, 255);
+            const std::size_t pixel = (static_cast<std::size_t>(y)
+                * resolution + static_cast<std::size_t>(x)) * 4U;
+            image.rgba[pixel] = static_cast<std::uint8_t>(value);
+            image.rgba[pixel + 1U] = static_cast<std::uint8_t>(std::max(0, value - 2));
+            image.rgba[pixel + 2U] = static_cast<std::uint8_t>(std::max(0, value - 6));
+            image.rgba[pixel + 3U] = 255U;
+        }
+    }
+    return image;
+}
+
 CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages()
 {
     constexpr int resolution = 1024;
@@ -100,6 +177,70 @@ CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages()
             write(images.normal, x, y, normal);
             write(images.properties, x, y, properties);
             write(images.emission, x, y, emission);
+        }
+    }
+    return images;
+}
+
+CeilingFixtureMaterialImages makeMissionTerminalMaterialImages()
+{
+    // The terminal has its own warm painted-steel atlas. Reusing the ceiling
+    // fixture paint would turn its large cream panels nearly black in-game.
+    constexpr int resolution = 256;
+    CeilingFixtureMaterialImages images;
+    for (wkc::render::ImageData* const image
+        : {&images.albedo, &images.normal, &images.properties, &images.emission}) {
+        image->width = resolution;
+        image->height = resolution;
+        image->rgba.resize(static_cast<std::size_t>(resolution)
+            * resolution * 4U);
+    }
+    const auto write = [](wkc::render::ImageData& image,
+                           const int x, const int y,
+                           const std::array<std::uint8_t, 4> color) {
+        const std::size_t index = (static_cast<std::size_t>(y)
+            * static_cast<std::size_t>(image.width)
+            + static_cast<std::size_t>(x)) * 4U;
+        std::copy(color.begin(), color.end(), image.rgba.begin()
+            + static_cast<std::ptrdiff_t>(index));
+    };
+    for (int y = 0; y < resolution; ++y) {
+        for (int x = 0; x < resolution; ++x) {
+            const std::uint32_t ux = static_cast<std::uint32_t>(x);
+            const std::uint32_t uy = static_cast<std::uint32_t>(y);
+            const std::uint32_t hash = (ux * 1'663'939U)
+                ^ (uy * 1'013'903U) ^ ((ux * uy) * 65'537U);
+            const int grain = static_cast<int>((hash >> 7U) & 7U) - 3;
+            const bool chip = ((hash >> 14U) & 255U) < 3U;
+            const bool scratch = (x * 3 + y * 11) % 157 < 2
+                && ((hash >> 20U) & 15U) < 7U;
+            std::array<std::uint8_t, 4> albedo{};
+            std::array<std::uint8_t, 4> normal{128U, 128U, 255U, 255U};
+            std::array<std::uint8_t, 4> properties{};
+            if (x < resolution / 2) {
+                const int wear = chip ? -74 : scratch ? -24 : 0;
+                albedo = {
+                    static_cast<std::uint8_t>(std::clamp(188 + grain + wear, 0, 255)),
+                    static_cast<std::uint8_t>(std::clamp(185 + grain + wear, 0, 255)),
+                    static_cast<std::uint8_t>(std::clamp(174 + grain + wear, 0, 255)),
+                    255U};
+                properties = {150U, 92U, 245U, 255U};
+            } else if (x < resolution * 68 / 100) {
+                const std::uint8_t steel = static_cast<std::uint8_t>(
+                    125 + (y % 7) + grain);
+                albedo = {steel, static_cast<std::uint8_t>(steel + 4U),
+                    static_cast<std::uint8_t>(steel + 5U), 255U};
+                normal = {128U, static_cast<std::uint8_t>(126 + y % 4),
+                    255U, 255U};
+                properties = {95U, 185U, 250U, 255U};
+            } else {
+                albedo = {20U, 25U, 28U, 255U};
+                properties = {210U, 12U, 200U, 255U};
+            }
+            write(images.albedo, x, y, albedo);
+            write(images.normal, x, y, normal);
+            write(images.properties, x, y, properties);
+            write(images.emission, x, y, {0U, 0U, 0U, 255U});
         }
     }
     return images;

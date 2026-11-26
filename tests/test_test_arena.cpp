@@ -6,6 +6,7 @@
 #include "gameplay/RoomTraversal.hpp"
 #include "world/RoomArchitecture.hpp"
 #include "world/RoomFootprint.hpp"
+#include "world/LightingGenerator.hpp"
 #include "world/WorldValidation.hpp"
 
 #include <algorithm>
@@ -113,9 +114,9 @@ void testBossRoomPreview()
     const auto architecture = world::makeRoomArchitecture(room);
     expect(room.moduleId == world::bossRoomPreviewModuleId
             && span.x > 27.0F && span.z > 31.0F && span.y == 7.0F
-            && architecture.size() == 8U
+            && architecture.size() == 115U
             && world::validateRoomArchitecture(room, architecture),
-        "Boss preview matches the campaign arena and its two columns");
+        "Boss preview matches the campaign arena and detailed columns");
 
     EntityManager manager;
     const auto initial = game::populateBossRoomPreview(preview, manager,
@@ -129,9 +130,13 @@ void testBossRoomPreview()
     }
     const auto collision = gameplay::collisionWorldWithProps(
         gameplay::makeRoomNavigationCollision(preview, room.id), manager, room.id);
+    const auto* terminal = manager.find(initial.terminal);
     expect(initial.isValid() && bossCount == 1U && aideCount == 2U
             && manager.query(EntityKind::Prop).size() >= 5U
+            && terminal != nullptr
+            && terminal->transform.position == wkc::core::Vec3{0.0F, 0.0F, 2.2F}
             && collision.canOccupy({0.0F, 0.0F, 13.0F})
+            && collision.canOccupy({0.0F, 0.0F, -2.2F})
             && !collision.canOccupy({7.0F, 0.0F, -8.0F})
             && !collision.canOccupy({7.0F, 0.0F, 8.0F}),
         "Boss preview starts clear with its combatants and solid columns");
@@ -204,6 +209,95 @@ void testCombatRoomPreview()
     const auto parts = world::makeRoomArchitecture(room);
     expect(!parts.empty() && world::validateRoomArchitecture(room, parts),
         "Combat architecture clears reserved enemy pockets");
+    expect(world::makeRoomWallColumns(room).empty(),
+        "Combat's authored columns replace generic wall columns");
+    const auto countCombatPart = [&](const world::CombatArchitecturePart kind) {
+        return std::count_if(parts.begin(), parts.end(),
+            [kind](const world::RoomArchitecturePart& part) {
+                return part.combatPart == kind;
+            });
+    };
+    expect(countCombatPart(world::CombatArchitecturePart::Cover) == 6
+            && countCombatPart(world::CombatArchitecturePart::CoverFace) == 12
+            && countCombatPart(world::CombatArchitecturePart::CoverFrame) == 24
+            && countCombatPart(world::CombatArchitecturePart::CoverRib) == 24
+            && countCombatPart(world::CombatArchitecturePart::CoverBolt) == 48
+            && countCombatPart(world::CombatArchitecturePart::ColumnShaft) == 8
+            && countCombatPart(world::CombatArchitecturePart::ColumnInset) == 16
+            && countCombatPart(world::CombatArchitecturePart::ColumnBrace) == 24
+            && countCombatPart(world::CombatArchitecturePart::GalleryDeck) == 2
+            && countCombatPart(world::CombatArchitecturePart::GalleryPillar) == 6
+            && countCombatPart(world::CombatArchitecturePart::GalleryPillarTrim) == 18
+            && countCombatPart(world::CombatArchitecturePart::GalleryBracket) == 32
+            && countCombatPart(world::CombatArchitecturePart::GalleryFastener) == 16
+            && countCombatPart(world::CombatArchitecturePart::GalleryRail) == 14
+            && countCombatPart(world::CombatArchitecturePart::StairTread) == 28
+            && countCombatPart(world::CombatArchitecturePart::StairRail) == 14
+            && countCombatPart(world::CombatArchitecturePart::StairRailSlope) == 30
+            && countCombatPart(world::CombatArchitecturePart::CeilingBeam) == 8
+            && countCombatPart(world::CombatArchitecturePart::CeilingBrace) == 4
+            && countCombatPart(world::CombatArchitecturePart::CeilingPanel) == 4
+            && countCombatPart(world::CombatArchitecturePart::CeilingGrille) == 20
+            && std::count_if(parts.begin(), parts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.decoration
+                        == world::RoomDecorationPart::CeilingDuct;
+                }) == 2,
+        "Combat preview has detailed parapets, galleries, stairs, columns and ceiling grid");
+    for (const float side : {-1.0F, 1.0F}) {
+        expect(std::any_of(parts.begin(), parts.end(), [side](const auto& part) {
+            return part.combatPart == world::CombatArchitecturePart::CeilingBrace
+                && part.bounds.contains({side * 9.48F, 5.80F, 10.20F});
+        }), "perimeter ceiling girder reaches each side wall column");
+        expect(std::any_of(parts.begin(), parts.end(), [side](const auto& part) {
+            return part.combatPart == world::CombatArchitecturePart::GalleryBracket
+                && part.bounds.contains({side * 9.88F, 2.74F, -5.70F});
+        }), "wall-mounted gallery has a bolted 3D bracket");
+        for (const float z : {-5.7F, -2.7F, 2.0F}) {
+            expect(std::any_of(parts.begin(), parts.end(), [side, z](const auto& part) {
+                return part.combatPart == world::CombatArchitecturePart::GalleryPillar
+                    && part.solid
+                    && part.bounds.contains({side * 8.76F, 1.5F, z});
+            }), "gallery has a solid support from floor to its deck");
+        }
+    }
+    for (const float side : {-1.0F, 1.0F}) {
+        const float railX = side * 8.53F;
+        for (int junction = 0; junction <= 14; ++junction) {
+            const float z = 9.0F - static_cast<float>(junction) * 0.4F;
+            const float y = 0.80F + (9.0F - z) * (3.30F / 5.80F);
+            const wkc::core::Vec3 onRail{railX, y, z};
+            expect(std::any_of(parts.begin(), parts.end(),
+                    [&onRail](const world::RoomArchitecturePart& part) {
+                        return part.combatPart
+                                == world::CombatArchitecturePart::StairRailSlope
+                            && part.bounds.contains(onRail);
+                    }),
+                "sloped stair handrail has a continuous compact collider");
+        }
+        expect(std::any_of(parts.begin(), parts.end(),
+                [railX](const world::RoomArchitecturePart& part) {
+                    return part.combatPart
+                            == world::CombatArchitecturePart::StairRailSlope
+                        && part.bounds.contains({railX, 4.10F, 3.20F});
+                }),
+            "stair handrail connects to the gallery handrail");
+    }
+    const auto lighting = world::generateRoomLightingPlan(room.seed,
+        room.role, room.theme, room.worldBounds);
+    for (const auto& light : lighting.lights) {
+        expect(std::none_of(parts.begin(), parts.end(),
+                [&light](const world::RoomArchitecturePart& part) {
+                    return (part.combatPart
+                                == world::CombatArchitecturePart::CeilingBeam
+                            || part.combatPart
+                                == world::CombatArchitecturePart::CeilingPanel
+                            || part.combatPart
+                                == world::CombatArchitecturePart::CeilingGrille)
+                        && part.bounds.contains(light.position);
+                }),
+            "Combat ceiling structure leaves each fixture origin exposed");
+    }
     EntityManager manager;
     const auto initial = game::populateCombatRoomPreview(preview, manager, {
         .transform = {.position = {0.0F, 0.0F, 4.0F}},
@@ -218,10 +312,59 @@ void testCombatRoomPreview()
             && navigation.canOccupy({5.0F, 0.0F, 4.0F})
             && navigation.canOccupy({-5.0F, 0.0F, -4.0F}),
         "center and flanks remain traversable");
+    for (const float side : {-1.0F, 1.0F}) {
+        bool directSideDoorApproach = true;
+        for (const float x : {8.0F, 8.2F, 8.4F, 8.6F,
+                 8.8F, 9.0F, 9.2F, 9.4F}) {
+            directSideDoorApproach = directSideDoorApproach
+                && navigation.canOccupy({side * x, 0.0F, 0.0F});
+        }
+        expect(directSideDoorApproach,
+            "gallery pillars leave a direct player-width path to each side door");
+    }
+    const auto library = world::makeDefaultRoomModuleLibrary();
+    const auto gallery = std::find_if(library.begin(), library.end(),
+        [](const world::RoomModule& module) {
+            return module.id == world::combatGalleryArenaModuleId;
+        });
+    expect(gallery != library.end(), "campaign gallery module is available");
+    if (gallery != library.end()) {
+        for (const auto rotation : {wkc::core::QuarterTurn::Degrees0,
+                 wkc::core::QuarterTurn::Degrees90,
+                 wkc::core::QuarterTurn::Degrees180,
+                 wkc::core::QuarterTurn::Degrees270}) {
+            const auto placed = world::instantiateRoom(*gallery, 1U,
+                world::RoomRole::Arena, 20261028U, {}, rotation);
+            expect(placed.has_value(),
+                "campaign gallery instantiates with all four doorways");
+            if (!placed) continue;
+            const auto placedParts = world::makeRoomArchitecture(*placed);
+            expect(placed->connectors.size() == 4U
+                    && world::validateRoomArchitecture(*placed, placedParts),
+                "gallery pillars clear all four campaign doors in every rotation");
+            auto rotatedPreview = preview;
+            rotatedPreview.rooms.front() = *placed;
+            const CollisionWorld rotatedNavigation = makeRoomNavigationCollision(
+                rotatedPreview, placed->id, false);
+            for (const float side : {-1.0F, 1.0F}) {
+                bool approach = true;
+                for (const float x : {8.0F, 8.2F, 8.4F, 8.6F,
+                         8.8F, 9.0F, 9.2F, 9.4F}) {
+                    const auto feet = wkc::core::rotateQuarterTurns(
+                        {side * x, 0.0F, 0.0F}, rotation);
+                    approach = approach && rotatedNavigation.canOccupy(feet);
+                }
+                expect(approach,
+                    "both campaign side doors keep a direct player-width approach after rotation");
+            }
+        }
+    }
     expect(!navigation.canOccupy({3.2F, 0.0F, -3.6F})
             && !navigation.canOccupy({-3.2F, 0.0F, 3.6F})
-            && !navigation.canOccupy({6.9F, 0.0F, 0.0F}),
-        "visible waist and tall cover have navigation collision");
+            && !navigation.canOccupy({6.9F, 0.0F, 0.0F})
+            && !navigation.canOccupy({5.3F, 0.0F, 5.8F})
+            && navigation.canOccupy({0.0F, 0.0F, 5.8F}),
+        "spaced parapets block their footprints and leave a central path");
     for (const float side : {-1.0F, 1.0F}) {
         expect(navigation.canOccupy({side * 9.1F, 0.0F, 4.0F}),
             "upper wall-mounted treads leave walkable space beneath them");
@@ -379,16 +522,36 @@ void testCafeteriaLongPreview()
             && !navigation.canOccupy({3.0F, 0.0F, 7.0F})
             && !navigation.canOccupy({6.5F, 0.0F, 7.0F}),
         "long Cafeteria keeps end and side approaches while tables and counter collide");
-    expect(!navigation.canOccupy({-7.8F, 0.0F, -10.7F})
-            && !navigation.canOccupy({-7.8F, 0.0F, 10.7F})
-            && navigation.canOccupy({-5.8F, 0.0F, -10.7F})
-            && navigation.canOccupy({-5.8F, 0.0F, 10.7F}),
-        "Cafeteria planters collide while the end aisles stay traversable");
     entities::EntityManager manager;
     const auto initial = game::populateCafeteriaPreview(preview, manager, {
         .transform = {.position = {0.0F, 0.0F, 4.0F}}, .health = 100.0F});
     expect(initial.isValid() && manager.query(entities::EntityKind::Enemy).empty(),
         "long Cafeteria preview starts clear for playtest");
+    for (const world::RoomArchitecturePart& part : parts) {
+        if (part.decoration != world::RoomDecorationPart::BroadleafPlanter)
+            continue;
+        const wkc::core::Vec3 size = part.bounds.maximum - part.bounds.minimum;
+        const wkc::core::Vec3 position{
+            (part.bounds.minimum.x + part.bounds.maximum.x) * 0.5F,
+            part.bounds.minimum.y,
+            (part.bounds.minimum.z + part.bounds.maximum.z) * 0.5F,
+        };
+        (void)manager.createProp({
+            .transform = {.position = position, .scale = size},
+            .roomId = room.id,
+            .type = entities::PropType::CafeteriaPlanter,
+            .solid = true,
+            .health = 2.0F,
+            .maximumHealth = 2.0F,
+        });
+    }
+    const auto withBreakablePlants = gameplay::collisionWorldWithProps(
+        navigation, manager, room.id);
+    expect(!withBreakablePlants.canOccupy({-7.8F, 0.0F, -10.7F})
+            && !withBreakablePlants.canOccupy({-7.8F, 0.0F, 10.7F})
+            && withBreakablePlants.canOccupy({-5.8F, 0.0F, -10.7F})
+            && withBreakablePlants.canOccupy({-5.8F, 0.0F, 10.7F}),
+        "breakable Cafeteria planters collide while the end aisles stay traversable");
 }
 
 void testLaboratoryPreview()
@@ -493,7 +656,10 @@ void testTechnicalPreview()
             .transform = {.position = position, .scale = scale},
             .roomId = room.id, .type = PropType::StorageBox,
             .solid = true, .health = 35.0F, .maximumHealth = 35.0F,
+            .tabletopBox = true,
         });
+        expect(manager.findData<PropData>(target)->tabletopBox,
+            "Technical tabletop box keeps its visual classification");
         const CollisionWorld withBox = collisionWorldWithProps(
             navigation, manager, room.id);
         Weapon gun({.damage = 70.0F, .fireInterval = 0.0F, .range = 10.0F});
@@ -625,6 +791,32 @@ void testSecurityPreview()
     const auto parts = world::makeRoomArchitecture(room);
     expect(!parts.empty() && world::validateRoomArchitecture(room, parts),
         "Security furniture clears reserved encounter positions");
+    expect(std::count_if(parts.begin(), parts.end(),
+            [](const world::RoomArchitecturePart& part) {
+                return part.securityFurniturePart
+                    == world::SecurityFurniturePart::Monitor;
+            }) == 2
+            && std::count_if(parts.begin(), parts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.securityFurniturePart
+                        == world::SecurityFurniturePart::ObservationPanel;
+                }) == 1
+            && std::count_if(parts.begin(), parts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.securityFurniturePart
+                        == world::SecurityFurniturePart::ObservationSurround;
+                }) == 4
+            && std::count_if(parts.begin(), parts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.decoration == world::RoomDecorationPart::Planter;
+                }) == 2
+            && std::count_if(parts.begin(), parts.end(),
+                [](const world::RoomArchitecturePart& part) {
+                    return part.decoration
+                            == world::RoomDecorationPart::CeilingDuct
+                        && part.bounds.minimum.y >= 5.0F;
+                }) == 2,
+        "Security square has stations, a housed display, plants and overhead ducts");
     EntityManager manager;
     const auto initial = game::populateSecurityPreview(preview, manager, {
         .transform = {.position = {0.0F, 0.0F, 4.0F}},
@@ -644,6 +836,8 @@ void testSecurityPreview()
             && !navigation.canOccupy({6.0F, 0.0F, -8.0F})
             && !navigation.canOccupy({-4.2F, 0.0F, 3.8F})
             && !navigation.canOccupy({4.2F, 0.0F, -3.8F})
+            && navigation.canOccupy({-6.0F, 0.0F, 8.0F})
+            && navigation.canOccupy({6.0F, 0.0F, 8.0F})
             && navigation.canOccupy({0.0F, 0.0F, 3.8F})
             && navigation.canOccupy({0.0F, 0.0F, -3.8F})
             && navigation.canOccupy({-6.0F, 0.0F, 3.8F})
@@ -772,6 +966,10 @@ void testIndustrialCorridorPreview()
     const auto& first = preview.rooms.front();
     const auto& second = preview.rooms.back();
     const auto& corridor = preview.corridors.front();
+    expect(first.moduleId == world::industrialCorridorStartPreviewModuleId
+            && world::makeRoomArchitecture(first).empty()
+            && world::validateRoomArchitecture(first, {}),
+        "corridor start preview keeps the widened doorway clear");
     expect(second.moduleId
                 == world::industrialCorridorDestinationPreviewModuleId
             && world::makeRoomArchitecture(second).empty()

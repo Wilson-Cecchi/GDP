@@ -1,5 +1,8 @@
 # Plano de formatos das salas
 
+Após concluir e integrar as salas à campanha, seguir para o
+[plano visual do arsenal e do Player](../visual/weapon_visual_roadmap.md).
+
 ## Critério de sala pronta
 
 Uma **variante de sala** só recebe o estado **pronta** quando seu formato,
@@ -12,36 +15,58 @@ testada, sem se estender automaticamente às outras salas do mesmo tema.
 | Variante | Estado pelo critério completo | Falta para fechar |
 | --- | --- | --- |
 | Storage Hall, 18 × 20 m | **Pronta** | — |
-| Central Hub octogonal | Em validação | Conexões em partida e aprovação final dos objetos/materiais aplicados. |
+| Central Hub octogonal | **Pronta** | — |
 | Manutenção em L | **Pronta** | — |
-| Cafeteria alongada, 18 × 24 m | **Pronta** | — |
-| Segurança em T | **Pronta na prévia isolada** | Integração na campanha é etapa separada. |
+| Laboratório grande, 18 × 20 m | **Pronta** | — |
+| Cafeteria alongada, 18 × 24 m | **Pronta na prévia isolada** | Validar a variante já incluída na biblioteca em partidas de campanha. |
+| Segurança em T | **Pronta na prévia isolada** | Validar a variante já incluída na biblioteca em partidas de campanha. |
 | Arena do Boss com colunas | Em validação | Playtest da revisão com colunas e aceite visual completo da variante. |
-| Laboratório redesenhado | Em validação na campanha | Playtest do formato, materiais, móveis e colunas na sala do Terminal da semente 2. |
-| Arena de combate redesenhada | Prévia | Playtest do formato e materiais finais dos objetos. |
+| Segurança quadrada | **Pronta na prévia isolada** | Validar a variante agora integrada à biblioteca em partida de campanha. |
+| Arena de combate redesenhada | Prancha aprovada; revisão integrada em validação | Validar parede, piso, teto, galerias, escadas, colunas e coberturas em partida. A primeira prévia foi reprovada. |
 | Office deslocado | Planejada | Formato, objetos e materiais da variante. |
 
-Estado em 02/11/2026: Central Hub octogonal e Manutenção em L estão na geração
+Em 20/11/2026, a `CafeteriaHall_01` recebeu mesas, bancos e balcão para a
+variante de 18 × 18 m; os módulos Office receberam estação e acabamento de
+metal próprios. Variantes compactas de Cafeteria, Segurança, Laboratório e
+Manutenção receberam uma estação pequena coerente com o tema. Essas mudanças
+estão integradas para [playtest de campanha](campaign_visual_playtest_2026-11-20.md)
+e ainda não alteram o estado de aprovação das variantes acima.
+
+Estado em 02/11/2026: Central Hub octogonal e Manutenção em L estavam na geração
 da campanha para playtest das conexões. A Cafeteria alongada foi aprovada em
-partida como variante pronta, mas ainda está disponível apenas na prévia
-isolada; sua entrada na campanha é uma etapa de integração distinta.
+partida na prévia isolada. Em 15/11/2026, o código já inclui a variante longa
+na biblioteca da campanha; falta validar suas conexões e encontros em partida.
 Em 14/11/2026, o usuário aprovou a variante em L da Manutenção com seus móveis,
 materiais e teto revisado. A campanha na semente 1793, a travessia e a geração
 de mundo passaram pelos testes; a variante passa a **pronta**.
 Segurança em T foi aprovada pelo usuário em 03/11/2026, após o teste da
-sequência de indicadores. Continua em prévia isolada; a campanha ainda não
-recebeu esse formato.
+sequência de indicadores. Em 15/11/2026, o código já inclui a variante na
+biblioteca da campanha; falta validar suas conexões e encontros em partida.
+As travessas de teto de Storage, Cafeteria, Segurança, Laboratório e Hub foram
+aprovadas em 15/11/2026; esse aceite não fecha outras pendências dessas salas.
+Em 15/11/2026, o usuário aprovou a Segurança quadrada depois dos dutos no
+teto. A composição da prévia foi integrada ao módulo `SecurityHall_01` da
+campanha; a semente `1` coloca essa variante no primeiro andar para validar
+portas, encontros e circulação em partida real.
+Em 15/11/2026, o usuário aprovou o Laboratório grande após testar vasos
+quebráveis e a correção das marcas de tiro nas paredes; essa variante está pronta.
+O usuário já havia aprovado o Central Hub octogonal após os acabamentos de
+piso, paredes, coluna e objetos; a revisão das travessas preserva esse aceite.
+Em 15/11/2026, a prancha da Arena de Combate foi aprovada. A primeira prévia
+foi reprovada por se afastar da composição. A revisão reúne materiais de
+parede, piso e teto e arquitetura 3D na prévia e na variante da campanha;
+a avaliação visual e de combate ainda depende de playtest.
 
 ## Biblioteca de formatos
 
 | Sala | Estado | Formato e medida de referência | Uso proposto |
 | --- | --- | --- | --- |
-| Central Hub | Campanha em teste | Octógono regular, limite 20 × 20 m, 6 m de altura | Módulo Hub com portas nas quatro faces cardeais e marco central. |
+| Central Hub | Pronta na campanha | Octógono regular, limite 20 × 20 m, 6 m de altura | Módulo Hub com portas nas quatro faces cardeais e marco central. |
 | Manutenção | Campanha em teste | L dentro de 16 × 20 m, 5,5 m de altura | Variante normal grande junto da versão retangular. |
-| Cafeteria | Prévia aprovada | Retângulo 18 × 24 m, 6 m de altura | Variante longa pronta na prévia; `CafeteriaHall_01` da campanha continua em 18 × 18 m. |
+| Cafeteria | Biblioteca da campanha; playtest pendente | Retângulo 18 × 24 m, 6 m de altura | Variante longa aprovada na prévia; `CafeteriaHall_01` de 18 × 18 m também permanece na campanha. |
 | Storage | Manter por ora | Hall 18 × 20 m | Já oferece um eixo longo e estantes centrais; revisar após playtest conjunto. |
-| Laboratory | Em playtest | Hall 18 × 20 m | Geometria da prévia integrada à variante grande da campanha; aprovação visual pendente. |
-| Security | Prévia isolada em teste | Corpo em T, limite 20 × 20 m, 6 m de altura | Galeria larga com duas rotas laterais e aproximação central de 8 m. |
+| Laboratory | Pronta na campanha | Hall 18 × 20 m | Geometria e visual da variante grande aprovados em partida. |
+| Security | Biblioteca da campanha; playtest pendente | Corpo em T, limite 20 × 20 m, 6 m de altura | Galeria larga com duas rotas laterais e aproximação central de 8 m. |
 | Office | Ideia posterior | Planta deslocada, com um recuo lateral | Diferenciar a circulação da Manutenção em L sem transformar toda sala em corredor. |
 | Boss | Colunas em playtest | 28 × 32 m, 7 m de altura | Duas colunas no flanco direito complementam as barricadas existentes; desníveis caminháveis ficam para outra etapa. |
 
@@ -68,8 +93,8 @@ A sala tem uma aproximação sul de 8 m de largura que se abre numa galeria de
 20 m. Duas estações de controle ficam na parede norte; armários ficam nas
 paredes da aproximação e duas coberturas baixas marcam as rotas laterais.
 O corredor central e o encontro entre as três partes do T permanecem livres.
-A prévia usa os materiais atuais da Segurança para avaliar apenas formato,
-circulação e colisão. Ainda não é uma variante da campanha.
+A prévia permite avaliar formato, circulação e colisão sem inimigos; a variante
+equivalente também está na biblioteca da campanha para teste em encontros reais.
 
 ```bash
 cmake --build build/playtest --target gdp

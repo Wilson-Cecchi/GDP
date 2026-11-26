@@ -443,6 +443,8 @@ ImpactMaterial propImpactMaterial(
     switch (prop.type) {
     case PropType::Crate:
     case PropType::StorageBox:
+    case PropType::LaboratoryPlanter:
+    case PropType::CafeteriaPlanter:
     case PropType::Barricade:
     case PropType::Decoration:
         return ImpactMaterial::Composite;
@@ -450,6 +452,7 @@ ImpactMaterial propImpactMaterial(
     case PropType::Door:
     case PropType::Canister:
     case PropType::CeilingFixture:
+    case PropType::SecurityMonitor:
         return ImpactMaterial::Metal;
     }
     return ImpactMaterial::Composite;
@@ -740,17 +743,20 @@ static ShotContact traceHitscan(
             || prop->state == gdp::entities::PropState::Destroyed) {
             continue;
         }
-        const auto interval = rayAabbInterval(
-            origin, direction, propCollisionBounds(*entity, *prop), range);
-        if (!interval || interval->nearDistance > worldDistance + 1.0e-4F
-            || (nearestHit && interval->nearDistance >= nearestHit->distance)) {
-            continue;
+        const PropSolidBounds parts = propPhysicalBounds(*entity, *prop);
+        for (std::size_t index = 0U; index < parts.count; ++index) {
+            const auto interval = rayAabbInterval(
+                origin, direction, parts.parts[index], range);
+            if (!interval || interval->nearDistance > worldDistance + 1.0e-4F
+                || (nearestHit && interval->nearDistance >= nearestHit->distance)) {
+                continue;
+            }
+            nearestHit = HitResult{
+                id,
+                origin + (direction * interval->nearDistance),
+                interval->nearDistance,
+            };
         }
-        nearestHit = HitResult{
-            id,
-            origin + (direction * interval->nearDistance),
-            interval->nearDistance,
-        };
     }
 
     if (nearestHit) {
@@ -778,8 +784,20 @@ static ShotContact traceHitscan(
             * (archetype == WeaponArchetype::Shotgun
                 ? std::clamp(1.0F - nearestHit->distance / 20.0F, 0.25F, 1.0F) : 1.0F);
         if (targetIsProp) {
+            bool directPotHit = false;
+            const gdp::entities::PropData* prop
+                = manager.findData<gdp::entities::PropData>(nearestHit->target);
+            if (prop != nullptr && target != nullptr
+                && prop->type == gdp::entities::PropType::LaboratoryPlanter
+                && prop->state == gdp::entities::PropState::Intact) {
+                auto potState = *prop;
+                potState.state = gdp::entities::PropState::Damaged;
+                // The dome is hit first; check whether this same ray also reaches the pot.
+                directPotHit = rayAabbInterval(origin, direction,
+                    propCollisionBounds(*target, potState), range).has_value();
+            }
             const PropDamageResult damage
-                = damageProp(manager, nearestHit->target, damageAmount);
+                = damageProp(manager, nearestHit->target, damageAmount, directPotHit);
             const ShotOutcome outcome = damage.outcome == PropDamageOutcome::Destroyed
                 ? ShotOutcome::Destroyed
                 : damage.outcome == PropDamageOutcome::Damaged ? ShotOutcome::Hit

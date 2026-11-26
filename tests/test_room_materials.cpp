@@ -193,6 +193,97 @@ void testRepresentativeMaterialSet()
         "wall, floor and ceiling derive independent material sub-seeds");
 }
 
+void testDedicatedCorridorMaterial()
+{
+    using namespace gdp::game::visual;
+    constexpr wkc::core::Seed seed = 20261120U;
+    const auto first = generateCorridorRoomMaterials(seed);
+    const auto repeated = generateCorridorRoomMaterials(seed);
+    const auto different = generateCorridorRoomMaterials(seed + 1U);
+    const auto transit = generateCorridorRoomMaterials(
+        seed, CorridorSurfacePattern::StructuralTransit);
+    const auto repeatedTransit = generateCorridorRoomMaterials(
+        seed, CorridorSurfacePattern::StructuralTransit);
+    expect(first == repeated && first.materialHash != different.materialHash,
+        "corridor material has a stable independent seed");
+    expect(validateCorridorRoomMaterials(first).isValid()
+            && validateCorridorRoomMaterials(transit).isValid()
+            && transit == repeatedTransit
+            && first.materialHash != transit.materialHash,
+        "service and transit corridor families validate with distinct stable hashes");
+    for (const auto& materials : {first, transit}) {
+        for (const auto& recipe : materials.surfaces) {
+            const auto images = generateCorridorSurfaceMaterialImages(recipe);
+            expect(recipe.emissiveAmount == 0.0F && images
+                    && wkc::render::validateImageData(images->albedo)
+                    && wkc::render::validateImageData(images->normal)
+                    && wkc::render::validateImageData(images->properties),
+                "corridor surfaces have physical material maps without baked lights");
+        }
+    }
+    const auto serviceWall = generateCorridorSurfaceMaterialImages(
+        first.surfaces[static_cast<std::size_t>(RoomSurface::Wall)]);
+    const auto transitWall = generateCorridorSurfaceMaterialImages(
+        transit.surfaces[static_cast<std::size_t>(RoomSurface::Wall)]);
+    const auto serviceFloor = generateCorridorSurfaceMaterialImages(
+        first.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
+    const auto transitFloor = generateCorridorSurfaceMaterialImages(
+        transit.surfaces[static_cast<std::size_t>(RoomSurface::Floor)]);
+    expect(serviceWall && transitWall && serviceFloor && transitFloor
+            && imageHash(serviceWall->albedo) != imageHash(transitWall->albedo)
+            && imageHash(serviceWall->properties) != imageHash(transitWall->properties)
+            && imageHash(serviceFloor->albedo) != imageHash(transitFloor->albedo),
+        "warm service and slate transit finishes differ in paint and rough metal");
+}
+
+void testOfficePanelsDifferFromCorridor()
+{
+    using namespace gdp::game::visual;
+    auto corridor = generateCorridorRoomMaterials(20261120U);
+    auto office = corridor;
+    for (auto& recipe : office.surfaces) {
+        recipe.pattern = CorridorSurfacePattern::Office;
+    }
+    office.materialHash = hashCorridorRoomMaterials(office);
+    expect(validateCorridorRoomMaterials(office).isValid()
+            && office.materialHash != corridor.materialHash,
+        "Office surface pattern validates and has a separate material key");
+    const auto corridorWall = generateCorridorSurfaceMaterialImages(
+        corridor.surfaces[static_cast<std::size_t>(RoomSurface::Wall)]);
+    const auto officeWall = generateCorridorSurfaceMaterialImages(
+        office.surfaces[static_cast<std::size_t>(RoomSurface::Wall)]);
+    expect(corridorWall && officeWall,
+        "corridor and Office wall maps both generate");
+    if (!corridorWall || !officeWall) return;
+    const auto occlusionAt = [](const wkc::render::ImageData& image,
+                                 const std::size_t x, const std::size_t y) {
+        return image.rgba[(y * static_cast<std::size_t>(image.width) + x) * 4U + 2U];
+    };
+    expect(occlusionAt(corridorWall->properties, 128U, 100U)
+            < occlusionAt(corridorWall->properties, 90U, 100U)
+            && occlusionAt(officeWall->properties, 128U, 100U)
+                == occlusionAt(officeWall->properties, 90U, 100U)
+            && occlusionAt(officeWall->properties, 0U, 100U)
+                < occlusionAt(officeWall->properties, 90U, 100U),
+        "Office uses broad recessed cassettes instead of corridor's narrow seams");
+    const auto repeated = generateCorridorSurfaceMaterialImages(
+        office.surfaces[static_cast<std::size_t>(RoomSurface::Wall)]);
+    auto otherSeed = office.surfaces[static_cast<std::size_t>(RoomSurface::Wall)];
+    ++otherSeed.seed;
+    const auto varied = generateCorridorSurfaceMaterialImages(otherSeed);
+    expect(repeated && varied
+            && imageHash(officeWall->albedo) == imageHash(repeated->albedo)
+            && imageHash(officeWall->normal) == imageHash(repeated->normal)
+            && imageHash(officeWall->properties) == imageHash(repeated->properties)
+            && imageHash(officeWall->albedo) != imageHash(varied->albedo),
+        "Office metal albedo, relief and properties generate deterministically");
+    expect(occlusionAt(officeWall->properties, 2U, 100U)
+            < occlusionAt(officeWall->properties, 4U, 100U)
+            && officeWall->albedo.rgba[(100U * 256U + 90U) * 4U]
+                > officeWall->albedo.rgba[(100U * 256U) * 4U],
+        "Office seams stay narrow and the main metal plates remain legible");
+}
+
 void testStructuredSurfaceAlbedos()
 {
     using namespace wkc::procedural;
@@ -274,8 +365,8 @@ void testIndustrialHdMaterialMaps()
         const IndustrialSurfaceRecipe recipe = makeIndustrialWallArchetypeRecipe(
             conditions[index]);
         const auto images = generateIndustrialWallMaterialImages(recipe);
-        expect(recipe.version == 2U && recipe.resolution == 1024U,
-            "approved Industrial wall archetypes use the versioned 1024 HD contract");
+        expect(recipe.version == 3U && recipe.resolution == 1024U,
+            "Industrial graphite wall archetypes use the versioned 1024 HD contract");
         expect(images && images->albedo.width == 1024 && images->normal.width == 1024
                 && images->properties.width == 1024
                 && wkc::render::validateImageData(images->albedo)
@@ -411,8 +502,8 @@ void testApprovedIndustrialWallDirection()
         IndustrialCondition::Used,
         IndustrialCondition::Worn,
     };
-    constexpr std::array<std::uint8_t, 3> exposedSteel{139U, 144U, 145U};
-    constexpr std::array<std::uint8_t, 3> jointColor{21U, 26U, 28U};
+    constexpr std::array<std::uint8_t, 3> exposedSteel{100U, 98U, 94U};
+    constexpr std::array<std::uint8_t, 3> jointColor{24U, 24U, 23U};
     std::array<std::size_t, 3> exposedCounts{};
 
     for (std::size_t index = 0; index < seeds.size(); ++index) {
@@ -778,6 +869,337 @@ void testStructuredCombatAlbedos()
         = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
     expect(exactColorCount(*ceiling, ceilingRecipe.accentColor) == 0U,
         "Combat ceiling albedo preserves heavy beams without painted fixtures");
+}
+
+void testCombatGalleryWallVariant()
+{
+    using namespace gdp::game::visual;
+
+    const auto boss = generateCombatRoomMaterials(13579, false, true);
+    const auto bossRepeated = generateCombatRoomMaterials(13579, false, true);
+    const auto galleryReference = generateCombatRoomMaterials(13579, true);
+    expect(boss == bossRepeated && validateCombatRoomMaterials(boss).isValid()
+            && boss.materialHash != galleryReference.materialHash,
+        "Boss arena has deterministic valid materials distinct from the gallery");
+    expect(std::all_of(boss.surfaces.begin(), boss.surfaces.end(),
+               [](const CombatSurfaceRecipe& recipe) {
+                   return recipe.version == 4U && recipe.resolution == 256U;
+               }),
+        "Boss walls, floor and ceiling use dedicated physical-scale PBR recipes");
+
+    std::array<bool, static_cast<std::size_t>(CombatCondition::Count)> seenConditions{};
+    for (wkc::core::Seed seed = 0; seed < 80; ++seed) {
+        const CombatRoomMaterialSet baseline = generateCombatRoomMaterials(seed);
+        const CombatRoomMaterialSet gallery = generateCombatRoomMaterials(seed, true);
+        const CombatRoomMaterialSet repeated = generateCombatRoomMaterials(seed, true);
+        expect(gallery == repeated && validateCombatRoomMaterials(gallery).isValid(),
+            "gallery wall recipe is deterministic and valid");
+        expect(gallery.materialHash != baseline.materialHash,
+            "gallery wall has a distinct canonical material hash");
+        for (std::size_t surface = 0; surface < gallery.surfaces.size(); ++surface) {
+            const CombatSurfaceRecipe& recipe = gallery.surfaces[surface];
+            const bool floor = surface == static_cast<std::size_t>(RoomSurface::Floor);
+            expect(recipe.version == (surface == 0U ? 2U : 3U)
+                    && recipe.resolution == 256U
+                    && recipe.panelColumns == (floor ? 1U : 2U)
+                    && recipe.panelRows == (floor ? 1U : 2U),
+                "gallery uses one 2 m floor plate and four ceiling and wall plates per tile");
+            expect(recipe != baseline.surfaces[surface],
+                "gallery surface recipe differs from the Boss baseline");
+        }
+        seenConditions[static_cast<std::size_t>(gallery.condition)] = true;
+        if (seed >= 6 && std::all_of(seenConditions.begin(), seenConditions.end(),
+                [](const bool seen) { return seen; })) {
+            break;
+        }
+    }
+    expect(std::all_of(seenConditions.begin(), seenConditions.end(),
+               [](const bool seen) { return seen; }),
+        "gallery wall supports Ready, Active and Scarred conditions");
+
+    const CombatRoomMaterialSet baseline = generateCombatRoomMaterials(13579);
+    const CombatRoomMaterialSet gallery = generateCombatRoomMaterials(13579, true);
+    std::array<wkc::render::ImageData, 3> images;
+    for (std::size_t surface = 0; surface < images.size(); ++surface) {
+        const auto oldImage = generateCombatSurfaceAlbedo(baseline.surfaces[surface]);
+        const auto newImage = generateCombatSurfaceAlbedo(gallery.surfaces[surface]);
+        expect(oldImage && newImage && wkc::render::validateImageData(*newImage)
+                && imageHash(*oldImage) != imageHash(*newImage),
+            "each gallery surface produces a distinct renderer-valid albedo");
+        if (!newImage) {
+            return;
+        }
+        images[surface] = *newImage;
+    }
+    const auto& newWall = images[0];
+    const auto& newFloor = images[1];
+    const auto& newCeiling = images[2];
+    if (newWall.rgba.empty() || newFloor.rgba.empty() || newCeiling.rgba.empty()) {
+        return;
+    }
+    // Every tile edge belongs to the dark joint, so the 2 m UV repeat has
+    // no visible discontinuity even when adjacent panels vary in tone.
+    for (const auto& image : images) {
+        const std::array<std::uint8_t, 3> edgeColor{
+            image.rgba[0], image.rgba[1], image.rgba[2]};
+        for (int coordinate = 0; coordinate < image.width; ++coordinate) {
+            expect(pixelMatches(image, coordinate, 0, edgeColor)
+                    && pixelMatches(image, coordinate, image.height - 1, edgeColor),
+                "gallery surface top and bottom tile edges are seamless joints");
+            expect(pixelMatches(image, 0, coordinate, edgeColor)
+                    && pixelMatches(image, image.width - 1, coordinate, edgeColor),
+                "gallery surface left and right tile edges are seamless joints");
+        }
+    }
+    expect(exactColorCount(newWall, {0.045F, 0.05F, 0.04F}) == 0U,
+        "gallery wall does not bake repeating bullet-hole cores into its tile");
+    expect(exactColorCount(newFloor, baseline.surfaces[1].accentColor) == 0U,
+        "gallery floor does not repeat the old yellow perimeter per tile");
+    expect(exactColorCount(newCeiling, baseline.surfaces[2].accentColor) == 0U,
+        "gallery ceiling does not bake a luminous fixture into its albedo");
+    const auto channelRange = [](const wkc::render::ImageData& image) {
+        std::uint8_t low = 255U;
+        std::uint8_t high = 0U;
+        for (std::size_t pixel = 0; pixel < image.rgba.size(); pixel += 4U) {
+            low = std::min(low, image.rgba[pixel]);
+            high = std::max(high, image.rgba[pixel]);
+        }
+        return std::pair{low, high};
+    };
+    const auto [floorLow, floorHigh] = channelRange(newFloor);
+    const auto [ceilingLow, ceilingHigh] = channelRange(newCeiling);
+    expect(floorHigh > floorLow + 12U && floorHigh < 75U,
+        "gallery graphite floor has readable but restrained joints, bolts and wear");
+    expect(ceilingHigh > ceilingLow + 8U && ceilingHigh < 65U,
+        "gallery ceiling has panel detail without painted bright fixtures");
+    const std::array<std::uint8_t, 3> floorJoint{
+        newFloor.rgba[0], newFloor.rgba[1], newFloor.rgba[2]};
+    expect(!pixelMatches(newFloor, newFloor.width / 2, 20, floorJoint)
+            && !pixelMatches(newFloor, 20, newFloor.height / 2, floorJoint),
+        "2 m floor plate has no repeated 1 m central seam");
+    const auto averageChannel = [](const wkc::render::ImageData& image) {
+        std::uint64_t sum = 0U;
+        for (std::size_t pixel = 0; pixel < image.rgba.size(); pixel += 4U) {
+            sum += image.rgba[pixel];
+        }
+        return static_cast<float>(sum) / static_cast<float>(image.rgba.size() / 4U);
+    };
+    expect(averageChannel(newFloor) < averageChannel(newWall)
+            && averageChannel(newCeiling) < averageChannel(newWall),
+        "gallery floor and ceiling stay darker than the olive wall");
+    const auto baselineWall = generateCombatSurfaceAlbedo(baseline.surfaces[0]);
+    const auto baselineFloor = generateCombatSurfaceAlbedo(baseline.surfaces[1]);
+    expect(baselineWall && baselineFloor
+            && averageChannel(newWall) < averageChannel(*baselineWall) * 0.65F
+            && averageChannel(newFloor) < averageChannel(*baselineFloor) * 0.65F,
+        "gallery wall and floor stay materially darker than the legacy Combat set");
+    expect(gallery.surfaces[1].baseColor.z >= gallery.surfaces[1].baseColor.x,
+        "gallery floor keeps a cool graphite tone instead of warm brown");
+}
+
+void testBossArenaSurfaceMaterialImages()
+{
+    using namespace gdp::game::visual;
+    const auto boss = generateCombatRoomMaterials(13579, false, true);
+    const auto repeated = generateCombatRoomMaterials(13579, false, true);
+    const auto different = generateCombatRoomMaterials(13580, false, true);
+    const auto gallery = generateCombatRoomMaterials(13579, true);
+    expect(boss == repeated && boss.materialHash != different.materialHash
+            && boss.materialHash != gallery.materialHash,
+        "Boss PBR recipe is deterministic, seed-dependent and gallery-independent");
+
+    for (std::size_t surface = 0U; surface < boss.surfaces.size(); ++surface) {
+        const auto maps = generateBossArenaSurfaceMaterialImages(boss.surfaces[surface]);
+        const auto mapsAgain = generateBossArenaSurfaceMaterialImages(repeated.surfaces[surface]);
+        const auto mapsDifferent = generateBossArenaSurfaceMaterialImages(
+            different.surfaces[surface]);
+        const auto oldGallery = generateCombatSurfaceAlbedo(gallery.surfaces[surface]);
+        expect(maps && mapsAgain && mapsDifferent && oldGallery,
+            "Boss surfaces generate complete PBR maps");
+        if (!maps || !mapsAgain || !mapsDifferent || !oldGallery) {
+            continue;
+        }
+        for (const auto* image : {&maps->albedo, &maps->normal, &maps->properties}) {
+            expect(image->width == 256 && image->height == 256
+                    && wkc::render::validateImageData(*image),
+                "Boss maps are valid 256 px RGBA images");
+        }
+        expect(imageHash(maps->albedo) == imageHash(mapsAgain->albedo)
+                && imageHash(maps->normal) == imageHash(mapsAgain->normal)
+                && imageHash(maps->properties) == imageHash(mapsAgain->properties)
+                && imageHash(maps->albedo) != imageHash(mapsDifferent->albedo)
+                && imageHash(maps->albedo) != imageHash(*oldGallery),
+            "Boss material pixels are reproducible and distinct from the gallery");
+        const auto oldBossAlbedo = generateCombatSurfaceAlbedo(boss.surfaces[surface]);
+        expect(oldBossAlbedo && imageHash(*oldBossAlbedo) == imageHash(maps->albedo),
+            "Combat albedo API returns the same Boss albedo as the full PBR API");
+
+        std::uint8_t minimumRoughness = 255U;
+        std::uint8_t maximumRoughness = 0U;
+        std::uint8_t minimumNormalX = 255U;
+        std::uint8_t maximumNormalX = 0U;
+        std::uint64_t metalnessTotal = 0U;
+        for (std::size_t index = 0U; index < maps->properties.rgba.size(); index += 4U) {
+            minimumRoughness = std::min(minimumRoughness, maps->properties.rgba[index]);
+            maximumRoughness = std::max(maximumRoughness, maps->properties.rgba[index]);
+            minimumNormalX = std::min(minimumNormalX, maps->normal.rgba[index]);
+            maximumNormalX = std::max(maximumNormalX, maps->normal.rgba[index]);
+            metalnessTotal += maps->properties.rgba[index + 1U];
+        }
+        const auto meanMetalness = metalnessTotal / (256U * 256U);
+        expect(maximumRoughness > minimumRoughness + 40U
+                && meanMetalness > 170U
+                && maximumNormalX > minimumNormalX + 40U,
+            "Boss plates have variable roughness, metal response and recessed relief");
+        expect(maps->albedo.rgba[0] == maps->albedo.rgba[(255U * 4U)]
+                && maps->albedo.rgba[0]
+                    == maps->albedo.rgba[(255U * 256U * 4U)],
+            "Boss material tile boundaries share the same recessed seam color");
+    }
+    expect(!generateBossArenaSurfaceMaterialImages(gallery.surfaces[0]),
+        "Boss PBR API rejects ordinary Arena recipes");
+}
+
+void testCombatCoverAlbedo()
+{
+    using namespace gdp::game::visual;
+
+    constexpr wkc::core::Seed seed = 0x434F564552ULL;
+    const auto first = generateCombatCoverAlbedo(seed);
+    const auto repeated = generateCombatCoverAlbedo(seed);
+    const auto different = generateCombatCoverAlbedo(seed + 1U);
+    expect(first && repeated && different
+            && wkc::render::validateImageData(*first),
+        "Arena cover generates valid 256 px RGBA painted steel");
+    if (!first || !repeated || !different) {
+        return;
+    }
+    expect(first->width == 256 && first->height == 256,
+        "Arena cover albedo uses the object-scale 256 px tile");
+    expect(combatCoverMaterialHash(seed) == combatCoverMaterialHash(seed)
+            && combatCoverMaterialHash(seed) != combatCoverMaterialHash(seed + 1U),
+        "Arena cover material hash is stable and seed-dependent");
+    expect(imageHash(*first) == imageHash(*repeated)
+            && imageHash(*first) != imageHash(*different),
+        "Arena cover pixels are deterministic and seed-dependent");
+
+    const CombatRoomMaterialSet room = generateCombatRoomMaterials(seed, true);
+    const auto wall = generateCombatSurfaceAlbedo(room.surfaces[0]);
+    expect(wall && imageHash(*first) != imageHash(*wall),
+        "Arena cover uses a separate albedo from the large wall plates");
+
+    std::size_t opaque = 0U;
+    std::size_t differentiated = 0U;
+    std::uint64_t redSum = 0U;
+    bool oliveTint = true;
+    for (std::size_t index = 0U; index < first->rgba.size(); index += 4U) {
+        const auto red = first->rgba[index];
+        const auto green = first->rgba[index + 1U];
+        const auto blue = first->rgba[index + 2U];
+        opaque += first->rgba[index + 3U] == 255U;
+        differentiated += red != different->rgba[index]
+            || green != different->rgba[index + 1U]
+            || blue != different->rgba[index + 2U];
+        redSum += red;
+        oliveTint = oliveTint && red < green && green > blue;
+    }
+    expect(opaque == 256U * 256U,
+        "Arena cover pixels are fully opaque");
+    expect(oliveTint, "Arena cover retains a restrained olive metal tint");
+    expect(differentiated > 256U * 256U / 4U,
+        "different Arena cover seeds materially alter the tile");
+    expect(redSum > 256U * 256U * 35U && redSum < 256U * 256U * 65U,
+        "Arena cover remains dark enough to read as painted steel");
+}
+
+void testCombatColumnAlbedo()
+{
+    using namespace gdp::game::visual;
+
+    constexpr wkc::core::Seed seed = 0x434F4C554D4EULL;
+    const auto first = generateCombatColumnAlbedo(seed);
+    const auto repeated = generateCombatColumnAlbedo(seed);
+    const auto different = generateCombatColumnAlbedo(seed + 1U);
+    expect(first && repeated && different && wkc::render::validateImageData(*first),
+        "Arena column generates a renderer-valid metal tile");
+    if (!first || !repeated || !different) {
+        return;
+    }
+    expect(first->width == 256 && first->height == 256,
+        "Arena column has a 256 px tile for world-distance mapping");
+    expect(combatColumnMaterialHash(seed) == combatColumnMaterialHash(seed)
+            && combatColumnMaterialHash(seed) != combatColumnMaterialHash(seed + 1U)
+            && combatColumnMaterialHash(seed) != combatCoverMaterialHash(seed),
+        "Arena column uses a stable, versioned material identity");
+    expect(imageHash(*first) == imageHash(*repeated)
+            && imageHash(*first) != imageHash(*different),
+        "Arena column pixels are deterministic and seed-dependent");
+
+    const auto cover = generateCombatCoverAlbedo(seed);
+    const CombatRoomMaterialSet room = generateCombatRoomMaterials(seed, true);
+    const auto wall = generateCombatSurfaceAlbedo(room.surfaces[0]);
+    expect(cover && wall && imageHash(*first) != imageHash(*cover)
+            && imageHash(*first) != imageHash(*wall),
+        "Arena columns do not duplicate the cover or wall finish");
+
+    std::uint64_t redSum = 0U;
+    std::uint8_t darkest = 255U;
+    std::uint8_t brightest = 0U;
+    std::size_t differingPixels = 0U;
+    bool opaque = true;
+    for (std::size_t pixel = 0U; pixel < first->rgba.size(); pixel += 4U) {
+        const auto red = first->rgba[pixel];
+        redSum += red;
+        darkest = std::min(darkest, red);
+        brightest = std::max(brightest, red);
+        differingPixels += red != different->rgba[pixel]
+            || first->rgba[pixel + 1U] != different->rgba[pixel + 1U]
+            || first->rgba[pixel + 2U] != different->rgba[pixel + 2U];
+        opaque = opaque && first->rgba[pixel + 3U] == 255U;
+    }
+    const auto meanRed = redSum / (256U * 256U);
+    expect(opaque && meanRed >= 135U && meanRed <= 185U,
+        "Arena column retains an opaque steel base legible after renderer tint");
+    expect(static_cast<int>(brightest) - static_cast<int>(darkest) > 55,
+        "Arena column includes readable metal, seams and worn hardware");
+    expect(averageRedRow(*first, 1, 30, 95)
+            + 20.0F < averageRedRow(*first, 140, 30, 95),
+        "Arena column outer joint is recessed relative to the painted plate");
+    expect(averageRedRow(*first, 126, 30, 95)
+            > averageRedRow(*first, 1, 30, 95) + 20.0F,
+        "Arena column has no repeated central cross-joint");
+    const auto averageColumnRed = [&first](const std::size_t x) {
+        std::uint64_t sum = 0U;
+        for (std::size_t y = 30U; y < 95U; ++y) {
+            sum += first->rgba[(y * 256U + x) * 4U];
+        }
+        return static_cast<float>(sum) / 65.0F;
+    };
+    expect(averageColumnRed(126U) > averageColumnRed(1U) + 20.0F,
+        "Arena column has no repeated central vertical joint");
+    expect(differingPixels > 256U * 256U / 4U,
+        "different Arena seeds visibly vary the column patina");
+}
+
+void testCombatRailAlbedo()
+{
+    using namespace gdp::game::visual;
+
+    constexpr wkc::core::Seed seed = 0x5241494CULL;
+    const auto first = generateCombatRailAlbedo(seed);
+    const auto repeated = generateCombatRailAlbedo(seed);
+    const auto different = generateCombatRailAlbedo(seed + 1U);
+    expect(first && repeated && different && wkc::render::validateImageData(*first),
+        "Arena handrails generate a renderer-valid painted metal tile");
+    if (!first || !repeated || !different) {
+        return;
+    }
+    expect(first->width == 128 && first->height == 128
+            && imageHash(*first) == imageHash(*repeated)
+            && imageHash(*first) != imageHash(*different)
+            && imageHash(*first) != imageHash(*generateCombatColumnAlbedo(seed))
+            && combatRailMaterialHash(seed) != combatColumnMaterialHash(seed),
+        "Arena handrail finish is stable and independent of the column finish");
 }
 
 void testCombatValidationFailures()
@@ -1891,6 +2313,8 @@ void testRoomProfileHashIsolation()
 int main()
 {
     testRepresentativeMaterialSet();
+    testDedicatedCorridorMaterial();
+    testOfficePanelsDifferFromCorridor();
     testStructuredSurfaceAlbedos();
     testIndustrialHdMaterialMaps();
     testApprovedIndustrialCeilingDirection();
@@ -1903,6 +2327,11 @@ int main()
     testStorageSeedBatch();
     testRepresentativeCombatMaterialSet();
     testStructuredCombatAlbedos();
+    testCombatGalleryWallVariant();
+    testBossArenaSurfaceMaterialImages();
+    testCombatCoverAlbedo();
+    testCombatColumnAlbedo();
+    testCombatRailAlbedo();
     testCombatValidationFailures();
     testCombatSeedBatch();
     testRepresentativeCafeteriaMaterialSet();

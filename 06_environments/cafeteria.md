@@ -2,8 +2,10 @@
 
 > **Estado:** a variante alongada de 18 × 24 m foi aprovada em partida em
 > 02/11/2026 como sala pronta: formato, circulação, móveis e seus materiais,
-> paredes, piso e teto. Ela permanece na prévia isolada; a versão da campanha
-> ainda usa `CafeteriaHall_01` de 18 × 18 m.
+> paredes, piso e teto. A variante longa também consta na biblioteca da campanha,
+> junto de `CafeteriaHall_01` de 18 × 18 m. Esta última recebeu duas mesas com
+> bancos e um balcão ajustado à área livre em 20/11/2026; falta validar ambas
+> em encontro real de campanha.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -42,8 +44,8 @@ inimigos e rejeita mobiliário nas quatro possíveis portas.
 Uma variante de 18 × 24 m já está disponível na prévia isolada. Ela distribui
 seis conjuntos de mesa ao longo da sala e alonga o balcão, preservando sua
 passagem lateral. A `CafeteriaHall_01` da campanha continua em 18 × 18 m; a
-variante longa foi aprovada na prévia e aguarda integração à biblioteca
-procedural.
+variante longa também entrou na biblioteca procedural e aguarda playtest com
+conexões e encontros reais.
 
 ```sh
 ./build/playtest/gdp --cafeteria-preview --seed 20261029
@@ -59,7 +61,8 @@ As proporções e a circulação da prévia foram aprovadas. Parede, piso e teto
 usam os PNGs v1 aprovados, e a luz branco quente foi suavizada. Mesas, bancos,
 suportes e balcão usam os albedos metálicos v1 aprovados para implementação,
 com condições Clean/InUse/Faded. A aparência aplicada foi aprovada em partida
-para esta variante. A sala ainda não integra a geração da campanha.
+para esta variante. A aprovação visual ocorreu na prévia isolada; a versão da
+campanha ainda precisa de validação específica.
 
 Em 03/11/2026, a variante longa recebeu rodapé físico em tom quente, duto
 3D suspenso sobre o balcão de serviço e dois vasos nos cantos do salão. As

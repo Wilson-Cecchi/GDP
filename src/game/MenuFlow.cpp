@@ -7,7 +7,7 @@
 namespace gdp::game {
 namespace {
 void open(MenuFlowState& s, MenuPage p) { s.page = p; s.selection = 0U; s.capture.reset(); s.captureGamepad = false; s.notice.clear(); }
-std::array<std::string, 8> feedbackPreview(const std::string_view draft)
+std::array<std::string, 3> feedbackPreview(const std::string_view draft)
 {
     std::vector<std::string> lines(1);
     std::size_t offset = 0U;
@@ -18,7 +18,7 @@ std::array<std::string, 8> feedbackPreview(const std::string_view draft)
             lines.emplace_back();
         if (codepoint != '\n') lines.back().append(draft.substr(start, offset - start));
     }
-    std::array<std::string, 8> result{};
+    std::array<std::string, 3> result{};
     const auto first = lines.size() > result.size() ? lines.size() - result.size() : 0U;
     for (std::size_t i = 0; i < result.size(); ++i)
         if (first + i < lines.size()) result[i] = lines[first + i];
@@ -27,13 +27,19 @@ std::array<std::string, 8> feedbackPreview(const std::string_view draft)
 }
 }
 MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo, 3>& slots,
-    const std::vector<gameplay::SpeedrunRecord>& board, const gameplay::RuntimeSettings& settings, const bool testMode)
+    const std::vector<gameplay::SpeedrunRecord>& board, const gameplay::RuntimeSettings& settings,
+    const bool testMode, const bool gamepadRumbleAvailable)
 {
     using gameplay::SettingsMenuOption;
     MenuView view;
     auto row = [&](std::string text, bool enabled = true) { view.rows.push_back({std::move(text), enabled, {}, {}, {}, {}}); };
     auto setting = [&](const char* name, SettingsMenuOption option, std::string value) {
         view.rows.push_back({std::string{name} + "  " + value, true, option, {}, {}, {}});
+    };
+    const auto numericValue = [&](const SettingsMenuOption option) {
+        const auto descriptor = gameplay::numericSettingDescriptor(settings, option);
+        return descriptor ? std::to_string(descriptor->value)
+                + std::string{descriptor->unit} : std::string{};
     };
     switch (s.page) {
     case MenuPage::Root:
@@ -102,52 +108,72 @@ MenuView makeMenuView(const MenuFlowState& s, const std::array<CampaignSlotInfo,
     }
     case MenuPage::Display: {
         view.title = "DISPLAY";
-        setting("FIELD OF VIEW", SettingsMenuOption::FieldOfView, std::to_string(settings.fieldOfViewDegrees));
+        row("INTERFACE SCALE", false);
+        setting("UI SCALE MODE", SettingsMenuOption::UiScaleMode,
+            settings.uiScaleAuto ? "AUTO" : "MANUAL");
+        setting("UI SCALE", SettingsMenuOption::UiScaleManual,
+            numericValue(SettingsMenuOption::UiScaleManual));
+        view.rows.back().enabled = !settings.uiScaleAuto;
+        setting("FIELD OF VIEW", SettingsMenuOption::FieldOfView,
+            numericValue(SettingsMenuOption::FieldOfView));
         setting("GRAPHICS", SettingsMenuOption::GraphicsQuality, std::string{gameplay::graphicsQualityName(settings.graphicsQuality)});
         const auto quality = gameplay::effectiveGraphicsQualitySettings(settings);
         setting("SHADOWS", SettingsMenuOption::Shadows, quality.shadowsEnabled ? "ON" : "OFF");
         setting("DETAILED MATERIALS", SettingsMenuOption::DetailedMaterials, quality.detailedMaterials ? "ON" : "OFF");
-        setting("RENDER SCALE", SettingsMenuOption::RenderScale, std::to_string(quality.renderScalePercent) + "%");
-        setting("LIGHTS", SettingsMenuOption::MaximumLights, std::to_string(quality.maximumLights));
+        setting("RENDER SCALE", SettingsMenuOption::RenderScale,
+            numericValue(SettingsMenuOption::RenderScale));
+        setting("LIGHTS", SettingsMenuOption::MaximumLights,
+            numericValue(SettingsMenuOption::MaximumLights));
         const auto size = gameplay::windowResolutionSize(settings.windowResolution);
         setting("RESOLUTION", SettingsMenuOption::WindowResolution, std::to_string(size.width) + "X" + std::to_string(size.height));
         setting("FULLSCREEN", SettingsMenuOption::Fullscreen, settings.fullscreen ? "ON" : "OFF");
-        setting("VSYNC", SettingsMenuOption::VerticalSync, settings.verticalSync ? "ON" : "OFF"); row("BACK"); break;
+        setting("VSYNC", SettingsMenuOption::VerticalSync, settings.verticalSync ? "ON" : "OFF");
+        setting("LANGUAGE", SettingsMenuOption::Language,
+            settings.language == gameplay::Language::PortugueseBrazil
+                ? "PORTUGUÊS (BR)" : "ENGLISH");
+        row("BACK"); break;
     }
     case MenuPage::Audio:
         view.title = "AUDIO";
-        setting("MASTER", SettingsMenuOption::MasterVolume, std::to_string(settings.masterVolumePercent) + "%");
-        setting("EFFECTS", SettingsMenuOption::EffectsVolume, std::to_string(settings.effectsVolumePercent) + "%");
-        setting("AMBIENT", SettingsMenuOption::AmbientVolume, std::to_string(settings.ambientVolumePercent) + "%");
-        setting("UI", SettingsMenuOption::UiVolume, std::to_string(settings.uiVolumePercent) + "%"); row("BACK"); break;
+        setting("MASTER", SettingsMenuOption::MasterVolume, numericValue(SettingsMenuOption::MasterVolume));
+        setting("EFFECTS", SettingsMenuOption::EffectsVolume, numericValue(SettingsMenuOption::EffectsVolume));
+        setting("AMBIENT", SettingsMenuOption::AmbientVolume, numericValue(SettingsMenuOption::AmbientVolume));
+        setting("UI", SettingsMenuOption::UiVolume, numericValue(SettingsMenuOption::UiVolume)); row("BACK"); break;
     case MenuPage::Controls:
         view.title = "CONTROLS"; view.subtitle = "CHOOSE INPUT DEVICE";
         row("KEYBOARD / MOUSE"); row("CONTROLLER"); row("BACK"); break;
     case MenuPage::KeyboardControls:
         view.title = "KEYBOARD / MOUSE"; view.subtitle = "ESC / F3 RESERVED - MENU KEYS STAY FIXED";
-        setting("SENSITIVITY", SettingsMenuOption::MouseSensitivity, std::to_string(settings.mouseSensitivityPercent) + "%");
+        setting("SENSITIVITY", SettingsMenuOption::MouseSensitivity,
+            numericValue(SettingsMenuOption::MouseSensitivity));
+        setting("AIM SENSITIVITY", SettingsMenuOption::MouseAimSensitivity,
+            numericValue(SettingsMenuOption::MouseAimSensitivity));
         setting("INVERT MOUSE Y", SettingsMenuOption::InvertMouseY, settings.invertMouseY ? "ON" : "OFF");
-        row("REMAP KEYS / MOUSE"); row("BACK"); break;
+        row("REMAP KEYS / MOUSE"); row("CONTROLLER"); row("BACK"); break;
     case MenuPage::GamepadControls:
         view.title = "CONTROLLER"; view.subtitle = "MOVE STICK ALSO CHANGES LOOK STICK";
         setting("MOVE STICK", SettingsMenuOption::GamepadMoveStick,
             settings.gamepadSouthpaw ? "RIGHT STICK" : "LEFT STICK");
         setting("LOOK HORIZONTAL", SettingsMenuOption::GamepadLookHorizontal,
-            std::to_string(settings.gamepadLookHorizontalPercent) + "%");
+            numericValue(SettingsMenuOption::GamepadLookHorizontal));
         setting("LOOK VERTICAL", SettingsMenuOption::GamepadLookVertical,
-            std::to_string(settings.gamepadLookVerticalPercent) + "%");
+            numericValue(SettingsMenuOption::GamepadLookVertical));
         setting("AIM SENSITIVITY", SettingsMenuOption::GamepadAimSensitivity,
-            std::to_string(settings.gamepadAimSensitivityPercent) + "%");
+            numericValue(SettingsMenuOption::GamepadAimSensitivity));
         setting("MOVE DEADZONE", SettingsMenuOption::GamepadMoveDeadzone,
-            std::to_string(settings.gamepadMoveDeadzonePercent) + "%");
+            numericValue(SettingsMenuOption::GamepadMoveDeadzone));
         setting("LOOK DEADZONE", SettingsMenuOption::GamepadLookDeadzone,
-            std::to_string(settings.gamepadLookDeadzonePercent) + "%");
+            numericValue(SettingsMenuOption::GamepadLookDeadzone));
         setting("INVERT LOOK Y", SettingsMenuOption::GamepadInvertY,
             settings.invertGamepadY ? "ON" : "OFF");
-        setting("VIBRATION", SettingsMenuOption::GamepadVibration, settings.gamepadVibration ? "ON" : "OFF");
+        setting("VIBRATION", SettingsMenuOption::GamepadVibration,
+            gamepadRumbleAvailable ? (settings.gamepadVibration ? "ON" : "OFF") : "UNAVAILABLE");
+        view.rows.back().enabled = gamepadRumbleAvailable;
         setting("VIBRATION STRENGTH", SettingsMenuOption::GamepadVibrationStrength,
-            std::to_string(settings.gamepadVibrationPercent) + "%");
-        row("REMAP BUTTONS"); row("BACK"); break;
+            gamepadRumbleAvailable ? numericValue(SettingsMenuOption::GamepadVibrationStrength)
+                : "UNAVAILABLE");
+        view.rows.back().enabled = gamepadRumbleAvailable;
+        row("REMAP BUTTONS"); row("KEYBOARD / MOUSE"); row("BACK"); break;
     case MenuPage::Bindings:
     case MenuPage::MoreBindings:
     case MenuPage::GamepadBindings:
@@ -196,14 +222,65 @@ MenuCommand backMenu(MenuFlowState& s) noexcept
     case MenuPage::Difficulty: case MenuPage::Overwrite: open(s, MenuPage::CampaignSlot); break;
     case MenuPage::Leaderboard: open(s, MenuPage::Speedrun); break;
     case MenuPage::Settings: open(s, MenuPage::Root); return MenuCommand::CloseSettings;
-    case MenuPage::FeedbackCategory: open(s, s.feedbackFromSettings ? MenuPage::Settings : MenuPage::Root); break;
+    case MenuPage::FeedbackCategory:
+        open(s, MenuPage::Root);
+        if (s.feedbackFromSettings) return MenuCommand::CloseSettings;
+        break;
     case MenuPage::FeedbackCompose: open(s, MenuPage::FeedbackCategory); break;
-    case MenuPage::Display: case MenuPage::Audio: case MenuPage::Controls: open(s, MenuPage::Settings); break;
-    case MenuPage::KeyboardControls: case MenuPage::GamepadControls: open(s, MenuPage::Controls); break;
+    case MenuPage::Display: case MenuPage::Audio: case MenuPage::Controls:
+        open(s, MenuPage::Root); return MenuCommand::CloseSettings;
+    case MenuPage::KeyboardControls: case MenuPage::GamepadControls:
+        open(s, MenuPage::Root); return MenuCommand::CloseSettings;
     case MenuPage::Bindings: case MenuPage::MoreBindings: open(s, MenuPage::KeyboardControls); break;
     case MenuPage::GamepadBindings: case MenuPage::MoreGamepadBindings: open(s, MenuPage::GamepadControls); break;
     }
     return MenuCommand::None;
+}
+
+std::uint8_t configurationSection(const MenuFlowState& state) noexcept
+{
+    switch (state.page) {
+    case MenuPage::Audio: return 1U;
+    case MenuPage::Controls: case MenuPage::KeyboardControls:
+    case MenuPage::GamepadControls: case MenuPage::Bindings:
+    case MenuPage::MoreBindings: case MenuPage::GamepadBindings:
+    case MenuPage::MoreGamepadBindings: return 2U;
+    case MenuPage::FeedbackCategory: case MenuPage::FeedbackCompose:
+        return state.feedbackFromSettings ? 3U : 0U;
+    default: return 0U;
+    }
+}
+
+void openConfigurationSection(MenuFlowState& state,
+    const std::uint8_t section) noexcept
+{
+    state.feedbackFromSettings = section == 3U;
+    open(state, section == 1U ? MenuPage::Audio
+        : section == 2U ? MenuPage::KeyboardControls
+        : section == 3U ? MenuPage::FeedbackCategory : MenuPage::Display);
+    if (section == 0U) state.selection = 1U;
+}
+
+std::uint8_t configurationControlPage(const MenuFlowState& state) noexcept
+{
+    switch (state.page) {
+    case MenuPage::GamepadControls: return 1U;
+    case MenuPage::Bindings: case MenuPage::MoreBindings:
+    case MenuPage::GamepadBindings: case MenuPage::MoreGamepadBindings:
+        return 2U;
+    default: return 0U;
+    }
+}
+
+void openConfigurationControlPage(MenuFlowState& state,
+    const std::uint8_t page) noexcept
+{
+    const bool gamepad = state.page == MenuPage::GamepadControls
+        || state.page == MenuPage::GamepadBindings
+        || state.page == MenuPage::MoreGamepadBindings;
+    open(state, page == 1U ? MenuPage::GamepadControls
+        : page == 2U ? (gamepad ? MenuPage::GamepadBindings
+            : MenuPage::Bindings) : MenuPage::KeyboardControls);
 }
 MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::array<CampaignSlotInfo, 3>& slots)
 {
@@ -226,7 +303,8 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     } else if (s.page == MenuPage::FeedbackCompose && selected == 0U) {
         s.feedbackEditing = true;
         s.notice.clear();
-    } else if (s.page == MenuPage::FeedbackCompose && selected == 9U) {
+    } else if (s.page == MenuPage::FeedbackCompose
+        && selected + 2U == view.rows.size()) {
         return MenuCommand::None;
     } else if (s.page == MenuPage::CampaignSlots && selected < 3U) {
         s.slot = selected; open(s, MenuPage::CampaignSlot);
@@ -245,8 +323,12 @@ MenuCommand activateMenu(MenuFlowState& s, const MenuView& view, const std::arra
     }
     else if (s.page == MenuPage::Controls && selected < 2U)
         open(s, selected == 0U ? MenuPage::KeyboardControls : MenuPage::GamepadControls);
-    else if (s.page == MenuPage::KeyboardControls && selected == 2U) open(s, MenuPage::Bindings);
+    else if (s.page == MenuPage::KeyboardControls && selected == 3U) open(s, MenuPage::Bindings);
+    else if (s.page == MenuPage::KeyboardControls && selected == 4U)
+        open(s, MenuPage::GamepadControls);
     else if (s.page == MenuPage::GamepadControls && selected == 9U) open(s, MenuPage::GamepadBindings);
+    else if (s.page == MenuPage::GamepadControls && selected == 10U)
+        open(s, MenuPage::KeyboardControls);
     else if ((s.page == MenuPage::Bindings || s.page == MenuPage::MoreBindings) && selected == 11U)
         open(s, s.page == MenuPage::Bindings ? MenuPage::MoreBindings : MenuPage::Bindings);
     else if ((s.page == MenuPage::GamepadBindings || s.page == MenuPage::MoreGamepadBindings) && selected == 11U)

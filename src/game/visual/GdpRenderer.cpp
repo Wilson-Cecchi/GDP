@@ -34,6 +34,8 @@
 namespace gdp::game::visual {
 namespace {
 
+constexpr wkc::core::Vec3 hubRouteLedOrange{0.90F, 0.36F, 0.08F};
+
 wkc::render::MeshData makePlanterLeafMesh()
 {
     struct LeafRow { float height; float halfWidth; float bend; };
@@ -427,6 +429,56 @@ wkc::render::MeshData makeCentralHubColumnShaftMesh()
     return mesh;
 }
 
+wkc::render::MeshData makeCanisterCylinderMesh()
+{
+    // Faceted steel vessel, normalized to the same unit AABB as the prop's
+    // existing collision volume. Flat normals keep its industrial facets.
+    constexpr std::uint32_t sides = 12U;
+    constexpr float pi = std::numbers::pi_v<float>;
+    wkc::render::MeshData mesh;
+    mesh.vertices.reserve(sides * 8U);
+    mesh.indices.reserve(sides * 12U);
+    for (std::uint32_t side = 0U; side < sides; ++side) {
+        const float angleA = 2.0F * pi * static_cast<float>(side)
+            / static_cast<float>(sides);
+        const float angleB = 2.0F * pi * static_cast<float>(side + 1U)
+            / static_cast<float>(sides);
+        const float mid = (angleA + angleB) * 0.5F;
+        const wkc::core::Vec3 normal{std::cos(mid), 0.0F, std::sin(mid)};
+        const wkc::core::Vec3 a{0.5F * std::cos(angleA), 0.0F,
+            0.5F * std::sin(angleA)};
+        const wkc::core::Vec3 b{0.5F * std::cos(angleB), 0.0F,
+            0.5F * std::sin(angleB)};
+        const auto first = static_cast<std::uint32_t>(mesh.vertices.size());
+        mesh.vertices.push_back({{a.x, -0.5F, a.z}, normal, {0.0F, 0.0F}, 0U});
+        mesh.vertices.push_back({{a.x, 0.5F, a.z}, normal, {0.0F, 1.0F}, 0U});
+        mesh.vertices.push_back({{b.x, -0.5F, b.z}, normal, {1.0F, 0.0F}, 0U});
+        mesh.vertices.push_back({{b.x, 0.5F, b.z}, normal, {1.0F, 1.0F}, 0U});
+        mesh.indices.insert(mesh.indices.end(), {
+            first, first + 1U, first + 2U,
+            first + 1U, first + 3U, first + 2U});
+        const auto cap = static_cast<std::uint32_t>(mesh.vertices.size());
+        mesh.vertices.push_back({{0.0F, 0.5F, 0.0F}, {0.0F, 1.0F, 0.0F},
+            {0.5F, 0.5F}, 0U});
+        mesh.vertices.push_back({{a.x, 0.5F, a.z}, {0.0F, 1.0F, 0.0F},
+            {a.x + 0.5F, a.z + 0.5F}, 0U});
+        mesh.vertices.push_back({{b.x, 0.5F, b.z}, {0.0F, 1.0F, 0.0F},
+            {b.x + 0.5F, b.z + 0.5F}, 0U});
+        mesh.vertices.push_back({{0.0F, -0.5F, 0.0F}, {0.0F, -1.0F, 0.0F},
+            {0.5F, 0.5F}, 0U});
+        mesh.vertices.push_back({{a.x, -0.5F, a.z}, {0.0F, -1.0F, 0.0F},
+            {a.x + 0.5F, a.z + 0.5F}, 0U});
+        mesh.vertices.push_back({{b.x, -0.5F, b.z}, {0.0F, -1.0F, 0.0F},
+            {b.x + 0.5F, b.z + 0.5F}, 0U});
+        mesh.indices.insert(mesh.indices.end(), {
+            cap, cap + 2U, cap + 1U,
+            cap + 3U, cap + 4U, cap + 5U});
+    }
+    mesh.bounds = {{-0.5F, -0.5F, -0.5F}, {0.5F, 0.5F, 0.5F}};
+    mesh.backfaceCullingSafe = true;
+    return mesh;
+}
+
 wkc::render::MeshData makeGrenadeArmorMesh()
 {
     // Sixteen separate curved plates leave the dark housing visible at their
@@ -709,7 +761,7 @@ uniform vec3 uCameraPosition;
 #if GDP_LOW_SPEC
 const int MAX_LIGHTS = 4;
 #else
-const int MAX_LIGHTS = 8;
+const int MAX_LIGHTS = 16;
 #endif
 #ifndef GDP_MAX_SHADOW_OCCLUDERS
 #define GDP_MAX_SHADOW_OCCLUDERS 8
@@ -751,14 +803,20 @@ uniform float uSurfaceTileMetres;
 uniform int uMirrorSurfaceTile;
 uniform int uRackPart;
 uniform int uFurniturePart;
+uniform int uStructuralSteelMaterial;
 uniform float uPropIndirectFill;
 uniform int uHubWallMaterial;
+uniform int uCombatColumnMaterial;
+uniform int uCombatRailMaterial;
 uniform int uHubFloorMaterial;
+uniform int uBossFloorMaterial;
 uniform int uTechnicalSteelMaterial;
 uniform int uHubPlinthContactShadow;
 uniform vec3 uHubPlinthFootprint;
 uniform int uSecurityFloorVariation;
 uniform float uSecurityFloorSeed;
+uniform int uCombatWallVariation;
+uniform float uCombatWallSeed;
 uniform float uEmissiveStrength;
 uniform float uWorkerPaintWear;
 uniform int uEyeHalo;
@@ -972,6 +1030,34 @@ void main()
                 vec2(54.0, 17.0)) + wearChoice * 25.0);
             albedo += vec3(0.055) * wearFade * scratches;
         }
+    } else if (uCombatWallVariation != 0 && abs(normal.y) < 0.5) {
+        // Each 6 m sheet samples the same plate atlas with an independent
+        // orientation. Its 3 m panels also vary slightly in paint value, so
+        // a long wall does not reveal a repeated block of four plates.
+        vec2 wallPosition = abs(normal.z) > 0.5
+            ? vWorldPosition.xy : vWorldPosition.zy;
+        vec2 atlasPosition = wallPosition / 6.0;
+        vec2 sheet = floor(atlasPosition);
+        float choice = fract(sin(dot(sheet, vec2(127.1, 311.7))
+            + uCombatWallSeed) * 43758.5453);
+        int orientation = min(int(choice * 4.0), 3);
+        vec2 localUv = fract(atlasPosition);
+        vec2 gradientX = dFdx(atlasPosition);
+        vec2 gradientY = dFdy(atlasPosition);
+        if ((orientation & 1) != 0) {
+            localUv.x = 1.0 - localUv.x;
+            gradientX.x = -gradientX.x;
+            gradientY.x = -gradientY.x;
+        }
+        if ((orientation & 2) != 0) {
+            localUv.y = 1.0 - localUv.y;
+            gradientX.y = -gradientX.y;
+        }
+        vec2 plate = floor(wallPosition / 3.0);
+        float paint = fract(sin(dot(plate, vec2(46.37, 92.11))
+            + uCombatWallSeed * 0.031) * 17329.43);
+        albedo = textureGrad(uAlbedo, localUv, gradientX, gradientY).rgb
+            * uTint * (0.88 + paint * 0.24);
     } else {
         albedo = texture(uAlbedo, materialUv).rgb * uTint;
     }
@@ -1076,14 +1162,32 @@ void main()
             : uFurniturePart == 2 ? 0.59 : 0.65;
         metalness = uFurniturePart == 1 ? 0.52
             : uFurniturePart == 2 ? 0.12 : 0.18;
-    } else if (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0) {
-        roughness = 0.58;
-        metalness = 0.16;
+    } else if (uStructuralSteelMaterial != 0) {
+        // Painted structural steel is less glossy than exposed fittings, but
+        // should still catch the room lamps instead of reading as flat stone.
+        roughness = uDetailedMaterialsEnabled != 0 ? 0.46 : 0.61;
+        metalness = uDetailedMaterialsEnabled != 0 ? 0.26 : 0.14;
+    } else if (uCombatColumnMaterial != 0) {
+        // Dark brushed Arena steel has narrower lamp glints than the painted
+        // walls, while its diffuse face stays close to the other supports.
+        roughness = uDetailedMaterialsEnabled != 0 ? 0.30 : 0.46;
+        metalness = uDetailedMaterialsEnabled != 0 ? 0.56 : 0.35;
+    } else if (uCombatRailMaterial != 0) {
+        roughness = uDetailedMaterialsEnabled != 0 ? 0.35 : 0.50;
+        metalness = uDetailedMaterialsEnabled != 0 ? 0.46 : 0.28;
+    } else if (uHubWallMaterial != 0) {
+        // Dark painted steel keeps a broad lamp reflection on every preset.
+        roughness = uDetailedMaterialsEnabled != 0 ? 0.43 : 0.60;
+        metalness = uDetailedMaterialsEnabled != 0 ? 0.34 : 0.20;
     } else if (uHubFloorMaterial != 0) {
-        // The Hub floor is brushed steel. Its highlight follows live lamps;
-        // the broad low-spec lobe avoids extra material-map fetches.
-        roughness = uDetailedMaterialsEnabled != 0 ? 0.34 : 0.54;
-        metalness = uDetailedMaterialsEnabled != 0 ? 0.28 : 0.16;
+        // Warm brushed steel has a softer lamp reflection than the earlier
+        // cool graphite floor, while remaining legible on lower presets.
+        roughness = uBossFloorMaterial != 0
+            ? (uDetailedMaterialsEnabled != 0 ? 0.28 : 0.48)
+            : (uDetailedMaterialsEnabled != 0 ? 0.39 : 0.56);
+        metalness = uBossFloorMaterial != 0
+            ? (uDetailedMaterialsEnabled != 0 ? 0.52 : 0.27)
+            : (uDetailedMaterialsEnabled != 0 ? 0.30 : 0.18);
     } else if (uTechnicalSteelMaterial != 0) {
         // Broad painted wall sheets and bare floor plates share the room
         // lamps, with a soft sheen that survives lower presets.
@@ -1164,7 +1268,8 @@ void main()
             : 1.0;
 #endif
         result += albedo * (1.0 - metalness) * diffuse * radiance * visibility;
-        if (uTechnicalSteelMaterial == 2 && uDetailedMaterialsEnabled != 0
+        if ((uTechnicalSteelMaterial == 2 || uBossFloorMaterial != 0)
+            && uDetailedMaterialsEnabled != 0
             && diffuse > 0.0) {
             // A narrow lamp footprint gives the broad graphite plates a
             // readable metallic response without a costly reflection probe.
@@ -1175,7 +1280,8 @@ void main()
             float along = dot(lampOffset, viewAxis);
             float footprint = exp(-0.5 * (across * across / 1.2
                 + along * along / 64.0));
-            result += radiance * footprint * visibility * diffuse * 0.30;
+            result += radiance * footprint * visibility * diffuse
+                * (uBossFloorMaterial != 0 ? 0.19 : 0.30);
         }
         if (uPropIndirectFill > 0.0 && uViewmodel == 0) {
             // Approximate nearby floor/wall bounce on vertical prop faces.
@@ -1185,34 +1291,42 @@ void main()
             result += albedo * (1.0 - metalness) * radiance * bounce;
         }
 #if GDP_LOW_SPEC
-        if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+        if ((uFurniturePart != 0 || uStructuralSteelMaterial != 0
+                || uHubFloorMaterial != 0
                 || uTechnicalSteelMaterial != 0
-                || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                || uHubWallMaterial != 0)
             && diffuse > 0.0) {
 #else
         if (((uDetailedMaterial != 0 && uDetailedMaterialsEnabled != 0)
-                || uFurniturePart != 0 || uHubFloorMaterial != 0
+                || uFurniturePart != 0 || uStructuralSteelMaterial != 0
+                || uHubFloorMaterial != 0
                 || uTechnicalSteelMaterial != 0
-                || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                || uHubWallMaterial != 0)
             && diffuse > 0.0) {
 #endif
             vec3 halfway = normalize(lightDirection + viewDirection);
             float exponent = (uHubFloorMaterial != 0
                     || uTechnicalSteelMaterial == 2)
                 ? mix(11.0, 3.0, roughness)
-                : (uFurniturePart != 0 || uTechnicalSteelMaterial != 0
-                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                : (uFurniturePart != 0 || uStructuralSteelMaterial != 0
+                    || uTechnicalSteelMaterial != 0
+                    || uHubWallMaterial != 0)
                     ? mix(44.0, 7.0, roughness)
                     : mix(96.0, 8.0, roughness);
             // POTATO keeps one broad reflection per room lamp. Use the same
             // lobe when a shadow occluder selects the full shader path.
             if (uDetailedMaterialsEnabled == 0) exponent *= 0.65;
             float highlightStrength = uHubFloorMaterial != 0
-                ? mix(2.8, 0.50, roughness)
+                ? (uBossFloorMaterial != 0
+                    ? mix(4.0, 0.65, roughness)
+                    : mix(2.8, 0.50, roughness))
+                : uCombatColumnMaterial != 0
+                    ? mix(2.7, 0.40, roughness)
                 : uTechnicalSteelMaterial == 2
                     ? mix(3.4, 0.55, roughness)
-                : (uFurniturePart != 0 || uTechnicalSteelMaterial != 0
-                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                : (uFurniturePart != 0 || uStructuralSteelMaterial != 0
+                    || uTechnicalSteelMaterial != 0
+                    || uHubWallMaterial != 0)
                     ? mix(2.0, 0.20, roughness)
                     : mix(0.90, 0.12, roughness);
             float highlight = pow(max(dot(normal, halfway), 0.0), exponent)
@@ -1233,9 +1347,10 @@ void main()
             float rangeFade = 1.0 - smoothstep(11.0, 14.0, beamDistance);
             result += albedo * vec3(0.90, 0.95, 1.0)
                 * cone * incidence * falloff * rangeFade * 5.5;
-            if ((uFurniturePart != 0 || uHubFloorMaterial != 0
+            if ((uFurniturePart != 0 || uStructuralSteelMaterial != 0
+                    || uHubFloorMaterial != 0
                     || uTechnicalSteelMaterial != 0
-                    || (uHubWallMaterial != 0 && uDetailedMaterialsEnabled != 0))
+                    || uHubWallMaterial != 0)
                 && incidence > 0.0) {
                 vec3 halfway = normalize(-beamDirection + viewDirection);
                 float highlight = pow(max(dot(normal, halfway), 0.0),
@@ -1311,6 +1426,9 @@ enum class RoomMaterialChannel : std::uint8_t {
     Floor,
     HubFloorDetail,
     Ceiling,
+    CombatCover,
+    CombatColumn,
+    CombatRail,
     StorageRack,
     CafeteriaFurniture,
     LaboratoryFurniture,
@@ -1319,25 +1437,6 @@ enum class RoomMaterialChannel : std::uint8_t {
     StructuralColumn,
     SolidColor,
     Generic,
-};
-
-struct RoomPart {
-    wkc::core::Vec3 position;
-    wkc::core::Vec3 scale;
-    wkc::core::Vec3 tint;
-    RoomMaterialChannel material;
-    float uvScale;
-};
-
-constexpr std::array roomParts{
-    RoomPart{{-2.8F, 1.0F, -3.8F}, {0.45F, 2.0F, 0.45F}, {0.75F, 0.57F, 0.22F},
-        RoomMaterialChannel::Generic, 4.0F},
-    RoomPart{{2.8F, 1.0F, -3.8F}, {0.45F, 2.0F, 0.45F}, {0.75F, 0.57F, 0.22F},
-        RoomMaterialChannel::Generic, 4.0F},
-    RoomPart{{0.0F, 0.35F, -2.2F}, {2.2F, 0.7F, 1.2F}, {0.42F, 0.48F, 0.51F},
-        RoomMaterialChannel::Generic, 4.0F},
-    RoomPart{{0.0F, 1.0F, 2.2F}, {0.8F, 2.0F, 0.3F}, {0.25F, 0.72F, 0.68F},
-        RoomMaterialChannel::Generic, 4.0F},
 };
 
 using Glyph = std::array<std::uint8_t, 7U>;
@@ -1411,7 +1510,7 @@ constexpr Glyph glyphFor(const std::uint32_t character) noexcept
     }
 }
 
-int bitmapTextWidth(const std::string_view text, const int scale) noexcept
+[[maybe_unused]] int bitmapTextWidth(const std::string_view text, const int scale) noexcept
 {
     return static_cast<int>(uiTextLength(text)) * 6 * scale;
 }
@@ -1547,6 +1646,7 @@ bool GdpRenderer::initialize(const int width, const int height)
         return false;
     }
     if (!box_.upload(gl_, wkc::render::makeBoxMesh())
+        || !canisterCylinder_.upload(gl_, makeCanisterCylinderMesh())
         || !centralHubColumnShaft_.upload(gl_, makeCentralHubColumnShaftMesh())
         || !planterLeafMesh_.upload(gl_, makePlanterLeafMesh())
         || !glassTestDome_.upload(gl_, makeGlassTestDomeMesh())
@@ -1786,15 +1886,11 @@ bool GdpRenderer::initialize(const int width, const int height)
             }
         }
     }
-    constexpr std::array structuralColumnFiles{
-        "rooms/columns/structural_maintained.png",
-        "rooms/columns/structural_used.png",
-        "rooms/columns/structural_worn.png",
-    };
-    for (std::size_t index = 0; index < structuralColumnFiles.size(); ++index) {
-        const auto image = loadVisualImage(structuralColumnFiles[index]);
-        if (!image || !structuralColumnTextures_[index].upload(
-                gl_, *image, wkc::render::TextureSampling::Trilinear)) {
+    for (std::size_t index = 0; index < structuralColumnTextures_.size(); ++index) {
+        const auto image = gdp::game::makeStructuralSteelImage(
+            static_cast<std::uint8_t>(index));
+        if (!structuralColumnTextures_[index].upload(
+                gl_, image, wkc::render::TextureSampling::Trilinear)) {
             return false;
         }
     }
@@ -1864,6 +1960,52 @@ bool GdpRenderer::initialize(const int width, const int height)
                 "Loaded ceiling fixture " + path.string());
             break;
         }
+    }
+    const gdp::game::CeilingFixtureMaterialImages terminalImages
+        = gdp::game::makeMissionTerminalMaterialImages();
+    if (!terminalMaterial_.albedo.upload(
+            gl_, terminalImages.albedo, wkc::render::TextureSampling::Trilinear)
+        || !terminalMaterial_.normal.upload(
+            gl_, terminalImages.normal, wkc::render::TextureSampling::Trilinear)
+        || !terminalMaterial_.properties.upload(
+            gl_, terminalImages.properties, wkc::render::TextureSampling::Trilinear)
+        || !terminalMaterial_.emission.upload(
+            gl_, terminalImages.emission, wkc::render::TextureSampling::Trilinear)) {
+        return false;
+    }
+    const std::filesystem::path terminalRelative
+        = "models/mission_terminal/terminal_a.isemesh";
+    const std::array terminalCandidates{
+        base / "visual" / terminalRelative,
+        base / "../Resources/visual" / terminalRelative,
+        std::filesystem::path{"assets/visual"} / terminalRelative,
+    };
+    bool terminalLoaded = false;
+    for (const auto& path : terminalCandidates) {
+        std::error_code error;
+        if (!std::filesystem::exists(path, error)) continue;
+        std::string reason;
+        const auto asset = loadEnemyModelAsset(path, &reason);
+        if (!asset) {
+            wkc::core::log(wkc::core::LogLevel::Error,
+                "Invalid mission terminal " + path.string() + ": " + reason);
+            return false;
+        }
+        for (const EnemyModelSubmesh& submesh : asset->submeshes) {
+            if (submesh.partId > 2U || submesh.materialId > 5U) return false;
+            TerminalGpuPart part;
+            part.partId = submesh.partId;
+            part.materialId = submesh.materialId;
+            if (!part.mesh.upload(gl_, submesh.mesh)) return false;
+            terminalModelParts_.push_back(std::move(part));
+        }
+        terminalLoaded = !terminalModelParts_.empty();
+        break;
+    }
+    if (!terminalLoaded) {
+        wkc::core::log(wkc::core::LogLevel::Error,
+            "Mission terminal model is missing from visual assets");
+        return false;
     }
     if (!framebuffer_.resize(gl_, width, height)) {
         return false;
@@ -1965,6 +2107,32 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
         static_cast<float>((roomSeed >> 10U) & 1U) * 0.5F,
         static_cast<float>((roomSeed >> 11U) & 1U) * 0.5F,
     };
+    // The former low-resolution floor was the last visibly old surface in
+    // Industrial rooms. Reuse the broad metal-plate recipe already used by
+    // Office, with a warm charcoal palette that matches the Industrial wall
+    // without losing the floor-to-wall contrast, and an independent seed.
+    auto floorRecipe = generateCorridorRoomMaterials(
+        wkc::core::hashCombine(roomSeed, 0x494E445553464C32ULL))
+        .surfaces[static_cast<std::size_t>(RoomSurface::Floor)];
+    floorRecipe.pattern = CorridorSurfacePattern::Office;
+    floorRecipe.baseColor = {0.21F, 0.20F, 0.185F};
+    floorRecipe.secondaryColor = {0.061F, 0.058F, 0.052F};
+    floorRecipe.accentColor = {0.45F, 0.31F, 0.11F};
+    const auto floorImages = generateCorridorSurfaceMaterialImages(floorRecipe);
+    if (!floorImages) {
+        return false;
+    }
+    auto& floorMaterial = gpuMaterials.specialSurfaceMaterials[
+        static_cast<std::size_t>(RoomSurface::Floor)].emplace();
+    if (!floorMaterial.albedo.upload(
+            gl_, floorImages->albedo, wkc::render::TextureSampling::Trilinear)
+        || !floorMaterial.normal.upload(
+            gl_, floorImages->normal, wkc::render::TextureSampling::Trilinear)
+        || !floorMaterial.properties.upload(
+            gl_, floorImages->properties, wkc::render::TextureSampling::Trilinear)) {
+        return false;
+    }
+    gpuMaterials.industrialFloorV2 = true;
     const auto& wallRecipe = materials.surfaces[static_cast<std::size_t>(
         IndustrialSurface::Wall)];
     gpuMaterials.wallTone = std::clamp(wallRecipe.baseColor.x / 0.33F, 0.94F, 1.06F);
@@ -1972,27 +2140,88 @@ bool GdpRenderer::prepareIndustrialRoomMaterials(const wkc::core::Seed roomSeed)
         IndustrialSurface::Ceiling)];
     gpuMaterials.ceilingTone = std::clamp(
         ceilingRecipe.baseColor.x / 0.38F, 0.94F, 1.06F);
-    for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
-        const IndustrialSurfaceRecipe& recipe = materials.surfaces[index];
-        if (recipe.surface == IndustrialSurface::Wall
-            || recipe.surface == IndustrialSurface::Ceiling) {
-            continue;
-        }
-        const auto textureData = textureCache_.acquire(
-            industrialSurfaceRecipeHash(recipe),
-            [&recipe] {
-                return std::move(
-                    *generateIndustrialSurfaceAlbedo(recipe));
-            });
-        if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
-            return false;
-        }
-    }
     roomMaterials_.emplace(materials.materialHash, std::move(gpuMaterials));
     activeRoomMaterialKey_ = materials.materialHash;
     if (roomSeed == 0U) {
         fallbackRoomMaterialKey_ = materials.materialHash;
     }
+    return true;
+}
+
+bool GdpRenderer::prepareCorridorRoomMaterials(
+    const wkc::core::Seed corridorSeed, const bool structuralTransit)
+{
+    if (!initialized_) return false;
+    const CorridorRoomMaterialSet materials = generateCorridorRoomMaterials(
+        corridorSeed, structuralTransit
+            ? CorridorSurfacePattern::StructuralTransit
+            : CorridorSurfacePattern::ServiceCorridor);
+    if (!validateCorridorRoomMaterials(materials).isValid()) return false;
+    if (roomMaterials_.contains(materials.materialHash)) {
+        activeRoomMaterialKey_ = materials.materialHash;
+        return true;
+    }
+    RoomGpuMaterials gpu;
+    gpu.corridorV2 = true;
+    for (std::size_t i = 0; i < materials.surfaces.size(); ++i) {
+        const auto images = generateCorridorSurfaceMaterialImages(materials.surfaces[i]);
+        if (!images) return false;
+        auto& surface = gpu.specialSurfaceMaterials[i].emplace();
+        if (!surface.albedo.upload(gl_, images->albedo,
+                wkc::render::TextureSampling::Trilinear)
+            || !surface.normal.upload(gl_, images->normal,
+                wkc::render::TextureSampling::Trilinear)
+            || !surface.properties.upload(gl_, images->properties,
+                wkc::render::TextureSampling::Trilinear)) return false;
+    }
+    roomMaterials_.emplace(materials.materialHash, std::move(gpu));
+    activeRoomMaterialKey_ = materials.materialHash;
+    return true;
+}
+
+bool GdpRenderer::prepareOfficeRoomMaterials(const wkc::core::Seed roomSeed)
+{
+    if (!initialized_) return false;
+    // Office has broad recessed cassettes, separate from the corridor's
+    // narrow service sheets and floor grip strips.
+    CorridorRoomMaterialSet materials = generateCorridorRoomMaterials(
+        wkc::core::hashCombine(roomSeed, 0x4F46464943455F31ULL));
+    auto& wall = materials.surfaces[static_cast<std::size_t>(RoomSurface::Wall)];
+    wall.pattern = CorridorSurfacePattern::Office;
+    wall.baseColor = {0.33F, 0.36F, 0.35F};
+    wall.secondaryColor = {0.115F, 0.14F, 0.14F};
+    wall.accentColor = {0.24F, 0.56F, 0.60F};
+    auto& floor = materials.surfaces[static_cast<std::size_t>(RoomSurface::Floor)];
+    floor.pattern = CorridorSurfacePattern::Office;
+    floor.baseColor = {0.17F, 0.19F, 0.19F};
+    floor.secondaryColor = {0.065F, 0.075F, 0.075F};
+    floor.accentColor = {0.26F, 0.45F, 0.46F};
+    auto& ceiling = materials.surfaces[static_cast<std::size_t>(RoomSurface::Ceiling)];
+    ceiling.pattern = CorridorSurfacePattern::Office;
+    ceiling.baseColor = {0.25F, 0.28F, 0.28F};
+    ceiling.secondaryColor = {0.09F, 0.11F, 0.12F};
+    ceiling.accentColor = {0.24F, 0.50F, 0.52F};
+    materials.materialHash = hashCorridorRoomMaterials(materials);
+    if (!validateCorridorRoomMaterials(materials).isValid()) return false;
+    if (roomMaterials_.contains(materials.materialHash)) {
+        activeRoomMaterialKey_ = materials.materialHash;
+        return true;
+    }
+    RoomGpuMaterials gpu;
+    gpu.officeV1 = true;
+    for (std::size_t i = 0; i < materials.surfaces.size(); ++i) {
+        const auto images = generateCorridorSurfaceMaterialImages(materials.surfaces[i]);
+        if (!images) return false;
+        auto& surface = gpu.specialSurfaceMaterials[i].emplace();
+        if (!surface.albedo.upload(gl_, images->albedo,
+                wkc::render::TextureSampling::Trilinear)
+            || !surface.normal.upload(gl_, images->normal,
+                wkc::render::TextureSampling::Trilinear)
+            || !surface.properties.upload(gl_, images->properties,
+                wkc::render::TextureSampling::Trilinear)) return false;
+    }
+    roomMaterials_.emplace(materials.materialHash, std::move(gpu));
+    activeRoomMaterialKey_ = materials.materialHash;
     return true;
 }
 
@@ -2118,13 +2347,15 @@ bool GdpRenderer::prepareStorageRoomMaterials(
     return true;
 }
 
-bool GdpRenderer::prepareCombatRoomMaterials(const wkc::core::Seed roomSeed)
+bool GdpRenderer::prepareCombatRoomMaterials(
+    const wkc::core::Seed roomSeed, const bool galleryWallV1,
+    const bool bossArenaV1)
 {
     if (!initialized_) {
         return false;
     }
     const CombatRoomMaterialSet materials
-        = generateCombatRoomMaterials(roomSeed);
+        = generateCombatRoomMaterials(roomSeed, galleryWallV1, bossArenaV1);
     if (!validateCombatRoomMaterials(materials).isValid()) {
         wkc::core::log(
             wkc::core::LogLevel::Error, "Combat room material generation failed validation");
@@ -2136,15 +2367,55 @@ bool GdpRenderer::prepareCombatRoomMaterials(const wkc::core::Seed roomSeed)
     }
 
     RoomGpuMaterials gpuMaterials;
+    gpuMaterials.combatGalleryWallV1 = galleryWallV1 || bossArenaV1;
+    gpuMaterials.combatBossV1 = bossArenaV1;
+    gpuMaterials.combatWallSeed = static_cast<float>(roomSeed % 100000U);
     gpuMaterials.columnCondition = static_cast<std::uint8_t>(materials.condition);
     for (std::size_t index = 0; index < materials.surfaces.size(); ++index) {
         const CombatSurfaceRecipe& recipe = materials.surfaces[index];
+        if (bossArenaV1) {
+            auto images = generateBossArenaSurfaceMaterialImages(recipe);
+            if (!images) return false;
+            auto& gpu = gpuMaterials.bossSurfaceMaterials[index].emplace();
+            if (!gpu.albedo.upload(gl_, images->albedo,
+                    wkc::render::TextureSampling::Trilinear)
+                || !gpu.normal.upload(gl_, images->normal,
+                    wkc::render::TextureSampling::Trilinear)
+                || !gpu.properties.upload(gl_, images->properties,
+                    wkc::render::TextureSampling::Trilinear)) {
+                return false;
+            }
+            continue;
+        }
         const auto textureData = textureCache_.acquire(
             combatSurfaceRecipeHash(recipe),
             [&recipe] {
                 return std::move(*generateCombatSurfaceAlbedo(recipe));
             });
         if (!gpuMaterials.textures[index].upload(gl_, *textureData)) {
+            return false;
+        }
+    }
+    if (galleryWallV1 || bossArenaV1) {
+        const auto coverAlbedo = textureCache_.acquire(
+            combatCoverMaterialHash(roomSeed), [roomSeed] {
+                return std::move(*generateCombatCoverAlbedo(roomSeed));
+            });
+        if (!gpuMaterials.combatCoverTexture.upload(gl_, *coverAlbedo)) {
+            return false;
+        }
+        const auto columnAlbedo = textureCache_.acquire(
+            combatColumnMaterialHash(roomSeed), [roomSeed] {
+                return std::move(*generateCombatColumnAlbedo(roomSeed));
+            });
+        if (!gpuMaterials.combatColumnTexture.upload(gl_, *columnAlbedo)) {
+            return false;
+        }
+        const auto railAlbedo = textureCache_.acquire(
+            combatRailMaterialHash(roomSeed), [roomSeed] {
+                return std::move(*generateCombatRailAlbedo(roomSeed));
+            });
+        if (!gpuMaterials.combatRailTexture.upload(gl_, *railAlbedo)) {
             return false;
         }
     }
@@ -2864,7 +3135,7 @@ bool GdpRenderer::render(
         && hud.objective != ObjectiveRenderState::Defeat;
     const float scopeStrength = scopeAllowed ? sniperScopeStrength(weaponViewmodel) : 0.0F;
     const int renderScalePercent = std::clamp(
-        static_cast<int>(hud.worldRenderScalePercent), 50, 100);
+        static_cast<int>(hud.worldRenderScalePercent), 50, 150);
     const int renderWidth = std::max(1, (width * renderScalePercent) / 100);
     const int renderHeight = std::max(1, (height * renderScalePercent) / 100);
     const std::uint32_t lightCount = std::min<std::uint32_t>(
@@ -2896,7 +3167,19 @@ bool GdpRenderer::render(
     shader.beginUniformFrame();
     lastFrameStats_.meshCacheEntries = meshCache_.stats().entries;
     lastFrameStats_.textureCacheEntries = textureCache_.stats().entries;
+    const auto reportAllocationFailure = [](const std::string_view resource) {
+        const GLenum error = glGetError();
+        if (error == GL_NO_ERROR) return;
+        std::ostringstream message;
+        message << resource << " allocation failed with OpenGL error 0x"
+            << std::hex << error;
+        wkc::core::log(wkc::core::LogLevel::Error, message.str());
+        // A failed allocation can leave more than one pending error. Clear
+        // those errors before the next frame retries at a smaller scale.
+        for (int index = 0; index < 16 && glGetError() != GL_NO_ERROR; ++index) {}
+    };
     if (!framebuffer_.resize(gl_, renderWidth, renderHeight)) {
+        reportAllocationFailure("World framebuffer");
         return false;
     }
     if (geometryShadowsActive) {
@@ -2906,7 +3189,10 @@ bool GdpRenderer::render(
             hud.geometryShadowLightBudget,
             static_cast<std::uint32_t>(maxRenderedRoomLights));
         for (std::uint32_t index = 0U; index < requestedMaps; ++index) {
-            if (!shadowCubes_[index].resize(gl_, shadowSize)) return false;
+            if (!shadowCubes_[index].resize(gl_, shadowSize)) {
+                reportAllocationFailure("Shadow map");
+                return false;
+            }
         }
     } else {
         shadowCubeCount_ = 0U;
@@ -3224,6 +3510,16 @@ bool GdpRenderer::render(
         wkc::core::Vec2 materialUvOffset{};
         switch (material) {
         case RoomMaterialChannel::Wall:
+            if (roomMaterials.combatGalleryWallV1) {
+                // Two panels per axis: 6 m tiles make each wall plate 3 m
+                // wide, matching the scale of the approved arena board.
+                style.surfaceTileMetres = 6.0F;
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.combatBossV1) {
+                resolvedTint = {tint.x * 0.78F, tint.y * 0.76F,
+                    tint.z * 0.73F};
+            }
             if (roomMaterials.technicalV1) {
                 style.surfaceTileMetres = 2.0F;
                 style.mirrorSurfaceTile = true;
@@ -3234,6 +3530,10 @@ bool GdpRenderer::render(
             }
             if (roomMaterials.centralHubWallCondition) {
                 style.mirrorSurfaceTile = true;
+                // Match the warm graphite of the central column plate while
+                // retaining this wall tile's own seams and edge wear.
+                resolvedTint = {tint.x * 0.63F, tint.y * 0.59F,
+                    tint.z * 0.53F};
             }
             if (roomMaterials.industrialWallCondition) {
                 const std::size_t conditionIndex = static_cast<std::size_t>(
@@ -3247,12 +3547,24 @@ bool GdpRenderer::render(
             }
             break;
         case RoomMaterialChannel::Floor:
+            if (roomMaterials.industrialFloorV2) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
+            if (roomMaterials.combatGalleryWallV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.technicalV1) {
                 style.surfaceTileMetres = 2.0F;
                 style.mirrorSurfaceTile = true;
             }
             if (roomMaterials.centralHubWallCondition) {
                 style.mirrorSurfaceTile = true;
+                // Lift the approved plate's midtones toward the column's
+                // warm graphite without stretching or replacing its wear.
+                resolvedTint = {tint.x * 1.16F, tint.y * 1.08F,
+                    tint.z * 0.96F};
             }
             if (roomMaterials.laboratoryPreviewV1) {
                 style.surfaceTileMetres = 2.0F;
@@ -3268,6 +3580,10 @@ bool GdpRenderer::render(
             style.surfaceTileMetres = 0.75F;
             break;
         case RoomMaterialChannel::Ceiling:
+            if (roomMaterials.combatGalleryWallV1) {
+                style.surfaceTileMetres = 2.0F;
+                style.mirrorSurfaceTile = true;
+            }
             if (roomMaterials.technicalV1) {
                 style.surfaceTileMetres = 2.0F;
                 style.mirrorSurfaceTile = true;
@@ -3289,6 +3605,22 @@ bool GdpRenderer::render(
                     materialUvOffset = roomMaterials.ceilingUvOffset;
                 }
             }
+            break;
+        case RoomMaterialChannel::CombatCover:
+            // Covers are a few metres across. Their own painted-steel
+            // material keeps ribs and wear in object scale.
+            style.surfaceTileMetres = 1.2F;
+            style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::CombatColumn:
+            // One broad finish across a column face. The physical braces
+            // supply the panel divisions without repeating joints sideways.
+            style.surfaceTileMetres = 1.8F;
+            style.mirrorSurfaceTile = true;
+            break;
+        case RoomMaterialChannel::CombatRail:
+            // No panel seams: the posts and joints are already real geometry.
+            style.surfaceTileMetres = 0.9F;
             break;
         case RoomMaterialChannel::StorageRack:
             style.surfaceTileMetres = 0.8F;
@@ -3315,6 +3647,16 @@ bool GdpRenderer::render(
             break;
         case RoomMaterialChannel::Generic:
             break;
+        }
+        if ((roomMaterials.corridorV2 || roomMaterials.officeV1
+                || (roomMaterials.industrialFloorV2
+                    && material == RoomMaterialChannel::Floor))
+            && (material == RoomMaterialChannel::Wall
+                || material == RoomMaterialChannel::Floor
+                || material == RoomMaterialChannel::Ceiling)) {
+            detailedMaterial = true;
+            style.surfaceTileMetres = material == RoomMaterialChannel::Wall
+                ? 3.0F : 2.0F;
         }
         const bool customUv = (detailedMaterial || roomMaterials.storageHallV1
             || roomMaterials.cafeteriaV1 || roomMaterials.securityV1)
@@ -3344,6 +3686,7 @@ bool GdpRenderer::render(
             || material == RoomMaterialChannel::Wall;
     };
 
+    constexpr float fallbackRoomShellHalfThickness = 0.10F;
     const auto drawRoomShell = [&](const RoomRenderData renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
         const wkc::core::Aabb bounds = renderedRoom.worldBounds;
@@ -3432,7 +3775,7 @@ bool GdpRenderer::render(
             bounds.minimum.y,
             (bounds.minimum.z + bounds.maximum.z) * 0.5F,
         };
-        constexpr float shellThickness = 0.20F;
+        constexpr float shellThickness = fallbackRoomShellHalfThickness * 2.0F;
         if (approvedTiledRoom) {
             const float materialTileMetres = (roomMaterials.securityV1
                     || roomMaterials.technicalV1)
@@ -3549,9 +3892,10 @@ bool GdpRenderer::render(
                     }
                 }
             }
-            const auto drawWallSpan = [&](const float minimum, const float maximum,
-                                          const float bottom, const float top,
-                                          const std::size_t tileIndex) {
+            const auto drawWallSegment = [&](const float minimum, const float maximum,
+                                             const float bottom, const float top,
+                                             const std::size_t tileIndex,
+                                             const bool upperIndustrialSegment) {
                 if (maximum - minimum <= 1.0e-4F || top - bottom <= 1.0e-4F) {
                     return;
                 }
@@ -3591,8 +3935,29 @@ bool GdpRenderer::render(
                             : minimum / tileMetres,
                         approvedTiledRoom
                             ? 1.0F - (bottom / tileMetres)
-                            : bottom / tileMetres},
+                            : upperIndustrialSegment
+                                ? 0.5F + (bottom - 4.0F) / tileMetres
+                                : bottom / tileMetres},
                     wallVariant);
+            };
+            const auto drawWallSpan = [&](const float minimum, const float maximum,
+                                          const float bottom, const float top,
+                                          const std::size_t tileIndex) {
+                // The industrial wall atlas has a safety stripe only at its
+                // base. On a wall taller than its 4 m tile, sample the upper
+                // half of that atlas for the additional height at the same
+                // texel density instead of wrapping the stripe mid-wall.
+                if (roomMaterials.industrialWallCondition
+                    && !approvedTiledRoom && bottom < 4.0F && top > 4.0F) {
+                    drawWallSegment(minimum, maximum, bottom, 4.0F,
+                        tileIndex, false);
+                    drawWallSegment(minimum, maximum, 4.0F, top,
+                        tileIndex, true);
+                } else {
+                    drawWallSegment(minimum, maximum, bottom, top, tileIndex,
+                        roomMaterials.industrialWallCondition
+                            && !approvedTiledRoom && bottom >= 4.0F);
+                }
             };
             for (std::size_t tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
                 const float tileMinimum = approvedTiledRoom
@@ -3871,6 +4236,155 @@ bool GdpRenderer::render(
         drawTechnicalCeilingBraces(connectedRoom);
     }
 
+    const auto drawRoomCeilingBraces = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        const bool storage = materials.storageHallV1;
+        const bool cafeteria = materials.cafeteriaV1;
+        const bool security = materials.securityV1;
+        const bool laboratory = materials.laboratoryPreviewV1;
+        const bool hub = materials.centralHubWallCondition.has_value();
+        const bool boss = materials.combatBossV1;
+        if (!storage && !cafeteria && !security && !laboratory && !hub
+            && !boss) return;
+        const auto& bounds = renderedRoom.worldBounds;
+        const auto extent = bounds.maximum - bounds.minimum;
+        // Compact modules keep their simpler ceiling. These braces belong to
+        // the spacious room variants, where their 4 m rhythm remains legible.
+        if (std::min(extent.x, extent.z) < 14.0F || extent.y < 5.4F) return;
+
+        const std::array<wkc::core::Vec2, 4> rectangle{{
+            {bounds.minimum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.minimum.z},
+            {bounds.maximum.x, bounds.maximum.z},
+            {bounds.minimum.x, bounds.maximum.z},
+        }};
+        const std::span<const wkc::core::Vec2> outline
+            = renderedRoom.walkableOutline.empty()
+                ? std::span<const wkc::core::Vec2>{rectangle}
+                : renderedRoom.walkableOutline;
+        const wkc::core::Vec3 braceColor = storage
+            ? wkc::core::Vec3{0.29F, 0.34F, 0.30F}
+            : cafeteria ? wkc::core::Vec3{0.36F, 0.37F, 0.35F}
+            : security ? wkc::core::Vec3{0.27F, 0.36F, 0.41F}
+            : laboratory ? wkc::core::Vec3{0.40F, 0.51F, 0.55F}
+            : boss ? wkc::core::Vec3{0.105F, 0.103F, 0.10F}
+                         : wkc::core::Vec3{0.31F, 0.35F, 0.36F};
+        const wkc::core::Vec3 fastenerColor = storage
+            ? wkc::core::Vec3{0.57F, 0.56F, 0.48F}
+            : cafeteria ? wkc::core::Vec3{0.62F, 0.58F, 0.53F}
+            : security ? wkc::core::Vec3{0.54F, 0.64F, 0.68F}
+            : laboratory ? wkc::core::Vec3{0.70F, 0.77F, 0.78F}
+            : boss ? wkc::core::Vec3{0.35F, 0.32F, 0.27F}
+                         : wkc::core::Vec3{0.55F, 0.60F, 0.60F};
+        const float centerX = (bounds.minimum.x + bounds.maximum.x) * 0.5F;
+        const float centerZ = (bounds.minimum.z + bounds.maximum.z) * 0.5F;
+        const float ceiling = bounds.maximum.y;
+        const auto piece = [&](const wkc::core::Vec3 center,
+            const wkc::core::Vec3 size, const wkc::core::Vec3 color) {
+            queueSurface(materials, center, size,
+                RoomMaterialChannel::SolidColor, 1.0F, color);
+            surfaceCommands.back().castsShadow = !boss || size.y >= 0.08F;
+        };
+        const std::size_t fixtureCount = lighting.visibleFixturesPopulated
+            ? lighting.visibleFixtures.size()
+            : std::min<std::size_t>(lighting.lightCount, lighting.lights.size());
+        const auto fixtureAt = [&](const std::size_t index)
+            -> const PointLightRenderData& {
+            return lighting.visibleFixturesPopulated
+                ? lighting.visibleFixtures[index] : lighting.lights[index];
+        };
+        const auto roomFixture = [&](const PointLightRenderData& fixture) {
+            return fixture.position.x > bounds.minimum.x + 0.2F
+                && fixture.position.x < bounds.maximum.x - 0.2F
+                && fixture.position.z > bounds.minimum.z + 0.2F
+                && fixture.position.z < bounds.maximum.z - 0.2F
+                && std::abs(fixture.position.y - ceiling) < 1.6F;
+        };
+        const auto spans = [&](const bool alongX, const float fixed) {
+            std::vector<float> crossings;
+            crossings.reserve(outline.size());
+            for (std::size_t index = 0U; index < outline.size(); ++index) {
+                const auto& a = outline[index];
+                const auto& b = outline[(index + 1U) % outline.size()];
+                const float aFixed = alongX ? a.y : a.x;
+                const float bFixed = alongX ? b.y : b.x;
+                if ((aFixed > fixed) == (bFixed > fixed)) continue;
+                const float aAlong = alongX ? a.x : a.y;
+                const float bAlong = alongX ? b.x : b.y;
+                crossings.push_back(aAlong + (fixed - aFixed)
+                    * (bAlong - aAlong) / (bFixed - aFixed));
+            }
+            std::sort(crossings.begin(), crossings.end());
+            for (std::size_t index = 0U; index + 1U < crossings.size(); index += 2U) {
+                const float start = crossings[index] + 0.16F;
+                const float end = crossings[index + 1U] - 0.16F;
+                if (end - start < 1.0F) continue;
+                std::vector<std::pair<float, float>> clearSpans{{start, end}};
+                for (std::size_t fixtureIndex = 0U;
+                     fixtureIndex < fixtureCount; ++fixtureIndex) {
+                    const PointLightRenderData& fixture = fixtureAt(fixtureIndex);
+                    if (!roomFixture(fixture)) continue;
+                    const float across = alongX
+                        ? fixture.position.z : fixture.position.x;
+                    if (std::abs(across - fixed) > 1.2F) continue;
+                    const float along = alongX
+                        ? fixture.position.x : fixture.position.z;
+                    std::vector<std::pair<float, float>> next;
+                    for (const auto& [first, last] : clearSpans) {
+                        if (along - 1.1F > first + 0.6F) {
+                            next.emplace_back(first,
+                                std::min(last, along - 1.1F));
+                        }
+                        if (along + 1.1F < last - 0.6F) {
+                            next.emplace_back(std::max(first, along + 1.1F),
+                                last);
+                        }
+                    }
+                    clearSpans = std::move(next);
+                }
+                for (const auto& [first, last] : clearSpans) {
+                    if (last - first < 0.6F) continue;
+                    const float middle = (first + last) * 0.5F;
+                    piece(alongX
+                            ? wkc::core::Vec3{middle, ceiling - 0.14F, fixed}
+                            : wkc::core::Vec3{fixed, ceiling - 0.075F, middle},
+                        alongX ? wkc::core::Vec3{last - first, 0.12F, 0.16F}
+                               : wkc::core::Vec3{0.16F, 0.13F, last - first},
+                        braceColor);
+                }
+            }
+        };
+        const auto forGrid = [&](const float center, const float halfSpan,
+            const auto& callback) {
+            for (float offset = 2.0F; offset < halfSpan - 0.5F; offset += 4.0F) {
+                callback(center - offset);
+                callback(center + offset);
+            }
+        };
+        forGrid(centerZ, extent.z * 0.5F,
+            [&](const float z) { spans(true, z); });
+        forGrid(centerX, extent.x * 0.5F,
+            [&](const float x) { spans(false, x); });
+        forGrid(centerX, extent.x * 0.5F, [&](const float x) {
+            forGrid(centerZ, extent.z * 0.5F, [&](const float z) {
+                if (!world::footprintContainsDisk(outline,
+                        {x, ceiling, z}, 0.22F)) return;
+                for (std::size_t index = 0U; index < fixtureCount; ++index) {
+                    const PointLightRenderData& fixture = fixtureAt(index);
+                    if (roomFixture(fixture)
+                        && std::abs(fixture.position.x - x) < 1.2F
+                        && std::abs(fixture.position.z - z) < 1.2F) return;
+                }
+                piece({x, ceiling - 0.212F, z},
+                    {0.075F, 0.018F, 0.075F}, fastenerColor);
+            });
+        });
+    };
+    drawRoomCeilingBraces(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawRoomCeilingBraces(connectedRoom);
+    }
+
     const auto drawTechnicalServiceWalls = [&](const RoomRenderData& renderedRoom) {
         const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
         if (!materials.technicalV1) return;
@@ -4054,12 +4568,12 @@ bool GdpRenderer::render(
                         first.y + inwardZ * 0.10F},
                     {0.26F, 5.64F, 0.26F},
                     RoomMaterialChannel::SolidColor, 1.0F,
-                    {0.20F, 0.22F, 0.23F});
+                    {0.23F, 0.21F, 0.18F});
                 addOriented({(first.x + second.x) * 0.5F + inwardX * 0.05F,
                         floorY + 5.63F,
                         (first.y + second.y) * 0.5F + inwardZ * 0.05F},
                     {length, 0.18F, 0.10F},
-                    {0.20F, 0.22F, 0.22F}, yaw);
+                    {0.24F, 0.22F, 0.19F}, yaw);
                 std::vector<std::pair<float, float>> spans{{0.0F, length}};
                 for (const DoorRenderData& door : doors) {
                     const float relativeX = door.position.x - first.x;
@@ -4099,16 +4613,16 @@ bool GdpRenderer::render(
                     };
                     addOriented(at(0.49F, 0.030F),
                         {segmentLength, 0.98F, 0.060F},
-                        {0.18F, 0.20F, 0.21F}, yaw);
+                        {0.22F, 0.20F, 0.17F}, yaw);
                     addOriented(at(0.17F, 0.070F),
                         {segmentLength, 0.25F, 0.080F},
-                        {0.12F, 0.14F, 0.15F}, yaw);
+                        {0.12F, 0.11F, 0.10F}, yaw);
                     addOriented(at(0.99F, 0.071F),
                         {segmentLength, 0.055F, 0.052F},
-                        {0.11F, 0.44F, 0.50F}, yaw);
+                        hubRouteLedOrange, yaw);
                     addOriented(at(1.04F, 0.062F),
                         {segmentLength, 0.023F, 0.045F},
-                        {0.30F, 0.32F, 0.31F}, yaw);
+                        {0.34F, 0.31F, 0.27F}, yaw);
                     for (float along = std::ceil(start / 2.0F) * 2.0F;
                          along < end - 0.12F; along += 2.0F) {
                         if (along < start + 0.12F) continue;
@@ -4118,13 +4632,13 @@ bool GdpRenderer::render(
                                 floorY + 0.49F,
                                 boltZ + inwardZ * 0.107F},
                             {0.024F, 0.77F, 0.028F},
-                            {0.10F, 0.12F, 0.13F}, yaw);
+                            {0.11F, 0.10F, 0.09F}, yaw);
                         for (const float y : {0.19F, 0.83F}) {
                             addOriented({boltX + inwardX * 0.126F,
                                     floorY + y,
                                     boltZ + inwardZ * 0.126F},
                                 {0.070F, 0.070F, 0.025F},
-                                {0.53F, 0.55F, 0.53F}, yaw);
+                                {0.55F, 0.51F, 0.45F}, yaw);
                         }
                     }
                 }
@@ -4143,22 +4657,22 @@ bool GdpRenderer::render(
                         cx + inwardX * 0.12F, floorY + 3.65F,
                         cz + inwardZ * 0.12F};
                     addOriented(center, {2.20F, 0.065F, 0.075F},
-                        {0.25F, 0.27F, 0.27F}, yaw);
+                        {0.27F, 0.25F, 0.22F}, yaw);
                     addOriented(center + wkc::core::Vec3{
                             directionX * 0.62F, -0.50F,
                             directionZ * 0.62F},
                         {0.065F, 1.00F, 0.075F},
-                        {0.25F, 0.27F, 0.27F}, yaw);
+                        {0.27F, 0.25F, 0.22F}, yaw);
                     addOriented(center + wkc::core::Vec3{
                             directionX * 0.62F, -0.83F,
                             directionZ * 0.62F},
                         {0.15F, 0.12F, 0.10F},
-                        {0.14F, 0.18F, 0.20F}, yaw);
+                        {0.16F, 0.15F, 0.13F}, yaw);
                     addOriented(center + wkc::core::Vec3{
                             -directionX * 0.80F, -0.15F,
                             -directionZ * 0.80F},
                         {0.42F, 0.38F, 0.12F},
-                        {0.32F, 0.34F, 0.33F}, yaw);
+                        {0.34F, 0.31F, 0.27F}, yaw);
                 }
                 if ((index & 1U) != 0U) {
                     // Service ducts follow the diagonal ceiling perimeter.
@@ -4170,22 +4684,22 @@ bool GdpRenderer::render(
                         (first.y + second.y) * 0.5F + inwardZ * 0.48F};
                     addOriented(ductCenter,
                         {length - 0.72F, 0.20F, 0.28F},
-                        {0.36F, 0.39F, 0.40F}, yaw,
+                        {0.34F, 0.31F, 0.27F}, yaw,
                         RoomMaterialChannel::StructuralColumn);
                     addOriented(ductCenter + wkc::core::Vec3{0.0F, -0.113F, 0.0F},
                         {length - 0.82F, 0.026F, 0.30F},
-                        {0.12F, 0.15F, 0.17F}, yaw);
+                        {0.13F, 0.12F, 0.11F}, yaw);
                     for (const float side : {-1.0F, 1.0F}) {
                         const wkc::core::Vec3 collarCenter = ductCenter
                             + wkc::core::Vec3{
                                 directionX * side * (length * 0.30F), 0.0F,
                                 directionZ * side * (length * 0.30F)};
                         addOriented(collarCenter, {0.10F, 0.25F, 0.34F},
-                            {0.16F, 0.19F, 0.20F}, yaw);
+                            {0.17F, 0.16F, 0.14F}, yaw);
                         addOriented(collarCenter
                                 + wkc::core::Vec3{0.0F, 0.175F, 0.0F},
                             {0.055F, 0.16F, 0.075F},
-                            {0.24F, 0.27F, 0.28F}, yaw);
+                            {0.25F, 0.23F, 0.20F}, yaw);
                     }
                     // Shallow wall-mounted service pieces occupy only the
                     // diagonal faces. Cardinal doorways stay unobstructed.
@@ -4201,11 +4715,11 @@ bool GdpRenderer::render(
                     const bool servicePanel = index == 1U || index == 5U;
                     addOriented(wallDetail(0.0F, 2.18F, 0.055F),
                         {1.46F, 1.30F, 0.065F},
-                        {0.09F, 0.12F, 0.14F}, yaw);
+                        {0.11F, 0.10F, 0.09F}, yaw);
                     addOriented(wallDetail(0.0F, 2.18F, 0.098F),
                         {1.31F, 1.14F, 0.035F},
-                        servicePanel ? wkc::core::Vec3{0.31F, 0.35F, 0.36F}
-                                     : wkc::core::Vec3{0.12F, 0.16F, 0.18F},
+                        servicePanel ? wkc::core::Vec3{0.33F, 0.30F, 0.26F}
+                                     : wkc::core::Vec3{0.14F, 0.13F, 0.11F},
                         yaw, servicePanel
                             ? RoomMaterialChannel::StructuralColumn
                             : RoomMaterialChannel::SolidColor);
@@ -4214,33 +4728,67 @@ bool GdpRenderer::render(
                             addOriented(wallDetail(side * 0.63F,
                                     boltY, 0.124F),
                                 {0.055F, 0.055F, 0.025F},
-                                {0.57F, 0.60F, 0.59F}, yaw);
+                                {0.57F, 0.53F, 0.47F}, yaw);
                         }
                     }
                     if (servicePanel) {
                         addOriented(wallDetail(0.0F, 2.69F, 0.124F),
                             {1.18F, 0.035F, 0.025F},
-                            {0.12F, 0.15F, 0.16F}, yaw);
+                            {0.13F, 0.12F, 0.10F}, yaw);
                         addOriented(wallDetail(0.47F, 2.15F, 0.126F),
                             {0.11F, 0.39F, 0.032F},
-                            {0.08F, 0.11F, 0.12F}, yaw);
+                            {0.10F, 0.09F, 0.08F}, yaw);
                         addOriented(wallDetail(0.47F, 2.15F, 0.148F),
                             {0.045F, 0.17F, 0.020F},
-                            {0.51F, 0.55F, 0.54F}, yaw);
+                            {0.53F, 0.49F, 0.43F}, yaw);
                         addOriented(wallDetail(-0.43F, 1.80F, 0.126F),
                             {0.21F, 0.045F, 0.022F},
-                            {0.12F, 0.42F, 0.47F}, yaw);
+                            hubRouteLedOrange, yaw);
                     } else {
                         for (int slat = 0; slat < 8; ++slat) {
                             addOriented(wallDetail(0.0F,
                                     1.74F + static_cast<float>(slat) * 0.12F,
                                     0.133F),
                                 {1.17F, 0.052F, 0.030F},
-                                {0.35F, 0.39F, 0.40F}, yaw);
+                                {0.34F, 0.31F, 0.27F}, yaw);
                         }
                         addOriented(wallDetail(0.0F, 1.64F, 0.125F),
                             {1.16F, 0.033F, 0.025F},
-                            {0.10F, 0.37F, 0.43F}, yaw);
+                            hubRouteLedOrange * 0.80F, yaw);
+                    }
+                    // Paired recessed service bays give the otherwise empty
+                    // diagonal walls a readable rhythm. Everything is fixed
+                    // to the wall, above floor traffic and away from doors.
+                    for (const float side : {-1.0F, 1.0F}) {
+                        const float along = side * 1.68F;
+                        addOriented(wallDetail(along, 2.18F, 0.070F),
+                            {0.55F, 1.28F, 0.080F},
+                            {0.085F, 0.078F, 0.068F}, yaw);
+                        addOriented(wallDetail(along, 2.18F, 0.116F),
+                            {0.43F, 1.12F, 0.024F},
+                            {0.32F, 0.29F, 0.25F}, yaw,
+                            RoomMaterialChannel::StructuralColumn);
+                        addOriented(wallDetail(along, 2.61F, 0.137F),
+                            {0.32F, 0.055F, 0.025F},
+                            hubRouteLedOrange * 0.75F, yaw);
+                        for (const float boltY : {1.66F, 2.70F}) {
+                            for (const float boltSide : {-1.0F, 1.0F}) {
+                                addOriented(wallDetail(along + boltSide * 0.22F,
+                                        boltY, 0.135F),
+                                    {0.045F, 0.045F, 0.025F},
+                                    {0.56F, 0.51F, 0.44F}, yaw);
+                            }
+                        }
+                    }
+                    // A short overhead status rail visually connects the
+                    // three bays without turning into a repeated wall tile.
+                    addOriented(wallDetail(0.0F, 3.34F, 0.080F),
+                        {4.25F, 0.14F, 0.085F},
+                        {0.18F, 0.16F, 0.14F}, yaw);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        addOriented(wallDetail(side * 1.66F, 3.34F, 0.132F),
+                            {0.44F, 0.055F, 0.020F},
+                            hubRouteLedOrange * 0.65F, yaw);
                     }
                 }
             }
@@ -4254,7 +4802,7 @@ bool GdpRenderer::render(
                 (renderedRoom.worldBounds.minimum.z
                     + renderedRoom.worldBounds.maximum.z) * 0.5F};
             // Navigation traces are localized geometry. The repeatable metal
-            // plate contains no cyan stripe that would recur on every tile.
+            // plate contains no orange stripe that would recur on every tile.
             for (const float direction : {-1.0F, 1.0F}) {
                 for (const bool alongX : {false, true}) {
                     const wkc::core::Vec3 traceCenter = hubCenter
@@ -4265,11 +4813,11 @@ bool GdpRenderer::render(
                     addOriented(traceCenter,
                         alongX ? wkc::core::Vec3{7.40F, 0.016F, 0.075F}
                                : wkc::core::Vec3{0.075F, 0.016F, 7.40F},
-                        {0.035F, 0.065F, 0.070F}, 0.0F);
+                        {0.055F, 0.052F, 0.045F}, 0.0F);
                     addOriented(traceCenter + wkc::core::Vec3{0.0F, 0.012F, 0.0F},
                         alongX ? wkc::core::Vec3{7.40F, 0.008F, 0.024F}
                                : wkc::core::Vec3{0.024F, 0.008F, 7.40F},
-                        {0.10F, 0.47F, 0.52F}, 0.0F);
+                        hubRouteLedOrange, 0.0F);
                 }
             }
             const auto floorPosition = [&](const float x, const float z) {
@@ -4288,16 +4836,16 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 hatch = floorPosition(-4.4F, 4.0F);
             addOriented(hatch + wkc::core::Vec3{0.0F, 0.008F, 0.0F},
                 {1.72F, 0.016F, 1.10F},
-                {0.11F, 0.14F, 0.16F}, floorYaw);
+                {0.13F, 0.12F, 0.10F}, floorYaw);
             addOriented(hatch + wkc::core::Vec3{0.0F, 0.019F, 0.0F},
                 {1.56F, 0.012F, 0.94F},
-                {0.70F, 0.78F, 0.82F}, floorYaw,
+                {0.74F, 0.70F, 0.63F}, floorYaw,
                 RoomMaterialChannel::HubFloorDetail);
             for (const float side : {-1.0F, 1.0F}) {
                 addOriented(hatch + wkc::core::Vec3{0.0F, 0.029F, 0.0F}
                         + floorDetailOffset(side * 0.73F, 0.0F),
                     {0.055F, 0.010F, 0.94F},
-                    {0.58F, 0.63F, 0.65F}, floorYaw,
+                    {0.61F, 0.57F, 0.51F}, floorYaw,
                     RoomMaterialChannel::HubFloorDetail);
             }
             for (const float x : {-0.66F, 0.66F}) {
@@ -4306,29 +4854,29 @@ bool GdpRenderer::render(
                             + wkc::core::Vec3{0.0F, 0.030F, 0.0F}
                             + floorDetailOffset(x, z),
                         {0.045F, 0.010F, 0.045F},
-                        {0.55F, 0.59F, 0.58F}, floorYaw);
+                        {0.57F, 0.53F, 0.47F}, floorYaw);
                 }
             }
             addOriented(hatch + wkc::core::Vec3{0.0F, 0.029F, 0.0F}
                     + floorDetailOffset(0.42F, 0.0F),
                 {0.25F, 0.012F, 0.055F},
-                {0.08F, 0.11F, 0.12F}, floorYaw);
+                {0.10F, 0.09F, 0.08F}, floorYaw);
             const wkc::core::Vec3 vent = floorPosition(4.2F, -4.1F);
             addOriented(vent + wkc::core::Vec3{0.0F, 0.008F, 0.0F},
                 {1.60F, 0.016F, 0.88F},
-                {0.035F, 0.050F, 0.060F}, floorYaw);
+                {0.045F, 0.042F, 0.038F}, floorYaw);
             for (const float side : {-1.0F, 1.0F}) {
                 addOriented(vent + wkc::core::Vec3{0.0F, 0.026F, 0.0F}
                         + floorDetailOffset(0.0F, side * 0.40F),
                     {1.60F, 0.020F, 0.07F},
-                    {0.72F, 0.80F, 0.84F}, floorYaw,
+                    {0.74F, 0.70F, 0.63F}, floorYaw,
                     RoomMaterialChannel::HubFloorDetail);
             }
             for (int slat = -3; slat <= 3; ++slat) {
                 addOriented(vent + wkc::core::Vec3{0.0F, 0.024F, 0.0F}
                         + floorDetailOffset(static_cast<float>(slat) * 0.19F, 0.0F),
                     {0.075F, 0.018F, 0.76F},
-                    {0.74F, 0.82F, 0.86F}, floorYaw,
+                    {0.76F, 0.72F, 0.65F}, floorYaw,
                     RoomMaterialChannel::HubFloorDetail);
             }
             for (const wkc::core::Vec3 local
@@ -4337,17 +4885,17 @@ bool GdpRenderer::render(
                 const wkc::core::Vec3 grille = floorPosition(local.x, local.z);
                 addOriented(grille + wkc::core::Vec3{0.0F, 5.978F, 0.0F},
                     {1.46F, 0.044F, 0.88F},
-                    {0.54F, 0.59F, 0.61F}, floorYaw,
+                    {0.53F, 0.49F, 0.43F}, floorYaw,
                     RoomMaterialChannel::HubFloorDetail);
                 addOriented(grille + wkc::core::Vec3{0.0F, 5.946F, 0.0F},
                     {1.34F, 0.014F, 0.76F},
-                    {0.025F, 0.040F, 0.050F}, floorYaw);
+                    {0.030F, 0.029F, 0.026F}, floorYaw);
                 for (const float side : {-1.0F, 1.0F}) {
                     addOriented(grille
                             + wkc::core::Vec3{0.0F, 5.928F, 0.0F}
                             + floorDetailOffset(0.0F, side * 0.40F),
                         {1.46F, 0.035F, 0.060F},
-                        {0.74F, 0.78F, 0.80F}, floorYaw,
+                        {0.70F, 0.66F, 0.59F}, floorYaw,
                         RoomMaterialChannel::HubFloorDetail);
                 }
                 for (int slat = -3; slat <= 3; ++slat) {
@@ -4356,7 +4904,7 @@ bool GdpRenderer::render(
                             + floorDetailOffset(
                                 static_cast<float>(slat) * 0.19F, 0.0F),
                         {0.050F, 0.036F, 0.70F},
-                        {0.76F, 0.81F, 0.83F}, floorYaw,
+                        {0.72F, 0.68F, 0.61F}, floorYaw,
                         RoomMaterialChannel::HubFloorDetail);
                 }
             }
@@ -4581,6 +5129,23 @@ bool GdpRenderer::render(
     for (const CorridorRenderData& corridor : corridors) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(corridor.materialKey);
         const float corridorHalfWidth = corridor.width * 0.5F;
+        const bool transit = corridor.width >= 2.4F;
+        const wkc::core::Vec3 routeTint = transit
+            ? wkc::core::Vec3{0.12F, 0.51F, 0.56F}
+            : wkc::core::Vec3{0.69F, 0.32F, 0.055F};
+        const auto corridorDetail = [&](const wkc::core::Vec3 position,
+                                         const wkc::core::Vec3 scale,
+                                         const wkc::core::Vec3 tint,
+                                         const bool shadow = false,
+                                         const bool luminous = false) {
+            queueSurface(roomMaterials, position, scale,
+                luminous ? RoomMaterialChannel::SolidColor
+                         : RoomMaterialChannel::StructuralColumn,
+                1.0F, tint);
+            surfaceCommands.back().castsShadow = shadow;
+            if (luminous)
+                surfaceCommands.back().style.emissiveStrength = 0.95F;
+        };
         for (std::size_t index = 1U; index + 1U < corridor.points.size(); ++index) {
             const wkc::core::Vec3 incoming = wkc::core::normalized(
                 corridor.points[index] - corridor.points[index - 1U]);
@@ -4595,7 +5160,10 @@ bool GdpRenderer::render(
             queueSurface(roomMaterials,
                 corner + wkc::core::Vec3{
                     0.0F, -corridorShellThickness * 0.5F, 0.0F},
-                cornerScale, RoomMaterialChannel::Floor, 2.0F);
+                cornerScale, RoomMaterialChannel::Floor, 2.0F,
+                {1.0F, 1.0F, 1.0F},
+                {corridor.width / 4.0F, corridor.width / 4.0F},
+                {corner.x / 4.0F, corner.z / 4.0F});
             queueSurface(roomMaterials,
                 corner + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
@@ -4603,6 +5171,11 @@ bool GdpRenderer::render(
                 {1.0F, 1.0F, 1.0F},
                 {corridor.width / 4.0F, corridor.width / 4.0F},
                 {corner.x / 4.0F, corner.z / 4.0F});
+            const float ductWidth = transit ? 0.32F : 0.20F;
+            corridorDetail(corner + wkc::core::Vec3{
+                    0.0F, corridor.height - 0.035F, 0.0F},
+                {ductWidth + 0.07F, 0.10F, ductWidth + 0.07F},
+                {0.18F, 0.18F, 0.19F}, true);
         }
         for (std::size_t index = 0; index + 1U < corridor.points.size(); ++index) {
             const wkc::core::Vec3 first = corridor.points[index];
@@ -4619,7 +5192,11 @@ bool GdpRenderer::render(
                 : wkc::core::Vec3{corridor.width, corridorShellThickness, length};
             queueSurface(roomMaterials,
                 center + wkc::core::Vec3{0.0F, -corridorShellThickness * 0.5F, 0.0F},
-                floorScale, RoomMaterialChannel::Floor, 2.0F);
+                floorScale, RoomMaterialChannel::Floor, 2.0F,
+                {1.0F, 1.0F, 1.0F},
+                {floorScale.x / 4.0F, floorScale.z / 4.0F},
+                {(alongX ? std::min(first.x, second.x) : center.x) / 4.0F,
+                    (alongX ? center.z : std::min(first.z, second.z)) / 4.0F});
             queueSurface(roomMaterials, center + wkc::core::Vec3{
                     0.0F, corridor.height + corridorShellThickness * 0.5F, 0.0F},
                 floorScale, RoomMaterialChannel::Ceiling, 1.0F,
@@ -4672,16 +5249,247 @@ bool GdpRenderer::render(
                     {wallLength / 4.0F, 1.0F},
                     {(alongX ? std::min(wallStart.x, wallEnd.x)
                              : std::min(wallStart.z, wallEnd.z)) / 4.0F, 0.0F});
+                const wkc::core::Vec3 trimCenter = wallCenter
+                    - side * 0.095F
+                    + wkc::core::Vec3{0.0F,
+                        0.15F - corridor.height * 0.5F, 0.0F};
+                const wkc::core::Vec3 trimScale = alongX
+                    ? wkc::core::Vec3{wallLength, 0.27F, 0.055F}
+                    : wkc::core::Vec3{0.055F, 0.27F, wallLength};
+                corridorDetail(trimCenter, trimScale,
+                    transit ? wkc::core::Vec3{0.17F, 0.20F, 0.22F}
+                            : wkc::core::Vec3{0.20F, 0.19F, 0.17F});
+                const wkc::core::Vec3 lineScale = alongX
+                    ? wkc::core::Vec3{wallLength, 0.022F, 0.021F}
+                    : wkc::core::Vec3{0.021F, 0.022F, wallLength};
+                corridorDetail(wallCenter - side * 0.082F
+                        + wkc::core::Vec3{0.0F,
+                            corridor.height * 0.47F
+                                - corridor.height * 0.5F, 0.0F},
+                    lineScale, routeTint, false, true);
+                if (transit) {
+                    const wkc::core::Vec3 railScale = alongX
+                        ? wkc::core::Vec3{wallLength, 0.062F, 0.085F}
+                        : wkc::core::Vec3{0.085F, 0.062F, wallLength};
+                    corridorDetail(wallCenter - side * 0.116F
+                            + wkc::core::Vec3{0.0F,
+                                0.79F - corridor.height * 0.5F, 0.0F},
+                        railScale, {0.32F, 0.35F, 0.36F}, true);
+                    const int bracketCount = std::clamp(
+                        static_cast<int>(std::floor(wallLength / 1.9F)), 1, 6);
+                    for (int bracket = 0; bracket < bracketCount; ++bracket) {
+                        const float fraction = (static_cast<float>(bracket) + 0.5F)
+                            / static_cast<float>(bracketCount);
+                        const wkc::core::Vec3 station
+                            = wallStart + (wallEnd - wallStart) * fraction
+                                + side * (corridorHalfWidth - 0.12F);
+                        const wkc::core::Vec3 bracketScale = alongX
+                            ? wkc::core::Vec3{0.10F, 0.21F, 0.14F}
+                            : wkc::core::Vec3{0.14F, 0.21F, 0.10F};
+                        corridorDetail(station + wkc::core::Vec3{0.0F, 0.79F, 0.0F},
+                            bracketScale, {0.19F, 0.21F, 0.22F});
+                        corridorDetail(station - side * 0.08F
+                                + wkc::core::Vec3{0.0F, 0.79F, 0.0F},
+                            {0.037F, 0.037F, 0.037F},
+                            {0.56F, 0.58F, 0.56F});
+                    }
+                }
+                if (wallLength >= 3.4F && sideSign > 0.0F) {
+                    const wkc::core::Vec3 hatchScale = alongX
+                        ? wkc::core::Vec3{0.57F, 0.54F, 0.029F}
+                        : wkc::core::Vec3{0.029F, 0.54F, 0.57F};
+                    const wkc::core::Vec3 hatchCenter = wallCenter
+                        - side * 0.095F
+                        + wkc::core::Vec3{0.0F,
+                            0.58F - corridor.height * 0.5F, 0.0F};
+                    corridorDetail(hatchCenter, hatchScale,
+                        {0.26F, 0.27F, 0.27F});
+                    const wkc::core::Vec3 gripScale = alongX
+                        ? wkc::core::Vec3{0.13F, 0.017F, 0.038F}
+                        : wkc::core::Vec3{0.038F, 0.017F, 0.13F};
+                    corridorDetail(hatchCenter - side * 0.020F,
+                        gripScale, {0.10F, 0.11F, 0.11F});
+                }
+            }
+            const float ductWidth = transit ? 0.32F : 0.20F;
+            const wkc::core::Vec3 ductScale = alongX
+                ? wkc::core::Vec3{length, 0.105F, ductWidth}
+                : wkc::core::Vec3{ductWidth, 0.105F, length};
+            corridorDetail(center + wkc::core::Vec3{
+                    0.0F, corridor.height - 0.035F, 0.0F},
+                ductScale, {0.19F, 0.19F, 0.20F}, true);
+            const int ductJointCount = std::clamp(
+                static_cast<int>(std::floor(length / 1.8F)), 1, 8);
+            for (int joint = 0; joint < ductJointCount; ++joint) {
+                const float fraction = (static_cast<float>(joint) + 0.5F)
+                    / static_cast<float>(ductJointCount);
+                const wkc::core::Vec3 station
+                    = first + (second - first) * fraction;
+                corridorDetail(station + wkc::core::Vec3{
+                        0.0F, corridor.height - 0.095F, 0.0F},
+                    alongX
+                        ? wkc::core::Vec3{0.045F, 0.025F, ductWidth + 0.06F}
+                        : wkc::core::Vec3{ductWidth + 0.06F, 0.025F, 0.045F},
+                    {0.35F, 0.36F, 0.35F});
+            }
+            const wkc::core::Vec3 trayScale = alongX
+                ? wkc::core::Vec3{length, 0.055F, 0.10F}
+                : wkc::core::Vec3{0.10F, 0.055F, length};
+            corridorDetail(center + left * (transit ? 0.68F : 0.37F)
+                    + wkc::core::Vec3{0.0F, corridor.height - 0.015F, 0.0F},
+                trayScale, {0.12F, 0.13F, 0.14F});
+            if (length >= 4.5F) {
+                const wkc::core::Vec3 hatchCenter
+                    = center + wkc::core::Vec3{0.0F, 0.009F, 0.0F};
+                const wkc::core::Vec3 hatchFrame = alongX
+                    ? wkc::core::Vec3{1.04F, 0.014F, 0.74F}
+                    : wkc::core::Vec3{0.74F, 0.014F, 1.04F};
+                const wkc::core::Vec3 hatchPlate = alongX
+                    ? wkc::core::Vec3{0.91F, 0.016F, 0.61F}
+                    : wkc::core::Vec3{0.61F, 0.016F, 0.91F};
+                corridorDetail(hatchCenter, hatchFrame,
+                    {0.47F, 0.48F, 0.45F});
+                corridorDetail(hatchCenter + wkc::core::Vec3{0.0F, 0.011F, 0.0F},
+                    hatchPlate, {0.16F, 0.18F, 0.19F});
+                for (const float along : {-0.42F, 0.42F}) {
+                    for (const float across : {-0.29F, 0.29F}) {
+                        corridorDetail(hatchCenter
+                                + direction * along + left * across
+                                + wkc::core::Vec3{0.0F, 0.026F, 0.0F},
+                            {0.035F, 0.015F, 0.035F},
+                            {0.63F, 0.62F, 0.56F});
+                    }
+                }
+            }
+            if (length >= 2.2F) {
+                const int fixtureCount = std::clamp(
+                    static_cast<int>(std::floor(length / 3.5F)), 1, 3);
+                for (int fixture = 0; fixture < fixtureCount; ++fixture) {
+                    const float fraction = (static_cast<float>(fixture) + 0.5F)
+                        / static_cast<float>(fixtureCount);
+                    const wkc::core::Vec3 mountScale = alongX
+                        ? wkc::core::Vec3{0.69F, 0.075F, 0.13F}
+                        : wkc::core::Vec3{0.13F, 0.075F, 0.69F};
+                    const wkc::core::Vec3 lensScale = alongX
+                        ? wkc::core::Vec3{0.61F, 0.019F, 0.075F}
+                        : wkc::core::Vec3{0.075F, 0.019F, 0.61F};
+                    for (int sideIndex = 0; sideIndex < (transit ? 2 : 1);
+                         ++sideIndex) {
+                        const float side = sideIndex == 0 ? -1.0F : 1.0F;
+                        const wkc::core::Vec3 fixtureCenter = first
+                            + (second - first) * fraction
+                            + left * side * (transit ? 0.62F : 0.37F)
+                            + wkc::core::Vec3{0.0F,
+                                corridor.height - 0.075F, 0.0F};
+                        corridorDetail(fixtureCenter, mountScale,
+                            {0.15F, 0.15F, 0.16F});
+                        corridorDetail(fixtureCenter
+                                + wkc::core::Vec3{0.0F, -0.048F, 0.0F},
+                            lensScale, {0.88F, 0.78F, 0.62F}, false, true);
+                    }
+                }
             }
         }
-        for (const wkc::core::Aabb& column : world::makeCorridorWallColumns(
-                 corridor.points, corridor.width, corridor.height)) {
+        const auto columns = world::makeCorridorWallColumns(
+            corridor.points, corridor.width, corridor.height);
+        for (const wkc::core::Aabb& column : columns) {
             queueSurface(roomMaterials,
                 (column.minimum + column.maximum) * 0.5F,
                 column.maximum - column.minimum,
                 RoomMaterialChannel::StructuralColumn, 2.0F,
-                {0.34F, 0.36F, 0.38F});
+                transit ? wkc::core::Vec3{0.21F, 0.23F, 0.24F}
+                        : wkc::core::Vec3{0.24F, 0.23F, 0.21F});
             surfaceCommands.back().castsShadow = true;
+        }
+        std::vector<bool> pairedColumns(columns.size(), false);
+        for (std::size_t index = 0U; index < columns.size(); ++index) {
+            if (pairedColumns[index]) continue;
+            const wkc::core::Aabb& first = columns[index];
+            const bool alongX = first.maximum.x - first.minimum.x
+                > first.maximum.z - first.minimum.z;
+            const wkc::core::Vec3 firstCenter
+                = (first.minimum + first.maximum) * 0.5F;
+            std::size_t matchingIndex = columns.size();
+            for (std::size_t other = index + 1U; other < columns.size(); ++other) {
+                if (pairedColumns[other]) continue;
+                const wkc::core::Aabb& candidate = columns[other];
+                const bool candidateAlongX
+                    = candidate.maximum.x - candidate.minimum.x
+                        > candidate.maximum.z - candidate.minimum.z;
+                if (candidateAlongX != alongX) continue;
+                const wkc::core::Vec3 candidateCenter
+                    = (candidate.minimum + candidate.maximum) * 0.5F;
+                const float longitudinalDistance = alongX
+                    ? std::abs(firstCenter.x - candidateCenter.x)
+                    : std::abs(firstCenter.z - candidateCenter.z);
+                const float lateralDistance = alongX
+                    ? std::abs(firstCenter.z - candidateCenter.z)
+                    : std::abs(firstCenter.x - candidateCenter.x);
+                const float columnDepth = alongX
+                    ? first.maximum.z - first.minimum.z
+                    : first.maximum.x - first.minimum.x;
+                if (longitudinalDistance < 0.02F
+                    && std::abs(lateralDistance
+                        - (corridor.width - columnDepth)) < 0.04F) {
+                    matchingIndex = other;
+                    break;
+                }
+            }
+            if (matchingIndex == columns.size()) continue;
+            pairedColumns[index] = pairedColumns[matchingIndex] = true;
+            const wkc::core::Aabb& second = columns[matchingIndex];
+            const wkc::core::Vec3 transverse = alongX
+                ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
+                : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
+            const wkc::core::Vec3 portalCenter
+                = (first.minimum + first.maximum
+                    + second.minimum + second.maximum) * 0.25F;
+            const wkc::core::Vec3 minimum{
+                std::min(first.minimum.x, second.minimum.x),
+                corridor.height - 0.11F,
+                std::min(first.minimum.z, second.minimum.z),
+            };
+            const wkc::core::Vec3 maximum{
+                std::max(first.maximum.x, second.maximum.x),
+                corridor.height,
+                std::max(first.maximum.z, second.maximum.z),
+            };
+            corridorDetail((minimum + maximum) * 0.5F,
+                maximum - minimum, {0.22F, 0.22F, 0.22F}, true);
+            if (transit) {
+                for (const float side : {-1.0F, 1.0F}) {
+                    const wkc::core::Vec3 braceCenter = {
+                        portalCenter.x + transverse.x * side * 0.91F,
+                        first.minimum.y + corridor.height - 0.34F,
+                        portalCenter.z + transverse.z * side * 0.91F,
+                    };
+                    const wkc::core::Vec3 braceScale = alongX
+                        ? wkc::core::Vec3{0.20F, 0.68F, 0.12F}
+                        : wkc::core::Vec3{0.12F, 0.68F, 0.20F};
+                    corridorDetail(braceCenter, braceScale,
+                        {0.29F, 0.31F, 0.32F}, true);
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(braceCenter)
+                            * (alongX
+                                ? wkc::core::rotationXMatrix(side * 0.55F)
+                                : wkc::core::rotationZMatrix(-side * 0.55F))
+                            * wkc::core::scaleMatrix(braceScale);
+                    const wkc::core::Vec3 plateCenter = portalCenter
+                        + transverse * side * (corridorHalfWidth - 0.035F);
+                    const wkc::core::Vec3 plateScale = alongX
+                        ? wkc::core::Vec3{0.28F, 0.56F, 0.045F}
+                        : wkc::core::Vec3{0.045F, 0.56F, 0.28F};
+                    corridorDetail(plateCenter + wkc::core::Vec3{
+                            0.0F, -0.45F, 0.0F},
+                        plateScale, {0.24F, 0.26F, 0.27F});
+                    for (const float boltY : {-0.61F, -0.29F}) {
+                        corridorDetail(plateCenter - transverse * side * 0.035F
+                                + wkc::core::Vec3{0.0F, boltY, 0.0F},
+                            {0.042F, 0.042F, 0.042F},
+                            {0.61F, 0.61F, 0.58F});
+                    }
+                }
+            }
         }
     }
 
@@ -4693,23 +5501,25 @@ bool GdpRenderer::render(
     std::vector<GlassTestDome> glassTestDomes;
     const auto drawRoomParts = [&](const RoomRenderData& renderedRoom) {
         const RoomGpuMaterials& roomMaterials = resolveMaterials(renderedRoom.materialKey);
-        if (!renderedRoom.customArchitecture) {
-            for (const RoomPart& part : roomParts) {
-                const wkc::core::Vec3 position = renderedRoom.origin
-                    + wkc::core::rotateQuarterTurns(part.position, renderedRoom.rotation);
-                wkc::core::Vec3 scale = part.scale;
-                if (renderedRoom.rotation == wkc::core::QuarterTurn::Degrees90
-                    || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270) {
-                    std::swap(scale.x, scale.z);
-                }
-                queueSurface(roomMaterials, position, scale, part.material,
-                    part.uvScale, part.tint);
-                surfaceCommands.back().castsShadow = true;
-            }
-        }
         for (const world::RoomArchitecturePart& part
             : renderedRoom.architectureParts) {
             architectureCastsShadow = part.solid || part.structuralColumn;
+            if (roomMaterials.combatBossV1) {
+                // The cabinet doors, bolt heads and grille slats rest on
+                // larger shadow casters. Drawing each one into every light's
+                // shadow map adds cost without a visible silhouette change.
+                architectureCastsShadow = architectureCastsShadow
+                    && part.combatPart
+                        != world::CombatArchitecturePart::CeilingPanel
+                    && part.combatPart
+                        != world::CombatArchitecturePart::CeilingGrille
+                    && part.combatPart
+                        != world::CombatArchitecturePart::GalleryFastener
+                    && part.combatPart
+                        != world::CombatArchitecturePart::ColumnInset
+                    && part.combatPart
+                        != world::CombatArchitecturePart::ColumnBrace;
+            }
             if (part.breakable) continue;
             const wkc::core::Vec3 position
                 = (part.bounds.minimum + part.bounds.maximum) * 0.5F;
@@ -4758,7 +5568,6 @@ bool GdpRenderer::render(
                 constexpr float pi = std::numbers::pi_v<float>;
                 const wkc::core::Vec3 seam{0.13F, 0.15F, 0.16F};
                 const wkc::core::Vec3 bolt{0.65F, 0.63F, 0.56F};
-                const wkc::core::Vec3 cyan{0.10F, 0.78F, 0.86F};
                 for (int face = 0; face < 8; ++face) {
                     const float angle = static_cast<float>(face) * pi / 4.0F;
                     for (const float level : {0.35F, 1.35F, 3.35F, 5.35F}) {
@@ -4777,7 +5586,7 @@ bool GdpRenderer::render(
                             {0.115F, 3.42F, 0.055F}, angle, seam);
                         piece({0.0F, 2.70F, 1.256F},
                             {0.070F, 3.22F, 0.025F}, angle,
-                            {0.92F, 0.81F, 0.65F}, 1.15F);
+                            hubRouteLedOrange, 1.15F);
                     }
                 }
                 for (int face = 0; face < 4; ++face) {
@@ -4786,10 +5595,10 @@ bool GdpRenderer::render(
                         {0.87F, 1.25F, 0.075F}, angle, seam);
                     piece({0.0F, 2.48F, 1.280F},
                         {0.73F, 1.10F, 0.020F}, angle,
-                        {0.025F, 0.065F, 0.075F});
+                        {0.045F, 0.035F, 0.025F});
                     piece({0.0F, 2.48F, 1.298F},
                         {0.63F, 0.98F, 0.008F}, angle,
-                        {0.010F, 0.045F, 0.055F});
+                        {0.025F, 0.020F, 0.015F});
                     for (const float x : {-0.39F, 0.39F}) {
                         for (const float y : {1.92F, 3.04F}) {
                             piece({x, y, 1.288F},
@@ -4801,32 +5610,35 @@ bool GdpRenderer::render(
                         horizontal
                             ? wkc::core::Vec3{0.43F, 0.018F, 0.012F}
                             : wkc::core::Vec3{0.018F, 0.43F, 0.012F},
-                        angle, cyan, 0.75F);
+                        angle, hubRouteLedOrange, 0.75F);
                     for (int node = -1; node <= 1; ++node) {
                         piece({horizontal ? static_cast<float>(node) * 0.20F : 0.0F,
                                 horizontal ? 2.37F
                                     : 2.37F + static_cast<float>(node) * 0.20F,
                                 1.317F},
-                            {0.055F, 0.055F, 0.014F}, angle, cyan, 0.90F);
+                            {0.055F, 0.055F, 0.014F}, angle,
+                            hubRouteLedOrange, 0.90F);
                     }
                     if (horizontal) {
                         const float direction = face == 1 ? 1.0F : -1.0F;
                         piece({direction * 0.04F, 2.78F, 1.308F},
-                            {0.28F, 0.044F, 0.016F}, angle, cyan, 0.95F);
+                            {0.28F, 0.044F, 0.016F}, angle,
+                            hubRouteLedOrange, 0.95F);
                         for (const float side : {-1.0F, 1.0F}) {
                             angledPiece({direction * 0.23F,
                                 2.78F + side * 0.075F, 1.308F},
                                 {0.16F, 0.035F, 0.016F}, angle,
                                 direction * side * pi / 4.0F,
-                                cyan, 0.95F);
+                                hubRouteLedOrange, 0.95F);
                         }
                     } else {
                         piece({0.0F, 2.78F, 1.308F},
-                            {0.044F, 0.22F, 0.016F}, angle, cyan, 0.95F);
+                            {0.044F, 0.22F, 0.016F}, angle,
+                            hubRouteLedOrange, 0.95F);
                         for (const float side : {-1.0F, 1.0F}) {
                             angledPiece({side * 0.066F, 2.89F, 1.308F},
                                 {0.16F, 0.035F, 0.016F}, angle,
-                                -side * pi / 4.0F, cyan, 0.95F);
+                                -side * pi / 4.0F, hubRouteLedOrange, 0.95F);
                         }
                     }
                 }
@@ -4844,10 +5656,15 @@ bool GdpRenderer::render(
                 continue;
             }
             if (part.decoration
-                == world::RoomDecorationPart::LaboratoryColumnIndicator) {
+                    == world::RoomDecorationPart::LaboratoryColumnIndicator
+                || part.decoration
+                    == world::RoomDecorationPart::IndustrialStatusIndicator) {
                 queueSurface(roomMaterials, position, scale,
                     RoomMaterialChannel::SolidColor, 1.0F, part.tint);
-                surfaceCommands.back().style.emissiveStrength = 1.6F;
+                surfaceCommands.back().style.emissiveStrength
+                    = part.decoration
+                            == world::RoomDecorationPart::IndustrialStatusIndicator
+                        ? 0.65F : 1.6F;
                 continue;
             }
             if (part.decoration == world::RoomDecorationPart::GlassTestPlanter
@@ -4973,13 +5790,25 @@ bool GdpRenderer::render(
                 }
                 continue;
             }
-            if (part.decoration == world::RoomDecorationPart::CeilingDuct) {
+            if (part.decoration == world::RoomDecorationPart::CeilingDuct
+                || part.decoration
+                    == world::RoomDecorationPart::CeilingDuctMuted) {
                 const bool alongX = scale.x >= scale.z;
                 const float length = alongX ? scale.x : scale.z;
                 const float ductWidth = alongX ? scale.z : scale.x;
+                const float ductTone = roomMaterials.combatGalleryWallV1
+                    ? 0.22F
+                    : part.decoration
+                            == world::RoomDecorationPart::CeilingDuctMuted
+                        ? 0.52F : 1.0F;
                 queueSurface(roomMaterials, position, scale,
                     RoomMaterialChannel::StructuralColumn, 1.0F,
-                    {0.39F, 0.45F, 0.47F});
+                    part.decoration
+                            == world::RoomDecorationPart::CeilingDuctMuted
+                        ? part.tint * 0.70F
+                        : roomMaterials.industrialWallCondition
+                            ? part.tint
+                            : wkc::core::Vec3{0.39F, 0.45F, 0.47F} * ductTone);
                 if (roomMaterials.technicalV1) {
                     // A shallow mounting collar makes the duct-to-wall joint
                     // visible without extending into the room's walkable space.
@@ -4997,7 +5826,10 @@ bool GdpRenderer::render(
                                 : wkc::core::Vec3{ductWidth + 0.12F,
                                     scale.y + 0.12F, 0.11F},
                             RoomMaterialChannel::StructuralColumn, 1.0F,
-                            {0.55F, 0.58F, 0.55F});
+                            part.decoration
+                                    == world::RoomDecorationPart::CeilingDuctMuted
+                                ? part.tint * 0.90F
+                                : wkc::core::Vec3{0.55F, 0.58F, 0.55F});
                     }
                 }
                 const float hangerGap = renderedRoom.worldBounds.maximum.y
@@ -5019,14 +5851,19 @@ bool GdpRenderer::render(
                             queueSurface(roomMaterials, hangerCenter,
                                 {0.035F, hangerGap, 0.035F},
                                 RoomMaterialChannel::SolidColor, 1.0F,
-                                {0.28F, 0.31F, 0.31F});
+                                roomMaterials.industrialWallCondition
+                                    ? wkc::core::Vec3{0.26F, 0.25F, 0.23F}
+                                    : wkc::core::Vec3{0.28F, 0.31F, 0.31F});
                             queueSurface(roomMaterials,
                                 {hangerCenter.x,
                                     renderedRoom.worldBounds.maximum.y - 0.016F,
                                     hangerCenter.z},
                                 {0.15F, 0.032F, 0.15F},
                                 RoomMaterialChannel::StructuralColumn, 1.0F,
-                                {0.48F, 0.52F, 0.50F});
+                                (roomMaterials.industrialWallCondition
+                                    ? wkc::core::Vec3{0.45F, 0.43F, 0.39F}
+                                    : wkc::core::Vec3{0.48F, 0.52F, 0.50F})
+                                    * ductTone);
                         }
                     }
                 }
@@ -5045,7 +5882,9 @@ bool GdpRenderer::render(
                             : wkc::core::Vec3{ductWidth + 0.05F,
                                 scale.y + 0.04F, 0.095F},
                         RoomMaterialChannel::StructuralColumn, 1.0F,
-                        {0.56F, 0.59F, 0.56F});
+                        (roomMaterials.industrialWallCondition
+                            ? wkc::core::Vec3{0.50F, 0.48F, 0.44F}
+                            : wkc::core::Vec3{0.56F, 0.59F, 0.56F}) * ductTone);
                 }
                 for (float offset = 2.8F; offset < length - 1.0F;
                      offset += 4.3F) {
@@ -5075,7 +5914,10 @@ bool GdpRenderer::render(
                                 : wkc::core::Vec3{ductWidth * 0.64F,
                                     0.022F, 0.06F},
                             RoomMaterialChannel::StructuralColumn, 1.0F,
-                            {0.59F, 0.62F, 0.61F});
+                            (roomMaterials.industrialWallCondition
+                                ? wkc::core::Vec3{0.52F, 0.50F, 0.47F}
+                                : wkc::core::Vec3{0.59F, 0.62F, 0.61F})
+                                * ductTone);
                     }
                 }
                 continue;
@@ -5088,18 +5930,66 @@ bool GdpRenderer::render(
             const bool securityFurniture = roomMaterials.securityV1
                 && part.securityFurniturePart
                     != world::SecurityFurniturePart::None;
-            const bool laboratoryFurniture = roomMaterials.laboratoryPreviewV1
-                && part.laboratoryFurniturePart
-                    != world::LaboratoryFurniturePart::None;
+            const bool securityWallColumn = roomMaterials.securityV1
+                && part.structuralColumn;
+            const bool laboratoryFurniture = part.laboratoryFurniturePart
+                != world::LaboratoryFurniturePart::None;
             const bool technicalFurniture = roomMaterials.technicalV1
                 && part.technicalFurniturePart
                     != world::TechnicalFurniturePart::None
                 && part.technicalFurniturePart
                     != world::TechnicalFurniturePart::ServicePipe;
+            const bool combatCover = roomMaterials.combatGalleryWallV1
+                && (part.combatPart == world::CombatArchitecturePart::Cover
+                    || part.combatPart == world::CombatArchitecturePart::CoverFace);
+            const bool combatCeilingPanel = roomMaterials.combatGalleryWallV1
+                && !roomMaterials.combatBossV1
+                && part.combatPart == world::CombatArchitecturePart::CeilingPanel;
+            const bool bossCabinetDoor = roomMaterials.combatBossV1
+                && part.combatPart == world::CombatArchitecturePart::CeilingPanel;
+            const bool combatColumn = roomMaterials.combatGalleryWallV1
+                && (bossCabinetDoor
+                    || part.combatPart == world::CombatArchitecturePart::ColumnShaft
+                    || part.combatPart == world::CombatArchitecturePart::ColumnTrim
+                    || part.combatPart == world::CombatArchitecturePart::ColumnInset
+                    || part.combatPart == world::CombatArchitecturePart::ColumnBrace
+                    || part.combatPart == world::CombatArchitecturePart::GalleryPillar
+                    || part.combatPart
+                        == world::CombatArchitecturePart::GalleryPillarTrim);
+            const bool combatMetal = roomMaterials.combatGalleryWallV1
+                && part.combatPart != world::CombatArchitecturePart::None
+                && !combatCover && !combatCeilingPanel;
+            const bool combatRail = combatMetal
+                && (part.combatPart == world::CombatArchitecturePart::GalleryRail
+                    || part.combatPart == world::CombatArchitecturePart::StairRail
+                    || part.combatPart == world::CombatArchitecturePart::StairRailSlope);
+            const bool combatFastener = combatMetal
+                && (part.combatPart == world::CombatArchitecturePart::CoverBolt
+                    || part.combatPart
+                        == world::CombatArchitecturePart::GalleryFastener);
+            const bool combatEdge = combatMetal
+                && (part.combatPart == world::CombatArchitecturePart::CoverRib
+                    || part.combatPart
+                        == world::CombatArchitecturePart::GalleryBracket
+                    || part.combatPart
+                        == world::CombatArchitecturePart::ColumnBrace
+                    || part.combatPart
+                        == world::CombatArchitecturePart::CeilingBrace);
             const float securityTone = roomMaterials.columnCondition == 0U
                 ? 1.18F : roomMaterials.columnCondition == 2U ? 0.94F : 1.05F;
+            const float securityPartTone = part.securityFurniturePart
+                    == world::SecurityFurniturePart::ObservationSurround
+                ? securityTone * 0.78F : securityTone;
             queueSurface(roomMaterials, position, scale,
-                part.structuralColumn ? RoomMaterialChannel::StructuralColumn
+                combatCover ? RoomMaterialChannel::CombatCover
+                    : combatColumn ? RoomMaterialChannel::CombatColumn
+                    : combatRail ? RoomMaterialChannel::CombatRail
+                    : combatCeilingPanel ? RoomMaterialChannel::Ceiling
+                    : combatMetal ? (combatRail || combatFastener
+                        ? RoomMaterialChannel::SolidColor
+                        : RoomMaterialChannel::StructuralColumn)
+                    : securityWallColumn ? RoomMaterialChannel::Wall
+                    : part.structuralColumn ? RoomMaterialChannel::StructuralColumn
                     : texturedRack ? RoomMaterialChannel::StorageRack
                     : texturedFurniture ? RoomMaterialChannel::CafeteriaFurniture
                     : laboratoryFurniture
@@ -5109,6 +5999,7 @@ bool GdpRenderer::render(
                             : RoomMaterialChannel::LaboratoryFurniture)
                     : securityFurniture ? RoomMaterialChannel::SecurityFurniture
                     : technicalFurniture ? RoomMaterialChannel::TechnicalFurniture
+                    : roomMaterials.officeV1 ? RoomMaterialChannel::StructuralColumn
                     : RoomMaterialChannel::Generic,
                 texturedRack ? 3.0F : 2.0F,
                 texturedRack
@@ -5116,11 +6007,44 @@ bool GdpRenderer::render(
                             == world::StorageRackPart::Upright
                         ? wkc::core::Vec3{0.88F, 1.16F, 1.05F}
                         : wkc::core::Vec3{1.35F, 1.35F, 1.35F})
+                    : combatCover ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
+                    : combatCeilingPanel ? wkc::core::Vec3{0.85F, 0.85F, 0.83F}
+                    : combatRail ? wkc::core::Vec3{0.34F, 0.20F, 0.060F}
+                    : combatFastener ? wkc::core::Vec3{0.43F, 0.34F, 0.18F}
+                    : roomMaterials.combatBossV1 && combatColumn
+                        ? (bossCabinetDoor
+                            ? wkc::core::Vec3{0.70F, 0.67F, 0.61F}
+                            : part.combatPart
+                                == world::CombatArchitecturePart::ColumnInset
+                            ? wkc::core::Vec3{0.78F, 0.73F, 0.66F}
+                            : part.combatPart
+                                    == world::CombatArchitecturePart::ColumnBrace
+                                ? wkc::core::Vec3{0.78F, 0.34F, 0.095F}
+                            : part.combatPart
+                                    == world::CombatArchitecturePart::ColumnTrim
+                                ? wkc::core::Vec3{0.24F, 0.25F, 0.25F}
+                                : wkc::core::Vec3{0.24F, 0.25F, 0.26F})
+                    : combatColumn ? (part.combatPart
+                            == world::CombatArchitecturePart::ColumnInset
+                        ? wkc::core::Vec3{0.29F, 0.33F, 0.31F}
+                        : (part.combatPart
+                                == world::CombatArchitecturePart::GalleryPillar
+                            || part.combatPart
+                                == world::CombatArchitecturePart::GalleryPillarTrim)
+                            ? wkc::core::Vec3{0.21F, 0.25F, 0.23F}
+                        : combatEdge
+                            ? wkc::core::Vec3{0.24F, 0.28F, 0.26F}
+                            : wkc::core::Vec3{0.26F, 0.30F, 0.28F})
+                    : combatMetal ? part.tint * (combatEdge ? 0.55F : 0.42F)
                     : texturedFurniture ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
                     : securityFurniture ? wkc::core::Vec3{
-                        securityTone, securityTone, securityTone}
+                        securityPartTone, securityPartTone, securityPartTone}
                     : technicalFurniture ? wkc::core::Vec3{1.0F, 1.0F, 1.0F}
-                    : part.tint,
+                    : roomMaterials.combatBossV1 && part.structuralColumn
+                        ? wkc::core::Vec3{0.30F, 0.29F, 0.27F}
+                    : securityWallColumn
+                        ? wkc::core::Vec3{0.95F, 0.95F, 0.95F}
+                        : part.tint,
                 {}, {}, texturedRack
                     ? static_cast<std::uint8_t>(
                         *roomMaterials.storageRackCondition)
@@ -5130,6 +6054,127 @@ bool GdpRenderer::render(
                     : world::StorageRackPart::None,
                 texturedFurniture ? part.cafeteriaFurniturePart
                     : world::CafeteriaFurniturePart::None);
+            if (roomMaterials.combatGalleryWallV1
+                && part.combatPart == world::CombatArchitecturePart::StairRailSlope) {
+                const auto delta = part.railEnd - part.railStart;
+                const float length = std::sqrt(delta.x * delta.x
+                    + delta.y * delta.y + delta.z * delta.z);
+                const float horizontal = std::sqrt(delta.x * delta.x
+                    + delta.z * delta.z);
+                if (length > 0.01F && horizontal > 0.01F) {
+                    const auto center = (part.railStart + part.railEnd) * 0.5F;
+                    const float yaw = std::atan2(delta.x, delta.z);
+                    const float pitch = -std::atan2(delta.y, horizontal);
+                    surfaceCommands.back().model
+                        = wkc::core::translationMatrix(center)
+                        * wkc::core::rotationYMatrix(yaw)
+                        * wkc::core::rotationXMatrix(pitch)
+                        * wkc::core::scaleMatrix({0.09F, 0.09F, length});
+                }
+            }
+            if (roomMaterials.combatGalleryWallV1
+                && (part.combatPart == world::CombatArchitecturePart::GalleryRail
+                    || part.combatPart == world::CombatArchitecturePart::StairRail
+                    || part.combatPart == world::CombatArchitecturePart::StairRailSlope
+                    || part.combatPart == world::CombatArchitecturePart::ColumnInset
+                    || part.combatPart == world::CombatArchitecturePart::CeilingGrille
+                    || part.combatPart == world::CombatArchitecturePart::CoverFace
+                    || part.combatPart == world::CombatArchitecturePart::CoverRib
+                    || part.combatPart == world::CombatArchitecturePart::CoverBolt
+                    || part.combatPart == world::CombatArchitecturePart::ColumnBrace
+                    || part.combatPart == world::CombatArchitecturePart::GalleryBracket
+                    || part.combatPart
+                        == world::CombatArchitecturePart::GalleryFastener
+                    || part.combatPart == world::CombatArchitecturePart::CeilingBrace)) {
+                // These narrow inlays and rails do not change the broad
+                // shadows, but each otherwise costs a cubemap draw per lamp.
+                surfaceCommands.back().castsShadow = false;
+            }
+            if (roomMaterials.combatGalleryWallV1
+                && part.combatPart == world::CombatArchitecturePart::Cover
+                && std::none_of(renderedRoom.architectureParts.begin(),
+                    renderedRoom.architectureParts.end(),
+                    [](const world::RoomArchitecturePart& candidate) {
+                        return candidate.combatPart
+                            == world::CombatArchitecturePart::CoverFrame;
+                    })) {
+                // The cap and fasteners sit on the same solid footprint as
+                // the cover, so bullets and navigation meet the visible form.
+                const float top = part.bounds.maximum.y;
+                const float bottom = part.bounds.minimum.y;
+                const bool alongX = scale.x >= scale.z;
+                queueSurface(roomMaterials,
+                    {position.x, top - 0.014F, position.z},
+                    {scale.x, 0.028F, scale.z},
+                    RoomMaterialChannel::SolidColor, 1.0F,
+                    {0.31F, 0.34F, 0.32F});
+                for (const float faceSide : {-1.0F, 1.0F}) {
+                    const float face = alongX
+                        ? position.z + faceSide * (scale.z * 0.5F + 0.004F)
+                        : position.x + faceSide * (scale.x * 0.5F + 0.004F);
+                    const auto faceDetail = [&](const float along,
+                        const float verticalCenter, const float length,
+                        const float thickness, const wkc::core::Vec3 tint) {
+                        queueSurface(roomMaterials,
+                            alongX ? wkc::core::Vec3{position.x + along,
+                                         verticalCenter, face}
+                                   : wkc::core::Vec3{face, verticalCenter,
+                                         position.z + along},
+                            alongX ? wkc::core::Vec3{length, thickness, 0.014F}
+                                   : wkc::core::Vec3{0.014F, thickness, length},
+                            RoomMaterialChannel::SolidColor, 1.0F, tint);
+                    };
+                    const float length = alongX ? scale.x : scale.z;
+                    for (const float end : {-1.0F, 1.0F}) {
+                        faceDetail(end * (length * 0.5F - 0.07F),
+                            (top + bottom) * 0.5F, 0.075F,
+                            top - bottom - 0.16F, {0.17F, 0.19F, 0.18F});
+                        faceDetail(end * (length * 0.5F - 0.07F),
+                            top - 0.16F, 0.045F, 0.045F,
+                            {0.49F, 0.50F, 0.45F});
+                    }
+                    faceDetail(0.0F, top - 0.07F, length - 0.14F, 0.055F,
+                        {0.18F, 0.20F, 0.19F});
+                    faceDetail(0.0F, bottom + 0.07F, length - 0.14F, 0.055F,
+                        {0.15F, 0.17F, 0.16F});
+                }
+                for (const float side : {-1.0F, 1.0F}) {
+                    const wkc::core::Vec3 boltPosition = scale.x >= scale.z
+                        ? wkc::core::Vec3{
+                            position.x + side * (scale.x * 0.5F - 0.12F),
+                            top - 0.008F, position.z}
+                        : wkc::core::Vec3{
+                            position.x, top - 0.008F,
+                            position.z + side * (scale.z * 0.5F - 0.12F)};
+                    queueSurface(roomMaterials, boltPosition,
+                        {0.075F, 0.016F, 0.075F},
+                        RoomMaterialChannel::SolidColor, 1.0F,
+                        {0.085F, 0.095F, 0.09F});
+                }
+            }
+            if (roomMaterials.combatGalleryWallV1
+                && part.combatPart
+                    == world::CombatArchitecturePart::ColumnShaft
+                && std::none_of(renderedRoom.architectureParts.begin(),
+                    renderedRoom.architectureParts.end(),
+                    [](const world::RoomArchitecturePart& candidate) {
+                        return candidate.combatPart
+                            == world::CombatArchitecturePart::ColumnInset;
+                    })) {
+                const float shaftHeight = scale.y - 0.60F;
+                if (shaftHeight > 0.0F) {
+                    for (const float side : {-1.0F, 1.0F}) {
+                        queueSurface(roomMaterials,
+                            {position.x,
+                                (part.bounds.minimum.y
+                                    + part.bounds.maximum.y) * 0.5F,
+                                position.z + side * (scale.z * 0.5F + 0.004F)},
+                            {0.12F, shaftHeight, 0.014F},
+                            RoomMaterialChannel::SolidColor, 1.0F,
+                            {0.16F, 0.18F, 0.17F});
+                    }
+                }
+            }
             if (technicalFurniture) {
                 const auto kind = part.technicalFurniturePart;
                 surfaceCommands.back().style.furniturePart
@@ -5488,7 +6533,27 @@ bool GdpRenderer::render(
                         {0.028F, scale.y - 0.06F, scale.z - 0.06F}, navy);
                     solid({faceX + facing * 0.034F, position.y, position.z},
                         {0.025F, scale.y - 0.17F, scale.z - 0.18F},
-                        {0.24F, 0.47F, 0.54F});
+                        {0.055F, 0.105F, 0.12F});
+                    // The sealed viewport now shows two restrained sample
+                    // silhouettes and their clamps instead of a flat blue
+                    // rectangle. Details stay shallow against the existing
+                    // physical cover and outside the firing lane.
+                    for (const float offset : {-0.38F, 0.38F}) {
+                        solid({faceX + facing * 0.052F,
+                                position.y - 0.08F, position.z + offset},
+                            {0.045F, 0.48F, 0.17F},
+                            {0.17F, 0.50F, 0.48F});
+                        for (const float y : {position.y - 0.30F,
+                                 position.y + 0.14F}) {
+                            solid({faceX + facing * 0.061F,
+                                    y, position.z + offset},
+                                {0.026F, 0.035F, 0.24F}, brushed);
+                        }
+                    }
+                    solid({faceX + facing * 0.072F,
+                            position.y + 0.12F, position.z + 0.12F},
+                        {0.012F, scale.y * 0.55F, 0.025F},
+                        {0.25F, 0.37F, 0.39F});
                     for (const float z : {min.z + 0.04F, max.z - 0.04F}) {
                         solid({faceX + facing * 0.052F, position.y, z},
                             {0.030F, scale.y, 0.055F}, brushed);
@@ -5538,14 +6603,27 @@ bool GdpRenderer::render(
             const wkc::core::Vec3 localScale = rotateSize(scale);
             const wkc::core::Vec3 localMin = localPosition - localScale * 0.5F;
             const wkc::core::Vec3 localMax = localPosition + localScale * 0.5F;
+            const bool mirroredConsole = localPosition.z < 0.0F
+                && (part.securityFurniturePart
+                        == world::SecurityFurniturePart::ConsoleBase
+                    || part.securityFurniturePart
+                        == world::SecurityFurniturePart::ConsoleTop
+                    || part.securityFurniturePart
+                        == world::SecurityFurniturePart::Monitor);
+            const auto detailToWorld = [&](wkc::core::Vec3 local) {
+                if (mirroredConsole) {
+                    local.z = 2.0F * localPosition.z - local.z;
+                }
+                return toWorld(local);
+            };
             const auto metal = [&](const wkc::core::Vec3 center,
                 const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
-                queueSurface(roomMaterials, toWorld(center), rotateSize(size),
+                queueSurface(roomMaterials, detailToWorld(center), rotateSize(size),
                     RoomMaterialChannel::SecurityFurniture, 1.0F, tint);
             };
             const auto solid = [&](const wkc::core::Vec3 center,
                 const wkc::core::Vec3 size, const wkc::core::Vec3 tint) {
-                queueSurface(roomMaterials, toWorld(center), rotateSize(size),
+                queueSurface(roomMaterials, detailToWorld(center), rotateSize(size),
                     RoomMaterialChannel::SolidColor, 1.0F, tint);
             };
             const SecurityIndicatorVisual indicator = sampleSecurityIndicator(
@@ -5568,6 +6646,14 @@ bool GdpRenderer::render(
             const wkc::core::Vec3& min = localMin;
             const wkc::core::Vec3& max = localMax;
             switch (part.securityFurniturePart) {
+            case world::SecurityFurniturePart::ConsoleTrim:
+                // Compact drawer faces already have their final geometry.
+                // Reusing ConsoleTop here would add full-size control banks.
+                if (min.y > 1.0F) {
+                    surfaceCommands.back().style.emissiveStrength
+                        = indicator.emissiveStrength;
+                }
+                break;
             case world::SecurityFurniturePart::Cabinet: {
                 const float faceX = localPosition.x < 0.0F
                     ? max.x + 0.022F : min.x - 0.022F;
@@ -5606,6 +6692,11 @@ bool GdpRenderer::render(
                 break;
             }
             case world::SecurityFurniturePart::ConsoleBase: {
+                if (localScale.x < 1.0F) {
+                    // The compact station faces the room along X. Its three
+                    // drawer fronts are authored as separate trim parts.
+                    break;
+                }
                 const float faceZ = min.z - 0.025F;
                 metal({localPosition.x, 0.10F, localPosition.z},
                     {localScale.x + 0.08F, 0.20F, localScale.z + 0.08F},
@@ -5628,6 +6719,22 @@ bool GdpRenderer::render(
                 break;
             }
             case world::SecurityFurniturePart::ConsoleTop: {
+                if (localScale.x < 1.0F) {
+                    metal({localPosition.x, max.y + 0.014F,
+                            localPosition.z},
+                        {localScale.x + 0.06F, 0.028F,
+                            localScale.z + 0.06F},
+                        {1.12F, 1.10F, 1.05F});
+                    for (int bank = 0; bank < 3; ++bank) {
+                        const float z = min.z + 0.25F
+                            + static_cast<float>(bank) * 0.37F;
+                        solid({max.x - 0.17F, max.y + 0.033F, z},
+                            {0.30F, 0.020F, 0.25F}, gasket);
+                        light({max.x - 0.17F, max.y + 0.047F, z},
+                            {0.13F, 0.010F, 0.045F}, indicator.color);
+                    }
+                    break;
+                }
                 metal({localPosition.x, max.y + 0.014F, localPosition.z},
                     {localScale.x + 0.12F, 0.028F, localScale.z + 0.06F},
                     {1.12F, 1.10F, 1.05F});
@@ -5647,11 +6754,30 @@ bool GdpRenderer::render(
                         }
                     }
                 }
-                light({localPosition.x, max.y + 0.050F, max.z - 0.14F},
+                light({localPosition.x, max.y + 0.035F, max.z - 0.14F},
                     {2.9F, 0.014F, 0.04F}, indicator.color);
                 break;
             }
             case world::SecurityFurniturePart::Monitor: {
+                if (localScale.x < 1.0F) {
+                    const float faceX = max.x + 0.025F;
+                    solid({faceX, localPosition.y, localPosition.z},
+                        {0.035F, localScale.y - 0.06F,
+                            localScale.z - 0.06F}, edge);
+                    solid({faceX + 0.023F, localPosition.y,
+                            localPosition.z},
+                        {0.020F, localScale.y - 0.11F,
+                            localScale.z - 0.11F}, gasket);
+                    for (int row = 0; row < 3; ++row) {
+                        light({faceX + 0.038F,
+                                min.y + 0.10F
+                                    + static_cast<float>(row) * 0.08F,
+                                localPosition.z},
+                            {0.008F, 0.015F, localScale.z * 0.48F},
+                            indicator.color);
+                    }
+                    break;
+                }
                 const float faceZ = min.z - 0.028F;
                 metal({localPosition.x, max.y + 0.04F, localPosition.z},
                     {localScale.x + 0.12F, 0.08F, localScale.z + 0.04F}, edge);
@@ -5678,6 +6804,104 @@ bool GdpRenderer::render(
                 }
                 light({localPosition.x, max.y + 0.045F, faceZ - 0.035F},
                     {localScale.x * 0.55F, 0.025F, 0.018F}, indicator.color);
+                break;
+            }
+            case world::SecurityFurniturePart::ObservationSurround: {
+                const float faceX = min.x - 0.035F;
+                if (max.y < 1.0F) {
+                    // The former wall-like sill reads as three equipment bays.
+                    solid({faceX, 0.46F, localPosition.z},
+                        {0.040F, 0.68F, localScale.z - 0.20F}, gasket);
+                    for (const float y : {0.10F, 0.84F}) {
+                        metal({faceX - 0.035F, y, localPosition.z},
+                            {0.055F, 0.075F, localScale.z - 0.12F},
+                            {1.22F, 1.27F, 1.28F});
+                    }
+                    for (int bay = 0; bay < 3; ++bay) {
+                        const float z = min.z + 0.53F
+                            + static_cast<float>(bay) * 0.97F;
+                        solid({faceX - 0.028F, 0.46F, z},
+                            {0.020F, 0.53F, 0.79F},
+                            {0.11F, 0.15F, 0.17F});
+                        for (int slat = 0; slat < 4; ++slat) {
+                            metal({faceX - 0.042F,
+                                    0.31F + static_cast<float>(slat) * 0.10F,
+                                    z},
+                                {0.012F, 0.020F, 0.55F},
+                                {0.95F, 1.02F, 1.04F});
+                        }
+                        bolt({faceX - 0.044F, 0.74F, z - 0.32F}, true);
+                        bolt({faceX - 0.044F, 0.74F, z + 0.32F}, true);
+                    }
+                } else if (min.y > 3.0F) {
+                    metal({faceX - 0.030F, localPosition.y, localPosition.z},
+                        {0.060F, 0.075F, localScale.z - 0.08F},
+                        {1.22F, 1.27F, 1.28F});
+                    for (const float z : {min.z + 0.16F, max.z - 0.16F}) {
+                        bolt({faceX - 0.066F, localPosition.y, z}, true);
+                    }
+                } else {
+                    // Narrow side uprights keep the display recessed but no
+                    // longer look like full-height structural columns.
+                    solid({faceX, 1.72F, localPosition.z},
+                        {0.045F, 3.18F, localScale.z - 0.035F},
+                        {0.095F, 0.13F, 0.14F});
+                    metal({faceX - 0.030F, 1.72F, localPosition.z},
+                        {0.025F, 3.14F, 0.030F},
+                        {1.24F, 1.30F, 1.32F});
+                    for (const float y : {0.30F, 1.33F, 2.36F, 3.22F}) {
+                        bolt({faceX - 0.052F, y, localPosition.z}, true);
+                    }
+                }
+                break;
+            }
+            case world::SecurityFurniturePart::ObservationPanel: {
+                // The displays sit on the recessed backing, behind the
+                // structural piers rather than flush with the room wall.
+                const float faceX = min.x - 0.055F;
+                solid({faceX, 2.20F, localPosition.z},
+                    {0.065F, 1.72F, localScale.z - 0.24F}, gasket);
+                // A slim four-piece steel frame replaces the broad, dark
+                // border without changing the display faces or their state.
+                for (const float y : {1.39F, 3.02F}) {
+                    metal({faceX - 0.095F, y, localPosition.z},
+                        {0.065F, 0.075F, localScale.z - 0.32F},
+                        {1.42F, 1.46F, 1.46F});
+                }
+                for (const float z : {min.z + 0.18F, max.z - 0.18F}) {
+                    metal({faceX - 0.095F, 2.205F, z},
+                        {0.065F, 1.56F, 0.075F},
+                        {1.42F, 1.46F, 1.46F});
+                    for (const float y : {1.39F, 3.02F}) {
+                        bolt({faceX - 0.133F, y, z}, true);
+                    }
+                }
+                for (int screen = 0; screen < 3; ++screen) {
+                    const float z = min.z + 0.55F
+                        + static_cast<float>(screen) * 0.95F;
+                    metal({faceX - 0.065F, 2.24F, z},
+                        {0.06F, 1.47F, 0.83F}, edge);
+                    solid({faceX - 0.102F, 2.24F, z},
+                        {0.020F, 1.34F, 0.73F},
+                        {0.012F, 0.027F, 0.034F});
+                    for (int row = 0; row < 5; ++row) {
+                        solid({faceX - 0.115F,
+                                1.86F + static_cast<float>(row) * 0.15F,
+                                z - 0.17F},
+                            {0.008F, 0.025F,
+                                0.22F + static_cast<float>((row + screen) % 3)
+                                    * 0.11F},
+                            {0.07F, 0.31F, 0.38F});
+                        surfaceCommands.back().style.emissiveStrength = 0.38F;
+                    }
+                    light({faceX - 0.115F, 2.76F, z},
+                        {0.010F, 0.037F, 0.44F}, indicator.color);
+                    for (const float y : {1.43F, 3.00F}) {
+                        for (const float dz : {-0.36F, 0.36F}) {
+                            bolt({faceX - 0.101F, y, z + dz}, true);
+                        }
+                    }
+                }
                 break;
             }
             case world::SecurityFurniturePart::Barricade: {
@@ -5743,6 +6967,162 @@ bool GdpRenderer::render(
         drawRoomParts(connectedRoom);
     }
 
+    const auto drawBossArenaDetails = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.combatBossV1) return;
+        const bool quarterTurn = renderedRoom.rotation
+                == wkc::core::QuarterTurn::Degrees90
+            || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270;
+        const auto piece = [&](const wkc::core::Vec3 local,
+            wkc::core::Vec3 size, const wkc::core::Vec3 tint,
+            const bool shadow = false) {
+            const wkc::core::Vec3 center = renderedRoom.origin
+                + wkc::core::rotateQuarterTurns(local, renderedRoom.rotation);
+            if (quarterTurn) std::swap(size.x, size.z);
+            queueSurface(materials, center, size,
+                RoomMaterialChannel::SolidColor, 1.0F, tint);
+            surfaceCommands.back().castsShadow = shadow;
+        };
+        constexpr wkc::core::Vec3 graphite{0.105F, 0.101F, 0.096F};
+        constexpr wkc::core::Vec3 rim{0.27F, 0.25F, 0.22F};
+        constexpr wkc::core::Vec3 steel{0.47F, 0.44F, 0.39F};
+        constexpr wkc::core::Vec3 amber{0.62F, 0.31F, 0.075F};
+        constexpr wkc::core::Vec3 bolt{0.58F, 0.54F, 0.47F};
+        const float floor = renderedRoom.worldBounds.minimum.y
+            - renderedRoom.origin.y;
+        const float ceiling = renderedRoom.worldBounds.maximum.y
+            - renderedRoom.origin.y;
+
+        // Two clear, walkable route outlines replace a repeated warning mark
+        // in every floor tile. Their shallow inlays do not change collision.
+        for (const float side : {-1.0F, 1.0F}) {
+            for (const float x : {side * 4.25F, side * 11.20F}) {
+                piece({x, floor + 0.010F, 0.0F},
+                    {0.14F, 0.014F, 21.0F}, graphite);
+                piece({x, floor + 0.019F, 0.0F},
+                    {0.062F, 0.012F, 20.95F}, amber);
+            }
+            for (const float z : {-10.50F, 10.50F}) {
+                piece({side * 7.725F, floor + 0.010F, z},
+                    {7.05F, 0.014F, 0.14F}, graphite);
+                piece({side * 7.725F, floor + 0.019F, z},
+                    {7.02F, 0.012F, 0.062F}, amber);
+            }
+        }
+
+        const auto wallPiece = [&](const bool xWall, const float side,
+            const float along, const float y, const float length,
+            const float panelHeight, const float depth,
+            const wkc::core::Vec3 tint, const bool shadow = false) {
+            piece(xWall
+                    ? wkc::core::Vec3{side * 13.68F, floor + y, along}
+                    : wkc::core::Vec3{along, floor + y, side * 15.68F},
+                xWall ? wkc::core::Vec3{depth, panelHeight, length}
+                      : wkc::core::Vec3{length, panelHeight, depth},
+                tint, shadow);
+        };
+        for (const bool xWall : {false, true}) {
+            for (const float side : {-1.0F, 1.0F}) {
+                const float halfLength = xWall ? 15.5F : 13.5F;
+                wallPiece(xWall, side, 0.0F, 5.25F,
+                    halfLength * 2.0F, 0.20F, 0.20F, graphite, true);
+                for (const float segment : {-1.0F, 1.0F}) {
+                    const float middle = segment * (halfLength + 1.8F) * 0.5F;
+                    const float length = halfLength - 2.0F;
+                    wallPiece(xWall, side, middle, 0.42F,
+                        length, 0.84F, 0.20F, graphite, true);
+                    wallPiece(xWall, side, middle, 0.88F,
+                        length, 0.075F, 0.23F, rim);
+                    wallPiece(xWall, side, middle, 3.54F,
+                        length * 0.38F, 0.18F, 0.12F, rim);
+                    wallPiece(xWall, side, middle, 3.55F,
+                        length * 0.36F, 0.070F, 0.145F, amber);
+                }
+                const float service = side * (xWall ? 9.2F : 8.0F);
+                wallPiece(xWall, side, service, 2.52F,
+                    2.15F, 1.58F, 0.20F, graphite, true);
+                wallPiece(xWall, side, service, 2.52F,
+                    1.91F, 1.35F, 0.225F, steel);
+                wallPiece(xWall, side, service, 3.15F,
+                    1.82F, 0.075F, 0.245F, amber);
+                for (int slat = 0; slat < 6; ++slat) {
+                    wallPiece(xWall, side, service,
+                        2.08F + static_cast<float>(slat) * 0.17F,
+                        1.58F, 0.055F, 0.25F, rim);
+                }
+                for (const float offset : {-0.90F, 0.90F}) {
+                    for (const float y : {1.82F, 3.20F}) {
+                        wallPiece(xWall, side, service + offset, y,
+                            0.075F, 0.075F, 0.27F, bolt);
+                    }
+                }
+            }
+        }
+        // A few large recessed ceiling grilles and paired conduit runs keep
+        // the high roof readable without multiplying the ceiling texture.
+        for (const float x : {-9.0F, 9.0F}) {
+            piece({x, ceiling - 0.23F, 0.0F},
+                {0.13F, 0.15F, 27.0F}, rim, true);
+            for (const float z : {-10.5F, 10.5F}) {
+                piece({x, ceiling - 0.19F, z},
+                    {2.4F, 0.13F, 1.8F}, graphite, true);
+                for (int slat = -4; slat <= 4; ++slat) {
+                    piece({x + static_cast<float>(slat) * 0.23F,
+                            ceiling - 0.28F, z},
+                        {0.075F, 0.055F, 1.46F}, rim);
+                }
+            }
+        }
+    };
+    drawBossArenaDetails(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawBossArenaDetails(connectedRoom);
+    }
+
+    // Sparse service-sector identifiers make the far Arena walls distinct
+    // without adding cover or changing the approved sniper sightlines.
+    const auto drawArenaSectorMarkers = [&](const RoomRenderData& renderedRoom) {
+        const RoomGpuMaterials& materials = resolveMaterials(renderedRoom.materialKey);
+        if (!materials.combatGalleryWallV1 || materials.combatBossV1) return;
+        const wkc::core::Vec3 span = renderedRoom.worldBounds.maximum
+            - renderedRoom.worldBounds.minimum;
+        const bool quarterTurn = renderedRoom.rotation
+                == wkc::core::QuarterTurn::Degrees90
+            || renderedRoom.rotation == wkc::core::QuarterTurn::Degrees270;
+        const float halfX = (quarterTurn ? span.z : span.x) * 0.5F;
+        const float halfZ = (quarterTurn ? span.x : span.z) * 0.5F;
+        if (halfX < 8.0F || halfZ < 8.0F) return;
+        const auto marker = [&](const wkc::core::Vec3 local,
+                                wkc::core::Vec3 size,
+                                const wkc::core::Vec3 color) {
+            if (quarterTurn) std::swap(size.x, size.z);
+            queueSurface(materials,
+                renderedRoom.origin + wkc::core::rotateQuarterTurns(
+                    local, renderedRoom.rotation),
+                size, RoomMaterialChannel::SolidColor, 1.0F, color);
+            surfaceCommands.back().castsShadow = false;
+            surfaceCommands.back().style.emissiveStrength = 0.16F;
+        };
+        for (const float end : {-1.0F, 1.0F}) {
+            for (const float side : {-1.0F, 1.0F}) {
+                const float x = side * 5.6F;
+                const float z = end * (halfZ - 0.10F);
+                marker({x, 3.95F, z}, {0.94F, 0.075F, 0.030F},
+                    {0.70F, 0.36F, 0.10F});
+                for (int bar = 0; bar < (side > 0.0F ? 2 : 1); ++bar) {
+                    marker({x - 0.35F + static_cast<float>(bar) * 0.16F,
+                            3.73F, z},
+                        {0.065F, 0.27F, 0.032F},
+                        {0.70F, 0.36F, 0.10F});
+                }
+            }
+        }
+    };
+    drawArenaSectorMarkers(room);
+    for (const RoomRenderData& connectedRoom : connectedRooms) {
+        drawArenaSectorMarkers(connectedRoom);
+    }
+
     const auto bindSurfaceStyle = [this, &shader](const SurfaceStyle& style) {
         if (style.roomMaterials == nullptr) {
             return false;
@@ -5750,7 +7130,21 @@ bool GdpRenderer::render(
         const RoomGpuMaterials& roomMaterials = *style.roomMaterials;
         switch (style.material) {
         case RoomMaterialChannel::Wall:
-            if (style.detailedMaterial) {
+            if (roomMaterials.corridorV2 || roomMaterials.officeV1) {
+                const auto& material = roomMaterials.specialSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Wall)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (roomMaterials.combatBossV1) {
+                const auto& material = roomMaterials.bossSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Wall)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (style.detailedMaterial) {
                 if (!roomMaterials.industrialWallCondition) {
                     return false;
                 }
@@ -5777,7 +7171,28 @@ bool GdpRenderer::render(
             }
             break;
         case RoomMaterialChannel::Floor:
-            if (roomMaterials.storageHallV1) {
+            if (roomMaterials.corridorV2 || roomMaterials.officeV1) {
+                const auto& material = roomMaterials.specialSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Floor)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (roomMaterials.industrialFloorV2) {
+                const auto& material = roomMaterials.specialSurfaceMaterials[
+                    static_cast<std::size_t>(RoomSurface::Floor)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (roomMaterials.combatBossV1) {
+                const auto& material = roomMaterials.bossSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Floor)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (roomMaterials.storageHallV1) {
                 storageFloorTextures_[style.surfaceVariant]
                     .bind(gl_, textureBindings_);
             } else if (roomMaterials.cafeteriaV1) {
@@ -5792,7 +7207,21 @@ bool GdpRenderer::render(
             centralHubFloorDetailTexture_.bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::Ceiling:
-            if (style.detailedMaterial) {
+            if (roomMaterials.corridorV2 || roomMaterials.officeV1) {
+                const auto& material = roomMaterials.specialSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Ceiling)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (roomMaterials.combatBossV1) {
+                const auto& material = roomMaterials.bossSurfaceMaterials[
+                    static_cast<std::size_t>(IndustrialSurface::Ceiling)];
+                if (!material) return false;
+                material->albedo.bind(gl_, textureBindings_, 0U);
+                material->normal.bind(gl_, textureBindings_, 1U);
+                material->properties.bind(gl_, textureBindings_, 2U);
+            } else if (style.detailedMaterial) {
                 if (!roomMaterials.industrialCeilingCondition) {
                     return false;
                 }
@@ -5817,6 +7246,15 @@ bool GdpRenderer::render(
                         IndustrialSurface::Ceiling)].bind(gl_, textureBindings_);
                 }
             }
+            break;
+        case RoomMaterialChannel::CombatCover:
+            roomMaterials.combatCoverTexture.bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::CombatColumn:
+            roomMaterials.combatColumnTexture.bind(gl_, textureBindings_);
+            break;
+        case RoomMaterialChannel::CombatRail:
+            roomMaterials.combatRailTexture.bind(gl_, textureBindings_);
             break;
         case RoomMaterialChannel::StorageRack:
             if (style.rackPart == world::StorageRackPart::Upright) {
@@ -5866,21 +7304,43 @@ bool GdpRenderer::render(
         }
         shader.setVec3(gl_, "uTint", style.tint);
         shader.setInt(gl_, "uDetailedMaterial",
-            style.detailedMaterial ? 1 : 0);
+            style.detailedMaterial || (roomMaterials.combatBossV1
+                && (style.material == RoomMaterialChannel::Wall
+                    || style.material == RoomMaterialChannel::Floor
+                    || style.material == RoomMaterialChannel::Ceiling)) ? 1 : 0);
         shader.setVec2(gl_, "uUvScale", style.uvScale);
         shader.setVec2(gl_, "uUvOffset", style.uvOffset);
         shader.setFloat(gl_, "uSurfaceTileMetres", style.surfaceTileMetres);
         shader.setInt(gl_, "uMirrorSurfaceTile", style.mirrorSurfaceTile ? 1 : 0);
         shader.setInt(gl_, "uRackPart", static_cast<int>(style.rackPart));
         shader.setInt(gl_, "uFurniturePart", static_cast<int>(style.furniturePart));
+        shader.setInt(gl_, "uStructuralSteelMaterial",
+            style.material == RoomMaterialChannel::StructuralColumn
+                && !style.hubColumnPlate ? 1 : 0);
         shader.setInt(gl_, "uHubWallMaterial",
-            roomMaterials.centralHubWallCondition
-                && style.material == RoomMaterialChannel::Wall ? 1 : 0);
+            ((roomMaterials.centralHubWallCondition
+                    || roomMaterials.combatGalleryWallV1)
+                    && style.material == RoomMaterialChannel::Wall)
+                || (roomMaterials.combatGalleryWallV1
+                    && (style.material == RoomMaterialChannel::CombatCover
+                        || style.material == RoomMaterialChannel::CombatColumn
+                        || style.material
+                            == RoomMaterialChannel::StructuralColumn)) ? 1 : 0);
+        shader.setInt(gl_, "uCombatColumnMaterial",
+            roomMaterials.combatGalleryWallV1
+                && style.material == RoomMaterialChannel::CombatColumn ? 1 : 0);
+        shader.setInt(gl_, "uCombatRailMaterial",
+            roomMaterials.combatGalleryWallV1
+                && style.material == RoomMaterialChannel::CombatRail ? 1 : 0);
         shader.setInt(gl_, "uHubFloorMaterial",
-            roomMaterials.centralHubWallCondition
+            (roomMaterials.centralHubWallCondition
+                || roomMaterials.combatGalleryWallV1)
                 && (style.material == RoomMaterialChannel::Floor
                     || style.material == RoomMaterialChannel::HubFloorDetail)
                 ? 1 : 0);
+        shader.setInt(gl_, "uBossFloorMaterial",
+            roomMaterials.combatBossV1
+                && style.material == RoomMaterialChannel::Floor ? 1 : 0);
         shader.setInt(gl_, "uTechnicalSteelMaterial",
             roomMaterials.technicalV1
                 ? (style.material == RoomMaterialChannel::Floor ? 2
@@ -5890,6 +7350,11 @@ bool GdpRenderer::render(
             roomMaterials.securityV1
                 && style.material == RoomMaterialChannel::Floor ? 1 : 0);
         shader.setFloat(gl_, "uSecurityFloorSeed", roomMaterials.securityFloorSeed);
+        shader.setInt(gl_, "uCombatWallVariation",
+            roomMaterials.combatGalleryWallV1
+                && !roomMaterials.combatBossV1
+                && style.material == RoomMaterialChannel::Wall ? 1 : 0);
+        shader.setFloat(gl_, "uCombatWallSeed", roomMaterials.combatWallSeed);
         shader.setFloat(gl_, "uEmissiveStrength", style.emissiveStrength);
         shader.setFloat(gl_, "uUnlitMix", style.unlitMix);
         return true;
@@ -5958,47 +7423,17 @@ bool GdpRenderer::render(
     }
     shader.setFloat(gl_, "uUnlitMix", 0.0F);
 
-    // Render the laboratory cloche after the opaque planter and furniture.
-    // Its low alpha reveals the specimen while the opaque base owns collision.
-    if (!glassTestDomes.empty()) {
-        solidColorTexture_.bind(gl_, textureBindings_);
-        shader.setInt(gl_, "uDetailedMaterial", 0);
-        shader.setInt(gl_, "uInstanced", 0);
-        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
-        shader.setVec2(gl_, "uUvOffset", {});
-        shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
-        shader.setInt(gl_, "uMirrorSurfaceTile", 0);
-        shader.setInt(gl_, "uRackPart", 0);
-        shader.setInt(gl_, "uFurniturePart", 0);
-        shader.setInt(gl_, "uHubWallMaterial", 0);
-        shader.setInt(gl_, "uHubFloorMaterial", 0);
-        shader.setInt(gl_, "uTechnicalSteelMaterial", 0);
-        shader.setInt(gl_, "uSecurityFloorVariation", 0);
-        shader.setFloat(gl_, "uEmissiveStrength", 0.10F);
-        shader.setFloat(gl_, "uOpacity", 0.19F);
-        shader.setVec3(gl_, "uTint", {0.49F, 0.80F, 0.88F});
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
-        for (const auto& dome : glassTestDomes) {
-            shader.setMat4(gl_, "uModel",
-                wkc::core::translationMatrix(dome.center)
-                    * wkc::core::scaleMatrix(
-                        {dome.radius, dome.height, dome.radius}));
-            drawMesh(glassTestDome_);
-        }
-        glDepthMask(GL_TRUE);
-        glDisable(GL_BLEND);
-        shader.setFloat(gl_, "uOpacity", 1.0F);
-        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
-    }
-
     shader.setInt(gl_, "uRackPart", 0);
     shader.setInt(gl_, "uFurniturePart", 0);
+    shader.setInt(gl_, "uStructuralSteelMaterial", 0);
     shader.setInt(gl_, "uHubWallMaterial", 0);
+    shader.setInt(gl_, "uCombatColumnMaterial", 0);
+    shader.setInt(gl_, "uCombatRailMaterial", 0);
     shader.setInt(gl_, "uHubFloorMaterial", 0);
+    shader.setInt(gl_, "uBossFloorMaterial", 0);
     shader.setInt(gl_, "uTechnicalSteelMaterial", 0);
     shader.setInt(gl_, "uSecurityFloorVariation", 0);
+    shader.setInt(gl_, "uCombatWallVariation", 0);
     shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
     shader.setInt(gl_, "uMirrorSurfaceTile", 0);
     fallbackTexture_.bind(gl_, textureBindings_);
@@ -6009,23 +7444,30 @@ bool GdpRenderer::render(
         const auto drawDoorPiece = [&](const wkc::core::Vec3 position,
                                        const wkc::core::Vec3 scale,
                                        const wkc::core::Vec3 tint,
-                                       const float emissive) {
+                                       const float emissive,
+                                       const bool steel = true,
+                                       const bool castsShadow = false) {
             const wkc::core::Mat4 model
                 = wkc::core::translationMatrix(position)
                     * wkc::core::scaleMatrix(scale);
             shader.setMat4(gl_, "uModel", model);
-            if (geometryShadowsActive) shadowCasters.push_back({&box_, model});
+            if (geometryShadowsActive && castsShadow)
+                shadowCasters.push_back({&box_, model});
+            if (steel) structuralColumnTextures_[1U].bind(gl_, textureBindings_);
+            else solidColorTexture_.bind(gl_, textureBindings_);
             shader.setVec3(gl_, "uTint", tint);
             shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setInt(gl_, "uStructuralSteelMaterial", steel ? 1 : 0);
             shader.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
             shader.setVec2(gl_, "uUvOffset", {});
             shader.setFloat(gl_, "uEmissiveStrength", emissive);
             drawMesh(box_);
         };
         constexpr float frameThickness = 0.14F;
-        const wkc::core::Vec3 frameColor = door.locked
-            ? wkc::core::Vec3{0.90F, 0.10F, 0.05F}
-            : wkc::core::Vec3{0.10F, 0.66F, 0.72F};
+        const wkc::core::Vec3 frameColor{0.25F, 0.26F, 0.26F};
+        const wkc::core::Vec3 darkSteel{0.17F, 0.18F, 0.19F};
+        const wkc::core::Vec3 edgeSteel{0.27F, 0.28F, 0.28F};
+        const wkc::core::Vec3 boltSteel{0.54F, 0.55F, 0.52F};
         const wkc::core::Vec3 transverse = facesX
             ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
             : wkc::core::Vec3{1.0F, 0.0F, 0.0F};
@@ -6036,9 +7478,9 @@ bool GdpRenderer::render(
         const wkc::core::Vec3 postCenter
             = insetPosition + wkc::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
         drawDoorPiece(postCenter + (transverse * postOffset),
-            postScale, frameColor, 0.28F);
+            postScale, frameColor, 0.0F, true, true);
         drawDoorPiece(postCenter - (transverse * postOffset),
-            postScale, frameColor, 0.28F);
+            postScale, frameColor, 0.0F, true, true);
         const wkc::core::Vec3 lintelScale = facesX
             ? wkc::core::Vec3{0.12F, frameThickness,
                 door.width + (frameThickness * 2.0F)}
@@ -6046,34 +7488,173 @@ bool GdpRenderer::render(
                 frameThickness, 0.12F};
         drawDoorPiece(insetPosition
                 + wkc::core::Vec3{0.0F, door.height + (frameThickness * 0.5F), 0.0F},
-            lintelScale, frameColor, 0.28F);
+            lintelScale, frameColor, 0.0F, true, true);
+
+        // Both doors retain the existing two-leaf travel and collision. The
+        // tracks, actuator and fasteners add depth without occupying the
+        // opening; only the small status lens carries the lock colour.
+        const wkc::core::Vec3 trackScale{
+            0.065F, door.height - 0.10F, 0.065F};
+        for (const float sign : {-1.0F, 1.0F}) {
+            const wkc::core::Vec3 trackCenter = postCenter
+                + transverse * (sign * postOffset)
+                - door.outwardNormal * 0.082F;
+            drawDoorPiece(trackCenter, trackScale, darkSteel, 0.0F);
+            for (const float fastenerY : {0.20F, 0.82F}) {
+                const wkc::core::Vec3 boltCenter = postCenter
+                    + transverse * (sign * postOffset)
+                    - door.outwardNormal * 0.112F
+                    + wkc::core::Vec3{0.0F,
+                        (fastenerY - 0.5F) * door.height, 0.0F};
+                drawDoorPiece(boltCenter, {0.047F, 0.047F, 0.047F},
+                    boltSteel, 0.0F);
+            }
+        }
+        const wkc::core::Vec3 actuatorScale = facesX
+            ? wkc::core::Vec3{0.17F, 0.20F, door.width * 0.72F}
+            : wkc::core::Vec3{door.width * 0.72F, 0.20F, 0.17F};
+        const wkc::core::Vec3 actuatorCenter = insetPosition
+            - door.outwardNormal * 0.065F
+            + wkc::core::Vec3{0.0F, door.height + 0.17F, 0.0F};
+        drawDoorPiece(actuatorCenter, actuatorScale, darkSteel, 0.0F, true, true);
+        const wkc::core::Vec3 indicatorColor = door.locked
+            ? wkc::core::Vec3{0.90F, 0.10F, 0.05F}
+            : door.openFraction > 0.01F && door.openFraction < 0.99F
+                ? wkc::core::Vec3{0.95F, 0.53F, 0.08F}
+                : wkc::core::Vec3{0.08F, 0.74F, 0.77F};
+        const wkc::core::Vec3 indicatorScale = facesX
+            ? wkc::core::Vec3{0.022F, 0.035F, std::min(0.30F, door.width * 0.24F)}
+            : wkc::core::Vec3{std::min(0.30F, door.width * 0.24F), 0.035F, 0.022F};
+        drawDoorPiece(actuatorCenter - door.outwardNormal * 0.100F,
+            indicatorScale, indicatorColor, 1.8F, false);
 
         const float openFraction = std::isfinite(door.openFraction)
             ? std::clamp(door.openFraction, 0.0F, 1.0F) : 0.0F;
         const float panelWidth = std::max(0.05F, (door.width * 0.5F) - 0.02F);
-        const float panelOffset = (panelWidth * 0.5F) + (panelWidth * openFraction);
+        const float panelOffset = (panelWidth * 0.5F)
+            + ((panelWidth + 0.04F) * openFraction);
         const wkc::core::Vec3 panelScale = facesX
             ? wkc::core::Vec3{0.10F, door.height - 0.10F, panelWidth}
             : wkc::core::Vec3{panelWidth, door.height - 0.10F, 0.10F};
         const wkc::core::Vec3 panelCenter
             = insetPosition + wkc::core::Vec3{0.0F, door.height * 0.5F, 0.0F};
-        const wkc::core::Vec3 panelColor = door.locked
-            ? wkc::core::Vec3{0.72F, 0.08F, 0.04F}
-            : wkc::core::Vec3{0.22F, 0.30F, 0.34F};
-        const float panelEmissive = door.locked ? 0.48F : 0.08F;
-        drawDoorPiece(panelCenter + (transverse * panelOffset),
-            panelScale, panelColor, panelEmissive);
-        drawDoorPiece(panelCenter - (transverse * panelOffset),
-            panelScale, panelColor, panelEmissive);
+        for (const float side : {-1.0F, 1.0F}) {
+            const wkc::core::Vec3 leafCenter = panelCenter
+                + transverse * (side * panelOffset);
+            drawDoorPiece(leafCenter, panelScale, frameColor,
+                0.0F, true, true);
+            const wkc::core::Vec3 face = leafCenter - door.outwardNormal * 0.058F;
+            const wkc::core::Vec3 insetScale = facesX
+                ? wkc::core::Vec3{0.024F, door.height * 0.72F,
+                    panelWidth * 0.77F}
+                : wkc::core::Vec3{panelWidth * 0.77F,
+                    door.height * 0.72F, 0.024F};
+            drawDoorPiece(face, insetScale, darkSteel, 0.0F);
+            const wkc::core::Vec3 panelLip = leafCenter
+                - door.outwardNormal * 0.075F;
+            const wkc::core::Vec3 horizontalLip = facesX
+                ? wkc::core::Vec3{0.027F, 0.028F, panelWidth * 0.78F}
+                : wkc::core::Vec3{panelWidth * 0.78F, 0.028F, 0.027F};
+            for (const float level : {-0.36F, 0.36F}) {
+                drawDoorPiece(panelLip
+                        + wkc::core::Vec3{0.0F, door.height * level, 0.0F},
+                    horizontalLip, edgeSteel, 0.0F);
+            }
+            const wkc::core::Vec3 seamScale = facesX
+                ? wkc::core::Vec3{0.028F, door.height * 0.86F, 0.026F}
+                : wkc::core::Vec3{0.026F, door.height * 0.86F, 0.028F};
+            drawDoorPiece(leafCenter - door.outwardNormal * 0.069F
+                    - transverse * (side * panelWidth * 0.46F),
+                seamScale, edgeSteel, 0.0F);
+            for (const float level : {0.16F, 0.83F}) {
+                for (const float edge : {-0.33F, 0.33F}) {
+                    drawDoorPiece(panelLip - door.outwardNormal * 0.014F
+                            + transverse * (edge * panelWidth)
+                            + wkc::core::Vec3{
+                                0.0F, (level - 0.5F) * door.height, 0.0F},
+                        {0.030F, 0.030F, 0.030F}, boltSteel, 0.0F);
+                }
+            }
+            if (door.inspectionWindow) {
+                const wkc::core::Vec3 glassScale = facesX
+                    ? wkc::core::Vec3{0.034F, door.height * 0.32F,
+                        std::min(0.12F, panelWidth * 0.25F)}
+                    : wkc::core::Vec3{std::min(0.12F, panelWidth * 0.25F),
+                        door.height * 0.32F, 0.034F};
+                const wkc::core::Vec3 glassCenter = face
+                    - door.outwardNormal * 0.025F
+                    + wkc::core::Vec3{0.0F, door.height * 0.13F, 0.0F};
+                drawDoorPiece(glassCenter, glassScale,
+                    {0.025F, 0.075F, 0.095F}, 0.0F, false);
+                const wkc::core::Vec3 rimScale = facesX
+                    ? wkc::core::Vec3{0.040F, door.height * 0.34F,
+                        std::min(0.16F, panelWidth * 0.32F)}
+                    : wkc::core::Vec3{std::min(0.16F, panelWidth * 0.32F),
+                        door.height * 0.34F, 0.040F};
+                drawDoorPiece(glassCenter + door.outwardNormal * 0.012F,
+                    rimScale, edgeSteel, 0.0F);
+                const wkc::core::Vec3 lowerPlateScale = facesX
+                    ? wkc::core::Vec3{0.037F, door.height * 0.23F,
+                        panelWidth * 0.67F}
+                    : wkc::core::Vec3{panelWidth * 0.67F,
+                        door.height * 0.23F, 0.037F};
+                drawDoorPiece(face - door.outwardNormal * 0.027F
+                        + wkc::core::Vec3{
+                            0.0F, -door.height * 0.27F, 0.0F},
+                    lowerPlateScale, {0.33F, 0.34F, 0.34F}, 0.0F);
+            } else {
+                const wkc::core::Vec3 armorBandScale = facesX
+                    ? wkc::core::Vec3{0.038F, door.height * 0.16F,
+                        panelWidth * 0.79F}
+                    : wkc::core::Vec3{panelWidth * 0.79F,
+                        door.height * 0.16F, 0.038F};
+                drawDoorPiece(face - door.outwardNormal * 0.035F
+                        + wkc::core::Vec3{0.0F, door.height * 0.07F, 0.0F},
+                    armorBandScale, {0.32F, 0.33F, 0.33F}, 0.0F);
+            }
+        }
     }
+    shader.setInt(gl_, "uStructuralSteelMaterial", 0);
 
     fallbackTexture_.bind(gl_, textureBindings_);
     shader.setInt(gl_, "uDetailedMaterial", 0);
     shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
     shader.setVec2(gl_, "uUvOffset", {});
+    const auto bulletMarkPosition = [&](const ImpactRenderData& mark) {
+        const auto onFallbackWall = [&](const RoomRenderData& renderedRoom) {
+            if (!renderedRoom.walkableOutline.empty()
+                || resolveMaterials(renderedRoom.materialKey).technicalV1) {
+                return false;
+            }
+            const auto& bounds = renderedRoom.worldBounds;
+            if (mark.position.y < bounds.minimum.y - 0.02F
+                || mark.position.y > bounds.maximum.y + 0.02F) {
+                return false;
+            }
+            constexpr float wallTolerance = 0.02F;
+            return (mark.normal.x > 0.9F
+                    && std::abs(mark.position.x - bounds.minimum.x) < wallTolerance)
+                || (mark.normal.x < -0.9F
+                    && std::abs(mark.position.x - bounds.maximum.x) < wallTolerance)
+                || (mark.normal.z > 0.9F
+                    && std::abs(mark.position.z - bounds.minimum.z) < wallTolerance)
+                || (mark.normal.z < -0.9F
+                    && std::abs(mark.position.z - bounds.maximum.z) < wallTolerance);
+        };
+        if (onFallbackWall(room)
+            || std::any_of(connectedRooms.begin(), connectedRooms.end(),
+                onFallbackWall)) {
+            // Collision ends at the room boundary; box shells render 10 cm
+            // inside it. Keep the mark on that visible face.
+            return mark.position + wkc::core::normalized(mark.normal)
+                * (fallbackRoomShellHalfThickness + 0.005F);
+        }
+        return mark.position;
+    };
     for (const ImpactRenderData& impact : impacts) {
         if (impact.kind == ImpactVisualKind::BulletMark) {
             const wkc::core::Vec3 normal = wkc::core::normalized(impact.normal);
+            const wkc::core::Vec3 markPosition = bulletMarkPosition(impact);
             const wkc::core::Vec3 reference = std::abs(normal.y) > 0.9F
                 ? wkc::core::Vec3{0.0F, 0.0F, 1.0F}
                 : wkc::core::Vec3{0.0F, 1.0F, 0.0F};
@@ -6087,7 +7668,7 @@ bool GdpRenderer::render(
             shader.setVec3(gl_, "uTint", {0.025F, 0.027F, 0.029F});
             shader.setMat4(gl_, "uModel",
                 wkc::core::translationMatrix(
-                    impact.position + normal * 0.006F)
+                    markPosition + normal * 0.006F)
                     * orientation
                     * wkc::core::scaleMatrix(
                         {0.105F * variation, 0.006F, 0.105F * variation}));
@@ -6095,7 +7676,7 @@ bool GdpRenderer::render(
             shader.setVec3(gl_, "uTint", {0.78F, 0.75F, 0.68F});
             shader.setMat4(gl_, "uModel",
                 wkc::core::translationMatrix(
-                    impact.position + normal * 0.014F)
+                    markPosition + normal * 0.014F)
                     * orientation
                     * wkc::core::scaleMatrix(
                         {0.077F * variation, 0.077F * variation,
@@ -6287,7 +7868,7 @@ bool GdpRenderer::render(
         wkc::core::Vec3{0.13F, 0.16F, 0.17F},    // Security
         wkc::core::Vec3{0.39F, 0.43F, 0.44F},    // Office
         wkc::core::Vec3{0.125F, 0.125F, 0.13F}, // Boss / Arena
-        wkc::core::Vec3{0.155F, 0.20F, 0.22F},  // Central Hub
+        wkc::core::Vec3{0.21F, 0.19F, 0.16F},   // Central Hub
     };
     const std::span<const PointLightRenderData> visibleFixtures
         = lighting.visibleFixturesPopulated
@@ -6296,6 +7877,14 @@ bool GdpRenderer::render(
     for (const PointLightRenderData& light : visibleFixtures) {
         const bool hubFixture
             = light.fixtureVariant == CeilingFixtureVariant::CentralHub;
+        const bool combatFixture
+            = light.fixtureVariant == CeilingFixtureVariant::BossArena
+            && light.sourceRoomBounds.maximum.x
+                - light.sourceRoomBounds.minimum.x < 24.0F;
+        const bool bossFixture
+            = light.fixtureVariant == CeilingFixtureVariant::BossArena
+            && light.sourceRoomBounds.maximum.x
+                - light.sourceRoomBounds.minimum.x >= 24.0F;
         const wkc::core::Vec3 roomCenter
             = (light.sourceRoomBounds.minimum
                 + light.sourceRoomBounds.maximum) * 0.5F;
@@ -6337,16 +7926,17 @@ bool GdpRenderer::render(
                 : wkc::core::Vec3{1.0F, 1.0F, 1.0F};
         const float suspensionLength = light.sourceRoomBounds.maximum.y
             - light.position.y - 0.26F;
-        if (hubFixture && suspensionLength > 0.05F) {
+        if ((hubFixture || combatFixture || bossFixture)
+            && suspensionLength > 0.05F) {
             const wkc::core::Vec2 metalUvScale{0.12F, 0.88F};
             const wkc::core::Vec2 metalUvOffset{0.53F, 0.05F};
             for (const float side : {-1.0F, 1.0F}) {
-                drawFixturePiece({side * 0.44F,
+                drawFixturePiece({side * (bossFixture ? 0.82F : 0.44F),
                         0.18F + suspensionLength * 0.5F, 0.0F},
                     {0.028F, suspensionLength, 0.028F},
                     metalUvScale, metalUvOffset,
                     housingTint * 0.72F, 0.0F);
-                drawFixturePiece({side * 0.44F,
+                drawFixturePiece({side * (bossFixture ? 0.82F : 0.44F),
                         0.18F + suspensionLength + 0.025F, 0.0F},
                     {0.15F, 0.05F, 0.15F},
                     metalUvScale, metalUvOffset,
@@ -6367,7 +7957,10 @@ bool GdpRenderer::render(
                 wkc::core::translationMatrix(light.position)
                     * wkc::core::rotationYMatrix(fixtureYaw)
                     * wkc::core::translationMatrix(
-                        {0.0F, 0.095F, 0.0F}));
+                        {0.0F, 0.095F, 0.0F})
+                    * wkc::core::scaleMatrix(bossFixture
+                        ? wkc::core::Vec3{1.9F, 1.0F, 1.0F}
+                        : wkc::core::Vec3{1.0F, 1.0F, 1.0F}));
             shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
             shader.setVec2(gl_, "uUvOffset", {0.0F, 0.0F});
             for (const CeilingFixtureGpuPart& part : ceilingFixtureModels_[variant]) {
@@ -6389,6 +7982,25 @@ bool GdpRenderer::render(
                 shader.setFloat(gl_, "uEmissiveStrength",
                     part.materialId == 4U ? lensEmission : 0.0F);
                 drawMesh(part.mesh);
+            }
+            if (bossFixture) {
+                // Use an unmasked metal housing and diffuser: the fixture
+                // atlas only lights a short central strip of this long bar.
+                shader.setInt(gl_, "uUseEmissionMap", 0);
+                shader.setInt(gl_, "uDetailedMaterial", 0);
+                solidColorTexture_.bind(gl_, textureBindings_);
+                drawFixturePiece({0.0F, -0.045F, 0.0F},
+                    {2.48F, 0.15F, 0.31F}, {}, {},
+                    {0.15F, 0.14F, 0.13F}, 0.0F);
+                drawFixturePiece({0.0F, -0.129F, 0.0F},
+                    {2.27F, 0.045F, 0.22F}, {}, {},
+                    lensTint, lensEmission * 2.1F);
+                ceilingFixtureMaterial_.albedo.bind(gl_, textureBindings_, 0U);
+                ceilingFixtureMaterial_.normal.bind(gl_, textureBindings_, 1U);
+                ceilingFixtureMaterial_.properties.bind(gl_, textureBindings_, 2U);
+                ceilingFixtureMaterial_.emission.bind(gl_, textureBindings_, 3U);
+                shader.setInt(gl_, "uDetailedMaterial", 1);
+                shader.setInt(gl_, "uUseEmissionMap", 1);
             }
             continue;
         }
@@ -6711,44 +8323,453 @@ bool GdpRenderer::render(
             fallbackTexture_.bind(gl_, textureBindings_);
             continue;
         }
-        wkc::core::Vec3 tint{0.20F, 0.85F, 0.32F};
-        wkc::core::Vec3 scale{0.30F, 0.22F, 0.30F};
-        if (pickup.role == PickupVisualRole::Ammo) {
-            tint = {0.92F, 0.68F, 0.16F};
-            scale = {0.34F, 0.18F, 0.24F};
-        } else if (pickup.role == PickupVisualRole::Key) {
-            tint = {0.18F, 0.78F, 0.92F};
-            scale = {0.38F, 0.12F, 0.16F};
-        } else if (pickup.role == PickupVisualRole::Armor) {
-            tint = {0.18F, 0.42F, 0.96F};
-            scale = {0.36F, 0.26F, 0.30F};
-        } else if (pickup.role == PickupVisualRole::Special) {
-            tint = {1.0F, 0.24F, 0.52F};
-            scale = {0.24F, 0.38F, 0.24F};
-        }
-        const wkc::core::Mat4 model
-            = wkc::core::translationMatrix(
-                pickup.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
-            * wkc::core::scaleMatrix(scale);
-        shader.setMat4(gl_, "uModel", model);
-        shader.setVec3(gl_, "uTint", tint);
+        // Supply pickups share the room's metal language, but each has a
+        // distinct silhouette and readable mark instead of a plain color box.
         shader.setInt(gl_, "uDetailedMaterial", 0);
-        shader.setVec2(gl_, "uUvScale", {2.0F, 2.0F});
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
         shader.setVec2(gl_, "uUvOffset", {});
-        shader.setFloat(gl_, "uEmissiveStrength", 0.16F);
-        drawMesh(box_);
+        const float yaw = static_cast<float>(pickup.visualSeed & 3U)
+            * std::numbers::pi_v<float> * 0.5F;
+        const wkc::core::Mat4 pickupRoot
+            = wkc::core::translationMatrix(pickup.position)
+            * wkc::core::rotationYMatrix(yaw);
+        const auto pickupPart = [&](const wkc::core::Vec3 center,
+            const wkc::core::Vec3 dimensions,
+            const wkc::core::Vec3 color, const float emission = 0.0F) {
+            shader.setMat4(gl_, "uModel", pickupRoot
+                * wkc::core::translationMatrix(center)
+                * wkc::core::scaleMatrix(dimensions));
+            shader.setVec3(gl_, "uTint", color);
+            shader.setFloat(gl_, "uEmissiveStrength", emission);
+            drawMesh(box_);
+        };
+        constexpr wkc::core::Vec3 darkHousing{0.20F, 0.23F, 0.24F};
+        constexpr wkc::core::Vec3 edgeSteel{0.55F, 0.58F, 0.55F};
+        switch (pickup.role) {
+        case PickupVisualRole::Health:
+            pickupPart({0.0F, 0.10F, 0.0F}, {0.42F, 0.19F, 0.32F},
+                {0.29F, 0.48F, 0.34F});
+            pickupPart({0.0F, 0.205F, 0.0F}, {0.36F, 0.020F, 0.26F},
+                darkHousing);
+            pickupPart({0.0F, 0.220F, 0.0F}, {0.22F, 0.012F, 0.055F},
+                {0.77F, 0.89F, 0.72F}, 0.25F);
+            pickupPart({0.0F, 0.220F, 0.0F}, {0.055F, 0.012F, 0.20F},
+                {0.77F, 0.89F, 0.72F}, 0.25F);
+            break;
+        case PickupVisualRole::Ammo:
+            pickupPart({0.0F, 0.065F, 0.0F}, {0.46F, 0.12F, 0.30F},
+                darkHousing);
+            pickupPart({0.0F, 0.133F, 0.0F}, {0.41F, 0.022F, 0.25F},
+                edgeSteel);
+            for (const float x : {-0.12F, 0.0F, 0.12F}) {
+                pickupPart({x, 0.160F, 0.0F}, {0.075F, 0.036F, 0.19F},
+                    {0.70F, 0.49F, 0.19F});
+                pickupPart({x, 0.181F, -0.065F},
+                    {0.075F, 0.010F, 0.045F},
+                    {0.88F, 0.70F, 0.36F}, 0.08F);
+            }
+            break;
+        case PickupVisualRole::Key:
+            pickupPart({0.0F, 0.035F, 0.0F}, {0.46F, 0.065F, 0.24F},
+                darkHousing);
+            pickupPart({0.0F, 0.073F, 0.0F}, {0.40F, 0.012F, 0.18F},
+                {0.17F, 0.52F, 0.60F}, 0.12F);
+            pickupPart({-0.11F, 0.083F, 0.0F},
+                {0.055F, 0.010F, 0.11F},
+                {0.63F, 0.87F, 0.88F}, 0.25F);
+            pickupPart({0.14F, 0.083F, 0.0F},
+                {0.055F, 0.010F, 0.11F},
+                {0.79F, 0.50F, 0.18F});
+            break;
+        case PickupVisualRole::Armor:
+            pickupPart({0.0F, 0.090F, 0.0F}, {0.44F, 0.17F, 0.36F},
+                darkHousing);
+            pickupPart({0.0F, 0.183F, 0.0F}, {0.36F, 0.024F, 0.28F},
+                {0.32F, 0.42F, 0.48F});
+            pickupPart({0.0F, 0.199F, 0.0F}, {0.12F, 0.012F, 0.22F},
+                {0.22F, 0.66F, 0.82F}, 0.22F);
+            break;
+        case PickupVisualRole::Special:
+            pickupPart({0.0F, 0.035F, 0.0F}, {0.24F, 0.07F, 0.24F},
+                darkHousing);
+            pickupPart({0.0F, 0.17F, 0.0F}, {0.16F, 0.25F, 0.16F},
+                {0.82F, 0.24F, 0.43F}, 0.30F);
+            for (const float side : {-1.0F, 1.0F}) {
+                pickupPart({side * 0.095F, 0.17F, 0.0F},
+                    {0.028F, 0.27F, 0.20F}, darkHousing);
+            }
+            pickupPart({0.0F, 0.345F, 0.0F}, {0.24F, 0.035F, 0.24F},
+                edgeSteel);
+            pickupPart({0.0F, 0.225F, 0.086F},
+                {0.11F, 0.055F, 0.010F},
+                {0.91F, 0.42F, 0.56F}, 0.35F);
+            break;
+        default:
+            break;
+        }
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
     }
 
     shader.setFloat(gl_, "uPropIndirectFill", 0.28F);
     for (const PropRenderData& prop : props) {
+        if (prop.role == PropVisualRole::Terminal) {
+            const wkc::core::Mat4 model
+                = wkc::core::translationMatrix(prop.position)
+                    * wkc::core::rotationYMatrix(prop.yawDegrees
+                        * std::numbers::pi_v<float> / 180.0F);
+            wkc::core::Vec3 statusColor{0.28F, 0.77F, 0.82F};
+            if (prop.terminalState == TerminalVisualState::Locked) {
+                statusColor = {0.91F, 0.48F, 0.10F};
+            } else if (prop.terminalState == TerminalVisualState::Alert) {
+                statusColor = (hud.elapsedRunTicks / 60U) % 2U == 0U
+                    ? wkc::core::Vec3{0.98F, 0.14F, 0.08F}
+                    : wkc::core::Vec3{0.10F, 0.025F, 0.025F};
+            } else if (prop.terminalState == TerminalVisualState::Ready) {
+                statusColor = {0.22F, 0.78F, 0.42F};
+            }
+            shader.setFloat(gl_, "uPropIndirectFill", 0.08F);
+            shader.setMat4(gl_, "uModel", model);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            for (const TerminalGpuPart& part : terminalModelParts_) {
+                const bool metal = part.materialId <= 3U;
+                if (metal) {
+                    terminalMaterial_.albedo.bind(gl_, textureBindings_, 0U);
+                    terminalMaterial_.normal.bind(gl_, textureBindings_, 1U);
+                    terminalMaterial_.properties.bind(gl_, textureBindings_, 2U);
+                    terminalMaterial_.emission.bind(gl_, textureBindings_, 3U);
+                    shader.setInt(gl_, "uDetailedMaterial", 1);
+                    shader.setInt(gl_, "uUseEmissionMap", 1);
+                    shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                    shader.setVec3(gl_, "uTint", prop.bossArena
+                        ? part.materialId == 0U
+                            ? wkc::core::Vec3{0.78F, 0.69F, 0.57F}
+                            : part.materialId == 1U
+                                ? wkc::core::Vec3{0.33F, 0.31F, 0.28F}
+                            : part.materialId == 2U
+                                ? wkc::core::Vec3{0.87F, 0.73F, 0.58F}
+                            : wkc::core::Vec3{0.82F, 0.74F, 0.65F}
+                        : part.materialId == 1U
+                            ? wkc::core::Vec3{0.36F, 0.40F, 0.43F}
+                            : wkc::core::Vec3{1.0F, 1.0F, 1.0F});
+                    if (geometryShadowsActive && part.partId == 0U) {
+                        shadowCasters.push_back({&part.mesh, model});
+                    }
+                } else {
+                    solidColorTexture_.bind(gl_, textureBindings_);
+                    shader.setInt(gl_, "uDetailedMaterial", 0);
+                    shader.setInt(gl_, "uUseEmissionMap", 0);
+                    shader.setVec3(gl_, "uTint", part.materialId == 4U
+                        ? wkc::core::Vec3{0.012F, 0.044F, 0.054F}
+                        : part.partId == 1U
+                            ? (prop.bossArena
+                                ? wkc::core::Vec3{1.0F, 0.48F, 0.16F}
+                                : wkc::core::Vec3{0.96F, 0.81F, 0.62F})
+                            : statusColor);
+                    shader.setFloat(gl_, "uEmissiveStrength",
+                        part.materialId == 4U ? 0.0F
+                            : part.partId == 1U ? 0.55F
+                            : prop.terminalState == TerminalVisualState::Alert
+                                && (hud.elapsedRunTicks / 60U) % 2U != 0U
+                                ? 0.0F : 0.65F);
+                }
+                drawMesh(part.mesh);
+            }
+            shader.setFloat(gl_, "uPropIndirectFill", 0.28F);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setInt(gl_, "uUseEmissionMap", 0);
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
+        if (prop.role == PropVisualRole::SecurityMonitor
+            || prop.role == PropVisualRole::CafeteriaPlanter) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setInt(gl_, "uUseEmissionMap", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            if (geometryShadowsActive
+                && prop.state != PropVisualState::Destroyed) {
+                shadowCasters.push_back({&box_,
+                    wkc::core::translationMatrix(prop.position)
+                        * wkc::core::scaleMatrix(prop.scale)});
+            }
+            const auto piece = [&](const wkc::core::Vec3 center,
+                                   const wkc::core::Vec3 size,
+                                   const wkc::core::Vec3 color,
+                                   const float glow = 0.0F,
+                                   wkc::render::Mesh* mesh = nullptr,
+                                   const float yaw = 0.0F) {
+                shader.setMat4(gl_, "uModel",
+                    wkc::core::translationMatrix(center)
+                        * wkc::core::rotationYMatrix(yaw)
+                        * wkc::core::scaleMatrix(size));
+                shader.setVec3(gl_, "uTint", color);
+                shader.setFloat(gl_, "uEmissiveStrength", glow);
+                drawMesh(mesh ? *mesh : box_);
+            };
+            if (prop.role == PropVisualRole::SecurityMonitor) {
+                const wkc::core::Vec3 casing{0.19F, 0.25F, 0.28F};
+                const wkc::core::Vec3 rim{0.42F, 0.48F, 0.49F};
+                const wkc::core::Vec3 activeColor
+                    = prop.terminalState == TerminalVisualState::Alert
+                        ? wkc::core::Vec3{0.95F, 0.16F, 0.10F}
+                    : prop.terminalState == TerminalVisualState::Locked
+                        ? wkc::core::Vec3{0.96F, 0.70F, 0.12F}
+                    : prop.terminalState == TerminalVisualState::Ready
+                        ? wkc::core::Vec3{0.27F, 0.82F, 0.53F}
+                        : wkc::core::Vec3{0.23F, 0.64F, 0.76F};
+                const bool lightOn = prop.terminalState
+                        != TerminalVisualState::Alert
+                    || (hud.elapsedRunTicks / 60U) % 2U == 0U;
+                const bool facesX = prop.scale.x < prop.scale.z;
+                const float length = facesX ? prop.scale.z : prop.scale.x;
+                const float depth = facesX ? prop.scale.x : prop.scale.z;
+                if (prop.state == PropVisualState::Destroyed) {
+                    const float base = prop.position.y - prop.scale.y * 0.5F;
+                    piece({prop.position.x, base + 0.025F, prop.position.z},
+                        {prop.scale.x * 0.82F, 0.05F, prop.scale.z * 0.82F}, casing);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        piece(prop.position + wkc::core::Vec3{
+                                facesX ? side * depth * 0.36F : side * length * 0.29F,
+                                -prop.scale.y * 0.5F + 0.075F,
+                                facesX ? side * length * 0.29F : side * depth * 0.36F},
+                            {0.13F, 0.10F, 0.14F}, rim);
+                    }
+                } else {
+                    piece(prop.position, prop.scale, casing);
+                    const float faceOffset = depth * 0.5F + 0.012F;
+                    const float panelWidth = length * 0.25F;
+                    for (const float side : {-1.0F, 1.0F}) {
+                        for (int screen = 0; screen < 3; ++screen) {
+                            const float along = (static_cast<float>(screen) - 1.0F)
+                                * length * 0.29F;
+                            const wkc::core::Vec3 face = prop.position
+                                + wkc::core::Vec3{
+                                    facesX ? side * faceOffset : along,
+                                    0.0F,
+                                    facesX ? along : side * faceOffset};
+                            const wkc::core::Vec3 panelSize = facesX
+                                ? wkc::core::Vec3{0.028F,
+                                    prop.scale.y * 0.68F, panelWidth}
+                                : wkc::core::Vec3{panelWidth,
+                                    prop.scale.y * 0.68F, 0.028F};
+                            piece(face, panelSize, rim);
+                            piece(face + wkc::core::Vec3{
+                                    facesX ? side * 0.018F : 0.0F, 0.0F,
+                                    facesX ? 0.0F : side * 0.018F},
+                                panelSize * 0.86F,
+                                prop.state == PropVisualState::Damaged
+                                    ? wkc::core::Vec3{0.025F, 0.027F, 0.026F}
+                                    : wkc::core::Vec3{0.022F, 0.045F, 0.055F});
+                            if (prop.state == PropVisualState::Intact && lightOn) {
+                                piece(face + wkc::core::Vec3{
+                                        facesX ? side * 0.035F : 0.0F,
+                                        prop.scale.y * 0.18F,
+                                        facesX ? 0.0F : side * 0.035F},
+                                    facesX
+                                        ? wkc::core::Vec3{0.009F, 0.024F,
+                                            panelWidth * 0.72F}
+                                        : wkc::core::Vec3{panelWidth * 0.72F,
+                                            0.024F, 0.009F},
+                                    activeColor, 0.58F);
+                            }
+                        }
+                    }
+                }
+            } else {
+                const float base = prop.position.y - prop.scale.y * 0.5F;
+                const wkc::core::Vec3 pot{0.35F, 0.39F, 0.37F};
+                if (prop.state == PropVisualState::Destroyed) {
+                    for (const float side : {-1.0F, 1.0F}) {
+                        piece({prop.position.x + side * prop.scale.x * 0.28F,
+                                base + 0.065F,
+                                prop.position.z - side * prop.scale.z * 0.17F},
+                            {prop.scale.x * 0.42F, 0.13F,
+                                prop.scale.z * 0.38F}, pot);
+                        piece({prop.position.x + side * prop.scale.x * 0.28F,
+                                base + 0.136F,
+                                prop.position.z - side * prop.scale.z * 0.17F},
+                            {prop.scale.x * 0.39F, 0.012F,
+                                prop.scale.z * 0.35F},
+                            {0.60F, 0.62F, 0.54F});
+                    }
+                    for (int leaf = 0; leaf < 5; ++leaf) {
+                        const float angle = static_cast<float>(leaf)
+                            * (2.0F * std::numbers::pi_v<float> / 5.0F);
+                        piece({prop.position.x + std::cos(angle) * 0.18F,
+                                base + 0.12F,
+                                prop.position.z + std::sin(angle) * 0.18F},
+                            {0.48F, 0.22F, 0.48F},
+                            leaf % 2 == 0
+                                ? wkc::core::Vec3{0.30F, 0.48F, 0.24F}
+                                : wkc::core::Vec3{0.21F, 0.38F, 0.19F},
+                            0.0F, &planterLeafMesh_, angle);
+                    }
+                } else {
+                    piece({prop.position.x, base + prop.scale.y * 0.40F,
+                            prop.position.z},
+                        {prop.scale.x, prop.scale.y * 0.80F, prop.scale.z}, pot);
+                    piece({prop.position.x, base + prop.scale.y * 0.78F,
+                            prop.position.z},
+                        {prop.scale.x * 0.90F, 0.06F,
+                            prop.scale.z * 0.90F},
+                        {0.56F, 0.58F, 0.51F});
+                    piece({prop.position.x, base + prop.scale.y * 0.82F,
+                            prop.position.z},
+                        {prop.scale.x * 0.71F, 0.025F,
+                            prop.scale.z * 0.71F},
+                        {0.07F, 0.09F, 0.07F});
+                    for (int leaf = 0; leaf < 7; ++leaf) {
+                        const float angle = static_cast<float>(leaf)
+                            * (2.0F * std::numbers::pi_v<float> / 7.0F);
+                        piece({prop.position.x + std::cos(angle) * 0.06F,
+                                base + prop.scale.y * 0.82F,
+                                prop.position.z + std::sin(angle) * 0.06F},
+                            {0.88F, 0.43F + 0.05F * static_cast<float>(leaf % 3),
+                                0.88F},
+                            leaf % 2 == 0
+                                ? wkc::core::Vec3{0.27F, 0.45F, 0.25F}
+                                : wkc::core::Vec3{0.20F, 0.36F, 0.19F},
+                            0.0F, &planterLeafMesh_, angle);
+                    }
+                }
+            }
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
+        if (prop.role == PropVisualRole::LaboratoryPlanter) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            const auto planterPart = [&](const wkc::core::Vec3 center,
+                                         const wkc::core::Vec3 size,
+                                         const wkc::core::Vec3 tint,
+                                         wkc::render::Mesh* mesh = nullptr) {
+                shader.setMat4(gl_, "uModel",
+                    wkc::core::translationMatrix(prop.position + center)
+                        * wkc::core::scaleMatrix(size));
+                shader.setVec3(gl_, "uTint", tint);
+                drawMesh(mesh != nullptr ? *mesh : box_);
+            };
+            if (prop.state == PropVisualState::Destroyed) {
+                planterPart({-0.09F, 0.015F, 0.03F},
+                    {0.21F, 0.03F, 0.25F}, {0.30F, 0.41F, 0.44F});
+                planterPart({0.12F, 0.018F, -0.07F},
+                    {0.17F, 0.035F, 0.18F}, {0.19F, 0.27F, 0.30F});
+            } else {
+                if (geometryShadowsActive) {
+                    shadowCasters.push_back({&box_,
+                        wkc::core::translationMatrix(prop.position
+                            + wkc::core::Vec3{0.0F, 0.08F, 0.0F})
+                            * wkc::core::scaleMatrix({0.44F, 0.16F, 0.44F})});
+                }
+                planterPart({0.0F, 0.08F, 0.0F},
+                    {0.44F, 0.16F, 0.44F}, {0.55F, 0.69F, 0.70F});
+                planterPart({0.0F, 0.167F, 0.0F},
+                    {0.36F, 0.014F, 0.36F}, {0.045F, 0.075F, 0.070F});
+                for (int leaf = 0; leaf < 7; ++leaf) {
+                    const float angle = static_cast<float>(leaf)
+                        * (2.0F * std::numbers::pi_v<float> / 7.0F);
+                    const wkc::core::Vec3 leafBase{
+                        std::cos(angle) * 0.01F,
+                        0.17F,
+                        std::sin(angle) * 0.01F};
+                    const wkc::core::Vec3 leafScale{0.20F,
+                        0.17F + 0.015F * static_cast<float>(leaf % 3), 0.20F};
+                    shader.setMat4(gl_, "uModel",
+                        wkc::core::translationMatrix(prop.position + leafBase)
+                            * wkc::core::rotationYMatrix(angle)
+                            * wkc::core::scaleMatrix(leafScale));
+                    shader.setVec3(gl_, "uTint", leaf % 2 == 0
+                        ? wkc::core::Vec3{0.24F, 0.52F, 0.38F}
+                        : wkc::core::Vec3{0.16F, 0.39F, 0.31F});
+                    drawMesh(planterLeafMesh_);
+                }
+                if (prop.state == PropVisualState::Intact) {
+                    planterPart({0.0F, 0.172F, 0.0F},
+                        {0.38F, 0.025F, 0.38F},
+                        {0.57F, 0.72F, 0.75F}, &grenadeRing_);
+                    planterPart({0.0F, 0.415F, 0.0F},
+                        {0.07F, 0.035F, 0.07F}, {0.69F, 0.79F, 0.79F});
+                    glassTestDomes.push_back({
+                        prop.position + wkc::core::Vec3{0.0F, 0.172F, 0.0F},
+                        0.20F, 0.24F});
+                }
+            }
+            if (prop.state != PropVisualState::Intact) {
+                // Glass remains visible after either the dome-only or direct pot shot.
+                planterPart({-0.25F, 0.015F, 0.03F},
+                    {0.08F, 0.022F, 0.15F}, {0.45F, 0.71F, 0.76F});
+                planterPart({0.26F, 0.014F, -0.06F},
+                    {0.09F, 0.020F, 0.11F}, {0.55F, 0.78F, 0.81F});
+                planterPart({0.04F, 0.012F, 0.27F},
+                    {0.13F, 0.018F, 0.08F}, {0.41F, 0.66F, 0.72F});
+            }
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
         const bool storageBox = prop.role == PropVisualRole::StorageBox;
+        const bool tableBox = prop.role == PropVisualRole::TableBox;
+        const bool canister = prop.role == PropVisualRole::Canister;
+        const bool barricade = prop.role == PropVisualRole::Barricade;
+        const bool supplyCrate = prop.role == PropVisualRole::Crate;
+        struct CratePalette {
+            wkc::core::Vec3 shell;
+            wkc::core::Vec3 frame;
+            wkc::core::Vec3 accent;
+        };
+        CratePalette cratePalette{{0.30F, 0.31F, 0.30F},
+            {0.13F, 0.15F, 0.16F}, {0.83F, 0.40F, 0.11F}};
+        switch (prop.theme) {
+        case world::RoomTheme::Storage:
+            cratePalette = {{0.35F, 0.39F, 0.30F},
+                {0.19F, 0.24F, 0.20F}, {0.69F, 0.54F, 0.26F}};
+            break;
+        case world::RoomTheme::Cafeteria:
+            cratePalette = {{0.55F, 0.57F, 0.52F},
+                {0.25F, 0.30F, 0.29F}, {0.37F, 0.63F, 0.51F}};
+            break;
+        case world::RoomTheme::Security:
+            cratePalette = {{0.31F, 0.39F, 0.43F},
+                {0.13F, 0.19F, 0.23F}, {0.26F, 0.67F, 0.75F}};
+            break;
+        case world::RoomTheme::Laboratory:
+            cratePalette = {{0.60F, 0.64F, 0.62F},
+                {0.22F, 0.31F, 0.36F}, {0.26F, 0.69F, 0.65F}};
+            break;
+        case world::RoomTheme::Maintenance:
+            cratePalette = {{0.34F, 0.37F, 0.32F},
+                {0.15F, 0.18F, 0.16F}, {0.77F, 0.58F, 0.22F}};
+            break;
+        case world::RoomTheme::Office:
+            cratePalette = {{0.48F, 0.46F, 0.40F},
+                {0.25F, 0.25F, 0.23F}, {0.69F, 0.48F, 0.31F}};
+            break;
+        case world::RoomTheme::Industrial:
+            cratePalette = {{0.36F, 0.34F, 0.30F},
+                {0.15F, 0.15F, 0.14F}, {0.76F, 0.42F, 0.14F}};
+            break;
+        }
+        if (prop.bossArena) {
+            cratePalette = {{0.43F, 0.41F, 0.37F},
+                {0.12F, 0.13F, 0.13F}, {0.88F, 0.45F, 0.10F}};
+        }
         wkc::core::Vec3 tint{0.54F, 0.34F, 0.17F};
         if (prop.role == PropVisualRole::Canister) {
             tint = {0.68F, 0.18F, 0.10F};
         } else if (prop.role == PropVisualRole::Barricade) {
-            tint = {0.24F, 0.34F, 0.40F};
+            tint = prop.theme == world::RoomTheme::Industrial
+                ? wkc::core::Vec3{0.30F, 0.29F, 0.26F}
+                : wkc::core::Vec3{0.24F, 0.34F, 0.40F};
         } else if (storageBox) {
             tint = {1.0F, 1.0F, 1.0F};
+        } else if (supplyCrate || tableBox) {
+            tint = cratePalette.shell;
         }
         const float seedVariation = storageBox ? 0.0F
             : static_cast<float>((prop.visualSeed >> 8U) & 0xFFU)
@@ -6765,11 +8786,490 @@ bool GdpRenderer::render(
             scale.x *= 1.12F;
             scale.z *= 1.12F;
         }
+        // The test arena also reuses Canister for wide target plates. Keep
+        // their rectangular geometry; only ordinary square-footprint props
+        // become the faceted vessel.
+        const bool canisterVessel = canister
+            && prop.state != PropVisualState::Destroyed
+            && std::abs(prop.scale.x - prop.scale.z)
+                <= std::min(prop.scale.x, prop.scale.z) * 0.35F;
+        const float coverLongAxis = std::max(prop.scale.x, prop.scale.z);
+        const float coverShortAxis = std::min(prop.scale.x, prop.scale.z);
+        // Large test-arena walls and square targets reuse Barricade. Preserve
+        // those shapes while styling the narrow loose cover and boss panels.
+        const bool barricadePanel = barricade
+            && coverLongAxis >= coverShortAxis * 1.8F
+            && coverLongAxis < 4.1F;
         const wkc::core::Mat4 model = wkc::core::translationMatrix(
             prop.position + wkc::core::Vec3{0.0F, scale.y * 0.5F, 0.0F})
             * wkc::core::scaleMatrix(scale);
         shader.setMat4(gl_, "uModel", model);
-        if (geometryShadowsActive) shadowCasters.push_back({&box_, model});
+        if (geometryShadowsActive) {
+            shadowCasters.push_back({
+                canisterVessel ? &canisterCylinder_ : &box_, model});
+        }
+        if (canisterVessel) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            const float wear = prop.state == PropVisualState::Damaged
+                ? 0.72F : 1.0F;
+            const float variant = 0.94F
+                + static_cast<float>((prop.visualSeed >> 9U) & 7U) * 0.012F;
+            const auto canisterPart = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 dimensions,
+                const wkc::core::Vec3 color,
+                const bool round = false) {
+                shader.setMat4(gl_, "uModel", model
+                    * wkc::core::translationMatrix(center)
+                    * wkc::core::scaleMatrix(dimensions));
+                shader.setVec3(gl_, "uTint", color * (wear * variant));
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(round ? canisterCylinder_ : box_);
+            };
+            // The pressure vessel, raised bands and fittings remain inside
+            // the original 0.46 x 1.02 x 0.46 collision AABB.
+            canisterPart({0.0F, -0.02F, 0.0F},
+                {0.84F, 0.76F, 0.84F}, {0.69F, 0.15F, 0.105F}, true);
+            canisterPart({0.0F, 0.345F, 0.0F},
+                {0.76F, 0.125F, 0.76F}, {0.57F, 0.12F, 0.09F}, true);
+            for (const float y : {-0.445F, -0.25F, 0.24F, 0.405F}) {
+                const bool endBand = std::abs(y) > 0.40F;
+                canisterPart({0.0F, y, 0.0F},
+                    {endBand ? 0.94F : 0.91F,
+                        endBand ? 0.09F : 0.055F,
+                        endBand ? 0.94F : 0.91F},
+                    endBand ? wkc::core::Vec3{0.18F, 0.20F, 0.21F}
+                        : wkc::core::Vec3{0.27F, 0.28F, 0.27F}, true);
+            }
+            canisterPart({0.0F, 0.463F, 0.0F},
+                {0.72F, 0.046F, 0.72F}, {0.31F, 0.33F, 0.32F}, true);
+            for (const float side : {-1.0F, 1.0F}) {
+                canisterPart({side * 0.16F, -0.02F, 0.405F},
+                    {0.040F, 0.58F, 0.074F},
+                    {0.38F, 0.09F, 0.075F});
+                canisterPart({side * 0.25F, 0.466F, 0.0F},
+                    {0.045F, 0.052F, 0.12F},
+                    {0.24F, 0.26F, 0.26F});
+            }
+            canisterPart({0.0F, 0.488F, 0.0F},
+                {0.54F, 0.020F, 0.10F}, {0.20F, 0.22F, 0.23F});
+            canisterPart({0.0F, -0.02F, 0.438F},
+                {0.27F, 0.22F, 0.075F}, {0.13F, 0.16F, 0.17F});
+            canisterPart({0.0F, -0.02F, 0.481F},
+                {0.21F, 0.15F, 0.024F}, {0.66F, 0.67F, 0.61F});
+            canisterPart({0.0F, -0.02F, 0.495F},
+                {0.15F, 0.029F, 0.008F}, cratePalette.accent);
+            if (prop.state == PropVisualState::Damaged) {
+                canisterPart({0.07F, -0.11F, 0.476F},
+                    {0.08F, 0.025F, 0.025F}, {0.07F, 0.065F, 0.06F});
+            }
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
+        if (barricadePanel) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            const bool alongZ = prop.scale.z > prop.scale.x;
+            const float wear = prop.state == PropVisualState::Damaged
+                ? 0.70F : prop.state == PropVisualState::Destroyed
+                    ? 0.36F : 1.0F;
+            const float variant = 0.94F
+                + static_cast<float>((prop.visualSeed >> 8U) & 7U) * 0.012F;
+            // Coordinates are width, height, depth. Swap the axes when a room
+            // rotates the cover 90 degrees so its detailing follows the wall.
+            const auto coverPart = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 dimensions,
+                const wkc::core::Vec3 color) {
+                const wkc::core::Vec3 localCenter = alongZ
+                    ? wkc::core::Vec3{center.z, center.y, center.x} : center;
+                const wkc::core::Vec3 localDimensions = alongZ
+                    ? wkc::core::Vec3{dimensions.z, dimensions.y, dimensions.x}
+                    : dimensions;
+                shader.setMat4(gl_, "uModel", model
+                    * wkc::core::translationMatrix(localCenter)
+                    * wkc::core::scaleMatrix(localDimensions));
+                shader.setVec3(gl_, "uTint", color * (wear * variant));
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(box_);
+            };
+            const auto bossHazardStripe = [&](const float horizontal,
+                const float face, const wkc::core::Vec3 color) {
+                const wkc::core::Vec3 center{horizontal, -0.14F,
+                    face * 0.474F};
+                const wkc::core::Vec3 localCenter = alongZ
+                    ? wkc::core::Vec3{center.z, center.y, center.x} : center;
+                const wkc::core::Vec3 dimensions = alongZ
+                    ? wkc::core::Vec3{0.035F, 0.26F, 0.072F}
+                    : wkc::core::Vec3{0.072F, 0.26F, 0.035F};
+                shader.setMat4(gl_, "uModel", model
+                    * wkc::core::translationMatrix(localCenter)
+                    * (alongZ ? wkc::core::rotationXMatrix(-0.37F)
+                        : wkc::core::rotationZMatrix(-0.37F))
+                    * wkc::core::scaleMatrix(dimensions));
+                shader.setVec3(gl_, "uTint", color * (wear * variant));
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(box_);
+            };
+            const wkc::core::Vec3 coverShell = prop.bossArena
+                ? wkc::core::Vec3{0.48F, 0.46F, 0.40F}
+                : cratePalette.shell * 0.88F;
+            const wkc::core::Vec3 coverFrame = prop.bossArena
+                ? wkc::core::Vec3{0.12F, 0.13F, 0.13F}
+                : cratePalette.frame;
+            const wkc::core::Vec3 coverAccent = prop.bossArena
+                ? wkc::core::Vec3{0.88F, 0.45F, 0.10F}
+                : cratePalette.accent;
+            if (prop.state == PropVisualState::Destroyed) {
+                coverPart({}, {0.92F, 0.68F, 0.80F}, coverShell);
+                coverPart({0.0F, 0.24F, 0.0F},
+                    {0.86F, 0.12F, 0.88F}, coverFrame);
+            } else {
+                // Solid panels match the existing full AABB cover collision.
+                // Recesses, braces and bolt heads add depth without creating
+                // visual holes that bullets cannot pass through.
+                coverPart({}, {0.80F, 0.80F, 0.76F}, coverFrame * 0.72F);
+                for (const float face : {-1.0F, 1.0F}) {
+                    coverPart({0.0F, 0.0F, face * 0.410F},
+                        {0.76F, 0.72F, 0.060F}, coverShell);
+                    for (const float side : {-1.0F, 1.0F}) {
+                        coverPart({side * 0.445F, 0.0F, face * 0.420F},
+                            {0.09F, 0.86F, 0.12F}, coverFrame);
+                        for (const float y : {-0.32F, 0.32F}) {
+                            coverPart({side * 0.33F, y, face * 0.472F},
+                                {0.045F, 0.045F, 0.025F},
+                                {0.67F, 0.68F, 0.64F});
+                        }
+                    }
+                    for (const float y : {-0.365F, 0.365F}) {
+                        coverPart({0.0F, y, face * 0.445F},
+                            {0.90F, 0.075F, 0.085F}, coverFrame);
+                    }
+                    coverPart({0.0F, 0.015F, face * 0.452F},
+                        {0.62F, 0.055F, 0.078F},
+                        coverAccent * 0.70F);
+                }
+                coverPart({0.0F, 0.445F, 0.0F},
+                    {0.95F, 0.085F, 0.94F}, coverFrame);
+                coverPart({0.0F, -0.445F, 0.0F},
+                    {0.95F, 0.085F, 0.94F}, coverFrame);
+                coverPart({0.0F, 0.493F, 0.0F},
+                    {0.76F, 0.012F, 0.72F}, coverShell * 0.82F);
+                switch (prop.theme) {
+                case world::RoomTheme::Storage:
+                    // Cargo-barrier slats echo the storage rack finish.
+                    for (const float face : {-1.0F, 1.0F}) {
+                        for (const float y : {-0.20F, 0.20F}) {
+                            coverPart({0.0F, y, face * 0.466F},
+                                {0.58F, 0.07F, 0.060F},
+                                cratePalette.accent * 0.70F);
+                        }
+                    }
+                    break;
+                case world::RoomTheme::Cafeteria:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        coverPart({0.0F, -0.20F, face * 0.467F},
+                            {0.58F, 0.10F, 0.058F},
+                            cratePalette.shell * 0.58F);
+                    }
+                    break;
+                case world::RoomTheme::Security:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        coverPart({0.0F, -0.18F, face * 0.470F},
+                            {0.56F, 0.055F, 0.052F},
+                            cratePalette.accent);
+                    }
+                    break;
+                case world::RoomTheme::Laboratory:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        for (const float side : {-1.0F, 1.0F}) {
+                            coverPart({side * 0.25F, -0.15F, face * 0.466F},
+                                {0.025F, 0.30F, 0.058F},
+                                cratePalette.accent * 0.80F);
+                        }
+                    }
+                    break;
+                case world::RoomTheme::Maintenance:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        if (prop.bossArena) {
+                            for (const float horizontal :
+                                    {-0.24F, -0.08F, 0.08F, 0.24F}) {
+                                bossHazardStripe(horizontal, face,
+                                    coverAccent);
+                            }
+                            coverPart({0.0F, 0.23F, face * 0.469F},
+                                {0.55F, 0.035F, 0.046F}, coverFrame);
+                        } else {
+                            coverPart({0.0F, -0.25F, face * 0.469F},
+                                {0.58F, 0.07F, 0.055F}, coverAccent);
+                        }
+                    }
+                    break;
+                case world::RoomTheme::Office:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        for (const float y : {-0.21F, -0.28F}) {
+                            coverPart({0.0F, y, face * 0.468F},
+                                {0.54F, 0.020F, 0.055F}, coverFrame);
+                        }
+                    }
+                    break;
+                case world::RoomTheme::Industrial:
+                    for (const float face : {-1.0F, 1.0F}) {
+                        for (const float side : {-1.0F, 1.0F}) {
+                            coverPart({side * 0.26F, -0.17F,
+                                    face * 0.469F},
+                                {0.042F, 0.28F, 0.055F},
+                                cratePalette.accent);
+                        }
+                    }
+                    break;
+                }
+            }
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
+        if (tableBox && prop.state != PropVisualState::Destroyed) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            const float wear = prop.state == PropVisualState::Damaged
+                ? 0.68F : 1.0F;
+            const float variant = 0.94F
+                + static_cast<float>((prop.visualSeed >> 9U) & 7U) * 0.012F;
+            const auto tablePart = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 dimensions,
+                const wkc::core::Vec3 color) {
+                shader.setMat4(gl_, "uModel", model
+                    * wkc::core::translationMatrix(center)
+                    * wkc::core::scaleMatrix(dimensions));
+                shader.setVec3(gl_, "uTint", color * (wear * variant));
+                shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+                drawMesh(box_);
+            };
+            // Compact bench case, built from the same room palette as the
+            // supply crates. Every raised piece fits its original hitbox.
+            tablePart({}, {0.84F, 0.82F, 0.84F},
+                cratePalette.frame * 0.76F);
+            for (const float face : {-1.0F, 1.0F}) {
+                tablePart({0.0F, 0.0F, face * 0.431F},
+                    {0.76F, 0.70F, 0.045F}, cratePalette.shell);
+                tablePart({face * 0.431F, 0.0F, 0.0F},
+                    {0.045F, 0.70F, 0.76F}, cratePalette.shell * 0.85F);
+                for (const float side : {-1.0F, 1.0F}) {
+                    tablePart({side * 0.43F, 0.0F, face * 0.43F},
+                        {0.10F, 0.89F, 0.10F}, cratePalette.frame);
+                }
+                for (const float y : {-0.34F, 0.34F}) {
+                    tablePart({0.0F, y, face * 0.469F},
+                        {0.84F, 0.07F, 0.05F}, cratePalette.frame);
+                    tablePart({face * 0.469F, y, 0.0F},
+                        {0.05F, 0.07F, 0.84F}, cratePalette.frame);
+                }
+            }
+            tablePart({0.0F, 0.445F, 0.0F},
+                {0.94F, 0.08F, 0.94F}, cratePalette.frame);
+            tablePart({0.0F, 0.490F, 0.0F},
+                {0.76F, 0.014F, 0.76F}, cratePalette.shell * 0.82F);
+            tablePart({0.0F, -0.445F, 0.0F},
+                {0.92F, 0.07F, 0.92F}, cratePalette.frame);
+            for (const float side : {-1.0F, 1.0F}) {
+                tablePart({side * 0.23F, 0.0F, 0.472F},
+                    {0.045F, 0.58F, 0.035F}, cratePalette.frame);
+                tablePart({side * 0.27F, 0.26F, 0.490F},
+                    {0.055F, 0.055F, 0.018F},
+                    {0.69F, 0.69F, 0.64F});
+            }
+            tablePart({0.0F, 0.12F, 0.466F},
+                {0.34F, 0.13F, 0.025F}, cratePalette.frame * 0.62F);
+            tablePart({0.0F, 0.12F, 0.487F},
+                {0.22F, 0.035F, 0.018F}, cratePalette.accent);
+            // Alternating top ribs read clearly at bench height without
+            // repeating the large crate's full-size cargo markings.
+            for (const float x : {-0.21F, 0.21F}) {
+                tablePart({x, 0.492F, 0.0F},
+                    {0.030F, 0.008F, 0.51F}, cratePalette.frame * 0.70F);
+            }
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
+        if (supplyCrate && prop.state != PropVisualState::Destroyed) {
+            solidColorTexture_.bind(gl_, textureBindings_);
+            shader.setInt(gl_, "uDetailedMaterial", 0);
+            shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+            shader.setVec2(gl_, "uUvOffset", {});
+            const float wear = prop.state == PropVisualState::Damaged
+                ? 0.72F : 1.0F;
+            const float variant = 0.93F
+                + static_cast<float>((prop.visualSeed >> 9U) & 7U) * 0.014F;
+            const auto cratePart = [&](const wkc::core::Vec3 center,
+                const wkc::core::Vec3 dimensions,
+                const wkc::core::Vec3 color,
+                const float emission = 0.0F) {
+                shader.setMat4(gl_, "uModel", model
+                    * wkc::core::translationMatrix(center)
+                    * wkc::core::scaleMatrix(dimensions));
+                shader.setVec3(gl_, "uTint", color * (wear * variant));
+                shader.setFloat(gl_, "uEmissiveStrength", emission);
+                drawMesh(box_);
+            };
+            // Recess the casing beneath the load-bearing frame. The different
+            // face depths give the crate a visible silhouette from oblique
+            // angles without growing beyond its existing collision AABB.
+            cratePart({}, {0.80F, 0.80F, 0.80F},
+                cratePalette.frame * 0.74F);
+            cratePart({0.0F, 0.0F, 0.414F},
+                {0.70F, 0.70F, 0.030F}, cratePalette.frame * 0.58F);
+            cratePart({0.0F, 0.0F, 0.442F},
+                {0.70F, 0.63F, 0.040F}, cratePalette.shell);
+            for (const float side : {-1.0F, 1.0F}) {
+                cratePart({side * 0.414F, 0.0F, 0.0F},
+                    {0.030F, 0.70F, 0.70F}, cratePalette.frame * 0.58F);
+                cratePart({side * 0.442F, 0.0F, 0.0F},
+                    {0.040F, 0.63F, 0.63F}, cratePalette.shell * 0.83F);
+            }
+            // All raised pieces stay within the existing collision AABB.
+            for (const float x : {-0.43F, 0.43F}) {
+                for (const float z : {-0.43F, 0.43F}) {
+                    cratePart({x, 0.0F, z}, {0.10F, 0.88F, 0.10F},
+                        cratePalette.frame);
+                }
+            }
+            // Exposed horizontal ribs bridge the corner uprights. The narrow
+            // gap behind them remains dark even under a strong room light.
+            for (const float y : {-0.35F, 0.35F}) {
+                cratePart({0.0F, y, 0.467F},
+                    {0.80F, 0.075F, 0.052F}, cratePalette.frame);
+                for (const float side : {-1.0F, 1.0F}) {
+                    cratePart({side * 0.467F, y, 0.0F},
+                        {0.052F, 0.075F, 0.80F}, cratePalette.frame);
+                }
+            }
+            cratePart({0.0F, 0.44F, 0.0F}, {0.96F, 0.08F, 0.96F},
+                cratePalette.frame);
+            cratePart({0.0F, -0.44F, 0.0F}, {0.92F, 0.07F, 0.92F},
+                cratePalette.frame);
+            cratePart({0.0F, 0.489F, 0.0F},
+                {0.74F, 0.018F, 0.74F}, cratePalette.shell * 0.82F);
+            for (const float side : {-1.0F, 1.0F}) {
+                // Cast handles: mounting feet, a clear opening, and a bar.
+                for (const float y : {-0.095F, 0.095F}) {
+                    cratePart({side * 0.468F, y, 0.0F},
+                        {0.044F, 0.055F, 0.31F}, cratePalette.frame);
+                }
+                cratePart({side * 0.489F, 0.0F, 0.0F},
+                    {0.018F, 0.032F, 0.31F}, cratePalette.accent * 0.75F);
+            }
+            for (const float side : {-1.0F, 1.0F}) {
+                cratePart({side * 0.23F, 0.0F, 0.465F},
+                    {0.050F, 0.62F, 0.052F}, cratePalette.frame);
+                cratePart({side * 0.29F, 0.28F, 0.481F},
+                    {0.065F, 0.065F, 0.028F},
+                    {0.69F, 0.69F, 0.64F});
+            }
+            // Physical clasp: recessed socket, two projecting hinge blocks,
+            // and a coloured release bar at the outermost safe depth.
+            cratePart({0.0F, 0.14F, 0.452F},
+                {0.48F, 0.17F, 0.024F}, cratePalette.frame * 0.61F);
+            for (const float side : {-1.0F, 1.0F}) {
+                cratePart({side * 0.19F, 0.14F, 0.472F},
+                    {0.070F, 0.17F, 0.055F}, cratePalette.frame);
+            }
+            cratePart({0.0F, 0.14F, 0.489F},
+                {0.34F, 0.052F, 0.018F}, cratePalette.accent, 0.12F);
+            const wkc::core::Vec3 contentsColor
+                = prop.crateDrop == PickupVisualRole::Health
+                ? wkc::core::Vec3{0.52F, 0.83F, 0.59F}
+                : wkc::core::Vec3{0.87F, 0.69F, 0.36F};
+            if (prop.crateDrop) {
+                // A small mark labels the content while the casing remains
+                // tied to its room, not to the pickup color.
+                cratePart({0.0F, -0.14F, 0.465F},
+                    {0.31F, 0.26F, 0.045F}, cratePalette.frame * 0.61F);
+                cratePart({0.0F, -0.14F, 0.483F},
+                    {0.27F, 0.22F, 0.012F}, cratePalette.frame);
+                cratePart({0.0F, -0.14F, 0.491F},
+                    {0.18F, 0.040F, 0.010F}, contentsColor, 0.16F);
+                if (prop.crateDrop == PickupVisualRole::Health) {
+                    cratePart({0.0F, -0.14F, 0.492F},
+                        {0.045F, 0.16F, 0.010F}, contentsColor, 0.16F);
+                }
+            }
+            switch (prop.theme) {
+            case world::RoomTheme::Storage:
+                // Cargo straps match the olive storage racks and boxes.
+                for (const float side : {-1.0F, 1.0F}) {
+                    cratePart({side * 0.19F, 0.0F, 0.469F},
+                        {0.038F, 0.72F, 0.050F}, cratePalette.accent);
+                    cratePart({side * 0.19F, 0.490F, 0.0F},
+                        {0.038F, 0.010F, 0.72F}, cratePalette.accent);
+                }
+                break;
+            case world::RoomTheme::Cafeteria:
+                // A wipe-clean supply carrier with a vented lid.
+                for (const float x : {-0.26F, -0.13F, 0.13F, 0.26F}) {
+                    cratePart({x, 0.490F, 0.0F},
+                        {0.045F, 0.010F, 0.57F}, cratePalette.shell * 0.57F);
+                }
+                cratePart({0.0F, -0.31F, 0.471F},
+                    {0.48F, 0.055F, 0.050F}, cratePalette.accent);
+                break;
+            case world::RoomTheme::Security:
+                // Reinforced vertical spine echoes the security consoles.
+                cratePart({0.0F, 0.0F, 0.471F},
+                    {0.072F, 0.72F, 0.050F}, cratePalette.frame);
+                for (const float side : {-1.0F, 1.0F}) {
+                    cratePart({side * 0.34F, 0.0F, 0.471F},
+                        {0.055F, 0.74F, 0.050F}, cratePalette.accent * 0.70F);
+                }
+                break;
+            case world::RoomTheme::Laboratory:
+                // Sealed sample case with paired containment indicators.
+                for (const float side : {-1.0F, 1.0F}) {
+                    cratePart({side * 0.35F, 0.0F, 0.471F},
+                        {0.025F, 0.59F, 0.050F}, cratePalette.accent, 0.10F);
+                }
+                cratePart({0.0F, 0.490F, 0.0F},
+                    {0.48F, 0.010F, 0.22F}, cratePalette.shell * 0.77F);
+                break;
+            case world::RoomTheme::Maintenance:
+                // Service case with warning bars and a removable top plate.
+                for (const float y : {-0.31F, -0.24F}) {
+                    cratePart({0.0F, y, 0.471F},
+                        {0.48F, 0.025F, 0.050F}, cratePalette.accent);
+                }
+                cratePart({0.0F, 0.490F, 0.0F},
+                    {0.44F, 0.010F, 0.44F}, cratePalette.shell * 0.70F);
+                break;
+            case world::RoomTheme::Office:
+                // A compact document chest, with two drawer seams.
+                for (const float y : {-0.29F, -0.36F}) {
+                    cratePart({0.0F, y, 0.471F},
+                        {0.50F, 0.014F, 0.050F}, cratePalette.frame);
+                }
+                cratePart({0.0F, -0.325F, 0.494F},
+                    {0.13F, 0.025F, 0.008F}, cratePalette.accent);
+                break;
+            case world::RoomTheme::Industrial:
+                // Orange corner rails tie the case to industrial routing.
+                for (const float side : {-1.0F, 1.0F}) {
+                    cratePart({side * 0.35F, 0.0F, 0.471F},
+                        {0.055F, 0.69F, 0.050F}, cratePalette.accent);
+                }
+                break;
+            }
+            if (prop.state == PropVisualState::Damaged) {
+                cratePart({0.12F, -0.035F, 0.485F},
+                    {0.28F, 0.025F, 0.014F},
+                    {0.07F, 0.07F, 0.065F});
+            }
+            shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+            fallbackTexture_.bind(gl_, textureBindings_);
+            continue;
+        }
         shader.setVec3(gl_, "uTint", tint);
         shader.setInt(gl_, "uDetailedMaterial", 0);
         shader.setVec2(gl_, "uUvScale", storageBox
@@ -6777,16 +9277,60 @@ bool GdpRenderer::render(
             : wkc::core::Vec2{3.0F, 3.0F});
         shader.setVec2(gl_, "uUvOffset", {});
         shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        const bool solidLooseProp = barricade
+            || (prop.state == PropVisualState::Destroyed
+                && (supplyCrate || canister));
         if (storageBox) {
             storageBoxTextures_[(prop.visualSeed & 1ULL) != 0U ? 1U : 0U]
                 .bind(gl_, textureBindings_);
+        } else if (solidLooseProp) {
+            solidColorTexture_.bind(gl_, textureBindings_);
         }
         drawMesh(box_);
-        if (storageBox) {
+        if (storageBox || solidLooseProp) {
             fallbackTexture_.bind(gl_, textureBindings_);
         }
     }
     shader.setFloat(gl_, "uPropIndirectFill", 0.0F);
+
+    // Draw glass after every opaque planter, including the damageable ones.
+    if (!glassTestDomes.empty()) {
+        solidColorTexture_.bind(gl_, textureBindings_);
+        shader.setInt(gl_, "uDetailedMaterial", 0);
+        shader.setInt(gl_, "uInstanced", 0);
+        shader.setVec2(gl_, "uUvScale", {1.0F, 1.0F});
+        shader.setVec2(gl_, "uUvOffset", {});
+        shader.setFloat(gl_, "uSurfaceTileMetres", 0.0F);
+        shader.setInt(gl_, "uMirrorSurfaceTile", 0);
+        shader.setInt(gl_, "uRackPart", 0);
+        shader.setInt(gl_, "uFurniturePart", 0);
+        shader.setInt(gl_, "uStructuralSteelMaterial", 0);
+        shader.setInt(gl_, "uHubWallMaterial", 0);
+        shader.setInt(gl_, "uCombatColumnMaterial", 0);
+        shader.setInt(gl_, "uCombatRailMaterial", 0);
+        shader.setInt(gl_, "uHubFloorMaterial", 0);
+        shader.setInt(gl_, "uBossFloorMaterial", 0);
+        shader.setInt(gl_, "uTechnicalSteelMaterial", 0);
+        shader.setInt(gl_, "uSecurityFloorVariation", 0);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.10F);
+        shader.setFloat(gl_, "uOpacity", 0.19F);
+        shader.setVec3(gl_, "uTint", {0.49F, 0.80F, 0.88F});
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        for (const auto& dome : glassTestDomes) {
+            shader.setMat4(gl_, "uModel",
+                wkc::core::translationMatrix(dome.center)
+                    * wkc::core::scaleMatrix(
+                        {dome.radius, dome.height, dome.radius}));
+            drawMesh(glassTestDome_);
+        }
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+        shader.setFloat(gl_, "uOpacity", 1.0F);
+        shader.setFloat(gl_, "uEmissiveStrength", 0.0F);
+        fallbackTexture_.bind(gl_, textureBindings_);
+    }
 
     std::array<std::uint32_t, maxRenderedRoomLights> shadowLightIndices{};
     std::uint32_t selectedShadowLightCount = 0U;
@@ -7320,10 +9864,39 @@ bool GdpRenderer::render(
     const UiVisualTheme uiTheme = industrialUiTheme();
     const wkc::core::Vec3 textColor = uiTheme.text;
     const wkc::core::Vec3 cyanColor = uiTheme.accent;
+    // Gameplay HUD uses the same setting as the menus. Keep each group anchored
+    // to its screen corner so changing the scale does not move it off-screen.
+    const float requestedHudScale = static_cast<float>(
+        std::clamp(hud.uiScalePercent, std::uint16_t{75}, std::uint16_t{200})) / 100.0F;
+    // On narrow windows, cap enlargement before the left and right resource
+    // groups can cover each other. Reducing the setting still works normally.
+    const float gameplayHudScale = std::min(requestedHudScale,
+        std::max(1.0F, static_cast<float>(width) / 480.0F));
+    bool scaleGameplayHud = false;
+    int hudAnchorX = 0;
+    int hudAnchorY = 0;
+    const auto scaledHudRect = [&](const UiRect rect) {
+        if (!scaleGameplayHud || gameplayHudScale == 1.0F) return rect;
+        const auto position = [&](const int coordinate, const int anchor) {
+            return anchor + static_cast<int>(std::lround(
+                static_cast<float>(coordinate - anchor) * gameplayHudScale));
+        };
+        const int left = position(rect.x, hudAnchorX);
+        const int bottom = position(rect.y, hudAnchorY);
+        const int right = position(rect.x + rect.width, hudAnchorX);
+        const int top = position(rect.y + rect.height, hudAnchorY);
+        return UiRect{left, bottom, right - left, top - bottom};
+    };
+    const auto drawSolidRect = [&](const int x, const int y, const int rectWidth,
+                                   const int rectHeight, const wkc::core::Vec3 color) {
+        const UiRect rect = scaledHudRect({x, y, rectWidth, rectHeight});
+        gdp::game::visual::drawSolidRect(rect.x, rect.y, rect.width, rect.height, color);
+    };
     uiShader_.beginUniformFrame();
     // Cached quad and embedded atlas: no font files, rasterization or blur per frame.
-    const auto drawUiQuad = [&](const UiRect rect, const wkc::core::Vec3 color,
+    const auto drawUiQuad = [&](const UiRect unscaledRect, const wkc::core::Vec3 color,
                                const float alpha, const int glyph) {
+        const UiRect rect = scaledHudRect(unscaledRect);
         glDisable(GL_SCISSOR_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -7354,30 +9927,34 @@ bool GdpRenderer::render(
     if (scopeStrength > 0.0F) {
         drawUiQuad({0, 0, width, height}, {0.005F, 0.007F, 0.008F}, scopeStrength, -2);
     }
-    const auto drawBitmapText = [&](const int x, const int y, const int scale,
+    const auto drawBitmapText = [&](const int x, const int y, const auto scale,
                                     const std::string_view source, const wkc::core::Vec3 color) {
         const auto text = localize(hud.language, source);
-        if (scale <= 1) {
-            gdp::game::visual::drawBitmapText(x, y, scale, text, color);
+        if (scale <= 1 && (!scaleGameplayHud || gameplayHudScale == 1.0F)) {
+            gdp::game::visual::drawBitmapText(x, y, 1, text, color);
             return;
         }
+        const float pixelScale = static_cast<float>(scale);
         int cursor = x;
         for (std::size_t offset = 0U; offset < text.size();) {
             auto character = nextUiCodepoint(text, offset);
             if (character > static_cast<std::uint32_t>(uiFontLastCodepoint)) character = '?';
             if (character > 32U) {
                 // Same six-unit advance as the compact fallback and all shared layouts.
-                const float cellScale = 0.4F * static_cast<float>(scale);
-                drawUiQuad({cursor - scale,
+                const float cellScale = 0.4F * pixelScale;
+                drawUiQuad({cursor - static_cast<int>(std::lround(pixelScale)),
                     y - static_cast<int>(std::round(static_cast<float>(uiFontCellHeight - uiFontBaseline - 1) * cellScale)),
-                    8 * scale, static_cast<int>(std::round(static_cast<float>(uiFontCellHeight) * cellScale))},
+                    static_cast<int>(std::lround(8.0F * pixelScale)),
+                    static_cast<int>(std::round(static_cast<float>(uiFontCellHeight) * cellScale))},
                     color, 1.0F, static_cast<int>(character) - uiFontFirstCodepoint);
             }
-            cursor += 6 * scale;
+            cursor += static_cast<int>(std::lround(6.0F * pixelScale));
         }
     };
-    const auto bitmapTextWidth = [&](const std::string_view text, const int scale) {
-        return gdp::game::visual::bitmapTextWidth(localize(hud.language, text), scale);
+    const auto bitmapTextWidth = [&](const std::string_view text, const auto scale) {
+        return static_cast<int>(std::lround(
+            static_cast<float>(uiTextLength(localize(hud.language, text)))
+                * 6.0F * static_cast<float>(scale)));
     };
     const auto drawMenuPanel = [&](const UiRect panel,
                                          const int scale,
@@ -7435,27 +10012,37 @@ bool GdpRenderer::render(
     const int topRightHeight = topRightLines == 0 ? 0
         : (hudPadding * 2) + (topRightLines * hudLineHeight);
     const auto drawSelectedRow = [&](const UiRect row,
-                                     const int scale,
+                                     const auto scale,
                                      const wkc::core::Vec3 accent) {
+        const float pixelScale = static_cast<float>(scale);
         drawUiQuad(row, textColor, 0.10F, -1);
-        drawSolidRect(row.x + 6 * scale, row.y, row.width - 12 * scale, scale, accent);
+        drawSolidRect(row.x + static_cast<int>(std::lround(6.0F * pixelScale)),
+            row.y, row.width - static_cast<int>(std::lround(12.0F * pixelScale)),
+            std::max(1, static_cast<int>(std::lround(pixelScale))), accent);
     };
     const auto drawExitConfirmation = [&]() {
         if (!hud.exitConfirmation) {
             return;
         }
         const ExitConfirmationLayout layout
-            = makeExitConfirmationLayout(width, height);
-        const int scale = layout.scale;
+            = makeExitConfirmationLayout(width, height, hud.uiScalePercent);
+        const float scale = layout.textScale;
         const wkc::core::Vec3 dangerColor = uiTheme.danger;
-        drawMenuPanel(layout.panel, scale, dangerColor);
-        constexpr std::string_view title = "EXIT GAME?";
-        drawBitmapText((width - bitmapTextWidth(title, 2 * scale)) / 2,
-            layout.panel.y + layout.panel.height - (22 * scale),
-            2 * scale, title, dangerColor);
+        drawMenuPanel(layout.panel, layout.scale, dangerColor);
+        const std::string_view title = hud.pauseConfirmation == HudPauseSelection::RestartRun
+            ? "RESTART RUN?" : hud.pauseConfirmation == HudPauseSelection::MainMenu
+            ? "RETURN TO MAIN MENU?" : "EXIT GAME?";
+        const float titleScale = bitmapTextWidth(title, 2.0F * scale)
+                > layout.panel.width - static_cast<int>(16.0F * scale)
+            ? scale : 2.0F * scale;
+        drawBitmapText((width - bitmapTextWidth(title, titleScale)) / 2,
+            layout.panel.y + layout.panel.height - static_cast<int>(22.0F * scale),
+            titleScale, title, dangerColor);
 
-        constexpr std::array<std::string_view, 2> options{
-            "CANCEL", "EXIT",
+        const std::array<std::string_view, 2> options{
+            "CANCEL", hud.pauseConfirmation == HudPauseSelection::RestartRun
+                ? "RESTART" : hud.pauseConfirmation == HudPauseSelection::MainMenu
+                ? "RETURN" : "EXIT",
         };
         const std::array<UiRect, 2> buttons{
             layout.cancelButton, layout.exitButton,
@@ -7473,21 +10060,27 @@ bool GdpRenderer::render(
             drawBitmapText(
                 button.x
                     + ((button.width - bitmapTextWidth(options[index], scale)) / 2),
-                button.y + (3 * scale), scale, options[index],
+                button.y + static_cast<int>(3.0F * scale), scale, options[index],
                 index == selected
                     ? (index == 0U ? cyanColor : dangerColor)
                     : textColor);
         }
         constexpr std::string_view controls = "WASD  ARROWS  ENTER  ESC  MOUSE";
-        drawBitmapText((width - bitmapTextWidth(controls, 1)) / 2,
-            layout.panel.y + (5 * scale), 1, controls,
+        const float footerScale = std::max(1.0F, scale / 2.0F);
+        drawBitmapText((width - bitmapTextWidth(controls, footerScale)) / 2,
+            layout.panel.y + static_cast<int>(5.0F * scale), footerScale, controls,
             uiTheme.mutedText);
     };
 
     if (hud.listMenu.active) {
         const auto& menu = hud.listMenu;
-        const auto layout = makeListMenuLayout(width, height, menu.rows.size(), menu.titleScreen);
+        const auto layout = makeListMenuLayout(width, height, menu.rows.size(),
+            menu.titleScreen, menu.uiScalePercent, menu.selection,
+            menu.configuration && menu.configurationSection == 2U);
         const int scale = layout.scale;
+        const float menuScale = layout.textScale;
+        const auto configurationAccent = menu.configuration
+            ? uiTheme.warning : uiTheme.accent;
         drawUiQuad({0, 0, width, height}, uiTheme.background, 0.16F, -1);
         if (menu.titleScreen) {
             // Quiet left-to-right scrim: the live scene remains the focus on the right.
@@ -7499,38 +10092,167 @@ bool GdpRenderer::render(
         } else {
             drawMenuPanel(layout.panel, scale, textColor);
         }
-        const auto fit = [&](const std::string& source, const int available, const int textScale,
+        const auto fit = [&](const std::string& source, const int available, const float textScale,
             const bool raw = false) {
             std::string text = raw ? source : localize(hud.language, source);
             while (!text.empty() && bitmapTextWidth(text, textScale) > available) popUiCodepoint(text);
             return text;
         };
-        const int titleScale = menu.titleScreen ? 3 * scale : 2 * scale;
-        const auto title = fit(menu.title, layout.panel.width - 16 * scale, titleScale);
-        drawBitmapText(layout.panel.x + 8 * scale,
-            layout.panel.y + layout.panel.height - 8 * scale - 7 * titleScale,
+        const float titleScale = menu.titleScreen ? 3 * menuScale : 2 * menuScale;
+        const auto title = fit(menu.title,
+            layout.panel.width - static_cast<int>(16.0F * menuScale), titleScale);
+        drawBitmapText(layout.panel.x + static_cast<int>(8.0F * menuScale),
+            layout.panel.y + layout.panel.height
+                - static_cast<int>(8.0F * menuScale + 7.0F * titleScale),
             titleScale, title, textColor);
-        const auto subtitle = fit(menu.subtitle, layout.panel.width - 16 * scale, scale);
-        drawBitmapText(layout.panel.x + 8 * scale,
-            layout.panel.y + layout.panel.height - 45 * scale, scale, subtitle, uiTheme.mutedText);
+        if (menu.configuration) {
+            constexpr std::array<std::string_view, 4> tabs{
+                "VIDEO", "AUDIO", "CONTROLS", "FEEDBACK"};
+            const int inset = static_cast<int>(std::lround(8.0F * menuScale));
+            const int tabWidth = (layout.panel.width - 2 * inset) / 4;
+            const int tabY = layout.panel.y + layout.panel.height
+                - static_cast<int>(std::lround(44.0F * menuScale));
+            for (std::size_t i = 0; i < tabs.size(); ++i) {
+                const UiRect tab{layout.panel.x + inset
+                    + static_cast<int>(i) * tabWidth, tabY,
+                    tabWidth, static_cast<int>(std::lround(12.0F * menuScale))};
+                if (i == menu.configurationSection)
+                    drawSelectedRow(tab, menuScale, configurationAccent);
+                const auto caption = localize(hud.language, tabs[i]);
+                const float tabTextScale = std::min(menuScale,
+                    static_cast<float>(tab.width - static_cast<int>(4.0F * menuScale))
+                        / std::max(1.0F, static_cast<float>(uiTextLength(caption)) * 6.0F));
+                drawBitmapText(tab.x + static_cast<int>(2.0F * menuScale),
+                    tab.y + static_cast<int>(2.0F * menuScale), tabTextScale,
+                    caption, i == menu.configurationSection
+                        ? configurationAccent : uiTheme.mutedText);
+            }
+            if (menu.configurationSection == 2U) {
+                constexpr std::array<std::string_view, 3> controlPages{
+                    "KEYBOARD", "CONTROLLER", "MAPPING"};
+                const float sideScale = std::max(1.0F, menuScale * 0.70F);
+                for (std::size_t i = 0U; i < layout.controlTabs.size(); ++i) {
+                    const UiRect tab = layout.controlTabs[i];
+                    if (tab.width <= 0 || tab.height <= 0) continue;
+                    if (i == menu.configurationControlPage)
+                        drawSelectedRow(tab, sideScale, configurationAccent);
+                    const auto caption = fit(std::string{controlPages[i]},
+                        tab.width - static_cast<int>(4.0F * sideScale),
+                        sideScale);
+                    drawBitmapText(tab.x + static_cast<int>(2.0F * sideScale),
+                        tab.y + static_cast<int>(2.0F * sideScale),
+                        sideScale, caption,
+                        i == menu.configurationControlPage
+                            ? configurationAccent : uiTheme.mutedText);
+                }
+            }
+        } else {
+            const auto subtitle = fit(menu.subtitle,
+                layout.panel.width - static_cast<int>(16.0F * menuScale), menuScale);
+            drawBitmapText(layout.panel.x + static_cast<int>(8.0F * menuScale),
+                layout.panel.y + layout.panel.height - static_cast<int>(45.0F * menuScale),
+                menuScale, subtitle, uiTheme.mutedText);
+        }
         for (std::size_t i = 0; i < layout.rows.size(); ++i) {
             const auto row = layout.rows[i];
+            if (row.width <= 0 || row.height <= 0) continue;
             const bool enabled = i >= menu.enabled.size() || menu.enabled[i];
             if (i == menu.selection && enabled) drawSelectedRow(row, scale, textColor);
             const bool adjustable = i < menu.adjustable.size() && menu.adjustable[i];
-            const auto text = fit(menu.rows[i], row.width - (adjustable ? 48 : 12) * scale, scale,
-                i < menu.rawText.size() && menu.rawText[i]);
-            drawBitmapText(row.x + 6 * scale, row.y + std::max(0, (row.height - 7 * scale) / 2),
-                scale, text, !enabled ? uiTheme.mutedText : textColor);
+            const float slider = i < menu.sliderFractions.size()
+                ? menu.sliderFractions[i] : -1.0F;
+            const int left = row.x + static_cast<int>(6.0F * menuScale);
+            const auto rowColor = enabled ? textColor : uiTheme.mutedText;
             if (adjustable) {
-                const int y = row.y + std::max(0, (row.height - 7 * scale) / 2);
-                drawBitmapText(row.x + row.width - 34 * scale, y, scale, "<", textColor);
-                drawBitmapText(row.x + row.width - 14 * scale, y, scale, ">", textColor);
+                // Settings reserve one line for the label and one for the live
+                // value. The atlas glyph can occupy about 13 scale units, so
+                // the 16-unit baseline gap leaves clear space between lines.
+                const auto separator = menu.rows[i].rfind("  ");
+                const std::string label = separator == std::string::npos
+                    ? menu.rows[i] : menu.rows[i].substr(0U, separator);
+                const std::string value = separator == std::string::npos
+                    ? std::string{} : menu.rows[i].substr(separator + 2U);
+                drawBitmapText(left,
+                    row.y + static_cast<int>(listMenuLabelBaselineUnits * menuScale),
+                    menuScale,
+                    fit(label, row.width - static_cast<int>(12.0F * menuScale),
+                        menuScale), rowColor);
+                const int valueWidth = slider >= 0.0F
+                    ? static_cast<int>(38.0F * menuScale)
+                    : row.width - static_cast<int>(52.0F * menuScale);
+                const int valueX = slider >= 0.0F
+                    ? row.x + row.width - static_cast<int>(76.0F * menuScale)
+                    : left;
+                drawBitmapText(valueX,
+                    row.y + static_cast<int>(listMenuValueBaselineUnits * menuScale),
+                    menuScale, fit(value, valueWidth, menuScale), rowColor);
+            } else {
+                const auto text = fit(menu.rows[i],
+                    row.width - static_cast<int>(12.0F * menuScale), menuScale,
+                    i < menu.rawText.size() && menu.rawText[i]);
+                drawBitmapText(left,
+                    row.y + std::max(0,
+                        (row.height - static_cast<int>(7.0F * menuScale)) / 2),
+                    menuScale, text, rowColor);
+            }
+            if (slider >= 0.0F) {
+                const UiRect track = listMenuSliderTrack(layout, i);
+                drawSolidRect(track.x, track.y, track.width, track.height,
+                    uiTheme.panelBorder);
+                drawSolidRect(track.x, track.y,
+                    static_cast<int>(std::lround(
+                        static_cast<float>(track.width) * std::clamp(slider, 0.0F, 1.0F))),
+                    track.height, enabled ? configurationAccent : uiTheme.mutedText);
+            }
+            if (adjustable) {
+                const int y = row.y
+                    + static_cast<int>(listMenuValueBaselineUnits * menuScale);
+                drawBitmapText(row.x + row.width - static_cast<int>(34.0F * menuScale),
+                    y, menuScale, "<", textColor);
+                drawBitmapText(row.x + row.width - static_cast<int>(14.0F * menuScale),
+                    y, menuScale, ">", textColor);
+            }
+        }
+        const auto firstVisible = std::find_if(layout.rows.begin(), layout.rows.end(),
+            [](const UiRect& row) { return row.width > 0 && row.height > 0; });
+        const auto visibleCount = static_cast<std::size_t>(std::count_if(
+            layout.rows.begin(), layout.rows.end(),
+            [](const UiRect& row) { return row.width > 0 && row.height > 0; }));
+        if (firstVisible != layout.rows.end() && visibleCount < layout.rows.size()) {
+            const int trackTop = layout.panel.y + layout.panel.height
+                - static_cast<int>(std::lround(52.0F * menuScale));
+            const int trackBottom = layout.panel.y
+                + static_cast<int>(std::lround(20.0F * menuScale));
+            const int trackHeight = trackTop - trackBottom;
+            const int barWidth = std::max(2, static_cast<int>(std::lround(2.0F * menuScale)));
+            const int barX = layout.panel.x + layout.panel.width
+                - static_cast<int>(std::lround(4.0F * menuScale));
+            if (trackHeight > 0) {
+                const int thumbHeight = std::min(trackHeight, std::max(
+                    static_cast<int>(std::lround(12.0F * menuScale)),
+                    static_cast<int>(std::lround(static_cast<float>(trackHeight)
+                        * static_cast<float>(visibleCount)
+                        / static_cast<float>(layout.rows.size())))));
+                const auto firstIndex = static_cast<std::size_t>(
+                    std::distance(layout.rows.begin(), firstVisible));
+                const int thumbY = trackTop - thumbHeight
+                    - static_cast<int>(std::lround(
+                        static_cast<float>(trackHeight - thumbHeight)
+                        * static_cast<float>(firstIndex)
+                        / static_cast<float>(layout.rows.size() - visibleCount)));
+                drawUiQuad({barX, trackBottom, barWidth, trackHeight},
+                    uiTheme.panelBorder, 0.6F, -1);
+                drawUiQuad({barX, thumbY, barWidth, thumbHeight},
+                    configurationAccent, 0.9F, -1);
             }
         }
         constexpr std::string_view controls = "WASD/ARROWS ENTER ESC MOUSE";
-        const auto footer = fit(std::string{controls}, layout.panel.width - 16 * scale, scale);
-        drawBitmapText(layout.panel.x + 8 * scale, layout.panel.y + 4 * scale, scale, footer, uiTheme.mutedText);
+        const auto footer = fit(menu.configuration && !menu.subtitle.empty()
+                ? menu.subtitle : std::string{controls},
+            layout.panel.width - static_cast<int>(16.0F * menuScale), menuScale);
+        drawBitmapText(layout.panel.x + static_cast<int>(8.0F * menuScale),
+            layout.panel.y + static_cast<int>(4.0F * menuScale),
+            menuScale, footer, uiTheme.mutedText);
         drawExitConfirmation();
         glDisable(GL_SCISSOR_TEST);
         glEnable(GL_DEPTH_TEST);
@@ -7829,6 +10551,10 @@ bool GdpRenderer::render(
                 height - (edgeThickness * 2), damageColor);
         }
 
+        scaleGameplayHud = true;
+        hudAnchorX = 0;
+        hudAnchorY = 0;
+
         const int health = static_cast<int>(std::round(std::max(hud.health, 0.0F)));
         const int maximumHealth = static_cast<int>(std::round(std::max(hud.maximumHealth, 1.0F)));
         const int armor = static_cast<int>(std::round(std::max(hud.armor, 0.0F)));
@@ -7863,6 +10589,7 @@ bool GdpRenderer::render(
             static_cast<int>(std::round(static_cast<float>(healthBarWidth) * armorRatio)),
             hudScale, uiTheme.mutedText);
 
+        hudAnchorX = width;
         const std::string weaponLabel = std::string{hud.grenadeSelected ? "FRAG"
             : hud.weapon == HudWeaponRole::Knife ? "KNIFE"
             : hud.weapon == HudWeaponRole::Sniper ? "SNIPER"
@@ -7945,6 +10672,7 @@ bool GdpRenderer::render(
         drawSolidRect(rightEdge - progressWidth, resourceY + 12 * hudScale,
             static_cast<int>(std::round(static_cast<float>(progressWidth) * progressRatio)),
             hudScale, grenadeFuseActive ? uiTheme.warning : uiTheme.mutedText);
+        hudAnchorX = width / 2;
         if (hud.flashlightOn && width >= 640) {
             const std::string lightText = hud.flashlightBinding + " LIGHT ON";
             drawBitmapText((width - bitmapTextWidth(lightText, hudScale)) / 2,
@@ -7965,6 +10693,8 @@ bool GdpRenderer::render(
             eventText = "EVENT CLEAR";
             eventColor = {0.28F, 0.92F, 0.56F};
         }
+        hudAnchorX = width;
+        hudAnchorY = height;
         if (!eventText.empty()) {
             const int eventWidth = bitmapTextWidth(eventText, hudScale) + (hudPadding * 2);
             const int eventHeight = (7 * hudScale) + (hudPadding * 2);
@@ -8003,6 +10733,8 @@ bool GdpRenderer::render(
         } else if (hud.prompt == HudPrompt::FinishCampaignTerminal) {
             promptText = hud.interactBinding + " FINISH CAMPAIGN";
         }
+        hudAnchorX = width / 2;
+        hudAnchorY = height / 2;
         if (!hud.paused && !promptText.empty()) {
             promptText = localize(hud.language, promptText);
             const int promptWidth = bitmapTextWidth(promptText, hudScale)
@@ -8084,6 +10816,7 @@ bool GdpRenderer::render(
         }
         const float noticeStrength = std::clamp(
             hud.noticeFeedbackStrength, 0.0F, 1.0F);
+        hudAnchorY = height;
         if (!hud.paused && !noticeText.empty() && noticeStrength > 0.0F) {
             const int noticeWidth = bitmapTextWidth(noticeText, hudScale)
                 + (hudPadding * 2);
@@ -8162,6 +10895,8 @@ bool GdpRenderer::render(
                 : (width - panelWidth) / 2;
             const int panelY = fitsBelowMap ? belowMapY
                 : (height - panelHeight) / 2;
+            hudAnchorX = fitsBelowMap ? 0 : width / 2;
+            hudAnchorY = fitsBelowMap ? height : height / 2;
             drawIndustrialPanel({panelX, panelY, panelWidth, panelHeight},
                 panelScale, cyanColor);
             int lineY = panelY + panelHeight - hudPadding
@@ -8177,6 +10912,9 @@ bool GdpRenderer::render(
 
     int performancePanelHeight = 0;
     if (hud.performanceOverlay) {
+        scaleGameplayHud = true;
+        hudAnchorX = 0;
+        hudAnchorY = height;
         const wkc::core::Vec3 performanceColor
             = hud.percentile95FrameMilliseconds <= 17U
             ? uiTheme.success
@@ -8289,6 +11027,9 @@ bool GdpRenderer::render(
 
     if (hud.visible && hud.map.visible && hud.map.roomCount > 0U
         && (!hud.performanceOverlay || height >= 520)) {
+        scaleGameplayHud = true;
+        hudAnchorX = 0;
+        hudAnchorY = height;
         const int mapSize = std::max(24,
             std::min({76 * hudScale, width / 3, height / 3}));
         const int mapWidth = mapSize + (hudPadding * 2);
@@ -8498,6 +11239,9 @@ bool GdpRenderer::render(
             bestText = "BEST " + runTimeText(hud.bestSpeedrunTicks);
         }
     }
+    scaleGameplayHud = hud.visible;
+    hudAnchorX = width;
+    hudAnchorY = height;
     if (topRightLines > 0) {
         const int topRightWidth = std::max({
             bitmapTextWidth("OBJECTIVE", hudScale),
@@ -8532,6 +11276,7 @@ bool GdpRenderer::render(
         }
     }
     if (showBoss) {
+        hudAnchorX = width / 2;
         const int bossX = (width - bossPanelWidth) / 2;
         const int bossY = height - hudMargin - bossPanelHeight;
         const int textX = bossX + hudPadding;
@@ -8549,6 +11294,7 @@ bool GdpRenderer::render(
         drawSolidRect(textX, bossY + hudPadding, filledWidth,
             4 * hudScale, uiTheme.warning);
     }
+    scaleGameplayHud = false;
     if (hud.objective == ObjectiveRenderState::Victory
         || hud.objective == ObjectiveRenderState::Defeat) {
         const bool victory = hud.objective == ObjectiveRenderState::Victory;
@@ -8616,35 +11362,30 @@ bool GdpRenderer::render(
             uiTheme.mutedText);
     }
     if (hud.paused) {
-        const PauseMenuLayout layout = makePauseMenuLayout(width, height);
-        const int scale = layout.scale;
-        drawMenuPanel(layout.panel, scale, textColor);
+        const PauseMenuLayout layout = makePauseMenuLayout(width, height,
+            hud.uiScalePercent);
+        const float scale = layout.textScale;
+        drawMenuPanel(layout.panel, layout.scale, textColor);
         constexpr std::string_view pauseTitle = "PAUSED";
         const int titleWidth = bitmapTextWidth(pauseTitle, scale);
         drawBitmapText((width - titleWidth) / 2,
-            layout.panel.y + layout.panel.height - (14 * scale), scale,
+            layout.panel.y + layout.panel.height - static_cast<int>(14.0F * scale), scale,
             pauseTitle, textColor);
 
-        constexpr std::array<std::string_view, 6> options{
-            "RESUME", "RESTART RUN", "SETTINGS", "CONTROLS",
-            "MAIN MENU", "EXIT GAME",
+        constexpr std::array<std::string_view, 4> options{
+            "RESUME GAME", "RESTART RUN", "RETURN TO MAIN MENU", "CONFIGURATION",
         };
         std::size_t selected = 0U;
         if (hud.pauseSelection == HudPauseSelection::RestartRun) {
             selected = 1U;
-        } else if (hud.pauseSelection == HudPauseSelection::Settings) {
-            selected = 2U;
-        } else if (hud.pauseSelection == HudPauseSelection::Controls) {
-            selected = 3U;
         } else if (hud.pauseSelection == HudPauseSelection::MainMenu) {
-            selected = 4U;
-        } else if (hud.pauseSelection == HudPauseSelection::ExitGame) {
-            selected = 5U;
+            selected = 2U;
+        } else if (hud.pauseSelection == HudPauseSelection::Settings) {
+            selected = 3U;
         }
-        const std::array<UiRect, 6> buttons{
+        const std::array<UiRect, 4> buttons{
             layout.resumeButton, layout.restartButton,
-            layout.settingsButton, layout.controlsButton,
-            layout.mainMenuButton, layout.exitButton,
+            layout.mainMenuButton, layout.settingsButton,
         };
         for (std::size_t index = 0; index < options.size(); ++index) {
             const UiRect button = buttons[index];
@@ -8653,32 +11394,40 @@ bool GdpRenderer::render(
                 drawSelectedRow(button, scale, textColor);
             }
             drawBitmapText((width - optionWidth) / 2,
-                button.y + (2 * scale), scale, options[index],
+                button.y + static_cast<int>(2.0F * scale), scale, options[index],
                 textColor);
         }
         const std::string_view controls = width >= 480
             ? "W S  ENTER  MOUSE  ESC"
             : "W S  ENTER  MOUSE";
-        const int controlsWidth = bitmapTextWidth(controls, 1);
+        const float footerScale = std::max(1.0F, scale / 2.0F);
+        const int controlsWidth = bitmapTextWidth(controls, footerScale);
         drawBitmapText((width - controlsWidth) / 2,
-            layout.panel.y + (6 * scale),
-            1, controls, uiTheme.mutedText);
+            layout.panel.y + static_cast<int>(6.0F * scale),
+            footerScale, controls, uiTheme.mutedText);
     } else if (scopeStrength == 0.0F
         && (weaponViewmodel.visible ? weaponViewmodel.role : hud.weapon) != HudWeaponRole::Sniper) {
         glClearColor(0.78F, 0.88F, 0.90F, 1.0F);
         const int centerX = width / 2;
         const int centerY = height / 2;
-        constexpr int armLength = 7;
+        const int armLength = std::max(1, static_cast<int>(std::lround(
+            7.0F * gameplayHudScale)));
+        const int thickness = std::max(1, static_cast<int>(std::lround(
+            3.0F * gameplayHudScale)));
         const int spreadGap = static_cast<int>(std::lround(
             std::clamp(hud.weaponSpread, 0.0F, 1.0F)
-            * 5.0F * static_cast<float>(hudScale)));
-        glScissor(centerX - spreadGap - armLength, centerY - 1, armLength, 3);
+            * 5.0F * static_cast<float>(hudScale) * gameplayHudScale));
+        glScissor(centerX - spreadGap - armLength, centerY - thickness / 2,
+            armLength, thickness);
         glClear(GL_COLOR_BUFFER_BIT);
-        glScissor(centerX + spreadGap + 1, centerY - 1, armLength, 3);
+        glScissor(centerX + spreadGap + 1, centerY - thickness / 2,
+            armLength, thickness);
         glClear(GL_COLOR_BUFFER_BIT);
-        glScissor(centerX - 1, centerY - spreadGap - armLength, 3, armLength);
+        glScissor(centerX - thickness / 2, centerY - spreadGap - armLength,
+            thickness, armLength);
         glClear(GL_COLOR_BUFFER_BIT);
-        glScissor(centerX - 1, centerY + spreadGap + 1, 3, armLength);
+        glScissor(centerX - thickness / 2, centerY + spreadGap + 1,
+            thickness, armLength);
         glClear(GL_COLOR_BUFFER_BIT);
     }
     drawExitConfirmation();

@@ -4,10 +4,35 @@
 #include "core/Log.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
+
+namespace {
+bool displaySupportsResolution(SDL_Window* window,
+    const gdp::gameplay::WindowResolution resolution, const bool fullscreen)
+{
+    if (!window) return true;
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(window);
+    if (!display) return true;
+    const auto size = gdp::gameplay::windowResolutionSize(resolution);
+    if (!fullscreen) {
+        const SDL_DisplayMode* desktop = SDL_GetDesktopDisplayMode(display);
+        return !desktop || (size.width <= desktop->w && size.height <= desktop->h);
+    }
+    int count = 0;
+    SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &count);
+    bool supported = false;
+    for (int i = 0; modes && i < count; ++i)
+        supported |= modes[i]->w == size.width && modes[i]->h == size.height;
+    SDL_free(modes);
+    return supported;
+}
+}
 
 namespace gdp::game {
 MenuView Application::frontendMenuView() const {
-    return makeMenuView(menuFlow_, campaignSlots_, speedrunLeaderboard_, runtimeSettings_, GDP_ENABLE_TEST_MODE != 0);
+    return makeMenuView(menuFlow_, campaignSlots_, speedrunLeaderboard_,
+        runtimeSettings_, GDP_ENABLE_TEST_MODE != 0,
+        !gamepad_.connected() || gamepad_.supportsRumble());
 }
 void Application::processFrontendMenu()
 {
@@ -17,6 +42,17 @@ void Application::processFrontendMenu()
     playerCommand_ = {}; interactionPending_ = false; jumpPending_ = false;
     firePending_ = false; fireHeld_ = false; reloadPending_ = false;
     weaponSwitchPending_.reset(); dropPending_ = false;
+    if (numericAdjustmentPendingSave_
+        && !input_.isMouseButtonDown(MouseButton::Primary)
+        && !input_.isKeyDown(Key::Left) && !input_.isKeyDown(Key::Right)
+        && !input_.isKeyDown(Key::A) && !input_.isKeyDown(Key::D)
+        && !input_.isGamepadButtonDown(GamepadButton::DpadLeft)
+        && !input_.isGamepadButtonDown(GamepadButton::DpadRight)
+        && !input_.isGamepadButtonDown(GamepadButton::StickLeft)
+        && !input_.isGamepadButtonDown(GamepadButton::StickRight)) {
+        (void)savePersistedSettings();
+        numericAdjustmentPendingSave_ = false;
+    }
     auto play = [&](gdp::audio::AudioEventKind kind) {
         if (audio_) audio_->playUi(kind, session_.state().currentSeed, uiAudioEventCounter_++);
     };
@@ -54,42 +90,137 @@ void Application::processFrontendMenu()
                 ? std::optional{GamepadButton::Count}
                 : gameplay::pressedGamepadBinding(input_);
             if (button) {
+                std::optional<gameplay::ControlAction> conflict;
+                if (*button != GamepadButton::Count) {
+                    for (std::size_t index = 0U;
+                         index < runtimeSettings_.gamepadControls.values.size();
+                         ++index) {
+                        if (runtimeSettings_.gamepadControls.values[index] == *button
+                            && index != static_cast<std::size_t>(*menuFlow_.capture)) {
+                            conflict = static_cast<gameplay::ControlAction>(index);
+                            break;
+                        }
+                    }
+                }
                 if (gameplay::assignGamepadBinding(runtimeSettings_.gamepadControls,
                     *menuFlow_.capture, *button)) {
                     settingsDirty_ = true; (void)savePersistedSettings();
+                    if (conflict) menuFlow_.notice = "BINDING SWAPPED: "
+                        + std::string{gameplay::controlActionName(*conflict)};
                 }
                 menuFlow_.capture.reset(); menuFlow_.captureGamepad = false;
                 play(gdp::audio::AudioEventKind::UiConfirm);
             }
         } else if (auto binding = gameplay::pressedControlBinding(input_)) {
+            std::optional<gameplay::ControlAction> conflict;
+            for (std::size_t index = 0U;
+                 index < runtimeSettings_.controls.values.size(); ++index) {
+                if (runtimeSettings_.controls.values[index] == *binding
+                    && index != static_cast<std::size_t>(*menuFlow_.capture)) {
+                    conflict = static_cast<gameplay::ControlAction>(index);
+                    break;
+                }
+            }
             if (gameplay::assignControlBinding(runtimeSettings_.controls, *menuFlow_.capture, *binding)) {
                 settingsDirty_ = true; (void)savePersistedSettings();
+                if (conflict) menuFlow_.notice = "BINDING SWAPPED: "
+                    + std::string{gameplay::controlActionName(*conflict)};
             }
             menuFlow_.capture.reset(); play(gdp::audio::AudioEventKind::UiConfirm);
         }
         return;
     }
+    if (settingsMenu_.active) {
+        const bool backward = input_.wasGamepadButtonPressed(GamepadButton::LeftShoulder)
+            || (input_.wasKeyPressed(Key::Tab)
+                && input_.isKeyDown(Key::LeftShift));
+        const bool forward = input_.wasGamepadButtonPressed(GamepadButton::RightShoulder)
+            || (input_.wasKeyPressed(Key::Tab) && !backward);
+        if (forward != backward) {
+            const int current = configurationSection(menuFlow_);
+            const int next = (current + (forward ? 1 : 3)) % 4;
+            openConfigurationSection(menuFlow_, static_cast<std::uint8_t>(next));
+            menuAdjustmentRepeat_.reset();
+            sliderDraggingRow_.reset();
+            (void)savePersistedSettings();
+            numericAdjustmentPendingSave_ = false;
+            play(gdp::audio::AudioEventKind::UiNavigate);
+            return;
+        }
+        if (configurationSection(menuFlow_) == 2U) {
+            const bool previousPage = input_.wasKeyPressed(Key::PageUp)
+                || input_.wasGamepadButtonPressed(GamepadButton::LeftTrigger);
+            const bool nextPage = input_.wasKeyPressed(Key::PageDown)
+                || input_.wasGamepadButtonPressed(GamepadButton::RightTrigger);
+            if (previousPage != nextPage) {
+                const int current = configurationControlPage(menuFlow_);
+                const int next = (current + (nextPage ? 1 : 2)) % 3;
+                openConfigurationControlPage(menuFlow_,
+                    static_cast<std::uint8_t>(next));
+                menuAdjustmentRepeat_.reset();
+                sliderDraggingRow_.reset();
+                (void)savePersistedSettings();
+                numericAdjustmentPendingSave_ = false;
+                play(gdp::audio::AudioEventKind::UiNavigate);
+                return;
+            }
+        }
+    }
     auto view = frontendMenuView();
     if (view.rows.empty()) return;
     if (menuFlow_.selection >= view.rows.size() || !view.rows[menuFlow_.selection].enabled) {
-        menuFlow_.selection = view.rows.size() - 1U;
-        if (!view.rows[menuFlow_.selection].enabled) moveMenuSelection(menuFlow_, view, 1);
+        menuFlow_.selection = 0U;
+        if (!view.rows[0U].enabled) moveMenuSelection(menuFlow_, view, 1);
     }
+    const std::size_t layoutSelection = menuFlow_.selection;
+    const bool controlSidebar = settingsMenu_.active
+        && configurationSection(menuFlow_) == 2U;
     std::optional<std::size_t> pointed;
     float pointerX = 0.0F;
     float pointerY = 0.0F;
     int dw = 0, dh = 0;
+    std::uint16_t uiScalePercent = 100U;
     if (window_) {
         int ww = 0, wh = 0;
         if (SDL_GetWindowSize(window_, &ww, &wh) && SDL_GetWindowSizeInPixels(window_, &dw, &dh) && ww > 0 && wh > 0) {
             const auto pointer = input_.mousePosition();
             pointerX = pointer.x * static_cast<float>(dw) / static_cast<float>(ww);
             pointerY = pointer.y * static_cast<float>(dh) / static_cast<float>(wh);
+            uiScalePercent = gameplay::resolvedUiScalePercent(runtimeSettings_,
+                dw, dh, ww, wh);
             pointed = visual::listMenuSelectionAt(dw, dh, view.rows.size(), pointerX,
-                pointerY, menuFlow_.page == MenuPage::Root);
+                pointerY, menuFlow_.page == MenuPage::Root, uiScalePercent,
+                layoutSelection, controlSidebar);
         }
     }
-    if (pointed && view.rows[*pointed].enabled && input_.mouseDelta() != wkc::core::Vec2{}) {
+    if (settingsMenu_.active && window_
+        && input_.wasMouseButtonPressed(MouseButton::Primary)) {
+        if (const auto tab = visual::configurationTabAt(dw, dh, view.rows.size(),
+                pointerX, pointerY, uiScalePercent, layoutSelection)) {
+            openConfigurationSection(menuFlow_, *tab);
+            menuAdjustmentRepeat_.reset();
+            sliderDraggingRow_.reset();
+            (void)savePersistedSettings();
+            numericAdjustmentPendingSave_ = false;
+            play(gdp::audio::AudioEventKind::UiNavigate);
+            return;
+        }
+        if (controlSidebar) {
+            if (const auto tab = visual::configurationControlTabAt(dw, dh,
+                    view.rows.size(), pointerX, pointerY,
+                    uiScalePercent, layoutSelection)) {
+                openConfigurationControlPage(menuFlow_, *tab);
+                menuAdjustmentRepeat_.reset();
+                sliderDraggingRow_.reset();
+                (void)savePersistedSettings();
+                numericAdjustmentPendingSave_ = false;
+                play(gdp::audio::AudioEventKind::UiNavigate);
+                return;
+            }
+        }
+    }
+    if (!sliderDraggingRow_ && pointed && view.rows[*pointed].enabled
+        && input_.mouseDelta() != wkc::core::Vec2{}) {
         if (menuFlow_.selection != *pointed) play(gdp::audio::AudioEventKind::UiNavigate);
         menuFlow_.selection = *pointed;
     }
@@ -100,6 +231,16 @@ void Application::processFrontendMenu()
         || input_.wasGamepadButtonPressed(GamepadButton::DpadDown)
         || input_.wasGamepadButtonPressed(GamepadButton::StickDown);
     if (up != down) { moveMenuSelection(menuFlow_, view, up ? -1 : 1); play(gdp::audio::AudioEventKind::UiNavigate); }
+    const float wheel = input_.mouseWheelDelta();
+    if (wheel != 0.0F) {
+        const int direction = wheel > 0.0F ? -1 : 1;
+        const int count = std::clamp(static_cast<int>(std::ceil(std::abs(wheel))), 1, 6);
+        for (int i = 0; i < count; ++i)
+            moveMenuSelection(menuFlow_, view, direction);
+        menuAdjustmentRepeat_.reset();
+        sliderDraggingRow_.reset();
+        play(gdp::audio::AudioEventKind::UiNavigate);
+    }
     const bool click = pointed && view.rows[*pointed].enabled && input_.wasMouseButtonPressed(MouseButton::Primary);
     if (click) menuFlow_.selection = *pointed;
     auto& row = view.rows[menuFlow_.selection];
@@ -109,22 +250,125 @@ void Application::processFrontendMenu()
     const bool right = input_.wasKeyPressed(Key::Right) || input_.wasKeyPressed(Key::D)
         || input_.wasGamepadButtonPressed(GamepadButton::DpadRight)
         || input_.wasGamepadButtonPressed(GamepadButton::StickRight);
-    const auto mouseDirection = click ? visual::listMenuAdjustmentDirectionAt(dw, dh,
-        view.rows.size(), pointerX, pointerY, menuFlow_.page == MenuPage::Root) : std::nullopt;
-    if (row.setting && (left != right || mouseDirection)) {
-        const int direction = mouseDirection.value_or(left ? -1 : 1);
-        if (gameplay::adjustRuntimeSetting(runtimeSettings_, *row.setting, direction)) {
+    const bool mouseHeld = input_.isMouseButtonDown(MouseButton::Primary);
+    if (!mouseHeld) sliderDraggingRow_.reset();
+    int mouseDirection = 0;
+    if (mouseHeld && pointed && *pointed == menuFlow_.selection) {
+        const auto direction = visual::listMenuAdjustmentDirectionAt(dw, dh,
+            view.rows.size(), pointerX, pointerY,
+            menuFlow_.page == MenuPage::Root, uiScalePercent, layoutSelection,
+            controlSidebar);
+        if (direction) mouseDirection = *direction;
+    }
+    bool settingChanged = false;
+    bool numericAdjustment = false;
+    if (row.setting) {
+        const auto descriptor = gameplay::numericSettingDescriptor(
+            runtimeSettings_, *row.setting);
+        numericAdjustment = descriptor.has_value();
+        if (descriptor && click) {
+            if (visual::listMenuSliderFractionAt(dw, dh, view.rows.size(),
+                    menuFlow_.selection, pointerX, pointerY,
+                    uiScalePercent, layoutSelection, controlSidebar)) {
+                sliderDraggingRow_ = menuFlow_.selection;
+                menuAdjustmentRepeat_.reset();
+            }
+        }
+        if (descriptor && sliderDraggingRow_ == menuFlow_.selection && mouseHeld) {
+            const auto layout = visual::makeListMenuLayout(dw, dh,
+                view.rows.size(), false, uiScalePercent, menuFlow_.selection,
+                controlSidebar);
+            const auto track = visual::listMenuSliderTrack(layout, menuFlow_.selection);
+            if (track.width > 0) {
+                const float fraction = std::clamp(
+                    (pointerX - static_cast<float>(track.x))
+                        / static_cast<float>(track.width), 0.0F, 1.0F);
+                const int value = static_cast<int>(std::lround(
+                    static_cast<float>(descriptor->minimum)
+                        + fraction * static_cast<float>(
+                            descriptor->maximum - descriptor->minimum)));
+                settingChanged = gameplay::setRuntimeNumericSetting(
+                    runtimeSettings_, *row.setting, value);
+            }
+        } else if (descriptor) {
+            const bool leftHeld = input_.isKeyDown(Key::Left)
+                || input_.isKeyDown(Key::A)
+                || input_.isGamepadButtonDown(GamepadButton::DpadLeft)
+                || input_.isGamepadButtonDown(GamepadButton::StickLeft);
+            const bool rightHeld = input_.isKeyDown(Key::Right)
+                || input_.isKeyDown(Key::D)
+                || input_.isGamepadButtonDown(GamepadButton::DpadRight)
+                || input_.isGamepadButtonDown(GamepadButton::StickRight);
+            const int direction = mouseDirection != 0 ? mouseDirection
+                : leftHeld != rightHeld ? (leftHeld ? -1 : 1) : 0;
+            const bool pressed = mouseDirection != 0
+                ? click : direction < 0 ? left : right;
+            const bool held = mouseDirection != 0
+                ? mouseHeld : leftHeld != rightHeld;
+            const std::uint64_t token =
+                (static_cast<std::uint64_t>(menuFlow_.page) << 32U)
+                | (static_cast<std::uint64_t>(menuFlow_.selection) << 16U)
+                | (mouseDirection != 0 ? 0x100U : 0U)
+                | (direction > 0 ? 1U : 2U);
+            const int steps = direction == 0 ? 0
+                : menuAdjustmentRepeat_.advance(token,
+                    MenuAdjustmentRepeat::Clock::now(), pressed, held);
+            if (direction == 0) menuAdjustmentRepeat_.reset();
+            for (int i = 0; i < steps; ++i) {
+                if (!gameplay::adjustRuntimeSetting(runtimeSettings_,
+                        *row.setting, direction)) {
+                    menuAdjustmentRepeat_.reset();
+                    break;
+                }
+                settingChanged = true;
+            }
+        } else {
+            menuAdjustmentRepeat_.reset();
+            if (left != right || (click && mouseDirection != 0)) {
+                const int direction = mouseDirection != 0 ? mouseDirection : left ? -1 : 1;
+                if (*row.setting == gameplay::SettingsMenuOption::WindowResolution) {
+                    gameplay::RuntimeSettings candidate = runtimeSettings_;
+                    for (int tries = 0;
+                         tries < static_cast<int>(gameplay::WindowResolution::Count);
+                         ++tries) {
+                        if (!gameplay::adjustRuntimeSetting(candidate,
+                                *row.setting, direction)) break;
+                        if (displaySupportsResolution(window_, candidate.windowResolution,
+                                candidate.fullscreen)) {
+                            runtimeSettings_.windowResolution = candidate.windowResolution;
+                            settingChanged = true;
+                            break;
+                        }
+                    }
+                } else {
+                    settingChanged = gameplay::adjustRuntimeSetting(
+                        runtimeSettings_, *row.setting, direction);
+                }
+            }
+        }
+        if (settingChanged) {
             if ((!runtimeSettings_.gamepadVibration || runtimeSettings_.gamepadVibrationPercent == 0U)
                 && (*row.setting == gameplay::SettingsMenuOption::GamepadVibration
                     || *row.setting == gameplay::SettingsMenuOption::GamepadVibrationStrength))
                 gamepad_.stopRumble();
             settingsDirty_ = true; applyRuntimeSettings();
-            (void)savePersistedSettings(); play(gdp::audio::AudioEventKind::UiNavigate);
+            const auto updatedView = frontendMenuView();
+            if (menuFlow_.selection < updatedView.rows.size()) {
+                log(wkc::core::LogLevel::Info,
+                    "Setting changed: " + updatedView.rows[menuFlow_.selection].text);
+            }
+            if (numericAdjustment) numericAdjustmentPendingSave_ = true;
+            else (void)savePersistedSettings();
+            play(gdp::audio::AudioEventKind::UiNavigate);
         }
-    }
+    } else menuAdjustmentRepeat_.reset();
     MenuCommand command = MenuCommand::None;
     if (input_.wasKeyPressed(Key::Escape)
         || input_.wasGamepadButtonPressed(GamepadButton::East)) {
+        menuAdjustmentRepeat_.reset();
+        sliderDraggingRow_.reset();
+        (void)savePersistedSettings();
+        numericAdjustmentPendingSave_ = false;
         command = backMenu(menuFlow_); play(gdp::audio::AudioEventKind::UiBack);
     } else if ((input_.wasKeyPressed(Key::Enter)
         || input_.wasGamepadButtonPressed(GamepadButton::South) || click)
@@ -137,7 +381,8 @@ void Application::processFrontendMenu()
             else runtimeSettings_.controls = {};
             settingsDirty_ = true; (void)savePersistedSettings();
             menuFlow_.notice = "DEFAULT BINDINGS RESTORED";
-        } else if (menuFlow_.page == MenuPage::FeedbackCompose && menuFlow_.selection == 9U) {
+        } else if (menuFlow_.page == MenuPage::FeedbackCompose
+            && menuFlow_.selection + 2U == view.rows.size()) {
             const auto json = playerFeedbackJson(menuFlow_.feedbackTopic, menuFlow_.feedbackDraft,
                 GDP_VERSION_STRING, SDL_GetPlatform());
             if (!json.empty() && playerFeedbackTransport_.start(json)) {
@@ -158,6 +403,7 @@ void Application::processFrontendMenu()
     }
     if (command == MenuCommand::OpenSettings) {
         gameplay::openSettingsMenu(settingsMenu_, gameplay::SettingsMenuOrigin::MainMenu);
+        openConfigurationSection(menuFlow_, 0U);
     } else if (command == MenuCommand::CloseSettings) {
         gameplay::closeSettingsMenu(settingsMenu_); (void)savePersistedSettings();
     } else if (command == MenuCommand::ExitGame) {

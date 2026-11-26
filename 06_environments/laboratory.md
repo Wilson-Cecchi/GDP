@@ -1,10 +1,16 @@
 # Environment — Laboratory
 
-> **Estado:** materiais de parede, piso e teto implementados e validados na
-> Fase 10. A variante grande com bancadas, contenção e colunas físicas também
-> está na campanha para playtest; a revisão visual ainda aguarda aprovação.
+> **Estado:** variante grande de 18 × 20 m aprovada em partida em 15/11/2026,
+> incluindo materiais, móveis, colunas, vasos quebráveis e marcas de tiro nas
+> paredes. A mesma variante está integrada à campanha.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
+
+Em 20/11/2026, as variantes compactas de Laboratório na campanha passaram a
+usar as mesmas texturas aprovadas de parede, piso e teto da variante grande.
+A geometria e o mobiliário continuam próprios de cada formato. A
+[captura de comparação](../visual/validation/campaign_audit_2026-11-20/README.md)
+registra o módulo 403 na semente 1793.
 
 ## Função
 
@@ -51,7 +57,8 @@ env __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
 As unidades de contenção permanecem opacas nesta fase. O vidro funcional
 depende de uma revisão posterior.
 As [capturas técnicas](../visual/validation/laboratory_geometry_preview/README.md)
-mostram FOV 60 e 100 em POTATO e ULTRA; a aprovação em partida está pendente.
+mostram FOV 60 e 100 em POTATO e ULTRA; a variante foi aprovada em partida
+depois das revisões descritas abaixo.
 
 `generateLaboratoryRoomMaterials(roomSeed)` seleciona `Sterile`, `Operational`
 ou `Contained`. A condição usa o ID local 400; Wall/Floor/Ceiling usam 401–403:
@@ -81,7 +88,8 @@ As bancadas e unidades de contenção usam esmalte metálico claro em repetiçã
 de 0,75 m. Portas, puxadores, molduras, telas, grades e fixadores são volumes
 3D; as peças principais mantêm a colisão existente. As janelas de contenção
 continuam opacas. As [capturas técnicas](../visual/validation/laboratory_material_v1/README.md)
-incluem vista geral e detalhes dos móveis; o aceite em partida está pendente.
+incluem vista geral e detalhes dos móveis; o conjunto final foi aprovado em
+partida em 15/11/2026.
 
 ### Rodapé, extração e espécime de teste
 
@@ -90,12 +98,17 @@ portas, e dois dutos suspensos de extração com suportes e grelhas inferiores.
 Uma planta fica no canto posterior esquerdo, dentro de uma cúpula de vidro
 translúcido sobre base metálica. A base sólida encosta na parede e na unidade
 de contenção; o vidro é apenas visual. A circulação central, os flancos e as
-quatro portas continuam livres. Esses detalhes ainda aguardam aceite em
-partida antes de serem considerados prontos.
+quatro portas continuam livres. Esses detalhes foram incluídos na aprovação
+da variante grande em partida.
 
 Cada uma das duas bancadas centrais recebeu dois vasos pequenos de espécime,
 também cobertos por domos translúcidos. As bases encostam no tampo e ocupam
 apenas as extremidades das bancadas; a área entre elas permanece livre.
+Os quatro vasos das bancadas são quebráveis: tiros que atravessam o vaso
+destroem o vaso e o domo de vidro juntos. Tiros que atingem apenas o domo
+removem primeiro o vidro e deixam o vaso para outro disparo. Depois que o
+vidro quebra, a área de acerto encolhe até a altura do vaso. A
+planta grande do canto continua como decoração fixa nesta revisão.
 
 ### Revisão da parede e colunas físicas
 
@@ -108,8 +121,9 @@ acabamento na base e no topo, bordas claras e indicador verde luminoso em 3D.
 As colunas respeitam as quatro rotações da sala e são omitidas onde
 encontrariam móveis, zonas reservadas ou portas.
 
-Esta revisão é uma prévia para playtest. A textura anterior continua no
-repositório, e o piso, teto e móveis permanecem como na versão anterior.
+Esta revisão foi aprovada no playtest da variante grande. A textura anterior
+continua no repositório, e o piso, teto e móveis permanecem como na versão
+anterior.
 
 No primeiro andar da campanha com a semente `2`, a sala do Terminal é o
 `LaboratoryHall_01`. Inicie um slot novo com o comando documentado em

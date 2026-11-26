@@ -4,6 +4,7 @@
 #include "game/SeedDomains.hpp"
 #include "world/Corridor.hpp"
 #include "world/MapGraph.hpp"
+#include "world/RoomArchitecture.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -198,7 +199,8 @@ CandidateOutcome generateCandidate(
     const wkc::core::Seed attemptSeed,
     const std::uint32_t attempt,
     const WorldGenerationConfig config,
-    const std::span<const RoomModule> library)
+    const std::span<const RoomModule> library,
+    const bool defaultLibrary)
 {
     World candidate;
     candidate.masterSeed = masterSeed;
@@ -265,6 +267,7 @@ CandidateOutcome generateCandidate(
             [id](const RoomInstance& value) { return value.id == id; });
         return room == candidate.rooms.end() ? nullptr : &*room;
     };
+    bool wideCorridorInstalled = false;
     for (const MapEdge& edge : candidate.graph.edges) {
         RoomInstance* firstRoom = findRoom(edge.first);
         RoomInstance* secondRoom = findRoom(edge.second);
@@ -277,17 +280,66 @@ CandidateOutcome generateCandidate(
             || !assignEdge(*first, edge.id) || !assignEdge(*second, edge.id)) {
             return {std::nullopt, GenerationFailure::ConnectorUnresolved};
         }
-        auto corridor = routeCorridor(
-            edge.id, firstRoom->id, secondRoom->id, *first, *second, candidate.rooms);
+        const auto route = [&]() {
+            // The middle segment must start beyond the expanded half-width;
+            // otherwise the wide corridor appears to intersect its own rooms.
+            const float stubLength = std::max(0.75F,
+                std::min(first->width, second->width) * 0.5F + 0.02F);
+            return routeCorridor(edge.id, firstRoom->id, secondRoom->id,
+                *first, *second, candidate.rooms, stubLength);
+        };
+        const auto lengthOf = [](const CorridorPath& corridor) {
+            float length = 0.0F;
+            for (std::size_t point = 1U; point < corridor.points.size(); ++point) {
+                length += std::abs(corridor.points[point].x
+                        - corridor.points[point - 1U].x)
+                    + std::abs(corridor.points[point].z
+                        - corridor.points[point - 1U].z);
+            }
+            return length;
+        };
+        const auto architectureClear = [](const RoomInstance& room) {
+            if (!usesAuthoredRoomArchitecture(room)) return true;
+            const auto parts = makeRoomArchitecture(room);
+            return validateRoomArchitecture(room, parts);
+        };
+        std::optional<CorridorPath> corridor;
+        // One main-route transfer per floor gets the large opening. Prefer a
+        // Hub or Arena connection, then the Boss approach. Side branches and
+        // the other main-route transfers keep the 1.2 m service passage.
+        const bool wideEligible = defaultLibrary && edge.mainPath
+            && !wideCorridorInstalled
+            && (firstRoom->role == RoomRole::Hub
+                || secondRoom->role == RoomRole::Hub
+                || firstRoom->role == RoomRole::Arena
+                || secondRoom->role == RoomRole::Arena
+                || secondRoom->role == RoomRole::Boss);
+        if (wideEligible) {
+            const float firstWidth = first->width;
+            const float firstHeight = first->height;
+            const float secondWidth = second->width;
+            const float secondHeight = second->height;
+            first->width = second->width = 2.4F;
+            first->height = second->height = 2.8F;
+            auto trial = route();
+            const bool clearFirst = architectureClear(*firstRoom);
+            const bool clearSecond = architectureClear(*secondRoom);
+            if (trial && lengthOf(*trial) <= 17.0F
+                && clearFirst && clearSecond) {
+                corridor = std::move(trial);
+                wideCorridorInstalled = true;
+            } else {
+                first->width = firstWidth;
+                first->height = firstHeight;
+                second->width = secondWidth;
+                second->height = secondHeight;
+            }
+        }
+        if (!corridor) corridor = route();
         if (!corridor) {
             return {std::nullopt, GenerationFailure::CorridorInvalid};
         }
-        float routeLength = 0.0F;
-        for (std::size_t point = 1U; point < corridor->points.size(); ++point) {
-            routeLength += std::abs(corridor->points[point].x - corridor->points[point - 1U].x)
-                + std::abs(corridor->points[point].z - corridor->points[point - 1U].z);
-        }
-        if (routeLength > 17.0F) {
+        if (lengthOf(*corridor) > 17.0F) {
             return {std::nullopt, GenerationFailure::CorridorInvalid};
         }
         candidate.corridors.push_back(std::move(*corridor));
@@ -322,7 +374,8 @@ WorldGenerationResult generateWorld(
         const wkc::core::Seed attemptSeed = wkc::core::deriveSeed(
             masterSeed, gdp::game::SeedDomain::World, attempt);
         CandidateOutcome candidate = generateCandidate(
-            masterSeed, attemptSeed, attempt, config, library);
+            masterSeed, attemptSeed, attempt, config, library,
+            moduleLibrary.empty());
         if (!candidate.world) {
             result.lastFailure = candidate.failure;
             continue;

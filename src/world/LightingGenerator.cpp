@@ -34,7 +34,10 @@ LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
         return {RoomLightingMood::Dim, {0.42F, 0.50F, 0.58F}, {0.56F, 0.72F, 0.86F}};
     }
     if (role == RoomRole::Boss) {
-        return {RoomLightingMood::Ominous, {0.54F, 0.32F, 0.28F}, {0.94F, 0.44F, 0.30F}};
+        // Warm neutral work lamps reveal the arena materials. Combat alert
+        // still supplies the red warning state through the renderer.
+        return {RoomLightingMood::Ominous, {0.67F, 0.64F, 0.59F},
+            {1.0F, 0.88F, 0.75F}};
     }
     if (role == RoomRole::Hub) {
         return {RoomLightingMood::Warm, {0.73F, 0.72F, 0.68F},
@@ -52,7 +55,10 @@ LightingPalette paletteFor(const RoomRole role, const RoomTheme theme) noexcept
     case RoomTheme::Office:
         return {RoomLightingMood::Neutral, {0.74F, 0.76F, 0.68F}, {0.90F, 0.88F, 0.70F}};
     case RoomTheme::Industrial:
-        return {RoomLightingMood::Cool, {0.58F, 0.68F, 0.78F}, {0.70F, 0.84F, 1.0F}};
+        // Neutral work lights let the graphite wall and steel furniture keep
+        // their intended tone. Hub lighting is selected above this branch.
+        return {RoomLightingMood::Neutral, {0.72F, 0.72F, 0.70F},
+            {0.96F, 0.91F, 0.84F}};
     case RoomTheme::Maintenance:
         // The Technical room uses warm neutral work lamps so its painted
         // steel stays distinct from the darker graphite floor.
@@ -176,14 +182,20 @@ RoomLightingPlan generateRoomLightingPlan(
         // The four Hub bars follow a symmetric quadrant layout. Their actual
         // light origins sit with the suspended models, not at the ceiling.
         const float ceiling = roomBounds.maximum.y
-            - (spaciousHub ? 0.48F : 0.16F);
+            - (spaciousBoss ? 0.78F : spaciousHub ? 0.48F : 0.16F);
         for (std::size_t index = 0; index < count; ++index) {
             const bool fillLight = index == mainLightCount;
-            const float jitterX = spaciousHub
+            // The fifth Boss bar focuses the central mission terminal. Its
+            // centered position also works when the whole room is rotated;
+            // the terminal is only a short distance from the room origin.
+            const bool bossFocalLight = spaciousBoss && index == 4U;
+            const float jitterX = spaciousHub || bossFocalLight
                 ? 0.0F : random.rangeFloat(-0.025F, 0.025F);
-            const float jitterZ = spaciousHub
+            const float jitterZ = spaciousHub || bossFocalLight
                 ? 0.0F : random.rangeFloat(-0.025F, 0.025F);
-            const wkc::core::Vec2 anchor = fillLight && mainLightCount < 4U
+            const wkc::core::Vec2 anchor = bossFocalLight
+                ? wkc::core::Vec2{0.50F, 0.50F}
+                : fillLight && mainLightCount < 4U
                 ? wkc::core::Vec2{0.50F, 0.50F} : anchors[index];
             const float normalizedX = std::clamp(anchor.x + jitterX, 0.15F, 0.85F);
             const float normalizedZ = std::clamp(anchor.y + jitterZ, 0.15F, 0.85F);
@@ -262,8 +274,11 @@ LightingValidationResult validateRoomLightingPlan(
             || light.range < 2.0F || light.range > 12.0F) {
             result.errors.push_back(LightingValidationError::InvalidLight);
         }
+        const float maximumSuspension = plan.role == RoomRole::Boss
+            && roomBounds.maximum.x - roomBounds.minimum.x >= 24.0F
+            ? 0.90F : 0.50F;
         if (!roomBounds.contains(light.position)
-            || light.position.y < roomBounds.maximum.y - 0.5F) {
+            || light.position.y < roomBounds.maximum.y - maximumSuspension) {
             result.errors.push_back(LightingValidationError::LightOutsideRoom);
         }
     }

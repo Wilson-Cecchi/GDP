@@ -1,6 +1,7 @@
 #include "world/WorldValidation.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -105,11 +106,11 @@ WorldValidationResult validateWorld(const World& world)
         }
     }
 
-    std::unordered_map<EdgeId, std::size_t> connectorUses;
+    std::unordered_map<EdgeId, std::vector<const ConnectorInstance*>> connectorsByEdge;
     for (const RoomInstance& room : world.rooms) {
         for (const ConnectorInstance& connector : room.connectors) {
             if (connector.edge) {
-                ++connectorUses[*connector.edge];
+                connectorsByEdge[*connector.edge].push_back(&connector);
             }
         }
     }
@@ -118,6 +119,15 @@ WorldValidationResult validateWorld(const World& world)
         if (!corridorEdges.insert(corridor.edge).second
             || !validateCorridorPath(corridor, world.rooms)) {
             result.failures.push_back(GenerationFailure::CorridorInvalid);
+        }
+        const auto linked = connectorsByEdge.find(corridor.edge);
+        if (linked == connectorsByEdge.end() || linked->second.size() != 2U
+            || std::any_of(linked->second.begin(), linked->second.end(),
+                [&corridor](const ConnectorInstance* connector) {
+                    return std::abs(connector->width - corridor.width) > 0.01F
+                        || std::abs(connector->height - corridor.height) > 0.01F;
+                })) {
+            result.failures.push_back(GenerationFailure::ConnectorUnresolved);
         }
     }
     for (std::size_t first = 0; first < world.corridors.size(); ++first) {
@@ -145,7 +155,7 @@ WorldValidationResult validateWorld(const World& world)
         }
     }
     for (const MapEdge& edge : world.graph.edges) {
-        if (connectorUses[edge.id] != 2U) {
+        if (connectorsByEdge[edge.id].size() != 2U) {
             result.failures.push_back(GenerationFailure::ConnectorUnresolved);
         }
         if (!corridorEdges.contains(edge.id)) {

@@ -72,6 +72,9 @@ void testMissingAndRoundTrip()
     settings.ambientVolumePercent = 40U;
     settings.uiVolumePercent = 60U;
     settings.mouseSensitivityPercent = 130U;
+    settings.mouseAimSensitivityPercent = 75U;
+    settings.uiScaleAuto = false;
+    settings.uiScaleManualPercent = 145U;
     settings.invertMouseY = true;
     settings.fieldOfViewDegrees = 82U;
     settings.graphicsQuality = gdp::gameplay::GraphicsQuality::Low;
@@ -114,7 +117,7 @@ void testRecoveryAndForwardCompatibility()
     const std::filesystem::path path = directory.path() / "settings.toml";
     writeText(path,
         "# recover individual invalid fields\n"
-        "version = 13\n"
+        "version = 14\n"
         "master_volume = 250\n"
         "effects_volume = loud\n"
         "ambient_volume = 45\n"
@@ -139,14 +142,14 @@ void testRecoveryAndForwardCompatibility()
             && recovered.settings.effectsVolumePercent == 100U
             && recovered.settings.ambientVolumePercent == 45U
             && recovered.settings.uiVolumePercent == 100U
-            && recovered.settings.mouseSensitivityPercent == 200U
+            && recovered.settings.mouseSensitivityPercent == 300U
             && !recovered.settings.invertMouseY
             && recovered.settings.fieldOfViewDegrees == 60U
             && recovered.settings.graphicsQuality
-                == gdp::gameplay::GraphicsQuality::Medium
+                == gdp::gameplay::GraphicsQuality::Ultra
             && recovered.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720
-            && !recovered.settings.fullscreen
+            && recovered.settings.fullscreen
             && recovered.settings.verticalSync
             && recovered.settings.language == gdp::gameplay::Language::English
             && recovered.settings.gamepadLookHorizontalPercent == 200U
@@ -155,7 +158,7 @@ void testRecoveryAndForwardCompatibility()
         "recovery clamps ranges and defaults malformed or missing values");
 
     writeText(path,
-        "version = 13\n"
+        "version = 14\n"
         "master_volume = 35\n"
         "graphics_quality = HIGH\n"
         "future_option = any future representation\n");
@@ -175,6 +178,15 @@ void testRecoveryAndForwardCompatibility()
             && previousV8.settings.controls.values[0] == gdp::gameplay::bindingForName("I")
             && previousV8.settings.gamepadControls == gdp::gameplay::GamepadBindings{},
         "v8 migration preserves keyboard bindings and adds controller defaults");
+
+    writeText(path, "version = 13\nfield_of_view = 82\nmouse_sensitivity = 130\n");
+    const auto previousV13 = loadRuntimeSettings(path);
+    expect(previousV13.status == SettingsLoadStatus::Migrated
+            && previousV13.settings.fieldOfViewDegrees == 82U
+            && previousV13.settings.mouseSensitivityPercent == 130U
+            && previousV13.settings.uiScaleAuto
+            && previousV13.settings.uiScaleManualPercent == 100U,
+        "v13 migration preserves video controls and initializes UI scale safely");
 
     writeText(path, "version = 9\ngamepad_vibration_strength = 70\n");
     const auto previousV9 = loadRuntimeSettings(path);
@@ -239,7 +251,7 @@ void testRecoveryAndForwardCompatibility()
             && v11Custom.settings.gamepadControls == v11Preset,
         "custom v11 remaps survive without hijacking R3 or R1");
 
-    writeText(path, "version = 13\ngamepad_binding_7 = X / SQUARE\n"
+    writeText(path, "version = 14\ngamepad_binding_7 = X / SQUARE\n"
         "gamepad_binding_9 = X / SQUARE\ngamepad_vibration_strength = 250\n");
     const auto brokenGamepad = loadRuntimeSettings(path);
     expect(brokenGamepad.status == SettingsLoadStatus::LoadedWithRecovery
@@ -351,7 +363,7 @@ void testCustomGraphicsPersistence()
             && migrated.settings.customGraphics == graphicsQualitySettings(GraphicsQuality::High),
         "v12 preset migrates with matching custom baseline");
 
-    writeText(path, "version = 13\ngraphics_quality = CUSTOM\n"
+    writeText(path, "version = 14\ngraphics_quality = CUSTOM\n"
         "custom_render_scale = 100\ncustom_max_lights = 8\ncustom_shadows = false\n");
     const auto recovered = loadRuntimeSettings(path);
     expect(recovered.status == SettingsLoadStatus::LoadedWithRecovery
@@ -391,12 +403,12 @@ void testInvalidAndUnsupportedFiles()
     const SettingsLoadResult canonical = loadRuntimeSettings(path);
     expect(canonical.status == SettingsLoadStatus::Loaded
             && canonical.settings.masterVolumePercent == 100U
-            && canonical.settings.mouseSensitivityPercent == 30U
-            && canonical.settings.fieldOfViewDegrees == 100U
+            && canonical.settings.mouseSensitivityPercent == 1U
+            && canonical.settings.fieldOfViewDegrees == 120U
             && canonical.settings.windowResolution
                 == gdp::gameplay::WindowResolution::R1280x720
             && canonical.settings.graphicsQuality
-                == gdp::gameplay::GraphicsQuality::Medium,
+                == gdp::gameplay::GraphicsQuality::Ultra,
         "save persists only canonical settings ranges");
 }
 

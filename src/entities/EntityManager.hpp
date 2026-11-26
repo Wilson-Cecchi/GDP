@@ -81,6 +81,9 @@ enum class PropType : std::uint8_t {
     Barricade,
     CeilingFixture,
     StorageBox,
+    LaboratoryPlanter,
+    SecurityMonitor,
+    CafeteriaPlanter,
 };
 
 enum class PropState : std::uint8_t {
@@ -155,6 +158,7 @@ struct PropData {
     ItemType dropType{ItemType::Ammo};
     std::uint32_t dropQuantity{0};
     wkc::core::Seed visualSeed{0};
+    bool tabletopBox{false};
 };
 
 using EntityData = std::variant<PlayerData, EnemyData, ItemData, PropData>;
@@ -202,6 +206,7 @@ struct PropCreateInfo {
     ItemType dropType{ItemType::Ammo};
     std::uint32_t dropQuantity{0};
     wkc::core::Seed visualSeed{0};
+    bool tabletopBox{false};
 };
 
 class EntityManager {

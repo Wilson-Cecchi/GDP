@@ -59,7 +59,8 @@ world::InitialEntitySet populateStorageRoomPreview(
     // The terminal gives the existing Test Mode a valid return interaction.
     // Keep the warehouse floor clear for inspection of the architecture.
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 8.5F}},
+        .transform = {.position = {0.0F, 0.0F, 8.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -105,7 +106,8 @@ world::InitialEntitySet populateCombatRoomPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 9.5F}},
+        .transform = {.position = {0.0F, 0.0F, 9.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -145,7 +147,8 @@ world::InitialEntitySet populateBossRoomPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {-11.0F, 0.0F, 13.0F}},
+        .transform = {.position = {0.0F, 0.0F, 2.2F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     room.entities.push_back(manager.createEnemy({
@@ -236,7 +239,8 @@ world::InitialEntitySet populateCafeteriaPreview(
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
         .transform = {.position = {0.0F, 0.0F,
-            room.moduleId == world::cafeteriaLongPreviewModuleId ? 10.5F : 8.5F}},
+            room.moduleId == world::cafeteriaLongPreviewModuleId ? 10.5F : 8.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -280,7 +284,8 @@ world::InitialEntitySet populateLaboratoryPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 8.5F}},
+        .transform = {.position = {0.0F, 0.0F, 8.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -340,7 +345,8 @@ world::InitialEntitySet populateTechnicalPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 8.5F}},
+        .transform = {.position = {0.0F, 0.0F, 8.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -400,7 +406,8 @@ world::InitialEntitySet populateSecurityPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 7.5F}},
+        .transform = {.position = {0.0F, 0.0F, 7.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     return result;
@@ -454,7 +461,8 @@ world::InitialEntitySet populateCentralHubPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {0.0F, 0.0F, 8.5F}},
+        .transform = {.position = {0.0F, 0.0F, 8.5F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = room.id, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     if (shadowPilot) {
@@ -504,9 +512,9 @@ world::World makeIndustrialCorridorPreview(const wkc::core::Seed seed)
         return preview;
     }
 
-    // The graph needs a Boss endpoint, but this is a compact traversal room.
-    // Mark it explicitly so the boss arena's large columns are not authored
-    // outside its walls when the preview starts.
+    // Both compact preview rooms leave the widened doorway clear. Campaign
+    // architecture may reserve a narrower opening in this fixed module.
+    first->moduleId = world::industrialCorridorStartPreviewModuleId;
     second->moduleId = world::industrialCorridorDestinationPreviewModuleId;
 
     preview.rooms.push_back(std::move(*first));
@@ -553,7 +561,8 @@ world::InitialEntitySet populateIndustrialCorridorPreview(
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
     result.terminal = manager.createProp({
-        .transform = {.position = {2.4F, 0.0F, 2.0F}},
+        .transform = {.position = {2.4F, 0.0F, 2.0F},
+            .scale = {1.15F, 1.80F, 0.60F}},
         .roomId = start.id, .type = PropType::Terminal, .solid = true});
     start.entities = {result.player, result.terminal};
     return result;
@@ -567,7 +576,10 @@ world::InitialEntitySet populateTestArena(world::World& arena, entities::EntityM
     player.roomId = room.id;
     world::InitialEntitySet result;
     result.player = manager.createPlayer(player);
-    result.terminal = manager.createProp({.transform = {.position = {0.0F, 0.0F, 8.0F}}, .roomId = 1U, .type = PropType::Terminal, .solid = true});
+    result.terminal = manager.createProp({
+        .transform = {.position = {0.0F, 0.0F, 8.0F},
+            .scale = {1.15F, 1.80F, 0.60F}},
+        .roomId = 1U, .type = PropType::Terminal, .solid = true});
     room.entities = {result.player, result.terminal};
     // Two tall bulkheads shelter the weapon pickups and target lane from the
     // robot's long-range cannon. The four-metre center gap stays walkable.

@@ -56,12 +56,24 @@ enum class PropVisualRole : std::uint8_t {
     Canister,
     Barricade,
     StorageBox,
+    TableBox,
+    LaboratoryPlanter,
+    Terminal,
+    SecurityMonitor,
+    CafeteriaPlanter,
 };
 
 enum class PropVisualState : std::uint8_t {
     Intact,
     Damaged,
     Destroyed,
+};
+
+enum class TerminalVisualState : std::uint8_t {
+    Standby,
+    Locked,
+    Alert,
+    Ready,
 };
 
 enum class EnemyAnimationState : std::uint8_t {
@@ -197,6 +209,11 @@ struct PropRenderData {
     PropVisualRole role{PropVisualRole::Crate};
     PropVisualState state{PropVisualState::Intact};
     wkc::core::Seed visualSeed{0};
+    world::RoomTheme theme{world::RoomTheme::Industrial};
+    std::optional<PickupVisualRole> crateDrop{};
+    float yawDegrees{0.0F};
+    TerminalVisualState terminalState{TerminalVisualState::Standby};
+    bool bossArena{false};
 };
 
 enum class ImpactVisualMaterial : std::uint8_t {
@@ -366,6 +383,7 @@ struct DoorRenderData {
     float height{2.2F};
     bool locked{false};
     float openFraction{1.0F};
+    bool inspectionWindow{false};
 };
 
 [[nodiscard]] ImpactRenderData bulletMarkOnDoor(
@@ -448,10 +466,8 @@ enum class HudNotice : std::uint8_t {
 enum class HudPauseSelection : std::uint8_t {
     Resume,
     RestartRun,
-    Settings,
-    Controls,
     MainMenu,
-    ExitGame,
+    Settings,
 };
 
 enum class HudMainMenuSelection : std::uint8_t {
@@ -548,20 +564,24 @@ struct MainMenuLayout {
 
 struct PauseMenuLayout {
     int scale{1};
+    float textScale{1.0F};
     UiRect panel{};
     UiRect resumeButton{};
     UiRect restartButton{};
-    UiRect settingsButton{};
-    UiRect controlsButton{};
     UiRect mainMenuButton{};
-    UiRect exitButton{};
+    UiRect settingsButton{};
 };
 
 struct ListMenuLayout {
     int scale{1};
+    float textScale{1.0F};
     UiRect panel{};
     std::vector<UiRect> rows;
+    std::array<UiRect, 3> controlTabs{};
 };
+inline constexpr float listMenuTwoLineRowUnits = 32.0F;
+inline constexpr float listMenuLabelBaselineUnits = 17.0F;
+inline constexpr float listMenuValueBaselineUnits = 1.0F;
 struct ListMenuRenderData {
     bool active{false};
     bool titleScreen{false};
@@ -571,14 +591,36 @@ struct ListMenuRenderData {
     std::vector<bool> enabled;
     std::vector<bool> adjustable;
     std::vector<bool> rawText;
+    std::vector<float> sliderFractions;
     std::size_t selection{0U};
+    std::uint16_t uiScalePercent{100U};
+    bool configuration{false};
+    std::uint8_t configurationSection{0U};
+    std::uint8_t configurationControlPage{0U};
 };
 [[nodiscard]] ListMenuLayout makeListMenuLayout(int width, int height, std::size_t count,
-    bool titleScreen = false);
+    bool titleScreen = false, std::uint16_t uiScalePercent = 100U,
+    std::size_t selectedRow = 0U, bool controlSidebar = false);
 [[nodiscard]] std::optional<std::size_t> listMenuSelectionAt(int width, int height,
-    std::size_t count, float pointerX, float pointerY, bool titleScreen = false);
+    std::size_t count, float pointerX, float pointerY, bool titleScreen = false,
+    std::uint16_t uiScalePercent = 100U, std::size_t selectedRow = 0U,
+    bool controlSidebar = false);
 [[nodiscard]] std::optional<int> listMenuAdjustmentDirectionAt(int width, int height,
-    std::size_t count, float pointerX, float pointerY, bool titleScreen = false);
+    std::size_t count, float pointerX, float pointerY, bool titleScreen = false,
+    std::uint16_t uiScalePercent = 100U, std::size_t selectedRow = 0U,
+    bool controlSidebar = false);
+[[nodiscard]] std::optional<std::uint8_t> configurationTabAt(int width,
+    int height, std::size_t count, float pointerX, float pointerY,
+    std::uint16_t uiScalePercent, std::size_t selectedRow);
+[[nodiscard]] UiRect listMenuSliderTrack(const ListMenuLayout& layout,
+    std::size_t rowIndex) noexcept;
+[[nodiscard]] std::optional<float> listMenuSliderFractionAt(int width,
+    int height, std::size_t count, std::size_t rowIndex, float pointerX,
+    float pointerY, std::uint16_t uiScalePercent, std::size_t selectedRow,
+    bool controlSidebar = false);
+[[nodiscard]] std::optional<std::uint8_t> configurationControlTabAt(
+    int width, int height, std::size_t count, float pointerX,
+    float pointerY, std::uint16_t uiScalePercent, std::size_t selectedRow);
 
 struct ControlsMenuLayout {
     int scale{1};
@@ -602,6 +644,7 @@ struct ResultMenuLayout {
 
 struct ExitConfirmationLayout {
     int scale{1};
+    float textScale{1.0F};
     UiRect panel{};
     UiRect cancelButton{};
     UiRect exitButton{};
@@ -623,12 +666,13 @@ struct SettingsMenuLayout {
     int height,
     float pointerX,
     float pointerY) noexcept;
-[[nodiscard]] PauseMenuLayout makePauseMenuLayout(int width, int height) noexcept;
+[[nodiscard]] PauseMenuLayout makePauseMenuLayout(int width, int height,
+    std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] std::optional<HudPauseSelection> pauseMenuSelectionAt(
     int width,
     int height,
     float pointerX,
-    float pointerY) noexcept;
+    float pointerY, std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] ResultMenuLayout makeResultMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudResultMenuSelection> resultMenuSelectionAt(
     int width,
@@ -637,13 +681,13 @@ struct SettingsMenuLayout {
     float pointerY) noexcept;
 [[nodiscard]] ExitConfirmationLayout makeExitConfirmationLayout(
     int width,
-    int height) noexcept;
+    int height, std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] std::optional<HudExitConfirmationSelection>
 exitConfirmationSelectionAt(
     int width,
     int height,
     float pointerX,
-    float pointerY) noexcept;
+    float pointerY, std::uint16_t uiScalePercent = 100U) noexcept;
 [[nodiscard]] SettingsMenuLayout makeSettingsMenuLayout(int width, int height) noexcept;
 [[nodiscard]] std::optional<HudSettingsSelection> settingsMenuSelectionAt(
     int width,
@@ -770,7 +814,10 @@ struct HudRenderData {
     HudNotice notice{HudNotice::None};
     float noticeFeedbackStrength{0.0F};
     bool paused{false};
+    std::uint16_t uiScalePercent{100U};
     HudPauseSelection pauseSelection{HudPauseSelection::Resume};
+    // An active exit dialog can confirm either quitting or a paused-run action.
+    HudPauseSelection pauseConfirmation{HudPauseSelection::Resume};
     bool mainMenu{false};
     ListMenuRenderData listMenu{};
     HudMainMenuSelection mainMenuSelection{HudMainMenuSelection::StartRun};
@@ -839,7 +886,7 @@ struct HudRenderData {
     gameplay::Language language{gameplay::Language::English};
 };
 
-inline constexpr std::size_t maxRenderedRoomLights = 8U;
+inline constexpr std::size_t maxRenderedRoomLights = 16U;
 inline constexpr std::size_t maxShadowOccluders = 16U;
 inline constexpr std::size_t maxShadowCastingLights = 2U;
 inline constexpr std::size_t maxActiveShadowOccluders = 8U;

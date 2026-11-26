@@ -129,6 +129,13 @@ struct CombatRoomMaterialSet {
     constexpr bool operator==(const CombatRoomMaterialSet&) const noexcept = default;
 };
 
+struct CombatSurfaceMaterialImages {
+    wkc::render::ImageData albedo;
+    wkc::render::ImageData normal;
+    // RGB stores roughness, metalness and ambient occlusion respectively.
+    wkc::render::ImageData properties;
+};
+
 enum class CafeteriaCondition : std::uint8_t {
     Clean,
     InUse,
@@ -336,6 +343,68 @@ struct IndustrialRoomMaterialSet {
     constexpr bool operator==(const IndustrialRoomMaterialSet&) const noexcept = default;
 };
 
+// Corridor materials have their own seed and palette. The caller derives the
+// corridor seed from its path, so neither adjoining room chooses its finish.
+enum class CorridorCondition : std::uint8_t {
+    Maintained,
+    Used,
+    Worn,
+    Count,
+};
+
+enum class CorridorSurfacePattern : std::uint8_t {
+    ServiceCorridor,
+    Office,
+    StructuralTransit,
+    Count,
+};
+
+struct CorridorSurfaceRecipe {
+    std::uint32_t version{2};
+    wkc::core::Seed seed{0};
+    RoomSurface surface{RoomSurface::Wall};
+    CorridorSurfacePattern pattern{CorridorSurfacePattern::ServiceCorridor};
+    wkc::procedural::MaterialFamily family{wkc::procedural::MaterialFamily::PaintedSteel};
+    wkc::core::Vec3 baseColor{0.16F, 0.25F, 0.29F};
+    wkc::core::Vec3 secondaryColor{0.055F, 0.075F, 0.085F};
+    wkc::core::Vec3 accentColor{0.57F, 0.34F, 0.13F};
+    float wearAmount{0.2F};
+    float dirtAmount{0.16F};
+    float emissiveAmount{0.0F};
+    std::uint32_t resolution{256};
+
+    constexpr bool operator==(const CorridorSurfaceRecipe&) const noexcept = default;
+};
+
+struct CorridorRoomMaterialSet {
+    wkc::core::Seed corridorSeed{0};
+    CorridorCondition condition{CorridorCondition::Used};
+    std::array<CorridorSurfaceRecipe,
+        static_cast<std::size_t>(RoomSurface::Count)> surfaces{};
+    std::uint64_t materialHash{0};
+
+    constexpr bool operator==(const CorridorRoomMaterialSet&) const noexcept = default;
+};
+
+using CorridorSurfaceMaterialImages = IndustrialWallMaterialImages;
+
+enum class CorridorMaterialValidationError : std::uint8_t {
+    InvalidCondition,
+    InvalidSurface,
+    InvalidFamily,
+    InvalidColor,
+    InvalidParameter,
+    InvalidResolution,
+    InvalidSurfaceOrder,
+    InvalidMaterialHash,
+};
+
+struct CorridorMaterialValidationResult {
+    std::vector<CorridorMaterialValidationError> errors;
+
+    [[nodiscard]] bool isValid() const noexcept;
+};
+
 enum class IndustrialMaterialValidationError : std::uint8_t {
     InvalidCondition,
     InvalidSurface,
@@ -491,6 +560,19 @@ struct CentralHubMaterialValidationResult {
 
 [[nodiscard]] IndustrialRoomMaterialSet generateIndustrialRoomMaterials(
     wkc::core::Seed roomSeed);
+[[nodiscard]] CorridorRoomMaterialSet generateCorridorRoomMaterials(
+    wkc::core::Seed corridorSeed,
+    CorridorSurfacePattern pattern = CorridorSurfacePattern::ServiceCorridor);
+[[nodiscard]] CorridorMaterialValidationResult validateCorridorSurfaceRecipe(
+    const CorridorSurfaceRecipe& recipe);
+[[nodiscard]] CorridorMaterialValidationResult validateCorridorRoomMaterials(
+    const CorridorRoomMaterialSet& materials);
+[[nodiscard]] std::uint64_t corridorSurfaceRecipeHash(
+    const CorridorSurfaceRecipe& recipe) noexcept;
+[[nodiscard]] std::uint64_t hashCorridorRoomMaterials(
+    const CorridorRoomMaterialSet& materials) noexcept;
+[[nodiscard]] std::optional<CorridorSurfaceMaterialImages>
+generateCorridorSurfaceMaterialImages(const CorridorSurfaceRecipe& recipe);
 [[nodiscard]] IndustrialMaterialValidationResult validateIndustrialSurfaceRecipe(
     const IndustrialSurfaceRecipe& recipe);
 [[nodiscard]] IndustrialMaterialValidationResult validateIndustrialRoomMaterials(
@@ -524,7 +606,8 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const StorageSurfaceRecipe& recipe);
 
 [[nodiscard]] CombatRoomMaterialSet generateCombatRoomMaterials(
-    wkc::core::Seed roomSeed);
+    wkc::core::Seed roomSeed, bool galleryWallV1 = false,
+    bool bossArenaV1 = false);
 [[nodiscard]] CombatMaterialValidationResult validateCombatSurfaceRecipe(
     const CombatSurfaceRecipe& recipe);
 [[nodiscard]] CombatMaterialValidationResult validateCombatRoomMaterials(
@@ -535,6 +618,20 @@ generateIndustrialCeilingMaterialImages(const IndustrialSurfaceRecipe& recipe);
     const CombatRoomMaterialSet& materials) noexcept;
 [[nodiscard]] std::optional<wkc::render::ImageData> generateCombatSurfaceAlbedo(
     const CombatSurfaceRecipe& recipe);
+[[nodiscard]] std::optional<CombatSurfaceMaterialImages>
+generateBossArenaSurfaceMaterialImages(const CombatSurfaceRecipe& recipe);
+// Separate small-scale painted steel for Arena cover; never reuses the wall tile.
+[[nodiscard]] std::uint64_t combatCoverMaterialHash(wkc::core::Seed roomSeed) noexcept;
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCombatCoverAlbedo(
+    wkc::core::Seed roomSeed);
+// A broad repeating plate for the Arena's load-bearing metal columns.
+[[nodiscard]] std::uint64_t combatColumnMaterialHash(wkc::core::Seed roomSeed) noexcept;
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCombatColumnAlbedo(
+    wkc::core::Seed roomSeed);
+// Fine brushed paint for the Arena's gallery and stair handrails.
+[[nodiscard]] std::uint64_t combatRailMaterialHash(wkc::core::Seed roomSeed) noexcept;
+[[nodiscard]] std::optional<wkc::render::ImageData> generateCombatRailAlbedo(
+    wkc::core::Seed roomSeed);
 
 [[nodiscard]] CafeteriaRoomMaterialSet generateCafeteriaRoomMaterials(
     wkc::core::Seed roomSeed);

@@ -460,6 +460,89 @@ void appendConnectedRoomLights(
     lighting.lightCount = static_cast<std::uint32_t>(lightCount);
 }
 
+void appendNearbyCorridorLights(
+    visual::RoomLightingRenderData& lighting,
+    const gdp::world::World& world,
+    const gdp::world::RoomId currentRoomId,
+    const wkc::core::Vec3 observerPosition,
+    const std::uint32_t maximumLights)
+{
+    struct Candidate {
+        visual::PointLightRenderData light;
+        float distanceSquared{0.0F};
+    };
+    std::vector<Candidate> candidates;
+    for (const gdp::world::CorridorPath& corridor : world.corridors) {
+        if (corridor.firstRoom != currentRoomId
+            && corridor.secondRoom != currentRoomId) continue;
+        for (std::size_t index = 0U; index + 1U < corridor.points.size(); ++index) {
+            const wkc::core::Vec3 first = corridor.points[index];
+            const wkc::core::Vec3 second = corridor.points[index + 1U];
+            const float length = wkc::core::length(second - first);
+            if (length < 2.2F) continue;
+            const int fixtureCount = std::clamp(
+                static_cast<int>(std::floor(length / 3.5F)), 1, 3);
+            for (int fixture = 0; fixture < fixtureCount; ++fixture) {
+                const float fraction = (static_cast<float>(fixture) + 0.5F)
+                    / static_cast<float>(fixtureCount);
+                const wkc::core::Vec3 position = first
+                    + (second - first) * fraction
+                    + wkc::core::Vec3{0.0F, corridor.height - 0.22F, 0.0F};
+                const wkc::core::Vec3 delta = position - observerPosition;
+                const float distanceSquared = wkc::core::dot(delta, delta);
+                if (distanceSquared > 64.0F) continue;
+                visual::PointLightRenderData light;
+                light.position = position;
+                light.color = corridor.width >= 2.4F
+                    ? wkc::core::Vec3{0.72F, 0.83F, 0.86F}
+                    : wkc::core::Vec3{0.96F, 0.82F, 0.64F};
+                light.intensity = 0.82F;
+                light.range = 4.6F;
+                light.boundedToRoom = true;
+                light.ambientWeight = 0.0F;
+                const float halfWidth = corridor.width * 0.5F + 0.15F;
+                light.sourceRoomBounds = {
+                    {std::min(first.x, second.x) - halfWidth,
+                        first.y - 0.1F,
+                        std::min(first.z, second.z) - halfWidth},
+                    {std::max(first.x, second.x) + halfWidth,
+                        first.y + corridor.height + 0.2F,
+                        std::max(first.z, second.z) + halfWidth},
+                };
+                candidates.push_back({light, distanceSquared});
+            }
+        }
+    }
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Candidate& left, const Candidate& right) {
+            return left.distanceSquared < right.distanceSquared;
+        });
+    const std::size_t activeLimit = std::min<std::size_t>(
+        {maximumLights, visual::maxRenderedRoomLights, lighting.lights.size()});
+    const bool insideRoom = gameplay::roomContainingPosition(
+        world, observerPosition).has_value();
+    for (std::size_t index = 0U; index < std::min<std::size_t>(2U, candidates.size()); ++index) {
+        if (lighting.lightCount < activeLimit) {
+            lighting.lights[lighting.lightCount++] = candidates[index].light;
+            continue;
+        }
+        if (activeLimit == 0U || insideRoom) break;
+        std::size_t farthestIndex = 0U;
+        float farthestDistanceSquared = -1.0F;
+        for (std::size_t lightIndex = 0U; lightIndex < activeLimit; ++lightIndex) {
+            const wkc::core::Vec3 offset
+                = lighting.lights[lightIndex].position - observerPosition;
+            const float distanceSquared = wkc::core::dot(offset, offset);
+            if (distanceSquared > farthestDistanceSquared) {
+                farthestDistanceSquared = distanceSquared;
+                farthestIndex = lightIndex;
+            }
+        }
+        if (candidates[index].distanceSquared < farthestDistanceSquared)
+            lighting.lights[farthestIndex] = candidates[index].light;
+    }
+}
+
 gameplay::ProgressionEvent progressionEventFor(
     const entities::EnemyArchetype archetype) noexcept
 {
@@ -499,19 +582,32 @@ bool prepareRoomMaterials(
         || room.moduleId == world::centralHubPreviewModuleId) {
         return renderer.prepareCentralHubRoomMaterials(room.seed);
     }
-    if (room.role == world::RoomRole::Arena || room.role == world::RoomRole::Boss
+    const bool themedArena = room.role == world::RoomRole::Arena
+        && (room.theme == world::RoomTheme::Maintenance
+            || room.theme == world::RoomTheme::Security)
+        && room.moduleId != world::combatGalleryArenaModuleId
+        && room.moduleId != world::combatRoomPreviewModuleId;
+    if ((room.role == world::RoomRole::Arena && !themedArena)
+        || room.role == world::RoomRole::Boss
         || room.moduleId == world::bossRoomPreviewModuleId
         || room.moduleId == world::combatRoomPreviewModuleId) {
-        return renderer.prepareCombatRoomMaterials(room.seed);
+        const bool galleryWallV1 = room.moduleId == world::combatRoomPreviewModuleId
+            || room.moduleId == world::combatGalleryArenaModuleId;
+        const bool bossArenaV1 = room.role == world::RoomRole::Boss
+            || room.moduleId == world::bossRoomPreviewModuleId;
+        return renderer.prepareCombatRoomMaterials(room.seed, galleryWallV1,
+            bossArenaV1);
     }
     switch (room.theme) {
     case world::RoomTheme::Storage:
-        return renderer.prepareStorageRoomMaterials(room.seed,
-            room.sizeClass == world::RoomSizeClass::Large);
+        // The approved Storage wall, floor and ceiling set must also reach
+        // compact, medium and secret campaign variants. The former size gate
+        // left those rooms on the older procedural textures.
+        return renderer.prepareStorageRoomMaterials(room.seed, true);
     case world::RoomTheme::Laboratory:
-        return renderer.prepareLaboratoryRoomMaterials(room.seed,
-            room.moduleId == world::laboratoryPreviewModuleId
-                || room.moduleId == world::laboratoryHallModuleId);
+        // The approved panel set is shared by every Laboratory footprint;
+        // the previous module check left compact campaign rooms on legacy art.
+        return renderer.prepareLaboratoryRoomMaterials(room.seed, true);
     case world::RoomTheme::Maintenance:
         return renderer.prepareTechnicalRoomMaterials(room.seed);
     case world::RoomTheme::Security:
@@ -519,35 +615,11 @@ bool prepareRoomMaterials(
     case world::RoomTheme::Cafeteria:
         return renderer.prepareCafeteriaRoomMaterials(room.seed);
     case world::RoomTheme::Industrial:
-    case world::RoomTheme::Office:
         return renderer.prepareIndustrialRoomMaterials(room.seed);
+    case world::RoomTheme::Office:
+        return renderer.prepareOfficeRoomMaterials(room.seed);
     }
     return false;
-}
-
-bool usesAuthoredRoomArchitecture(const world::RoomInstance& room) noexcept
-{
-    if (room.moduleId == world::industrialCorridorDestinationPreviewModuleId) {
-        return false;
-    }
-    return room.role == world::RoomRole::Boss
-        || room.moduleId == world::bossRoomPreviewModuleId
-        || room.theme == world::RoomTheme::Storage
-        || room.moduleId == world::combatRoomPreviewModuleId
-        || room.moduleId == world::combatGalleryArenaModuleId
-        || room.moduleId == world::cafeteriaPreviewModuleId
-        || room.moduleId == world::cafeteriaLongPreviewModuleId
-        || room.moduleId == world::cafeteriaLongModuleId
-        || room.moduleId == world::laboratoryPreviewModuleId
-        || room.moduleId == world::laboratoryHallModuleId
-        || room.moduleId == world::technicalPreviewModuleId
-        || room.moduleId == world::technicalLPreviewModuleId
-        || room.moduleId == world::maintenanceLModuleId
-        || room.moduleId == world::securityPreviewModuleId
-        || room.moduleId == world::securityTPreviewModuleId
-        || room.moduleId == world::securityTModuleId
-        || room.moduleId == world::centralHubPreviewModuleId
-        || room.moduleId == world::centralHubModuleId;
 }
 
 float yawForDirection(const wkc::core::Vec3 direction) noexcept
@@ -704,7 +776,12 @@ int Application::run()
                     runtimeSettings_.gamepadControls, gameplay::ControlAction::Aim, input_);
                 const float aimScale = aiming
                     ? static_cast<float>(runtimeSettings_.gamepadAimSensitivityPercent) / 100.0F : 1.0F;
-                player_.applyLook(input_.mouseDelta());
+                const float mouseAimScale = aiming
+                    ? static_cast<float>(runtimeSettings_.mouseAimSensitivityPercent) / 100.0F
+                    : 1.0F;
+                const Vec2 mouseLook = input_.mouseDelta();
+                player_.applyLook({mouseLook.x * mouseAimScale,
+                    mouseLook.y * mouseAimScale});
                 player_.applyGamepadLook(gameplay::gamepadLookDegrees(gamepadLook,
                     static_cast<float>(frameDelta),
                     aimScale * static_cast<float>(runtimeSettings_.gamepadLookHorizontalPercent) / 100.0F,
@@ -1113,7 +1190,7 @@ bool Application::initializeRun()
     world_ = std::move(generation.world);
     roomArchitectureParts_.clear();
     for (const world::RoomInstance& room : world_->rooms) {
-        const bool authored = usesAuthoredRoomArchitecture(room);
+        const bool authored = world::usesAuthoredRoomArchitecture(room);
         auto parts = authored
             ? world::makeRoomArchitecture(room)
             : std::vector<world::RoomArchitecturePart>{};
@@ -1255,18 +1332,39 @@ bool Application::initializeRun()
                 part.bounds.minimum.y,
                 (part.bounds.minimum.z + part.bounds.maximum.z) * 0.5F,
             };
+            const bool laboratoryPlanter = part.decoration
+                == world::RoomDecorationPart::SmallGlassTestPlanter;
+            const bool securityMonitor = part.securityFurniturePart
+                == world::SecurityFurniturePart::Monitor;
+            // The compact station has a thin status strip attached to its
+            // monitor. The dynamic monitor draws the strip with the body.
+            if (securityMonitor && scale.y < 0.30F) continue;
+            const bool cafeteriaPlanter = room.theme == world::RoomTheme::Cafeteria
+                && (part.decoration == world::RoomDecorationPart::Planter
+                    || part.decoration
+                        == world::RoomDecorationPart::BroadleafPlanter);
             // The lowest seed bit preserves the authored olive/charcoal tier.
             const wkc::core::Seed visualSeed = (wkc::core::deriveSeed(
                 room.seed, gdp::game::SeedDomain::Props, 1000U + index) & ~1ULL)
                 | (part.tint.x < 0.4F ? 1ULL : 0ULL);
             room.entities.push_back(entities_.createProp({
-                .transform = {.position = position, .scale = scale},
+                .transform = {.position = position,
+                    .scale = laboratoryPlanter
+                        ? wkc::core::Vec3{scale.x, 0.42F, scale.z} : scale},
                 .roomId = room.id,
-                .type = entities::PropType::StorageBox,
+                .type = laboratoryPlanter
+                    ? entities::PropType::LaboratoryPlanter
+                    : securityMonitor ? entities::PropType::SecurityMonitor
+                    : cafeteriaPlanter ? entities::PropType::CafeteriaPlanter
+                    : entities::PropType::StorageBox,
                 .solid = true,
-                .health = 35.0F,
-                .maximumHealth = 35.0F,
+                .health = laboratoryPlanter || cafeteriaPlanter ? 2.0F
+                    : securityMonitor ? 24.0F : 35.0F,
+                .maximumHealth = laboratoryPlanter || cafeteriaPlanter ? 2.0F
+                    : securityMonitor ? 24.0F : 35.0F,
                 .visualSeed = visualSeed,
+                .tabletopBox = part.technicalFurniturePart
+                    == world::TechnicalFurniturePart::Instrument,
             }));
         }
     }
@@ -1366,11 +1464,47 @@ bool Application::initializeRun()
             return false;
         }
         roomEvents_.push_back(gameplay::makeRoomEventRuntime(std::move(plan), room.id));
+        const bool combatGallery = room.moduleId == world::combatRoomPreviewModuleId
+            || room.moduleId == world::combatGalleryArenaModuleId;
         const world::RoomRole lightingRole = config_.industrialCorridorPreview
             ? world::RoomRole::Normal
-            : config_.centralHubPreview ? world::RoomRole::Hub : room.role;
+            : config_.centralHubPreview ? world::RoomRole::Hub
+            : combatGallery ? world::RoomRole::Arena : room.role;
         world::RoomLightingPlan lighting = world::generateRoomLightingPlan(
-            room.seed, lightingRole, room.theme, room.worldBounds);
+            room.seed, lightingRole,
+            combatGallery ? world::RoomTheme::Maintenance : room.theme,
+            room.worldBounds);
+        if (combatGallery) {
+            // Five suspended bars match the arena's long, open lanes. The
+            // preview uses the same warm Arena fixture layout as the
+            // campaign module; every light remains a breakable fixture.
+            if (lighting.lights.size() < 5U) {
+                log(LogLevel::Error, "Combat gallery needs five ceiling fixtures");
+                return false;
+            }
+            lighting.ambientIntensity = 0.22F;
+            constexpr std::array localLights{
+                wkc::core::Vec3{-4.7F, 0.0F, -5.0F},
+                wkc::core::Vec3{4.7F, 0.0F, -5.0F},
+                wkc::core::Vec3{-4.7F, 0.0F, 5.0F},
+                wkc::core::Vec3{4.7F, 0.0F, 5.0F},
+                wkc::core::Vec3{0.0F, 0.0F, 1.2F},
+            };
+            const wkc::core::Vec3 roomCenter
+                = (room.worldBounds.minimum + room.worldBounds.maximum) * 0.5F;
+            for (std::size_t index = 0U; index < localLights.size(); ++index) {
+                lighting.lights[index].position = roomCenter
+                    + wkc::core::rotateQuarterTurns(
+                        localLights[index], room.rotation);
+                lighting.lights[index].position.y
+                    = room.worldBounds.maximum.y - 0.48F;
+                lighting.lights[index].color
+                    = world::combatGalleryFixtureColor;
+                lighting.lights[index].intensity = index == 4U ? 0.80F : 1.42F;
+                lighting.lights[index].range = index == 4U ? 7.8F : 10.5F;
+            }
+            lighting.planHash = world::roomLightingPlanHash(lighting);
+        }
         if (room.moduleId == world::securityTPreviewModuleId
             || room.moduleId == world::securityTModuleId) {
             // One fixture over the narrow approach, two over the gallery,
@@ -1500,6 +1634,18 @@ bool Application::initializeRun()
             }
             roomMaterialKeys_.emplace(room.id, renderer_->activeRoomMaterialKey());
         }
+        for (const world::CorridorPath& corridor : world_->corridors) {
+            const wkc::core::Seed corridorSeed = wkc::core::hashCombine(
+                world_->generationSeed,
+                static_cast<std::uint64_t>(corridor.edge));
+            if (!renderer_->prepareCorridorRoomMaterials(
+                    corridorSeed, corridor.width >= 2.4F)) {
+                log(LogLevel::Error, "World corridor material preparation failed");
+                return false;
+            }
+            corridorMaterialKeys_.emplace(
+                corridor.edge, renderer_->activeRoomMaterialKey());
+        }
         for (const entities::EntityId id : entities_.query(entities::EntityKind::Enemy)) {
             const entities::EnemyData* enemy = entities_.findData<entities::EnemyData>(id);
             if (enemy == nullptr) {
@@ -1567,6 +1713,14 @@ void Application::processEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         (void)wkc::platform::handleSdlInputEvent(input_, event);
+        if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            menuAdjustmentRepeat_.reset();
+            sliderDraggingRow_.reset();
+            if (numericAdjustmentPendingSave_) {
+                (void)savePersistedSettings();
+                numericAdjustmentPendingSave_ = false;
+            }
+        }
         if (config_.enableGamepad) gamepad_.handleEvent(input_, event);
         if (event.type == SDL_EVENT_TEXT_INPUT && menuFlow_.feedbackEditing
             && menuFlow_.page == MenuPage::FeedbackCompose) {
@@ -1581,6 +1735,7 @@ void Application::processEvents()
             }
         }
         if (event.type == SDL_EVENT_QUIT) {
+            log(LogLevel::Info, "SDL requested application exit");
             running_ = false;
         }
     }
@@ -1641,6 +1796,7 @@ void Application::processEvents()
         if (input_.wasKeyPressed(Key::Escape)
             || padPressed(GamepadButton::East)) {
             gameplay::closeExitConfirmation(exitConfirmation_);
+            pauseConfirmationCommand_ = gameplay::PauseMenuCommand::None;
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
             return;
         }
@@ -1661,7 +1817,10 @@ void Application::processEvents()
                     pointer.x * static_cast<float>(drawableWidth)
                         / static_cast<float>(windowWidth),
                     pointer.y * static_cast<float>(drawableHeight)
-                        / static_cast<float>(windowHeight));
+                        / static_cast<float>(windowHeight),
+                    mainMenu_.active ? 100U : gameplay::resolvedUiScalePercent(
+                        runtimeSettings_, drawableWidth, drawableHeight,
+                        windowWidth, windowHeight));
             }
         }
         const auto confirmationOptionFor
@@ -1709,12 +1868,34 @@ void Application::processEvents()
                 exitConfirmation_);
         }
         if (command == gameplay::ExitConfirmationCommand::Cancel) {
+            pauseConfirmationCommand_ = gameplay::PauseMenuCommand::None;
             playUiAudio(gdp::audio::AudioEventKind::UiBack);
         } else if (command == gameplay::ExitConfirmationCommand::ExitGame) {
             playUiAudio(gdp::audio::AudioEventKind::UiConfirm);
-            log(LogLevel::Info, "Game exit confirmed");
-            restartRequested_ = false;
-            running_ = false;
+            const auto pausedAction = pauseConfirmationCommand_;
+            pauseConfirmationCommand_ = gameplay::PauseMenuCommand::None;
+            if (pausedAction == gameplay::PauseMenuCommand::RestartRun) {
+                if (!stageCampaignFloorReplay()) {
+                    fatalError_ = true;
+                    running_ = false;
+                    return;
+                }
+                log(LogLevel::Info, "Pause menu confirmed same seed restart");
+                (void)session_.update(false, world::RoomRole::Count, false, false);
+                restartMode_ = gameplay::RunRestartMode::SameSeed;
+                restartRequested_ = true;
+                running_ = false;
+            } else if (pausedAction == gameplay::PauseMenuCommand::MainMenu) {
+                log(LogLevel::Info, "Pause menu confirmed return to main menu");
+                if (!returnToMainMenu()) {
+                    fatalError_ = true;
+                    running_ = false;
+                }
+            } else {
+                log(LogLevel::Info, "Game exit confirmed");
+                restartRequested_ = false;
+                running_ = false;
+            }
         }
         return;
     }
@@ -1933,21 +2114,20 @@ void Application::processEvents()
                     pointer.x * static_cast<float>(drawableWidth)
                         / static_cast<float>(windowWidth),
                     pointer.y * static_cast<float>(drawableHeight)
-                        / static_cast<float>(windowHeight));
+                        / static_cast<float>(windowHeight),
+                    gameplay::resolvedUiScalePercent(runtimeSettings_,
+                        drawableWidth, drawableHeight,
+                        windowWidth, windowHeight));
             }
         }
         const auto pauseOptionFor = [](const visual::HudPauseSelection selection) {
             switch (selection) {
             case visual::HudPauseSelection::RestartRun:
                 return gameplay::PauseMenuOption::RestartRun;
-            case visual::HudPauseSelection::Settings:
-                return gameplay::PauseMenuOption::Settings;
-            case visual::HudPauseSelection::Controls:
-                return gameplay::PauseMenuOption::Controls;
             case visual::HudPauseSelection::MainMenu:
                 return gameplay::PauseMenuOption::MainMenu;
-            case visual::HudPauseSelection::ExitGame:
-                return gameplay::PauseMenuOption::ExitGame;
+            case visual::HudPauseSelection::Settings:
+                return gameplay::PauseMenuOption::Settings;
             case visual::HudPauseSelection::Resume:
                 return gameplay::PauseMenuOption::Resume;
             }
@@ -1991,36 +2171,15 @@ void Application::processEvents()
         }
         if (command == gameplay::PauseMenuCommand::Resume) {
             setPaused(false);
-        } else if (command == gameplay::PauseMenuCommand::RestartRun) {
-            if (!stageCampaignFloorReplay()) {
-                fatalError_ = true;
-                running_ = false;
-                return;
-            }
-            log(LogLevel::Info, "Pause menu requested the same seed restart");
-            (void)session_.update(
-                false, world::RoomRole::Count, false, false);
-            restartMode_ = gameplay::RunRestartMode::SameSeed;
-            restartRequested_ = true;
-            running_ = false;
+        } else if (command == gameplay::PauseMenuCommand::RestartRun
+            || command == gameplay::PauseMenuCommand::MainMenu) {
+            pauseConfirmationCommand_ = command;
+            gameplay::openExitConfirmation(exitConfirmation_);
         } else if (command == gameplay::PauseMenuCommand::Settings) {
-            menuFlow_ = {}; menuFlow_.page = MenuPage::Settings;
+            menuFlow_ = {}; openConfigurationSection(menuFlow_, 0U);
             gameplay::openSettingsMenu(
                 settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
             log(LogLevel::Info, "Pause menu opened settings");
-        } else if (command == gameplay::PauseMenuCommand::Controls) {
-            menuFlow_ = {}; menuFlow_.page = MenuPage::Controls;
-            gameplay::openSettingsMenu(settingsMenu_, gameplay::SettingsMenuOrigin::PauseMenu);
-            log(LogLevel::Info, "Pause menu opened controls");
-        } else if (command == gameplay::PauseMenuCommand::MainMenu) {
-            log(LogLevel::Info, "Pause menu requested main menu");
-            if (!returnToMainMenu()) {
-                fatalError_ = true;
-                running_ = false;
-            }
-        } else if (command == gameplay::PauseMenuCommand::ExitGame) {
-            gameplay::openExitConfirmation(exitConfirmation_);
-            log(LogLevel::Info, "Pause menu opened exit confirmation");
         }
         return;
     }
@@ -2157,6 +2316,7 @@ bool Application::returnToMainMenu()
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
+    corridorMaterialKeys_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();
     activeImpacts_.clear();
@@ -2245,6 +2405,30 @@ void Application::applyRuntimeSettings()
         gameplay::mouseSensitivity(runtimeSettings_));
     player_.setInvertMouseY(runtimeSettings_.invertMouseY);
     if (window_ != nullptr) {
+        if (runtimeSettings_.fullscreen
+            && appliedFullscreenResolution_ != runtimeSettings_.windowResolution) {
+            const SDL_DisplayID display = SDL_GetDisplayForWindow(window_);
+            int modeCount = 0;
+            SDL_DisplayMode** modes = display
+                ? SDL_GetFullscreenDisplayModes(display, &modeCount) : nullptr;
+            const auto desired = gameplay::windowResolutionSize(
+                runtimeSettings_.windowResolution);
+            const SDL_DisplayMode* selected = nullptr;
+            for (int i = 0; modes && i < modeCount; ++i) {
+                if (modes[i]->w == desired.width && modes[i]->h == desired.height
+                    && (!selected || modes[i]->refresh_rate > selected->refresh_rate))
+                    selected = modes[i];
+            }
+            if (!SDL_SetWindowFullscreenMode(window_, selected)) {
+                appliedFullscreenResolution_.reset();
+                log(LogLevel::Warning, sdlError("Fullscreen resolution unavailable"));
+            } else {
+                appliedFullscreenResolution_ = runtimeSettings_.windowResolution;
+            }
+            SDL_free(modes);
+        } else if (!runtimeSettings_.fullscreen) {
+            appliedFullscreenResolution_.reset();
+        }
         const bool fullscreen
             = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0U;
         if (fullscreen != runtimeSettings_.fullscreen
@@ -3259,7 +3443,12 @@ void Application::fixedUpdate(const double fixedStep)
             }
         }
         if (std::any_of(signals.signals.begin(), signals.signals.begin() + signals.count,
-                [](const auto& signal) { return signal.outcome == gameplay::ShotOutcome::Destroyed; })) {
+                [this](const auto& signal) {
+                    if (signal.outcome == gameplay::ShotOutcome::Destroyed) return true;
+                    const auto* prop = entities_.findData<entities::PropData>(signal.target);
+                    return signal.outcome == gameplay::ShotOutcome::Hit && prop
+                        && prop->type == entities::PropType::LaboratoryPlanter;
+                })) {
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
         }
@@ -3367,13 +3556,14 @@ void Application::fixedUpdate(const double fixedStep)
         const gameplay::GrenadeBlastResult result
             = gameplay::resolveGrenadeBlast(blast, player_, entities_);
         grenadeHitPlayer = grenadeHitPlayer || result.playerDamaged;
-        bool destroyedProp = false;
+        bool changedPropCollider = false;
         for (const gameplay::GrenadeHit& hit : result.hits) {
             const auto* target = entities_.find(hit.target);
             if (!target) continue;
             if (hit.prop) {
-                destroyedProp = destroyedProp || hit.killed;
                 const auto* prop = entities_.findData<entities::PropData>(hit.target);
+                changedPropCollider = changedPropCollider || hit.killed
+                    || (prop && prop->type == entities::PropType::LaboratoryPlanter);
                 if (hit.killed && prop
                     && prop->type != entities::PropType::CeilingFixture)
                     awardProgress(gameplay::ProgressionEvent::PropDestroyed, 1U);
@@ -3394,7 +3584,7 @@ void Application::fixedUpdate(const double fixedStep)
                 }
             }
         }
-        if (destroyedProp) {
+        if (changedPropCollider) {
             collisionWorld_ = gameplay::collisionWorldWithProps(
                 baseCollisionWorld_, entities_, playerRoom);
         }
@@ -3623,18 +3813,18 @@ void Application::fixedUpdate(const double fixedStep)
     if (playerCommand_.interact) {
         const entities::Entity* terminal = entities_.find(terminalEntity_);
         if (terminal != nullptr && terminal->roomId == playerRoom) {
-            const wkc::core::Vec3 position = terminal->transform.position;
-            const std::array targets{
-                gameplay::InteractionTarget{
+            const entities::PropData* prop
+                = entities_.findData<entities::PropData>(terminalEntity_);
+            if (prop != nullptr) {
+                const std::array targets{gameplay::InteractionTarget{
                     terminalEntity_,
-                    {{position.x - 0.4F, position.y, position.z - 0.15F},
-                        {position.x + 0.4F, position.y + 2.0F, position.z + 0.15F}}},
-            };
-            if (const auto target = player_.findInteraction(targets)) {
-                terminalUsed = *target == terminalEntity_;
-                std::ostringstream message;
-                message << "Player interacted with entity " << target->packed();
-                log(LogLevel::Info, message.str());
+                    gameplay::propCollisionBounds(*terminal, *prop)}};
+                if (const auto target = player_.findInteraction(targets)) {
+                    terminalUsed = *target == terminalEntity_;
+                    std::ostringstream message;
+                    message << "Player interacted with entity " << target->packed();
+                    log(LogLevel::Info, message.str());
+                }
             }
         }
         interactionPending_ = false;
@@ -3952,12 +4142,17 @@ void Application::render()
         log(LogLevel::Warning, sdlError("SDL_GetWindowSizeInPixels failed"));
         return;
     }
+    int logicalWidth = width;
+    int logicalHeight = height;
+    (void)SDL_GetWindowSize(window_, &logicalWidth, &logicalHeight);
+    const std::uint16_t uiScalePercent = gameplay::resolvedUiScalePercent(
+        runtimeSettings_, width, height, logicalWidth, logicalHeight);
     const gameplay::GraphicsQualitySettings graphicsQuality
         = gameplay::effectiveGraphicsQualitySettings(runtimeSettings_);
     const visual::HudGraphicsQuality hudGraphicsQuality
         = static_cast<visual::HudGraphicsQuality>(runtimeSettings_.graphicsQuality);
 
-    const auto renderAndPresent = [this](auto&& drawFrame,
+    const auto renderAndPresent = [this, width, height, graphicsQuality](auto&& drawFrame,
                                       const std::string_view errorMessage) {
         using Clock = std::chrono::steady_clock;
         const auto renderStart = Clock::now();
@@ -3967,7 +4162,22 @@ void Application::render()
             = std::chrono::duration<double, std::milli>(
                 renderEnd - renderStart).count();
         if (!rendered) {
-            log(LogLevel::Error, errorMessage);
+            std::ostringstream details;
+            details << errorMessage << " | framebuffer " << width << 'x' << height
+                << " | render scale " << graphicsQuality.renderScalePercent << '%'
+                << " | graphics "
+                << gameplay::graphicsQualityName(runtimeSettings_.graphicsQuality);
+            log(LogLevel::Error, details.str());
+            if (renderer_ != nullptr
+                && runtimeSettings_.graphicsQuality == gameplay::GraphicsQuality::Custom
+                && runtimeSettings_.customGraphics.renderScalePercent > 100U) {
+                runtimeSettings_.customGraphics.renderScalePercent = 100U;
+                settingsDirty_ = true;
+                (void)savePersistedSettings();
+                log(LogLevel::Warning,
+                    "Renderer retrying next frame at 100% render scale");
+                return false;
+            }
             fatalError_ = true;
             running_ = false;
             return false;
@@ -4030,23 +4240,50 @@ void Application::render()
         return;
     }
 
-    if (settingsMenu_.active || mainMenu_.active) {
+    const auto fillFrontendMenuHud = [this, uiScalePercent](
+        visual::HudRenderData& hud) {
         const auto view = frontendMenuView();
-        SDL_SetWindowTitle(window_, ("GDP | " + view.title).c_str());
-        visual::HudRenderData hud;
-        hud.language = runtimeSettings_.language;
         hud.listMenu.active = true;
         hud.listMenu.titleScreen = menuFlow_.page == MenuPage::Root;
+        hud.listMenu.configuration = settingsMenu_.active;
+        hud.listMenu.configurationSection = configurationSection(menuFlow_);
+        hud.listMenu.configurationControlPage
+            = configurationControlPage(menuFlow_);
         hud.listMenu.title = view.title;
         hud.listMenu.subtitle = view.subtitle;
         hud.listMenu.selection = menuFlow_.selection;
+        hud.listMenu.uiScalePercent = uiScalePercent;
+        hud.uiScalePercent = uiScalePercent;
         for (const auto& row : view.rows) {
             hud.listMenu.rows.push_back(row.text);
             hud.listMenu.enabled.push_back(row.enabled);
             hud.listMenu.adjustable.push_back(row.setting.has_value());
             hud.listMenu.rawText.push_back(row.rawText);
+            float fraction = -1.0F;
+            if (row.setting) {
+                if (const auto numeric = gameplay::numericSettingDescriptor(
+                        runtimeSettings_, *row.setting)) {
+                    fraction = static_cast<float>(numeric->value - numeric->minimum)
+                        / static_cast<float>(numeric->maximum - numeric->minimum);
+                }
+            }
+            hud.listMenu.sliderFractions.push_back(fraction);
         }
+    };
+
+    if (mainMenu_.active || (settingsMenu_.active
+            && settingsMenu_.origin == gameplay::SettingsMenuOrigin::MainMenu)) {
+        const auto view = frontendMenuView();
+        SDL_SetWindowTitle(window_, ("GDP | " + view.title).c_str());
+        visual::HudRenderData hud;
+        hud.language = runtimeSettings_.language;
+        fillFrontendMenuHud(hud);
+        if (menuFlow_.page == MenuPage::Root) hud.uiScalePercent = 100U;
         hud.exitConfirmation = exitConfirmation_.active;
+        if (pauseConfirmationCommand_ == gameplay::PauseMenuCommand::RestartRun)
+            hud.pauseConfirmation = visual::HudPauseSelection::RestartRun;
+        else if (pauseConfirmationCommand_ == gameplay::PauseMenuCommand::MainMenu)
+            hud.pauseConfirmation = visual::HudPauseSelection::MainMenu;
         if (exitConfirmation_.selection == gameplay::ExitConfirmationOption::ExitGame)
             hud.exitConfirmationSelection = visual::HudExitConfirmationSelection::ExitGame;
         const auto backdrop = visual::sampleMenuBackdrop(menuBackdropSeconds_);
@@ -4220,6 +4457,9 @@ void Application::render()
     for (const entities::EntityId id : entities_.query(entities::EntityKind::Prop)) {
         const entities::Entity* entity = entities_.find(id);
         const entities::PropData* prop = entities_.findData<entities::PropData>(id);
+        const bool visibleTerminal = prop != nullptr
+            && prop->type == entities::PropType::Terminal
+            && (id == terminalEntity_ || id == exitTerminalEntity_);
         const bool onScreen = entity != nullptr && sphereIsVisible(
             entity->transform.position
                 + wkc::core::Vec3{
@@ -4231,8 +4471,12 @@ void Application::render()
                 && entity->roomId == playerRoom))
             || (prop->type != entities::PropType::Crate
                 && prop->type != entities::PropType::StorageBox
+                && prop->type != entities::PropType::LaboratoryPlanter
+                && prop->type != entities::PropType::SecurityMonitor
+                && prop->type != entities::PropType::CafeteriaPlanter
                 && prop->type != entities::PropType::Canister
-                && prop->type != entities::PropType::Barricade)) {
+                && prop->type != entities::PropType::Barricade
+                && !visibleTerminal)) {
             continue;
         }
         visual::PropVisualRole role = visual::PropVisualRole::Crate;
@@ -4241,7 +4485,16 @@ void Application::render()
         } else if (prop->type == entities::PropType::Barricade) {
             role = visual::PropVisualRole::Barricade;
         } else if (prop->type == entities::PropType::StorageBox) {
-            role = visual::PropVisualRole::StorageBox;
+            role = prop->tabletopBox ? visual::PropVisualRole::TableBox
+                                     : visual::PropVisualRole::StorageBox;
+        } else if (prop->type == entities::PropType::LaboratoryPlanter) {
+            role = visual::PropVisualRole::LaboratoryPlanter;
+        } else if (prop->type == entities::PropType::SecurityMonitor) {
+            role = visual::PropVisualRole::SecurityMonitor;
+        } else if (prop->type == entities::PropType::CafeteriaPlanter) {
+            role = visual::PropVisualRole::CafeteriaPlanter;
+        } else if (visibleTerminal) {
+            role = visual::PropVisualRole::Terminal;
         }
         visual::PropVisualState state = visual::PropVisualState::Intact;
         if (prop->state == entities::PropState::Damaged) {
@@ -4249,12 +4502,89 @@ void Application::render()
         } else if (prop->state == entities::PropState::Destroyed) {
             state = visual::PropVisualState::Destroyed;
         }
+        world::RoomTheme propTheme = world::RoomTheme::Industrial;
+        bool bossArenaProp = false;
+        if (world_) {
+            const auto propRoom = std::find_if(world_->rooms.begin(),
+                world_->rooms.end(), [entity](const world::RoomInstance& candidate) {
+                    return candidate.id == entity->roomId;
+                });
+            if (propRoom != world_->rooms.end()) {
+                propTheme = propRoom->theme;
+                bossArenaProp = propRoom->role == world::RoomRole::Boss
+                    || propRoom->moduleId == world::bossRoomPreviewModuleId;
+            }
+        }
+        std::optional<visual::PickupVisualRole> crateDrop;
+        if (prop->type == entities::PropType::Crate
+            && prop->dropQuantity > 0U) {
+            crateDrop = prop->dropType == entities::ItemType::Health
+                ? visual::PickupVisualRole::Health
+                : visual::PickupVisualRole::Ammo;
+        }
+        visual::TerminalVisualState terminalState
+            = visual::TerminalVisualState::Standby;
+        if (visibleTerminal && id == exitTerminalEntity_) {
+            terminalState = session_.state().campaignExitReady
+                ? visual::TerminalVisualState::Ready
+                : visual::TerminalVisualState::Locked;
+        } else if (visibleTerminal) {
+            const auto event = std::find_if(roomEvents_.begin(), roomEvents_.end(),
+                [entity](const gameplay::RoomEventRuntime& runtime) {
+                    return runtime.roomId == entity->roomId;
+                });
+            if (event != roomEvents_.end()) {
+                terminalState = event->phase == gameplay::RoomEventPhase::Active
+                    ? visual::TerminalVisualState::Alert
+                    : event->phase == gameplay::RoomEventPhase::Completed
+                        ? visual::TerminalVisualState::Ready
+                        : visual::TerminalVisualState::Standby;
+            }
+        } else if (role == visual::PropVisualRole::SecurityMonitor) {
+            if (config_.securityIndicatorDemo) {
+                const float seconds = std::fmod(
+                    static_cast<float>(session_.state().elapsedRunTicks)
+                        / static_cast<float>(gameplay::runTimerTicksPerSecond),
+                    23.0F);
+                terminalState = seconds < 10.0F
+                    ? visual::TerminalVisualState::Alert
+                    : seconds < 13.0F
+                        ? visual::TerminalVisualState::Locked
+                        : visual::TerminalVisualState::Ready;
+            } else {
+                const auto event = std::find_if(roomEvents_.begin(),
+                    roomEvents_.end(), [entity](const auto& runtime) {
+                        return runtime.roomId == entity->roomId;
+                    });
+                if (event != roomEvents_.end()) {
+                    if (event->phase == gameplay::RoomEventPhase::Active) {
+                        terminalState = visual::TerminalVisualState::Alert;
+                    } else if (event->phase
+                        == gameplay::RoomEventPhase::Completed) {
+                        const auto start = roomEventPhaseStartTicks_.find(
+                            entity->roomId);
+                        const auto elapsed = start != roomEventPhaseStartTicks_.end()
+                            ? session_.state().elapsedRunTicks - start->second
+                            : 3U * gameplay::runTimerTicksPerSecond;
+                        terminalState = elapsed < 3U
+                                * gameplay::runTimerTicksPerSecond
+                            ? visual::TerminalVisualState::Locked
+                            : visual::TerminalVisualState::Ready;
+                    }
+                }
+            }
+        }
         visibleProps.push_back({
             entity->transform.position,
             entity->transform.scale,
             role,
             state,
             prop->visualSeed,
+            propTheme,
+            crateDrop,
+            entity->transform.rotationDegrees.y,
+            terminalState,
+            bossArenaProp,
         });
         if (onScreen) ++onScreenPropCount;
     }
@@ -4381,9 +4711,7 @@ void Application::render()
             if (const auto architecture = roomArchitectureParts_.find(currentRoom->id);
                 architecture != roomArchitectureParts_.end()) {
                 roomRender.architectureParts = architecture->second;
-                roomRender.customArchitecture = usesAuthoredRoomArchitecture(*currentRoom)
-                    && currentRoom->role != world::RoomRole::Boss
-                    && currentRoom->moduleId != world::bossRoomPreviewModuleId;
+                roomRender.customArchitecture = world::usesAuthoredRoomArchitecture(*currentRoom);
             }
             if (const auto material = roomMaterialKeys_.find(currentRoom->id);
                 material != roomMaterialKeys_.end()) {
@@ -4458,6 +4786,9 @@ void Application::render()
             appendConnectedRoomLights(
                 lighting, *world_, roomLighting_, entities_,
                 roomFixtureEntities_, playerRoom, player_.state().position);
+            appendNearbyCorridorLights(
+                lighting, *world_, playerRoom, player_.state().position,
+                graphicsQuality.maximumLights);
             lighting.lightCount = std::min<std::uint32_t>(
                 lighting.lightCount, graphicsQuality.maximumLights);
             if (config_.fixturePreviewVariant || config_.centralHubPreview) {
@@ -4517,6 +4848,16 @@ void Application::render()
                     if (prop.state == visual::PropVisualState::Destroyed) {
                         continue;
                     }
+                    if (prop.role == visual::PropVisualRole::Terminal) {
+                        const gameplay::PropSolidBounds physical
+                            = gameplay::terminalPhysicalBounds(
+                                prop.position, prop.scale);
+                        for (std::size_t index = 0U; index < physical.count;
+                             ++index) {
+                            appendShadowOccluder(physical.parts[index]);
+                        }
+                        continue;
+                    }
                     const wkc::core::Vec3 half{
                         prop.scale.x * 0.5F, 0.0F, prop.scale.z * 0.5F};
                     appendShadowOccluder({
@@ -4570,8 +4911,8 @@ void Application::render()
                     std::span<const wkc::core::Vec3>{corridor.points},
                     corridor.width,
                     corridor.height,
-                    roomMaterialKeys_.contains(corridor.firstRoom)
-                        ? roomMaterialKeys_.at(corridor.firstRoom) : 0U,
+                    corridorMaterialKeys_.contains(corridor.edge)
+                        ? corridorMaterialKeys_.at(corridor.edge) : 0U,
                 };
                 const std::optional<wkc::core::Aabb> corridorBounds
                     = visual::corridorRenderBounds(renderedCorridor);
@@ -4603,9 +4944,7 @@ void Application::render()
                 if (const auto architecture = roomArchitectureParts_.find(renderedRoom.id);
                     architecture != roomArchitectureParts_.end()) {
                     connected.architectureParts = architecture->second;
-                    connected.customArchitecture = usesAuthoredRoomArchitecture(renderedRoom)
-                        && renderedRoom.role != world::RoomRole::Boss
-                        && renderedRoom.moduleId != world::bossRoomPreviewModuleId;
+                    connected.customArchitecture = world::usesAuthoredRoomArchitecture(renderedRoom);
                 }
                 connectedRooms.push_back(connected);
                 const std::size_t connectedIndex = static_cast<std::size_t>(
@@ -4645,6 +4984,16 @@ void Application::render()
                             && edgeTouchesRoom(*world_, edge, runtime.roomId);
                     });
             };
+            std::vector<world::EdgeId> inspectionDoorEdges;
+            for (const world::RoomInstance& candidate : world_->rooms) {
+                if (candidate.theme != world::RoomTheme::Security
+                    && candidate.theme != world::RoomTheme::Laboratory) {
+                    continue;
+                }
+                for (const world::ConnectorInstance& connector : candidate.connectors) {
+                    if (connector.edge) inspectionDoorEdges.push_back(*connector.edge);
+                }
+            }
             for (const world::RoomInstance& renderedRoom : world_->rooms) {
                 if (std::find(geometryRooms.begin(), geometryRooms.end(), renderedRoom.id)
                     == geometryRooms.end()) {
@@ -4665,6 +5014,9 @@ void Application::render()
                         edgeIsLocked(*connector.edge),
                         door == doorRuntimes_.end() ? 0.0F
                             : gameplay::doorPanelTravel(door->second.openness),
+                        std::find(inspectionDoorEdges.begin(),
+                            inspectionDoorEdges.end(), *connector.edge)
+                                != inspectionDoorEdges.end(),
                     });
                 }
             }
@@ -4692,6 +5044,7 @@ void Application::render()
     SDL_SetWindowTitle(window_, localize(runtimeSettings_.language, title.str()).c_str());
     visual::HudRenderData hud;
     hud.language = runtimeSettings_.language;
+    if (settingsMenu_.active) fillFrontendMenuHud(hud);
     hud.visible = true;
     hud.flashlightOn = flashlightOn_ && player_.state().alive;
     const auto promptDevice = config_.enableGamepad && gamepadConnected_
@@ -4873,7 +5226,12 @@ void Application::render()
     }
     hud.noticeFeedbackStrength = gameplay::noticeFeedbackStrength(feedback_);
     hud.paused = pauseMenu_.paused;
+    hud.uiScalePercent = uiScalePercent;
     hud.exitConfirmation = exitConfirmation_.active;
+    if (pauseConfirmationCommand_ == gameplay::PauseMenuCommand::RestartRun)
+        hud.pauseConfirmation = visual::HudPauseSelection::RestartRun;
+    else if (pauseConfirmationCommand_ == gameplay::PauseMenuCommand::MainMenu)
+        hud.pauseConfirmation = visual::HudPauseSelection::MainMenu;
     if (exitConfirmation_.selection
         == gameplay::ExitConfirmationOption::ExitGame) {
         hud.exitConfirmationSelection
@@ -4881,14 +5239,10 @@ void Application::render()
     }
     if (pauseMenu_.selection == gameplay::PauseMenuOption::RestartRun) {
         hud.pauseSelection = visual::HudPauseSelection::RestartRun;
-    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Settings) {
-        hud.pauseSelection = visual::HudPauseSelection::Settings;
-    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Controls) {
-        hud.pauseSelection = visual::HudPauseSelection::Controls;
     } else if (pauseMenu_.selection == gameplay::PauseMenuOption::MainMenu) {
         hud.pauseSelection = visual::HudPauseSelection::MainMenu;
-    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::ExitGame) {
-        hud.pauseSelection = visual::HudPauseSelection::ExitGame;
+    } else if (pauseMenu_.selection == gameplay::PauseMenuOption::Settings) {
+        hud.pauseSelection = visual::HudPauseSelection::Settings;
     }
     if (resultMenu_.selection == gameplay::ResultMenuOption::ReplaySeed) {
         hud.resultMenuSelection = visual::HudResultMenuSelection::ReplaySeed;
@@ -4970,13 +5324,13 @@ void Application::render()
             && session_.state().mode == gameplay::RunMode::TestMode) {
             const entities::Entity* terminal = entities_.find(terminalEntity_);
             if (terminal != nullptr && terminal->roomId == playerRoom) {
-                const wkc::core::Vec3 position = terminal->transform.position;
+                const entities::PropData* prop
+                    = entities_.findData<entities::PropData>(terminalEntity_);
                 const std::array targets{gameplay::InteractionTarget{
-                    terminalEntity_,
-                    {{position.x - 0.4F, position.y, position.z - 0.15F},
-                        {position.x + 0.4F, position.y + 2.0F,
-                            position.z + 0.15F}}}};
-                if (player_.findInteraction(targets) == terminalEntity_) {
+                    terminalEntity_, prop == nullptr ? wkc::core::Aabb{}
+                        : gameplay::propCollisionBounds(*terminal, *prop)}};
+                if (prop != nullptr
+                    && player_.findInteraction(targets) == terminalEntity_) {
                     hud.prompt = visual::HudPrompt::Restock;
                 }
             }
@@ -5001,15 +5355,12 @@ void Application::render()
             && activeEvent->plan.trigger == world::RoomEventTrigger::TerminalUse) {
             const entities::Entity* terminal = entities_.find(terminalEntity_);
             if (terminal != nullptr && terminal->roomId == playerRoom) {
-                const wkc::core::Vec3 position = terminal->transform.position;
-                const std::array targets{
-                    gameplay::InteractionTarget{
-                        terminalEntity_,
-                        {{position.x - 0.4F, position.y, position.z - 0.15F},
-                            {position.x + 0.4F, position.y + 2.0F,
-                                position.z + 0.15F}}},
-                };
-                if (player_.findInteraction(targets)) {
+                const entities::PropData* prop
+                    = entities_.findData<entities::PropData>(terminalEntity_);
+                const std::array targets{gameplay::InteractionTarget{
+                    terminalEntity_, prop == nullptr ? wkc::core::Aabb{}
+                        : gameplay::propCollisionBounds(*terminal, *prop)}};
+                if (prop != nullptr && player_.findInteraction(targets)) {
                     hud.prompt = visual::HudPrompt::UseTerminal;
                 }
             }
@@ -5167,6 +5518,7 @@ void Application::shutdown()
     roomLighting_.clear();
     roomFixtureEntities_.clear();
     roomMaterialKeys_.clear();
+    corridorMaterialKeys_.clear();
     roomArchitectureParts_.clear();
     doorRuntimes_.clear();
     doorAudioEventCounters_.clear();

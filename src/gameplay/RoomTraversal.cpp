@@ -102,24 +102,7 @@ void appendFixedRoomSolids(
     std::vector<wkc::core::Aabb>& solids,
     std::vector<wkc::core::Aabb>& octagonalSolids)
 {
-    const bool authored = room.role == gdp::world::RoomRole::Boss
-        || room.moduleId == gdp::world::bossRoomPreviewModuleId
-        || room.theme == gdp::world::RoomTheme::Storage
-        || room.moduleId == gdp::world::combatRoomPreviewModuleId
-        || room.moduleId == gdp::world::combatGalleryArenaModuleId
-        || room.moduleId == gdp::world::cafeteriaPreviewModuleId
-        || room.moduleId == gdp::world::cafeteriaLongPreviewModuleId
-        || room.moduleId == gdp::world::cafeteriaLongModuleId
-        || room.moduleId == gdp::world::laboratoryPreviewModuleId
-        || room.moduleId == gdp::world::laboratoryHallModuleId
-        || room.moduleId == gdp::world::technicalPreviewModuleId
-        || room.moduleId == gdp::world::technicalLPreviewModuleId
-        || room.moduleId == gdp::world::maintenanceLModuleId
-        || room.moduleId == gdp::world::securityPreviewModuleId
-        || room.moduleId == gdp::world::securityTPreviewModuleId
-        || room.moduleId == gdp::world::securityTModuleId
-        || room.moduleId == gdp::world::centralHubPreviewModuleId
-        || room.moduleId == gdp::world::centralHubModuleId;
+    const bool authored = gdp::world::usesAuthoredRoomArchitecture(room);
     if (authored) {
         for (const gdp::world::RoomArchitecturePart& part
             : gdp::world::makeRoomArchitecture(room)) {
@@ -132,8 +115,10 @@ void appendFixedRoomSolids(
             }
         }
     }
-    if (!authored || room.role == gdp::world::RoomRole::Boss
-        || room.moduleId == gdp::world::bossRoomPreviewModuleId) {
+    // Authored architecture owns its visible colliders. The legacy fixed-room
+    // obstacles have no visible counterpart in these rooms and would block
+    // movement and shots in empty space.
+    if (!authored) {
         const CollisionWorld fixed = CollisionWorld::fixedRoom(
             room.transform.position, room.rotation);
         solids.insert(solids.end(), fixed.solids().begin(), fixed.solids().end());

@@ -93,6 +93,21 @@ resultado final:
 
 ## Propostas ativas
 
+### Arena de Combate — composição v1
+
+```text
+unidade visual: Combat Room/Wall+Floor+Ceiling+Architecture
+versão: v1
+data: 2026-11-15
+proposta: visual/proposals/combat_arena_material_v1/README.md
+prancha: visual/proposals/combat_arena_material_v1/concept_board.png
+condições: Ready, Active, Scarred
+tile físico / UV: parede 6 x 6 m com placas de 3 x 3 m; piso e teto 2 x 2 m; UV por metros reais
+decisão do usuário: "prancha aprovada pode implementar, lembra de fazer a parte 3d das colunas e do teto, incluindo as muretas espaçhadas" em 15/11/2026
+estado: PRANCHA APROVADA; primeira prévia reprovada por divergência; revisão integrada de parede, piso, teto, galerias, escadas, corrimãos, colunas e muretas, agora com material próprio e relevo 3D nos obstáculos e reforços metálicos das colunas e mezaninos, em validação visual na build
+capturas técnicas: visual/validation/combat_arena_metal_details_v3/README.md
+```
+
 ### Técnica — materiais e props v1
 
 ```text
@@ -820,6 +835,37 @@ provisório por carcaça, aro, junta, lente e fixadores físicos, com atlas
 Contrato e prompt estão em
 [`proposals/ceiling_fixture_proposal_v1_hd.md`](proposals/ceiling_fixture_proposal_v1_hd.md).
 
+### Aço estrutural compartilhado — v2 sem grade repetida
+
+```text
+unidade visual: colunas, carcaças e detalhes com material estrutural compartilhado
+versão da proposta: v2 aço pintado contínuo
+referência: feedback do usuário com captura da coluna e do módulo Industrial
+data: 2026-11-22
+estado: IMPLEMENTADA EM VALIDAÇÃO
+capturas técnicas: visual/validation/structural_steel_v2_2026-11-22/
+resultado final: aceite visual em partida pendente
+```
+
+### Salas Industrial/Wall + móveis + piso — v3 grafite
+
+```text
+unidade visual: salas Industrial 101, 102, 103 e 105 / parede, móveis e piso
+versão da proposta: v3 grafite
+arquivo/prancha: visual/proposals/industrial_wall_v3_graphite_2026-11-22.png
+seeds de referência: 2 Maintained; 3 Used; 1 Worn; sala 103 com seed 4
+tile físico / mapeamento UV: painéis 2×2 em mapa 1024×1024, escala física
+decisão do usuário: gostou da proposta e pediu alinhar as cores dos móveis e do piso
+data: 2026-11-22
+estado: IMPLEMENTADA EM VALIDAÇÃO
+capturas técnicas: visual/validation/industrial_wall_v3_graphite_2026-11-22/
+resultado final: aceite visual em partida pendente
+```
+
+O corredor Industrial mantém seu material independente. A imagem da proposta é
+conceitual; as capturas técnicas são quadros do renderer e não substituem a
+avaliação do jogador.
+
 ### Industrial Corridor/Wall — v2 HD
 
 ```text
@@ -1188,7 +1234,7 @@ permanecem na prévia.
 |---|---|---|---|
 | Industrial Corridor | V2 HD aceita no jogo | Não revisada | V1 HD aceita no jogo |
 | Storage | V1 com seis variações aprovada no playtest | Três variantes aprovadas no playtest | Três variantes aprovadas no playtest |
-| Combat Room | Não revisada | Não revisada | Não revisada |
+| Combat Room | Proposta aprovada; revisão em validação | Proposta aprovada; revisão em validação | Proposta aprovada; revisão em validação |
 | Cafeteria | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA | V1 aprovada na captura NVIDIA/ULTRA |
 | Laboratory | V2 em validação na prévia | V1 em validação na prévia | V1 em validação na prévia |
 | Technical Area | Revisão v2 aprovada na Manutenção em L | Revisão v2 fosca aprovada na Manutenção em L | V1 com travessas 3D aprovada na Manutenção em L em 14/11/2026 |

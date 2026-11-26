@@ -21,6 +21,7 @@
 #include "gameplay/RoomEvents.hpp"
 #include "gameplay/Session.hpp"
 #include "gameplay/SettingsMenu.hpp"
+#include "game/MenuAdjustmentRepeat.hpp"
 #include "gameplay/Speedrun.hpp"
 #include "gameplay/ViewMotion.hpp"
 #include "gameplay/Weapon.hpp"
@@ -173,7 +174,12 @@ private:
     gameplay::SettingsMenuState settingsMenu_;
     bool controlsMenuActive_{false};
     gameplay::ExitConfirmationState exitConfirmation_;
+    gameplay::PauseMenuCommand pauseConfirmationCommand_{gameplay::PauseMenuCommand::None};
+    MenuAdjustmentRepeat menuAdjustmentRepeat_{};
+    bool numericAdjustmentPendingSave_{false};
+    std::optional<std::size_t> sliderDraggingRow_{};
     gameplay::RuntimeSettings runtimeSettings_;
+    std::optional<gameplay::WindowResolution> appliedFullscreenResolution_{};
     std::optional<std::filesystem::path> settingsPath_;
     std::optional<gameplay::SpeedrunRecord> speedrunRecord_;
     gameplay::SpeedrunRecordResult latestSpeedrunRecordResult_{
@@ -221,6 +227,7 @@ private:
     std::unordered_map<world::RoomId, std::vector<entities::EntityId>>
         roomFixtureEntities_;
     std::unordered_map<world::RoomId, std::uint64_t> roomMaterialKeys_;
+    std::unordered_map<world::EdgeId, std::uint64_t> corridorMaterialKeys_;
     std::unordered_map<world::RoomId,
         std::vector<world::RoomArchitecturePart>> roomArchitectureParts_;
     std::unordered_map<world::EdgeId, gameplay::DoorRuntime> doorRuntimes_;

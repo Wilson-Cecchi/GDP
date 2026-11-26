@@ -51,16 +51,18 @@ void menuTests() {
     expect(state.page == MenuPage::Controls && view().rows[0].text == "KEYBOARD / MOUSE"
         && view().rows[1].text == "CONTROLLER", "settings separate input devices");
     state.selection = 0U; (void)activateMenu(state, view(), slots);
-    expect(state.page == MenuPage::KeyboardControls && view().rows[2].text == "REMAP KEYS / MOUSE",
+    expect(state.page == MenuPage::KeyboardControls && view().rows[3].text == "REMAP KEYS / MOUSE",
         "keyboard controls keep existing settings");
-    state.selection = 2U; (void)activateMenu(state, view(), slots);
+    state.selection = 3U; (void)activateMenu(state, view(), slots);
     expect(view().rows.size() == 14U, "bindings fit two short pages rather than an overflowing list");
     state.selection = 0U; (void)activateMenu(state, view(), slots);
     expect(state.capture == ControlAction::Forward, "binding row starts input capture");
     (void)backMenu(state);
     expect(!state.capture && state.page == MenuPage::Bindings, "Esc cancels capture before leaving page");
-    (void)backMenu(state); (void)backMenu(state); (void)backMenu(state);
-    expect(backMenu(state) == MenuCommand::CloseSettings, "back from categories returns to settings origin");
+    (void)backMenu(state);
+    expect(backMenu(state) == MenuCommand::CloseSettings
+        && state.page == MenuPage::Root,
+        "back from keyboard controls closes settings");
     state.page = MenuPage::Controls; state.selection = 1U;
     (void)activateMenu(state, view(), slots);
     expect(state.page == MenuPage::GamepadControls && view().rows[0].setting == SettingsMenuOption::GamepadMoveStick
@@ -84,7 +86,8 @@ void menuTests() {
     settings.language = Language::PortugueseBrazil;
     auto feedbackView = view();
     expect(feedbackView.rows[1].rawText && feedbackView.rows[1].text == "GAMEPLAY feedback"
-        && feedbackView.rows[9].enabled, "player-written text stays untranslated and valid message enables send");
+        && feedbackView.rows[feedbackView.rows.size() - 2U].enabled,
+        "player-written text stays untranslated and valid message enables send");
     (void)backMenu(state);
     expect(state.page == MenuPage::FeedbackCategory && state.feedbackDraft == "GAMEPLAY feedback",
         "draft survives navigation");
@@ -92,8 +95,9 @@ void menuTests() {
     (void)activateMenu(state, view(), slots);
     expect(state.page == MenuPage::FeedbackCategory && state.feedbackFromSettings,
         "settings can open the same feedback flow while paused");
-    (void)backMenu(state);
-    expect(state.page == MenuPage::Settings, "feedback returns to settings origin");
+    expect(backMenu(state) == MenuCommand::CloseSettings
+        && state.page == MenuPage::Root,
+        "feedback returns to the title when opened from settings");
 }
 void feedbackTests() {
     using namespace gdp::game;
@@ -311,20 +315,30 @@ void layoutTests() {
                 && rect.y + rect.height <= dimensions[1], "tactical HUD corner groups remain in viewport");
         }
         for (std::size_t count = 2U; count <= 14U; ++count) {
-            auto layout = makeListMenuLayout(dimensions[0], dimensions[1], count);
-            expect(layout.rows.size() == count, "every menu row has a shared render/hit rectangle");
+            expect(makeListMenuLayout(dimensions[0], dimensions[1], count).rows.size() == count,
+                "every menu row has a shared render/hit rectangle");
             for (std::size_t i = 0U; i < count; ++i) {
+                const auto layout = makeListMenuLayout(dimensions[0], dimensions[1], count,
+                    false, 100U, i);
                 const auto r = layout.rows[i];
-                expect(r.x >= 0 && r.y >= 0 && r.x + r.width <= dimensions[0] && r.y + r.height <= dimensions[1], "rows remain inside viewport");
-                if (i > 0U) expect(r.y + r.height < layout.rows[i - 1U].y, "refined menu hit targets do not overlap");
+                expect(r.width > 0 && r.height > 0 && r.x >= 0 && r.y >= 0
+                    && r.x + r.width <= dimensions[0] && r.y + r.height <= dimensions[1],
+                    "selected row remains visible inside viewport while scrolling");
+                if (i > 0U && layout.rows[i - 1U].height > 0)
+                    expect(r.y + r.height < layout.rows[i - 1U].y,
+                        "visible menu hit targets do not overlap");
                 float x = static_cast<float>(r.x + r.width / 2);
                 float y = static_cast<float>(dimensions[1] - r.y - r.height / 2);
-                expect(listMenuSelectionAt(dimensions[0], dimensions[1], count, x, y) == i, "mouse finds exactly the rendered row");
-                expect(!listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count, x, y), "clicking label only selects");
+                expect(listMenuSelectionAt(dimensions[0], dimensions[1], count, x, y,
+                    false, 100U, i) == i, "mouse finds exactly the rendered row");
+                expect(!listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count,
+                    x, y, false, 100U, i), "clicking label only selects");
                 x = static_cast<float>(r.x + r.width - 30 * layout.scale);
-                expect(listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count, x, y) == -1, "left arrow reduces setting");
+                expect(listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count,
+                    x, y, false, 100U, i) == -1, "left arrow reduces setting");
                 x = static_cast<float>(r.x + r.width - 10 * layout.scale);
-                expect(listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count, x, y) == 1, "right arrow increases setting");
+                expect(listMenuAdjustmentDirectionAt(dimensions[0], dimensions[1], count,
+                    x, y, false, 100U, i) == 1, "right arrow increases setting");
             }
         }
     }

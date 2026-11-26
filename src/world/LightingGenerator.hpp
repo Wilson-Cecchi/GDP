@@ -11,6 +11,8 @@
 namespace gdp::world {
 
 inline constexpr std::size_t maxRoomLights = 5U;
+// Warm-neutral steel work lights shared by the playable gallery and captures.
+inline constexpr wkc::core::Vec3 combatGalleryFixtureColor{1.0F, 0.88F, 0.76F};
 
 enum class RoomLightingMood : std::uint8_t {
     Neutral,

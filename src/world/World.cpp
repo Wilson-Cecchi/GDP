@@ -56,6 +56,8 @@ std::uint64_t worldFingerprint(const World& world) noexcept
             hash = wkc::core::hashCombine(hash, connector.definitionId);
             hash = addVec3(hash, connector.worldPosition);
             hash = addVec3(hash, connector.worldNormal);
+            hash = addFloat(hash, connector.width);
+            hash = addFloat(hash, connector.height);
             hash = wkc::core::hashCombine(hash, connector.edge.value_or(0));
             hash = wkc::core::hashCombine(hash, connector.sealed ? 1U : 0U);
         }
@@ -63,6 +65,8 @@ std::uint64_t worldFingerprint(const World& world) noexcept
     for (const CorridorPath& corridor : world.corridors) {
         hash = wkc::core::hashCombine(hash, corridor.edge);
         hash = wkc::core::hashCombine(hash, static_cast<std::uint8_t>(corridor.shape));
+        hash = addFloat(hash, corridor.width);
+        hash = addFloat(hash, corridor.height);
         for (const wkc::core::Vec3 point : corridor.points) {
             hash = addVec3(hash, point);
         }

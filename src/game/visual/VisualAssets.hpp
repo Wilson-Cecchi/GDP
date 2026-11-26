@@ -3,6 +3,8 @@
 #include "procedural/AssetRecipe.hpp"
 #include "render/Texture.hpp"
 
+#include <cstdint>
+
 namespace gdp::game {
 
 struct CeilingFixtureMaterialImages {
@@ -15,7 +17,10 @@ struct CeilingFixtureMaterialImages {
 [[nodiscard]] wkc::render::ImageData makeIndustrialCheckerImage(
     int width = 8,
     int height = 8);
+[[nodiscard]] wkc::render::ImageData makeStructuralSteelImage(
+    std::uint8_t condition);
 [[nodiscard]] CeilingFixtureMaterialImages makeCeilingFixtureMaterialImages();
+[[nodiscard]] CeilingFixtureMaterialImages makeMissionTerminalMaterialImages();
 
 [[nodiscard]] wkc::procedural::MeshRecipe makeWorkerFoundationMeshRecipe(
     wkc::core::Seed seed = 0);

@@ -6,27 +6,15 @@
 namespace gdp::gameplay {
 namespace {
 
-constexpr std::array<WindowResolutionSize, 4> windowResolutionSizes{{
+constexpr std::array<WindowResolutionSize, 7> windowResolutionSizes{{
     {960U, 540U},
     {1280U, 720U},
     {1600U, 900U},
     {1920U, 1080U},
+    {2560U, 1440U},
+    {2880U, 1620U},
+    {3840U, 2160U},
 }};
-
-bool adjustPercent(
-    std::uint16_t& value,
-    const int direction,
-    const std::uint16_t minimum,
-    const std::uint16_t maximum,
-    const std::uint16_t step) noexcept
-{
-    const std::uint16_t previous = value;
-    const int adjusted = static_cast<int>(value)
-        + (direction > 0 ? static_cast<int>(step) : -static_cast<int>(step));
-    value = static_cast<std::uint16_t>(std::clamp(
-        adjusted, static_cast<int>(minimum), static_cast<int>(maximum)));
-    return value != previous;
-}
 
 bool applyGraphicsAdjustment(
     RuntimeSettings& settings,
@@ -81,6 +69,84 @@ void selectSettingsMenuOption(
     }
 }
 
+std::optional<NumericSettingDescriptor> numericSettingDescriptor(
+    const RuntimeSettings& settings, const SettingsMenuOption option) noexcept
+{
+    using O = SettingsMenuOption;
+    const auto quality = effectiveGraphicsQualitySettings(settings);
+    const auto percent = [](const std::uint16_t minimum,
+        const std::uint16_t maximum, const std::uint16_t step,
+        const std::uint16_t value, const std::uint16_t fallback) {
+        return NumericSettingDescriptor{minimum, maximum, step, value,
+            fallback, "%"};
+    };
+    switch (option) {
+    case O::MasterVolume: return percent(0U, 100U, 1U, settings.masterVolumePercent, 100U);
+    case O::EffectsVolume: return percent(0U, 100U, 1U, settings.effectsVolumePercent, 100U);
+    case O::AmbientVolume: return percent(0U, 100U, 1U, settings.ambientVolumePercent, 100U);
+    case O::UiVolume: return percent(0U, 100U, 1U, settings.uiVolumePercent, 100U);
+    case O::MouseSensitivity: return percent(1U, 300U, 1U, settings.mouseSensitivityPercent, 100U);
+    case O::MouseAimSensitivity: return percent(1U, 200U, 1U, settings.mouseAimSensitivityPercent, 100U);
+    case O::FieldOfView: return NumericSettingDescriptor{60U, 120U, 1U,
+        settings.fieldOfViewDegrees, 100U, "°"};
+    case O::RenderScale: return percent(50U, 150U, 1U, quality.renderScalePercent, 100U);
+    case O::MaximumLights: return NumericSettingDescriptor{1U, 16U, 1U,
+        quality.maximumLights, 8U, {}};
+    case O::UiScaleManual: return percent(75U, 200U, 5U, settings.uiScaleManualPercent, 100U);
+    case O::GamepadVibrationStrength: return percent(0U, 100U, 1U, settings.gamepadVibrationPercent, 50U);
+    case O::GamepadLookHorizontal: return percent(1U, 200U, 1U, settings.gamepadLookHorizontalPercent, 100U);
+    case O::GamepadLookVertical: return percent(1U, 200U, 1U, settings.gamepadLookVerticalPercent, 100U);
+    case O::GamepadAimSensitivity: return percent(1U, 200U, 1U, settings.gamepadAimSensitivityPercent, 100U);
+    case O::GamepadMoveDeadzone: return percent(0U, 40U, 1U, settings.gamepadMoveDeadzonePercent, 18U);
+    case O::GamepadLookDeadzone: return percent(0U, 40U, 1U, settings.gamepadLookDeadzonePercent, 18U);
+    default: return std::nullopt;
+    }
+}
+
+bool setRuntimeNumericSetting(RuntimeSettings& settings,
+    const SettingsMenuOption option, const int value) noexcept
+{
+    const auto descriptor = numericSettingDescriptor(settings, option);
+    if (!descriptor) return false;
+    const int bounded = std::clamp(value, static_cast<int>(descriptor->minimum),
+        static_cast<int>(descriptor->maximum));
+    const int step = descriptor->step;
+    const auto rounded = static_cast<std::uint16_t>(
+        std::clamp(static_cast<int>(descriptor->minimum)
+                + ((bounded - static_cast<int>(descriptor->minimum) + step / 2) / step) * step,
+            static_cast<int>(descriptor->minimum), static_cast<int>(descriptor->maximum)));
+    if (rounded == descriptor->value) return false;
+    using O = SettingsMenuOption;
+    switch (option) {
+    case O::MasterVolume: settings.masterVolumePercent = rounded; break;
+    case O::EffectsVolume: settings.effectsVolumePercent = rounded; break;
+    case O::AmbientVolume: settings.ambientVolumePercent = rounded; break;
+    case O::UiVolume: settings.uiVolumePercent = rounded; break;
+    case O::MouseSensitivity: settings.mouseSensitivityPercent = rounded; break;
+    case O::MouseAimSensitivity: settings.mouseAimSensitivityPercent = rounded; break;
+    case O::FieldOfView: settings.fieldOfViewDegrees = rounded; break;
+    case O::UiScaleManual: settings.uiScaleManualPercent = rounded; break;
+    case O::GamepadVibrationStrength: settings.gamepadVibrationPercent = rounded; break;
+    case O::GamepadLookHorizontal: settings.gamepadLookHorizontalPercent = rounded; break;
+    case O::GamepadLookVertical: settings.gamepadLookVerticalPercent = rounded; break;
+    case O::GamepadAimSensitivity: settings.gamepadAimSensitivityPercent = rounded; break;
+    case O::GamepadMoveDeadzone: settings.gamepadMoveDeadzonePercent = rounded; break;
+    case O::GamepadLookDeadzone: settings.gamepadLookDeadzonePercent = rounded; break;
+    case O::RenderScale: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        quality.renderScalePercent = rounded;
+        return applyGraphicsAdjustment(settings, quality);
+    }
+    case O::MaximumLights: {
+        auto quality = effectiveGraphicsQualitySettings(settings);
+        quality.maximumLights = static_cast<std::uint8_t>(rounded);
+        return applyGraphicsAdjustment(settings, quality);
+    }
+    default: return false;
+    }
+    return true;
+}
+
 bool adjustRuntimeSetting(
     RuntimeSettings& settings,
     const SettingsMenuOption option,
@@ -89,30 +155,22 @@ bool adjustRuntimeSetting(
     if (direction == 0) {
         return false;
     }
+    if (const auto descriptor = numericSettingDescriptor(settings, option)) {
+        return setRuntimeNumericSetting(settings, option,
+            static_cast<int>(descriptor->value)
+                + (direction > 0 ? descriptor->step : -static_cast<int>(descriptor->step)));
+    }
     switch (option) {
-    case SettingsMenuOption::MasterVolume:
-        return adjustPercent(
-            settings.masterVolumePercent, direction, 0U, 100U, 10U);
-    case SettingsMenuOption::EffectsVolume:
-        return adjustPercent(
-            settings.effectsVolumePercent, direction, 0U, 100U, 10U);
-    case SettingsMenuOption::AmbientVolume:
-        return adjustPercent(
-            settings.ambientVolumePercent, direction, 0U, 100U, 10U);
-    case SettingsMenuOption::UiVolume:
-        return adjustPercent(
-            settings.uiVolumePercent, direction, 0U, 100U, 10U);
-    case SettingsMenuOption::MouseSensitivity:
-        return adjustPercent(
-            settings.mouseSensitivityPercent, direction, 30U, 200U, 10U);
+    case SettingsMenuOption::UiScaleMode: {
+        const bool previous = settings.uiScaleAuto;
+        settings.uiScaleAuto = direction < 0;
+        return previous != settings.uiScaleAuto;
+    }
     case SettingsMenuOption::InvertMouseY: {
         const bool previous = settings.invertMouseY;
         settings.invertMouseY = direction > 0;
         return settings.invertMouseY != previous;
     }
-    case SettingsMenuOption::FieldOfView:
-        return adjustPercent(
-            settings.fieldOfViewDegrees, direction, 60U, 100U, 2U);
     case SettingsMenuOption::GraphicsQuality: {
         const GraphicsQuality previous = settings.graphicsQuality;
         const int maximum = static_cast<int>(GraphicsQuality::Ultra);
@@ -138,21 +196,6 @@ bool adjustRuntimeSetting(
     case SettingsMenuOption::DetailedMaterials: {
         auto quality = effectiveGraphicsQualitySettings(settings);
         quality.detailedMaterials = direction > 0;
-        return applyGraphicsAdjustment(settings, quality);
-    }
-    case SettingsMenuOption::RenderScale: {
-        auto quality = effectiveGraphicsQualitySettings(settings);
-        const auto current = static_cast<int>(quality.renderScalePercent);
-        const auto adjusted = direction > 0
-            ? std::min(100, ((current / 5) + 1) * 5)
-            : std::max(50, ((current - 1) / 5) * 5);
-        quality.renderScalePercent = static_cast<std::uint16_t>(adjusted);
-        return applyGraphicsAdjustment(settings, quality);
-    }
-    case SettingsMenuOption::MaximumLights: {
-        auto quality = effectiveGraphicsQualitySettings(settings);
-        quality.maximumLights = static_cast<std::uint8_t>(std::clamp(
-            static_cast<int>(quality.maximumLights) + (direction > 0 ? 1 : -1), 2, 8));
         return applyGraphicsAdjustment(settings, quality);
     }
     case SettingsMenuOption::WindowResolution: {
@@ -186,23 +229,11 @@ bool adjustRuntimeSetting(
         settings.gamepadVibration = direction > 0;
         return settings.gamepadVibration != previous;
     }
-    case SettingsMenuOption::GamepadVibrationStrength:
-        return adjustPercent(settings.gamepadVibrationPercent, direction, 0U, 100U, 10U);
     case SettingsMenuOption::GamepadMoveStick: {
         const bool previous = settings.gamepadSouthpaw;
         settings.gamepadSouthpaw = direction > 0;
         return settings.gamepadSouthpaw != previous;
     }
-    case SettingsMenuOption::GamepadLookHorizontal:
-        return adjustPercent(settings.gamepadLookHorizontalPercent, direction, 30U, 200U, 10U);
-    case SettingsMenuOption::GamepadLookVertical:
-        return adjustPercent(settings.gamepadLookVerticalPercent, direction, 30U, 200U, 10U);
-    case SettingsMenuOption::GamepadAimSensitivity:
-        return adjustPercent(settings.gamepadAimSensitivityPercent, direction, 30U, 150U, 10U);
-    case SettingsMenuOption::GamepadMoveDeadzone:
-        return adjustPercent(settings.gamepadMoveDeadzonePercent, direction, 0U, 40U, 2U);
-    case SettingsMenuOption::GamepadLookDeadzone:
-        return adjustPercent(settings.gamepadLookDeadzonePercent, direction, 0U, 40U, 2U);
     case SettingsMenuOption::GamepadInvertY: {
         const bool previous = settings.invertGamepadY;
         settings.invertGamepadY = direction > 0;
@@ -210,6 +241,22 @@ bool adjustRuntimeSetting(
     }
     case SettingsMenuOption::Back:
     case SettingsMenuOption::Count:
+    case SettingsMenuOption::MasterVolume:
+    case SettingsMenuOption::EffectsVolume:
+    case SettingsMenuOption::AmbientVolume:
+    case SettingsMenuOption::UiVolume:
+    case SettingsMenuOption::MouseSensitivity:
+    case SettingsMenuOption::MouseAimSensitivity:
+    case SettingsMenuOption::UiScaleManual:
+    case SettingsMenuOption::FieldOfView:
+    case SettingsMenuOption::RenderScale:
+    case SettingsMenuOption::MaximumLights:
+    case SettingsMenuOption::GamepadVibrationStrength:
+    case SettingsMenuOption::GamepadLookHorizontal:
+    case SettingsMenuOption::GamepadLookVertical:
+    case SettingsMenuOption::GamepadAimSensitivity:
+    case SettingsMenuOption::GamepadMoveDeadzone:
+    case SettingsMenuOption::GamepadLookDeadzone:
         return false;
     }
     return false;
@@ -249,8 +296,27 @@ float mouseSensitivity(const RuntimeSettings& settings) noexcept
 {
     constexpr float baseSensitivity = 0.12F;
     const std::uint16_t percent = std::clamp<std::uint16_t>(
-        settings.mouseSensitivityPercent, 30U, 200U);
+        settings.mouseSensitivityPercent, 1U, 300U);
     return baseSensitivity * (static_cast<float>(percent) / 100.0F);
+}
+
+std::uint16_t resolvedUiScalePercent(const RuntimeSettings& settings,
+    const int drawableWidth, const int drawableHeight,
+    const int windowWidth, const int windowHeight) noexcept
+{
+    if (!settings.uiScaleAuto)
+        return std::clamp<std::uint16_t>(settings.uiScaleManualPercent, 75U, 200U);
+    // SDL reports drawable and logical dimensions separately on high DPI displays.
+    // Prefer logical height when the ratio shows OS scaling, then keep the
+    // calibrated pixel-height fallback deterministic on ordinary displays.
+    const bool highDpi = windowWidth > 0 && windowHeight > 0
+        && drawableWidth > windowWidth * 5 / 4
+        && drawableHeight > windowHeight * 5 / 4;
+    const int usefulHeight = highDpi ? windowHeight : drawableHeight;
+    if (usefulHeight >= 1900) return 200U;
+    if (usefulHeight >= 1530) return 150U;
+    if (usefulHeight >= 1260) return 125U;
+    return 100U;
 }
 
 GraphicsQualitySettings graphicsQualitySettings(
@@ -332,16 +398,22 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     settings.uiVolumePercent = std::min<std::uint16_t>(
         settings.uiVolumePercent, 100U);
     settings.mouseSensitivityPercent = std::clamp<std::uint16_t>(
-        settings.mouseSensitivityPercent, 30U, 200U);
+        settings.mouseSensitivityPercent, 1U, 300U);
+    settings.mouseAimSensitivityPercent = std::clamp<std::uint16_t>(
+        settings.mouseAimSensitivityPercent, 1U, 200U);
+    settings.uiScaleManualPercent = std::clamp<std::uint16_t>(
+        settings.uiScaleManualPercent, 75U, 200U);
+    settings.uiScaleManualPercent = static_cast<std::uint16_t>(75U
+        + ((settings.uiScaleManualPercent - 75U + 2U) / 5U) * 5U);
     settings.fieldOfViewDegrees = std::clamp<std::uint16_t>(
-        settings.fieldOfViewDegrees, 60U, 100U);
+        settings.fieldOfViewDegrees, 60U, 120U);
     if (settings.graphicsQuality >= GraphicsQuality::Count) {
-        settings.graphicsQuality = GraphicsQuality::Medium;
+        settings.graphicsQuality = GraphicsQuality::Ultra;
     }
     settings.customGraphics.renderScalePercent = std::clamp<std::uint16_t>(
-        settings.customGraphics.renderScalePercent, 50U, 100U);
+        settings.customGraphics.renderScalePercent, 50U, 150U);
     settings.customGraphics.maximumLights = std::clamp<std::uint8_t>(
-        settings.customGraphics.maximumLights, 2U, 8U);
+        settings.customGraphics.maximumLights, 1U, 16U);
     settings.customGraphics.maximumShadowLights = std::min<std::uint8_t>(
         settings.customGraphics.maximumShadowLights, 8U);
     settings.customGraphics.maximumShadowOccluders = std::min<std::uint8_t>(
@@ -361,9 +433,9 @@ RuntimeSettings sanitizeRuntimeSettings(RuntimeSettings settings) noexcept
     if (!validateControlBindings(settings.controls)) settings.controls = {};
     if (!validateGamepadBindings(settings.gamepadControls)) settings.gamepadControls = {};
     settings.gamepadVibrationPercent = std::min<std::uint16_t>(settings.gamepadVibrationPercent, 100U);
-    settings.gamepadLookHorizontalPercent = std::clamp<std::uint16_t>(settings.gamepadLookHorizontalPercent, 30U, 200U);
-    settings.gamepadLookVerticalPercent = std::clamp<std::uint16_t>(settings.gamepadLookVerticalPercent, 30U, 200U);
-    settings.gamepadAimSensitivityPercent = std::clamp<std::uint16_t>(settings.gamepadAimSensitivityPercent, 30U, 150U);
+    settings.gamepadLookHorizontalPercent = std::clamp<std::uint16_t>(settings.gamepadLookHorizontalPercent, 1U, 200U);
+    settings.gamepadLookVerticalPercent = std::clamp<std::uint16_t>(settings.gamepadLookVerticalPercent, 1U, 200U);
+    settings.gamepadAimSensitivityPercent = std::clamp<std::uint16_t>(settings.gamepadAimSensitivityPercent, 1U, 200U);
     settings.gamepadMoveDeadzonePercent = std::min<std::uint16_t>(settings.gamepadMoveDeadzonePercent, 40U);
     settings.gamepadLookDeadzonePercent = std::min<std::uint16_t>(settings.gamepadLookDeadzonePercent, 40U);
     return settings;

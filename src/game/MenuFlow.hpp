@@ -53,8 +53,13 @@ struct MenuView {
     std::vector<MenuRow> rows;
 };
 [[nodiscard]] MenuView makeMenuView(const MenuFlowState&, const std::array<CampaignSlotInfo, 3>&,
-    const std::vector<gameplay::SpeedrunRecord>& leaderboard, const gameplay::RuntimeSettings&, bool testMode);
+    const std::vector<gameplay::SpeedrunRecord>& leaderboard, const gameplay::RuntimeSettings&,
+    bool testMode, bool gamepadRumbleAvailable = true);
 void moveMenuSelection(MenuFlowState&, const MenuView&, int direction) noexcept;
 [[nodiscard]] MenuCommand activateMenu(MenuFlowState&, const MenuView&, const std::array<CampaignSlotInfo, 3>&);
 [[nodiscard]] MenuCommand backMenu(MenuFlowState&) noexcept;
+[[nodiscard]] std::uint8_t configurationSection(const MenuFlowState&) noexcept;
+void openConfigurationSection(MenuFlowState&, std::uint8_t section) noexcept;
+[[nodiscard]] std::uint8_t configurationControlPage(const MenuFlowState&) noexcept;
+void openConfigurationControlPage(MenuFlowState&, std::uint8_t page) noexcept;
 } // namespace gdp::game

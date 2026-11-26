@@ -266,6 +266,47 @@ void testRotatedRoomCollisionMatchesModuleBounds()
     }
 }
 
+void testIndustrialRoomsDoNotKeepInvisibleFixedProps()
+{
+    using namespace gdp;
+    const auto library = world::makeDefaultRoomModuleLibrary();
+    for (const world::RoomModuleId moduleId : {101U, 103U}) {
+        const auto module = std::find_if(library.begin(), library.end(),
+            [moduleId](const world::RoomModule& candidate) {
+                return candidate.id == moduleId;
+            });
+        expect(module != library.end(), "Industrial module exists for collision test");
+        if (module == library.end()) continue;
+        for (const wkc::core::QuarterTurn rotation : {
+                 wkc::core::QuarterTurn::Degrees0,
+                 wkc::core::QuarterTurn::Degrees90,
+                 wkc::core::QuarterTurn::Degrees180,
+                 wkc::core::QuarterTurn::Degrees270}) {
+            const auto room = world::instantiateRoom(*module, moduleId,
+                moduleId == 103U ? world::RoomRole::Start
+                                 : world::RoomRole::Normal,
+                1793U, {}, rotation);
+            expect(room.has_value(), "Industrial room instantiates for collision test");
+            if (!room) continue;
+            world::World generated;
+            generated.rooms.push_back(*room);
+            const gameplay::CollisionWorld navigation
+                = gameplay::makeRoomNavigationCollision(generated, room->id, true);
+            const auto local = [rotation](const wkc::core::Vec3 point) {
+                return wkc::core::rotateQuarterTurns(point, rotation);
+            };
+            expect(navigation.canOccupy(local({0.0F, 0.0F, -2.2F}))
+                    && navigation.canOccupy(local({0.0F, 0.0F, 2.2F})),
+                "old fixed-room props do not block Industrial floor space");
+            expect(gameplay::hasLineOfSight(local({0.0F, 0.55F, -3.0F}),
+                       local({0.0F, 0.55F, -1.4F}), navigation)
+                    && gameplay::hasLineOfSight(local({0.0F, 1.30F, 1.7F}),
+                       local({0.0F, 1.30F, 2.7F}), navigation),
+                "shots pass through the former invisible Industrial props");
+        }
+    }
+}
+
 void testWallColumnsShareNavigationCollision()
 {
     using namespace gdp;
@@ -276,12 +317,12 @@ void testWallColumnsShareNavigationCollision()
              wkc::core::QuarterTurn::Degrees180,
              wkc::core::QuarterTurn::Degrees270}) {
         const auto room = world::instantiateRoom(module, 19U,
-            world::RoomRole::Normal, 20261031U,
+            world::RoomRole::Hub, 20261031U,
             {14.0F, 0.0F, -28.0F}, rotation);
         expect(room.has_value(), "room instantiates for wall-column collision test");
         if (!room) continue;
         const auto columns = world::makeRoomWallColumns(*room);
-        expect(!columns.empty(), "normal room gains physical wall columns");
+        expect(!columns.empty(), "generic room gains physical wall columns");
         world::World generated;
         generated.rooms.push_back(*room);
         const gameplay::CollisionWorld navigation
@@ -519,6 +560,8 @@ void testShapedCampaignDoorwaysPassShotsOnlyWhenOpen()
 {
     using namespace gdp;
     bool sawShapedDoor = false;
+    bool sawWideCorridor = false;
+    bool sawNarrowCorridor = false;
     bool openPasses = true;
     bool closedBlocks = true;
     bool wallBesideDoorBlocks = true;
@@ -567,6 +610,8 @@ void testShapedCampaignDoorwaysPassShotsOnlyWhenOpen()
             }
         }
         for (const auto& corridor : generated.world->corridors) {
+            sawWideCorridor |= wkc::core::nearlyEqual(corridor.width, 2.4F);
+            sawNarrowCorridor |= wkc::core::nearlyEqual(corridor.width, 1.2F);
             if (corridor.shape != world::CorridorShape::Straight) continue;
             const auto* source = findRoom(*generated.world, corridor.firstRoom);
             const auto* destination = findRoom(*generated.world,
@@ -590,6 +635,8 @@ void testShapedCampaignDoorwaysPassShotsOnlyWhenOpen()
         }
     }
     expect(sawShapedDoor, "campaign samples contain shaped rooms with doors");
+    expect(sawWideCorridor && sawNarrowCorridor,
+        "campaign doorway samples include both corridor gauges");
     expect(openPasses,
         "open shaped-room doorways let shots cross the wall outline");
     expect(closedBlocks,
@@ -1108,6 +1155,9 @@ void testBossFlankCoverAcrossRotations()
     bool lowCrouchCover = true;
     bool highStandingCover = true;
     bool longCentralSightline = true;
+    bool clearLegacyCenter = true;
+    bool terminalGapClear = true;
+    bool terminalScreenSolid = true;
     bool rightColumnsBlock = true;
     bool rightFlankWalkable = true;
     std::array<bool, 4> rotations{};
@@ -1118,7 +1168,7 @@ void testBossFlankCoverAcrossRotations()
             continue;
         }
         entities::EntityManager manager;
-        (void)world::populateInitialEntities(*generated.world, manager,
+        const auto initial = world::populateInitialEntities(*generated.world, manager,
             {.transform = {.position = {0.0F, 0.0F, 4.0F}}}, 1.0F, true);
         const auto boss = std::find_if(generated.world->rooms.begin(),
             generated.world->rooms.end(), [](const world::RoomInstance& room) {
@@ -1150,6 +1200,13 @@ void testBossFlankCoverAcrossRotations()
             highFeet + Vec3{0.0F, 1.62F, 0.0F}, collision);
         longCentralSightline &= gameplay::hasLineOfSight(robotEye,
             local({0.0F, 1.62F, -12.0F}), collision);
+        clearLegacyCenter &= collision.canOccupy(local({0.0F, 0.0F, -2.2F}));
+        terminalGapClear &= initial.exitTerminal.isValid()
+            && gameplay::hasLineOfSight(local({0.0F, 0.55F, 3.1F}),
+                local({0.0F, 0.55F, 1.3F}), collision);
+        terminalScreenSolid &= !gameplay::hasLineOfSight(
+            local({0.0F, 1.12F, 3.1F}),
+            local({0.0F, 1.12F, 1.3F}), collision);
         for (const float z : {-8.0F, 8.0F}) {
             rightColumnsBlock &= !collision.canOccupy(local({7.0F, 0.0F, z}))
                 && !gameplay::hasLineOfSight(robotEye,
@@ -1162,6 +1219,10 @@ void testBossFlankCoverAcrossRotations()
     expect(lowCrouchCover && highStandingCover,
         "low barricade protects a crouched approach and tall barricade protects standing player");
     expect(longCentralSightline, "Boss central lane remains open for long-range shots");
+    expect(clearLegacyCenter,
+        "Boss center has no invisible cover from the old fixed test room");
+    expect(terminalGapClear && terminalScreenSolid,
+        "Boss terminal blocks its visible screen while preserving the lower opening");
     expect(rightColumnsBlock && rightFlankWalkable,
         "Boss right columns stop shots while both sides remain walkable");
     expect(std::all_of(rotations.begin(), rotations.end(), [](bool seen) { return seen; }),
@@ -1380,6 +1441,7 @@ int main()
     testRangeInvalidInputAndPlayerRelocation();
     testCharacterRoomAdoptionRequiresFullClearance();
     testRotatedRoomCollisionMatchesModuleBounds();
+    testIndustrialRoomsDoNotKeepInvisibleFixedProps();
     testWallColumnsShareNavigationCollision();
     testCorridorColumnsShareNavigationCollision();
     testDoorRuntimeOpensHoldsClosesAndLocks();

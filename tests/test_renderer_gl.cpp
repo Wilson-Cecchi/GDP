@@ -4,6 +4,7 @@
 #include "gameplay/PlayerGrenade.hpp"
 #include "world/RoomArchitecture.hpp"
 #include "world/RoomFootprint.hpp"
+#include "world/LightingGenerator.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -16,6 +17,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,8 +32,328 @@ namespace {
 // still needs visual acceptance from the user.
 enum class RoomPreviewKind {
     Storage, Cafeteria, CafeteriaLong, Laboratory, Technical, TechnicalL,
-    Security, SecurityT, CentralHub, Boss
+    Security, SecurityT, CentralHub, Boss, Combat, Industrial
 };
+
+bool validateTerminalVisual(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    CameraData camera;
+    camera.position = {0.0F, 1.35F, 2.2F};
+    camera.forward = wkc::core::normalized(
+        wkc::core::Vec3{0.0F, -0.45F, -2.2F});
+    HudRenderData quality;
+    quality.graphicsQuality = HudGraphicsQuality::Ultra;
+    quality.detailedMaterials = true;
+    const auto pixelsFor = [&](const std::span<const PropRenderData> props) {
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        if (!renderer.render(width, height, camera, {}, {}, props,
+                {}, {}, {}, {}, {}, quality)) {
+            return std::vector<std::uint8_t>{};
+        }
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        return pixels;
+    };
+    const auto empty = pixelsFor({});
+    const std::array terminal{PropRenderData{
+        {0.0F, 0.0F, 0.0F}, {1.15F, 1.8F, 0.6F},
+        PropVisualRole::Terminal, PropVisualState::Intact,
+        20261119U, gdp::world::RoomTheme::Laboratory}};
+    auto visible = pixelsFor(terminal);
+    if (empty.empty() || visible.size() != empty.size()) return false;
+    if (const char* capturePath = std::getenv("GDP_TERMINAL_CAPTURE_PATH")) {
+        const std::size_t stride = static_cast<std::size_t>(width * 4);
+        std::vector<std::uint8_t> topDown(visible.size());
+        for (int row = 0; row < height; ++row) {
+            std::copy_n(visible.data()
+                    + static_cast<std::size_t>(height - row - 1) * stride,
+                stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+        }
+        auto* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        if (surface) SDL_SaveBMP(surface, capturePath);
+        SDL_DestroySurface(surface);
+    }
+    std::size_t changedChannels = 0U;
+    for (std::size_t index = 0U; index < empty.size(); ++index) {
+        changedChannels += empty[index] != visible[index] ? 1U : 0U;
+    }
+    if (changedChannels < 1000U) {
+        std::cerr << "Mission terminal is absent from the rendered frame (changed "
+                  << changedChannels << " channels)\n";
+        return false;
+    }
+    return true;
+}
+
+bool captureSupplyPickups(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* directory = std::getenv("GDP_SUPPLY_PICKUP_CAPTURE_DIR");
+    if (!directory || !*directory) {
+        std::cerr << "Set GDP_SUPPLY_PICKUP_CAPTURE_DIR for pickup captures\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    CameraData camera;
+    camera.position = {0.0F, 0.72F, 1.20F};
+    camera.forward = wkc::core::normalized(
+        wkc::core::Vec3{0.0F, -0.57F, -1.20F});
+    HudRenderData quality;
+    quality.graphicsQuality = HudGraphicsQuality::Ultra;
+    quality.detailedMaterials = true;
+    for (const auto& [role, name] : std::array{
+             std::pair{PickupVisualRole::Health, "health"},
+             std::pair{PickupVisualRole::Ammo, "ammo"},
+             std::pair{PickupVisualRole::Key, "key"},
+             std::pair{PickupVisualRole::Armor, "armor"},
+             std::pair{PickupVisualRole::Special, "special"}}) {
+        const std::array pickup{PickupRenderData{
+            {0.0F, 0.0F, 0.0F}, role, 0U}};
+        if (!renderer.render(width, height, camera, {}, pickup,
+                {}, {}, {}, {}, {}, {}, quality)) {
+            return false;
+        }
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        const auto stride = static_cast<std::size_t>(width * 4);
+        std::vector<std::uint8_t> topDown(pixels.size());
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride,
+                stride, topDown.data() + static_cast<std::size_t>(y) * stride);
+        }
+        auto* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        const auto path = std::filesystem::path{directory}
+            / (std::string{name} + ".bmp");
+        const bool saved = surface
+            && SDL_SaveBMP(surface, path.string().c_str());
+        SDL_DestroySurface(surface);
+        if (!saved) return false;
+    }
+    return true;
+}
+
+bool captureSupplyCrates(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    using gdp::world::RoomTheme;
+    const char* directory = std::getenv("GDP_SUPPLY_CRATE_CAPTURE_DIR");
+    if (!directory || !*directory) {
+        std::cerr << "Set GDP_SUPPLY_CRATE_CAPTURE_DIR for crate captures\n";
+        return false;
+    }
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    CameraData camera;
+    camera.position = {0.0F, 1.0F, 1.8F};
+    camera.forward = wkc::core::normalized(
+        wkc::core::Vec3{0.0F, -0.55F, -1.8F});
+    HudRenderData quality;
+    quality.graphicsQuality = HudGraphicsQuality::Ultra;
+    quality.detailedMaterials = true;
+    struct CrateCase {
+        RoomTheme theme;
+        PickupVisualRole drop;
+        const char* name;
+    };
+    for (const auto& [theme, drop, name] : std::array{
+             CrateCase{RoomTheme::Industrial, PickupVisualRole::Ammo, "industrial"},
+             CrateCase{RoomTheme::Storage, PickupVisualRole::Ammo, "storage"},
+             CrateCase{RoomTheme::Storage, PickupVisualRole::Ammo, "storage_angle"},
+             CrateCase{RoomTheme::Storage, PickupVisualRole::Health, "storage_health"},
+             CrateCase{RoomTheme::Office, PickupVisualRole::Ammo, "office"},
+             CrateCase{RoomTheme::Laboratory, PickupVisualRole::Ammo, "laboratory"},
+             CrateCase{RoomTheme::Maintenance, PickupVisualRole::Ammo, "maintenance"},
+             CrateCase{RoomTheme::Security, PickupVisualRole::Ammo, "security"},
+             CrateCase{RoomTheme::Cafeteria, PickupVisualRole::Ammo, "cafeteria"}}) {
+        const std::array crate{PropRenderData{
+            {0.0F, 0.0F, 0.0F}, {0.78F, 0.72F, 0.78F},
+            PropVisualRole::Crate, PropVisualState::Intact, 20261114U,
+            theme, drop}};
+        CameraData caseCamera = camera;
+        if (std::string_view{name} == "storage_angle") {
+            caseCamera.position = {0.95F, 1.0F, 1.8F};
+            caseCamera.forward = wkc::core::normalized(
+                wkc::core::Vec3{-0.95F, -0.55F, -1.8F});
+        }
+        if (!renderer.render(width, height, caseCamera, {}, {}, crate,
+                {}, {}, {}, {}, {}, quality)) {
+            return false;
+        }
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        const auto stride = static_cast<std::size_t>(width * 4);
+        std::vector<std::uint8_t> topDown(pixels.size());
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride,
+                stride, topDown.data() + static_cast<std::size_t>(y) * stride);
+        }
+        auto* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        const auto path = std::filesystem::path{directory}
+            / (std::string{name} + ".bmp");
+        const bool saved = surface
+            && SDL_SaveBMP(surface, path.string().c_str());
+        SDL_DestroySurface(surface);
+        if (!saved) return false;
+    }
+    return true;
+}
+
+bool captureCanisters(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    const char* directory = std::getenv("GDP_CANISTER_CAPTURE_DIR");
+    if (!directory || !*directory) return false;
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    struct CanisterCase {
+        gdp::world::RoomTheme theme;
+        PropVisualState state;
+        bool angled;
+        const char* name;
+    };
+    for (const auto& [theme, state, angled, name] : std::array{
+             CanisterCase{gdp::world::RoomTheme::Industrial,
+                 PropVisualState::Intact, false, "industrial_front"},
+             CanisterCase{gdp::world::RoomTheme::Industrial,
+                 PropVisualState::Intact, true, "industrial_angle"},
+             CanisterCase{gdp::world::RoomTheme::Laboratory,
+                 PropVisualState::Intact, false, "laboratory_front"},
+             CanisterCase{gdp::world::RoomTheme::Industrial,
+                 PropVisualState::Damaged, false, "industrial_damaged"}}) {
+        CameraData camera;
+        camera.position = angled
+            ? wkc::core::Vec3{0.72F, 1.18F, 1.70F}
+            : wkc::core::Vec3{0.0F, 1.18F, 1.70F};
+        camera.forward = wkc::core::normalized(angled
+            ? wkc::core::Vec3{-0.72F, -0.68F, -1.70F}
+            : wkc::core::Vec3{0.0F, -0.68F, -1.70F});
+        HudRenderData quality;
+        quality.graphicsQuality = HudGraphicsQuality::Ultra;
+        quality.detailedMaterials = true;
+        const std::array canister{PropRenderData{
+            {0.0F, 0.0F, 0.0F}, {0.46F, 1.02F, 0.46F},
+            PropVisualRole::Canister, state, 20261115U, theme}};
+        if (!renderer.render(width, height, camera, {}, {}, canister,
+                {}, {}, {}, {}, {}, quality)) {
+            return false;
+        }
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        const auto stride = static_cast<std::size_t>(width * 4);
+        std::vector<std::uint8_t> topDown(pixels.size());
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride,
+                stride, topDown.data() + static_cast<std::size_t>(y) * stride);
+        }
+        auto* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        const auto path = std::filesystem::path{directory}
+            / (std::string{name} + ".bmp");
+        const bool saved = surface
+            && SDL_SaveBMP(surface, path.string().c_str());
+        SDL_DestroySurface(surface);
+        if (!saved) return false;
+    }
+    return true;
+}
+
+bool captureBarricades(gdp::game::visual::GdpRenderer& renderer)
+{
+    using namespace gdp::game::visual;
+    using gdp::world::RoomTheme;
+    const char* directory = std::getenv("GDP_BARRICADE_CAPTURE_DIR");
+    if (!directory || !*directory) return false;
+    std::filesystem::create_directories(directory);
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    struct CoverCase {
+        RoomTheme theme;
+        PropVisualState state;
+        bool rotated;
+        const char* name;
+    };
+    for (const auto& [theme, state, rotated, name] : std::array{
+             CoverCase{RoomTheme::Industrial, PropVisualState::Intact,
+                 false, "industrial"},
+             CoverCase{RoomTheme::Storage, PropVisualState::Intact,
+                 false, "storage"},
+             CoverCase{RoomTheme::Cafeteria, PropVisualState::Intact,
+                 false, "cafeteria"},
+             CoverCase{RoomTheme::Security, PropVisualState::Intact,
+                 false, "security"},
+             CoverCase{RoomTheme::Laboratory, PropVisualState::Intact,
+                 false, "laboratory"},
+             CoverCase{RoomTheme::Maintenance, PropVisualState::Intact,
+                 false, "maintenance"},
+             CoverCase{RoomTheme::Office, PropVisualState::Intact,
+                 false, "office"},
+             CoverCase{RoomTheme::Industrial, PropVisualState::Intact,
+                 true, "industrial_rotated"},
+             CoverCase{RoomTheme::Industrial, PropVisualState::Damaged,
+                 false, "industrial_damaged"},
+             CoverCase{RoomTheme::Industrial, PropVisualState::Destroyed,
+                 false, "industrial_destroyed"}}) {
+        CameraData camera;
+        camera.position = rotated
+            ? wkc::core::Vec3{1.9F, 1.03F, 0.65F}
+            : wkc::core::Vec3{0.7F, 1.03F, 1.95F};
+        camera.forward = wkc::core::normalized(
+            wkc::core::Vec3{-camera.position.x,
+                -0.58F, -camera.position.z});
+        HudRenderData quality;
+        quality.graphicsQuality = HudGraphicsQuality::Ultra;
+        quality.detailedMaterials = true;
+        const std::array cover{PropRenderData{
+            {0.0F, 0.0F, 0.0F},
+            rotated ? wkc::core::Vec3{0.34F, 0.92F, 1.16F}
+                : wkc::core::Vec3{1.16F, 0.92F, 0.34F},
+            PropVisualRole::Barricade, state, 20261115U, theme}};
+        if (!renderer.render(width, height, camera, {}, {}, cover,
+                {}, {}, {}, {}, {}, quality)) {
+            return false;
+        }
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        const auto stride = static_cast<std::size_t>(width * 4);
+        std::vector<std::uint8_t> topDown(pixels.size());
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - y - 1) * stride,
+                stride, topDown.data() + static_cast<std::size_t>(y) * stride);
+        }
+        auto* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        const auto path = std::filesystem::path{directory}
+            / (std::string{name} + ".bmp");
+        const bool saved = surface
+            && SDL_SaveBMP(surface, path.string().c_str());
+        SDL_DestroySurface(surface);
+        if (!saved) return false;
+    }
+    return true;
+}
 
 bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     const RoomPreviewKind kind, const bool blackout = false,
@@ -45,14 +367,20 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     const bool technical = kind == RoomPreviewKind::Technical || technicalL;
     const bool securityT = kind == RoomPreviewKind::SecurityT;
     const bool security = kind == RoomPreviewKind::Security || securityT;
+    const bool securityCompact = security && !securityT
+        && std::getenv("GDP_SECURITY_COMPACT_CAPTURE") != nullptr;
     const bool centralHub = kind == RoomPreviewKind::CentralHub;
     const bool boss = kind == RoomPreviewKind::Boss;
+    const bool combat = kind == RoomPreviewKind::Combat;
+    const bool industrial = kind == RoomPreviewKind::Industrial;
     const char* directory = shadowPilot
         ? std::getenv(centralHub
             ? "GDP_CENTRAL_HUB_SHADOW_CAPTURE_DIR"
             : "GDP_ROOM_SHADOW_CAPTURE_DIR") : blackout
         ? std::getenv("GDP_ROOM_BLACKOUT_CAPTURE_DIR")
-        : std::getenv(boss
+        : std::getenv(industrial
+            ? "GDP_INDUSTRIAL_ROOM_CAPTURE_DIR" : combat
+            ? "GDP_COMBAT_ARENA_CAPTURE_DIR" : boss
             ? "GDP_BOSS_COLUMNS_CAPTURE_DIR" : cafeteriaLong
             ? "GDP_CAFETERIA_LONG_CAPTURE_DIR" : cafeteria
             ? "GDP_CAFETERIA_FURNITURE_CAPTURE_DIR" : centralHub
@@ -68,14 +396,16 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     }
     std::filesystem::create_directories(directory);
     gdp::world::RoomInstance worldRoom;
-    worldRoom.theme = boss ? gdp::world::RoomTheme::Maintenance
+    worldRoom.theme = boss || combat ? gdp::world::RoomTheme::Maintenance
         : cafeteria ? gdp::world::RoomTheme::Cafeteria
-        : centralHub ? gdp::world::RoomTheme::Industrial
+        : centralHub || industrial ? gdp::world::RoomTheme::Industrial
         : security ? gdp::world::RoomTheme::Security
         : technical ? gdp::world::RoomTheme::Maintenance
         : laboratory ? gdp::world::RoomTheme::Laboratory
             : gdp::world::RoomTheme::Storage;
-    worldRoom.moduleId = boss ? gdp::world::bossRoomPreviewModuleId
+    worldRoom.moduleId = securityCompact ? 601U : industrial ? 103U
+        : combat ? gdp::world::combatRoomPreviewModuleId
+        : boss ? gdp::world::bossRoomPreviewModuleId
         : cafeteriaLong ? gdp::world::cafeteriaLongPreviewModuleId
         : cafeteria ? gdp::world::cafeteriaPreviewModuleId
         : centralHub ? gdp::world::centralHubPreviewModuleId
@@ -84,16 +414,25 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
         : technicalL ? gdp::world::technicalLPreviewModuleId
         : technical ? gdp::world::technicalPreviewModuleId
         : laboratory ? gdp::world::laboratoryPreviewModuleId : 0U;
-    worldRoom.worldBounds = {{boss ? -13.85F
+    worldRoom.worldBounds = {{securityCompact ? -3.5F : boss ? -13.85F
+                : combat ? -10.0F
+                : industrial ? -4.5F
                 : centralHub || securityT ? -10.0F : technical ? -8.0F : -9.0F,
-            0.0F, boss ? -15.85F
+            0.0F, securityCompact ? -4.5F : boss ? -15.85F
+                : combat ? -11.0F : industrial ? -5.0F
                 : cafeteriaLong ? -12.0F : security && !securityT ? -9.0F : -10.0F},
-        {boss ? 13.85F : centralHub || securityT ? 10.0F : technical ? 8.0F : 9.0F,
-            boss ? 7.0F : technical ? 5.5F : 6.0F,
-            boss ? 15.85F : cafeteriaLong ? 12.0F
+        {securityCompact ? 3.5F : boss ? 13.85F : combat ? 10.0F
+                : industrial ? 4.5F
+                : centralHub || securityT ? 10.0F : technical ? 8.0F : 9.0F,
+            securityCompact ? 4.0F : industrial ? 4.0F : boss ? 7.0F
+                : technical ? 5.5F : 6.0F,
+            securityCompact ? 4.5F : boss ? 15.85F : combat ? 11.0F
+                : industrial ? 5.0F : cafeteriaLong ? 12.0F
                 : security && !securityT ? 9.0F : 10.0F}};
     if (boss) worldRoom.role = gdp::world::RoomRole::Boss;
-    worldRoom.seed = 20261031U;
+    if (combat) worldRoom.role = gdp::world::RoomRole::Arena;
+    if (industrial) worldRoom.role = gdp::world::RoomRole::Start;
+    worldRoom.seed = industrial ? 4U : 20261031U;
     if (securityT) {
         worldRoom.walkableOutline = gdp::world::securityTPreviewFootprint();
     } else if (technicalL) {
@@ -108,23 +447,44 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     std::vector<PropRenderData> breakableProps;
     for (const gdp::world::RoomArchitecturePart& part : parts) {
         if (!part.breakable) continue;
+        const bool laboratoryPlanter = part.decoration
+            == gdp::world::RoomDecorationPart::SmallGlassTestPlanter;
+        const wkc::core::Vec3 partScale = part.bounds.maximum - part.bounds.minimum;
+        const bool securityMonitor = part.securityFurniturePart
+            == gdp::world::SecurityFurniturePart::Monitor;
+        if (securityMonitor && partScale.y < 0.30F) continue;
         breakableProps.push_back({
             {(part.bounds.minimum.x + part.bounds.maximum.x) * 0.5F,
                 part.bounds.minimum.y,
                 (part.bounds.minimum.z + part.bounds.maximum.z) * 0.5F},
-            part.bounds.maximum - part.bounds.minimum,
-            PropVisualRole::StorageBox,
+            laboratoryPlanter
+                ? wkc::core::Vec3{partScale.x, 0.42F, partScale.z} : partScale,
+            securityMonitor ? PropVisualRole::SecurityMonitor
+                : laboratoryPlanter ? PropVisualRole::LaboratoryPlanter
+                : part.technicalFurniturePart
+                    == gdp::world::TechnicalFurniturePart::Instrument
+                ? PropVisualRole::TableBox : PropVisualRole::StorageBox,
             PropVisualState::Intact,
             part.tint.x < 0.4F ? 1U : 0U,
+            worldRoom.theme,
         });
     }
     if (boss) {
+        breakableProps.push_back({{0.0F, 0.0F, 2.2F},
+            {1.15F, 1.8F, 0.6F}, PropVisualRole::Terminal,
+            PropVisualState::Intact, 20261119U,
+            gdp::world::RoomTheme::Maintenance, {}, 0.0F,
+            TerminalVisualState::Standby, true});
         breakableProps.push_back({{-8.5F, 0.0F, -8.5F},
             {2.4F, 1.35F, 0.6F}, PropVisualRole::Barricade,
-            PropVisualState::Intact, 901U});
+            PropVisualState::Intact, 901U,
+            gdp::world::RoomTheme::Maintenance, {}, 0.0F,
+            TerminalVisualState::Standby, true});
         breakableProps.push_back({{-8.5F, 0.0F, 8.5F},
             {0.6F, 2.25F, 2.4F}, PropVisualRole::Barricade,
-            PropVisualState::Intact, 902U});
+            PropVisualState::Intact, 902U,
+            gdp::world::RoomTheme::Maintenance, {}, 0.0F,
+            TerminalVisualState::Standby, true});
     }
     if (shadowPilot) {
         breakableProps.push_back({{4.5F, 0.0F, -1.5F},
@@ -138,11 +498,11 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     const std::span<const EnemyRenderData> pilotEnemies = shadowPilot
         ? std::span<const EnemyRenderData>{pilotEnemy}
         : std::span<const EnemyRenderData>{};
-    renderer.setGeometryShadowsEnabled(shadowPilot);
+    renderer.setGeometryShadowsEnabled(shadowPilot || combat || boss);
     constexpr int width = 1280;
     constexpr int height = 720;
     RoomLightingRenderData lighting;
-    lighting.ambientColor = boss
+    lighting.ambientColor = boss || combat
         ? wkc::core::Vec3{0.77F, 0.81F, 0.78F}
         : cafeteria
         ? wkc::core::Vec3{0.89F, 0.83F, 0.75F}
@@ -160,6 +520,19 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
         {1.0F, 0.86F, 0.70F}, 1.2F, 8.5F};
     lighting.lights[1] = {{-3.5F, 5.1F, -5.0F},
         {0.84F, 0.89F, 1.0F}, 1.0F, 8.5F};
+    if (boss || industrial) {
+        const auto plan = gdp::world::generateRoomLightingPlan(worldRoom.seed,
+            worldRoom.role, worldRoom.theme, worldRoom.worldBounds);
+        lighting.ambientColor = plan.ambientColor;
+        lighting.ambientIntensity = plan.ambientIntensity;
+        lighting.fixtureEmissive = plan.fixtureEmissive;
+        lighting.lightCount = static_cast<std::uint32_t>(plan.lights.size());
+        for (std::size_t index = 0; index < plan.lights.size(); ++index) {
+            const auto& light = plan.lights[index];
+            lighting.lights[index] = {light.position, light.color,
+                light.intensity, light.range};
+        }
+    }
     if (centralHub) {
         // Match the four-corner coverage of the playable 20 m Hub rather
         // than validating its column with two artificial rear lights.
@@ -178,6 +551,29 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 index == 4U ? 6.5F : 9.0F};
         }
     }
+    if (combat) {
+        // Match the playable Arena's ambient and five suspended work lights.
+        const auto plan = gdp::world::generateRoomLightingPlan(worldRoom.seed,
+            gdp::world::RoomRole::Arena,
+            gdp::world::RoomTheme::Maintenance, worldRoom.worldBounds);
+        lighting.ambientColor = plan.ambientColor;
+        lighting.ambientIntensity = 0.22F;
+        lighting.fixtureEmissive = plan.fixtureEmissive;
+        lighting.lightCount = 5U;
+        constexpr std::array positions{
+            wkc::core::Vec3{-4.7F, 5.18F, -5.0F},
+            wkc::core::Vec3{4.7F, 5.18F, -5.0F},
+            wkc::core::Vec3{-4.7F, 5.18F, 5.0F},
+            wkc::core::Vec3{4.7F, 5.18F, 5.0F},
+            wkc::core::Vec3{0.0F, 5.18F, 1.2F},
+        };
+        for (std::size_t index = 0U; index < positions.size(); ++index) {
+            lighting.lights[index] = {positions[index],
+                gdp::world::combatGalleryFixtureColor,
+                index == 4U ? 0.80F : 1.42F,
+                index == 4U ? 7.8F : 10.5F};
+        }
+    }
     if (securityT) {
         lighting.lightCount = 3U;
         lighting.lights[0].position = {0.0F, 5.56F, -6.0F};
@@ -186,7 +582,8 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             {0.88F, 0.93F, 1.0F}, 1.0F, 8.5F};
     }
     if (technicalL) lighting.lights[0].position = {0.0F, 5.1F, -5.0F};
-    const CeilingFixtureVariant fixtureVariant = boss
+    const CeilingFixtureVariant fixtureVariant = industrial
+        ? CeilingFixtureVariant::Industrial : boss || combat
         ? CeilingFixtureVariant::BossArena : cafeteria
         ? CeilingFixtureVariant::Cafeteria : centralHub
         ? CeilingFixtureVariant::CentralHub : security
@@ -204,10 +601,14 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
     bool passed = true;
     for (const bool potato : {false, true}) {
         for (const float fov : {60.0F, 100.0F}) {
-            const wkc::core::Seed seed = centralHub ? 20261030U
+            const wkc::core::Seed seed = industrial ? 4U : combat ? 20261028U
+                : centralHub ? 20261030U
                 : securityT ? 20261102U : 20261029U;
-            passed &= (boss
-                ? renderer.prepareCombatRoomMaterials(seed)
+            passed &= (industrial
+                ? renderer.prepareIndustrialRoomMaterials(seed)
+                : combat
+                ? renderer.prepareCombatRoomMaterials(seed, true)
+                : boss ? renderer.prepareCombatRoomMaterials(seed, false, true)
                 : cafeteria
                 ? renderer.prepareCafeteriaRoomMaterials(seed)
                 : centralHub
@@ -223,20 +624,27 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             room.walkableOutline = worldRoom.walkableOutline;
             room.materialKey = renderer.activeRoomMaterialKey();
             room.architectureParts = parts;
-            room.customArchitecture = !boss;
+            room.customArchitecture = true;
             std::array<float, 3> hubShaftBrightness{};
+            std::vector<std::uint8_t> laboratoryMarkedWallPixels;
             for (int variant = 0; variant < (
-                    blackout ? 3 : centralHub ? (shadowPilot ? 10 : 8)
+                    blackout ? 3 : securityCompact ? 1
+                    : centralHub ? (shadowPilot ? 10 : 8)
                     : securityT ? 16 : cafeteriaLong ? 7
-                    : cafeteria ? 5 : laboratory ? 7
-                    : kind == RoomPreviewKind::Storage ? 3 : 2);
+                    : cafeteria ? 5 : laboratory ? 9
+                    : security ? 4 : combat ? 4
+                    : kind == RoomPreviewKind::Storage || technical || industrial ? 3 : 2);
                  ++variant) {
             const bool fixtureDetail = !blackout && variant == 1;
+            const bool industrialSteelDetail = industrial && variant == 2;
+            const bool technicalTableBoxDetail = technical && variant == 2;
             const bool laboratoryBenchDetail = laboratory && variant == 2;
             const bool laboratoryContainmentDetail = laboratory && variant == 3;
             const bool laboratoryDomeDetail = laboratory && variant == 4;
             const bool laboratoryDuctDetail = laboratory && variant == 5;
             const bool laboratoryTabletopDetail = laboratory && variant == 6;
+            const bool laboratoryBulletMarkDetail = laboratory && variant == 7;
+            const bool laboratoryBulletMarkBaseline = laboratory && variant == 8;
             const bool floorDetail = securityT && variant == 2;
             const bool floorOverview = securityT && variant == 3;
             const bool planterDetail = securityT && variant == 4;
@@ -248,6 +656,10 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             const bool securityCoverCornerDetail = securityT && variant == 10;
             const bool bulletMarkDetail = securityT && variant == 11;
             const bool securityIndicatorDetail = securityT && variant >= 12;
+            const bool observationDetail = security && !securityT
+                && variant == 2;
+            const bool securityDuctDetail = security && !securityT
+                && variant == 3;
             const bool counterDetail = cafeteria && !blackout && variant == 2;
             const bool counterTopDetail = cafeteria && !blackout && variant == 3;
             const bool counterGrazingDetail = cafeteria && !blackout && variant == 4;
@@ -261,8 +673,15 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             const bool hubWallVentDetail = centralHub && !blackout && variant == 7;
             const bool cafeteriaPlantDetail = cafeteriaLong && variant == 5;
             const bool cafeteriaDuctDetail = cafeteriaLong && variant == 6;
+            const bool combatCeilingDetail = combat && variant == 1;
+            const bool combatStairDetail = combat && variant == 2;
+            const bool combatCoverDetail = combat && variant == 3;
             CameraData camera;
-            camera.position = boss
+            camera.position = industrial
+                ? wkc::core::Vec3{0.0F, 1.62F, -2.0F}
+                : combat
+                ? wkc::core::Vec3{0.0F, 1.62F, 8.4F}
+                : boss
                 ? wkc::core::Vec3{1.4F, 1.62F, 13.2F}
                 : cafeteria
                 ? wkc::core::Vec3{2.8F, 1.62F, cafeteriaLong ? 10.2F : 8.2F}
@@ -276,7 +695,11 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 ? wkc::core::Vec3{1.0F, 1.62F, 8.2F}
                 : laboratory ? wkc::core::Vec3{0.4F, 1.62F, 8.0F}
                 : wkc::core::Vec3{4.7F, 1.62F, -0.8F};
-            camera.forward = boss
+            camera.forward = industrial
+                ? wkc::core::Vec3{0.0F, -0.02F, 1.0F}
+                : combat
+                ? wkc::core::Vec3{0.1F, -0.03F, -1.0F}
+                : boss
                 ? wkc::core::Vec3{0.28F, -0.02F, -1.0F}
                 : cafeteria
                 ? wkc::core::Vec3{-0.18F, -0.025F, -1.0F}
@@ -290,6 +713,10 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 ? wkc::core::Vec3{0.0F, -0.04F, -1.0F}
                 : laboratory ? wkc::core::Vec3{0.2F, -0.02F, -1.0F}
                 : wkc::core::Vec3{0.65F, -0.02F, -0.76F};
+            if (securityCompact) {
+                camera.position = {1.0F, 1.62F, 2.9F};
+                camera.forward = {-1.0F, -0.07F, 0.0F};
+            }
             if (shadowPilot && centralHub && variant == 8) {
                 camera.position = {-7.4F, 1.62F, 5.8F};
                 camera.forward = {1.0F, -0.02F, -0.75F};
@@ -309,6 +736,16 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                     camera.position = {0.0F, 2.4F, -8.5F};
                     camera.forward = {0.0F, 0.78F, 0.62F};
                 }
+            }
+            if (industrialSteelDetail) {
+                camera.position = {2.65F, 1.64F, 0.35F};
+                camera.forward = wkc::core::normalized(
+                    wkc::core::Vec3{1.0F, -0.10F, 0.42F});
+            }
+            if (technicalTableBoxDetail) {
+                camera.position = {1.1F, 1.72F, 5.75F};
+                camera.forward = wkc::core::normalized(
+                    wkc::core::Vec3{1.9F, -0.55F, -1.95F});
             }
             if (floorDetail) {
                 camera.position = {0.0F, 1.7F, -3.5F};
@@ -333,6 +770,14 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             if (securityConsoleDetail || securityIndicatorDetail) {
                 camera.position = {5.6F, 1.65F, 4.4F};
                 camera.forward = {0.0F, -0.02F, 1.0F};
+            }
+            if (observationDetail) {
+                camera.position = {4.6F, 1.75F, 4.1F};
+                camera.forward = {1.0F, -0.025F, 0.0F};
+            }
+            if (securityDuctDetail) {
+                camera.position = {0.0F, 1.7F, 4.0F};
+                camera.forward = {0.34F, 0.46F, -1.0F};
             }
             if (securityCabinetDetail) {
                 camera.position = {0.0F, 1.60F, -6.8F};
@@ -365,6 +810,10 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
             if (laboratoryTabletopDetail) {
                 camera.position = {2.65F, 1.62F, 3.9F};
                 camera.forward = {1.0F, -0.24F, 0.0F};
+            }
+            if (laboratoryBulletMarkDetail || laboratoryBulletMarkBaseline) {
+                camera.position = {0.0F, 1.62F, -7.0F};
+                camera.forward = {0.0F, 0.0F, -1.0F};
             }
             if (bulletMarkDetail) {
                 camera.position = {-7.0F, 1.62F, 4.0F};
@@ -418,14 +867,33 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 camera.position = {5.6F, 1.8F, 6.0F};
                 camera.forward = {0.28F, 0.70F, -1.0F};
             }
+            if (combatCeilingDetail) {
+                camera.position = {1.2F, 1.7F, 1.0F};
+                camera.forward = {0.28F, 0.68F, -1.0F};
+            }
+            if (combatStairDetail) {
+                camera.position = {2.7F, 1.62F, 5.7F};
+                camera.forward = {1.0F, 0.08F, 0.05F};
+            }
+            if (combatCoverDetail) {
+                camera.position = {1.0F, 1.62F, 1.4F};
+                camera.forward = {0.78F, -0.12F, -0.65F};
+            }
             camera.verticalFieldOfViewDegrees = fov;
             HudRenderData hud;
             hud.graphicsQuality = potato
                 ? HudGraphicsQuality::Potato : HudGraphicsQuality::Ultra;
-            hud.geometryShadowLightBudget = shadowPilot && !potato ? 8U : 0U;
+            hud.geometryShadowLightBudget = (shadowPilot || combat || boss) && !potato
+                ? 8U : 0U;
             hud.detailedMaterials = !potato;
             hud.worldRenderScalePercent = potato ? 50U : 100U;
             RoomLightingRenderData frameLighting = lighting;
+            if (industrial) {
+                frameLighting.flashlightEnabled = std::getenv(
+                    "GDP_INDUSTRIAL_FLASHLIGHT") != nullptr;
+                frameLighting.flashlightPosition = camera.position;
+                frameLighting.flashlightDirection = camera.forward;
+            }
             if (centralHub) {
                 const auto shaft = std::find_if(parts.begin(), parts.end(),
                     [](const gdp::world::RoomArchitecturePart& part) {
@@ -477,8 +945,15 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                     ImpactVisualMaterial::Metal, 1.0F, 103U,
                     ImpactVisualKind::BulletMark},
             };
+            constexpr std::array laboratoryBulletMarks{
+                ImpactRenderData{{0.0F, 1.62F, -10.0F}, {0.0F, 0.0F, 1.0F},
+                    ImpactVisualMaterial::Metal, 1.0F, 104U,
+                    ImpactVisualKind::BulletMark},
+            };
             const std::span<const ImpactRenderData> marks = bulletMarkDetail
                 ? std::span<const ImpactRenderData>{bulletMarks}
+                : laboratoryBulletMarkDetail
+                    ? std::span<const ImpactRenderData>{laboratoryBulletMarks}
                 : std::span<const ImpactRenderData>{};
             if (shadowPilot && !potato) {
                 passed &= renderer.render(width, height, camera, pilotEnemies, {},
@@ -749,6 +1224,17 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                     stride,
                     topDown.data() + static_cast<std::size_t>(row) * stride);
             }
+            if (laboratoryBulletMarkDetail) {
+                laboratoryMarkedWallPixels = topDown;
+            }
+            if (laboratoryBulletMarkBaseline) {
+                std::size_t changedChannels = 0U;
+                for (std::size_t index = 0U; index < topDown.size(); ++index) {
+                    changedChannels += topDown[index]
+                        != laboratoryMarkedWallPixels[index];
+                }
+                passed &= changedChannels > 30U;
+            }
             if (blackout && centralHub && !potato && fov == 60.0F) {
                 // An upper shaft patch excludes the route screen and light
                 // strip. It must go dark with the room, then respond to the
@@ -765,7 +1251,8 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 hubShaftBrightness[static_cast<std::size_t>(variant)]
                     = static_cast<float>(channelSum) / (60.0F * 80.0F * 3.0F);
             }
-            const std::string prefix = shadowPilot
+            const std::string prefix = securityCompact
+                ? "compact_console_" : shadowPilot
                 ? std::string{"shadow_pilot_"} + std::to_string(variant) + "_"
                 : blackout
                 ? std::string{centralHub ? "central_hub_"
@@ -787,23 +1274,32 @@ bool captureRoomPreview(gdp::game::visual::GdpRenderer& renderer,
                 : securityCabinetDetail ? "security_cabinet_detail_"
                 : securityCoverDetail ? "security_cover_detail_"
                 : securityCoverCornerDetail ? "security_cover_corner_detail_"
+                : observationDetail ? "observation_detail_"
+                : securityDuctDetail ? "security_square_duct_detail_"
                 : bulletMarkDetail ? "bullet_mark_detail_"
                 : securityIndicatorDetail
                     ? (variant == 12 ? "security_alarm_on_"
                         : variant == 13 ? "security_alarm_off_"
                         : variant == 14 ? "security_reboot_"
                         : "security_ready_")
+                : industrialSteelDetail ? "structural_steel_detail_"
+                : technicalTableBoxDetail ? "table_box_detail_"
                 : laboratoryBenchDetail ? "bench_detail_"
                 : laboratoryContainmentDetail ? "containment_detail_"
                 : laboratoryDomeDetail ? "dome_detail_"
                 : laboratoryDuctDetail ? "lab_duct_detail_"
                 : laboratoryTabletopDetail ? "tabletop_domes_"
+                : laboratoryBulletMarkDetail ? "lab_bullet_mark_"
+                : laboratoryBulletMarkBaseline ? "lab_bullet_mark_baseline_"
                 : counterGrazingDetail ? "counter_grazing_detail_"
                 : counterTopDetail ? "counter_top_detail_"
                 : counterDetail ? "counter_detail_"
                 : storageDuctDetail ? "storage_duct_detail_"
                 : cafeteriaPlantDetail ? "cafeteria_plant_detail_"
                 : cafeteriaDuctDetail ? "cafeteria_duct_detail_"
+                : combatCeilingDetail ? "ceiling_detail_"
+                : combatStairDetail ? "stair_detail_"
+                : combatCoverDetail ? "cover_detail_"
                 : fixtureDetail
                     ? (cafeteria ? "furniture_detail_" : "fixture_detail_")
                     : "";
@@ -851,19 +1347,11 @@ bool captureIndustrialCorridorPreview(
     RoomRenderData destination;
     destination.worldBounds = {{-3.85F, 0.0F, -24.85F},
         {3.85F, 4.0F, -15.15F}};
-    destination.materialKey = materialKey;
+    if (!renderer.prepareOfficeRoomMaterials(20261031U)) return false;
+    destination.materialKey = renderer.activeRoomMaterialKey();
     const std::array points{
         wkc::core::Vec3{0.0F, 0.0F, -4.85F},
         wkc::core::Vec3{0.0F, 0.0F, -15.15F},
-    };
-    const std::array corridor{
-        CorridorRenderData{points, 2.4F, 2.8F, materialKey},
-    };
-    const std::array doors{
-        DoorRenderData{{0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F},
-            2.4F, 2.8F, false, 1.0F},
-        DoorRenderData{{0.0F, 0.0F, -15.15F}, {0.0F, 0.0F, 1.0F},
-            2.4F, 2.8F, false, 1.0F},
     };
     RoomLightingRenderData lighting;
     lighting.ambientColor = {0.76F, 0.79F, 0.82F};
@@ -874,41 +1362,79 @@ bool captureIndustrialCorridorPreview(
     lighting.lights[1] = {{0.0F, 2.45F, -11.0F},
         {0.95F, 0.89F, 0.78F}, 1.15F, 7.0F};
     bool passed = true;
-    for (const bool potato : {false, true}) {
-        for (const float fov : {60.0F, 100.0F}) {
-            CameraData camera;
-            camera.position = {0.0F, 1.62F, -6.5F};
-            camera.forward = {0.0F, -0.02F, -1.0F};
-            camera.verticalFieldOfViewDegrees = fov;
-            HudRenderData hud;
-            hud.graphicsQuality = potato
-                ? HudGraphicsQuality::Potato : HudGraphicsQuality::Ultra;
-            hud.detailedMaterials = !potato;
-            hud.worldRenderScalePercent = potato ? 50U : 100U;
-            passed &= renderer.render(width, height, camera, {}, {}, {},
-                lighting, startRoom, doors, corridor,
-                std::span<const RoomRenderData>{&destination, 1U}, hud);
-            glFinish();
-            std::vector<std::uint8_t> pixels(
-                static_cast<std::size_t>(width * height * 4));
-            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
-                pixels.data());
-            passed &= glGetError() == GL_NO_ERROR;
-            std::vector<std::uint8_t> topDown(pixels.size());
-            const std::size_t stride = static_cast<std::size_t>(width * 4);
-            for (int row = 0; row < height; ++row) {
-                std::copy_n(pixels.data()
-                        + static_cast<std::size_t>(height - row - 1) * stride,
-                    stride,
-                    topDown.data() + static_cast<std::size_t>(row) * stride);
-            }
-            const auto path = std::filesystem::path{directory}
-                / (std::string{potato ? "potato" : "ultra"}
+    const auto saveFrame = [&](const std::string& fileName) {
+        glFinish();
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width * height * 4));
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+            pixels.data());
+        if (glGetError() != GL_NO_ERROR) return false;
+        std::vector<std::uint8_t> topDown(pixels.size());
+        const std::size_t stride = static_cast<std::size_t>(width * 4);
+        for (int row = 0; row < height; ++row) {
+            std::copy_n(pixels.data()
+                    + static_cast<std::size_t>(height - row - 1) * stride,
+                stride,
+                topDown.data() + static_cast<std::size_t>(row) * stride);
+        }
+        const auto path = std::filesystem::path{directory} / fileName;
+        SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
+            SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+        const bool saved = surface
+            && SDL_SaveBMP(surface, path.string().c_str());
+        if (surface) SDL_DestroySurface(surface);
+        return saved;
+    };
+    for (const bool wide : {false, true}) {
+        const float passageWidth = wide ? 2.4F : 1.2F;
+        const float passageHeight = wide ? 2.8F : 2.2F;
+        if (!renderer.prepareCorridorRoomMaterials(20261031U, wide)) return false;
+        const std::array corridor{
+            CorridorRenderData{points, passageWidth, passageHeight,
+                renderer.activeRoomMaterialKey()},
+        };
+        const std::array doors{
+            DoorRenderData{{0.0F, 0.0F, -4.85F}, {0.0F, 0.0F, -1.0F},
+                passageWidth, passageHeight, false, 1.0F},
+            DoorRenderData{{0.0F, 0.0F, -15.15F}, {0.0F, 0.0F, 1.0F},
+                passageWidth, passageHeight, false, 1.0F},
+        };
+        for (const bool potato : {false, true}) {
+            for (const float fov : {60.0F, 100.0F}) {
+                CameraData camera;
+                camera.position = {0.0F, 1.62F, -6.5F};
+                camera.forward = {0.0F, -0.02F, -1.0F};
+                camera.verticalFieldOfViewDegrees = fov;
+                HudRenderData hud;
+                hud.graphicsQuality = potato
+                    ? HudGraphicsQuality::Potato : HudGraphicsQuality::Ultra;
+                hud.detailedMaterials = !potato;
+                hud.worldRenderScalePercent = potato ? 50U : 100U;
+                passed &= renderer.render(width, height, camera, {}, {}, {},
+                    lighting, startRoom, doors, corridor,
+                    std::span<const RoomRenderData>{&destination, 1U}, hud);
+                passed &= saveFrame(std::string{wide ? "wide_" : "narrow_"}
+                    + (potato ? "potato" : "ultra")
                     + "_fov" + std::to_string(static_cast<int>(fov)) + ".bmp");
-            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height,
-                SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
-            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
-            if (surface) SDL_DestroySurface(surface);
+            }
+        }
+        for (const bool inspectionWindow : {false, true}) {
+            auto closedDoors = doors;
+            closedDoors[0].openFraction = 0.0F;
+            closedDoors[0].inspectionWindow = inspectionWindow;
+            CameraData doorCamera;
+            doorCamera.position = {0.0F, 1.62F, -2.2F};
+            doorCamera.forward = {0.0F, 0.0F, -1.0F};
+            RoomLightingRenderData doorLighting = lighting;
+            doorLighting.lights[0].position = {0.0F, 2.7F, -3.0F};
+            HudRenderData doorHud;
+            doorHud.graphicsQuality = HudGraphicsQuality::Ultra;
+            doorHud.detailedMaterials = true;
+            passed &= renderer.render(width, height, doorCamera, {}, {}, {},
+                doorLighting, startRoom, closedDoors, corridor,
+                std::span<const RoomRenderData>{&destination, 1U}, doorHud);
+            passed &= saveFrame(std::string{wide ? "wide" : "narrow"}
+                + (inspectionWindow ? "_door_b.bmp" : "_door_a.bmp"));
         }
     }
     return passed;
@@ -1359,6 +1885,7 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
     using namespace gdp::game::visual;
     bool passed = true;
     const char* captureDirectory = std::getenv("GDP_MENU_CAPTURE_DIR");
+    const char* configurationCapture = std::getenv("GDP_CONFIG_CAPTURE_DIR");
     std::array<CampaignSlotInfo, 3> slots{};
     gdp::gameplay::CampaignCheckpoint checkpoint;
     checkpoint.floor = 7U; checkpoint.difficulty = gdp::gameplay::Difficulty::Hard;
@@ -1369,17 +1896,41 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
         for (auto page : {MenuPage::Root, MenuPage::CampaignSlots, MenuPage::CampaignSlot,
                  MenuPage::Difficulty, MenuPage::Overwrite, MenuPage::Speedrun,
                  MenuPage::Leaderboard, MenuPage::Settings, MenuPage::Display,
-                 MenuPage::Audio, MenuPage::Controls, MenuPage::Bindings, MenuPage::MoreBindings}) {
+                 MenuPage::Audio, MenuPage::Controls, MenuPage::KeyboardControls,
+                 MenuPage::GamepadControls, MenuPage::Bindings,
+                 MenuPage::MoreBindings, MenuPage::GamepadBindings,
+                 MenuPage::FeedbackCategory, MenuPage::FeedbackCompose}) {
             MenuFlowState state; state.page = page;
+            state.feedbackFromSettings = page == MenuPage::FeedbackCategory
+                || page == MenuPage::FeedbackCompose;
             gdp::gameplay::RuntimeSettings settings; settings.language = language;
             const auto view = makeMenuView(state, slots, {}, settings, true);
             HudRenderData hud;
             hud.language = language;
             hud.listMenu.active = true; hud.listMenu.title = view.title; hud.listMenu.subtitle = view.subtitle;
             hud.listMenu.titleScreen = page == MenuPage::Root;
+            hud.listMenu.configuration = page == MenuPage::Settings || page == MenuPage::Display
+                || page == MenuPage::Audio || page == MenuPage::Controls
+                || page == MenuPage::KeyboardControls
+                || page == MenuPage::GamepadControls
+                || page == MenuPage::Bindings || page == MenuPage::MoreBindings
+                || page == MenuPage::GamepadBindings
+                || page == MenuPage::FeedbackCategory
+                || page == MenuPage::FeedbackCompose;
+            hud.listMenu.configurationSection = configurationSection(state);
+            hud.listMenu.configurationControlPage
+                = configurationControlPage(state);
+            hud.listMenu.selection = page == MenuPage::Display ? 1U : 0U;
             for (const auto& row : view.rows) {
                 hud.listMenu.rows.push_back(row.text); hud.listMenu.enabled.push_back(row.enabled);
                 hud.listMenu.adjustable.push_back(row.setting.has_value());
+                const auto numeric = row.setting
+                    ? gdp::gameplay::numericSettingDescriptor(settings, *row.setting)
+                    : std::nullopt;
+                hud.listMenu.sliderFractions.push_back(numeric
+                    ? static_cast<float>(numeric->value - numeric->minimum)
+                        / static_cast<float>(numeric->maximum - numeric->minimum)
+                    : -1.0F);
             }
             const auto renderBackdrop = [&](const double time) {
                 const auto scene = sampleMenuBackdrop(time);
@@ -1420,8 +1971,96 @@ bool validateFrontendMenus(gdp::game::visual::GdpRenderer& renderer)
         }
     }
     }
+    if (configurationCapture) {
+        for (const auto dimensions : {std::array{1280, 720}}) {
+            const int width = dimensions[0], height = dimensions[1];
+            for (const auto page : {MenuPage::Display, MenuPage::Audio,
+                    MenuPage::KeyboardControls, MenuPage::GamepadControls}) {
+            MenuFlowState state;
+            state.page = page;
+            state.selection = page == MenuPage::Display ? 1U : 0U;
+            gdp::gameplay::RuntimeSettings settings;
+            settings.language = gdp::gameplay::Language::PortugueseBrazil;
+            const auto view = makeMenuView(state, slots, {}, settings, true);
+            HudRenderData hud;
+            hud.language = settings.language;
+            hud.listMenu.active = true;
+            hud.listMenu.configuration = true;
+            hud.listMenu.configurationSection = configurationSection(state);
+            hud.listMenu.configurationControlPage
+                = configurationControlPage(state);
+            hud.listMenu.uiScalePercent = 200U;
+            hud.listMenu.title = view.title;
+            hud.listMenu.subtitle = view.subtitle;
+            hud.listMenu.selection = state.selection;
+            for (const auto& row : view.rows) {
+                hud.listMenu.rows.push_back(row.text);
+                hud.listMenu.enabled.push_back(row.enabled);
+                hud.listMenu.adjustable.push_back(row.setting.has_value());
+                const auto numeric = row.setting
+                    ? gdp::gameplay::numericSettingDescriptor(settings, *row.setting)
+                    : std::nullopt;
+                hud.listMenu.sliderFractions.push_back(numeric
+                    ? static_cast<float>(numeric->value - numeric->minimum)
+                        / static_cast<float>(numeric->maximum - numeric->minimum)
+                    : -1.0F);
+            }
+            const auto scene = sampleMenuBackdrop(0.0);
+            passed &= renderer.render(width, height, scene.camera, scene.enemies,
+                {}, scene.props, scene.lighting, scene.room, {}, {}, {}, hud);
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(width * height * 4));
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                pixels.data());
+            std::vector<std::uint8_t> topDown(pixels.size());
+            const auto stride = static_cast<std::size_t>(width * 4);
+            for (int row = 0; row < height; ++row)
+                std::copy_n(pixels.data()
+                        + static_cast<std::size_t>(height - row - 1) * stride,
+                    stride, topDown.data() + static_cast<std::size_t>(row) * stride);
+            std::filesystem::create_directories(configurationCapture);
+            const std::string_view pageName = page == MenuPage::Display ? "video"
+                : page == MenuPage::Audio ? "audio"
+                : page == MenuPage::GamepadControls ? "gamepad" : "keyboard";
+            const auto path = std::filesystem::path{configurationCapture}
+                / ("configuration-200-"
+                    + std::string{pageName}
+                    + "-" + std::to_string(width) + "x"
+                    + std::to_string(height) + ".bmp");
+            auto* surface = SDL_CreateSurfaceFrom(width, height,
+                SDL_PIXELFORMAT_RGBA32, topDown.data(), width * 4);
+            passed &= surface && SDL_SaveBMP(surface, path.string().c_str());
+            SDL_DestroySurface(surface);
+            }
+        }
+    }
     if (!passed) std::cerr << "Frontend menu pixel render failed\n";
     return passed;
+}
+
+bool validateHighResolutionSettingsTransition(gdp::game::visual::GdpRenderer& renderer)
+{
+    if (!std::getenv("GDP_HIGH_RES_SETTINGS_TEST")) return true;
+    using namespace gdp::game::visual;
+    const auto scene = sampleMenuBackdrop(0.0);
+    HudRenderData hud;
+    hud.graphicsQuality = HudGraphicsQuality::Ultra;
+    hud.detailedMaterials = true;
+    hud.geometryShadowLightBudget = 8U;
+    for (int scale = 100; scale <= 150; ++scale) {
+        hud.worldRenderScalePercent = static_cast<std::uint16_t>(scale);
+        if (!renderer.render(1920, 1080, scene.camera, scene.enemies, {},
+                scene.props, scene.lighting, scene.room, {}, {}, {}, hud)) {
+            std::cerr << "High-resolution settings transition failed at "
+                << scale << "% render scale\n";
+            return false;
+        }
+    }
+    hud.worldRenderScalePercent = 100U;
+    if (!renderer.render(1920, 1080, scene.camera, scene.enemies, {},
+            scene.props, scene.lighting, scene.room, {}, {}, {}, hud)) return false;
+    glFinish();
+    return glGetError() == GL_NO_ERROR;
 }
 
 bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
@@ -1447,6 +2086,13 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
             return pixels;
         };
         const auto original = pixelsFor(hud);
+        hud.uiScalePercent = 75U;
+        const auto smallerHud = pixelsFor(hud);
+        hud.uiScalePercent = 150U;
+        const auto largerHud = pixelsFor(hud);
+        hud.uiScalePercent = 200U;
+        const auto largestHud = pixelsFor(hud);
+        hud.uiScalePercent = 100U;
         hud.health = 12.0F;
         const auto damaged = pixelsFor(hud);
         hud.health = 100.0F; hud.magazineAmmo = 0U;
@@ -1465,6 +2111,12 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
             && differences(damaged, width / 2, width) == 0U;
         passed &= differences(empty, 0, width / 2) == 0U
             && differences(empty, width / 2, width) > 0U;
+        // The setting must change the actual gameplay HUD on both sides.
+        for (const auto* scaled : {&smallerHud, &largerHud, &largestHud}) {
+            if (width <= 480 && scaled != &smallerHud) continue;
+            passed &= differences(*scaled, 0, width / 2) > 0U
+                && differences(*scaled, width / 2, width) > 0U;
+        }
         hud.weapon = HudWeaponRole::Knife;
         passed &= pixelsFor(hud) != empty;
         for (const auto role : {HudWeaponRole::Sniper, HudWeaponRole::Shotgun, HudWeaponRole::SubmachineGun}) {
@@ -1503,7 +2155,9 @@ bool validateTacticalHud(gdp::game::visual::GdpRenderer& renderer)
                 SDL_DestroySurface(surface);
                 return saved;
             };
-            passed &= save(original, "normal") && save(freshFuse, "fuse-full")
+            passed &= save(original, "normal") && save(smallerHud, "scale-75")
+                && save(largerHud, "scale-150") && save(largestHud, "scale-200")
+                && save(freshFuse, "fuse-full")
                 && save(urgentFuse, "fuse-urgent");
         }
     }
@@ -1583,6 +2237,23 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
         const auto halfBar = longestWarningRun(half);
         passed &= fullBar[0] > 40 && std::abs(halfBar[0] * 2 - fullBar[0]) <= 1
             && std::abs(fullBar[1] + fullBar[2] + 1 - width) <= 1;
+        hud.boss.health = 200.0F;
+        hud.uiScalePercent = 150U;
+        const auto enlarged = renderPixels(hud);
+        const auto enlargedBar = longestWarningRun(enlarged);
+        if (width > 480) {
+            const bool enlargedAndCentered = enlargedBar[0] > fullBar[0]
+                && std::abs(enlargedBar[1] + enlargedBar[2] + 1 - width) <= 1;
+            if (!enlargedAndCentered) {
+                std::cerr << "Boss HUD scale " << width << "x" << height
+                    << ": original=" << fullBar[0] << " enlarged="
+                    << enlargedBar[0] << " edges=" << enlargedBar[1]
+                    << "," << enlargedBar[2] << '\n';
+            }
+            passed &= enlargedAndCentered;
+        }
+        hud.uiScalePercent = 100U;
+        hud.boss.health = 100.0F;
         // Long Campaign timer text and F3 must not cover or move the central bar.
         HudRenderData campaignHud = hud;
         campaignHud.boss.health = 200.0F;
@@ -1622,7 +2293,8 @@ bool validateBossHud(gdp::game::visual::GdpRenderer& renderer)
                 SDL_DestroySurface(surface);
                 return saved;
             };
-            passed &= saveCapture(full, "range") && saveCapture(pressure, "pressure")
+            passed &= saveCapture(full, "range") && saveCapture(enlarged, "scale-150")
+                && saveCapture(pressure, "pressure")
                 && saveCapture(pursuit, "pursuit");
         }
         hud.boss.visible = false;
@@ -2138,6 +2810,14 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--security-t-capture";
     const bool centralHubCapture = argc == 2
         && std::string{argv[1]} == "--central-hub-capture";
+    const bool supplyPickupCapture = argc == 2
+        && std::string{argv[1]} == "--supply-pickup-capture";
+    const bool supplyCrateCapture = argc == 2
+        && std::string{argv[1]} == "--supply-crate-capture";
+    const bool canisterCapture = argc == 2
+        && std::string{argv[1]} == "--canister-capture";
+    const bool barricadeCapture = argc == 2
+        && std::string{argv[1]} == "--barricade-capture";
     const bool centralHubShadowCapture = argc == 2
         && std::string{argv[1]} == "--central-hub-shadow-capture";
     const bool storageShadowCapture = argc == 2
@@ -2152,8 +2832,12 @@ int main(const int argc, char** argv)
         && std::string{argv[1]} == "--central-hub-blackout-capture";
     const bool bossColumnsCapture = argc == 2
         && std::string{argv[1]} == "--boss-columns-capture";
+    const bool combatArenaCapture = argc == 2
+        && std::string{argv[1]} == "--combat-arena-capture";
     const bool industrialCorridorCapture = argc == 2
         && std::string{argv[1]} == "--industrial-corridor-capture";
+    const bool industrialRoomCapture = argc == 2
+        && std::string{argv[1]} == "--industrial-room-capture";
     // Smallest supported interface fixture: enough room for map and corner resources.
     // A 160x100 buffer intentionally collapses the minimap to avoid covering the HUD.
     constexpr int width = 320;
@@ -2345,6 +3029,14 @@ int main(const int argc, char** argv)
             passed = captureRoomPreview(renderer, RoomPreviewKind::SecurityT);
         } else if (centralHubCapture) {
             passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub);
+        } else if (supplyPickupCapture) {
+            passed = captureSupplyPickups(renderer);
+        } else if (supplyCrateCapture) {
+            passed = captureSupplyCrates(renderer);
+        } else if (canisterCapture) {
+            passed = captureCanisters(renderer);
+        } else if (barricadeCapture) {
+            passed = captureBarricades(renderer);
         } else if (centralHubShadowCapture) {
             passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub,
                 false, true);
@@ -2364,8 +3056,12 @@ int main(const int argc, char** argv)
             passed = captureRoomPreview(renderer, RoomPreviewKind::CentralHub, true);
         } else if (bossColumnsCapture) {
             passed = captureRoomPreview(renderer, RoomPreviewKind::Boss);
+        } else if (combatArenaCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Combat);
         } else if (industrialCorridorCapture) {
             passed = captureIndustrialCorridorPreview(renderer);
+        } else if (industrialRoomCapture) {
+            passed = captureRoomPreview(renderer, RoomPreviewKind::Industrial);
         } else if (bodyOnly) {
             passed = validatePlayerBody(renderer);
         } else if (handsOnly) {
@@ -2379,6 +3075,7 @@ int main(const int argc, char** argv)
         } else if (scopeOnly) {
             passed = validateSniperScope(renderer) && validateNewWeaponVisuals(renderer);
         } else {
+            passed = validateTerminalVisual(renderer) && passed;
             std::vector<std::uint8_t> baseline(
                 static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U);
             glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, baseline.data());
@@ -3401,6 +4098,59 @@ int main(const int argc, char** argv)
                     << " charcoal=" << renderedCharcoalBox
                     << " visible=" << (oliveBoxPixels != emptyBoxPixels) << '\n';
             }
+            storageBoxProps.front().role
+                = gdp::game::visual::PropVisualRole::TableBox;
+            storageBoxProps.front().theme
+                = gdp::world::RoomTheme::Maintenance;
+            const bool renderedTableBox = renderer.render(
+                width, height, {}, {}, {}, storageBoxProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> tableBoxPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                tableBoxPixels.data());
+            storageBoxProps.front().theme
+                = gdp::world::RoomTheme::Laboratory;
+            const bool renderedLaboratoryTableBox = renderer.render(
+                width, height, {}, {}, {}, storageBoxProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> laboratoryTableBoxPixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                laboratoryTableBoxPixels.data());
+            std::array supplyCrateProps{
+                gdp::game::visual::PropRenderData{
+                    {0.0F, 0.0F, -1.2F}, {0.78F, 0.72F, 0.78F},
+                    gdp::game::visual::PropVisualRole::Crate,
+                    gdp::game::visual::PropVisualState::Intact, 20261114U,
+                    gdp::world::RoomTheme::Storage,
+                    gdp::game::visual::PickupVisualRole::Ammo},
+            };
+            const bool renderedStorageCrate = renderer.render(
+                width, height, {}, {}, {}, supplyCrateProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> storageCratePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                storageCratePixels.data());
+            supplyCrateProps.front().theme = gdp::world::RoomTheme::Security;
+            const bool renderedSecurityCrate = renderer.render(
+                width, height, {}, {}, {}, supplyCrateProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> securityCratePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                securityCratePixels.data());
+            supplyCrateProps.front().crateDrop
+                = gdp::game::visual::PickupVisualRole::Health;
+            const bool renderedHealthCrate = renderer.render(
+                width, height, {}, {}, {}, supplyCrateProps, {}, storageBoxRoom);
+            std::vector<std::uint8_t> healthCratePixels(baseline.size());
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+                healthCratePixels.data());
+            if (!renderedStorageCrate || !renderedSecurityCrate
+                || !renderedHealthCrate
+                || storageCratePixels == securityCratePixels
+                || securityCratePixels == healthCratePixels) {
+                std::cerr << "Supply crate pixel variants: rendered="
+                    << renderedStorageCrate << '/' << renderedSecurityCrate
+                    << '/' << renderedHealthCrate << " theme="
+                    << (storageCratePixels != securityCratePixels)
+                    << " contents="
+                    << (securityCratePixels != healthCratePixels) << '\n';
+            }
 
             const bool renderedImpactBaseline = renderer.render(width, height);
             std::vector<std::uint8_t> impactBaselinePixels(baseline.size());
@@ -4036,6 +4786,13 @@ int main(const int argc, char** argv)
                 && oliveBoxPixels != emptyBoxPixels
                 && charcoalBoxPixels != emptyBoxPixels
                 && oliveBoxPixels != charcoalBoxPixels
+                && renderedTableBox && renderedLaboratoryTableBox
+                && tableBoxPixels != charcoalBoxPixels
+                && tableBoxPixels != laboratoryTableBoxPixels
+                && renderedStorageCrate && renderedSecurityCrate
+                && renderedHealthCrate
+                && storageCratePixels != securityCratePixels
+                && securityCratePixels != healthCratePixels
                 && renderedImpactBaseline && renderedImpacts
                 && impactChangedChannels > 10U
                 && renderedBulletMark && bulletMarkChangedChannels > 10U
@@ -4107,6 +4864,7 @@ int main(const int argc, char** argv)
             passed = validateBossHud(renderer) && passed;
             passed = validateCampaignExitHud(renderer) && passed;
             passed = validateFrontendMenus(renderer) && passed;
+            passed = validateHighResolutionSettingsTransition(renderer) && passed;
             passed = validateTacticalHud(renderer) && passed;
             passed = validateNewWeaponVisuals(renderer) && passed;
             passed = validateSniperScope(renderer) && passed;

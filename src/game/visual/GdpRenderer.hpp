@@ -111,9 +111,14 @@ public:
 
     [[nodiscard]] bool initialize(int width, int height);
     [[nodiscard]] bool prepareIndustrialRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareCorridorRoomMaterials(
+        wkc::core::Seed corridorSeed, bool structuralTransit = false);
+    [[nodiscard]] bool prepareOfficeRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareStorageRoomMaterials(
         wkc::core::Seed roomSeed, bool approvedHallMaterials = false);
-    [[nodiscard]] bool prepareCombatRoomMaterials(wkc::core::Seed roomSeed);
+    [[nodiscard]] bool prepareCombatRoomMaterials(
+        wkc::core::Seed roomSeed, bool galleryWallV1 = false,
+        bool bossArenaV1 = false);
     [[nodiscard]] bool prepareCafeteriaRoomMaterials(wkc::core::Seed roomSeed);
     [[nodiscard]] bool prepareLaboratoryRoomMaterials(
         wkc::core::Seed roomSeed, bool approvedPreviewMaterials = false);
@@ -276,6 +281,11 @@ private:
         wkc::render::Mesh mesh;
         std::uint32_t materialId{0U};
     };
+    struct TerminalGpuPart {
+        std::uint32_t partId{0U};
+        std::uint32_t materialId{0U};
+        wkc::render::Mesh mesh{};
+    };
 
     struct WeaponGpuMaterial {
         wkc::render::Texture albedo;
@@ -286,13 +296,26 @@ private:
     struct RoomGpuMaterials {
         std::array<wkc::render::Texture,
             static_cast<std::size_t>(IndustrialSurface::Count)> textures;
+        std::array<std::optional<WeaponGpuMaterial>,
+            static_cast<std::size_t>(IndustrialSurface::Count)> bossSurfaceMaterials;
+        std::array<std::optional<IndustrialWallGpuMaterial>,
+            static_cast<std::size_t>(IndustrialSurface::Count)> specialSurfaceMaterials;
+        wkc::render::Texture combatCoverTexture;
+        wkc::render::Texture combatColumnTexture;
+        wkc::render::Texture combatRailTexture;
         std::optional<IndustrialCondition> industrialWallCondition;
         std::optional<IndustrialCondition> industrialCeilingCondition;
+        bool industrialFloorV2{false};
         wkc::core::Vec2 wallUvOffset{};
         wkc::core::Vec2 ceilingUvOffset{};
         float wallTone{1.0F};
         float ceilingTone{1.0F};
         bool storageHallV1{false};
+        bool combatGalleryWallV1{false};
+        bool combatBossV1{false};
+        bool corridorV2{false};
+        bool officeV1{false};
+        float combatWallSeed{0.0F};
         std::uint64_t storageHallSeed{0};
         std::optional<StorageCondition> storageRackCondition{};
         bool cafeteriaV1{false};
@@ -323,6 +346,7 @@ private:
     wkc::render::Mesh uiQuad_{};
     wkc::render::Texture uiFont_{};
     wkc::render::Mesh box_{};
+    wkc::render::Mesh canisterCylinder_{};
     wkc::render::Mesh centralHubColumnShaft_{};
     wkc::render::Mesh planterLeafMesh_{};
     wkc::render::Mesh glassTestDome_{};
@@ -366,6 +390,8 @@ private:
     std::array<bool, 5U> referenceModelReady_{};
     wkc::render::TextureBindingCache textureBindings_{};
     CeilingFixtureGpuMaterial ceilingFixtureMaterial_{};
+    CeilingFixtureGpuMaterial terminalMaterial_{};
+    std::vector<TerminalGpuPart> terminalModelParts_{};
     std::array<std::vector<CeilingFixtureGpuPart>,
         static_cast<std::size_t>(CeilingFixtureVariant::Count)>
         ceilingFixtureModels_{};

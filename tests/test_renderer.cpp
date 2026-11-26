@@ -5,6 +5,7 @@
 #include "render/Mesh.hpp"
 #include "render/RasterState.hpp"
 #include "game/visual/GdpRenderer.hpp"
+#include "game/visual/UiFontAtlas.hpp"
 #include "game/visual/WeaponViewmodelAssets.hpp"
 #include "gameplay/Weapon.hpp"
 #include "render/Texture.hpp"
@@ -527,9 +528,7 @@ void testPauseMenuLayout()
     expect(wide.panel.contains(wide.resumeButton.x, wide.resumeButton.y)
             && wide.panel.contains(wide.restartButton.x, wide.restartButton.y)
             && wide.panel.contains(wide.settingsButton.x, wide.settingsButton.y)
-            && wide.panel.contains(wide.controlsButton.x, wide.controlsButton.y)
-            && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y)
-            && wide.panel.contains(wide.exitButton.x, wide.exitButton.y),
+            && wide.panel.contains(wide.mainMenuButton.x, wide.mainMenuButton.y),
         "pause menu hit targets stay inside the panel");
 
     const auto pointerX = [](const UiRect& button) {
@@ -552,17 +551,9 @@ void testPauseMenuLayout()
             == HudPauseSelection::Settings,
         "top-origin pointer maps to pause Settings");
     expect(pauseMenuSelectionAt(1280, 720,
-               pointerX(wide.controlsButton), pointerY(wide.controlsButton))
-            == HudPauseSelection::Controls,
-        "top-origin pointer maps to pause Controls");
-    expect(pauseMenuSelectionAt(1280, 720,
                pointerX(wide.mainMenuButton), pointerY(wide.mainMenuButton))
             == HudPauseSelection::MainMenu,
         "top-origin pointer maps to pause Main Menu");
-    expect(pauseMenuSelectionAt(1280, 720,
-               pointerX(wide.exitButton), pointerY(wide.exitButton))
-            == HudPauseSelection::ExitGame,
-        "top-origin pointer maps to Exit Game");
     expect(!pauseMenuSelectionAt(1280, 720, 0.0F, 0.0F),
         "pointer outside pause buttons has no selection");
 
@@ -578,9 +569,7 @@ void testPauseMenuLayout()
     expect(tiny.panel.contains(tiny.resumeButton.x, tiny.resumeButton.y)
             && tiny.panel.contains(tiny.restartButton.x, tiny.restartButton.y)
             && tiny.panel.contains(tiny.settingsButton.x, tiny.settingsButton.y)
-            && tiny.panel.contains(tiny.controlsButton.x, tiny.controlsButton.y)
-            && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y)
-            && tiny.panel.contains(tiny.exitButton.x, tiny.exitButton.y),
+            && tiny.panel.contains(tiny.mainMenuButton.x, tiny.mainMenuButton.y),
         "tiny pause menu clamps all hit targets inside the framebuffer");
 }
 
@@ -1484,18 +1473,18 @@ void testBulletMarksFollowDoorPanels()
     const auto closedMark = bulletMarkOnDoor(mark, closed, 0.25F);
     const auto openMark = bulletMarkOnDoor(mark, open, 0.25F);
     expect(wkc::core::nearlyEqual(closedMark.position.x, 0.25F)
-            && wkc::core::nearlyEqual(closedMark.position.z, -0.173F)
+            && wkc::core::nearlyEqual(closedMark.position.z, -0.218F)
             && wkc::core::nearlyEqual(closedMark.position.y, 1.30F),
         "closed-door bullet mark lies on the panel face at its impact height");
     expect(wkc::core::nearlyEqual(openMark.position.x - closedMark.position.x,
-            0.98F)
+            1.02F)
             && openMark.normal == wkc::core::Vec3{0.0F, 0.0F, -1.0F},
         "bullet mark moves with the right door panel when it opens");
     DoorRenderData rotated = open;
     rotated.outwardNormal = {1.0F, 0.0F, 0.0F};
     const auto leftMark = bulletMarkOnDoor(mark, rotated, -0.25F);
-    expect(wkc::core::nearlyEqual(leftMark.position.z, -1.23F)
-            && wkc::core::nearlyEqual(leftMark.position.x, -0.173F),
+    expect(wkc::core::nearlyEqual(leftMark.position.z, -1.27F)
+            && wkc::core::nearlyEqual(leftMark.position.x, -0.218F),
         "left panel bullet mark follows a rotated doorway");
 }
 
@@ -2365,7 +2354,7 @@ void testOptimizedShadowBudget()
         = optimizeShadowBudget(lighting, {}, candidates);
     const ShadowBudgetResult repeatedResult
         = optimizeShadowBudget(repeated, {}, candidates);
-    expect(result.activeLights == 7U
+    expect(result.activeLights == maxRenderedRoomLights - 1U
             && lighting.shadowLightCount == maxShadowCastingLights,
         "shadow optimization selects only two nearest active lights");
     expect(result.candidateOccluders == candidates.size()
@@ -2679,6 +2668,92 @@ void testPlayerBody()
     }
 }
 
+void testConfigurationScaleLayout()
+{
+    using namespace gdp::game::visual;
+    for (const auto& [width, height] :
+        {std::pair{1280, 720}, std::pair{1920, 1080},
+         std::pair{2560, 1440}, std::pair{2880, 1620},
+         std::pair{3840, 2160}}) {
+        for (const auto percent : {std::uint16_t{75U}, std::uint16_t{100U},
+                std::uint16_t{125U}, std::uint16_t{150U},
+                std::uint16_t{200U}}) {
+            const auto layout = makeListMenuLayout(width, height, 14U,
+                false, percent, 13U);
+            expect(layout.panel.x >= 0 && layout.panel.y >= 0
+                    && layout.panel.x + layout.panel.width <= width
+                    && layout.panel.y + layout.panel.height <= height,
+                "scaled configuration panel stays within the framebuffer");
+            const auto row = layout.rows[13U];
+            expect(row.width > 0 && row.height > 0
+                    && row.y >= layout.panel.y
+                    && row.y + row.height <= layout.panel.y + layout.panel.height,
+                "selected row stays visible after vertical scrolling");
+            const float x = static_cast<float>(row.x + row.width / 2);
+            const float y = static_cast<float>(height - row.y - row.height / 2);
+            expect(listMenuSelectionAt(width, height, 14U, x, y,
+                       false, percent, 13U) == 13U,
+                "scaled pointer hit matches the selected visible row");
+            const auto track = listMenuSliderTrack(layout, 13U);
+            const float sliderX = static_cast<float>(track.x + track.width / 2);
+            expect(!listMenuSliderFractionAt(width, height, 14U, 13U,
+                       sliderX, y, percent, 13U),
+                "clicking the label line does not drag a slider");
+            const float sliderY = static_cast<float>(
+                height - track.y - track.height / 2);
+            const auto fraction = listMenuSliderFractionAt(width, height,
+                14U, 13U, sliderX, sliderY, percent, 13U);
+            expect(fraction && *fraction > 0.45F && *fraction < 0.55F,
+                "slider drag coordinates follow the shared scaled layout");
+        }
+    }
+    const auto controls = makeListMenuLayout(1280, 720, 12U,
+        false, 200U, 0U, true);
+    const auto tab = controls.controlTabs[1U];
+    expect(tab.width > 0 && controls.rows[0U].x >= tab.x + tab.width
+            && configurationControlTabAt(1280, 720, 12U,
+                static_cast<float>(tab.x + tab.width / 2),
+                static_cast<float>(720 - tab.y - tab.height / 2),
+                200U, 0U) == 1U,
+        "control sidebar renders beside content and shares its mouse hitboxes");
+}
+
+void testListMenuTextClearance()
+{
+    using namespace gdp::game::visual;
+    for (const auto percent : {std::uint16_t{75U}, std::uint16_t{100U},
+             std::uint16_t{150U}, std::uint16_t{200U}}) {
+        const auto layout = makeListMenuLayout(1280, 720, 14U,
+            false, percent, 13U);
+        const float scale = layout.textScale;
+        const int glyphDrop = static_cast<int>(std::lround(
+            static_cast<float>(uiFontCellHeight - uiFontBaseline - 1)
+                * 0.4F * scale));
+        const int glyphHeight = static_cast<int>(std::lround(
+            static_cast<float>(uiFontCellHeight) * 0.4F * scale));
+        const int labelOffset = static_cast<int>(listMenuLabelBaselineUnits * scale);
+        const int valueOffset = static_cast<int>(listMenuValueBaselineUnits * scale);
+        const int minimumGap = static_cast<int>(std::ceil(2.0F * scale));
+        const auto valueTop = valueOffset - glyphDrop + glyphHeight;
+        const auto labelBottom = labelOffset - glyphDrop;
+        expect(labelBottom - valueTop >= minimumGap,
+            "setting label and value have visible space between font cells");
+        const auto last = layout.rows[13U];
+        const int footerTop = layout.panel.y
+            + static_cast<int>(4.0F * scale) - glyphDrop + glyphHeight;
+        const int lastValueBottom = last.y + valueOffset - glyphDrop;
+        expect(lastValueBottom - footerTop >= minimumGap,
+            "last setting value stays clear of the menu footer");
+        const auto previous = layout.rows[12U];
+        if (previous.height > 0) {
+            const int lowerLabelTop = last.y + labelOffset - glyphDrop + glyphHeight;
+            const int upperValueBottom = previous.y + valueOffset - glyphDrop;
+            expect(upperValueBottom - lowerLabelTop >= minimumGap,
+                "neighboring setting rows leave clear space between font cells");
+        }
+    }
+}
+
 } // namespace
 
 int main()
@@ -2716,6 +2791,8 @@ int main()
     testWeaponViewmodelAssets();
     testPlayerHands();
     testSettingsMenuLayout();
+    testConfigurationScaleLayout();
+    testListMenuTextClearance();
     testPlayerBody();
 
     if (failures != 0) {

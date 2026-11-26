@@ -2,7 +2,10 @@
 
 > **Estado:** materiais de parede, piso e teto implementados e validados na
 > Fase 10. A prévia isolada em T com consoles e cobertura física foi aprovada
-> em partida em 03/11/2026; ainda não integra a campanha.
+> em partida em 03/11/2026. A variante quadrada foi aprovada na prévia isolada
+> em 15/11/2026 e integrada ao módulo `SecurityHall_01` da campanha. Sua
+> circulação e seus encontros ainda precisam de playtest na campanha. A
+> variante em T também consta na biblioteca e aguarda esse teste específico.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -36,8 +39,8 @@ A prévia `Security` mede 18 × 18 m, com teto a 6 m, e segue a composição de
 um nicho de observação opaco na lateral direita, gabinete à esquerda e duas
 barricadas baixas desencontradas. A abertura central atrás da bancada tem
 6,8 m, e o eixo entre barricadas mantém 6,9 m livres. Centro, flancos e quatro
-posições possíveis de porta permanecem transitáveis. O nicho representa apenas
-a estrutura; vidro e funcionamento de observação ficam para revisão posterior.
+posições possíveis de porta permanecem transitáveis. O nicho tem um painel de
+monitoramento embutido; não é uma janela transparente nem um terminal interativo.
 As peças sólidas usam a mesma geometria para desenho e colisão; a sala abre
 sem inimigos para avaliar o formato.
 
@@ -47,9 +50,55 @@ env __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
   ./build/playtest/gdp --security-preview --seed 20261029
 ```
 
-Consoles e móveis usam material genérico nesta fase; não foram criadas novas
-texturas. As [capturas técnicas](../visual/validation/security_geometry_preview/README.md)
-mostram FOV 60 e 100 em POTATO e ULTRA. A avaliação em partida está pendente.
+As [capturas técnicas da geometria inicial](../visual/validation/security_geometry_preview/README.md)
+mostram FOV 60 e 100 em POTATO e ULTRA. O mobiliário inicial foi substituído
+pela revisão abaixo, aprovada na prévia isolada; falta o teste na campanha.
+
+### Revisão da Segurança quadrada
+
+A prévia quadrada agora usa a mesma família de metal, fixadores, painéis e
+indicadores da Segurança em T. Duas estações de controle ficam na parede ao
+fundo da vista inicial,
+voltadas para o centro, sem fechar a posição de porta central. O armário da
+parede oeste e as duas coberturas baixas receberam os respectivos detalhes 3D.
+O nicho opaco da parede leste tem três monitores embutidos com indicadores que
+acompanham o estado da sala. A carcaça externa é metal de equipamento escuro,
+com laterais mais estreitas e base em três painéis ventilados, distinta das
+colunas estruturais. Dois vasos ocupam os
+cantos sul sem bloquear as portas. As peças principais continuam com colisão;
+o centro e os acessos laterais ficam livres. A composição foi aprovada
+visualmente na prévia isolada em 15/11/2026 e agora
+integra também a variante quadrada da campanha.
+
+Dois dutos suspensos de 0,7 m de largura percorrem o teto em L: o trecho
+principal vai de uma parede à outra perto do nicho, e o ramal segue até a
+parede oposta. Eles se encontram sem sobrepor seus volumes e não cruzam as
+luminárias. A altura livre sob eles é 5,18 m.
+As [capturas técnicas dos dutos](../visual/validation/security_square_duct_v1/README.md)
+mostram a vista geral e o detalhe em ULTRA e POTATO.
+
+O usuário aprovou a carcaça externa do nicho. As colunas de parede da variante
+quadrada recebiam o material estrutural genérico, esverdeado, enquanto a
+variante em T usa o acabamento de parede de Segurança. As colunas quadradas
+agora usam esse mesmo acabamento; geometria e colisão permanecem próprias da
+variante quadrada. A comparação da variante quadrada em campanha ainda está pendente.
+
+As [capturas do nicho de monitoramento](../visual/validation/security_observation_v1/README.md)
+mostram o detalhe em ULTRA e POTATO; o conjunto foi aprovado no playtest da
+prévia isolada.
+
+Para validar a integração em uma partida de campanha, inicie um slot novo no
+primeiro andar com a semente `1`. Essa semente contém `SecurityHall_01` com
+as quatro portas, zonas de inimigos e objetos, consoles, nicho, vasos e dutos.
+Confira a circulação ao redor das coberturas, tiros pelas portas e a ocupação
+dos inimigos. Um checkpoint existente preserva sua própria semente.
+
+```bash
+cd /mnt/projetos/GDP/GDP-3
+cmake --build build/technical-ceiling-build --target gdp
+env __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
+  ./build/technical-ceiling-build/gdp --seed 1
+```
 
 ### Variante em T para playtest de formato
 
@@ -59,8 +108,9 @@ de 20 m. Há duas estações de controle na parede norte, armários junto às pa
 do acesso e duas coberturas baixas nas alas. O jogo inicia com Sniper, sem
 inimigos. O material da Segurança existente permanece aplicado nesta avaliação;
 há uma luminária sobre o acesso estreito e duas sobre a galeria larga.
-O novo formato ainda não integra a geração da campanha. Detalhes e comando de
-execução estão no [plano de formatos](room_shape_plan.md).
+O formato também consta na biblioteca da campanha; essa prévia segue útil para
+inspeção sem inimigos. Detalhes e comando de execução estão no
+[plano de formatos](room_shape_plan.md).
 
 Na prévia em T, as três luminárias de Segurança agora ficam suspensas por duas
 hastes com bases no teto. O arquivo 3D e o fonte Blender estão em
@@ -156,8 +206,8 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia \
 ```
 
 O usuário aprovou a sala em partida em 03/11/2026. A aprovação cobre a prévia
-isolada com formato, móveis, materiais e indicadores; a integração na campanha
-permanece uma etapa separada.
+isolada com formato, móveis, materiais e indicadores; o playtest da variante
+da campanha permanece uma etapa separada.
 
 ## Validação visual
 

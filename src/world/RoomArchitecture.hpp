@@ -20,6 +20,7 @@ inline constexpr RoomModuleId technicalLPreviewModuleId = 900007U;
 inline constexpr RoomModuleId bossRoomPreviewModuleId = 900009U;
 inline constexpr RoomModuleId securityTPreviewModuleId = 900010U;
 inline constexpr RoomModuleId industrialCorridorDestinationPreviewModuleId = 900011U;
+inline constexpr RoomModuleId industrialCorridorStartPreviewModuleId = 900012U;
 
 enum class StorageRackPart : std::uint8_t {
     None,
@@ -48,6 +49,8 @@ enum class RoomDecorationPart : std::uint8_t {
     CentralHubColumnShaft,
     CentralHubColumnPlinth,
     CentralHubRouteDisplay,
+    CeilingDuctMuted,
+    IndustrialStatusIndicator,
 };
 
 enum class SecurityFurniturePart : std::uint8_t {
@@ -57,6 +60,9 @@ enum class SecurityFurniturePart : std::uint8_t {
     Monitor,
     Cabinet,
     Barricade,
+    ObservationPanel,
+    ObservationSurround,
+    ConsoleTrim,
 };
 
 enum class LaboratoryFurniturePart : std::uint8_t {
@@ -80,6 +86,33 @@ enum class TechnicalFurniturePart : std::uint8_t {
     ServicePipe,
 };
 
+enum class CombatArchitecturePart : std::uint8_t {
+    None,
+    Cover,
+    CoverFace,
+    CoverFrame,
+    CoverRib,
+    CoverBolt,
+    ColumnShaft,
+    ColumnTrim,
+    ColumnInset,
+    ColumnBrace,
+    GalleryDeck,
+    GallerySupport,
+    GalleryPillar,
+    GalleryPillarTrim,
+    GalleryBracket,
+    GalleryFastener,
+    GalleryRail,
+    StairTread,
+    StairRail,
+    StairRailSlope,
+    CeilingBeam,
+    CeilingBrace,
+    CeilingPanel,
+    CeilingGrille,
+};
+
 // World-space authored geometry. Breakable parts are spawned as dynamic props;
 // the remaining parts share their geometry with navigation collision.
 struct RoomArchitecturePart {
@@ -95,12 +128,20 @@ struct RoomArchitecturePart {
     SecurityFurniturePart securityFurniturePart{SecurityFurniturePart::None};
     LaboratoryFurniturePart laboratoryFurniturePart{LaboratoryFurniturePart::None};
     TechnicalFurniturePart technicalFurniturePart{TechnicalFurniturePart::None};
+    CombatArchitecturePart combatPart{CombatArchitecturePart::None};
+    // World-space centre line used to draw the inclined stair rail. Its
+    // compact AABB remains the bullet/navigation collision volume.
+    wkc::core::Vec3 railStart{};
+    wkc::core::Vec3 railEnd{};
 
     constexpr bool operator==(const RoomArchitecturePart&) const noexcept = default;
 };
 
 // Returns authored architecture for the room's current theme. Empty means the
 // renderer/navigation should keep their existing generic room composition.
+[[nodiscard]] bool usesAuthoredRoomArchitecture(
+    const RoomInstance& room) noexcept;
+
 [[nodiscard]] std::vector<RoomArchitecturePart> makeRoomArchitecture(
     const RoomInstance& room);
 

@@ -130,6 +130,15 @@ const char* SdlGamepad::name() const noexcept
     return connected() ? SDL_GetGamepadName(device_) : nullptr;
 }
 
+bool SdlGamepad::supportsRumble() const noexcept
+{
+    if (!connected()) return false;
+    const SDL_PropertiesID properties = SDL_GetGamepadProperties(device_);
+    return properties != 0
+        && SDL_GetBooleanProperty(properties,
+            SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN, false);
+}
+
 bool SdlGamepad::rumble(const float low, const float high,
     const std::uint32_t durationMs) noexcept
 {

@@ -153,8 +153,17 @@ InitialEntitySet populateInitialEntities(
 
         switch (room.role) {
         case RoomRole::Terminal:
+        {
+            const bool sideways = room.rotation == wkc::core::QuarterTurn::Degrees90
+                || room.rotation == wkc::core::QuarterTurn::Degrees270;
             result.terminal = manager.createProp({
-                .transform = {.position = positionInRoom(room, {0.0F, 0.0F, 2.2F})},
+                .transform = {
+                    .position = positionInRoom(room, {0.0F, 0.0F, 2.2F}),
+                    .rotationDegrees = {0.0F,
+                        90.0F * static_cast<float>(room.rotation), 0.0F},
+                    .scale = sideways ? wkc::core::Vec3{0.60F, 1.80F, 1.15F}
+                                      : wkc::core::Vec3{1.15F, 1.80F, 0.60F},
+                },
                 .roomId = room.id,
                 .type = PropType::Terminal,
                 .solid = true,
@@ -167,6 +176,7 @@ InitialEntitySet populateInitialEntities(
             addEnemy(EnemyArchetype::Guard, {0.0F, 0.0F, -5.0F}, 75.0F);
             addEnemy(EnemyArchetype::Officer, {0.0F, 0.0F, 5.0F}, 65.0F);
             break;
+        }
         case RoomRole::Normal:
             if (encounterFloor == 1U && encounter.chance(0.5F)) {
                 addEnemy(EnemyArchetype::Worker, {}, 50.0F);
@@ -305,14 +315,16 @@ InitialEntitySet populateInitialEntities(
             }
             addFixedProp(PropType::Door, {0.0F, 0.0F, 2.5F}, true);
             if (campaignWeapons) {
-                // Reuse the authored teal console and its existing static solid.
+                // The same two-sided portal terminal serves the Campaign exit.
                 const bool sideways = room.rotation == wkc::core::QuarterTurn::Degrees90
                     || room.rotation == wkc::core::QuarterTurn::Degrees270;
                 result.exitTerminal = manager.createProp({
                     .transform = {
                         .position = positionInRoom(room, {0.0F, 0.0F, 2.2F}),
-                        .scale = sideways ? wkc::core::Vec3{0.3F, 2.0F, 0.8F}
-                                          : wkc::core::Vec3{0.8F, 2.0F, 0.3F},
+                        .rotationDegrees = {0.0F,
+                            90.0F * static_cast<float>(room.rotation), 0.0F},
+                        .scale = sideways ? wkc::core::Vec3{0.60F, 1.80F, 1.15F}
+                                          : wkc::core::Vec3{1.15F, 1.80F, 0.60F},
                     },
                     .roomId = room.id,
                     .type = PropType::Terminal,

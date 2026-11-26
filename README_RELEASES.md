@@ -77,6 +77,18 @@ auditoria de 02/11 não foram promovidos.
 O Download público só muda após CI do SHA exato da `main`, builds das quatro
 plataformas e conclusão do workflow de release.
 
+### Versão 0.1.11 (candidata)
+
+O próximo pacote reúne o acabamento das salas da campanha, o terminal de
+missão definitivo, ajustes de colisão e posicionamento dos objetos, a reforma
+das portas e corredores com trechos estreitos e largos, e os menus revisados.
+A opção de escala da interface agora também altera os elementos do HUD durante
+a partida; em janelas estreitas, a ampliação é limitada para evitar sobreposição.
+Os cérebros ativos não mudam neste pacote.
+
+A publicação depende da CI na revisão exata e do workflow de pacotes das quatro
+plataformas, conforme as etapas abaixo.
+
 ## Preparação única
 
 Configure no repositório do código-fonte o secret de Actions

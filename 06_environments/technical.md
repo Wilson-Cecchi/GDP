@@ -1,7 +1,7 @@
 # Environment — Technical / Maintenance
 
 > **Estado:** variante em L pronta: formato, móveis, parede, piso e teto
-> aprovados em 14/11/2026. Integrada à campanha como sala normal grande;
+> aprovados em 14–15/11/2026. Integrada à campanha como sala normal grande;
 > geração, conexões e travessia passaram pela validação.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
@@ -138,6 +138,16 @@ em L, as travessas terminam na parede de retorno em vez de atravessar o canto
 ausente. Dutos e luminárias continuam peças separadas nas posições atuais.
 O usuário aprovou esta revisão do teto em 14/11/2026; ela não altera o
 aceite da parede e do piso.
+Em 15/11/2026, o usuário aprovou também as caixas quebráveis das bancadas
+com armação, tampa, fecho e fixadores em 3D. A classificação visual é própria;
+colisão e resistência continuam iguais às das caixas anteriores. As caixas
+das estantes do Storage permanecem para uma revisão futura.
+O mesmo ritmo de travessas e fixadores do teto foi adaptado para Storage,
+Cafeteria, Segurança, Laboratório e Central Hub, com metais nas cores de cada
+ambiente. As peças são recortadas pelo contorno real das salas em T e octogonal
+e deixam espaço em volta das luminárias. Essas adaptações têm capturas técnicas
+e foram aprovadas pelo usuário em 15/11/2026 após avaliação das salas. A
+aprovação se refere às travessas e não fecha as demais pendências de cada sala.
 Pranchas e capturas em `visual/proposals/` e `visual/validation/` são
 artefatos locais de revisão, ignorados pelo Git; os albedos usados no jogo
 ficam em `assets/visual/rooms/technical/`.

@@ -1,8 +1,8 @@
 # Environment — Industrial Corridor
 
-> **Estado:** primeiro conjunto de materiais de parede, piso e teto implementado
-> e validado na Fase 10; geometria modular e detalhes ocasionais continuam em
-> expansão.
+> **Estado em 20/11/2026:** material próprio v2 de parede, piso e teto
+> integrado à prévia e à campanha, com seed independente das salas nas pontas.
+> Captura técnica passou; falta aceite em partida.
 >
 > Complementa `architecture.md`. Valores de balanceamento permanecem ajustáveis por playtest.
 
@@ -57,8 +57,8 @@ mostram a geometria atual em FOV 60 e 100, ULTRA e POTATO. O teste visual
 jogando está pendente.
 
 A [proposta v2 de material próprio](../visual/proposals/industrial_corridor_dedicated_material_v2/README.md)
-substitui a v1 após o pedido por uma textura realmente nova. Ela trata a
-dependência atual do material do cômodo de origem e aguarda decisão visual.
+foi implementada para playtest. O corredor mantém a mesma aparência nos dois
+sentidos e não herda a textura de qualquer cômodo adjacente.
 
 `generateIndustrialRoomMaterials(roomSeed)` seleciona deterministicamente
 `Maintained`, `Used` ou `Worn` e deriva sub-receitas independentes para:
@@ -68,16 +68,38 @@ dependência atual do material do cômodo de origem e aguarda decisão visual.
   juntas recuadas, fixadores, desgaste localizado e sinalização âmbar/preta
   somente na base. Os mapas compartilhados de albedo, normal e propriedades
   têm 1024×1024 px para cada condição;
-- **Floor:** BareSteel, grade 2/4 × 4, detalhes antiderrapantes, bordas mais
-  escuras e centro de tráfego discretamente polido;
+- **Floor:** a receita BareSteel original continua disponível no gerador
+  procedural. As salas Industrial da campanha agora usam placas largas de aço
+  grafite com juntas deslocadas, normal e mapa de propriedades em 256×256 px.
+  Essa revisão remove a repetição miúda do piso anterior e aguarda aceite
+  visual em partida; o corredor mantém seu piso exclusivo;
 - **Ceiling:** Aluminum, grade 2 × 2–4 e sequência regular de luminárias lineares
   com intensidade emissiva própria.
 
 Wear/dirt vêm da condição global, mas cada canal usa sua própria stream. O
 conjunto e cada receita possuem hashes canônicos usados pelo cache. A sala
-inicial e as salas com tema Industrial ou Office usam este perfil no jogo.
+inicial e as salas com tema Industrial usam este perfil no jogo. Office agora
+tem paleta própria de aço neutro com acentos ciano.
 A descrição das oito paredes e o formato para enviar novas referências estão
 em [walls_current_reference.md](walls_current_reference.md).
+
+### Gabaritos da campanha (25/11/2026)
+
+A campanha usa os dois tamanhos pedidos. Corredores comuns e ramificações
+continuam em **1,2 × 2,2 m**. Uma transferência da rota principal por andar,
+preferindo ligação com Hub ou Arena e depois a aproximação do Boss, tenta o
+gabarito **2,4 × 2,8 m**. O gerador amplia as duas portas da aresta junto com o
+corredor. Se o trajeto largo interceptar uma sala, exceder o comprimento
+permitido ou invadir a arquitetura dos cômodos, essa ligação volta ao tamanho
+estreito e o gerador tenta a próxima ligação elegível. Em mapas apertados,
+todos os trechos podem permanecer estreitos para preservar a rota válida.
+Bibliotecas de módulos
+fornecidas por testes ou ferramentas conservam seus conectores originais.
+
+O trecho largo usa um pequeno afastamento adicional entre a porta e o primeiro
+segmento interno; sem isso, a faixa de 2,4 m falsamente intercepta a própria
+sala durante a validação. A posição das salas e a regra de abertura das portas
+continuam determinadas pelos módulos e pelo gameplay.
 
 ## Validação visual
 

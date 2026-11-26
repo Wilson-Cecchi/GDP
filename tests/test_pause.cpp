@@ -28,23 +28,17 @@ void testPauseNavigation()
     expect(state.selection == PauseMenuOption::RestartRun,
         "down navigation selects Restart Run");
     movePauseSelection(state, 20);
-    expect(state.selection == PauseMenuOption::Settings,
+    expect(state.selection == PauseMenuOption::MainMenu,
         "navigation magnitude is normalized to one deterministic step");
     movePauseSelection(state, 1);
-    expect(state.selection == PauseMenuOption::Controls,
-        "down navigation selects Controls after Settings");
-    movePauseSelection(state, 1);
-    expect(state.selection == PauseMenuOption::MainMenu,
-        "down navigation selects Main Menu after Controls");
-    movePauseSelection(state, 1);
-    expect(state.selection == PauseMenuOption::ExitGame,
-        "down navigation selects Exit Game after Main Menu");
+    expect(state.selection == PauseMenuOption::Settings,
+        "down navigation selects Configuration after Main Menu");
     movePauseSelection(state, 1);
     expect(state.selection == PauseMenuOption::Resume,
-        "down navigation wraps from Exit Game to Resume");
+        "down navigation wraps from Configuration to Resume");
     movePauseSelection(state, -1);
-    expect(state.selection == PauseMenuOption::ExitGame,
-        "up navigation wraps from Resume to Exit Game");
+    expect(state.selection == PauseMenuOption::Settings,
+        "up navigation wraps from Resume to Configuration");
 }
 
 void testPauseCommands()
@@ -62,21 +56,13 @@ void testPauseCommands()
             && state.paused,
         "Restart Run is reported without mutating external run ownership");
     movePauseSelection(state, 1);
-    expect(activatePauseSelection(state) == PauseMenuCommand::Settings
-            && state.paused,
-        "Settings is reported without mutating pause ownership");
-    movePauseSelection(state, 1);
-    expect(activatePauseSelection(state) == PauseMenuCommand::Controls
-            && state.paused,
-        "Controls leaves the run paused");
-    movePauseSelection(state, 1);
     expect(activatePauseSelection(state) == PauseMenuCommand::MainMenu
             && state.paused,
-        "Main Menu is reported without mutating external run ownership");
+        "Main Menu is reported without mutating pause ownership");
     movePauseSelection(state, 1);
-    expect(activatePauseSelection(state) == PauseMenuCommand::ExitGame
+    expect(activatePauseSelection(state) == PauseMenuCommand::Settings
             && state.paused,
-        "Exit Game is reported without hiding the menu before shutdown");
+        "Configuration leaves the run paused");
     closePauseMenu(state);
     expect(state == PauseMenuState{},
         "explicit close restores the default pause state");
@@ -86,7 +72,7 @@ void testDirectPauseSelection()
 {
     using namespace gdp::gameplay;
     PauseMenuState state;
-    selectPauseMenuOption(state, PauseMenuOption::ExitGame);
+    selectPauseMenuOption(state, PauseMenuOption::Count);
     expect(state.selection == PauseMenuOption::Resume,
         "pointer selection is ignored while the pause menu is inactive");
 
@@ -94,18 +80,12 @@ void testDirectPauseSelection()
     selectPauseMenuOption(state, PauseMenuOption::RestartRun);
     expect(state.selection == PauseMenuOption::RestartRun,
         "pointer selection can target Restart Run directly");
-    selectPauseMenuOption(state, PauseMenuOption::Settings);
-    expect(state.selection == PauseMenuOption::Settings,
-        "pointer selection can target Settings directly");
-    selectPauseMenuOption(state, PauseMenuOption::Controls);
-    expect(state.selection == PauseMenuOption::Controls,
-        "pointer selection can target Controls directly");
     selectPauseMenuOption(state, PauseMenuOption::MainMenu);
     expect(state.selection == PauseMenuOption::MainMenu,
         "pointer selection can target Main Menu directly");
-    selectPauseMenuOption(state, PauseMenuOption::ExitGame);
-    expect(state.selection == PauseMenuOption::ExitGame,
-        "pointer selection can target Exit Game directly");
+    selectPauseMenuOption(state, PauseMenuOption::Settings);
+    expect(state.selection == PauseMenuOption::Settings,
+        "pointer selection can target Configuration directly");
     selectPauseMenuOption(state, PauseMenuOption::Resume);
     expect(state.selection == PauseMenuOption::Resume,
         "pointer selection can return to Resume directly");

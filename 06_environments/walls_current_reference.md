@@ -1,23 +1,27 @@
 # Paredes atuais — referência para novas texturas
 
-> Estado do jogo em 27/10/2026. Este inventário descreve o que o código usa
+> Revisado em 22/11/2026. Este inventário descreve o que o código usa
 > hoje; não fixa as cores nem os desenhos de uma futura revisão visual.
-> A parede Industrial Corridor v2 HD foi aceita em jogo. As outras sete
-> famílias são perfis técnicos implementados, ainda sem aprovação de arte final
-> no [registro visual](../visual/TEXTURE_APPROVALS.md).
+> A parede Industrial Corridor v2 HD foi aceita em jogo. O estado de aprovação
+> das demais variantes está no [registro visual](../visual/TEXTURE_APPROVALS.md)
+> e no [plano de salas](room_shape_plan.md). Todas seguem o
+> [padrão visual compartilhado](room_art_standard.md).
 
 ## Onde cada parede aparece
 
 O jogo prepara e guarda um conjunto de materiais por sala, usando a seed da
 sala. O papel da sala tem prioridade sobre o tema: **Hub** usa Central Hub;
-**Arena** e **Boss** usam Combat Room. Nas demais salas, o tema seleciona
+**Boss** e a Arena com galerias usam Combat Room. As arenas compactas de
+Manutenção e Segurança usam seus temas. Nas demais salas, o tema seleciona
 Storage, Laboratory, Maintenance/Technical, Security, Cafeteria ou Industrial.
-O tema **Office** também usa Industrial; ainda não possui uma parede própria.
+O tema **Office** usa painéis largos e recuados próprios, com acabamento de aço
+neutro e acentos ciano. A aprovação visual desse acabamento depende do playtest.
 Portas são aberturas na geometria da parede e têm material separado.
 
 Essa seleção está em [`Application.cpp`](../src/game/Application.cpp) na função
 `prepareRoomMaterials`. O renderer usa a chave de material da sala ao desenhar
-paredes e corredores em [`GdpRenderer.cpp`](../src/game/visual/GdpRenderer.cpp).
+paredes em [`GdpRenderer.cpp`](../src/game/visual/GdpRenderer.cpp). Os corredores
+agora têm chave e material próprios.
 Por isso, as frases antigas que limitavam estes perfis à sala inicial foram
 removidas dos documentos individuais.
 
@@ -25,7 +29,9 @@ removidas dos documentos individuais.
 
 | Ambiente | Parede que existe hoje | Variação por seed | Situação visual |
 | --- | --- | --- | --- |
-| [Industrial Corridor](industrial_corridor.md) | Aço pintado cinza frio, painéis grandes 2×2 com molduras chanfradas, juntas escuras recuadas, fixadores, nervuras discretas, riscos e desgaste concentrado nas bordas e na base. Faixa âmbar/preta somente no rodapé. | `Maintained`, `Used`, `Worn`: da tinta mais íntegra ao desgaste mais forte, sem cobrir toda a parede de ferrugem. | **v2 HD aceita em jogo**; a sala inicial e salas Industrial/Office usam o perfil. |
+| Salas Industrial 101, 102, 103 e 105 | Aço grafite neutro, painéis grandes 2×2 com molduras chanfradas, juntas escuras recuadas, fixadores e desgaste concentrado nas bordas e na base. Faixa âmbar/preta somente no rodapé. Armários, colunas e dutos em aço neutro combinam com a parede. | `Maintained`, `Used`, `Worn`: da tinta mais íntegra ao desgaste mais forte. | **v3 aprovada como direção e implementada; aceite em partida pendente**. |
+| [Industrial Corridor](industrial_corridor.md) | Aço pintado cinza frio com painéis próprios e detalhes de corredor. | Variação própria por seed. | **v2 HD aceita em jogo**; material separado das salas Industrial. |
+| Office | Cassetes largos de aço neutro, moldura recuada, parafusos espaçados, faixa técnica inferior e acento ciano. Painéis do piso deslocados entre fileiras e teto com canal de serviço. | Condição derivada da seed; desgaste localizado. | Implementado em mapas de albedo, normal e propriedades de 256 × 256 px; aguardando aprovação em partida. |
 | [Storage](storage.md) | Aço pintado amarronzado, 2–3 × 2 placas grandes, uma possível placa substituída, oxidação localizada nas juntas e na base, riscos baixos e marcação logística curta. | `Orderly`, `Dusty`, `Neglected`. | Perfil técnico em uso; arte final não revisada. |
 | [Combat Room](combat_room.md) | Aço pintado verde oliva, 1–4 × 2 placas grandes, molduras reforçadas, sinalização amarela curta e 1–3 impactos localizados. Também é a parede das salas Boss. | `Ready`, `Active`, `Scarred`. | Perfil técnico em uso; arte final não revisada. |
 | [Cafeteria](cafeteria.md) | Painéis cerâmicos claros em grade de 2–4 × 2, uma faixa vermelha contínua e controlada, com desgaste discreto de uso. | `Clean`, `InUse`, `Faded`. | Perfil técnico em uso; arte final não revisada. |
@@ -34,12 +40,14 @@ removidas dos documentos individuais.
 | [Security](security.md) | Aço pintado em 2–6 × 2 módulos organizados, com um console de tela abstrata, quatro indicadores agrupados e cabo saindo de baixo. O vermelho fica dentro do console no estado de alerta. | `Secured`, `Monitored`, `Alert`. | Perfil técnico em uso; arte final não revisada. |
 | [Central Hub](central_hub.md) | Aço pintado com 1–3 divisões amplas, uma coluna arquitetônica e uma única placa ciano compacta. Sem faixa amarelo/preto decorativa. | `Open`, `Active`, `Rerouted`, com eixo de circulação horizontal, vertical ou cruzado. | Perfil técnico em uso; arte final não revisada. |
 
-O material Industrial v2 HD usa mapas compartilhados de **albedo, normal e
+O material Industrial v3 das salas usa mapas compartilhados de **albedo, normal e
 propriedades (rugosidade, metalicidade e oclusão ambiente)**, cada um com
-1024×1024 px, repetidos conforme o tamanho da parede. As outras sete paredes
-ainda são geradas como **albedo procedural de 64×64 px**. Essa diferença é do
-renderizador atual; uma proposta nova pode ser HD mesmo para uma dessas sete
-salas, mas sua integração exigirá adaptar o material no jogo.
+1024×1024 px, repetidos conforme o tamanho da parede. O corredor mantém seu material v2 separado. Office gera albedo,
+normal e propriedades de 256×256 px. As demais famílias combinam imagens
+aprovadas de sala, mapas detalhados onde disponíveis e receitas procedurais
+para variação por seed. A antiga descrição de todas elas como albedo 64×64
+não representa mais o renderer atual. O padrão de arte exige escala física
+coerente mesmo quando resolução e técnica de material forem diferentes.
 
 ## Como criar um exemplo para me enviar
 

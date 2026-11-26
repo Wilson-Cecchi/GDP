@@ -16,9 +16,12 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
 {
     switch (role) {
     case RoomRole::Start:
-    case RoomRole::Hub:
     case RoomRole::Secret:
         return 1U;
+    case RoomRole::Hub:
+        // The central landmark has authored decoration. A generic crate or
+        // barricade here obscures its routes without adding useful cover.
+        return 0U;
     case RoomRole::Normal:
         return 2U + std::min(depth / 3U, 1U);
     case RoomRole::Terminal:
@@ -32,6 +35,23 @@ std::uint32_t baseBudget(const RoomRole role, const std::uint32_t depth) noexcep
         return 0U;
     }
     return 0U;
+}
+
+std::uint32_t roomPropLimit(const RoomRole role, const RoomTheme theme) noexcept
+{
+    // Furnished rooms already have authored cover and breakables. Keep loose
+    // props as an accent instead of filling the narrow free spawn pocket.
+    if (role == RoomRole::Hub) {
+        return 0U;
+    }
+    if (role == RoomRole::Arena || role == RoomRole::Boss) {
+        return 2U;
+    }
+    if (role == RoomRole::Normal || role == RoomRole::Terminal
+        || role == RoomRole::DeadEnd) {
+        return theme == RoomTheme::Industrial ? 2U : 1U;
+    }
+    return 1U;
 }
 
 gdp::entities::PropType selectType(
@@ -70,6 +90,12 @@ wkc::core::Vec3 scaleFor(const gdp::entities::PropType type) noexcept
         return {0.78F, 0.72F, 0.78F};
     case PropType::StorageBox:
         return {0.40F, 0.44F, 0.72F};
+    case PropType::LaboratoryPlanter:
+        return {0.44F, 0.42F, 0.44F};
+    case PropType::SecurityMonitor:
+        return {1.2F, 0.8F, 0.3F};
+    case PropType::CafeteriaPlanter:
+        return {0.70F, 0.68F, 0.70F};
     case PropType::Canister:
         return {0.46F, 1.02F, 0.46F};
     case PropType::Barricade:
@@ -92,6 +118,12 @@ float healthFor(const gdp::entities::PropType type) noexcept
         return 60.0F;
     case PropType::StorageBox:
         return 35.0F;
+    case PropType::LaboratoryPlanter:
+        return 2.0F;
+    case PropType::SecurityMonitor:
+        return 24.0F;
+    case PropType::CafeteriaPlanter:
+        return 2.0F;
     case PropType::Canister:
         return 35.0F;
     case PropType::Barricade:
@@ -228,9 +260,9 @@ PropLayout generatePropLayout(
     layout.depth = depth;
     const float safeDifficulty = std::clamp(difficulty, 0.5F, 2.0F);
     const std::uint32_t rawBudget = baseBudget(role, depth);
-    layout.budget = rawBudget == 0U ? 0U : std::clamp(
+    layout.budget = rawBudget == 0U ? 0U : std::min(roomPropLimit(role, theme), std::clamp(
         static_cast<std::uint32_t>(std::lround(
-            static_cast<float>(rawBudget) / safeDifficulty)), 1U, 3U);
+            static_cast<float>(rawBudget) / safeDifficulty)), 1U, 3U));
     if (layout.budget == 0U || propZones.empty()) {
         layout.layoutHash = propLayoutHash(layout);
         return layout;

@@ -253,6 +253,28 @@ RoomModule makeCombatGalleryArenaModule()
     return module;
 }
 
+RoomModule makeSecurityHallModule()
+{
+    RoomModule module = makeRectangularModule(
+        securityHallModuleId, "SecurityHall_01", RoomTheme::Security,
+        RoomSizeClass::Large, {18, 6, 18},
+        roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal));
+    module.localBounds = {{-9.0F, 0.0F, -9.0F}, {9.0F, 6.0F, 9.0F}};
+    module.connectors[0].position.z = 9.0F;
+    module.connectors[1].position.z = -9.0F;
+    module.connectors[2].position.x = 9.0F;
+    module.connectors[3].position.x = -9.0F;
+    // Keep the encounter and drops between the fixed consoles, covers and
+    // corner planters, including when this room hosts the Terminal event.
+    module.enemyZones = {{{{-1.4F, 0.0F, -1.5F},
+        {1.4F, 0.0F, 1.5F}}}};
+    module.propZones = {{{{2.5F, 0.0F, -1.2F},
+        {7.5F, 0.0F, 1.2F}}}};
+    module.lootZones = {{{{-4.0F, 0.0F, -0.8F},
+        {-3.0F, 0.0F, 0.8F}}}};
+    return module;
+}
+
 RoomModule makeSecurityTModule()
 {
     RoomModule module = makeRectangularModule(
@@ -593,9 +615,7 @@ std::vector<RoomModule> makeDefaultRoomModuleLibrary()
         makeRectangularModule(603, "SecurityArena_01", RoomTheme::Security,
             RoomSizeClass::Large, {13, 5, 12}, roomRoleBit(RoomRole::Arena)),
         makeBossArenaModule(604, "SecurityBoss_01", RoomTheme::Security),
-        makeRectangularModule(605, "SecurityHall_01", RoomTheme::Security,
-            RoomSizeClass::Large, {18, 6, 18},
-            roomRoleBit(RoomRole::Normal) | roomRoleBit(RoomRole::Terminal)),
+        makeSecurityHallModule(),
         makeSecurityTModule(),
 
         makeRectangularModule(701, "CafeteriaCompact_01", RoomTheme::Cafeteria,
